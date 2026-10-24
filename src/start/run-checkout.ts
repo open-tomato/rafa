@@ -20,6 +20,16 @@
  *    No offer is made and nothing is asked, since the flag is the answer,
  *    and the main checkout is never switched.
  *
+ *    Once the worktree is there, added or reused, the command
+ *    `loop.worktreeSetup` names runs in it ({@link runWorktreeSetup},
+ *    `./worktree-setup.ts`), with the worktree as its `cwd` and the
+ *    run's environment, before the settled checkout is answered: so
+ *    before the branch guard, the preflight, the suite baseline and
+ *    every session, all of which come after the settling. A null key,
+ *    the default, runs nothing, and without the flag nothing runs
+ *    whatever the key holds. A command that fails or reaches its limit
+ *    refuses the run, and the worktree is left where it is for a rerun.
+ *
  * The project root is the same on both routes: the one the dispatcher
  * resolved, holding `.rafa/`. So a worktree run still reads its config,
  * plan and tracker there, writes its session record and its store rows
@@ -68,11 +78,13 @@
  * and the settled branch is null.
  *
  * Every refusal on the way — a checkout git could not read, a branch
- * offer that could not be taken, a worktree git would not add — is the
+ * offer that could not be taken, a worktree git would not add, a setup
+ * command that failed — is the
  * `CommandExit` the module it comes from throws, passed through as is.
  */
 import type { RunDirs } from './checkout.js';
 import type { RunBranchRequest } from './run-setup.js';
+import type { WorktreeSetupRequest } from './worktree-setup.js';
 import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
@@ -83,6 +95,7 @@ import { resolveBaseBranch } from '../cleanup/index.js';
 
 import { resolveRunDirs } from './checkout.js';
 import { AS_WORKTREE_FLAG, resolveRunBranch } from './run-setup.js';
+import { runWorktreeSetup } from './worktree-setup.js';
 import { addRunWorktree } from './worktree.js';
 
 /** What the run settles its checkout from. */
@@ -91,6 +104,11 @@ export interface RunCheckoutRequest {
   readonly projectRoot: string;
   /** `loop.worktreeDir` as the config holds it, read under `--as-worktree` only. */
   readonly worktreeDir: string;
+  /**
+   * `loop.worktreeSetup` as the config holds it, null when unset: the
+   * command run in the worktree under `--as-worktree` only.
+   */
+  readonly worktreeSetup: string | null;
   /**
    * `pr.base` as the config holds it, null when unset, read under
    * `--as-worktree` and for a run started on a detached HEAD.
@@ -140,6 +158,11 @@ export interface RunCheckoutSeams {
   readonly offer?: (request: RunBranchRequest) => Promise<string | null>;
   /** The worktree `--as-worktree` adds. `addRunWorktree` when absent. */
   readonly worktree?: (request: WorktreeRequest) => WorktreeOutcome;
+  /**
+   * The setup run in that worktree when `loop.worktreeSetup` is set.
+   * `runWorktreeSetup` when absent.
+   */
+  readonly setup?: (request: WorktreeSetupRequest) => Promise<void>;
 }
 
 /** Where the base is read from when `pr.base` is unset, as the base line names it. */
@@ -170,7 +193,8 @@ function baseLine(base: string, prBase: string | null, startedOn: string | null)
  * Settles where the run works: the checkout it was started in and the
  * branch it stands on or was offered, null when it stands on none and
  * took no offer, or, under `--as-worktree`, the worktree added for the
- * plan's branch, cut from the run's base, and that branch. The project
+ * plan's branch, cut from the run's base, and that branch, once the
+ * `loop.worktreeSetup` command, when set, has run in it. The project
  * root is `request.projectRoot` either way. See the module note.
  */
 export async function settleRunCheckout(
@@ -207,5 +231,12 @@ export async function settleRunCheckout(
     base,
     branchTemplate: request.branchTemplate,
   });
+  if (request.worktreeSetup !== null) {
+    await (seams.setup ?? runWorktreeSetup)({
+      command: request.worktreeSetup,
+      worktree: worktree.path,
+      env: process.env,
+    });
+  }
   return Object.freeze({ projectRoot, checkout: worktree.path, branch: worktree.branch });
 }

@@ -647,7 +647,10 @@ New; it replaces no earlier text. What a row or an action added to
   "The worktree's base is `<base>`, read from `pr.base`, or from `origin/HEAD`
   (the default when it names none), not `<branch>`, which the run was started
   on", with "a detached HEAD" in place of the branch. A detached HEAD is not
-  refused on this route.
+  refused on this route. Once the worktree is added or reused, the command
+  `loop.worktreeSetup` names runs in it before the checkout is answered, and a
+  command that fails refuses the run (`start/worktree-setup.ts`; the rules are
+  in `context/workflow.md`).
 - **`start/worktree-upstream.ts` sets the upstream as a step of its own**:
   `git branch --set-upstream-to=origin/<branch> <branch>`, run in the project
   root after a `switch-remote` add. The add writes nothing to the `.git/config`
@@ -875,8 +878,9 @@ New; it replaces no earlier text. What a row or an action added to
 - **Where a wrapped command writes**: through the active output, in every module
   it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
-  `start/pause.ts`, `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
-  `start/wrap-up.ts`, `start/wrap-up-run.ts`, `start/follow-ups.ts`,
+  `start/pause.ts`, `start/preflight.ts`, `preflight/run.ts`,
+  `start/worktree-setup.ts`, `start/commit.ts`, `start/wrap-up.ts`,
+  `start/wrap-up-run.ts`, `start/follow-ups.ts`,
   `start/convention-body.ts`, `start/dispatch.ts`, `start/triage.ts`,
   `start/release-stage.ts`, `start/retry-budget.ts`, `start/continue-run.ts`,
   `start/forced-draft.ts`, `adapters/tracker/resolve.ts`,

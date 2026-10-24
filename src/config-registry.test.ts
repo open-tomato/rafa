@@ -141,6 +141,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['allowList', 'allowList'],
   ['settingSources', 'loop.settingSources'],
   ['loopWorktreeDir', 'loop.worktreeDir'],
+  ['loopWorktreeSetup', 'loop.worktreeSetup'],
   ['loopRetries', 'loop.retries'],
   ['loopRetriesOnContinue', 'loop.retriesOnContinue'],
   ['loopContinueCriteria', 'loop.continue.criteria'],
@@ -676,7 +677,7 @@ describe('knownKeysAbove', () => {
     ]);
     expect(knownKeysAbove('loop.worktreeDirs')).toEqual([
       'loop',
-      ['settingSources', 'worktreeDir', 'retries', 'retriesOnContinue', 'continue', 'forceWrapUp', 'wrapUp'],
+      ['settingSources', 'worktreeDir', 'worktreeSetup', 'retries', 'retriesOnContinue', 'continue', 'forceWrapUp', 'wrapUp'],
     ]);
     expect(knownKeysAbove('loop.continue.mode')).toEqual(['loop.continue', ['criteria', 'criteriaMode']]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);

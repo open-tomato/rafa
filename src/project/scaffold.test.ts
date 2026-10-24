@@ -130,6 +130,7 @@ function created(path: string, kind: ScopeWriteKind): ScopeWrite {
 const VALUELESS: readonly (readonly [string, string])[] = [
   ['hubUrl', 'default'],
   ['hubTokenSecret', 'default'],
+  ['loopWorktreeSetup', 'default'],
   ['prProvider', 'default'],
   ['prBase', 'default'],
   ['boardProjectNumber', 'default'],
@@ -328,7 +329,7 @@ describe('the config files', () => {
     ]).toEqual(['default', 'default', 'default']);
   });
 
-  it('carries the loop section, worktreeDir at .rafa/worktrees, retries at false, the --continue keys at their defaults and wrapUp.retries at 1, which resolve from the file once uncommented', () => {
+  it('carries the loop section, worktreeDir at .rafa/worktrees, worktreeSetup unset, retries at false, the --continue keys at their defaults and wrapUp.retries at 1, which resolve from the file once uncommented', () => {
     const loop = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# loop:'),
       CONFIG_SETTINGS_LINES.indexOf('# pr:'),
@@ -339,6 +340,7 @@ describe('the config files', () => {
       '# loop:',
       '#   settingSources: project,local',
       `#   worktreeDir: ${join('.rafa', 'worktrees')}`,
+      '#   worktreeSetup:',
       '#   retries: false',
       '#   retriesOnContinue: 1',
       '#   continue:',
@@ -350,6 +352,7 @@ describe('the config files', () => {
       '#     retries: 1',
     ]);
     expect([resolved.config.loopWorktreeDir, resolved.sources.loopWorktreeDir]).toEqual([join('.rafa', 'worktrees'), 'file']);
+    expect([resolved.config.loopWorktreeSetup, resolved.sources.loopWorktreeSetup]).toEqual([null, 'default']);
     expect([resolved.config.loopRetries, resolved.sources.loopRetries]).toEqual([false, 'file']);
     expect([resolved.config.loopRetriesOnContinue, resolved.sources.loopRetriesOnContinue]).toEqual([1, 'file']);
     expect([resolved.config.loopContinueCriteria, resolved.sources.loopContinueCriteria]).toEqual([join('.rafa', 'continue-criteria.md'), 'file']);

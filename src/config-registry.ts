@@ -176,7 +176,7 @@ export function handConfigToLogger(config: Readonly<RafaConfig>): void {
 /** Core's settings up to `effort.sync`, before the `hub` section. */
 const CORE_HEAD = ['version', 'store', 'effortBusyTimeoutMs', 'effortSync'] as const;
 
-/** Core's settings from `plan.inject` to `loop.worktreeDir`, before the `loop` sections and `pr`. */
+/** Core's settings from `plan.inject` to `loop.worktreeSetup`, before the `loop` sections and `pr`. */
 const CORE_PLAN_TO_LOOP = [
   'inject',
   'planDir',
@@ -197,6 +197,7 @@ const CORE_PLAN_TO_LOOP = [
   'allowList',
   'settingSources',
   'loopWorktreeDir',
+  'loopWorktreeSetup',
 ] as const;
 
 /** Core's `board` settings, before the `board.project` limits. */

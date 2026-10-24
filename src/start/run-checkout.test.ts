@@ -23,7 +23,14 @@
  * there hand it a git that answers every command with a failure and no
  * terminal, so nothing is spawned and nothing is asked.
  *
- * The second block runs the function against a real repository under
+ * The `loop.worktreeSetup` block drives the same stubs, with a `setup`
+ * seam that records the request it was handed: on the added route and
+ * on the `reuse` route a set key reaches it once, the worktree as `cwd`.
+ * The cases that must not reach it, a null key under the flag and a set
+ * key without it, hand a `setup` that throws, beside the recording ones.
+ * A refused setup is passed through as thrown, and no checkout answered.
+ *
+ * The block against a real repository runs the function under
  * the temporary directory — a bare remote and its clone — with only the
  * started directory handed in, so the worktree it answers is proven to
  * be a working tree git itself reports on the plan's branch, and the
@@ -38,6 +45,7 @@
 import type { BranchSeams } from './branch.js';
 import type { RunCheckoutSeams } from './run-checkout.js';
 import type { RunBranchRequest } from './run-setup.js';
+import type { WorktreeSetupRequest } from './worktree-setup.js';
 import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
 
 import { execFileSync } from 'node:child_process';
@@ -76,6 +84,7 @@ interface Calls {
   readonly baseReads: { readonly projectRoot: string; readonly prBase: string | null }[];
   readonly offers: RunBranchRequest[];
   readonly worktrees: WorktreeRequest[];
+  readonly setups: WorktreeSetupRequest[];
 }
 
 /**
@@ -88,7 +97,7 @@ function stubbed(
   startedOn: string | null,
   base = 'main',
 ): { readonly seams: RunCheckoutSeams; readonly calls: Calls } {
-  const calls: Calls = { startedReads: [], baseReads: [], offers: [], worktrees: [] };
+  const calls: Calls = { startedReads: [], baseReads: [], offers: [], worktrees: [], setups: [] };
   const seams: RunCheckoutSeams = {
     dirs: (projectRoot) => ({ projectRoot, checkout: started }),
     checkedOutBranch: (dir) => {
@@ -107,13 +116,24 @@ function stubbed(
       calls.worktrees.push(request);
       return { branch: OFFERED, path: WORKTREE, route: 'create', steps: [] };
     },
+    setup: (request) => {
+      calls.setups.push(request);
+      return Promise.resolve();
+    },
   };
   return { seams, calls };
 }
 
 /** The request every stubbed case varies. */
 function request(args: readonly string[]): Parameters<typeof settleRunCheckout>[0] {
-  return { projectRoot: ROOT, worktreeDir: CONFIG_DEFAULTS.loopWorktreeDir, prBase: null, planStub: STUB, args };
+  return {
+    projectRoot: ROOT,
+    worktreeDir: CONFIG_DEFAULTS.loopWorktreeDir,
+    worktreeSetup: CONFIG_DEFAULTS.loopWorktreeSetup,
+    prBase: null,
+    planStub: STUB,
+    args,
+  };
 }
 
 /** Sets an output that keeps every info and warning line, and answers the two lists. */
@@ -356,6 +376,90 @@ describe('settleRunCheckout under --as-worktree', () => {
   });
 });
 
+describe('settleRunCheckout and loop.worktreeSetup', () => {
+  /** A setup command as a project might name it, with a quote and a redirect the shell reads. */
+  const COMMAND = 'bun install --frozen-lockfile && echo "set up" >> setup-marker.txt';
+
+  /** {@link stubbed}'s seams with a `setup` that throws when reached, for the cases that must not reach it. */
+  function unreachable(): { readonly seams: RunCheckoutSeams; readonly calls: Calls } {
+    const { seams, calls } = stubbed(ROOT, 'main');
+    return {
+      seams: {
+        ...seams,
+        setup: () => {
+          throw new Error('the setup was reached');
+        },
+      },
+      calls,
+    };
+  }
+
+  it('reaches no setup under --as-worktree when the key is null, the default', async () => {
+    const { seams, calls } = unreachable();
+    const settled = await settleRunCheckout(request(['--as-worktree']), seams);
+
+    expect(CONFIG_DEFAULTS.loopWorktreeSetup).toBeNull();
+    expect(settled).toEqual({ projectRoot: ROOT, checkout: WORKTREE, branch: OFFERED });
+    expect(calls.worktrees).toHaveLength(1);
+  });
+
+  it('reaches the setup once on an added worktree, with the worktree as cwd and the command as written', async () => {
+    const { seams, calls } = stubbed(ROOT, 'main');
+    const settled = await settleRunCheckout({ ...request(['--as-worktree']), worktreeSetup: COMMAND }, seams);
+
+    expect(settled.checkout).toBe(WORKTREE);
+    expect(calls.setups).toEqual([{ command: COMMAND, worktree: WORKTREE, env: process.env }]);
+  });
+
+  it('reaches the setup once on a reused worktree, with the worktree as cwd and the command as written', async () => {
+    const reused = join(ROOT, '..', 'rafa-loops', STUB);
+    const { seams, calls } = stubbed(ROOT, 'main');
+    const reusing: RunCheckoutSeams = {
+      ...seams,
+      worktree: (asked): WorktreeOutcome => {
+        calls.worktrees.push(asked);
+        return { branch: OFFERED, path: reused, route: 'reuse', steps: [] };
+      },
+    };
+    const settled = await settleRunCheckout({ ...request(['--as-worktree']), worktreeSetup: COMMAND }, reusing);
+
+    expect(settled.checkout).toBe(reused);
+    expect(calls.worktrees).toHaveLength(1);
+    expect(calls.setups).toEqual([{ command: COMMAND, worktree: reused, env: process.env }]);
+  });
+
+  it('passes a refused setup through as it was thrown, answering no checkout', async () => {
+    const refusal = new CommandExit(1, 'loop.worktreeSetup `false` in /nonesuch exited 1.');
+    const { seams, calls } = stubbed(ROOT, 'main');
+    const refusing: RunCheckoutSeams = {
+      ...seams,
+      setup: (asked) => {
+        calls.setups.push(asked);
+        return Promise.reject(refusal);
+      },
+    };
+    let settled: unknown;
+    const settling = settleRunCheckout({ ...request(['--as-worktree']), worktreeSetup: 'false' }, refusing)
+      .then((answered) => {
+        settled = answered;
+      });
+
+    await expect(settling).rejects.toBe(refusal);
+    expect(settled).toBeUndefined();
+    expect(calls.worktrees).toHaveLength(1);
+    expect(calls.setups).toHaveLength(1);
+  });
+
+  it('reaches no setup without --as-worktree, whatever the key holds', async () => {
+    const { seams, calls } = unreachable();
+    const settled = await settleRunCheckout({ ...request(['--any-branch']), worktreeSetup: COMMAND }, seams);
+
+    expect(settled).toEqual({ projectRoot: ROOT, checkout: ROOT, branch: OFFERED });
+    expect(calls.worktrees).toEqual([]);
+    expect(calls.offers).toHaveLength(1);
+  });
+});
+
 describe('settleRunCheckout against a real repository', () => {
   let scratch = '';
   let project = '';
@@ -391,6 +495,7 @@ describe('settleRunCheckout against a real repository', () => {
     const settled = await settleRunCheckout({
       projectRoot: project,
       worktreeDir: CONFIG_DEFAULTS.loopWorktreeDir,
+      worktreeSetup: null,
       prBase: null,
       planStub: 'plain',
       args: ['--any-branch'],
@@ -404,6 +509,7 @@ describe('settleRunCheckout against a real repository', () => {
     const settled = await settleRunCheckout({
       projectRoot: project,
       worktreeDir: CONFIG_DEFAULTS.loopWorktreeDir,
+      worktreeSetup: null,
       prBase: null,
       planStub: 'real',
       args: ['--as-worktree'],
@@ -427,6 +533,7 @@ describe('settleRunCheckout against a real repository', () => {
   const settleDetached = (stub: string, args: readonly string[]): ReturnType<typeof settleRunCheckout> => settleRunCheckout({
     projectRoot: project,
     worktreeDir: CONFIG_DEFAULTS.loopWorktreeDir,
+    worktreeSetup: null,
     prBase: null,
     planStub: stub,
     args,
@@ -493,6 +600,7 @@ describe('settleRunCheckout against a real repository', () => {
       await settleRunCheckout({
         projectRoot: project,
         worktreeDir: CONFIG_DEFAULTS.loopWorktreeDir,
+        worktreeSetup: null,
         prBase: null,
         planStub: stub,
         args: ['--as-worktree'],
@@ -548,6 +656,7 @@ describe('settleRunCheckout against a real repository', () => {
     const settled = await settleRunCheckout({
       projectRoot: project,
       worktreeDir: '../rafa-loops',
+      worktreeSetup: null,
       prBase: null,
       planStub: 'beside',
       args: ['--as-worktree'],
