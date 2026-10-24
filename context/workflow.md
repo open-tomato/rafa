@@ -568,6 +568,28 @@ then read against `origin/<base>` as it stood; a failed merge is aborted and
 refuses the run. `--create-branch` without `--as-worktree` switches to an
 existing branch as it is, with no catch-up.
 
+**`loop.worktreeSetup` runs one command in the worktree before the first
+session.** Once `addRunWorktree` has added the plan's worktree or reused the
+one an earlier start left, the run runs the command the key names through
+`/bin/sh -c` with the worktree as its `cwd`. It runs after that step and
+before the branch guard, the preflight, the suite baseline and the first
+session (`src/start/run-checkout.ts`, `src/start/worktree-setup.ts`). It runs
+only under `--as-worktree`, never without the flag, and the default, `null`,
+runs nothing. Its stdin is closed, so a command that waits for input ends
+instead of holding the run. Its output is printed once it ends, stdout and
+then stderr, and a fixed limit of ten minutes kills its process group. A
+nonzero exit, or the limit, refuses the run: the first line names
+`loop.worktreeSetup`, the command, the worktree and how the command ended,
+and the last 20 lines of its output follow. The worktree stays where it is,
+so a rerun runs the command again. This repository sets
+`bun install --frozen-lockfile` in `rafa.config.ts`, because a worktree with
+no `node_modules/` resolves `@open-tomato/rafa` to its own `packages/rafa/`
+and the feature packages to the main checkout's, loads core twice, and a
+spawned `rafa` exits 1 with `no config section is registered` (#1345). Two
+edge cases: a cold cache that outlasts the ten-minute limit is killed, and
+the refusal names the limit; a reused worktree runs the command again, which
+`bun install --frozen-lockfile` makes a no-op once the packages are installed.
+
 **The loop guard halts the loop if the checkout's branch changes.** Every
 loop watches the checkout's branch and HEAD. If you switch branches in
 another terminal (or pull changes that move `main`), the guard compares
