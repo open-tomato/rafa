@@ -8,9 +8,15 @@
  * the remote with no local copy, what `git cherry` reads of each, and
  * the default build read side by side with it, so the option is shown
  * to add those three and move nothing else.
+ *
+ * Last, the fixture's clock: a build around a moment 400 days later,
+ * read with that same moment, reads as the default build reads with
+ * `SCRATCH_NOW`; read with `SCRATCH_NOW` instead, it reads nothing old.
  */
 import type { CleanupRead } from './index.js';
 import type { ScratchOptions, ScratchRepository } from './scratch-repository.js';
+
+import { statSync } from 'node:fs';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
@@ -185,14 +191,20 @@ interface ScratchGroups {
   readonly repo: ScratchRepository;
   readonly groups: unknown;
   readonly notes: readonly string[];
+  /** The whole reading the groups were projected from. */
+  readonly reading: CleanupRead;
 }
 
 /**
  * The five groups of a reading, as the names in each and the ticks, and
  * its notes apart: read with no provider, the remote-only set leaves a
  * note of its own, which is no part of what the five groups read.
+ *
+ * Read with the clock the repository was built around unless `clock`
+ * names another. Branches are projected to their names, since a
+ * branch's `lastCommit` moves with the build's clock.
  */
-async function groupsOf(options: ScratchOptions): Promise<ScratchGroups> {
+async function groupsOf(options: ScratchOptions, clock?: Date): Promise<ScratchGroups> {
   const repo = createScratchRepository(options);
   try {
     const reading = await readCleanup(defaultCleanupSeams(repo.clone, null), {
@@ -201,7 +213,7 @@ async function groupsOf(options: ScratchOptions): Promise<ScratchGroups> {
       keep: [],
       staleDays: 30,
       worktreeIdleDays: 0,
-      now: SCRATCH_NOW,
+      now: clock ?? repo.now,
       home: repo.home,
       cwd: repo.clone,
       projectRoot: repo.clone,
@@ -210,13 +222,13 @@ async function groupsOf(options: ScratchOptions): Promise<ScratchGroups> {
     if (!reading.ok) throw new Error(reading.detail);
     const groups = {
       base: reading.base,
-      merged: reading.merged.map((row) => [row.branch, row.ticked, row.reason]),
-      stale: reading.stale.map((row) => [row.branch, row.ticked, row.reason]),
-      notPushed: reading.notPushed.map((row) => [row.branch, row.ticked, row.commits]),
+      merged: reading.merged.map((row) => [row.branch.name, row.ticked, row.reason]),
+      stale: reading.stale.map((row) => [row.branch.name, row.ticked, row.reason]),
+      notPushed: reading.notPushed.map((row) => [row.branch.name, row.ticked, row.commits]),
       worktrees: reading.worktrees.map((row) => [row.branch, row.tickable, row.ticked]),
       counts: cleanupCounts(reading),
     };
-    return { repo, groups, notes: reading.notes };
+    return { repo, groups, notes: reading.notes, reading };
   } catch (error) {
     repo.dispose();
     throw error;
@@ -307,5 +319,61 @@ describe('the scratch repository with its remote-only option', () => {
     );
     expect(tips(plain.repo)).toHaveLength(DEFAULT_LOCAL_BRANCHES.length - 1);
     expect(tips(withSet.repo)).toEqual(tips(plain.repo));
+  });
+});
+
+/** How many days past `SCRATCH_NOW` the later build is built around. */
+const LATER_BUILD_DAYS = 400;
+
+describe('the scratch repository built around another moment', () => {
+  const later = new Date(SCRATCH_NOW.getTime() + LATER_BUILD_DAYS * 24 * 60 * 60 * 1000);
+  let fixed: ScratchGroups;
+  let moved: ScratchGroups;
+  let movedReadFixed: ScratchGroups;
+
+  beforeAll(async () => {
+    fixed = await groupsOf({});
+    moved = await groupsOf({ now: later });
+    movedReadFixed = await groupsOf({ now: later }, SCRATCH_NOW);
+  }, 30_000);
+
+  afterAll(() => {
+    fixed.repo.dispose();
+    moved.repo.dispose();
+    movedReadFixed.repo.dispose();
+  });
+
+  it('answers the moment it was built around, SCRATCH_NOW when none is given', () => {
+    expect(fixed.repo.now.getTime()).toBe(SCRATCH_NOW.getTime());
+    expect(moved.repo.now.getTime()).toBe(later.getTime());
+  });
+
+  it('dates its commits and its worktrees from that moment', () => {
+    const dateOf = (repo: ScratchRepository, ref: string): number => (
+      Number(repo.git(['log', '-1', '--format=%ct', ref]).trim()) * 1000
+    );
+    expect(dateOf(moved.repo, 'refs/heads/merged')).toBe(later.getTime());
+    expect(later.getTime() - dateOf(moved.repo, 'refs/heads/stale')).toBe(90 * 24 * 60 * 60 * 1000);
+    expect(dateOf(fixed.repo, 'refs/heads/merged')).toBe(SCRATCH_NOW.getTime());
+    // The idle rule at zero days reads an older worktree as it reads a current one; the times themselves do not.
+    for (const path of Object.values(moved.repo.worktrees)) {
+      expect(statSync(path).mtime.getTime()).toBe(later.getTime());
+    }
+  });
+
+  it('reads with its own clock as the default build reads with SCRATCH_NOW', () => {
+    expect(moved.groups).toEqual(fixed.groups);
+    expect(moved.notes).toEqual(fixed.notes);
+  });
+
+  it('reads no branch stale and every worktree recent when read with SCRATCH_NOW instead', () => {
+    // The control: a clock that is not the build's, the reading the fix keeps the spawned case from.
+    const recent = (groups: ScratchGroups): boolean[] => groups.reading.worktrees.map((row) => (
+      row.blockers.some((blocker) => blocker.kind === 'recent')
+    ));
+    expect(movedReadFixed.reading.stale).toEqual([]);
+    expect(recent(movedReadFixed)).toEqual([true, true, true]);
+    expect(fixed.reading.stale.map((row) => row.branch.name)).toEqual(['stale']);
+    expect(recent(fixed)).toEqual([false, false, false]);
   });
 });
