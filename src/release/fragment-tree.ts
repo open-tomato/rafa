@@ -7,14 +7,14 @@
  *
  * The settled state is the set of fragments in the tree, never a commit
  * trailer: settle deletes what it folds, so whatever is still under
- * `release.fragments` in the base branch's tree is waiting. A fragment
- * is a blob directly in that directory whose name is `<id>.md`, the id
+ * `release.fragments` in the base branch's tree is waiting. A fragment is
+ * a blob directly in that directory whose name is `<id>.md`, the id
  * matching {@link FRAGMENT_PLAN_ID_PATTERN} — the names
- * `allocateFragmentName` (`./fragment.ts`) hands out. Anything else
- * there (a subdirectory, a file of another extension, a name with a
- * space) is not a fragment and is not listed. A directory the tree does
- * not hold is an empty list, not a problem: a project that never wrote
- * a fragment has nothing waiting.
+ * `allocateFragmentName` (`packages/rafa/src/release/fragment.ts`) hands
+ * out. Anything else there (a subdirectory, a file of another extension, a
+ * name with a space) is not a fragment and is not listed. A directory the
+ * tree does not hold is an empty list, not a problem: a project that never
+ * wrote a fragment has nothing waiting.
  *
  * Each fragment's text is read out of the tree's blob and parsed, and
  * the {@link FragmentReading} is answered as it came, refusals

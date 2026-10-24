@@ -55,8 +55,9 @@ interface RewiredRow {
  * reach through `src/claims/`, `src/next/` and `src/start/`. On the graph the
  * fourth decouple item's survey regenerated, the codemod reads 15 of them on
  * a load cycle and `src/claims/drift.ts`, `src/claims/labels.ts`,
- * `src/commands/switch.ts` and `src/start/triage.ts` to rewire, and refuses
- * all four for names the facade lacks, so they stay here. The same stage took
+ * `src/commands/switch.ts` and `src/start/triage.ts` to rewire. The dry run
+ * takes all four now, the facade having the names they import, so they stay
+ * on their paths until the rewire runs. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
  * `preflight-drift.ts` onto the facade. `src/claims/ahead.ts` and
  * `src/epic/verify-run.ts` left the row in the fourth decouple item, which

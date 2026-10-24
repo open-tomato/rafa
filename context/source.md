@@ -729,9 +729,10 @@ names come from, and the facade entry is no node.
     `src/triage/refs-section.ts` and `src/triage/triage.ts`. On the graph the
     fourth decouple item's survey regenerated, the dry run reads fifteen of
     them on a load cycle and the other four, `drift.ts`, `labels.ts`,
-    `switch.ts` and `start/triage.ts`, to rewire, but refuses all four, since
-    the facade exports no `BranchScan`, `scanClaimBranches` or
-    `ROADMAP_LABEL`, so they keep their paths.
+    `switch.ts` and `start/triage.ts`, to rewire. The facade now exports
+    `BranchScan`, `scanClaimBranches` and `ROADMAP_LABEL`, so the rewire takes
+    all four and refuses none; they keep their paths until the rewire runs,
+    and its commit takes them off the guard's row.
     `src/claims/ahead.ts` and `src/epic/verify-run.ts` left them in the fourth
     decouple item (rafa-1333), which places both in board by name, and
     `src/claims/plan-claim.ts`, which took them by path, took the facade. The
@@ -741,30 +742,26 @@ names come from, and the facade entry is no node.
     `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an
     effort file, sat among them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
-    Release has two: `src/board/project/facts.ts` and
-    `src/docs/release-issue.ts`. `src/board/project/facts.ts` is among them
-    though it is a board file that imports release, because the load-cycle group
-    comes first; its edge to release is a back edge the decouple step before
-    pass 4 cuts. Pr has sixteen: `packages/rafa/src/claims/git.ts`, `src/claims/lost.ts`,
-    `src/cleanup/past-head.ts`, `src/cleanup/worktrees.ts`,
-    `src/commands/release/status-fragments.ts`, `src/next/epic-end.ts`,
-    `src/next/hint.ts`, `src/next/hop-rows.ts`, `src/next/readings.ts`,
-    `src/release/branch-forecast.ts`, `src/release/fragment-tree.ts`,
-    `src/release/settle-pr.ts`, `packages/rafa/src/start/branch-decision.ts`,
-    `src/start/pr-lifecycle.ts`, `src/start/pr-retarget.ts` and
-    `src/start/suite-blocker.ts`. Six of them, `src/cleanup/past-head.ts`,
-    `src/commands/release/status-fragments.ts`, `src/next/epic-end.ts`,
-    `src/release/branch-forecast.ts`, `src/release/fragment-tree.ts` and
+    Release has one: `src/docs/release-issue.ts`. `src/board/project/facts.ts`
+    left the group in the fourth decouple item: its one release import by path,
+    of `directoryPrefix` and `fragmentIdOf`, now comes from core's
+    `@open-tomato/rafa/release/fragment`. Pr has thirteen:
+    `src/claims/lost.ts`, `src/cleanup/past-head.ts`,
+    `src/cleanup/worktrees.ts`, `src/commands/release/status-fragments.ts`,
+    `src/next/epic-end.ts`, `src/next/hint.ts`, `src/next/hop-rows.ts`,
+    `src/next/readings.ts`, `src/release/branch-forecast.ts`,
+    `src/release/settle-pr.ts`, `src/start/pr-lifecycle.ts`,
+    `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. Five of them,
+    `src/cleanup/past-head.ts`, `src/commands/release/status-fragments.ts`,
+    `src/next/epic-end.ts`, `src/release/branch-forecast.ts` and
     `src/release/settle-pr.ts`, are release files by the cut table's unit that
     import pr from a package earlier in the move order; their edges are back
     edges the decouple step before pass 4 cuts, and they sit in this group
-    because the load-cycle group comes first. Run has fifteen: five board files
-    (`src/board/gate.ts`, `src/board/project/rules.ts`,
-    `src/board/roadmap-claims.ts`, `src/board/setup.ts` and
-    `src/next/relation-readings.ts`), nine pr files (`src/cleanup/groups.ts`,
-    `src/cleanup/steps.ts`, `src/next/owner-gate.ts`, `src/next/settle-step.ts`,
-    `src/next/sources.ts` and the four `src/triage/` files) and one release file
-    (`src/next/epic-end.ts`). All fifteen are files of packages earlier in
+    because the load-cycle group comes first. Run has nine:
+    `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/next/epic-end.ts`,
+    `src/next/owner-gate.ts`, `src/next/relation-readings.ts`,
+    `src/next/settle-step.ts`, `src/next/sources.ts`, `src/triage/base-run.ts`
+    and `src/triage/inherited.ts`. All nine are files of packages earlier in
     `MOVE_ORDER` of `scripts/survey/coupling.ts`, by the cut table's unit, and
     they sit in this group because the load-cycle group comes first. Their edges
     to run are back edges the decouple step before pass 4 cuts, since run moves
@@ -778,13 +775,15 @@ names come from, and the facade entry is no node.
     `packages/rafa-effort/src/effort/report-skills.ts` and
     `packages/rafa-effort/src/effort/skill-facts.ts`, import it forward and take
     it by name since the second decouple item's rewire. Board has none: no
-    effort file imports it. Release has none in the codemod's grouping, because
-    its one board importer, `src/board/project/facts.ts`, is taken first by the
-    load-cycle group. Pr has eighteen: `src/board/project/add-filed.ts`, the
-    three `src/commands/epic/` files (`close-docs.ts`, `close-triage.ts` and
-    `close.ts`), the two `src/commands/issue/` files (`create-bug.ts` and
-    `create.ts`), the ten `src/commands/release/` files,
-    `src/release/prepare.ts` and `src/release/verify.ts`;
+    effort file imports it. Release has none in the codemod's grouping, since
+    `src/board/project/facts.ts`, its one board importer, now takes
+    `directoryPrefix` and `fragmentIdOf` from core. Pr has sixteen:
+    `src/board/project/add-filed.ts`, the three `src/commands/epic/` files
+    (`close-docs.ts`, `close-triage.ts` and `close.ts`), the ten
+    `src/commands/release/` files, `src/release/prepare.ts` and
+    `src/release/verify.ts`; `src/commands/issue/create.ts` and
+    `create-bug.ts` left it in the same item, when their pr imports moved
+    into core;
     `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
@@ -801,10 +800,9 @@ names come from, and the facade entry is no node.
     them.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
-    a private package, which pass 4 settles. Effort has two:
-    `src/config/shape.ts` and `src/config-registry.ts`. Inventory has none.
-    Board has the same two as effort. Release has the same two. Pr has the
-    same two. Run has the same two.
+    a private package, which pass 4 settles. No package has one now: the dry
+    run's declaration-graph group is empty for effort, inventory, board,
+    release, pr and run.
 
   Tests move or rewire in pass 4 with the files they test, so the test files
   that import a rewired package by path stay on their paths in pass 3. The
@@ -812,8 +810,8 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's two, inventory's one, board's 23, release's four,
-  pr's 36 and run's 32, and a planted control reds on one relative import.
+  files, effort's none, inventory's none, board's 19, release's one, pr's 29
+  and run's 19, and a planted control reds on one relative import.
   No row keeps a file for the library build. Board's, release's, pr's and
   run's rows once held a fourth group, `libraryChunks`: 68 files a library
   entry reaches statically (board 21, release eight, pr 33 and run six), kept
