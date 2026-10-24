@@ -76,11 +76,11 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { MEMBERSHIP_NOTE, renderEpicCost } from '@open-tomato/rafa-effort/effort/epic-cost';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+import { MEMBERSHIP_NOTE, renderEpicCost } from '@open-tomato/rafa-effort/effort/epic-cost';
 
 import { draftFixture } from '../../adapters/tracker/contract.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
