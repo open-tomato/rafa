@@ -118,14 +118,14 @@
  * (`config-schema-readings.ts`): a global flag nobody typed would be one
  * this module invented.
  */
-import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
-import type { Reader } from '@open-tomato/rafa/core/config/sections';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
+import type { Reader } from './core/config/sections.js';
 
 import { isAbsolute } from 'node:path';
 
-import { flag, listOf, refused, text } from '@open-tomato/rafa/core/config/sections';
+import { flag, listOf, refused, text } from './core/config/sections.js';
 
-declare module '@open-tomato/rafa/core/config/config-schema' {
+declare module './core/config/config-schema.js' {
   /** The `tests` section's fields, added to core's. */
   interface RafaConfig extends TestsSettings {}
 }

@@ -19,7 +19,7 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Why a rewired package's file is still imported by path. */
-type KeptGroup = 'backEdge' | 'declarationGraph' | 'loadCycle';
+type KeptGroup = 'backEdge' | 'loadCycle';
 
 /** One rewired package and the files allowed to import it by path. */
 interface RewiredRow {
@@ -30,12 +30,17 @@ interface RewiredRow {
 }
 
 /**
- * One row per rewired package. Effort's two declaration-graph files are
- * reached from `src/config/index.ts`, whose declarations ship as
- * `dist/config/*.d.ts`; its six load-cycle files left the row when the
- * first decouple item moved their only effort imports into core, as
- * `packages/rafa/src/schema/frontmatter.ts` and
- * `packages/rafa/src/utils/agent-definition.ts`. Inventory's last
+ * One row per rewired package. Effort's row is empty. Its six load-cycle
+ * files left the row when the first decouple item moved their only
+ * effort imports into core, as `packages/rafa/src/schema/frontmatter.ts` and
+ * `packages/rafa/src/utils/agent-definition.ts`, and its two
+ * declaration-graph files, `src/config-registry.ts` and
+ * `src/config/shape.ts`, which `src/config/index.ts` reaches and whose
+ * declarations ship as `dist/config/*.d.ts`, left every row in the third
+ * decouple item (rafa-1325), which ended the group, as the first ended
+ * `libraryChunks`: they imported each package only through its section
+ * files, `src/config-schema-<section>.ts`, which that item takes out of
+ * the named lists and moves into core. Inventory's last
  * load-cycle file, `src/effort/skill-use.ts`, imports `bareSkillName` from
  * `packages/rafa-inventory/src/tiers/skill-names.ts`; the import graph held the search's edge into
  * `src/effort/collect.ts`, which reaches it through `collect-skills.ts`, so
@@ -47,23 +52,22 @@ interface RewiredRow {
  * `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
  * `src/inventory/browse.ts`.
  * Board's 21 load-cycle files are mostly run and pr files that board's files
- * reach through `src/claims/`, `src/next/` and `src/start/`; its two
- * declaration-graph files are effort's two. The same stage took
+ * reach through `src/claims/`, `src/next/` and `src/start/`. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
  * `preflight-drift.ts` onto the facade.
  * Release's one board importer, `src/board/project/facts.ts`, is a back edge
- * the load-cycle group takes first, and its two declaration-graph files are
- * effort's two.
+ * the load-cycle group takes first.
  * Pr's 16 load-cycle files are claims, cleanup, next, start and release files
  * pr's files reach, six of them release files that are back edges the
  * load-cycle group takes first. Its 18 back-edge files are board and release
- * files, every one earlier in the move order, and its two
- * declaration-graph files are effort's two.
- * Run's 15 load-cycle files are board, pr and release files run's files
+ * files, every one earlier in the move order.
+ * Run's 13 load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
- * moves last. Its 15 back-edge files are board and pr files, every one
- * earlier in the move order, and its two declaration-graph files are
- * effort's two.
+ * moves last. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
+ * left the row in the third decouple item: their one run import by path
+ * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
+ * 15 back-edge files are board and pr files, every one earlier in the
+ * move order.
  * No row keeps a file for the library build any more. Board, release, pr
  * and run each take their feature object through a commands entry,
  * `@open-tomato/rafa-<name>/commands`, which the roster alone imports, so a
@@ -73,10 +77,7 @@ interface RewiredRow {
  */
 const REWIRED: readonly RewiredRow[] = [
   {
-    allowed: {
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
-    },
+    allowed: {},
     packageName: 'rafa-effort',
   },
   {
@@ -90,8 +91,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/claims/drift.ts': 'loadCycle',
       'src/claims/labels.ts': 'loadCycle',
       'src/commands/switch.ts': 'loadCycle',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
       'src/epic/verify-run.ts': 'loadCycle',
       'src/next/hop-action.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
@@ -114,8 +113,6 @@ const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
       'src/board/project/facts.ts': 'loadCycle',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
       'src/docs/release-issue.ts': 'loadCycle',
     },
     packageName: 'rafa-release',
@@ -143,8 +140,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/release/status.ts': 'backEdge',
       'src/commands/release/tag-units.ts': 'backEdge',
       'src/commands/release/tag.ts': 'backEdge',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
       'src/next/epic-end.ts': 'loadCycle',
       'src/next/hint.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
@@ -184,8 +179,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/pr/triage-resolve.ts': 'backEdge',
       'src/commands/pr/triage.ts': 'backEdge',
       'src/commands/pr/wait.ts': 'backEdge',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
       'src/next/epic-end.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
       'src/next/relation-readings.ts': 'loadCycle',
@@ -193,8 +186,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/next/sources.ts': 'loadCycle',
       'src/triage/base-run.ts': 'loadCycle',
       'src/triage/inherited.ts': 'loadCycle',
-      'src/triage/kind-route.ts': 'loadCycle',
-      'src/triage/leftover-repair.ts': 'loadCycle',
     },
     packageName: 'rafa-run',
   },

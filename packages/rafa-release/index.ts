@@ -30,20 +30,6 @@ export {
   waitingSettingsOf,
 } from '../../src/commands/release/status-fragments.js';
 
-export type {
-  ReleaseDangerousShape,
-  ReleaseShape,
-} from '../../src/config-schema-release.js';
-export {
-  DANGEROUS_RELEASE_DEFAULTS,
-  DANGEROUS_RELEASE_SETTINGS,
-  PR_DEFAULTS,
-  PR_SETTINGS,
-  RELEASE_DEFAULTS,
-  RELEASE_SECTION,
-  RELEASE_SETTINGS,
-} from '../../src/config-schema-release.js';
-
 export type { EpicEndRelease } from '../../src/next/epic-end.js';
 export {
   epicEndLines,

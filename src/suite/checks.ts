@@ -76,7 +76,7 @@
  * file is compared as a path, never as a glob, so a name holding `[` or
  * `*` means itself.
  */
-import type { CheckName } from '../config-schema-checks.js';
+import type { CheckName } from '@open-tomato/rafa/config-schema-checks';
 import type { TestScope } from '@open-tomato/rafa/core/plan';
 
 import { normaliseFolder, owningBoard } from '@open-tomato/rafa-board';

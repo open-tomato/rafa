@@ -263,7 +263,8 @@ bugs:
 ```
 
 Both keys refuse `0`, a fraction, a quoted number and a boolean, and
-neither has an "off" spelling. The reader is `packages/rafa/src/config-schema-bugs.ts`.
+neither has an "off" spelling. The reader is
+`packages/rafa/src/config-schema-bugs.ts`.
 
 ### `--dry-run`
 
@@ -273,7 +274,7 @@ and stops: no tracker is resolved and nothing is filed.
 
 ### Config
 
-`src/config-schema-issues.ts` reads five keys:
+`packages/rafa/src/config-schema-issues.ts` reads five keys:
 
 ```yaml
 issues:

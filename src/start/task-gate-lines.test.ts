@@ -16,9 +16,8 @@ import type { Output } from '@open-tomato/rafa/ports';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { TESTS_DEFAULTS } from '@open-tomato/rafa/config-schema-tests';
 import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { TESTS_DEFAULTS } from '../config-schema-tests.js';
 
 import {
   alwaysRunFiles,

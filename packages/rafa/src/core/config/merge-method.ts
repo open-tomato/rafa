@@ -5,14 +5,14 @@
  *
  * They sat in `src/pr/types.ts`, the pull request port, until the
  * monorepo cut: the `pr.mergeMethod` setting in
- * `src/config-schema-release.ts` read them there, which tied the
+ * `packages/rafa/src/config-schema-release.ts` read them there, which tied the
  * release section to `src/pr/`. Here they are a core leaf, importing
  * nothing, so the section and the port both read them from the sections
  * barrel `./sections.ts`, and `src/pr/types.ts` re-exports them under
  * the same names for the port's own importers.
  *
  * The setting's reader, `mergeMethod`, stays in
- * `src/config-schema-release.ts` beside the one setting that reads it:
+ * `packages/rafa/src/config-schema-release.ts` beside the one setting that reads it:
  * this file holds the words, not a reading of the config.
  */
 

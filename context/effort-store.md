@@ -250,20 +250,21 @@ shared with the migration's guard (`migrateStore`, `migrate.ts`), which names no
 session id so it refuses any live loop, including its own if one somehow
 persists.
 
-**`effort.sync` in the project's config selects the sync strategy, one of
-`local`, `file`, `git`, `service`, or `p2p`.** The default is `local`, which
-means no sync: a device keeps its own store. The user scope's config under
-`~/.rafa/` already layers under the project's for every setting
-(`packages/rafa/src/core/config/config.ts`), so the user default needs no reader
-of its own. The user and project scopes share every config key in `config.ts`,
-and a change in one scope's declaration of `effort.sync` takes effect when
-either is read. A deployment of the `service` strategy requires `hub.url` (the
-hub's address), and may name `hub.tokenSecret` (the secret store name where the
-token is held, never the token itself) and `hub.timeout` (how long a request may
-take, `3s` by default, from `1s` to `30s`, as `3s`). `selectSync` hands the
-three to the adapter as `AdapterContext.hub` (`src/config-schema-hub.ts`). A
-module implementing `git`, `service` or `p2p` also names its own settings under
-`modules:`.
+**`effort.sync` in the project's config selects the sync strategy, one
+of `local`, `file`, `git`, `service`, or `p2p`.** The default is
+`local`, which means no sync: a device keeps its own store. The user
+scope's config under `~/.rafa/` already layers under the project's for
+every setting (`packages/rafa/src/core/config/config.ts`), so the user
+default needs no reader of its own. The user and project scopes share
+every config key in `config.ts`, and a change in one scope's
+declaration of `effort.sync` takes effect when either is read. A
+deployment of the `service` strategy requires `hub.url` (the hub's
+address), and may name `hub.tokenSecret` (the secret store name where
+the token is held, never the token itself) and `hub.timeout` (how long
+a request may take, `3s` by default, from `1s` to `30s`, as `3s`).
+`selectSync` hands the three to the adapter as `AdapterContext.hub`
+(`packages/rafa/src/config-schema-hub.ts`). A module implementing
+`git`, `service` or `p2p` also names its own settings under `modules:`.
 
 **Core's two sync adapters are registered in `CORE_ADAPTER_REGISTRY`
 (`packages/rafa/src/core/adapters/registry.ts`) by the composition root

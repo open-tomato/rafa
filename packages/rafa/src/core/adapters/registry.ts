@@ -269,7 +269,7 @@ export interface AdapterContext {
    *
    * The shape is spelled here rather than imported: it is the
    * `HubContext` the `hub` section declares in
-   * `src/config-schema-hub.ts`, and core imports no section file.
+   * `packages/rafa/src/config-schema-hub.ts`, and core imports no section file.
    * `selectSync` hands that section's value in, so the checker holds
    * the two shapes together there.
    */

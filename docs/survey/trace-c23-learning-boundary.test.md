@@ -10,20 +10,20 @@ The contract the exports are read against is `run(ctx, options)` from #119 (step
 
 | Folder | Files | Holds |
 | --- | --- | --- |
-| `src/tests` | 1 | `learning-boundary.test.ts`: one `describe` ("the src/learning/ boundary rule") with five `test` calls and one `test.each` over four module names, 9 tests in all (run: 9 pass, 14 assertions); helpers `messagesFor`, `ruleIds` and the constants `ROOT` and `SCRATCH` |
+| `src/tests` | 1 | `learning-boundary.test.ts`: one `describe` ("the packages/rafa-inventory/src/learning/ boundary rule") with five `test` calls and one `test.each` over four module names, 9 tests in all (run: 9 pass, 14 assertions); helpers `messagesFor`, `ruleIds` and the constants `ROOT` and `SCRATCH` |
 
 The nine tests are the rule and its controls:
 
 | Test | Scratch path | Source | Expected |
 | --- | --- | --- | --- |
-| refuses `../config.js` from the library | `src/learning/boundary-scratch.ts` | re-export of `loadConfig` from `../config.js` | one message, `import/no-restricted-paths`, text "src/learning/ imports nothing from the rest of src/." |
+| refuses `@open-tomato/rafa/core/config` from the library | `packages/rafa-inventory/src/learning/boundary-scratch.ts` | re-export of `loadConfig` from `@open-tomato/rafa/core/config` | one message, `import/no-restricted-paths`, text "packages/rafa-inventory/src/learning/ imports nothing from core." |
 | lets the same import through outside the library (control) | `src/plan/boundary-scratch.ts` | the same line | no message |
-| lets a sibling import through (control) | `src/learning/boundary-scratch.ts` | `actionHash` from `./identity.js` | no message |
-| lets a parent import that stays in the library through (control) | `src/learning/testdata/boundary-scratch.ts` | `actionHash` from `../identity.js` | no message |
-| refuses `node:fs`, `node:fs/promises`, `fs`, `fs/promises` (4 cases) | `src/learning/boundary-scratch.ts` | `readFile` from each | one message each, `no-restricted-imports`, text "src/learning/ touches no filesystem." |
-| lets `node:crypto` and `bun:test` through (control) | `src/learning/boundary-scratch.ts` | `createHash` and `expect` | no message |
+| lets a sibling import through (control) | `packages/rafa-inventory/src/learning/boundary-scratch.ts` | `actionHash` from `./identity.js` | no message |
+| lets a parent import that stays in the library through (control) | `packages/rafa-inventory/src/learning/testdata/boundary-scratch.ts` | `actionHash` from `../identity.js` | no message |
+| refuses `node:fs`, `node:fs/promises`, `fs`, `fs/promises` (4 cases) | `packages/rafa-inventory/src/learning/boundary-scratch.ts` | `readFile` from each | one message each, `no-restricted-imports`, text "packages/rafa-inventory/src/learning/ touches no filesystem." |
+| lets `node:crypto` and `bun:test` through (control) | `packages/rafa-inventory/src/learning/boundary-scratch.ts` | `createHash` and `expect` | no message |
 
-The scratch sources are linted with `new ESLint({ cwd: ROOT }).lintText(source, { filePath })` and written nowhere: the paths need not exist (`src/learning/testdata/` does not exist today), so no stray file can turn `eslint .` red. The test imports `node:path`, `bun:test` and the `eslint` package (a value, `ESLint`, and a type, `Linter`), nothing of the project. It runs in about 0.9 s, ESLint's load time, and spawns no process (the index says `spawns: false`).
+The scratch sources are linted with `new ESLint({ cwd: ROOT }).lintText(source, { filePath })` and written nowhere: the paths need not exist (`packages/rafa-inventory/src/learning/testdata/` does not exist today), so no stray file can turn `eslint .` red. The test imports `node:path`, `bun:test` and the `eslint` package (a value, `ESLint`, and a type, `Linter`), nothing of the project. It runs in about 0.9 s, ESLint's load time, and spawns no process (the index says `spawns: false`).
 
 The rule is the one custom block of the root config (`eslint.config.mjs`, `files: ['src/learning/**/*.ts']`, from line 24) beyond the ignores and the shared base: an `import/no-restricted-paths` zone (target `./src/learning`, from `./src`, except `./learning`) and a `no-restricted-imports` list of the four filesystem module names. Only `eslint.config.mjs` is a root leaf; the config for `packages/**` is ignored by it, and no `packages/*/eslint.config.mjs` is tracked.
 
@@ -44,7 +44,7 @@ An entry point is a member imported from outside the cluster, or a command regis
 | --- | --- | --- | --- |
 | Commands | **missing** | none | a test of a lint rule is not a command |
 | Steps with guards | **missing** | none | the rule is a guard on imports, enforced by lint, not a step with a class a run could consult |
-| Config section | **missing** | none; it reads no `src/config-schema*.ts` key; the rule it tests sits in `eslint.config.mjs`, which is lint config and not rafa's | no section of its own |
+| Config section | **missing** | none; it reads no `config-schema*.ts` key; the rule it tests sits in `eslint.config.mjs`, which is lint config and not rafa's | no section of its own |
 | Flows | **missing** | none | no multi-step path is driven; each test is one `lintText` call |
 
 ### Commands
@@ -57,7 +57,7 @@ None registered. The rule is the closest the repository has to a package boundar
 
 ### Config section
 
-None in rafa's own config. The boundary is lint config: the zone and the four forbidden module names are literals in `eslint.config.mjs`, and the test holds their messages by text ("src/learning/ imports nothing from the rest of src/.", "src/learning/ touches no filesystem.").
+None in rafa's own config. The boundary is lint config: the zone and the four forbidden module names are literals in `eslint.config.mjs`, and the test holds their messages by text ("packages/rafa-inventory/src/learning/ imports nothing from the rest of the package's src/.", "packages/rafa-inventory/src/learning/ imports nothing from core.", "packages/rafa-inventory/src/learning/ touches no filesystem.").
 
 ### Flows
 
@@ -66,7 +66,7 @@ None.
 ## Gaps
 
 1. **The test is bound to the root lint config by `cwd` and by path** (cut boundary). `ROOT = join(import.meta.dir, '..', '..')` and the scratch paths `src/learning/...` assume the library lives at `src/learning/` under the repository's `eslint.config.mjs`. If `src/learning/` becomes a package under `packages/` (it already has the `./learning` subpath), the rule moves into that package's own leaf config (the root config ignores `packages/**` and none is tracked there today), and this test moves with it with `ROOT` and `SCRATCH` changed; leaving it at the root would lint paths the root config no longer covers and the first test would fail by finding no rule.
-2. **Not selected by what it guards** (test index). Index 0 and a `.test.ts` name mean that editing `eslint.config.mjs` or the library does not select it; only the full suite and a named run do. A rule edit that turns the boundary off passes `bun test --changed=<base>` and fails the full suite late. A cut that wants a boundary edit to fail the same task renames the file `src/tests/learning-boundary.sweep.test.ts`, or adds the glob under `tests.alwaysRun` (`src/config-schema-tests.ts`); `src/tests/sweep-suffix.sweep.test.ts` does not require it, since the test reads no repository tree.
+2. **Not selected by what it guards** (test index). Index 0 and a `.test.ts` name mean that editing `eslint.config.mjs` or the library does not select it; only the full suite and a named run do. A rule edit that turns the boundary off passes `bun test --changed=<base>` and fails the full suite late. A cut that wants a boundary edit to fail the same task renames the file `src/tests/learning-boundary.sweep.test.ts`, or adds the glob under `tests.alwaysRun` (`packages/rafa/src/config-schema-tests.ts`); `src/tests/sweep-suffix.sweep.test.ts` does not require it, since the test reads no repository tree.
 3. **The rule is the model for the other boundaries and is the only one** (cut boundary). `package.json` exports six entries (`.`, `./cli`, `./plan`, `./store`, `./ports`, `./learning`), and `import/no-restricted-paths` appears once in the lint config (`eslint.config.mjs` line 34, for `src/learning/`); the folders behind `./plan`, `./store` and `./ports` have no rule that keeps them from importing the rest of `src/`, and the effort store's trace (`trace-c04-sqlite.md`) counts 87 edges out of its cluster. A cut that makes a cluster a package should add the same two-part rule (a restricted-paths zone and the forbidden built-ins) and a test shaped like this one: a refusal beside controls that must pass.
 4. **No contract surface** (the four exports, all missing). There is nothing to port to `run(ctx, options)`, a step registry or a config section from here.
 

@@ -95,45 +95,6 @@ export {
   defaultBoardOnce,
 } from '../../src/commands/switch.js';
 
-export type { ChecksShape } from '../../src/config-schema-checks.js';
-export {
-  CHECKS_DEFAULTS,
-  CHECKS_SECTION,
-  CHECKS_SETTINGS,
-  CHECK_NAMES,
-} from '../../src/config-schema-checks.js';
-
-export type { LoopContinueShape } from '../../src/config-schema-loop-continue.js';
-export {
-  LOOP_CONTINUE_DEFAULTS,
-  LOOP_CONTINUE_SECTION,
-  LOOP_CONTINUE_SETTINGS,
-} from '../../src/config-schema-loop-continue.js';
-
-export type {
-  LoopRetries,
-  LoopRetriesShape,
-} from '../../src/config-schema-loop-retries.js';
-export {
-  LOOP_RETRIES_DEFAULTS,
-  LOOP_RETRIES_SECTION,
-  LOOP_RETRIES_SETTINGS,
-} from '../../src/config-schema-loop-retries.js';
-
-export type { TestsShape } from '../../src/config-schema-tests.js';
-export {
-  TESTS_DEFAULTS,
-  TESTS_SECTION,
-  TESTS_SETTINGS,
-} from '../../src/config-schema-tests.js';
-
-export type { WrapUpShape } from '../../src/config-schema-wrap-up.js';
-export {
-  WRAP_UP_DEFAULTS,
-  WRAP_UP_SECTION,
-  WRAP_UP_SETTINGS,
-} from '../../src/config-schema-wrap-up.js';
-
 export type {
   CheckAnswered,
   CheckUnanswered,

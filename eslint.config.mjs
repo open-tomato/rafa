@@ -39,18 +39,18 @@ export default [
           target: './packages/rafa-inventory/src/learning',
           from: './packages/rafa-inventory/src',
           except: ['./learning'],
-          message: 'src/learning/ imports nothing from the rest of src/.',
+          message: 'packages/rafa-inventory/src/learning/ imports nothing from the rest of the package\'s src/.',
         }, {
           target: './packages/rafa-inventory/src/learning',
           from: './packages/rafa/src',
-          message: 'src/learning/ imports nothing from core.',
+          message: 'packages/rafa-inventory/src/learning/ imports nothing from core.',
         }],
       }],
       'no-restricted-imports': ['error', {
         paths: ['node:fs', 'node:fs/promises', 'fs', 'fs/promises'].map(
           (name) => ({
             name,
-            message: 'src/learning/ touches no filesystem.',
+            message: 'packages/rafa-inventory/src/learning/ touches no filesystem.',
           }),
         ),
       }],
@@ -60,10 +60,9 @@ export default [
     // A config section adds its fields to `RafaConfig` by declaration
     // merging: `interface RafaConfig extends HubSettings {}` inside a
     // `declare module` on `packages/rafa/src/core/config/config-schema.ts`.
-    // The empty body is the point, so these files alone, at the root and
-    // in core's package, allow an interface whose one supertype is its
-    // whole content.
-    files: ['src/config-schema-*.ts', 'packages/rafa/src/config-schema-*.ts'],
+    // The empty body is the point, so these files alone, in core's
+    // package, allow an interface whose one supertype is its whole content.
+    files: ['packages/rafa/src/config-schema-*.ts'],
     rules: {
       '@typescript-eslint/no-empty-object-type': ['error', {
         allowInterfaces: 'with-single-extends',

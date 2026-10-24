@@ -136,8 +136,9 @@ import type { PastHeadRead, PastHeadReading, PastHeadSettings } from '@open-toma
 
 import { basename } from 'node:path';
 
-import { RELEASE_DEFAULTS, readPastHead } from '@open-tomato/rafa-release';
+import { readPastHead } from '@open-tomato/rafa-release';
 
+import { RELEASE_DEFAULTS } from '@open-tomato/rafa/config-schema-release';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 

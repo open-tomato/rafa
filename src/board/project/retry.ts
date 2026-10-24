@@ -45,7 +45,7 @@
  * or its json event.
  */
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { BoardProjectRetries } from '../../config-schema-board-project.js';
+import type { BoardProjectRetries } from '@open-tomato/rafa/config-schema-board-project';
 
 /** What a failed call's stderr says about sending it again. */
 export type FailureClass = 'retried' | 'permanent';

@@ -14,10 +14,10 @@ import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CHECK_NAMES, checkList, CHECKS_DEFAULTS, CHECKS_SECTION } from '@open-tomato/rafa/config-schema-checks';
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { CHECK_NAMES, checkList, CHECKS_DEFAULTS, CHECKS_SECTION } from './config-schema-checks.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

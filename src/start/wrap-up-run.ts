@@ -112,7 +112,7 @@ import type { RunnerPrInput, RunnerPrOpened } from './runner-pr.js';
 import type { RunSession } from './session.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
-import type { WrapUpRetries } from '../config-schema-wrap-up.js';
+import type { WrapUpRetries } from '@open-tomato/rafa/config-schema-wrap-up';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { SessionServing } from '@open-tomato/rafa-inventory';

@@ -16,6 +16,13 @@ import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  similarityCandidates,
+  similarityThreshold,
+  similarityWeight,
+  TRIAGE_DEFAULTS,
+  TRIAGE_SECTION,
+} from '@open-tomato/rafa/config-schema-triage';
+import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
@@ -23,14 +30,7 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import {
-  similarityCandidates,
-  similarityThreshold,
-  similarityWeight,
-  TRIAGE_DEFAULTS,
-  TRIAGE_SECTION,
-} from './config-schema-triage.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

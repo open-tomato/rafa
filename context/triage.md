@@ -474,8 +474,9 @@ triage:
 
 Triage builds the record under the `issues` and `errors` keys the run
 resolves from `.rafa/config.yaml`. `bugRulesOf`
-(`src/config-schema-issues.ts`) turns them into the rules, read once per run
-in `src/start/triage.ts` and handed to every filing. It reads:
+(`packages/rafa/src/config-schema-issues.ts`) turns them into the rules,
+read once per run in `src/start/triage.ts` and handed to every filing. It
+reads:
 
 - `issues.titles.bug` and `issues.titles.summaryMax`: the template and the cap
   the summary is cut under, so a title reads back as its fields.

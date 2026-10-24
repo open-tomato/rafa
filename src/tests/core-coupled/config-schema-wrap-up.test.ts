@@ -13,6 +13,7 @@ import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 
 import { describe, expect, it } from 'bun:test';
 
+import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, wrapUpRetries } from '@open-tomato/rafa/config-schema-wrap-up';
 import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
@@ -21,8 +22,7 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, wrapUpRetries } from './config-schema-wrap-up.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

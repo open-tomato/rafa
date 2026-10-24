@@ -56,7 +56,7 @@
  * parser reads as `bug`. A store that refuses the write, or an entry it
  * refuses, is one warning line; neither stops the run.
  */
-import type { LoopRetries } from '../config-schema-loop-retries.js';
+import type { LoopRetries } from '@open-tomato/rafa/config-schema-loop-retries';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { BugKind, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { BugRouteEntry, BugRoute } from '@open-tomato/rafa/store/bug-routes';

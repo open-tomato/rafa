@@ -113,7 +113,7 @@ The port is the cluster's one wide file and no other member has more than three 
 | --- | --- | --- | --- |
 | Commands | **partial** | 5 `RafaCommand` definitions here (`issue show`, `issue create`, `issue comment`, `issue move`, `epic close`), plus `create-blocked.ts`, the spec line `issue create` reads | `run` is `run(context: RafaContext): Promise<void>`, not `run(ctx, options) -> { outcome, context?, message? }`; every refusal is a thrown `CommandExit`; registration is a central static import in `src/commands/index.ts`; the `issue` and `epic` subjects are each split with `c01-github` |
 | Steps with guards | **partial** | the gate in `src/commands/epic/close.ts`, `src/epic/verify-plan.ts` and `verify-run.ts` (a git step is data: `VerifyGitStep` with an id and an argv), the chain in `src/adapters/tracker/resolve.ts`, and triage in `src/triage/triage.ts` with `src/start/triage.ts` (an answer is data: `BugTriage` with a `channel` and an `action`) | no registry, no step id, no guard class declared, no `expect`, no `ctx.answered`; `--accept-unchecked` is a flag that passes a refusal, and the contract has no field for a flag-form pass |
-| Config section | **partial** | `triage.similarity.threshold` and `triage.similarity.candidates` have their own file, `src/config-schema-triage.ts` (`c03-config`, defaults 0.3 and 3); `tracker.default` and `tracker.fallback` sit in `src/config-schema.ts` | no `config-schema-tracker.ts`; the cluster reads three more keys it does not declare (below) and the registered `epic close` reads none of `board.relationships` |
+| Config section | **partial** | `triage.similarity.threshold` and `triage.similarity.candidates` have their own file, `packages/rafa/src/config-schema-triage.ts` (`c03-config`, defaults 0.3 and 3); `tracker.default` and `tracker.fallback` sit in `src/config-schema.ts` | no `config-schema-tracker.ts`; the cluster reads three more keys it does not declare (below) and the registered `epic close` reads none of `board.relationships` |
 | Flows | **partial** | seven multi-step paths the cluster drives end to end (below), `rafa epic close` the longest | each is a hand-ordered function chain; no flow list, no step id to drop or swap; no `--dry-run` on any command here |
 
 ### Commands
@@ -149,12 +149,12 @@ Consent: no unit of this cluster asks a question. The cluster has no prompter, n
 
 ### Config section
 
-The cluster declares none of the config it reads, but one of its sections already has a file of its own. `src/config-schema.ts` and `src/config-schema-triage.ts` (both `c03-config`) declare the keys; the cluster takes `Pick`s of `RafaConfig`.
+The cluster declares none of the config it reads, but one of its sections already has a file of its own. `src/config-schema.ts` and `packages/rafa/src/config-schema-triage.ts` (both `c03-config`) declare the keys; the cluster takes `Pick`s of `RafaConfig`.
 
 | Key | Default | Declared in | Read here by |
 | --- | --- | --- | --- |
-| `triage.similarity.threshold` | 0.3, a number above 0 and at most 1, or `false` | `src/config-schema-triage.ts` | `triage/triage.ts` (a `Pick<RafaConfig, 'triageSimilarityThreshold' \| 'triageSimilarityCandidates'>`), through `start/triage.ts` and `commands/epic/close.ts` |
-| `triage.similarity.candidates` | 3, a whole number from 1 to 10 | `src/config-schema-triage.ts` | the same |
+| `triage.similarity.threshold` | 0.3, a number above 0 and at most 1, or `false` | `packages/rafa/src/config-schema-triage.ts` | `triage/triage.ts` (a `Pick<RafaConfig, 'triageSimilarityThreshold' \| 'triageSimilarityCandidates'>`), through `start/triage.ts` and `commands/epic/close.ts` |
+| `triage.similarity.candidates` | 3, a whole number from 1 to 10 | `packages/rafa/src/config-schema-triage.ts` | the same |
 | `tracker.default` | `github` | `src/config-schema.ts` (`trackerDefault`, `cli: true`) | `adapters/tracker/resolve.ts` (a `Pick<RafaConfig, 'trackerDefault' \| 'trackerFallback'>`), `start/triage.ts`, `commands/epic/close.ts` (through `unresolvedTracker`) |
 | `tracker.fallback` | `[local]` | `src/config-schema.ts` (`trackerFallback`, `cli: false`) | `adapters/tracker/resolve.ts` |
 | `loop.settingSources` | `project`, `local` | `src/config-schema.ts` (`settingSources`, `cli: true`) | `commands/epic/close.ts`, handed to the planning and each check session |

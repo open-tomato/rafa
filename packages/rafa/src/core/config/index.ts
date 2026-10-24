@@ -113,7 +113,7 @@
  * or `registeredSettings()` from here, which answer the registered
  * records typed whole.
  * Neither are the hub's `HubContext` and `HubTimeout`, which a file
- * imports from `src/config-schema-hub.ts`.
+ * imports from `packages/rafa/src/config-schema-hub.ts`.
  *
  * The published surface is narrower than this file. `src/index.ts`
  * re-exports part of it, and of the runtime names leaves out core's

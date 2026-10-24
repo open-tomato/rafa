@@ -49,12 +49,12 @@
  * No key here is a `CommandLineSetting`: each is a list, which the
  * command line has no spelling for, as `config-schema.ts` says.
  */
-import type { ConfigSection, SettingSpec } from '@open-tomato/rafa/core/config';
-import type { Reader } from '@open-tomato/rafa/core/config/sections';
+import type { ConfigSection, SettingSpec } from './core/config/index.js';
+import type { Reader } from './core/config/sections.js';
 
-import { listOf, oneOf, refused } from '@open-tomato/rafa/core/config/sections';
+import { listOf, oneOf, refused } from './core/config/sections.js';
 
-declare module '@open-tomato/rafa/core/config/config-schema' {
+declare module './core/config/config-schema.js' {
   /** The `checks` section's fields, added to core's. */
   interface RafaConfig extends ChecksSettings {}
 }

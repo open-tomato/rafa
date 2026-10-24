@@ -54,6 +54,7 @@ import {
   it,
 } from 'bun:test';
 
+import { ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
@@ -61,7 +62,6 @@ import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { detail, PROVIDER_GH, SUMMARY } from '../tests/release-stage-fixtures.js';

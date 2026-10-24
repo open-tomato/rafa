@@ -91,6 +91,7 @@ import type { TaskReport } from '@open-tomato/rafa/report/parse';
 
 import { join } from 'node:path';
 
+import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
@@ -99,7 +100,6 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { addFiledBugs } from '../../board/project/add-filed.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
-import { bugRulesOf } from '../../config-schema-issues.js';
 import { readStaleDocsVersion } from '../../start/stale-docs.js';
 import { unresolvedTracker } from '../../start/triage.js';
 import { namedSecrets, redactSecrets, triageReport } from '../../triage/triage.js';

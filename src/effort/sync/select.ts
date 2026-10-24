@@ -25,7 +25,7 @@
  * carries a `hub.url` the adapter is also handed `hub`: the url, the
  * token's secret name and the timeout in milliseconds, which a
  * module's `service` strategy reads (`hubContextOf` in
- * `src/config-schema-hub.ts`). It is handed to whichever kind is
+ * `packages/rafa/src/config-schema-hub.ts`). It is handed to whichever kind is
  * selected, since core's own strategies read nothing they do not use,
  * and a config naming `service` with no `hub.url` never resolves. A caller
  * that loaded modules hands the registry `loadModules` answers
@@ -70,10 +70,9 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { SyncStrategy } from '@open-tomato/rafa/core/config/sections';
 import type { Sync, SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
 
+import { hubContextOf } from '@open-tomato/rafa/config-schema-hub';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { describeValue, SYNC_STRATEGIES } from '@open-tomato/rafa/core/config/sections';
-
-import { hubContextOf } from '../../config-schema-hub.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync';

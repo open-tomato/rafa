@@ -46,13 +46,13 @@ import {
   it,
 } from 'bun:test';
 
+import { ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { LEFTOVER_MARKER } from '../triage/leftover-repair.js';
 import { createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';

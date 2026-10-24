@@ -71,6 +71,7 @@ import { suggestedEnvironment } from '@open-tomato/rafa/bugs/places';
 import { bugProblems, EMPTY_BUG_RECORD, hasBugSections, parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { firstProjectPath } from '@open-tomato/rafa/bugs/stack-path';
 import { parseTitle } from '@open-tomato/rafa/bugs/title';
+import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isInside, packageOf, rootPackageOf } from '@open-tomato/rafa/project/package-of';
@@ -78,7 +79,6 @@ import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { bodyOf, checkoutOf, draftOf, redacted, settled } from '../../bugs/fill.js';
 import { codeVersionOf, versionsText } from '../../bugs/versions.js';
-import { bugRulesOf } from '../../config-schema-issues.js';
 import { namedSecrets, redactSecrets } from '../../triage/triage.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal, readNonBlankFlag } from './issue-tracker.js';

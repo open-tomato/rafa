@@ -13,6 +13,7 @@ import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 import { describe, expect, it } from 'bun:test';
 
 import { templateProblem } from '@open-tomato/rafa/bugs/title';
+import { bugRulesOf, ISSUES_SECTION } from '@open-tomato/rafa/config-schema-issues';
 import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
@@ -21,9 +22,8 @@ import {
 } from '@open-tomato/rafa/core/config';
 import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { bugRulesOf, ISSUES_SECTION } from './config-schema-issues.js';
-import { projectConfigText } from './project/scaffold.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
+import { projectConfigText } from '../../project/scaffold.js';
 
 /** What `setting` reads `raw` as, under its own file key. */
 function read(setting: ConfigSetting, raw: unknown): { value: unknown; problems: readonly string[]; extras: readonly unknown[] } {

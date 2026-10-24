@@ -18,6 +18,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { globList, TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from '@open-tomato/rafa/config-schema-tests';
 import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
@@ -27,15 +28,14 @@ import {
 } from '@open-tomato/rafa/core/config';
 import { flag } from '@open-tomato/rafa/core/config/sections';
 
-import { templateEntry } from './config/templates.js';
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import { globList, TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
+import { templateEntry } from '../../config/templates.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
 
 /** The repository root, which the glob scans below run from. */
-const ROOT = join(import.meta.dir, '..');
+const ROOT = join(import.meta.dir, '..', '..', '..');
 
 /** What a refused entry is expected to be. */
 const EXPECTED_GLOB = 'expected a glob pattern relative to the repository root';
@@ -169,7 +169,7 @@ describe('tests.contract', () => {
 
     expect(glob.match('packages/rafa/src/config/load.contract.test.ts')).toBe(true);
     expect(glob.match('src/x.contract.test.ts')).toBe(true);
-    expect(glob.match('src/config-schema-tests.test.ts')).toBe(false);
+    expect(glob.match('src/tests/core-coupled/config-schema-tests.test.ts')).toBe(false);
   });
 
   it('keeps a file\'s [] as empty, outranking the default', () => {
@@ -189,16 +189,16 @@ describe('tests.alwaysRun', () => {
   });
 
   it('finds this file through the same scan, so the empty scan above could fail', () => {
-    const scan = Array.from(new Bun.Glob('src/config-schema-tests.test.ts').scanSync({ cwd: ROOT }));
+    const scan = Array.from(new Bun.Glob('src/tests/core-coupled/config-schema-tests.test.ts').scanSync({ cwd: ROOT }));
 
-    expect(scan).toEqual(['src/config-schema-tests.test.ts']);
+    expect(scan).toEqual(['src/tests/core-coupled/config-schema-tests.test.ts']);
   });
 
   it('matches a sweep\'s name with its default glob, and a plain test\'s not', () => {
     const glob = new Bun.Glob('src/**/*.sweep.test.ts');
 
     expect(glob.match('src/tests/sweep-suffix.sweep.test.ts')).toBe(true);
-    expect(glob.match('src/config-schema-tests.test.ts')).toBe(false);
+    expect(glob.match('src/tests/core-coupled/config-schema-tests.test.ts')).toBe(false);
   });
 
   it('keeps a file\'s [] as empty, outranking the default', () => {

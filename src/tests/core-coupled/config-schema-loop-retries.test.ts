@@ -14,6 +14,13 @@ import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  LOOP_RETRIES_DEFAULTS,
+  LOOP_RETRIES_MAX,
+  LOOP_RETRIES_MIN,
+  LOOP_RETRIES_SECTION,
+  loopRetries,
+} from '@open-tomato/rafa/config-schema-loop-retries';
+import {
   ConfigError,
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
@@ -21,14 +28,7 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import {
-  LOOP_RETRIES_DEFAULTS,
-  LOOP_RETRIES_MAX,
-  LOOP_RETRIES_MIN,
-  LOOP_RETRIES_SECTION,
-  loopRetries,
-} from './config-schema-loop-retries.js';
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

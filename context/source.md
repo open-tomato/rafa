@@ -282,15 +282,14 @@ import like any other file. Three things are not seen: an `import()` or
 `require()` whose argument is not a string literal, a `mock.module()` call,
 and a path built for a spawned process or a file read. The sweep prints the
 files it read at load, so an empty read cannot pass. A module augmentation is
-no import: a `declare module` naming
-`@open-tomato/rafa/core/config/config-schema`, which each
-`src/config-schema-*.ts` file writes to add its fields to `RafaConfig`, is
-answered under `augment` and passes. The four section files inside the
-package (`packages/rafa/src/config-schema-*.ts`) name the same file by its
-relative path, `./core/config/config-schema.js`. It has to name the declaring file:
-spelled through the config barrel, two augmentations merged with each other
-and not with `RafaConfig`, whose `keyof` missed both. That file is one of
-core's `exports` entries until #808 retires them.
+no import: a `declare module` naming the declaring file, which each section
+file writes to add its fields to `RafaConfig`, is answered under `augment` and
+passes. Every section file in the package
+(`packages/rafa/src/config-schema-*.ts`) names it by its relative path,
+`./core/config/config-schema.js`. It has to name the declaring file: spelled
+through the config barrel, two augmentations merged with each other and not
+with `RafaConfig`, whose `keyof` missed both. That file is one of core's
+`exports` entries until #808 retires them.
 
 **The two-names sweep holds the two names to the live tree.**
 `src/tests/core-package.sweep.test.ts`, beside the barrels sweep, has three
@@ -324,51 +323,59 @@ own files, as `isCoreRead` reads them, so their deep subpaths into core are
 set aside and counted. It prints its counts at load, and a planted tree holds
 a control for each failure.
 
-**Core's tests that import above core wait in `src/tests/core-coupled/`.** Each
-keeps its path under `src/` from before the move: `core/config/config.test.ts`
-sits at `src/tests/core-coupled/core/config/config.test.ts`, and it tests
+**Core's tests that import above core wait in `src/tests/core-coupled/`.**
+Each keeps its path under `src/` from before the move:
+`core/config/config.test.ts` sits at
+`src/tests/core-coupled/core/config/config.test.ts`, and it tests
 `packages/rafa/src/core/config/config.ts`. A file's text changes only in its
 specifiers, and `src/tests/core-coupled/README.md` has one row per parked file
 naming what it reaches above core. A feature package's parked tests wait in
 `src/tests/<name>-coupled/` the same way, inventory's seven first, under
 `src/tests/inventory-coupled/`. A file that joins the folder takes its row in
-the same commit. `CORE_PARKED_TESTS` of `scripts/survey/core-moves.ts` names the
-folder: the barrels sweep reads these files as core's and does not hold their
-imports to the barrel rule. The test-index guard reads them as any test: under
-its own path, in the unit the cut table lists it in, and held to the rule of its
-kind. A later spec sorts each file back into the package once its coupling is
-gone, or into the module it really tests.
+the same commit. The ten section tests are the named exception: each parks
+under `src/tests/core-coupled/` as `config-schema-<section>.test.ts`, not
+beside its file under `packages/rafa/src/`, because it reads
+`src/config-registry.ts`, the root's merged registry, which stays at the root.
+They leave the folder when #913 places integration tests. `CORE_PARKED_TESTS`
+of `scripts/survey/core-moves.ts` names the folder: the barrels sweep reads
+these files as core's and does not hold their imports to the barrel rule. The
+test-index guard reads them as any test: under its own path, in the unit the
+cut table lists it in, and held to the rule of its kind. A later spec sorts
+each file back into the package once its coupling is gone, or into the module
+it really tests.
 
-**The config sections are handed in, never imported.** Core declares the section
-contract in `packages/rafa/src/core/config/section.ts`: a `ConfigSection`
-carries its `package` name, its `settings`, its `defaults` and its cross-key
-`checks`. Core names no section. The fifteen are listed in
+**The config sections are handed in, never imported.** Core declares the
+section contract in `packages/rafa/src/core/config/section.ts`: a
+`ConfigSection` carries its `package` name, its `settings`, its `defaults` and
+its cross-key `checks`. Core names no section. The fifteen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and fourteen `config-schema-*.ts` files, ten under
-`src/` and four, for `bugs`, `errors`, `features` and `logger`, under
-`packages/rafa/src/`. That module registers nothing as it is imported: its
-`registerCoreConfigSections()` registers the fifteen with core and sets core's
-load hook, and `src/rafa.ts`, `src/index.ts` and `src/tests/preload.ts` call it
-ahead of `registerCoreAdapters()`, before anything loads a config. A second call
-registers nothing. A file outside `packages/rafa/src/core/` takes the merged
-`SETTINGS`, `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`, `SECTIONS` and
-`knownKeysAbove` from the registry, never from the core barrel, which exports
-none of them; core reads the same through the `active*` functions of
-`section.ts`. The two registered readers are `registeredDefaults()` and
-`registeredSettings()` of `section.ts`, which the core barrel re-exports: a
-feature file that needs the whole default record or the whole spec record takes
-it from there, typed as `CONFIG_DEFAULTS` and `SETTINGS` are, and so imports no
-root file. The callers at this commit are `src/start/preflight.ts`,
-`src/start/pr-lifecycle.ts`, `src/board/roadmap.ts`, `src/effort/collect.ts` and
-`packages/rafa-inventory/src/inventory/index.ts` for the defaults, and
-`src/refs/extract.ts` and `src/refs/verify.ts` for the settings. Each refuses
-with a `ConfigSectionError` naming `src/config-registry.ts` while no section is
-registered, so a constant built as a module loads, before an entry registers,
-reads the section file that defines its value instead. A registration that
-breaks a rule throws from the call, naming what it refused: a setting name two
-sections define, a file key a second section defines under another setting name,
-which names both setting names too, or a `dangerous.*` key a second section
-defines under the same setting name, each naming both packages.
+own (`core-section.ts`) and fourteen `config-schema-*.ts` files, all under
+`packages/rafa/src/` since rafa-1325 moved the ten feature sections in from
+`src/`: four for `bugs`, `errors`, `features` and `logger`, and ten for the
+registered feature sections. That module registers nothing as it is imported:
+its `registerCoreConfigSections()` registers the fifteen with core and sets
+core's load hook, and `src/rafa.ts`, `src/index.ts` and `src/tests/preload.ts`
+call it ahead of `registerCoreAdapters()`, before anything loads a config. A
+second call registers nothing. A file outside `packages/rafa/src/core/` takes
+the merged `SETTINGS`, `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`,
+`SECTIONS` and `knownKeysAbove` from the registry, never from the core barrel,
+which exports none of them; core reads the same through the `active*`
+functions of `section.ts`. The two registered readers are
+`registeredDefaults()` and `registeredSettings()` of `section.ts`, which the
+core barrel re-exports: a feature file that needs the whole default record or
+the whole spec record takes it from there, typed as `CONFIG_DEFAULTS` and
+`SETTINGS` are, and so imports no root file. The callers at this commit are
+`src/start/preflight.ts`, `src/start/pr-lifecycle.ts`, `src/board/roadmap.ts`,
+`src/effort/collect.ts` and `packages/rafa-inventory/src/inventory/index.ts`
+for the defaults, and `src/refs/extract.ts` and `src/refs/verify.ts` for the
+settings. Each refuses with a `ConfigSectionError` naming
+`src/config-registry.ts` while no section is registered, so a constant built
+as a module loads, before an entry registers, reads the section file that
+defines its value instead. A registration that breaks a rule throws from the
+call, naming what it refused: a setting name two sections define, a file key a
+second section defines under another setting name, which names both setting
+names too, or a `dangerous.*` key a second section defines under the same
+setting name, each naming both packages.
 
 **The adapters are handed in, never imported.** Core declares the adapter
 registry in `packages/rafa/src/core/adapters/registry.ts`, and that file
@@ -396,13 +403,12 @@ itself.
 
 **A section adds its keys to `RafaConfig` by `declare module`.** `RafaConfig`
 stays declared in `packages/rafa/src/core/config/config-schema.ts` with core's
-keys. Each section file under `src/` adds its own by a `declare module` naming
-that file as `@open-tomato/rafa/core/config/config-schema`, and not the config
-barrel, for the reason the augment note in the deep-import sweep paragraph
-above gives. The four under `packages/rafa/src/` name it by its relative path,
-`./core/config/config-schema.js`, since no non-test file in the package imports
-`@open-tomato/rafa/<anything>`. So `ConfigSetting` names every key, and nothing
-in core names a section.
+keys. Each section file, all of them under `packages/rafa/src/` since
+rafa-1325, adds its own by a `declare module` naming that file by its relative
+path, `./core/config/config-schema.js`, and not the config barrel, for the
+reason the augment note in the deep-import sweep paragraph above gives: no
+non-test file in the package imports `@open-tomato/rafa/<anything>`. So
+`ConfigSetting` names every key, and nothing in core names a section.
 
 **`ConfigShape` is composed from the sections, not merged into.** Each section
 file exports an interface of the keys a file writes for it (`HubShape` holds
@@ -423,11 +429,11 @@ memory.
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under
 `packages/rafa/src/core/` and fails on any import of a `config-schema-*.ts`
-section file, at the root or in the package, by any specifier `textImports` finds, so a dynamic `import()` or a
-`require()` counts as much as a static import. Like the barrel sweep, it does
-not see an argument that is not a string literal. A second `describe` holds
-`loadConfig` with no section registered to a refusal naming
-`src/config-registry.ts`.
+section file in the package, by any specifier `textImports` finds, so a
+dynamic `import()` or a `require()` counts as much as a static import. Like
+the barrel sweep, it does not see an argument that is not a string literal. A
+second `describe` holds `loadConfig` with no section registered to a refusal
+naming `src/config-registry.ts`.
 
 **A barrel is split, never widened, when it closes a runtime cycle.** A barrel
 that groups a file with one outside `packages/rafa/src/core/` that imports the
@@ -483,27 +489,37 @@ as the Packages section below lists.
 
 **The named lists are in `scripts/survey/cut-names.ts`.** `BOARD_NAMED`,
 `PR_NAMED`, `RUN_NAMED`, `RELEASE_NAMED`, `EFFORT_NAMED` and `INVENTORY_NAMED`
-hold the root files that reach each feature package, each sorted by UTF-16 code
-unit. A file a list names is placed in that package whatever its folder, and
-keeps its path: no named file moves in the cut itself; the packages' moves move
-them. `CUT_RULES` reads them and adds a package's own file beside its list where
-one belongs (`src/pr/index.ts` to `PR_NAMED`, `src/start/branch-decision.ts` to
-`RUN_NAMED`). `INVENTORY_NAMED` is empty since pass 4a moved its six files into
-`packages/rafa-inventory/src/`, where the package's folder rule places them. The
-CLI's named files are four, `CLI_NAMED`: the roster, the bin entry and the agent
-schema, which were the CLI rule's three inline names, and
-`src/inventory/browse.ts`, the view behind `rafa skill list -i`, which sits
-under `src/inventory/` but is a CLI file by name: the CLI's prompt files it
-uses, `src/cli/prompt/page.ts`, `select.ts` and `terminal.ts`, are CLI-internal,
-so it counts no edge out of inventory and does not move. The first decouple item
-(#808) took `naming.ts` off `BOARD_NAMED` and `agent-definition.ts` off
-`EFFORT_NAMED` as they moved into core, now `packages/rafa/src/board/naming.ts`
-and `packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
+hold the root files that reach each feature package, each sorted by UTF-16
+code unit. A file a list names is placed in that package whatever its folder,
+and keeps its path: no named file moves in the cut itself; the packages' moves
+move them. `CUT_RULES` reads them and adds a package's own file beside its
+list where one belongs (`src/pr/index.ts` to `PR_NAMED`,
+`src/start/branch-decision.ts` to `RUN_NAMED`). `INVENTORY_NAMED` is empty
+since pass 4a moved its six files into `packages/rafa-inventory/src/`, where
+the package's folder rule places them. The CLI's named files are four,
+`CLI_NAMED`: the roster, the bin entry and the agent schema, which were the
+CLI rule's three inline names, and `src/inventory/browse.ts`, the view behind
+`rafa skill list -i`, which sits under `src/inventory/` but is a CLI file by
+name: the CLI's prompt files it uses, `src/cli/prompt/page.ts`, `select.ts`
+and `terminal.ts`, are CLI-internal, so it counts no edge out of inventory and
+does not move. The first decouple item (#808) took `naming.ts` off
+`BOARD_NAMED` and `agent-definition.ts` off `EFFORT_NAMED` as they moved into
+core, now `packages/rafa/src/board/naming.ts` and
+`packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
 effort rule of `CUT_RULES` for `packages/rafa/src/schema/frontmatter.ts`. The
 placement, in the same item, added `serving.ts` under `src/start/` to
 `INVENTORY_NAMED`; the move of pass 4a then moved it into the package, to
 `packages/rafa-inventory/src/start/serving.ts`, and the list has been empty
-since.
+since. The third decouple item (rafa-1325) took the eleven section files off
+the lists, each into `packages/rafa/src/` beside core's four, where the
+`packages/rafa/` folder of `CUT_RULES` places it:
+`config-schema-board-project.ts` and `config-schema-issues.ts` off
+`BOARD_NAMED`, `config-schema-readings.ts` and `config-schema-triage.ts` off
+`PR_NAMED`, `config-schema-checks.ts`, `config-schema-loop-continue.ts`,
+`config-schema-loop-retries.ts`, `config-schema-tests.ts` and
+`config-schema-wrap-up.ts` off `RUN_NAMED`, `config-schema-release.ts` off
+`RELEASE_NAMED` and `config-schema-hub.ts` off `EFFORT_NAMED`, which holds
+none now.
 
 **The left-to-place test is an edge check.** A file no rule holds is left to
 place, and it counts as the CLI's, the package that ranks highest. So an import
@@ -543,11 +559,16 @@ sits in the `rafa-effort` row beside `src/effort/`, and the table lists none of
 its files, since the graph holds no facade entry.
 
 **The counts rank options and do not certify a cut.** An upward edge from
-`packages/rafa/src/core/config/` into a `src/config-schema-<section>.ts` file is
+`packages/rafa/src/core/config/` into a `config-schema-<section>.ts` file is
 marked as cleared by #118, which makes each package own its config section. It
 still counts as upward: the table's `remaining` column is the count less the
-cleared edges. A count is only as current as the graph it was read from. `tsc
---build` with project references (#807) is the gate that certifies a cut.
+cleared edges. The rule reads none since the third decouple item (rafa-1325)
+moved the eleven sections into `packages/rafa/src/`, beside core's four, so an
+import from core's config folder into a section is no upward edge at all. The
+rule stays in `scripts/survey/cut-table.ts` for a section that moves back into
+a feature package that publishes on its own. A count is only as current as the
+graph it was read from. `tsc --build` with project references (#807) is the
+gate that certifies a cut.
 
 **The facade reader lists the names an outside file takes from a facade.**
 `scripts/survey/facade-names.ts --package=rafa-<name>` reads the root
@@ -964,25 +985,25 @@ names come from, and the facade entry is no node.
   the links.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script runs `scripts/build/bundle.ts`, which bun-builds
-  `src/rafa.ts`, five library entries under `src/` and, alone, the
-  learning entry the inventory package holds since pass 4a, with every
-  publishable member as `--external` (core is private, so it stays
-  bundled), and fails when a bundle holds a publishable member's file.
-  Two of those entries, `src/effort/store/index.ts` and
-  `src/ports/index.ts`, are one-line `export *` shims of
-  `@open-tomato/rafa/store` and `@open-tomato/rafa/ports`, so the `dist/`
-  files the root `exports` name exist until #808 bundles core into the
-  root. Its declarations come in two passes:
+  `src/rafa.ts`, five library entries under `src/` and, alone, the learning
+  entry the inventory package holds since pass 4a, with every publishable
+  member as `--external` (core is private, so it stays bundled), and fails
+  when a bundle holds a publishable member's file. Two of those entries,
+  `src/effort/store/index.ts` and `src/ports/index.ts`, are one-line
+  `export *` shims of `@open-tomato/rafa/store` and `@open-tomato/rafa/ports`,
+  so the `dist/` files the root `exports` name exist until #808 bundles core
+  into the root. Its declarations come in two passes:
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps thirteen `types`-only entries for
+  them. The root `exports` also keeps twenty-three `types`-only entries for
   core's files (`./core/config`, `./core/config/config-schema`,
   `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
-  `./ports/log-level`, `./report/parse`, `./store/check-rows`, and, since
-  pass 1 moved the section files in, `./bugs/record` and the four
-  `./config-schema-*` files), which #808 retires. The first pass's
-  `include` names each moved file the root's config files import.
+  `./ports/log-level`, `./report/parse`, `./store/check-rows`, and, since pass
+  1 and the third decouple item (rafa-1325) moved the section files in,
+  `./bugs/record` and the fourteen `./config-schema-*` files), which #808
+  retires. The first pass's `include` names each moved file the root's config
+  files import.
 - **A content schema is imported through its owner's `schemas` export.** A
   content schema is a frontmatter or record schema describing a file rafa
   reads (a skill, an agent, an instinct), not config and not a step. Across a
@@ -1089,11 +1110,10 @@ the end of the template. This section replaces nothing.
   test titles without one` until 2026-09-22, which those 46 falsify.
 - **An interface whose one `extends` is its whole content is refused**
   (`@typescript-eslint/no-empty-object-type`) everywhere but
-  `src/config-schema-*.ts` and `packages/rafa/src/config-schema-*.ts`,
-  where `eslint.config.mjs` and the package's own leaf allow it: a
-  section's `interface RafaConfig extends HubSettings {}` inside its
-  `declare module` is that shape on purpose. This bullet replaces
-  nothing.
+  `packages/rafa/src/config-schema-*.ts`, where `eslint.config.mjs` and the
+  package's own leaf allow it: a section's
+  `interface RafaConfig extends HubSettings {}` inside its `declare module` is
+  that shape on purpose.
 - **Markdown is a lint target, and every fenced block needs a language**
   (`markdown/fenced-code-language`). A fence shown INSIDE a fenced example
   — a `context/` page quoting the comment a command writes, say — is read

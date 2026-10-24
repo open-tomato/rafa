@@ -26,7 +26,7 @@ Each live sweep has planted controls beside it: a planted source the matcher mus
 
 - Outbound: none by import. The test names, and exempts, three helpers it never imports: `src/tests/git-identity.ts` (`gitIdentityEnv`) and `src/tests/scratch-home-env.ts` (`scratchHomeEnv`), both in `c08-cli-capture` (imported by 121 and 56 files, per the graph), and `packages/rafa-hub/src/testdata/scratch-home-env.ts` (`c12-index`). It reads `addRunWorktree` by name; that function is `src/start/worktree.ts` (`c02-active`), whose `git` seam is optional and falls back to `createGitRunner`, the host's own identity.
 - Inbound: none. Nothing imports a test.
-- Test reach, from `docs/survey/test-index.json`: index 0, 0 source files reached, no folders, no process spawned. A change to any source file leaves it unselected by `bun test --changed=<base>`; it runs on every task anyway, because its name ends `.sweep.test.ts` and the default `tests.alwaysRun` glob is `src/**/*.sweep.test.ts` (`src/config-schema-tests.ts`, line 135), which `src/start/task-always-run.ts` resolves and adds to a scoped run. It is one of the nine tracked sweeps under `src/tests/`. Its cost is one tree read: about 350 ms for the 25 tests on this checkout.
+- Test reach, from `docs/survey/test-index.json`: index 0, 0 source files reached, no folders, no process spawned. A change to any source file leaves it unselected by `bun test --changed=<base>`; it runs on every task anyway, because its name ends `.sweep.test.ts` and the default `tests.alwaysRun` glob is `src/**/*.sweep.test.ts` (`packages/rafa/src/config-schema-tests.ts`, line 135), which `src/start/task-always-run.ts` resolves and adds to a scoped run. It is one of the nine tracked sweeps under `src/tests/`. Its cost is one tree read: about 350 ms for the 25 tests on this checkout.
 
 ## Entry points
 
@@ -38,7 +38,7 @@ An entry point is a member imported from outside the cluster, or a command regis
 | --- | --- | --- | --- |
 | Commands | **missing** | none | a sweep is not a command |
 | Steps with guards | **missing** | none; the sweep gates every task through `tests.alwaysRun` (`src/start/task-always-run.ts`, `c02-active`), but the step is that file's | the sweep is the guard on a convention (isolate git and `HOME` in a spawned fixture), not a step with a class |
-| Config section | **missing** | none; it reads no config key; `tests.alwaysRun` (`src/config-schema-tests.ts`, `c03-config`) is what makes it run, and it is not read here | no section of its own |
+| Config section | **missing** | none; it reads no config key; `tests.alwaysRun` (`packages/rafa/src/config-schema-tests.ts`, `c03-config`) is what makes it run, and it is not read here | no section of its own |
 | Flows | **missing** | none | no multi-step path is driven; the sweep is a scan and a set of regex predicates |
 
 ### Commands

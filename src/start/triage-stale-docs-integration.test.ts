@@ -24,13 +24,13 @@ import {
   it,
 } from 'bun:test';
 
+import { ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { recordTaskReport } from '@open-tomato/rafa/report/record';
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';
 

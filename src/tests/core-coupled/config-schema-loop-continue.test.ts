@@ -18,15 +18,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 import {
-  ConfigError,
-  EMPTY_CONFIG_REGISTRY,
-  mergeConfigSections,
-  parseConfigText,
-  resolveConfig,
-} from '@open-tomato/rafa/core/config';
-
-import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
-import {
   CONTINUE_CRITERIA_MODES,
   FORCE_WRAP_UP_MAX_NEW_FAILURES_MAX,
   FORCE_WRAP_UP_MAX_NEW_FAILURES_MIN,
@@ -34,7 +25,16 @@ import {
   LOOP_CONTINUE_SECTION,
   RETRIES_ON_CONTINUE_MAX,
   RETRIES_ON_CONTINUE_MIN,
-} from './config-schema-loop-continue.js';
+} from '@open-tomato/rafa/config-schema-loop-continue';
+import {
+  ConfigError,
+  EMPTY_CONFIG_REGISTRY,
+  mergeConfigSections,
+  parseConfigText,
+  resolveConfig,
+} from '@open-tomato/rafa/core/config';
+
+import { CONFIG_DEFAULTS, SETTINGS } from '../../config-registry.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

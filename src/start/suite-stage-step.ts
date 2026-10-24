@@ -19,9 +19,9 @@
 
 import type { DueStage } from './suite-stage-ledger.js';
 import type { StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
-import type { CheckName } from '../config-schema-checks.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { CheckRun } from '../suite/checks.js';
+import type { CheckName } from '@open-tomato/rafa/config-schema-checks';
 import type { SessionStep, SessionStepReason } from '@open-tomato/rafa/core/loop';
 
 import { readFileSync } from 'node:fs';

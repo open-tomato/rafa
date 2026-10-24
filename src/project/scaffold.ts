@@ -81,8 +81,8 @@ import {
   PR_VERSION_COLLISION_LINE,
   RELEASE_FRAGMENT_LINES,
 } from '@open-tomato/rafa-release';
-import { CHECK_NAMES } from '@open-tomato/rafa-run';
 
+import { CHECK_NAMES } from '@open-tomato/rafa/config-schema-checks';
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { scopeAt } from '@open-tomato/rafa/project/scope';

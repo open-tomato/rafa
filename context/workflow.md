@@ -268,14 +268,15 @@ runner runs the suite after the task commits when the task declares
 `tests=full`.
 
 **Config keys choose the checks each step runs, and which tests always run:**
-- `checks.task`, `checks.stage` and `checks.loop` are the check points the
-  runner reads. Each is a list of check names from `affected`, `related`,
-  `unit`, `contract`, `integration` and `full`, each named at most once; a
-  name outside the list is refused, naming the key and the six. Each defaults
-  to an empty list, which runs nothing and blocks nothing at its point.
-  `checks.pullRequest`, `checks.stretch`, `checks.releasePullRequest` and
-  `checks.publish` take the same reader and default empty too, but no step
-  reads them yet (`src/config-schema-checks.ts`)
+- `checks.task`, `checks.stage` and `checks.loop` are the check points
+  the runner reads. Each is a list of check names from `affected`,
+  `related`, `unit`, `contract`, `integration` and `full`, each named at
+  most once; a name outside the list is refused, naming the key and the
+  six. Each defaults to an empty list, which runs nothing and blocks
+  nothing at its point. `checks.pullRequest`, `checks.stretch`,
+  `checks.releasePullRequest` and `checks.publish` take the same reader
+  and default empty too, but no step reads them yet
+  (`packages/rafa/src/config-schema-checks.ts`)
 - `templates` is a list of template names (`src/config/templates.ts`), which
   holds one template, `escalation`. `templates: [escalation]` adopts it: the
   three glob keys below, and the three check points it names:

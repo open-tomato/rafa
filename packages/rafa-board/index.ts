@@ -455,24 +455,6 @@ export {
   registryRoster,
 } from '../../src/commands/plan/refs-check.js';
 
-export type { BoardProjectLimitsShape } from '../../src/config-schema-board-project.js';
-export {
-  BOARD_PROJECT_LIMIT_DEFAULTS,
-  BOARD_PROJECT_LIMIT_SETTINGS,
-  BOARD_PROJECT_SECTION,
-} from '../../src/config-schema-board-project.js';
-
-export type {
-  IssuesConfigSettings,
-  IssuesShape,
-} from '../../src/config-schema-issues.js';
-export {
-  ISSUES_DEFAULTS,
-  ISSUES_SECTION,
-  ISSUES_SETTINGS,
-  bugRulesOf,
-} from '../../src/config-schema-issues.js';
-
 export type { CriterionCheck } from '../../src/epic/verify-plan.js';
 export { fenceFor } from '../../src/epic/verify-plan.js';
 

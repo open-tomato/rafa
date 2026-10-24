@@ -55,7 +55,7 @@
  * tracker that cannot be read, or a line `insertTrackerTask` refuses,
  * throws, as `insertTrackerTask` does; the caller answers the throw.
  */
-import type { LoopRetries } from '../config-schema-loop-retries.js';
+import type { LoopRetries } from '@open-tomato/rafa/config-schema-loop-retries';
 import type { BugKind } from '@open-tomato/rafa/report/parse';
 import type { InsertedTask } from '@open-tomato/rafa/utils/tracker';
 

@@ -4,13 +4,6 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-effort --entry`.
  */
 
-export type { HubShape } from '../../src/config-schema-hub.js';
-export {
-  HUB_DEFAULTS,
-  HUB_SECTION,
-  HUB_SETTINGS,
-} from '../../src/config-schema-hub.js';
-
 export {
   planStubsFromFileNames,
   resolvePlanStub,

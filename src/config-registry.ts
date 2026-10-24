@@ -95,15 +95,45 @@ import type {
 } from '@open-tomato/rafa/core/config';
 
 import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
+import {
+  BOARD_PROJECT_LIMIT_DEFAULTS,
+  BOARD_PROJECT_LIMIT_SETTINGS,
+  BOARD_PROJECT_SECTION,
+} from '@open-tomato/rafa/config-schema-board-project';
 import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from '@open-tomato/rafa/config-schema-bugs';
+import { CHECKS_DEFAULTS, CHECKS_SECTION, CHECKS_SETTINGS } from '@open-tomato/rafa/config-schema-checks';
 import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from '@open-tomato/rafa/config-schema-errors';
 import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from '@open-tomato/rafa/config-schema-features';
+import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from '@open-tomato/rafa/config-schema-hub';
+import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from '@open-tomato/rafa/config-schema-issues';
 import {
   LOGGER_DEFAULTS,
   LOGGER_SECTION,
   LOGGER_SETTINGS,
   loggerSettingsOf,
 } from '@open-tomato/rafa/config-schema-logger';
+import {
+  LOOP_CONTINUE_DEFAULTS,
+  LOOP_CONTINUE_SECTION,
+  LOOP_CONTINUE_SETTINGS,
+} from '@open-tomato/rafa/config-schema-loop-continue';
+import {
+  LOOP_RETRIES_DEFAULTS,
+  LOOP_RETRIES_SECTION,
+  LOOP_RETRIES_SETTINGS,
+} from '@open-tomato/rafa/config-schema-loop-retries';
+import {
+  DANGEROUS_RELEASE_DEFAULTS,
+  DANGEROUS_RELEASE_SETTINGS,
+  PR_DEFAULTS,
+  PR_SETTINGS,
+  RELEASE_DEFAULTS,
+  RELEASE_SECTION,
+  RELEASE_SETTINGS,
+} from '@open-tomato/rafa/config-schema-release';
+import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from '@open-tomato/rafa/config-schema-tests';
+import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from '@open-tomato/rafa/config-schema-triage';
+import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from '@open-tomato/rafa/config-schema-wrap-up';
 import {
   activeSettings,
   CORE_SECTION,
@@ -113,36 +143,6 @@ import {
 } from '@open-tomato/rafa/core/config';
 
 import { templateEntry } from './config/templates.js';
-import {
-  BOARD_PROJECT_LIMIT_DEFAULTS,
-  BOARD_PROJECT_LIMIT_SETTINGS,
-  BOARD_PROJECT_SECTION,
-} from './config-schema-board-project.js';
-import { CHECKS_DEFAULTS, CHECKS_SECTION, CHECKS_SETTINGS } from './config-schema-checks.js';
-import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from './config-schema-hub.js';
-import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from './config-schema-issues.js';
-import {
-  LOOP_CONTINUE_DEFAULTS,
-  LOOP_CONTINUE_SECTION,
-  LOOP_CONTINUE_SETTINGS,
-} from './config-schema-loop-continue.js';
-import {
-  LOOP_RETRIES_DEFAULTS,
-  LOOP_RETRIES_SECTION,
-  LOOP_RETRIES_SETTINGS,
-} from './config-schema-loop-retries.js';
-import {
-  DANGEROUS_RELEASE_DEFAULTS,
-  DANGEROUS_RELEASE_SETTINGS,
-  PR_DEFAULTS,
-  PR_SETTINGS,
-  RELEASE_DEFAULTS,
-  RELEASE_SECTION,
-  RELEASE_SETTINGS,
-} from './config-schema-release.js';
-import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
-import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from './config-schema-triage.js';
-import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
 
 /** The fifteen sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([

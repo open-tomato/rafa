@@ -49,7 +49,7 @@ function ruleIds(messages: Linter.LintMessage[]): (string | null)[] {
 const LEARNING_DIR = 'packages/rafa-inventory/src/learning';
 const SCRATCH = `${LEARNING_DIR}/boundary-scratch.ts`;
 
-describe('the src/learning/ boundary rule', () => {
+describe('the packages/rafa-inventory/src/learning/ boundary rule', () => {
   test('refuses an import of @open-tomato/rafa/core/config from src/learning/', async () => {
     const messages = await messagesFor(
       SCRATCH,
@@ -57,7 +57,9 @@ describe('the src/learning/ boundary rule', () => {
     );
 
     expect(ruleIds(messages)).toEqual(['import/no-restricted-paths']);
-    expect(messages[0]?.message).toContain('src/learning/ imports nothing from core.');
+    expect(messages[0]?.message).toContain(
+      'packages/rafa-inventory/src/learning/ imports nothing from core.',
+    );
   });
 
   test('refuses an import of ../tiers/resolve.js from src/learning/', async () => {
@@ -68,7 +70,7 @@ describe('the src/learning/ boundary rule', () => {
 
     expect(ruleIds(messages)).toEqual(['import/no-restricted-paths']);
     expect(messages[0]?.message).toContain(
-      'src/learning/ imports nothing from the rest of src/.',
+      'packages/rafa-inventory/src/learning/ imports nothing from the rest of the package\'s src/.',
     );
   });
 
@@ -109,7 +111,7 @@ describe('the src/learning/ boundary rule', () => {
 
       expect(ruleIds(messages)).toEqual(['no-restricted-imports']);
       expect(messages[0]?.message).toContain(
-        'src/learning/ touches no filesystem.',
+        'packages/rafa-inventory/src/learning/ touches no filesystem.',
       );
     },
   );
