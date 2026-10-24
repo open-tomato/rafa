@@ -200,11 +200,11 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
+import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 import type {
   BugTriage,
   InheritedTriage,
   KindRouteOptions,
-  SecretEnvironment,
   TriageOptions,
   TriageResult,
 } from '@open-tomato/rafa-pr';
@@ -217,8 +217,6 @@ import {
   checkedKindOf,
   hasText,
   inheritedFailureOf,
-  namedSecrets,
-  redactSecrets,
   scoreText,
   triageReport,
 } from '@open-tomato/rafa-pr';
@@ -229,6 +227,7 @@ import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { isMachineFault } from '@open-tomato/rafa/store/machine-fault';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { createGhRunner } from '../adapters/tracker/github.js';

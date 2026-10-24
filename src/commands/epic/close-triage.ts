@@ -83,17 +83,19 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { AddIssueOptions, RefreshAddedItems } from '../../board/project/add-issue.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';
-import type { BugTriage, NamedSecret, TriageResult } from '../../triage/triage.js';
+import type { BugTriage, TriageResult } from '../../triage/triage.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { TaskReport } from '@open-tomato/rafa/report/parse';
+import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
 
 import { join } from 'node:path';
 
 import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -102,7 +104,7 @@ import { addFiledBugs } from '../../board/project/add-filed.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { readStaleDocsVersion } from '../../start/stale-docs.js';
 import { unresolvedTracker } from '../../start/triage.js';
-import { namedSecrets, redactSecrets, triageReport } from '../../triage/triage.js';
+import { triageReport } from '../../triage/triage.js';
 
 import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';
 

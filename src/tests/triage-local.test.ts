@@ -27,10 +27,10 @@
  * issue file on disk, never off what `triageReport` answered.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
-import type { NamedSecret } from '../triage/triage.js';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
+import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {

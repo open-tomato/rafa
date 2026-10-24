@@ -75,11 +75,11 @@ import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isInside, packageOf, rootPackageOf } from '@open-tomato/rafa/project/package-of';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { bodyOf, checkoutOf, draftOf, redacted, settled } from '../../bugs/fill.js';
 import { codeVersionOf, versionsText } from '../../bugs/versions.js';
-import { namedSecrets, redactSecrets } from '../../triage/triage.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal, readNonBlankFlag } from './issue-tracker.js';
 

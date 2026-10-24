@@ -77,6 +77,7 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
 import type {
   BoardTrust,
   IssueSeams,
@@ -84,7 +85,6 @@ import type {
   LineFlags,
   TrustReading,
 } from '@open-tomato/rafa-board';
-import type { NamedSecret } from '@open-tomato/rafa-pr';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -108,8 +108,6 @@ import {
   NO_COMMIT,
   checkoutOf,
   codeVersionOf,
-  namedSecrets,
-  redactSecrets,
 } from '@open-tomato/rafa-pr';
 import { suiteEnv } from '@open-tomato/rafa-run';
 
@@ -118,6 +116,7 @@ import { readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/r
 import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 import { readTestReference, resolveTestReference } from '../../bugs/test-reference.js';

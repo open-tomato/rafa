@@ -1,8 +1,8 @@
 /**
  * The `issue` declarations as values: the values `declarations.ts` copies
  * from outside `src/commands/` stay equal to their sources (the triage
- * module read off `src/triage/triage.ts` as text, so no module of the
- * triage feature is imported); `issue ready` declares core's
+ * module read off core's `packages/rafa/src/triage/filed-text.ts` as
+ * text, so no triage module is imported); `issue ready` declares core's
  * `HINT_FLAG_SPEC` itself, not a copy; and each of the nine modules
  * exports a command that is its declaration plus a `run`.
  *
@@ -59,7 +59,7 @@ import issueShow from './show.js';
 import issueUnblock from './unblock.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const TRIAGE_PATH = join(HERE, '..', '..', 'triage', 'triage.ts');
+const TRIAGE_PATH = join(HERE, '..', '..', '..', 'packages', 'rafa', 'src', 'triage', 'filed-text.ts');
 
 /**
  * The string a source text initializes `TRIAGE_MODULE` with.
@@ -68,7 +68,7 @@ const TRIAGE_PATH = join(HERE, '..', '..', 'triage', 'triage.ts');
  * @returns The literal's value, or `undefined` when no such declaration holds one.
  */
 function readTriageModule(text: string): string | undefined {
-  const file = ts.createSourceFile('triage.ts', text, ts.ScriptTarget.Latest, true);
+  const file = ts.createSourceFile('filed-text.ts', text, ts.ScriptTarget.Latest, true);
   let found: string | undefined;
   const visit = (node: ts.Node): void => {
     if (

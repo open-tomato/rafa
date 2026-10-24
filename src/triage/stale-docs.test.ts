@@ -29,9 +29,10 @@
  *     the line not redacted 2, not cut to one line 2, cut before it is
  *     redacted 1, a blank `where` named 1, every index 0 2.
  */
-import type { BugTriage, NamedSecret, TriageOptions, TriageResult } from './triage.js';
+import type { BugTriage, TriageOptions, TriageResult } from './triage.js';
 import type { Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 import type { ReportBug, ReportStaleDoc, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
 
 import {
   mkdirSync,

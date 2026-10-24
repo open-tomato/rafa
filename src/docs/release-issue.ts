@@ -90,9 +90,9 @@ import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { unescapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 
 import { nextVersion } from '../release/version.js';
-import { TRIAGE_MODULE } from '../triage/triage.js';
 
 /** The comment a stale-docs issue's body holds, which marks the issue as one. */
 export const STALE_DOCS_MARKER = '<!-- rafa:stale-docs -->';

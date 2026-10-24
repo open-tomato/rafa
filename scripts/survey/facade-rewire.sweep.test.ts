@@ -66,8 +66,11 @@ interface RewiredRow {
  * `src/start/branch-decision.ts` and `src/release/fragment-tree.ts` left the
  * row in the fourth decouple item: their one pr import by path was the pr
  * barrel, for core's git names and `WorkingTreeStatus`, which they take from
- * `@open-tomato/rafa/core/git` now. Its 18 back-edge files are board and
+ * `@open-tomato/rafa/core/git` now. Its 17 back-edge files are board and
  * release files, every one earlier in the move order.
+ * `src/commands/issue/create.ts` left them in the same item: its one pr
+ * import by path was `TRIAGE_MODULE`, which it takes from
+ * `@open-tomato/rafa/triage/filed-text` now.
  * Run's 13 load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
@@ -133,7 +136,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/epic/close-triage.ts': 'backEdge',
       'src/commands/epic/close.ts': 'backEdge',
       'src/commands/issue/create-bug.ts': 'backEdge',
-      'src/commands/issue/create.ts': 'backEdge',
       'src/commands/release/fragment.ts': 'backEdge',
       'src/commands/release/list.ts': 'backEdge',
       'src/commands/release/publish.ts': 'backEdge',

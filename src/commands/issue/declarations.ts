@@ -33,7 +33,8 @@
  * each equal to its source: `ISSUE_STATE_WORDS`, `ISSUE_TYPE_WORDS` and
  * `ISSUE_PRIORITY_WORDS` are `ISSUE_STATES`, `ISSUE_TYPES` and
  * `ISSUE_PRIORITIES` (`src/adapters/tracker/issue-values.ts`);
- * `ISSUE_TRIAGE_MODULE` is `TRIAGE_MODULE` (`src/triage/triage.ts`);
+ * `ISSUE_TRIAGE_MODULE` is `TRIAGE_MODULE`
+ * (`packages/rafa/src/triage/filed-text.ts`);
  * `ISSUE_READY_LABEL`, `ISSUE_NEEDS_WORK_LABEL` and
  * `ISSUE_BLOCKED_LABEL` are `SPEC_READY_LABEL`
  * (`src/board/readiness.ts`), `SPEC_NEEDS_WORK_LABEL`

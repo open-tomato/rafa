@@ -120,12 +120,12 @@ import type { IssueDraft, IssueRef, IssueType, Tracker } from '@open-tomato/rafa
 
 import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
-import { TRIAGE_MODULE } from '../../triage/triage.js';
 
 import { readSpecLine, settleSpecLine } from './create-blocked.js';
 import { BUG_FLAGS, readBugLine } from './create-bug.js';

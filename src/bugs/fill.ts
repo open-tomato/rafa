@@ -45,8 +45,7 @@ import type { IssueDraft } from '@open-tomato/rafa/ports';
 import { bugTitle, hasBugSections, otherSections, renderBugBody } from '@open-tomato/rafa/bugs/record';
 import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { isInside } from '@open-tomato/rafa/project/package-of';
-
-import { TRIAGE_MODULE } from '../triage/triage.js';
+import { TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 
 import { errorLineOf } from './versions.js';
 

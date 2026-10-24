@@ -247,15 +247,10 @@ export {
 
 export type {
   BugTriage,
-  NamedSecret,
-  SecretEnvironment,
   TriageOptions,
   TriageResult,
 } from '../../src/triage/triage.js';
 export {
-  TRIAGE_MODULE,
   blockerTextOf,
-  namedSecrets,
-  redactSecrets,
   triageReport,
 } from '../../src/triage/triage.js';

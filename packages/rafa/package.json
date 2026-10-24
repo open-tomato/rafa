@@ -63,6 +63,7 @@
     "./schema/frontmatter": "./src/schema/frontmatter.ts",
     "./start/worktree-dir": "./src/start/worktree-dir.ts",
     "./triage/doc-only": "./src/triage/doc-only.ts",
+    "./triage/filed-text": "./src/triage/filed-text.ts",
     "./triage/local-paths": "./src/triage/local-paths.ts"
   },
   "scripts": {
