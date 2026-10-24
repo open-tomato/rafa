@@ -57,7 +57,12 @@ interface RewiredRow {
  * a load cycle and `src/claims/drift.ts`, `src/claims/labels.ts`,
  * `src/commands/switch.ts` and `src/start/triage.ts` to rewire. The dry run
  * takes all four now, the facade having the names they import, so they stay
- * on their paths until the rewire runs. The same stage took
+ * on their paths until the rewire runs. On the graph the fifth decouple
+ * item's survey regenerated, with board's back edges into run and pr gone,
+ * the codemod reads none of the nineteen on a load cycle and all nineteen to
+ * rewire, refusing `scanClaimBranches` of `src/board/roadmap.ts` in
+ * `src/next/readings.ts` and `src/next/sources.ts`; the rows below hold the
+ * path, not the group, so they stay. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
  * `preflight-drift.ts` onto the facade. `src/claims/ahead.ts` and
  * `src/epic/verify-run.ts` left the row in the fourth decouple item, which

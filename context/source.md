@@ -737,7 +737,13 @@ names come from, and the facade entry is no node.
     `switch.ts` and `start/triage.ts`, to rewire. The facade now exports
     `BranchScan`, `scanClaimBranches` and `ROADMAP_LABEL`, so the rewire takes
     all four and refuses none; they keep their paths until the rewire runs,
-    and its commit takes them off the guard's row.
+    and its commit takes them off the guard's row. On the graph the fifth
+    decouple item's survey regenerated, board's back edges into run and pr
+    gone, the dry run reads none of the nineteen on a load cycle and all
+    nineteen to rewire, and refuses two statements, `src/next/readings.ts:119`
+    and `src/next/sources.ts:277`, which take `scanClaimBranches` from
+    `src/board/roadmap.ts` while the facade lists it under another file; the
+    guard checks the path, not the group, so its row is unchanged.
     `src/claims/ahead.ts` and `src/epic/verify-run.ts` left them in the fourth
     decouple item (rafa-1333), which places both in board by name, and
     `src/claims/plan-claim.ts`, which took them by path, took the facade. The
