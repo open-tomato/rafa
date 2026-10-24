@@ -19,6 +19,7 @@ import { describe, expect, it } from 'bun:test';
 import { activeServices, registerServices, restoreServices, SERVICE_REASONS } from '@open-tomato/rafa/core/services';
 
 import { CORE_SERVICES, registerCoreServices } from './service-registry.js';
+import { expectExit } from './tests/cli-capture.js';
 
 const REFUSAL_PREFIX = 'service registry:';
 const SERVICE_KEYS = Object.keys(SERVICE_REASONS).sort();
@@ -70,10 +71,11 @@ describe('registerCoreServices', () => {
   });
 
   it('exits 0 with no registry refusal when the real entry prints --help', () => {
-    const child = Bun.spawnSync([process.execPath, 'src/rafa.ts', '--help'], { cwd: import.meta.dir + '/..' });
+    const spawned = Bun.spawnSync([process.execPath, 'src/rafa.ts', '--help'], { cwd: import.meta.dir + '/..' });
+    const child = { exitCode: spawned.exitCode, stdout: spawned.stdout.toString(), stderr: spawned.stderr.toString() };
 
-    expect(child.exitCode).toBe(0);
-    expect(child.stdout.toString()).not.toContain(REFUSAL_PREFIX);
-    expect(child.stderr.toString()).not.toContain(REFUSAL_PREFIX);
+    expectExit(child, 0);
+    expect(child.stdout).not.toContain(REFUSAL_PREFIX);
+    expect(child.stderr).not.toContain(REFUSAL_PREFIX);
   });
 });
