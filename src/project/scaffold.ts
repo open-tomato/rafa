@@ -39,11 +39,11 @@
  * Seven lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
  * `loop.worktreeSetup`, `pr.provider`, `pr.base`, `board.project.number`
  * and `roadmap.issue`, because each resolves to null and null is what a
- * key with no value parses to. Uncommented they
- * are silent, so those seven settings resolve from the defaults layer
- * where every other resolves from the file, and the tests name them. The line is written anyway: it tells an operator
- * the key exists and what it takes, which is the whole point of a
- * template of commented settings.
+ * key with no value parses to. Uncommented they are silent, so those
+ * seven settings resolve from the defaults layer where every other
+ * resolves from the file, and the tests name them. The line is written
+ * anyway: it tells an operator the key exists and what it takes, which
+ * is the whole point of a template of commented settings.
  *
  * The `tiers`, `routing`, `task`, `tests` and `checks` sections close
  * the template. `tiers.skills` and `tiers.agents` are written as `{}`, their
