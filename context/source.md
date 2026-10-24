@@ -59,18 +59,20 @@ spells out, and the shapes the lint config forces.
   importing the index loads the declarations and the core command barrel
   and no command module. `index.test.ts` reads each call off the source
   and holds its loader to its declaration's module.
-- **No module under `src/` registers an adapter or a config section on
-  import.** `src/config-registry.ts` and `src/adapter-registry.ts` register
-  nothing as they load, and neither do the declarations, the feature
-  indexes or the command modules. The registration calls sit at the top
-  level of two roots only: `src/index.ts`, the `@open-tomato/rafa` entry,
-  and `src/rafa.ts`, the CLI's. Each calls `registerCoreConfigSections`,
-  then `registerCoreAdapters`, once its imports have loaded.
-  `src/tests/preload.ts` makes the same two calls, and `bunfig.toml`'s
-  `[test] preload` runs it before the first test file. Other callers, such
-  as `src/cli/feature-load-probe.ts`, call them inside a function they run,
-  never on import. A child process a test spawns runs no preload, so its
-  script calls a root itself before it reads either registry.
+- **No module under `src/` registers an adapter, a service or a config
+  section on import.** `src/config-registry.ts`, `src/adapter-registry.ts`
+  and `src/service-registry.ts` register nothing as they load, and
+  neither do the declarations, the feature indexes or the command
+  modules. The registration calls sit at the top level of two entries
+  only: `src/index.ts`, the `@open-tomato/rafa` entry, and `src/rafa.ts`,
+  the CLI's. Each calls `registerCoreConfigSections`, then
+  `registerCoreAdapters`, then `registerCoreServices`, once its imports
+  have loaded. `src/tests/preload.ts` makes the same three calls, and
+  `bunfig.toml`'s `[test] preload` runs it before the first test file.
+  Other callers, such as `src/cli/feature-load-probe.ts`, call them inside
+  a function they run, never on import. A child process a test spawns
+  runs no preload, so its script calls a root itself before it reads any
+  of the three registries.
 
 ### Explicit types on exports
 

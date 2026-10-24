@@ -23,7 +23,7 @@ module's note is the long form.
 | `packages/rafa/src/core/command/shared-flags.ts` | the flags commands of several features declare, spelled once: `HINT_FLAG`, `'hint'`, and `HINT_FLAG_SPEC`, the `--no-hint` flag the six commands that end with a hint declare by identity (`pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready`, `loop start`), and `DEFAULT_CI_TIMEOUT_MIN`, 20, the minutes the loop's `--ci-timeout` and `pr wait`'s `--timeout` default to, here because a declarations file imports core's entries alone |
 | `packages/rafa/src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
-| `src/cli/feature-load-probe.ts` | the probe `src/cli/feature-load-cli.test.ts` spawns fresh: with no argument it registers core's sections and adapters, builds `createRosterRegistry()`, renders every help level and `describeRegistry`, and prints the modules `require.cache` holds under the repository root as `{ loaded, featureActions }`; `--run=<subject> <action>` runs that command's `run` over no project and no argument and prints the thrown message beside them as `refusal`; `--project=<dir> --home=<dir>` loads that project's modules and prints the adapter kinds before and after activation, building no roster |
+| `src/cli/feature-load-probe.ts` | the probe `src/cli/feature-load-cli.test.ts` spawns fresh: with no argument it registers core's sections, adapters and services, builds `createRosterRegistry()`, renders every help level and `describeRegistry`, and prints the modules `require.cache` holds under the repository root as `{ loaded, featureActions }`; `--run=<subject> <action>` runs that command's `run` over no project and no argument and prints the thrown message beside them as `refusal`; `--project=<dir> --home=<dir>` loads that project's modules and prints the adapter kinds before and after activation, building no roster |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help`, `rafa issue ready --help`, `rafa issue edit --help` and `rafa release tag --help` |
 | `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts` and `page.ts` the four prompts for text input, single selection, multi-selection and paged lists in raw mode on standard error; `confirm.ts`, the confirmation prompt, is `packages/rafa/src/core/command/confirm.ts` |
 | `packages/rafa/src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
@@ -169,7 +169,7 @@ module's note is the long form.
 | `src/commands/switch.ts` | `rafa switch <n | -> [--no-rehome]`: this checkout's place moved to a board or an epic by its number, or back to the previous place, decided off one board listing and written to `.rafa/position.json` through `packages/rafa/src/project/position.ts`, starting from the place `src/board/place.ts` resolves |
 | `src/adapters/tracker/github-open-issues.ts` | the `openIssues` reading of the `github` Tracker adapter: one `gh issue list --state open` narrowed by the `type:` label and asking for `OPEN_LIST_FIELDS`, so each row carries its title, body and `createdAt` in the one call. A row whose `createdAt` is missing or unparseable answers null, and the listing goes on; a row whose title or body is not a string fails it. Up to `OPEN_ISSUES_LIMIT` rows, newest first as `gh` lists them. `github.ts` hands it its own runner and row readers. The pit stop's open-bug count reads it as `openIssues('bug')`; its filed-since line reads `filedIssues` (`github-filed-issues.ts`) instead, so a bug closed after filing stays listed there |
 | `src/adapters/tracker/github-filed-issues.ts` | the `filedIssues` reading of the `github` Tracker adapter: one `gh issue list --state all` narrowed by the `type:` label and by a `--search` of `created:>=<since>`, `since` written to the second in UTC, asking for `OPEN_LIST_FIELDS` up to `OPEN_ISSUES_LIMIT` rows, newest first, so an issue closed since its filing is listed beside the open ones. A row whose `createdAt` is missing or unparseable fails the listing, naming the row, as one whose title or body is not a string does; a `since` that is no valid `Date` and a type the port does not name are refused before anything is sent. `github.ts` hands it the readers it hands `openIssues` |
-| `src/rafa.ts` | the entry: `process.argv` dispatched through `createRosterRegistry({ off: modules.disabledFeatures })`, built after `loadInvocationModules`, with `renderHelp`, and the exit code set |
+| `src/rafa.ts` | the entry: core's config sections, adapters and services registered through the three roots (`src/config-registry.ts`, `src/adapter-registry.ts`, `src/service-registry.ts`), then `process.argv` dispatched through `createRosterRegistry({ off: modules.disabledFeatures })`, built after `loadInvocationModules`, with `renderHelp`, and the exit code set |
 | `src/suite/checks.ts` | `resolveChecks`, the pure resolver of one check-point entry (`checks.task`, `checks.stage`, `checks.loop`) over the six check names into one `CheckRun`: an empty entry runs no check, and a `full` or a trigger widens the run |
 | `src/config/templates.ts` | `CONFIG_TEMPLATES`, `TEMPLATE_NAMES` and `templateEntry`: the `escalation` template a file adopts with `templates:`, reached by core only through the hook `src/config-registry.ts` sets |
 | `src/start/suite-task-step.ts` | `runTaskStep`, the suite step the runner takes after each task commits, with `checkRunsOf` for the pre-wrap-up step; `start/suite-step.ts` re-exports both names |
@@ -423,9 +423,9 @@ New; it replaces no earlier text. What a row or an action added to
 - **No feature command module loads until its command runs, and no
   module's adapters until the config names it.** `src/cli/feature-load-cli.test.ts`
   spawns `src/cli/feature-load-probe.ts` fresh and reads the modules off
-  `require.cache`: after the probe registers core's sections and
-  adapters, builds `createRosterRegistry()` and renders every help level
-  and `describeRegistry`, no `src/commands/<subject>/<action>.ts` of a
+  `require.cache`: after the probe registers core's sections, adapters
+  and services, builds `createRosterRegistry()` and renders every help
+  level and `describeRegistry`, no `src/commands/<subject>/<action>.ts` of a
   declared feature action is loaded; after it runs one (`--run=claim
   release`), that module alone of its feature is; and over a scratch
   project `loadInvocationModules` plus `activateModuleAdapters` load
@@ -2925,10 +2925,12 @@ refused config list no module action and say nothing of why.
   actions, or that none is mounted.
 - **The entries register core.** `src/rafa.ts` and `src/index.ts` call
   `registerCoreConfigSections` (`src/config-registry.ts`), then
-  `registerCoreAdapters` (`src/adapter-registry.ts`), so the entries hold
+  `registerCoreAdapters` (`src/adapter-registry.ts`), then
+  `registerCoreServices` (`src/service-registry.ts`), which hands run's
+  and pr's four services to core's service registry, so the entries hold
   under a manifest declaring `"sideEffects": false`, which the root
   manifest does not declare today because bun 1.3.14's split build breaks
-  under it (#1213). The test suite gets the same two calls from
+  under it (#1213). The test suite gets the same three calls from
   `src/tests/preload.ts`, which `bunfig.toml` names under `[test] preload`;
   a child process a test spawns runs no preload and calls the entries itself.
 
