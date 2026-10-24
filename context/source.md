@@ -692,18 +692,20 @@ names come from, and the facade entry is no node.
     decouple item cut that edge, and it took the facade once the graph was
     regenerated without the cycle, so the guard's inventory row is empty;
     `packages/rafa-inventory/src/start/serving.ts` is an inventory file by name,
-    so it is no importer. Board has twenty-one: `src/bugs/filed-values.ts`,
-    `src/claims/ahead.ts`, `src/claims/drift.ts`, `src/claims/labels.ts`,
-    `src/commands/switch.ts`, `src/epic/verify-run.ts`,
+    so it is no importer. Board has nineteen: `src/bugs/filed-values.ts`,
+    `src/claims/drift.ts`, `src/claims/labels.ts`, `src/commands/switch.ts`,
     `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/owner-gate.ts`,
     `src/next/readings.ts`, `src/next/relations-mode.ts`, `src/next/sources.ts`,
     `src/next/state.ts`, `src/pr/gh-close.ts`, `src/pr/gh.ts`,
     `src/pr/owner-approval.ts`, `src/start/stale-docs.ts`,
     `src/start/triage.ts`, `src/triage/bug-filing.ts`,
-    `src/triage/refs-section.ts` and `src/triage/triage.ts`. The second decouple
-    item took the importers it freed onto the facades: inventory's
-    `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and board's
-    `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
+    `src/triage/refs-section.ts` and `src/triage/triage.ts`.
+    `src/claims/ahead.ts` and `src/epic/verify-run.ts` left them in the fourth
+    decouple item (rafa-1333), which places both in board by name, and
+    `src/claims/plan-claim.ts`, which took them by path, took the facade. The
+    second decouple item took the importers it freed onto the facades:
+    inventory's `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and
+    board's `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
     `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an
     effort file, sat among them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
@@ -755,9 +757,8 @@ names come from, and the facade entry is no node.
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
     the decouple step before pass 4 cuts them.
-    Run has fifteen: seven board files (`src/board/issue-edit-state.ts`,
-    `src/board/spec-source.ts`, `src/commands/board/list.ts`, the three
-    `src/commands/epic/` files `close-triage.ts`, `close.ts` and `new.ts`, and
+    Run has twelve: four board files (`src/commands/board/list.ts`, the two
+    `src/commands/epic/` files `close-triage.ts` and `new.ts`, and
     `src/commands/issue/ready.ts`), the eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and

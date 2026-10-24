@@ -118,16 +118,21 @@
  * A landed C gets `rafa:claimed` by the home label's rule, over the
  * labels the request read off C, and never `rafa:in-development`.
  */
-import type { AheadClaim, AheadRequest, AtomicClaimRef } from './ahead.js';
 import type { DeviceStoreId, DeviceStoreIds } from './device.js';
 import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
 import type { ClaimsAhead, ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
-import type { IssueBoard } from '@open-tomato/rafa-board';
+import type { AheadClaim, AheadRequest, AtomicClaimRef, IssueBoard } from '@open-tomato/rafa-board';
 import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import path from 'node:path';
 
-import { weighBranchClaim } from '@open-tomato/rafa-board';
+import {
+  aheadEnabled,
+  aheadNotClaimed,
+  pushClaimsAtomic,
+  resolveAheadTarget,
+  weighBranchClaim,
+} from '@open-tomato/rafa-board';
 import { gitSaid } from '@open-tomato/rafa-pr';
 
 import {
@@ -144,7 +149,6 @@ import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/st
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
 import { branchNameFor, localRef, REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
-import { aheadEnabled, aheadNotClaimed, pushClaimsAtomic, resolveAheadTarget } from './ahead.js';
 import { holdsClaim } from './device.js';
 import { labelClaimed } from './labels.js';
 

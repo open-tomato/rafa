@@ -51,10 +51,13 @@ interface RewiredRow {
  * the row onto the facade: the three effort files of the skills report,
  * `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
  * `src/inventory/browse.ts`.
- * Board's 21 load-cycle files are mostly run and pr files that board's files
+ * Board's 19 load-cycle files are mostly run and pr files that board's files
  * reach through `src/claims/`, `src/next/` and `src/start/`. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
- * `preflight-drift.ts` onto the facade.
+ * `preflight-drift.ts` onto the facade. `src/claims/ahead.ts` and
+ * `src/epic/verify-run.ts` left the row in the fourth decouple item, which
+ * places them in board by name, and `src/claims/plan-claim.ts`, which took
+ * them by path then, took the facade.
  * Release's one board importer, `src/board/project/facts.ts`, left the row
  * in the fourth decouple item: its one release import by path was
  * `directoryPrefix` and `fragmentIdOf`, which it takes from
@@ -86,8 +89,11 @@ interface RewiredRow {
  * took into core. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
  * left the row in the third decouple item: their one run import by path
  * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
- * 14 back-edge files are board and pr files, every one earlier in the
- * move order.
+ * 12 back-edge files are board and pr files, every one earlier in the
+ * move order. `src/board/spec-source.ts` and `src/commands/epic/close.ts`
+ * left them in the fourth decouple item: their one run import by path was
+ * `src/claims/ahead.ts` and `src/epic/verify-run.ts`, which it places in
+ * board by name.
  * No row keeps a file for the library build any more. Board, release, pr
  * and run each take their feature object through a commands entry,
  * `@open-tomato/rafa-<name>/commands`, which the roster alone imports, so a
@@ -107,11 +113,9 @@ const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
       'src/bugs/filed-values.ts': 'loadCycle',
-      'src/claims/ahead.ts': 'loadCycle',
       'src/claims/drift.ts': 'loadCycle',
       'src/claims/labels.ts': 'loadCycle',
       'src/commands/switch.ts': 'loadCycle',
-      'src/epic/verify-run.ts': 'loadCycle',
       'src/next/hop-action.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
@@ -172,12 +176,10 @@ const REWIRED: readonly RewiredRow[] = [
   },
   {
     allowed: {
-      'src/board/spec-source.ts': 'backEdge',
       'src/cleanup/groups.ts': 'loadCycle',
       'src/cleanup/steps.ts': 'loadCycle',
       'src/commands/board/list.ts': 'backEdge',
       'src/commands/epic/close-triage.ts': 'backEdge',
-      'src/commands/epic/close.ts': 'backEdge',
       'src/commands/epic/new.ts': 'backEdge',
       'src/commands/issue/ready.ts': 'backEdge',
       'src/commands/pr/merge-cleanup.ts': 'backEdge',

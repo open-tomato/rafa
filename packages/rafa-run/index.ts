@@ -4,17 +4,6 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-run --entry`.
  */
 
-export type {
-  AheadCandidate,
-  AheadRequest,
-} from '../../src/claims/ahead.js';
-export {
-  aheadClaimedLine,
-  aheadEnabled,
-  aheadNotClaimedWarning,
-  nextUndoneLine,
-} from '../../src/claims/ahead.js';
-
 export { readDeviceStoreId } from '../../src/claims/device.js';
 
 export { STAGE_LABELS } from '../../src/claims/labels.js';
@@ -75,13 +64,6 @@ export {
   default as command,
   defaultBoardOnce,
 } from '../../src/commands/switch.js';
-
-export type {
-  CheckAnswered,
-  CheckUnanswered,
-  VerifyRunRan,
-} from '../../src/epic/verify-run.js';
-export { runVerification } from '../../src/epic/verify-run.js';
 
 export type { EventLine } from '../../src/loop/events-file.js';
 export {

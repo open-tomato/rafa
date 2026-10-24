@@ -70,26 +70,27 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
 import type { Output } from '@open-tomato/rafa/ports';
 import type {
+  AheadRequest,
   GateIssue,
   PlanSpecResolution,
   RefreshConfig,
   ResolvedSpec,
 } from '@open-tomato/rafa-board';
 import type {
-  AheadRequest,
   PlanClaim,
   PlanClaimContext,
   PlanClaimRequest,
 } from '@open-tomato/rafa-run';
 
-import { createGhRunner, createRefreshingGhIssueBoard } from '@open-tomato/rafa-board';
-import { resolvePrProvider } from '@open-tomato/rafa-pr';
 import {
   aheadClaimedLine,
   aheadEnabled,
   aheadNotClaimedWarning,
-  readDeviceStoreId,
-} from '@open-tomato/rafa-run';
+  createGhRunner,
+  createRefreshingGhIssueBoard,
+} from '@open-tomato/rafa-board';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
+import { readDeviceStoreId } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

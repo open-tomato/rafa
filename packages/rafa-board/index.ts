@@ -322,10 +322,7 @@ export {
   tickSentence,
 } from '../../src/board/roadmap-tick.js';
 
-export type {
-  RoadmapLine,
-  RoadmapReadings,
-} from '../../src/board/roadmap.js';
+export type { RoadmapLine } from '../../src/board/roadmap.js';
 export {
   closedIssuesIn,
   createGhOpenPullRequests,
@@ -404,6 +401,20 @@ export type {
 
 export { causeOf } from '../../src/bugs/cause-rule.js';
 
+export type {
+  AheadClaim,
+  AheadRequest,
+  AtomicClaimRef,
+} from '../../src/claims/ahead.js';
+export {
+  aheadClaimedLine,
+  aheadEnabled,
+  aheadNotClaimed,
+  aheadNotClaimedWarning,
+  pushClaimsAtomic,
+  resolveAheadTarget,
+} from '../../src/claims/ahead.js';
+
 export { BOARD_SUBJECT } from '../../src/commands/board/declarations.js';
 
 export type {
@@ -455,7 +466,6 @@ export {
   registryRoster,
 } from '../../src/commands/plan/refs-check.js';
 
-export type { CriterionCheck } from '../../src/epic/verify-plan.js';
 export { fenceFor } from '../../src/epic/verify-plan.js';
 
 export type {

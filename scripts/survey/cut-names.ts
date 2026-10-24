@@ -10,13 +10,16 @@
 
 /**
  * The files named for `rafa-board`: the fourteen `src/board/` files
- * `docs/survey/cluster-map.json` puts in cluster c6, and the six root
+ * `docs/survey/cluster-map.json` puts in cluster c6, and the eight root
  * files that reach the board. The fifteenth reaches only core and moved
  * into it in the first decouple item, as `packages/rafa/src/board/naming.ts`.
  * The section files `config-schema-board-project.ts` and
  * `config-schema-issues.ts` left the list in the third decouple item
  * (rafa-1325), which moves them into core's package, where the
- * `packages/rafa/` folder of `CUT_RULES` places them.
+ * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
+ * item (rafa-1333) added `src/claims/ahead.ts` and `src/epic/verify-run.ts`
+ * by pass 1's rule: once its cuts are made, each reaches only board and
+ * core, so each is board's.
  */
 export const BOARD_NAMED: readonly string[] = [
   'src/board/flags.ts',
@@ -34,9 +37,11 @@ export const BOARD_NAMED: readonly string[] = [
   'src/board/spec-source.ts',
   'src/board/trust.ts',
   'src/bugs/cause-rule.ts',
+  'src/claims/ahead.ts',
   'src/commands/doctor-refs.ts',
   'src/commands/plan/refs-check.ts',
   'src/epic/verify-plan.ts',
+  'src/epic/verify-run.ts',
   'src/next/hop-chain.ts',
   'src/next/relation-readings.ts',
 ];
@@ -76,7 +81,9 @@ export const PR_NAMED: readonly string[] = [
  * (rafa-1325), which moves them into core's package, where the
  * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
  * item (rafa-1333) moved `packages/rafa/src/plan/validate.ts` into core's
- * package too, and the same folder places it.
+ * package too, and the same folder places it, and placed
+ * `src/epic/verify-run.ts` in board by name, since it reaches only board
+ * and core.
  */
 export const RUN_NAMED: readonly string[] = [
   'src/cleanup/index.ts',
@@ -84,7 +91,6 @@ export const RUN_NAMED: readonly string[] = [
   'src/cleanup/runs.ts',
   'src/cleanup/worktrees.ts',
   'src/commands/switch.ts',
-  'src/epic/verify-run.ts',
   'src/loop/events-file.ts',
   'src/next/actions.ts',
   'src/next/ending.ts',

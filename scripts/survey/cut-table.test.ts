@@ -120,9 +120,9 @@ describe('CUT_RULES', () => {
 /** Each feature package's list of `cut-names.ts` and the CLI's, its length, and the file its rule names beside the list. */
 const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], length: number, kept: readonly string[]])[] = [
   ['rafa-inventory', INVENTORY_NAMED, 0, []],
-  ['rafa-board', BOARD_NAMED, 20, []],
+  ['rafa-board', BOARD_NAMED, 22, []],
   ['rafa-pr', PR_NAMED, 13, ['src/pr/index.ts']],
-  ['rafa-run', RUN_NAMED, 19, []],
+  ['rafa-run', RUN_NAMED, 18, []],
   ['rafa-release', RELEASE_NAMED, 4, []],
   ['rafa-effort', EFFORT_NAMED, 0, []],
   ['@open-tomato/rafa', CLI_NAMED, 5, []],
@@ -145,8 +145,8 @@ describe('the named lists against the tracked tree', () => {
     });
   }
 
-  it('names 61 files across the seven lists, the 64 pass 4b left less the three the fourth decouple item moved into core', () => {
-    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(61);
+  it('names 62 files across the seven lists, the 64 pass 4b left less the three the fourth decouple item moved into core, plus ahead.ts it placed in board', () => {
+    expect(NAMED_LISTS.reduce((sum, [, list]) => sum + list.length, 0)).toBe(62);
   });
 });
 
