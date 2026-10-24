@@ -575,20 +575,19 @@ New; it replaces no earlier text. What a row or an action added to
   its `start` dropped and its failed `result` thrown with its code and
   message. The child writes its own session record, so `loop stop` signals
   the child.
-- **`loop start --create-branch` creates the feature branch when on
-  `main`, `master` or a detached HEAD** (`start/run-setup.ts`): when the
-  working directory is checked out on `main` or `master`, or on no branch
-  at all, the flag creates `feat/<stub>` from the latest `origin/<base>`,
-  where `<base>` is `pr.base` when set, else `origin/HEAD`. The branch's
-  name is the `naming.branch` template, `feat/{stub}` by default, with the
-  plan's stub for `{stub}`; it names the worktree's branch under
-  `--as-worktree` too (`start/branch-decision.ts`), and the claim and
-  status readers match the same template. Without the
-  flag a terminal asks the same question, and any other run is refused,
-  naming the flag. The flag is read from the parsed line and handed into
-  `start`, which resolves the plan from `.rafa/plans/` unless `plan.dir`
-  in the config names another directory, then uses that plan's stub to
-  name the new branch.
+- **`loop start --create-branch` creates the feature branch when on `main`,
+  `master` or a detached HEAD** (`start/run-setup.ts`): when the working
+  directory is checked out on `main` or `master`, or on no branch at all, the
+  flag creates `feat/<stub>` from the latest `origin/<base>`, where `<base>` is
+  `pr.base` when set, else `origin/HEAD`. The branch's name is the
+  `naming.branch` template, `feat/{stub}` by default, with the plan's stub for
+  `{stub}`; it names the worktree's branch under `--as-worktree` too
+  (`packages/rafa/src/start/branch-decision.ts`), and the claim and status
+  readers match the same template. Without the flag a terminal asks the same
+  question, and any other run is refused, naming the flag. The flag is read from
+  the parsed line and handed into `start`, which resolves the plan from
+  `.rafa/plans/` unless `plan.dir` in the config names another directory, then
+  uses that plan's stub to name the new branch.
 - **`loop start --roadmap` stamps the away hop on the session record**
   (`start/session.ts`): `rafa next --roadmap` passes the flag to the loop
   it starts, and the run's `.rafa/runs/<session-id>.json` then carries the
@@ -2225,50 +2224,46 @@ New; it replaces no earlier text. What a row or an action added to
   is no epic, or does not hold, is refused with exit 1; a Roadmap that
   cannot be read, with `ROADMAP_REFUSAL_EXIT`. It declares no flag and
   no `spends`.
-- **`rafa epic new "<title>" --slug=<slug> [--horizon=now|next|later]`
-  creates one epic whole** (`src/commands/epic/new.ts`): the
-  `epic:<slug>` label, the epic issue, and its line on the current board.
-  The title is the one argument, one line; `--slug` is required;
-  `--horizon` defaults to `later`, so a new epic is not picked unasked.
-  Those are refused with exit 1, but the slug's own refusals exit 2
-  (`EPIC_NEW_REFUSAL_EXIT`), before `gh` is asked anything or before
-  anything is written: a slug that is not a kebab word (`KEBAB_SLUG`,
-  lowercase letters and digits joined by single hyphens), and a slug
-  ALREADY LABELLED, one any issue on the board listing carries as
-  `epic:<slug>`, open or closed, compared without case, the refusal
-  naming the issues. A repository label `epic:<slug>` no issue carries is
-  kept, not created again, so a rerun after a failed issue create goes
-  through; the labels are read with `listBoardLabels`, the first
-  `LABEL_LIST_LIMIT`. It reads the board listing once, for the slug check
-  and for `resolvePlace` with `defaultBoardOnce`
-  (`src/board/default-board-once.ts`); a listing, label list or default
-  board that cannot be read also exits 2 with nothing created. The writes then go in order through
-  `IssueBoard` (`src/board/issue-board.ts`): `createLabel` when needed,
-  then `createIssue` with the body `renderEpicBody` answers
-  (`src/board/epic-template.ts`) and the labels `type:epic`,
-  `epic:<slug>` and `horizon:<horizon>` in one `gh issue create`; then
-  `- [ ] #<n> <title>` appended to the current board with `appendLine`
-  and `editChecklist` (`src/board/epic-checklist.ts`), every other byte
-  of the board kept. A failed label or issue create exits 1, the second
-  naming the label it left; a board line that ends `failed` exits 1 after
-  the epic exists, naming it, its URL and the line to add by hand. No
-  comment is posted: `src/board/epic-trail.ts` holds none for a new epic.
-  Text mode prints the epic with its horizon and label, where its line
-  went, and its URL; json mode's result is `EpicNewResult`. All of that
-  is the `labels` mode, the default. Under `board.relationships: native`
-  (`epicNewMode` reads it off the config, its warnings dropped, `labels`
-  for a config `loadConfig` refuses, so a labels line meets its refusals
-  in the same order as before) an epic is named by its number and title:
+- **`rafa epic new "<title>" --slug=<slug> [--horizon=now|next|later]` creates
+  one epic whole** (`src/commands/epic/new.ts`): the `epic:<slug>` label, the
+  epic issue, and its line on the current board. The title is the one argument,
+  one line; `--slug` is required; `--horizon` defaults to `later`, so a new epic
+  is not picked unasked. Those are refused with exit 1, but the slug's own
+  refusals exit 2 (`EPIC_NEW_REFUSAL_EXIT`), before `gh` is asked anything or
+  before anything is written: a slug that is not a kebab word (`KEBAB_SLUG`,
+  lowercase letters and digits joined by single hyphens), and a slug ALREADY
+  LABELLED, one any issue on the board listing carries as `epic:<slug>`, open or
+  closed, compared without case, the refusal naming the issues. A repository
+  label `epic:<slug>` no issue carries is kept, not created again, so a rerun
+  after a failed issue create goes through; the labels are read with
+  `listBoardLabels`, the first `LABEL_LIST_LIMIT`. It reads the board listing
+  once, for the slug check and for `resolvePlace` with `defaultBoardOnce`
+  (`src/board/default-board-once.ts`); a listing, label list or default board
+  that cannot be read also exits 2 with nothing created. The writes then go in
+  order through `IssueBoard` (`src/board/issue-board.ts`): `createLabel` when
+  needed, then `createIssue` with the body `renderEpicBody` answers
+  (`src/board/epic-template.ts`) and the labels `type:epic`, `epic:<slug>` and
+  `horizon:<horizon>` in one `gh issue create`; then `- [ ] #<n> <title>`
+  appended to the current board with `appendLine` and `editChecklist`
+  (`src/board/epic-checklist.ts`), every other byte of the board kept. A failed
+  label or issue create exits 1, the second naming the label it left; a board
+  line that ends `failed` exits 1 after the epic exists, naming it, its URL and
+  the line to add by hand. No comment is posted: `src/board/epic-trail.ts` holds
+  none for a new epic. Text mode prints the epic with its horizon and label,
+  where its line went, and its URL; json mode's result is `EpicNewResult`. All
+  of that is the `labels` mode, the default. Under `board.relationships: native`
+  (`epicNewMode` reads it off the config, its warnings dropped, `labels` for a
+  config `loadConfig` refuses, so a labels line meets its refusals in the same
+  order as before) an epic is named by its number and title:
   `readNativeEpicDraft` reads the title and horizon only, `--slug` is not
-  required or checked and, when given, draws the warning
-  `NATIVE_SLUG_WARNING`; no slug-in-use check, `gh label list` or
-  `gh label create` is sent; the issue is created with `type:epic` and
-  `horizon:<horizon>` only (`nativeEpicIssueLabels`), a failed create
-  naming no label left; the listing read and the board line are the same.
-  Text mode names the mode where it named the label, and json's
-  `NativeEpicNewResult` carries `relationships: 'native'` with the
-  `slug`, `label` and `labelOutcome` keys left out. It declares
-  no `spends` and reads no terminal.
+  required or checked and, when given, draws the warning `NATIVE_SLUG_WARNING`;
+  no slug-in-use check, `gh label list` or `gh label create` is sent; the issue
+  is created with `type:epic` and `horizon:<horizon>` only
+  (`nativeEpicIssueLabels`), a failed create naming no label left; the listing
+  read and the board line are the same. Text mode names the mode where it named
+  the label, and json's `NativeEpicNewResult` carries `relationships: 'native'`
+  with the `slug`, `label` and `labelOutcome` keys left out. It declares no
+  `spends` and reads no terminal.
 - **`rafa epic defer <n> --to=next|later` and `rafa epic promote <n>
   --to=now|next`, each with `[--reason="<why>"]`, move an epic between
   horizons** (`src/commands/epic/defer.ts`, `src/commands/epic/promote.ts`,

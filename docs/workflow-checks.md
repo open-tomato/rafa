@@ -77,7 +77,7 @@ flowchart TD
 
 Coupled:
 
-- **The branch offer and the branch guard are two units that must agree** (`start/branch-decision.ts` vs. the guard in `start.ts`): the offer stands aside three ways and lets the guard "have the last word". Two places, one decision.
+- **The branch offer and the branch guard are two units that must agree** (`packages/rafa/src/start/branch-decision.ts` vs. the guard in `start.ts`): the offer stands aside three ways and lets the guard "have the last word". Two places, one decision.
 - **`--any-branch` outranks `--create-branch` by code order**, not by declaration. Nothing says which flags are escape hatches.
 - **The step order is the function's line order** (`src/start.ts`, 230 lines). #71 already records this: 23 steps, 17 named, 6 inline, no registry.
 
