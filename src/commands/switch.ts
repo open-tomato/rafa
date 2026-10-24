@@ -93,7 +93,7 @@
  * incremental one `src/board/board-cache.ts` would spend; the boards
  * compared are the listing's `type:roadmap` rows, its epics and
  * `roadmap.issue` when set. The branches are read through
- * `scanClaimBranches` (`src/board/roadmap.ts`) under `naming.branch`,
+ * `scanClaimBranches` (`src/board/branch-scan.ts`) under `naming.branch`,
  * and only when some issue carries a stage label. The report is report-only: it edits no label,
  * no checklist and no body, and neither what it finds nor a board or
  * git it cannot read changes the exit code. A refused switch reports no
@@ -126,6 +126,7 @@ import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { hop, positionFilePath, rehome, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { scanClaimBranches } from '../board/branch-scan.js';
 import { readConfiguredRelations } from '../board/configured-relations.js';
 import { defaultBoardOnce } from '../board/default-board-once.js';
 import { boardOfEpic } from '../board/epic-board.js';
@@ -133,8 +134,8 @@ import { firstNowEpic } from '../board/now-epic.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
-import { parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
-import { ROADMAP_LABEL } from '../board/setup.js';
+import { parseRoadmapBody } from '../board/roadmap.js';
+import { ROADMAP_LABEL } from '../board/setup-roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
