@@ -523,6 +523,11 @@ describe('elapsed minutes across a capture', () => {
   });
 });
 
+/**
+ * Every case runs against a planted repository, never the host's: the host's
+ * last commits can be the migration's move commits, whose rename detection
+ * took the argv case past bun's 5000 ms default on the runner (5218 ms).
+ */
 describe('readCommitLog against real git', () => {
   const tempRoot = mkdtempSync(join(tmpdir(), 'ralph-commits-'));
 
@@ -559,15 +564,17 @@ describe('readCommitLog against real git', () => {
   }
 
   it('parses what the argv it builds actually returns', () => {
+    const dir = plantRepo(4);
     const args = commitLogArgs({ maxCount: 3 });
     const raw = execFileSync('git', args, {
+      cwd: dir,
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
     });
 
     expect(raw).toContain(COMMIT_RECORD_MARKER);
     expect(parseCommitLog(raw).rows)
-      .toEqual(readCommitLog({ maxCount: 3 }).rows);
+      .toEqual(readCommitLog({ maxCount: 3, cwd: dir }).rows);
   });
 
   it('answers HEAD as its first row, with a full sha', () => {
