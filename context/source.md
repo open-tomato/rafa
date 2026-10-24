@@ -136,15 +136,15 @@ folder are the connective tissue of the codebase: graph analysis calls such
 files high-betweenness nodes, since many paths between the rest of the tree
 run through them. Twenty-nine files changed path into it, nineteen by #905 and
 ten more by #1088 and #1089, `runtime/identity.ts` among them. They sit in
-eight subject folders. `config/` holds the value readers, core's keys of the
+nine subject folders. `config/` holds the value readers, core's keys of the
 schema, the section contract, core's own section and the loader; `command/`
 the command contract (`RafaCommand`, `RafaContext`, `CommandExit`), the
 version and the confirm prompt; `output/` the active output; `adapters/` the
 adapter registry; `git/` the git runner and the commit helpers; `plan/` the
 block reader, the plan parser and the plan-file readers; `loop/` the loop's
 session helpers, its session readings and the Claude spawner; `runtime/` the
-reading of which build is running. A ninth folder, `services/`, moved nothing
-in: it was written there (#1336) and holds the service registry, the functions
+reading of which build is running. The ninth, `services/`, moved nothing in:
+it was written there (#1336) and holds the service registry, the functions
 of run and pr that board calls, registered by the root. A file keeps its base
 name when it moves. A moved file keeps no re-export at its old path. The root's
 build entries are the exception: `src/effort/store/index.ts` and
@@ -425,6 +425,41 @@ it, every member of `CORE_ADAPTER_REGISTRY` refuses, naming the root.
 `bunfig.toml` names under `[test] preload`, so a test reads core's adapters
 registered; a child process a test spawns runs no preload and calls the root
 itself.
+
+**The services are handed in, never imported.** Core declares the service
+registry in `packages/rafa/src/core/services/registry.ts`, in the form of the
+adapter registry, and that file imports no service: its only import is
+`shapes.ts`, for types. A service enters only when a lower package needs a
+higher package's function that cannot move into core, each entry recorded with
+its reason. `SERVICE_REASONS` holds that reason for each key of `RafaServices`,
+and its mapped type makes a key with no reason a `tsc` failure. A new entry
+names the lower and higher package, the function's file and its reach on the
+import graph, and why the function cannot move into core, and it needs a check
+on the import graph that the function cannot move there. A function that is
+pure, or that reaches nothing past core, moves into core instead. The four
+entries are board's calls, each into a higher package:
+
+- `addStaleDocLine`, pr's, in `src/docs/release-issue.ts` (reach 6), for
+  `rafa epic close`, which adds a line to the release's stale-docs issue, whose
+  module reads the release version helpers of `src/release/`.
+- `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for
+  `rafa issue ready`, which ends naming the next step and runs its action
+  through run's dispatch.
+- `readStaleDocsVersion`, run's, in `src/start/stale-docs.ts` (reach 165), for
+  `rafa epic close`, which titles the stale-docs issue by the release forecast.
+- `triageReport`, pr's, in `src/triage/triage.ts` (reach 66), for
+  `rafa epic close`, which files each failed criterion as a bug.
+
+The root is `src/service-registry.ts`, outside `packages/rafa/src/core/`. It
+lists the four as `CORE_SERVICES`, and `registerCoreServices()` hands them to
+`registerServices` and answers `activeServices()`, a frozen facade whose members
+call the active set. `src/rafa.ts` and `src/index.ts` call it straight after
+`registerCoreAdapters`, and `bun test` calls it once per process from
+`src/tests/preload.ts`. `registerServices` takes a whole `RafaServices`, so a
+root that leaves a key out fails `tsc`, and `src/service-registry.test.ts`
+fails when the root's keys differ from `SERVICE_REASONS`'s. Until something
+calls it, every member of `activeServices()` throws, naming its key and the
+root.
 
 **A section adds its keys to `RafaConfig` by `declare module`.** `RafaConfig`
 stays declared in `packages/rafa/src/core/config/config-schema.ts` with core's
@@ -793,12 +828,11 @@ names come from, and the facade entry is no node.
     `src/release/verify.ts`; `src/commands/issue/create.ts` and
     `create-bug.ts` left it in the same item, when their pr imports moved
     into core;
-    `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`
-    and `src/commands/epic/close.ts` left it in the fifth, which reaches
-    `triageReport` through core's service registry and types its result
-    on core's `TriagedBug` and `TriageServiceResult`, and
-    `src/commands/epic/close-docs.ts`, which reaches `addStaleDocLine`
-    through the same registry;
+    `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`,
+    `src/commands/epic/close.ts` and `src/commands/epic/close-docs.ts` left it
+    in the fifth decouple item: the first three type what they read on core's
+    declarations, and `close-triage.ts` and `close-docs.ts` reach `triageReport`
+    and `addStaleDocLine` through core's service registry;
     `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
@@ -807,7 +841,7 @@ names come from, and the facade entry is no node.
     `src/commands/epic/new.ts` left them in the fourth decouple item,
     which moved `defaultBoardOnce` into `src/board/default-board-once.ts`,
     and `src/commands/issue/ready.ts` and
-    `src/commands/epic/close-triage.ts` in the fifth, which calls
+    `src/commands/epic/close-triage.ts` in the fifth decouple item, which calls
     `endWithNextStep` and `readStaleDocsVersion` through core's service
     registry), and the eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
