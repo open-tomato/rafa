@@ -72,11 +72,7 @@ export type {
 } from '../../src/release/forecast.js';
 export { forecastSettle } from '../../src/release/forecast.js';
 
-export {
-  directoryPrefix,
-  fragmentIdOf,
-  readFragmentTree,
-} from '../../src/release/fragment-tree.js';
+export { readFragmentTree } from '../../src/release/fragment-tree.js';
 
 export type {
   GuardReaction,

@@ -150,11 +150,12 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
+import { directoryPrefix } from '@open-tomato/rafa/release/fragment';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 
 import { forecastLine } from './branch-forecast.js';
 import { forecastRelease } from './forecast.js';
-import { directoryPrefix, readFragmentTree } from './fragment-tree.js';
+import { readFragmentTree } from './fragment-tree.js';
 import { highestChangeLevel, RELEASE_LEVEL_RANK } from './level.js';
 import { packageBaseVersionAt } from './package-base-version.js';
 import { readReceipt } from './receipt.js';

@@ -38,8 +38,8 @@
  *
  * A pull request's files are read page by page, `changeType` beside each
  * `path`; a fragment is a file `ADDED` directly under the fragments
- * directory whose name `fragmentIdOf` (`../../release/fragment-tree.ts`)
- * reads as one. Its text is read at the pull request's `headRefOid`, and
+ * directory whose name `fragmentIdOf`
+ * (`packages/rafa/src/release/fragment.ts`) reads as one. Its text is read at the pull request's `headRefOid`, and
  * whether it is on the base branch by the same path at `baseRefName`;
  * `object(expression:)` answered null, exit 0, both for a path the branch
  * does not hold and for a branch that no longer exists (`stretch/3`,
@@ -111,9 +111,7 @@ import type { BoardIssueState } from '../roadmap-board.js';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
-import { parseFragment } from '@open-tomato/rafa/release/fragment';
-
-import { directoryPrefix, fragmentIdOf } from '../../release/fragment-tree.js';
+import { directoryPrefix, fragmentIdOf, parseFragment } from '@open-tomato/rafa/release/fragment';
 
 import {
   batchesOf,

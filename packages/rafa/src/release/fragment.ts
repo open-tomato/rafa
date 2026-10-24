@@ -59,12 +59,20 @@
  * admits letters, digits, `.`, `_` and `-`, starting with a letter or a
  * digit — no separator, no space, no leading dot.
  *
+ * {@link fragmentIdOf} reads a file name back as the id it carries, or
+ * null, and {@link directoryPrefix} spells `release.fragments` as a
+ * prefix from the root; every reader that asks which file of a tree is
+ * a fragment — the tree reader settle uses, the board's facts, the
+ * cleanup's past-head check — asks these two, so none can disagree.
+ *
  * {@link serializeFragment} writes the format back and throws on a
  * fragment the parser would refuse, so nothing this module writes is a
  * file it would then refuse to read. The level words and their order are
  * `PLAN_RELEASE_LEVELS` from `packages/rafa/src/core/plan/parse.ts`, not a third spelling.
  */
 import type { PlanReleaseLevel } from '../core/plan/index.js';
+
+import { posix } from 'node:path';
 
 import { PLAN_RELEASE_LEVELS } from '../core/plan/index.js';
 
@@ -321,4 +329,24 @@ export function allocateFragmentName(plan: string, taken: Iterable<string>): str
     const name = `${plan}-${suffix}${FRAGMENT_EXTENSION}`;
     if (!names.has(name)) return name;
   }
+}
+
+/**
+ * `directory` as a path prefix from the root: `./.changes/` and
+ * `.changes` both answer `.changes/`, and the root itself answers ''.
+ */
+export function directoryPrefix(directory: string): string {
+  const normal = posix.normalize(directory.replace(/\\/g, '/')).replace(/\/+$/, '');
+  return normal === '.' || normal === ''
+    ? ''
+    : `${normal}/`;
+}
+
+/** The id `name` carries as a fragment, or null when it is none. */
+export function fragmentIdOf(name: string): string | null {
+  if (!name.endsWith(FRAGMENT_EXTENSION)) return null;
+  const id = name.slice(0, -FRAGMENT_EXTENSION.length);
+  return FRAGMENT_PLAN_ID_PATTERN.test(id)
+    ? id
+    : null;
 }

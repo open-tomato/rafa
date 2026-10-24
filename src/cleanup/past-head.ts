@@ -25,8 +25,9 @@
  * release fragment the base already holds. A fragment is a file
  * directly under `release.fragments` named `<id>.md`, the id matching
  * `FRAGMENT_PLAN_ID_PATTERN` (`fragmentIdOf` of
- * `../release/fragment-tree.ts`, the reader settle uses, so the two
- * cannot disagree about which file is a fragment). The base holds it
+ * `packages/rafa/src/release/fragment.ts`, the helper settle's reader
+ * uses, so the two cannot disagree about which file is a fragment). The
+ * base holds it
  * when either:
  *
  *   - the base branch's tree has a file at that path, a fragment still
@@ -66,8 +67,8 @@ import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import { posix } from 'node:path';
 
 import { gitSaid } from '@open-tomato/rafa/core/git';
+import { directoryPrefix, fragmentIdOf } from '@open-tomato/rafa/release/fragment';
 
-import { directoryPrefix, fragmentIdOf } from '../release/fragment-tree.js';
 import { changelogSections } from '../release/receipt.js';
 
 /** Terminates every path `diff-tree -z` and `ls-tree -z` write. */

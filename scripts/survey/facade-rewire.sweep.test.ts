@@ -55,8 +55,11 @@ interface RewiredRow {
  * reach through `src/claims/`, `src/next/` and `src/start/`. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
  * `preflight-drift.ts` onto the facade.
- * Release's one board importer, `src/board/project/facts.ts`, is a back edge
- * the load-cycle group takes first.
+ * Release's one board importer, `src/board/project/facts.ts`, left the row
+ * in the fourth decouple item: its one release import by path was
+ * `directoryPrefix` and `fragmentIdOf`, which it takes from
+ * `@open-tomato/rafa/release/fragment` now. `src/docs/release-issue.ts`
+ * stays, for `SettleForecast` and `nextVersion`.
  * Pr's 13 load-cycle files are claims, cleanup, next, start and release files
  * pr's files reach, three of them release files that are back edges the
  * load-cycle group takes first. `src/claims/git.ts`,
@@ -116,7 +119,6 @@ const REWIRED: readonly RewiredRow[] = [
   },
   {
     allowed: {
-      'src/board/project/facts.ts': 'loadCycle',
       'src/docs/release-issue.ts': 'loadCycle',
     },
     packageName: 'rafa-release',
