@@ -2240,9 +2240,9 @@ New; it replaces no earlier text. What a row or an action added to
   kept, not created again, so a rerun after a failed issue create goes
   through; the labels are read with `listBoardLabels`, the first
   `LABEL_LIST_LIMIT`. It reads the board listing once, for the slug check
-  and for `resolvePlace` with `defaultBoardOnce` (`src/commands/switch.ts`);
-  a listing, label list or default board that cannot be read also exits
-  2 with nothing created. The writes then go in order through
+  and for `resolvePlace` with `defaultBoardOnce`
+  (`src/board/default-board-once.ts`); a listing, label list or default
+  board that cannot be read also exits 2 with nothing created. The writes then go in order through
   `IssueBoard` (`src/board/issue-board.ts`): `createLabel` when needed,
   then `createIssue` with the body `renderEpicBody` answers
   (`src/board/epic-template.ts`) and the labels `type:epic`,
@@ -2505,7 +2505,7 @@ New; it replaces no earlier text. What a row or an action added to
   (`src/commands/board/list.ts`), the first action of the `board` subject.
   It reads the board listing once, as `switch` does, and ranks the
   default board over that listing through `defaultBoardOnce`, which it imports from
-  `src/commands/switch.ts`, and `openBoards`, from
+  `src/board/default-board-once.ts`, and `openBoards`, from
   `src/board/epic-board.ts`. The
   boards are the listing's open `type:roadmap` rows, lowest first, plus
   the default board when it is open on the listing without the label (an

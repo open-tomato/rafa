@@ -60,10 +60,7 @@ export {
 
 export { CLAIM_SUBJECT } from '../../src/commands/claim/declarations.js';
 
-export {
-  default as command,
-  defaultBoardOnce,
-} from '../../src/commands/switch.js';
+export { default as command } from '../../src/commands/switch.js';
 
 export type { EventLine } from '../../src/loop/events-file.js';
 export {

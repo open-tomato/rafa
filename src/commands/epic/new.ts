@@ -43,8 +43,9 @@
  * `BOARD_LIST_FIELDS` and `parseBoardListing`), and serves the slug check
  * and the current place: `resolvePlace` (`src/board/place.ts`) over it,
  * with the default board ranked over its open `type:roadmap` rows by
- * `defaultBoardOnce` (`../switch.ts`), asked at most once. The epic's
- * line goes on the CURRENT board, the board `rafa switch` last moved to,
+ * `defaultBoardOnce` (`src/board/default-board-once.ts`), asked at most
+ * once. The epic's line goes on the CURRENT board, the board
+ * `rafa switch` last moved to,
  * or the default board with no position file; each notice the place
  * raises but the absent-file one is a warning. A listing, a label list or
  * a default board that cannot be read is refused with
@@ -143,6 +144,7 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { defaultBoardOnce } from '../../board/default-board-once.js';
 import { appendLine, editChecklist } from '../../board/epic-checklist.js';
 import { EPIC_TYPE_LABEL } from '../../board/epic-context.js';
 import { HORIZON_LABEL_PREFIX } from '../../board/epic-problems.js';
@@ -155,7 +157,6 @@ import { HORIZONS } from '../../board/roadmap-epic-rows.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { LABEL_LIST_LIMIT, listBoardLabels } from '../../board/setup.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readRequiredFlag } from '../issue/issue-tracker.js';
-import { defaultBoardOnce } from '../switch.js';
 
 import { DEFAULT_HORIZON, EPIC_NEW_DECLARATION } from './declarations.js';
 import { newEpicTarget, refreshProjectAfterEpic } from './epic-project.js';

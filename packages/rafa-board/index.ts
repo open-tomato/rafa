@@ -81,6 +81,8 @@ export { readCodeowners } from '../../src/board/codeowners.js';
 
 export { readConfiguredRelations } from '../../src/board/configured-relations.js';
 
+export { defaultBoardOnce } from '../../src/board/default-board-once.js';
+
 export type { BoardView } from '../../src/board/epic-board.js';
 export {
   boardOfEpic,

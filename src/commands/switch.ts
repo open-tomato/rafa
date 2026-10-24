@@ -11,9 +11,11 @@
  * `BOARD_LIST_FIELDS` and `parseBoardListing`), and everything it
  * decides, the drift report included, is read off that one answer. The labelled boards the default
  * board is ranked from are the listing's open `type:roadmap` rows, not a
- * second `gh issue list --label`. The default board (`resolveDefaultBoard`,
+ * second `gh issue list --label`. The default board (`defaultBoardOnce`,
+ * `src/board/default-board-once.ts`, over `resolveDefaultBoard`,
  * `src/board/boards.ts`) is asked at most once and only when an answer
- * needs it, so its title search is spent only then.
+ * needs it, so its title search is spent only then; its refusal keeps
+ * {@link SWITCH_REFUSAL_EXIT}'s value as `DEFAULT_BOARD_REFUSAL_EXIT`.
  *
  * ## The relationships mode
  *
@@ -124,14 +126,14 @@ import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { hop, positionFilePath, rehome, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { resolveDefaultBoard } from '../board/boards.js';
 import { readConfiguredRelations } from '../board/configured-relations.js';
-import { boardOfEpic, openBoards } from '../board/epic-board.js';
+import { defaultBoardOnce } from '../board/default-board-once.js';
+import { boardOfEpic } from '../board/epic-board.js';
 import { firstNowEpic } from '../board/now-epic.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
-import { createGhRoadmapSearch, parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
+import { parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 
@@ -314,27 +316,6 @@ export function placeLine(place: Place, board: Pick<SwitchBoard, 'rows'>, epics:
   if (epic === undefined || row === undefined) return `${head} · epic ${id(place.epic)}`;
   const { done, total } = epic.progress;
   return `${head} · epic ${id(epic.number)} ${epic.title} (${horizonOf(row.labels)}) · ${String(done)}/${String(total)} done`;
-}
-
-/** `thunk`, asked at most once, any failure refused with {@link SWITCH_REFUSAL_EXIT}. */
-export function defaultBoardOnce(config: RafaConfig, gh: GhRunner, listing: readonly BoardIssue[]): () => Promise<number> {
-  let answer: Promise<number> | null = null;
-  const read = async (): Promise<number> => {
-    try {
-      const found = await resolveDefaultBoard({
-        configured: config.roadmapIssue,
-        listBoards: () => Promise.resolve(openBoards(listing)),
-        search: createGhRoadmapSearch({ gh }),
-      });
-      return found.number;
-    } catch (error) {
-      throw refusal(`Could not find the default board: ${messageOf(error)}`);
-    }
-  };
-  return () => {
-    answer ??= read();
-    return answer;
-  };
 }
 
 /**

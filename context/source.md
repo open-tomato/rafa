@@ -757,9 +757,11 @@ names come from, and the facade entry is no node.
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
     the decouple step before pass 4 cuts them.
-    Run has twelve: four board files (`src/commands/board/list.ts`, the two
-    `src/commands/epic/` files `close-triage.ts` and `new.ts`, and
-    `src/commands/issue/ready.ts`), the eight `src/commands/pr/` files
+    Run has ten: two board files (`src/commands/epic/close-triage.ts` and
+    `src/commands/issue/ready.ts`; `src/commands/board/list.ts` and
+    `src/commands/epic/new.ts` left them in the fourth decouple item, which
+    moves `defaultBoardOnce` into `src/board/default-board-once.ts`), the
+    eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and
     `wait.ts`). Each sits earlier in the move order than
