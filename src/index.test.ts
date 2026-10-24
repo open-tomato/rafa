@@ -137,6 +137,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import effortCollect from '@open-tomato/rafa-effort/effort/collect';
+import effortReport from '@open-tomato/rafa-effort/effort/report';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
@@ -215,8 +217,6 @@ import {
   WireExportRefusal,
   WireFormatError,
 } from '@open-tomato/rafa/store/wire';
-import effortCollect from '@open-tomato/rafa-effort/effort/collect';
-import effortReport from '@open-tomato/rafa-effort/effort/report';
 
 import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
