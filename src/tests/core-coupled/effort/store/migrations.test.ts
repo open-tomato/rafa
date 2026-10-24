@@ -8,8 +8,8 @@
  * The pre-log rule is 0.24.1's own `checkedVersion`, transcribed below.
  * It refuses any `user_version` above 13, the length of that release's
  * history. A control reads an excerpt of the 0.24.1 bundle committed
- * under `src/effort/testdata/migrations/`, and holds the transcription
- * and the thirteen SQL bodies to it byte for byte. Every store is
+ * under `packages/rafa/src/effort/testdata/migrations/`, and holds the
+ * transcription and the thirteen SQL bodies to it byte for byte. Every store is
  * planted under this file's own temporary directory. A synthetic tail is
  * passed as an argument and never appended to `SQLITE_MIGRATIONS`.
  *
@@ -235,8 +235,11 @@ describe('the legacy gate under 0.24.1\'s rule', () => {
   });
 });
 
+/** This checkout's root. */
+const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..', '..');
+
 /** Where this file's committed inputs sit. */
-const TESTDATA = join(import.meta.dir, '..', '..', '..', '..', 'effort', 'testdata', 'migrations');
+const TESTDATA = join(REPO_ROOT, 'packages', 'rafa', 'src', 'effort', 'testdata', 'migrations');
 
 /**
  * The 0.24.1 bundle's `cli.js` from its `migrations.ts` module through
@@ -718,9 +721,6 @@ describe('every CREATEd object after applying to :memory:', () => {
 
 /** Where the lock sits in a checkout, as `git show` spells it. */
 const LOCK_PATH = 'packages/rafa/src/effort/store/migrations.lock.json';
-
-/** This checkout's root. */
-const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..', '..');
 
 /** The release whose lock is committed under `TESTDATA`. */
 const RELEASED_TAG = 'v0.33.0';
