@@ -88,7 +88,11 @@
  * `./close-triage.ts` files each failed check, as a bug through
  * `triageReport` or as a line on the release's stale-docs issue
  * (`./close-docs.ts`), and its module note says how: the report, the
- * recurrence key, the tracker and the lines it writes. With
+ * recurrence key, the tracker and the lines it writes. `triageReport`
+ * and the stale-docs version are pr's and run's, reached through core's
+ * service registry (`activeServices()`, registered by the root
+ * `src/service-registry.ts`) when their seams are left out, since board
+ * may not import either package. With
  * `board.project.number` set, each bug it filed on the public `github`
  * tracker is then added to the repository's project and filled
  * (`addFiledBugs`), every line of that add a warning after the bug's own
@@ -125,11 +129,11 @@ import type { EpicRelations } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { CriterionUncheckable, CriterionVerdict, EpicCriterion, VerifyPlanIssue } from '../../epic/verify-plan.js';
 import type { CheckAnswered, CheckUnanswered, VerifyRunRan } from '../../epic/verify-run.js';
-import type { TriageOptions, TriageResult } from '../../triage/triage.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { RafaServices } from '@open-tomato/rafa/core/services';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
@@ -226,13 +230,13 @@ export interface EpicCloseSeams extends EpicProjectSeams {
   readonly resolve?: (options: ResolveTrackerOptions) => Promise<TrackerResolution>;
   /** Where a bug routed private goes. `triageReport`'s own when left out. */
   readonly privateTracker?: Tracker;
-  /** Triages one failed check's report. `triageReport` when left out. */
-  readonly triageReport?: (options: TriageOptions) => Promise<TriageResult>;
+  /** Triages one failed check's report. `activeServices().triageReport`, pr's `triageReport` through core's service registry, when left out. */
+  readonly triageReport?: RafaServices['triageReport'];
   /** Seams for the tracker reference `triageReport` stores. */
   readonly findings?: FindingsWriterSeams;
   /** The board's relationships, which read the epic's members; `labels` mode when left out. See the module note. */
   readonly relations?: EpicRelations;
-  /** Reads the version the stale-docs issue is titled for. `readStaleDocsVersion` in the project root when left out. */
+  /** Reads the version the stale-docs issue is titled for. `activeServices().readStaleDocsVersion` in the project root when left out. */
   readonly staleDocsVersion?: () => string;
 }
 

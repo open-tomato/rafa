@@ -173,6 +173,12 @@ import {
   SYNC_STRATEGIES,
 } from '@open-tomato/rafa/core/config/sections';
 import {
+  activeServices,
+  registerServices,
+  restoreServices,
+  SERVICE_REASONS,
+} from '@open-tomato/rafa/core/services';
+import {
   FEATURE_TYPES,
   MANIFEST_VERSION,
   OUTPUT_CHANNELS,
@@ -238,6 +244,7 @@ import {
   prerequisitesPathForPlan,
 } from './preflight/prerequisites-md.js';
 import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './preflight/run.js';
+import { CORE_SERVICES, registerCoreServices } from './service-registry.js';
 import start from './start.js';
 
 import * as entry from './index.js';
@@ -252,6 +259,7 @@ const RUNTIME_EXPORTS = [
   'CONFIG_VERSIONS',
   'CORE_ADAPTERS',
   'CORE_ADAPTER_REGISTRY',
+  'CORE_SERVICES',
   'ConfigError',
   'DISK_FILE_SYSTEM',
   'EFFORT_KEY_PROJECTIONS',
@@ -275,6 +283,7 @@ const RUNTIME_EXPORTS = [
   'REPORT_STATUSES',
   'RUNNING_MANIFEST_SEAMS',
   'SCOPE_DIR',
+  'SERVICE_REASONS',
   'STORE_BACKENDS',
   'SYNC_STRATEGIES',
   'ScopeError',
@@ -284,6 +293,7 @@ const RUNTIME_EXPORTS = [
   'WireExportRefusal',
   'WireFormatError',
   'activeAdapterRegistry',
+  'activeServices',
   'configFilePath',
   'createAdapterRegistry',
   'decodeWirePayload',
@@ -313,10 +323,13 @@ const RUNTIME_EXPORTS = [
   'registerAdapters',
   'registerCoreAdapters',
   'registerCoreConfigSections',
+  'registerCoreServices',
+  'registerServices',
   'renderInjection',
   'resolveConfig',
   'resolveScope',
   'restoreAdapters',
+  'restoreServices',
   'runPreflight',
   'runShellProbe',
   'scopeAt',
@@ -336,6 +349,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['CONFIG_VERSIONS', entry.CONFIG_VERSIONS, CONFIG_VERSIONS],
   ['CORE_ADAPTERS', entry.CORE_ADAPTERS, CORE_ADAPTERS],
   ['CORE_ADAPTER_REGISTRY', entry.CORE_ADAPTER_REGISTRY, CORE_ADAPTER_REGISTRY],
+  ['CORE_SERVICES', entry.CORE_SERVICES, CORE_SERVICES],
   ['ConfigError', entry.ConfigError, ConfigError],
   ['DISK_FILE_SYSTEM', entry.DISK_FILE_SYSTEM, DISK_FILE_SYSTEM],
   ['EFFORT_KEY_PROJECTIONS', entry.EFFORT_KEY_PROJECTIONS, EFFORT_KEY_PROJECTIONS],
@@ -359,6 +373,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['REPORT_STATUSES', entry.REPORT_STATUSES, REPORT_STATUSES],
   ['RUNNING_MANIFEST_SEAMS', entry.RUNNING_MANIFEST_SEAMS, RUNNING_MANIFEST_SEAMS],
   ['SCOPE_DIR', entry.SCOPE_DIR, SCOPE_DIR],
+  ['SERVICE_REASONS', entry.SERVICE_REASONS, SERVICE_REASONS],
   ['STORE_BACKENDS', entry.STORE_BACKENDS, STORE_BACKENDS],
   ['SYNC_STRATEGIES', entry.SYNC_STRATEGIES, SYNC_STRATEGIES],
   ['ScopeError', entry.ScopeError, ScopeError],
@@ -368,6 +383,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['WireExportRefusal', entry.WireExportRefusal, WireExportRefusal],
   ['WireFormatError', entry.WireFormatError, WireFormatError],
   ['activeAdapterRegistry', entry.activeAdapterRegistry, activeAdapterRegistry],
+  ['activeServices', entry.activeServices, activeServices],
   ['configFilePath', entry.configFilePath, configFilePath],
   ['createAdapterRegistry', entry.createAdapterRegistry, createAdapterRegistry],
   ['decodeWirePayload', entry.decodeWirePayload, decodeWirePayload],
@@ -397,10 +413,13 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['registerAdapters', entry.registerAdapters, registerAdapters],
   ['registerCoreAdapters', entry.registerCoreAdapters, registerCoreAdapters],
   ['registerCoreConfigSections', entry.registerCoreConfigSections, registerCoreConfigSections],
+  ['registerCoreServices', entry.registerCoreServices, registerCoreServices],
+  ['registerServices', entry.registerServices, registerServices],
   ['renderInjection', entry.renderInjection, renderInjection],
   ['resolveConfig', entry.resolveConfig, resolveConfig],
   ['resolveScope', entry.resolveScope, resolveScope],
   ['restoreAdapters', entry.restoreAdapters, restoreAdapters],
+  ['restoreServices', entry.restoreServices, restoreServices],
   ['runPreflight', entry.runPreflight, runPreflight],
   ['runShellProbe', entry.runShellProbe, runShellProbe],
   ['scopeAt', entry.scopeAt, scopeAt],
@@ -496,6 +515,7 @@ const CLI_IMPORTS: ImportList = [
   ['./cli/help.js', ['renderHelp']],
   ['./commands/index.js', ['createRosterRegistry']],
   ['./config-registry.js', ['registerCoreConfigSections']],
+  ['./service-registry.js', ['registerCoreServices']],
   ['./status/hook.js', ['createStatusHook']],
 ];
 

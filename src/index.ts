@@ -1,8 +1,8 @@
 /**
  * The library's entry: the loop, the plan and report parsers, the
  * preflight, the effort store, the config resolver, scope resolution,
- * the adapter registry and the manifest validator, so a service
- * importing the package reaches everything the CLI reaches.
+ * the adapter and service registries and the manifest validator, so a
+ * service importing the package reaches everything the CLI reaches.
  *
  * The spec's `exports` map points the package root, `.`, at
  * `./dist/index.js`, which is this module built, and names what the root
@@ -55,6 +55,12 @@
  *     version core serves of each port, and {@link registerAdapters},
  *     {@link restoreAdapters} and {@link activeAdapterRegistry}, which
  *     register on, put back and read the registry it answers.
+ *   - The whole service registry barrel, `core/services/index.ts`:
+ *     {@link SERVICE_REASONS}, why each of its four keys is a service,
+ *     {@link registerServices}, {@link restoreServices} and
+ *     {@link activeServices}, which register, put back and read the set
+ *     of run's and pr's functions board's commands call, with
+ *     `RafaServices` and the types its keys are written over.
  *   - The whole manifest module, `modules/manifest.ts`:
  *     {@link validateManifest}, which reads the `rafa` manifest of a
  *     module's `package.json` and names every failure, with the schema's
@@ -70,17 +76,21 @@
  *
  * ## The registries load first
  *
- * Neither `config-registry.ts` nor `adapter-registry.ts` registers
- * anything as it is imported. Once its imports have loaded, the entry
- * calls {@link registerCoreConfigSections}, which hands the fourteen
- * sections of the config schema to core, so every setting is
- * registered before a caller of this entry loads or reads a config,
- * then {@link registerCoreAdapters}, which hands core's adapters to the
+ * None of `config-registry.ts`, `adapter-registry.ts` and
+ * `service-registry.ts` registers anything as it is imported. Once its
+ * imports have loaded, the entry calls
+ * {@link registerCoreConfigSections}, which hands the fourteen sections
+ * of the config schema to core, so every setting is registered before a
+ * caller of this entry loads or reads a config, then
+ * {@link registerCoreAdapters}, which hands core's adapters to the
  * adapter registry, so {@link CORE_ADAPTER_REGISTRY} answers every core
- * kind before a caller resolves one. A call is what survives a bundler
- * that drops an import kept for its effect alone. The entry exports
- * both roots, {@link CONFIG_DEFAULTS} (the registry's own) and
- * {@link CORE_ADAPTERS} too; a second call of either registers nothing.
+ * kind before a caller resolves one, then {@link registerCoreServices},
+ * which hands run's and pr's four services to the service registry, so
+ * {@link activeServices} calls them before a board command does. A call
+ * is what survives a bundler that drops an import kept for its effect
+ * alone. The entry exports the three roots, {@link CONFIG_DEFAULTS}
+ * (the registry's own), {@link CORE_ADAPTERS} and {@link CORE_SERVICES}
+ * too; a second call of any of them registers nothing.
  *
  * ## Why the commands carry a `Command` suffix
  *
@@ -135,6 +145,7 @@
  */
 import { registerCoreAdapters } from './adapter-registry.js';
 import { registerCoreConfigSections } from './config-registry.js';
+import { registerCoreServices } from './service-registry.js';
 
 export type {
   Adapter,
@@ -143,6 +154,24 @@ export type {
   AnyAdapter,
   PortImplementations,
 } from '@open-tomato/rafa/core/adapters';
+export type {
+  AddStaleDocLineOptions,
+  AddStaleDocLineService,
+  EndingSeams,
+  EndWithNextStepService,
+  RafaServices,
+  ReadStaleDocsVersionService,
+  ServiceReason,
+  StaleDocLineResult,
+  StaleDocsTracker,
+  StaleDocsVersionOptions,
+  TriageReportService,
+  TriagedAction,
+  TriagedBug,
+  TriagedChannel,
+  TriageServiceOptions,
+  TriageServiceResult,
+} from '@open-tomato/rafa/core/services';
 export type { ConfigRoots, ProjectScopeFiles } from '@open-tomato/rafa/core/config/load';
 export type {
   CommandLineSetting,
@@ -303,9 +332,16 @@ export {
   registerAdapters,
   restoreAdapters,
 } from '@open-tomato/rafa/core/adapters';
+export {
+  activeServices,
+  registerServices,
+  restoreServices,
+  SERVICE_REASONS,
+} from '@open-tomato/rafa/core/services';
 export { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/load';
 export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 export { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
+export { CORE_SERVICES, registerCoreServices } from './service-registry.js';
 export {
   CONFIG_FILE,
   ConfigError,
@@ -369,3 +405,4 @@ export { default as startCommand } from './start.js';
 
 registerCoreConfigSections();
 registerCoreAdapters();
+registerCoreServices();

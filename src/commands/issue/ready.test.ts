@@ -63,16 +63,18 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
-import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_LABEL } from '../../board/issue.js';
@@ -1197,6 +1199,98 @@ describe('the ending it names the next step with', () => {
 
     expect(command.flags.map((flag) => [flag.name, flag.type, flag.default]))
       .toEqual([['yes', 'boolean', undefined], ['dry-run', 'boolean', undefined], ['hint', 'boolean', true]]);
+  });
+});
+
+describe('the ending service', () => {
+  /** A project of this block's own, one per case. */
+  const plant = (): ReturnType<typeof plantProject> => plantProject(mkdtempSync(join(tempBase, 'service-')));
+
+  /** The line the stub prints through the context it was handed. */
+  const STUB_LINE = 'the stubbed ending ran';
+
+  /** What the stub was called with, one entry per call. */
+  interface EndingCall {
+    readonly context: RafaContext;
+    readonly seams: EndingSeams | undefined;
+  }
+
+  /** The set the stubbed setup replaced, put back after each case; undefined when none was set up. */
+  let replaced: RafaServices | null | undefined;
+
+  afterEach(() => {
+    if (replaced !== undefined) restoreServices(replaced);
+    replaced = undefined;
+  });
+
+  /** Registers a recording `endWithNextStep` over the active set; see the stage's stubbed setup. */
+  function stubEnding(): readonly EndingCall[] {
+    const calls: EndingCall[] = [];
+    const stub: RafaServices['endWithNextStep'] = (context, seams) => {
+      calls.push({ context, seams });
+      context.output.info(STUB_LINE);
+      return Promise.resolve(null);
+    };
+    replaced = registerServices({ ...activeServices(), endWithNextStep: stub });
+    return calls;
+  }
+
+  /** The command over a dispatched `gh`, answering yes, handing the ending `ending`. */
+  function commandWith(ending: EndingSeams): RafaCommand {
+    return createIssueReadyCommand({
+      openGh: () => dispatchedGh().run,
+      openGit: () => fakeGit,
+      isTerminal: () => true,
+      openPrompter: () => ({
+        say: () => undefined,
+        ask: () => Promise.resolve('y'),
+        close: () => undefined,
+      }),
+      ending,
+    });
+  }
+
+  it('calls the registered ending once, with the context of the run and the ending seams it was given', async () => {
+    const calls = stubEnding();
+    const ending: EndingSeams = { isTerminal: () => false };
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [commandWith(ending)], plant());
+
+    expect(outcome.exitCode).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.seams).toBe(ending);
+    expect(calls[0]?.context.argv).toContain('57');
+    expect(outcome.stdout.trimEnd().split('\n')
+      .at(-1)).toBe(STUB_LINE);
+  });
+
+  it('never calls the registered ending under --dry-run, which the marked run calls', async () => {
+    const calls = stubEnding();
+
+    const dry = await dispatchInProject(['issue', 'ready', '57', '--dry-run'], SUBJECTS, [commandWith({})], plant());
+    const dryCalls = calls.length;
+    const marked = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [commandWith({})], plant());
+
+    expect([dry.exitCode, marked.exitCode]).toEqual([0, 0]);
+    expect([dryCalls, calls.length]).toEqual([0, 1]);
+    expect(dry.stdout.includes(STUB_LINE)).toBe(false);
+  });
+
+  it('refuses the ending of a marked run, naming the key and the root, while no service is registered', async () => {
+    const held = registerServices({ ...activeServices() });
+    restoreServices(null);
+    let outcome: Awaited<ReturnType<typeof dispatchInProject>>;
+    try {
+      outcome = await dispatchInProject(['issue', 'ready', '57'], SUBJECTS, [commandWith({})], plant());
+    } finally {
+      restoreServices(held);
+    }
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stdout).toContain('Marked #57 spec:ready');
+    expect(outcome.stderr).toContain('service registry:');
+    expect(outcome.stderr).toContain('endWithNextStep');
+    expect(outcome.stderr).toContain('src/service-registry.ts');
   });
 });
 

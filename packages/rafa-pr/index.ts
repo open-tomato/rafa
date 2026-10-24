@@ -74,18 +74,12 @@ export type {
 } from '../../src/docs/open-lines.js';
 export { readOpenStaleDocLines } from '../../src/docs/open-lines.js';
 
-export type {
-  StaleDocEntry,
-  StaleDocLineResult,
-  StaleDocTickResult,
-  StaleDocsTracker,
-} from '../../src/docs/release-issue.js';
+export type { StaleDocTickResult } from '../../src/docs/release-issue.js';
 export {
   DOC_UPDATE_TASK_PREFIX,
   DOC_UPDATE_TITLE,
   addStaleDocLine,
   docUpdateLineText,
-  staleDocLineText,
   staleDocsVersion,
   tickStaleDocLine,
 } from '../../src/docs/release-issue.js';

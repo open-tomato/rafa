@@ -6,8 +6,9 @@
  *
  * `feature-load-probe.ts` is spawned with `bun`. In its roster mode it
  * does what `src/rafa.ts` does before dispatching (registers core's
- * config sections and adapters, builds `createRosterRegistry()`, renders
- * every help level and `describeRegistry`) and prints the modules of
+ * config sections, adapters and services, builds
+ * `createRosterRegistry()`, renders every help level and
+ * `describeRegistry`) and prints the modules of
  * `require.cache` relative to the repository root. The cases hold that:
  *
  *   - none of the modules `src/commands/<subject>/<action>.ts` of a

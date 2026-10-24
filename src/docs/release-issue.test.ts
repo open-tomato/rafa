@@ -9,8 +9,8 @@
  * Each case that answers no write sits beside the one that does, varied
  * in the one input, so a module that never wrote, or always did, reddens.
  */
-import type { StaleDocsTracker } from './release-issue.js';
 import type { SettleForecast } from '../release/forecast.js';
+import type { StaleDocsTracker } from '@open-tomato/rafa/core/services';
 import type { IssueDraft, IssueEdit, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { staleDocLineText } from '@open-tomato/rafa/triage/stale-doc-line';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
 
@@ -32,7 +33,6 @@ import {
   NO_EDITABLE_TRACKER,
   STALE_DOCS_MARKER,
   staleDocLine,
-  staleDocLineText,
   staleDocsBody,
   staleDocsTitle,
   staleDocsVersion,
@@ -93,18 +93,6 @@ describe('the builders', () => {
     expect(staleDocLine(PAGE)).toBe('- [ ] context/triage.md:12: names three channels');
     expect(staleDocLine({ where: null, what: 'names three channels' })).toBe('- [ ] names three channels');
     expect(staleDocLine({ where: '  ', what: 'names three channels' })).toBe('- [ ] names three channels');
-  });
-
-  it('puts a multi-line entry on one line, so it opens no second item', () => {
-    const text = staleDocLineText({ where: 'a.md', what: 'first\n- [ ] forged\u2028# heading\u0007' });
-    expect(text).toBe('a.md: first - [ ] forged # heading');
-    expect(text).not.toMatch(/[\n\r\u2028\u2029]/);
-  });
-
-  it('opens no HTML comment, so an entry neither hides the body nor forges the marker', () => {
-    const text = staleDocLineText({ where: null, what: `says ${STALE_DOCS_MARKER} and <!-- more` });
-    expect(text).not.toContain('<!--');
-    expect(text).toBe('says <\\!-- rafa:stale-docs --> and <\\!-- more');
   });
 
   it('opens a new body with the marker above the item', () => {

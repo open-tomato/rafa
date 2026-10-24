@@ -93,18 +93,14 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { StaleDocLineResult, StaleDocsTracker } from '@open-tomato/rafa/core/services';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 import type { ReportStaleDoc } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { StaleDocsWriteResult } from '@open-tomato/rafa/store/stale-docs';
 import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
-import type {
-  GitRunner,
-  StaleDocEntry,
-  StaleDocLineResult,
-  StaleDocTickResult,
-  StaleDocsTracker,
-} from '@open-tomato/rafa-pr';
+import type { StaleDocEntry } from '@open-tomato/rafa/triage/stale-doc-line';
+import type { GitRunner, StaleDocTickResult } from '@open-tomato/rafa-pr';
 import type { FoldFragment, SettleForecast } from '@open-tomato/rafa-release';
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -116,7 +112,6 @@ import {
   addStaleDocLine,
   createGitRunner,
   docUpdateLineText,
-  staleDocLineText,
   staleDocsVersion,
   tickStaleDocLine,
 } from '@open-tomato/rafa-pr';
@@ -138,6 +133,7 @@ import { parseReport } from '@open-tomato/rafa/report/parse';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
+import { staleDocLineText } from '@open-tomato/rafa/triage/stale-doc-line';
 
 import { resolveTracker } from '../adapters/tracker/resolve.js';
 

@@ -24,6 +24,7 @@
     "./core/plan": "./src/core/plan/index.ts",
     "./core/plan/block-reader": "./src/core/plan/block-reader.ts",
     "./core/runtime": "./src/core/runtime/index.ts",
+    "./core/services": "./src/core/services/index.ts",
     "./report/parse": "./src/report/parse.ts",
     "./report/record": "./src/report/record.ts",
     "./schema/tiers": "./src/schema/tiers.ts",
@@ -70,6 +71,7 @@
     "./triage/doc-only": "./src/triage/doc-only.ts",
     "./triage/filed-text": "./src/triage/filed-text.ts",
     "./triage/local-paths": "./src/triage/local-paths.ts",
+    "./triage/stale-doc-line": "./src/triage/stale-doc-line.ts",
     "./triage/test-failure": "./src/triage/test-failure.ts"
   },
   "scripts": {

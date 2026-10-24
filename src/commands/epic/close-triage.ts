@@ -6,6 +6,23 @@
  * {@link fileFailures} runs it, reading only the part of the close's run
  * it needs, {@link FilingRun}.
  *
+ * ## Through the service registry
+ *
+ * `triageReport` is pr's and `readStaleDocsVersion` is run's, and board
+ * may not import either package, so this module reaches both through
+ * core's service registry: `EpicCloseSeams.triageReport` when planted,
+ * else `activeServices().triageReport`, and `EpicCloseSeams.staleDocsVersion`
+ * when planted, else `activeServices().readStaleDocsVersion` in the
+ * project root, each registered by the root `src/service-registry.ts`.
+ * What it reads of a triaged bug is core's shape of it, `TriagedBug` and
+ * `TriageServiceResult` (`@open-tomato/rafa/core/services`). With nothing
+ * registered a member refuses, naming its key and the root: the refusal
+ * of `triageReport` is thrown inside the filing's `try`, so it is the
+ * criterion's `not filed:` warning line and the close goes on, and that
+ * of `readStaleDocsVersion` is thrown inside the docs route's own `try`
+ * (`./close-docs.ts`), so it is that criterion's `not added to the
+ * stale-docs issue:` warning line.
+ *
  * ## Filing a failed check
  *
  * Each failed check is one report of its own, holding one bug and no
@@ -76,7 +93,9 @@
  * (`namesOnlyDocs`, `packages/rafa/src/triage/doc-only.ts`) is no bug: in place of the
  * report it is one `unsettled` stale-docs row with no plan stub and one
  * line on the release's stale-docs issue, on the same tracker, the
- * version read once per run (`EpicCloseSeams.staleDocsVersion`).
+ * version read once per run (`EpicCloseSeams.staleDocsVersion`, or the
+ * registry's `readStaleDocsVersion` when left out; see "Through the
+ * service registry").
  * `./close-docs.ts` says what is stored and written.
  */
 import type { EpicCloseSeams } from './close.js';
@@ -84,9 +103,9 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { AddIssueOptions, RefreshAddedItems } from '../../board/project/add-issue.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';
-import type { BugTriage, TriageResult } from '../../triage/triage.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { TriagedBug, TriageServiceResult } from '@open-tomato/rafa/core/services';
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { TaskReport } from '@open-tomato/rafa/report/parse';
 import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
@@ -96,6 +115,7 @@ import { join } from 'node:path';
 import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeServices } from '@open-tomato/rafa/core/services';
 import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
@@ -104,8 +124,6 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { addFiledBugs } from '../../board/project/add-filed.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
-import { readStaleDocsVersion } from '../../start/stale-docs.js';
-import { triageReport } from '../../triage/triage.js';
 
 import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';
 
@@ -188,7 +206,7 @@ function issueName(issue: IssueRef): string {
 }
 
 /** The line one filed bug is reported with, and whether it is a warning. */
-export function bugLine(criterion: EpicCriterion, bug: BugTriage): { readonly text: string; readonly warn: boolean } {
+export function bugLine(criterion: EpicCriterion, bug: TriagedBug): { readonly text: string; readonly warn: boolean } {
   const which = `Criterion ${String(criterion.number)}`;
   switch (bug.action) {
     case 'filed': {
@@ -260,7 +278,7 @@ function addOptionsOf(run: FilingRun): AddIssueOptions {
 }
 
 /** Adds the bugs `result` filed on the public `github` tracker to the project, each line at `warn`; never rejects. */
-async function addToProject(run: FilingRun, add: AddIssueOptions, criterion: EpicCriterion, result: TriageResult): Promise<void> {
+async function addToProject(run: FilingRun, add: AddIssueOptions, criterion: EpicCriterion, result: TriageServiceResult): Promise<void> {
   try {
     for (const line of await addFiledBugs(add, result)) run.context.output.warn(line);
   } catch (error) {
@@ -282,13 +300,13 @@ export async function fileFailures(run: FilingRun, epic: number, failures: reado
   const local = localPathRedactor([run.root], run.home);
   const git = run.seams.git ?? createGitRunner(run.root);
   const bugRules = bugRulesOf(run.config);
-  const triage = run.seams.triageReport ?? triageReport;
+  const triage = run.seams.triageReport ?? activeServices().triageReport;
   const add = addOptionsOf(run);
   let version: string | null = null;
   const docs = {
     repoRoot: run.root, epic, tracker, seams: run.seams.findings,
     redact: (text: string): string => local(redactSecrets(text, secrets)),
-    version: (): string => version ??= (run.seams.staleDocsVersion ?? (() => readStaleDocsVersion({ repoRoot: run.root, checkout: run.root, config: run.config })))(),
+    version: (): string => version ??= (run.seams.staleDocsVersion ?? (() => activeServices().readStaleDocsVersion({ repoRoot: run.root, checkout: run.root, config: run.config })))(),
   };
   for (const failure of failures) {
     const { criterion } = failure.check;

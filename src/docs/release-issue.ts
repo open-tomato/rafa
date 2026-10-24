@@ -45,15 +45,22 @@
  * member, answers `kept` and makes no call; the caller keeps the line for
  * the print after the last task.
  *
+ * The shapes {@link addStaleDocLine} is written over, `StaleDocsTracker`,
+ * `StaleDocLineResult` and `AddStaleDocLineOptions`, are core's
+ * (`packages/rafa/src/core/services/shapes.ts`), since board calls the
+ * function through core's service registry; this module re-exports none.
+ *
  * ## Untrusted text
  *
  * `where` and `what` are a session's text. {@link staleDocLine} puts each
- * on one line, every run of white space (U+2028 and U+2029 included) one
- * space and every other control character dropped, so no entry can open
- * a second item or a heading. A `!` between `<` and `--` is written
- * `\!`, as `escapeBlockerText` (`utils/tracker.ts`) writes it, so no
- * entry opens an HTML comment that would hide the rest of the body on
- * the tracker, or writes a marker of its own. Redacting local paths is
+ * on one line through `staleDocLineText` and `oneLine`, which core holds
+ * (`packages/rafa/src/triage/stale-doc-line.ts`): every run of white
+ * space (U+2028 and U+2029 included) one space and every other control
+ * character dropped, so no entry can open a second item or a heading. A
+ * `!` between `<` and `--` is written `\!`, as `escapeBlockerText`
+ * (`utils/tracker.ts`) writes it, so no entry opens an HTML comment that
+ * would hide the rest of the body on the tracker, or writes a marker of
+ * its own. Redacting local paths is
  * the caller's, who knows the repository root: the line is written as it
  * is handed.
  *
@@ -86,11 +93,18 @@
  * the run, as triage's failures do not.
  */
 import type { SettleForecast } from '../release/forecast.js';
+import type {
+  AddStaleDocLineOptions,
+  StaleDocLineResult,
+  StaleDocsTracker,
+} from '@open-tomato/rafa/core/services';
 import type { IssueDraft, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { StaleDocEntry } from '@open-tomato/rafa/triage/stale-doc-line';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { unescapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
+import { oneLine, staleDocLineText } from '@open-tomato/rafa/triage/stale-doc-line';
 
 import { nextVersion } from '../release/version.js';
 
@@ -122,54 +136,9 @@ export const DOC_UPDATE_TITLE = 'chore(doc-update)';
 /** What each task of such a plan opens with, before its escaped line. */
 export const DOC_UPDATE_TASK_PREFIX = 'Repair the stale doc line at ';
 
-/** A run of white space, the line and paragraph separators included. */
-const WHITE_SPACE = /\s+/g;
-
-/** True for a control character that is not white space, or DEL. */
-function isDroppedControl(char: string): boolean {
-  const code = char.charCodeAt(0);
-  return code <= 0x08 || (code >= 0x0E && code <= 0x1F) || code === 0x7F;
-}
-
-/** A `!` that would open an HTML comment after a `<`. */
-const COMMENT_OPEN = /(?<=<)!(?=--)/g;
-
 /** The title of the stale-docs issue of `version`. */
 export function staleDocsTitle(version: string): string {
   return `Release ${version}: update stale docs`;
-}
-
-/** One stale documentation line: where it is, and what no longer matches. */
-export interface StaleDocEntry {
-  /** The file, with the line when known, or null when none was named. */
-  readonly where: string | null;
-  /** What no longer matches. */
-  readonly what: string;
-}
-
-/** `text` on one line, each white space run one space, no comment opened. */
-function oneLine(text: string): string {
-  return Array.from(text)
-    .filter((char) => !isDroppedControl(char))
-    .join('')
-    .replace(WHITE_SPACE, ' ')
-    .trim()
-    .replace(COMMENT_OPEN, '\\!');
-}
-
-/**
- * The text of the checklist item for `entry`, after its box:
- * `<where>: <what>`, or `<what>` when the entry named no place or a
- * blank one; see the module note for what is escaped.
- */
-export function staleDocLineText(entry: StaleDocEntry): string {
-  const what = oneLine(entry.what);
-  const where = entry.where === null
-    ? ''
-    : oneLine(entry.where);
-  return where === ''
-    ? what
-    : `${where}: ${what}`;
 }
 
 /** The unticked checklist item for `entry`, as the issue's body holds it. */
@@ -232,38 +201,12 @@ function issueDraft(title: string, item: string): IssueDraft {
   };
 }
 
-/** What {@link addStaleDocLine} did with one line. */
-export type StaleDocLineResult =
-  /** No issue of the title was open: one was created holding the line. */
-  | { readonly action: 'created'; readonly title: string; readonly ref: IssueRef }
-  /** The issue was found and the line appended to its body. */
-  | { readonly action: 'appended'; readonly title: string; readonly ref: IssueRef }
-  /** The issue already holds the line; nothing was written. */
-  | { readonly action: 'held'; readonly title: string; readonly ref: IssueRef }
-  /** No tracker can hold the issue; the caller keeps the line. */
-  | { readonly action: 'kept'; readonly title: string; readonly reason: string }
-  /** A tracker call rejected; nothing more was tried. */
-  | { readonly action: 'failed'; readonly title: string; readonly problem: string };
-
-/** The tracker members adding a line calls. */
-export type StaleDocsTracker = Pick<Tracker, 'create'> & Partial<Pick<Tracker, 'openIssues' | 'edit'>>;
-
 /** A tracker that can both list and edit, and so can hold the issue. */
 type HoldingTracker = StaleDocsTracker & Required<Pick<Tracker, 'openIssues' | 'edit'>>;
 
 /** True when `tracker` can list its open issues and edit one; see the module note. */
 function canHoldIssue(tracker: StaleDocsTracker | null): tracker is HoldingTracker {
   return tracker !== null && tracker.openIssues !== undefined && tracker.edit !== undefined;
-}
-
-/** What {@link addStaleDocLine} adds, and where. */
-export interface AddStaleDocLineOptions {
-  /** The tracker the run resolved, or null when it resolved none. */
-  readonly tracker: StaleDocsTracker | null;
-  /** The version the issue is titled for, from {@link staleDocsVersion}. */
-  readonly version: string;
-  /** The line to add. */
-  readonly entry: StaleDocEntry;
 }
 
 /** A tracker call's value, or the one-line problem it rejected with. */

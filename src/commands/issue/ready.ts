@@ -66,9 +66,14 @@
  * A run that MARKED the issue, under `--yes` or on a typed yes, and
  * one that found it marked already, ends by naming the one step that
  * follows — for a roadmap line that is ready and unblocked, the plan
- * (`src/next/ending.ts`, `--no-hint` to turn it off). A `--dry-run` run
- * never ends with it, `checked` or `already`: the ending puts a question
- * where there is a terminal, and `--dry-run` asks nothing. The declined run
+ * (`--no-hint` to turn it off). The ending is run's `endWithNextStep`,
+ * reached through core's service registry
+ * (`activeServices().endWithNextStep`, registered by the root
+ * `src/service-registry.ts`), since board may not import run; with
+ * nothing registered the call refuses, naming the key and the root. A
+ * `--dry-run` run never ends with it, `checked` or `already`: the ending
+ * puts a question where there is a terminal, and `--dry-run` asks
+ * nothing. The declined run
  * and the one with no terminal end without it: no label moved, so the
  * state still reads as an issue carrying no `spec:ready`, and the hint
  * would put the very question that was just answered no, or name this
@@ -159,14 +164,15 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
-import type { NextEndingSeams } from '../../next/ending.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { EndingSeams } from '@open-tomato/rafa/core/services';
 
 import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeServices } from '@open-tomato/rafa/core/services';
 
 import { createGhRunner, moduleOfLabels, typeOfLabels } from '../../adapters/tracker/github.js';
 import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.js';
@@ -182,7 +188,6 @@ import {
   SPEC_READY_LABEL,
 } from '../../board/readiness.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
-import { endWithNextStep } from '../../next/ending.js';
 
 import { ISSUE_READY_DECLARATION, READY_DRY_RUN_FLAG, READY_YES_FLAG } from './declarations.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
@@ -478,7 +483,7 @@ export interface ReadySeams {
   /** Opens the prompter the question is asked through. Called only to ask. */
   readonly openPrompter?: () => Prompter;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
-  readonly ending?: NextEndingSeams;
+  readonly ending?: EndingSeams;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -556,7 +561,7 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
       else writeReport(context, made);
       // A run that added no label left the project where it was, and --dry-run asks nothing; see the module note.
       if ((made.status === 'marked' || made.status === 'already') && !readReadyDryRun(context)) {
-        await endWithNextStep(context, seams.ending);
+        await activeServices().endWithNextStep(context, seams.ending);
       }
     },
   };

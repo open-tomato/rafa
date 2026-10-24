@@ -59,18 +59,20 @@ spells out, and the shapes the lint config forces.
   importing the index loads the declarations and the core command barrel
   and no command module. `index.test.ts` reads each call off the source
   and holds its loader to its declaration's module.
-- **No module under `src/` registers an adapter or a config section on
-  import.** `src/config-registry.ts` and `src/adapter-registry.ts` register
-  nothing as they load, and neither do the declarations, the feature
-  indexes or the command modules. The registration calls sit at the top
-  level of two roots only: `src/index.ts`, the `@open-tomato/rafa` entry,
-  and `src/rafa.ts`, the CLI's. Each calls `registerCoreConfigSections`,
-  then `registerCoreAdapters`, once its imports have loaded.
-  `src/tests/preload.ts` makes the same two calls, and `bunfig.toml`'s
-  `[test] preload` runs it before the first test file. Other callers, such
-  as `src/cli/feature-load-probe.ts`, call them inside a function they run,
-  never on import. A child process a test spawns runs no preload, so its
-  script calls a root itself before it reads either registry.
+- **No module under `src/` registers an adapter, a service or a config
+  section on import.** `src/config-registry.ts`, `src/adapter-registry.ts`
+  and `src/service-registry.ts` register nothing as they load, and
+  neither do the declarations, the feature indexes or the command
+  modules. The registration calls sit at the top level of two entries
+  only: `src/index.ts`, the `@open-tomato/rafa` entry, and `src/rafa.ts`,
+  the CLI's. Each calls `registerCoreConfigSections`, then
+  `registerCoreAdapters`, then `registerCoreServices`, once its imports
+  have loaded. `src/tests/preload.ts` makes the same three calls, and
+  `bunfig.toml`'s `[test] preload` runs it before the first test file.
+  Other callers, such as `src/cli/feature-load-probe.ts`, call them inside
+  a function they run, never on import. A child process a test spawns
+  runs no preload, so its script calls a root itself before it reads any
+  of the three registries.
 
 ### Explicit types on exports
 
@@ -134,17 +136,20 @@ folder are the connective tissue of the codebase: graph analysis calls such
 files high-betweenness nodes, since many paths between the rest of the tree
 run through them. Twenty-nine files changed path into it, nineteen by #905 and
 ten more by #1088 and #1089, `runtime/identity.ts` among them. They sit in
-eight subject folders. `config/` holds the value readers, core's keys of the
+nine subject folders. `config/` holds the value readers, core's keys of the
 schema, the section contract, core's own section and the loader; `command/`
 the command contract (`RafaCommand`, `RafaContext`, `CommandExit`), the
 version and the confirm prompt; `output/` the active output; `adapters/` the
 adapter registry; `git/` the git runner and the commit helpers; `plan/` the
 block reader, the plan parser and the plan-file readers; `loop/` the loop's
 session helpers, its session readings and the Claude spawner; `runtime/` the
-reading of which build is running. A file keeps its base name when it moves. A
-moved file keeps no re-export at its old path. The root's build entries are
-the exception: `src/effort/store/index.ts` and `src/ports/index.ts` stand at
-core's folder paths and re-export a package subpath until #808 publishes core.
+reading of which build is running. The ninth, `services/`, moved nothing in:
+it was written there (#1336) and holds the service registry, the functions
+of run and pr that board calls, registered by the root. A file keeps its base
+name when it moves. A moved file keeps no re-export at its old path. The root's
+build entries are the exception: `src/effort/store/index.ts` and
+`src/ports/index.ts` stand at core's folder paths and re-export a package
+subpath until #808 publishes core.
 
 Two edge cases show why a file is core. `src/pr/git.ts` sat under the
 pull-request code, but release code imports the git runner too, so it moved to
@@ -237,13 +242,13 @@ already publishes, so the store barrel is `@open-tomato/rafa/store`, and the
 ports barrel is `@open-tomato/rafa/ports`. The `core/` prefix is not optional:
 `@open-tomato/rafa/plan` and `@open-tomato/rafa/config` are the root's own
 `./plan` and `./config` exports, and core's subpaths must not collide with
-them. So the thirteen barrels of `CORE_BARRELS` read
+them. So the fourteen barrels of `CORE_BARRELS` read
 `@open-tomato/rafa/core/adapters`, `core/command`, `core/config`,
 `core/config/load`, `core/config/sections`, `core/git`, `core/loop`,
 `core/loop/hops`, `core/loop/readings`, `core/output`, `core/plan`,
-`core/plan/block-reader` and `core/runtime`; the named files read
-`report/parse`, `report/record`, `schema/tiers` and `schema/project-id`; the
-augmentation target reads `core/config/config-schema`. A store file is
+`core/plan/block-reader`, `core/runtime` and `core/services`; the named files
+read `report/parse`, `report/record`, `schema/tiers` and `schema/project-id`;
+the augmentation target reads `core/config/config-schema`. A store file is
 `store/<file>` and a ports file `ports/<file>`. A file moved outside `core/`
 takes the same spelling: `packages/rafa/src/bugs/record.ts` is `bugs/record`,
 which the package's `exports` names with `./bugs/*`, so a file outside the
@@ -260,7 +265,7 @@ manifests spell it in four places: core's own `package.json` and the three
 for core's files.
 
 **A subject's barrel is the only file under `packages/rafa/src/core/` that a
-file outside it may import.** There are thirteen, all listed in `CORE_BARRELS`
+file outside it may import.** There are fourteen, all listed in `CORE_BARRELS`
 of `scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
 five more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts`,
 `loop/hops.ts` and `plan/block-reader.ts`. A barrel re-exports the names of the
@@ -277,7 +282,7 @@ barrel. No non-test file under `packages/rafa/src/` imports
 core's own, so no barrel rule holds the effort store, the ports or a moved file
 outside `core/`. They reach core's barrels by relative path, as
 `effort/store/move.ts` and `utils/tracker.ts` do. A scan of the non-test files
-at this commit found every such import names one of the thirteen barrels and no
+at this commit found every such import names one of the fourteen barrels and no
 deeper file. A grep at this commit found no barrel imported from inside core,
 but no sweep measures that half.
 
@@ -420,6 +425,43 @@ it, every member of `CORE_ADAPTER_REGISTRY` refuses, naming the root.
 `bunfig.toml` names under `[test] preload`, so a test reads core's adapters
 registered; a child process a test spawns runs no preload and calls the root
 itself.
+
+**The services are handed in, never imported.** Core declares the service
+registry in `packages/rafa/src/core/services/registry.ts`, in the form of the
+adapter registry, and that file imports no service: its only import is
+`shapes.ts`, for types. A service enters only when a lower package needs a
+higher package's function that cannot move into core, each entry recorded with
+its reason. `SERVICE_REASONS` holds that reason for each key of `RafaServices`,
+and its mapped type makes a key with no reason a `tsc` failure. A new entry
+names the lower and higher package, the function's file and its reach on the
+import graph, and why the function cannot move into core, and it needs a check
+on the import graph that the function cannot move there. A function that is
+pure, or that reaches nothing past core, moves into core instead. The four
+entries are board's calls, each into a higher package:
+
+- `addStaleDocLine`, pr's, in `src/docs/release-issue.ts` (reach 6 at
+  aec5e4a, the figure the registry records; a second method read 95, so the
+  figure is unsettled and was not re-measured), for `rafa epic close`, which
+  adds a line to the release's stale-docs issue, whose module reads the
+  release version helpers of `src/release/`.
+- `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for
+  `rafa issue ready`, which ends naming the next step and runs its action
+  through run's dispatch.
+- `readStaleDocsVersion`, run's, in `src/start/stale-docs.ts` (reach 165), for
+  `rafa epic close`, which titles the stale-docs issue by the release forecast.
+- `triageReport`, pr's, in `src/triage/triage.ts` (reach 66), for
+  `rafa epic close`, which files each failed criterion as a bug.
+
+The root is `src/service-registry.ts`, outside `packages/rafa/src/core/`. It
+lists the four as `CORE_SERVICES`, and `registerCoreServices()` hands them to
+`registerServices` and answers `activeServices()`, a frozen facade whose members
+call the active set. `src/rafa.ts` and `src/index.ts` call it straight after
+`registerCoreAdapters`, and `bun test` calls it once per process from
+`src/tests/preload.ts`. `registerServices` takes a whole `RafaServices`, so a
+root that leaves a key out fails `tsc`, and `src/service-registry.test.ts`
+fails when the root's keys differ from `SERVICE_REASONS`'s. Until something
+calls it, every member of `activeServices()` throws, naming its key and the
+root.
 
 **A section adds its keys to `RafaConfig` by `declare module`.** `RafaConfig`
 stays declared in `packages/rafa/src/core/config/config-schema.ts` with core's
@@ -732,7 +774,13 @@ names come from, and the facade entry is no node.
     `switch.ts` and `start/triage.ts`, to rewire. The facade now exports
     `BranchScan`, `scanClaimBranches` and `ROADMAP_LABEL`, so the rewire takes
     all four and refuses none; they keep their paths until the rewire runs,
-    and its commit takes them off the guard's row.
+    and its commit takes them off the guard's row. On the graph the fifth
+    decouple item's survey regenerated, board's back edges into run and pr
+    gone, the dry run reads none of the nineteen on a load cycle and all
+    nineteen to rewire, and refuses two statements, `src/next/readings.ts:119`
+    and `src/next/sources.ts:277`, which take `scanClaimBranches` from
+    `src/board/roadmap.ts` while the facade lists it under another file; the
+    guard checks the path, not the group, so its row is unchanged.
     `src/claims/ahead.ts` and `src/epic/verify-run.ts` left them in the fourth
     decouple item (rafa-1333), which places both in board by name, and
     `src/claims/plan-claim.ts`, which took them by path, took the facade. The
@@ -777,22 +825,28 @@ names come from, and the facade entry is no node.
     it by name since the second decouple item's rewire. Board has none: no
     effort file imports it. Release has none in the codemod's grouping, since
     `src/board/project/facts.ts`, its one board importer, now takes
-    `directoryPrefix` and `fragmentIdOf` from core. Pr has sixteen:
-    `src/board/project/add-filed.ts`, the three `src/commands/epic/` files
-    (`close-docs.ts`, `close-triage.ts` and `close.ts`), the ten
+    `directoryPrefix` and `fragmentIdOf` from core. Pr has twelve: the ten
     `src/commands/release/` files, `src/release/prepare.ts` and
     `src/release/verify.ts`; `src/commands/issue/create.ts` and
     `create-bug.ts` left it in the same item, when their pr imports moved
     into core;
+    `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`,
+    `src/commands/epic/close.ts` and `src/commands/epic/close-docs.ts` left it
+    in the fifth decouple item: the first three type what they read on core's
+    declarations, and `close-triage.ts` and `close-docs.ts` reach `triageReport`
+    and `addStaleDocLine` through core's service registry;
     `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
     the decouple step before pass 4 cuts them.
-    Run has ten: two board files (`src/commands/epic/close-triage.ts` and
-    `src/commands/issue/ready.ts`; `src/commands/board/list.ts` and
-    `src/commands/epic/new.ts` left them in the fourth decouple item, which
-    moved `defaultBoardOnce` into `src/board/default-board-once.ts`), the
-    eight `src/commands/pr/` files
+    Run has eight: no board file (`src/commands/board/list.ts` and
+    `src/commands/epic/new.ts` left them in the fourth decouple item,
+    which moved `defaultBoardOnce` into `src/board/default-board-once.ts`,
+    and `src/commands/issue/ready.ts` and
+    `src/commands/epic/close-triage.ts` in the fifth decouple item, each
+    calling one run function through core's service registry (`ready.ts`
+    calls `endWithNextStep`, `close-triage.ts` calls `readStaleDocsVersion`),
+    and the eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and
     `wait.ts`). Each sits earlier in the move order than

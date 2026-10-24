@@ -32,11 +32,15 @@
  * `board.project.number` unset nothing is sent and no runner is opened,
  * and the answer is empty.
  *
- * `src/triage/` imports nothing from `src/board/`: this module reads its
- * types alone, and its callers hand it the result they already hold.
+ * `src/triage/` imports nothing from `src/board/`, and this module
+ * imports nothing from `src/triage/`: it reads the result through core's
+ * shapes of it, `TriagedBug` and `TriageServiceResult`
+ * (`@open-tomato/rafa/core/services`), which pr's `BugTriage` and
+ * `TriageResult` satisfy, and its callers hand it the result they
+ * already hold.
  */
 import type { AddIssueOptions } from './add-issue.js';
-import type { BugTriage, TriageResult } from '../../triage/triage.js';
+import type { TriagedBug, TriageServiceResult } from '@open-tomato/rafa/core/services';
 
 import { addAndRefreshIssue } from './add-issue.js';
 
@@ -44,7 +48,7 @@ import { addAndRefreshIssue } from './add-issue.js';
 const ISSUE_NUMBER = /^[1-9][0-9]*$/;
 
 /** The GitHub issue number `bug` was filed as on the public tracker, or null when it was not. */
-export function filedIssueNumber(bug: BugTriage): number | null {
+export function filedIssueNumber(bug: TriagedBug): number | null {
   if (bug.channel !== 'public' || bug.action !== 'filed') return null;
   if (bug.ref === null || bug.ref.kind !== 'github') return null;
   if (!ISSUE_NUMBER.test(bug.ref.externalId)) return null;
@@ -63,7 +67,7 @@ export function filedIssueNumber(bug: BugTriage): number | null {
  */
 export async function addFiledBugs(
   options: AddIssueOptions,
-  result: Pick<TriageResult, 'bugs'>,
+  result: Pick<TriageServiceResult, 'bugs'>,
 ): Promise<readonly string[]> {
   if (options.config.boardProjectNumber === null) return [];
   const issues = result.bugs.flatMap((bug) => {
