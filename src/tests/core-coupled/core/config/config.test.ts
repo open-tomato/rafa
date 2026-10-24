@@ -148,6 +148,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'allowList',
   'settingSources',
   'loopWorktreeDir',
+  'loopWorktreeSetup',
   'loopRetries',
   'loopRetriesOnContinue',
   'loopContinueCriteria',
@@ -263,6 +264,7 @@ const DEFAULTS: RafaConfig = {
   allowList: [],
   settingSources: ['project', 'local'],
   loopWorktreeDir: join('.rafa', 'worktrees'),
+  loopWorktreeSetup: null,
   loopRetries: false,
   loopRetriesOnContinue: 1,
   loopContinueCriteria: join('.rafa', 'continue-criteria.md'),
@@ -409,6 +411,7 @@ const FULL = [
   'loop:',
   '  settingSources: user, project',
   '  worktreeDir: ../worktrees',
+  '  worktreeSetup: bun install --frozen-lockfile',
   '  retries: 2',
   '  retriesOnContinue: 2',
   '  continue:',
@@ -576,6 +579,7 @@ const FULL_VALUES: RafaConfig = {
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
   loopWorktreeDir: '../worktrees',
+  loopWorktreeSetup: 'bun install --frozen-lockfile',
   loopRetries: 2,
   loopRetriesOnContinue: 2,
   loopContinueCriteria: 'docs/continue.md',
@@ -1021,6 +1025,10 @@ describe('parseConfigText', () => {
       [
         'loop.worktreeDir', 'loop:\n  worktreeDir: 7', 'loop.worktreeDir is 7, expected a directory path',
         'loop:\n  worktreeDir: /tmp/trees', 'loopWorktreeDir', '/tmp/trees',
+      ],
+      [
+        'loop.worktreeSetup', 'loop:\n  worktreeSetup: 7', 'loop.worktreeSetup is 7, expected a shell command',
+        'loop:\n  worktreeSetup: make setup', 'loopWorktreeSetup', 'make setup',
       ],
       [
         'loop.retries', 'loop:\n  retries: -1',

@@ -9,7 +9,7 @@
  * which `src/config/shape.ts` composes into `LoopShape` of `ConfigShape`,
  * the nested file shape.
  * `config-registry.ts`'s `CONFIG_DEFAULTS` and `SETTINGS`
- * spread the objects below right after `loop.worktreeDir` and ahead of
+ * spread the objects below right after `loop.worktreeSetup` and ahead of
  * `loop.wrapUp`, so the order settings are reported in holds the `loop`
  * section together.
  *

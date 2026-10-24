@@ -38,6 +38,7 @@ const INDEX = resolve(ROOT, 'src/config/index.ts');
 const SAMPLES: Readonly<Record<string, unknown>> = {
   'hub.url': 'https://hub.example.org',
   'hub.tokenSecret': 'rafa-hub-token',
+  'loop.worktreeSetup': 'bun install --frozen-lockfile',
   'pr.provider': 'gh',
   'pr.base': 'main',
   'board.project.number': 6,

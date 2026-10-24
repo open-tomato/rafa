@@ -25,7 +25,8 @@
  * the key naming the setting by itself: `inject`, named in phase 0
  * before any other plan key existed, and `settingSources`.
  *
- * Four readings the spec leaves to this module; the readings each later
+ * Four readings the spec leaves to this module, then the readings of the
+ * two `loop.worktree*` keys added after it; the readings each later
  * section's spec leaves are argued in `config-schema-readings.ts`:
  *
  *   - `tracker.default`, `tracker.fallback` and `learning.adapter`
@@ -48,6 +49,9 @@
  *   - `loop.worktreeDir` defaults to `.rafa/worktrees` and is never null:
  *     a relative value is read from the project root, not the checkout
  *     (`start/worktree-dir.ts`). It is no `CommandLineSetting`.
+ *   - `loop.worktreeSetup` defaults to null, which runs nothing; a string
+ *     is kept as written, as the shell command a `--as-worktree` run
+ *     runs in its worktree. It is no `CommandLineSetting`.
  *
  * ## Defaults
  *
@@ -176,6 +180,7 @@ export type CoreSetting =
   | 'allowList'
   | 'settingSources'
   | 'loopWorktreeDir'
+  | 'loopWorktreeSetup'
   | 'boardTrustedAuthors'
   | 'boardRelationships'
   | 'boardProjectTemplate'
@@ -263,6 +268,7 @@ const CORE_SPECS: CoreSection['settings'] = {
     cli: true,
   },
   loopWorktreeDir: { key: 'loop.worktreeDir', read: directory, cli: false },
+  loopWorktreeSetup: { key: 'loop.worktreeSetup', read: text('a shell command'), cli: false },
   boardTrustedAuthors: {
     key: 'board.trustedAuthors',
     read: listOf(githubLogin, 'GitHub logins'),
@@ -340,6 +346,7 @@ const CORE_DEFAULTS: CoreSection['defaults'] = Object.freeze({
   allowList: Object.freeze([]),
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
   loopWorktreeDir: join('.rafa', 'worktrees'),
+  loopWorktreeSetup: null,
   boardTrustedAuthors: Object.freeze([]),
   boardRelationships: 'labels',
   boardProjectTemplate: BOARD_PROJECT_TEMPLATE_DEFAULT,

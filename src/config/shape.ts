@@ -112,7 +112,7 @@ export type ModuleFileItem =
   };
 
 /**
- * The `loop` namespace: core's two keys, and the keys the
+ * The `loop` namespace: core's three keys, and the keys the
  * `loop-retries`, `loop-continue` and `wrap-up` sections write.
  */
 export interface LoopShape extends LoopRetriesShape, LoopContinueShape, WrapUpShape {
@@ -120,6 +120,8 @@ export interface LoopShape extends LoopRetriesShape, LoopContinueShape, WrapUpSh
   readonly settingSources: string;
   /** `loop.worktreeDir`: where the loop's worktrees are made. */
   readonly worktreeDir: string;
+  /** `loop.worktreeSetup`: the shell command run in a new or reused `--as-worktree` worktree, or null for none. */
+  readonly worktreeSetup: string | null;
 }
 
 /** The `board.project` namespace: core's two keys and the `board-project` section's limits. */

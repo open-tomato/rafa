@@ -55,6 +55,7 @@ const KEYS: readonly (readonly [string, string])[] = [
   ['allowList', 'allowList'],
   ['settingSources', 'loop.settingSources'],
   ['loopWorktreeDir', 'loop.worktreeDir'],
+  ['loopWorktreeSetup', 'loop.worktreeSetup'],
   ['boardTrustedAuthors', 'board.trustedAuthors'],
   ['boardRelationships', 'board.relationships'],
   ['boardProjectTemplate', 'board.project.template'],
@@ -117,6 +118,7 @@ const DEFAULTS: Readonly<Record<string, unknown>> = {
   allowList: [],
   settingSources: ['project', 'local'],
   loopWorktreeDir: join('.rafa', 'worktrees'),
+  loopWorktreeSetup: null,
   boardTrustedAuthors: [],
   boardRelationships: 'labels',
   boardProjectTemplate: 'https://github.com/orgs/open-tomato/projects/6',
@@ -271,6 +273,27 @@ describe('core through the section contract', () => {
     expect(refusal).toThrow(
       'dangerous.acceptStaleRefs is defined by package "core" and again by package "intruder"',
     );
+  });
+});
+
+describe('loop.worktreeSetup', () => {
+  const spec = CORE_SECTION.settings.loopWorktreeSetup;
+  const at = { label: spec.key, key: spec.key };
+
+  it('defaults to null, which runs nothing, and takes no flag', () => {
+    expect(CORE_SECTION.defaults.loopWorktreeSetup).toBeNull();
+    expect(spec.cli).toBe(false);
+  });
+
+  it('keeps a shell command as written, spaces and flags included', () => {
+    const command = '  bun install --frozen-lockfile && echo ready ';
+    expect(spec.read(command, at)).toEqual({ value: command, problems: [], extras: [] });
+  });
+
+  it('refuses a number, naming what it expected', () => {
+    const reading = spec.read(7, at);
+    expect(reading.value).toBeUndefined();
+    expect(reading.problems).toEqual(['loop.worktreeSetup is 7, expected a shell command']);
   });
 });
 
