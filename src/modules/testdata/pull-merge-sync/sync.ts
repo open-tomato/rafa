@@ -6,15 +6,15 @@
  * pull does to the store it runs on.
  *
  * Its push moves nothing and answers `pushed` with no path. Its pull is
- * the `file` strategy's (`src/effort/sync/file.ts`), handed the request as
- * it came, `sessionId` included, and reading the other device's
- * `effort.sqlite` from the path the `RAFA_TEST_OTHER_STORE` variable
- * names: a hub has nothing to carry here, so the other device's file is
- * where the test left it. A merge the guard or any other rule refuses
- * rejects as the `file` strategy rejects it, and each pull's outcome
- * (`pulled:<status>:<rows added>`, or `refused`) is appended, one line per
- * call, to `.rafa/sync-calls.log` under the repository the adapter is
- * made for, so a case reads what each end-of-task pull did.
+ * the `file` strategy's (`packages/rafa-effort/src/effort/sync/file.ts`),
+ * handed the request as it came, `sessionId` included, and reading the
+ * other device's `effort.sqlite` from the path the `RAFA_TEST_OTHER_STORE`
+ * variable names: a hub has nothing to carry here, so the other device's
+ * file is where the test left it. A merge the guard or any other rule
+ * refuses rejects as the `file` strategy rejects it, and each pull's
+ * outcome (`pulled:<status>:<rows added>`, or `refused`) is appended, one
+ * line per call, to `.rafa/sync-calls.log` under the repository the
+ * adapter is made for, so a case reads what each end-of-task pull did.
  */
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { Sync, SyncPullRequest, SyncPullResult } from '@open-tomato/rafa/ports';

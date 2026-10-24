@@ -17,8 +17,8 @@ takes 6.4 minutes a pass, so it is never the quick check:
 - `changed`: `bun test --changed=<base>`, with `tsc` and `eslint` on the
   changed files. The default.
 - `related`: the test files of the module the change touches, by path
-  (`bun test src/effort/`), when the change reaches past what `changed`
-  finds.
+  (`bun test packages/rafa-effort/src/effort/`), when the change reaches past
+  what `changed` finds.
 
 The full suite is the last warranty: run once, before a merge, after
 every scoped run is green. `context/verification.md` names the changes

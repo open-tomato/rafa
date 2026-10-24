@@ -384,10 +384,10 @@ sit in the package: the console logger and the events output
 (`adapters/logger/console`, `adapters/output/events`), and the two store
 backends, `store/sqlite` and `store/ndjson`, under
 `packages/rafa/src/effort/store/`. The text output is core's own, under
-`core/output/`. The rest sit above core, under `src/adapters/` and
-`packages/rafa-effort/src/effort/sync/`: the json output, the local and
-GitHub trackers, the local learning adapter, the claude planner, and the file
-and local sync strategies.
+`core/output/`. The rest sit above core. Under `src/adapters/` are the json
+output, the local and GitHub trackers and the claude planner. The local learning
+adapter sits under `packages/rafa-inventory/src/adapters/learning/`, and the
+file and local sync strategies under `packages/rafa-effort/src/effort/sync/`.
 `src/adapter-registry.ts`, outside
 `packages/rafa/src/core/`, lists them as `CORE_ADAPTERS` and registers nothing
 as it is imported: its `registerCoreAdapters()` hands them to
@@ -1037,12 +1037,12 @@ names come from, and the facade entry is no node.
   - `instinct.ts`, `skill.ts`, `stack.ts`, `provenance.ts`,
     `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
   - `agent.ts`: `@open-tomato/rafa` (the CLI)
-- **One upward edge survives the placement.**
-  `packages/rafa-effort/src/effort/report-skills.ts` (rafa-effort) reads
-  `readScopes` from `packages/rafa-inventory/src/schema/scope-records.ts`, which
-  lands in rafa-inventory. No placement clears it, because `scope-records.ts`
-  imports inventory's `instinct.ts` and `check/layout.ts`. The survey page
-  records it under its upward edges.
+- **No upward edge leaves rafa-effort.**
+  `packages/rafa-effort/src/effort/report-skills.ts` reads `readScopes` from
+  `packages/rafa-inventory/src/schema/scope-records.ts`, which lands in
+  rafa-inventory. Inventory ranks below effort in the cut table, so that edge
+  runs down the order, not up it, and the table reads rafa-effort at 0 upward
+  edges.
 
 ### References
 
