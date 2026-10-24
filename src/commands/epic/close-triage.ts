@@ -16,7 +16,8 @@
  * cause: a criterion that does not hold is a product bug, so it goes to
  * the public tracker the chain resolves, resolved once and only when a
  * check failed
- * (`resolveTracker`, with `unresolvedTracker` from `src/start/triage.ts`
+ * (`resolveTracker`, with `unresolvedTracker` from
+ * `packages/rafa/src/ports/unresolved-tracker.ts`
  * standing in for a chain that landed nowhere, so each bug then fails
  * with its refusal). Its
  * `what` names the epic and the criterion, and its `artifact` is
@@ -95,6 +96,7 @@ import { join } from 'node:path';
 import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
@@ -103,7 +105,6 @@ import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { addFiledBugs } from '../../board/project/add-filed.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { readStaleDocsVersion } from '../../start/stale-docs.js';
-import { unresolvedTracker } from '../../start/triage.js';
 import { triageReport } from '../../triage/triage.js';
 
 import { isDocsOnlyCriterion, routeDocsOnlyFailure } from './close-docs.js';

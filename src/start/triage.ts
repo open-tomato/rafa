@@ -54,7 +54,8 @@
  *
  * A report whose bugs are all security bugs resolves nothing, so its bugs
  * meet no public tracker, not even a preflight. `triageReport` still takes
- * a public tracker, so such a report is handed {@link unresolvedTracker},
+ * a public tracker, so such a report is handed `unresolvedTracker`
+ * (`packages/rafa/src/ports/unresolved-tracker.ts`),
  * which refuses every call, and which `triageReport` never calls for a
  * security bug. The same stand-in carries a chain that landed nowhere: each
  * public bug then fails with the chain's own refusal as its problem, while
@@ -197,7 +198,7 @@ import type { SuiteFailure } from '../suite/run.js';
 import type { IssuesConfigSettings } from '@open-tomato/rafa/config-schema-issues';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
-import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
+import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
@@ -225,6 +226,7 @@ import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { isMachineFault } from '@open-tomato/rafa/store/machine-fault';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
@@ -367,25 +369,6 @@ export interface StartTriageLines {
   readonly notes: readonly string[];
   /** Everything that was not, in the order it was found. */
   readonly warnings: readonly string[];
-}
-
-/**
- * A tracker standing in for one the run did not resolve: its preflight
- * answers `reason`, and every other call rejects with it. See the module
- * note.
- */
-export function unresolvedTracker(kind: TrackerKind, reason: string): Tracker {
-  const refuse = (): Promise<never> => Promise.reject(new Error(reason));
-  return Object.freeze({
-    kind,
-    capabilities: () => ({ projects: false, customFields: false, issueTypes: false }),
-    preflight: () => Promise.resolve({ ok: false as const, reason }),
-    find: refuse,
-    get: refuse,
-    create: refuse,
-    comment: refuse,
-    transition: refuse,
-  });
 }
 
 /** True for a bug that may reach the public tracker: a `what`, and a flag of `false`. */

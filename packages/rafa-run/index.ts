@@ -416,7 +416,6 @@ export { readAlwaysRunFiles } from '../../src/start/task-gate-lines.js';
 export {
   createStartTriage,
   runStartFailures,
-  unresolvedTracker,
 } from '../../src/start/triage.js';
 
 export { readTypeCheckRecipe } from '../../src/start/type-step.js';
