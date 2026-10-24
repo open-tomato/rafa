@@ -74,8 +74,8 @@ interface RewiredRow {
  * `packages/rafa/src/start/branch-decision.ts` and `src/release/fragment-tree.ts` left the
  * row in the fourth decouple item: their one pr import by path was the pr
  * barrel, for core's git names and `WorkingTreeStatus`, which they take from
- * `@open-tomato/rafa/core/git` now. Its 13 back-edge files are board and
- * release files, every one earlier in the move order.
+ * `@open-tomato/rafa/core/git` now. Its 12 back-edge files are release
+ * files, every one earlier in the move order.
  * `src/commands/issue/create.ts` left them in the same item: its one pr
  * import by path was `TRIAGE_MODULE`, which it takes from
  * `@open-tomato/rafa/triage/filed-text` now. So did
@@ -87,7 +87,9 @@ interface RewiredRow {
  * their pr imports by path were `triageReport` and its types, which they
  * reach through core's service registry,
  * `@open-tomato/rafa/core/services`, and its `TriagedBug` and
- * `TriageServiceResult`.
+ * `TriageServiceResult`. `src/commands/epic/close-docs.ts`, the last
+ * board file among them, left them in the same item: its pr import by
+ * path was `addStaleDocLine`, which it reaches through the same registry.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `src/board/gate.ts`, `src/board/project/rules.ts`,
@@ -163,7 +165,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/claims/lost.ts': 'loadCycle',
       'src/cleanup/past-head.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
-      'src/commands/epic/close-docs.ts': 'backEdge',
       'src/commands/release/fragment.ts': 'backEdge',
       'src/commands/release/list.ts': 'backEdge',
       'src/commands/release/publish.ts': 'backEdge',

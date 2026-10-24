@@ -782,15 +782,17 @@ names come from, and the facade entry is no node.
     it by name since the second decouple item's rewire. Board has none: no
     effort file imports it. Release has none in the codemod's grouping, since
     `src/board/project/facts.ts`, its one board importer, now takes
-    `directoryPrefix` and `fragmentIdOf` from core. Pr has thirteen:
-    `src/commands/epic/close-docs.ts`, the ten `src/commands/release/`
-    files, `src/release/prepare.ts` and `src/release/verify.ts`; `src/commands/issue/create.ts` and
+    `directoryPrefix` and `fragmentIdOf` from core. Pr has twelve: the ten
+    `src/commands/release/` files, `src/release/prepare.ts` and
+    `src/release/verify.ts`; `src/commands/issue/create.ts` and
     `create-bug.ts` left it in the same item, when their pr imports moved
     into core;
     `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`
     and `src/commands/epic/close.ts` left it in the fifth, which reaches
     `triageReport` through core's service registry and types its result
-    on core's `TriagedBug` and `TriageServiceResult`;
+    on core's `TriagedBug` and `TriageServiceResult`, and
+    `src/commands/epic/close-docs.ts`, which reaches `addStaleDocLine`
+    through the same registry;
     `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and

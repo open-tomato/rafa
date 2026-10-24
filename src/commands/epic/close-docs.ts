@@ -20,11 +20,15 @@
  *      no plan stub, since an epic close runs under no plan, the task line
  *      `rafa epic close <n>` and the outcome `failed`, as the bug report's
  *      dispatch would have been.
- *   2. One line through `addStaleDocLine` (`docs/release-issue.ts`) on
- *      the release's stale-docs issue, on the tracker the close resolved
- *      for its bugs. A tracker that cannot list and edit answers `kept`,
- *      and the line is printed then, since the close has no "after the
- *      last task" to keep it for.
+ *   2. One line through `activeServices().addStaleDocLine`, core's
+ *      service registry, which the root `src/service-registry.ts` fills
+ *      with pr's function, on the release's stale-docs issue, on the
+ *      tracker the close resolved for its bugs. A tracker that cannot
+ *      list and edit answers `kept`, and the line is printed then, since
+ *      the close has no "after the last task" to keep it for. While no
+ *      set is registered the call refuses, naming `addStaleDocLine` and
+ *      the root, and the refusal is a `warn` line like a failed tracker
+ *      call's.
  *
  * The entry names no `where`: a criterion is no file and line. Its `what`
  * is the epic, the criterion's number and its text on one line, the text
@@ -42,11 +46,10 @@ import type { IssueRef } from '@open-tomato/rafa/ports';
 import type { FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeServices } from '@open-tomato/rafa/core/services';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
 import { namesOnlyDocs } from '@open-tomato/rafa/triage/doc-only';
 import { staleDocLineText } from '@open-tomato/rafa/triage/stale-doc-line';
-
-import { addStaleDocLine } from '../../docs/release-issue.js';
 
 /** True when `criterion` names only documentation; see the module note. */
 export function isDocsOnlyCriterion(criterion: EpicCriterion): boolean {
@@ -123,7 +126,7 @@ export async function routeDocsOnlyFailure(failure: DocsOnlyFailure): Promise<re
   }
   try {
     const entry = { where: null, what };
-    const result = await addStaleDocLine({ tracker: failure.tracker, version: failure.version(), entry });
+    const result = await activeServices().addStaleDocLine({ tracker: failure.tracker, version: failure.version(), entry });
     lines.push(docsOnlyLine(criterion, result, staleDocLineText(entry)));
   } catch (error) {
     lines.push({ text: `Criterion ${String(criterion.number)}: not added to the stale-docs issue: ${failure.redact(messageOf(error))}`, warn: true });
