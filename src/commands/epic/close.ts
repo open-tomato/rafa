@@ -55,7 +55,7 @@
  *    each passed criterion and each one closed over with the flag, with
  *    its reason. A close `gh` refuses is exit 1.
  * 9. The cost: `readEpicCost` over the members at close time
- *    (`src/effort/epic-cost.ts`), printed by `renderEpicCost` beside the
+ *    (`packages/rafa-effort/src/effort/epic-cost.ts`), printed by `renderEpicCost` beside the
  *    body's `Estimate:`, with the line saying cost follows membership. A
  *    store that cannot be read is a `warn` line: the epic is closed.
  *

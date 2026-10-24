@@ -12,9 +12,8 @@ import type { SearchPromptInput } from '@open-tomato/rafa-inventory/inventory/se
 
 import { describe, expect, test } from 'bun:test';
 
+import { classifyPromptContent, PROMPT_SHAPES } from '@open-tomato/rafa-effort/effort/classify';
 import { renderSearchPrompt, SEARCH_BLOCK_FENCE, SEARCH_PROMPT_PREFIX } from '@open-tomato/rafa-inventory/inventory/search/prompt';
-
-import { classifyPromptContent, PROMPT_SHAPES } from '../../../../effort/classify.js';
 
 const INPUT: SearchPromptInput = {
   kind: 'skill',

@@ -59,8 +59,8 @@ import {
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration, stripTaskDeclaration , planStubFromPrompt , blockerComment, escapeBlockerText, splitBlockerComment } from '@open-tomato/rafa/core/plan';
 import { findNextTask, insertTrackerTask, updateTrackerLine, writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
+import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 
-import { classifyPromptContent } from '../../../effort/classify.js';
 import { parsePlan } from '../../../plan/index.js';
 import { commitFinishedTask } from '../../../start/commit.js';
 import { BLOCKER_PROMPT_PREFIX, buildTaskPrompt, dispatchTask } from '../../../start/dispatch.js';

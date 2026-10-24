@@ -135,13 +135,13 @@ import { planStubFromPrompt , trackerPathFor } from '@open-tomato/rafa/core/plan
 import { readPreflightHalts } from '@open-tomato/rafa/store/preflight';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 import { serveSession } from '@open-tomato/rafa-inventory/start/serving';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { classifyPromptContent } from '../effort/classify.js';
 import { createGitRunner } from '../pr/index.js';
 import {
   DEFAULT_GH_HOST,

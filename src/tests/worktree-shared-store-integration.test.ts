@@ -29,8 +29,8 @@
  * store.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { EffortReport } from '../effort/report.js';
 import type { TaskReportTally } from '@open-tomato/rafa/store/reports';
+import type { EffortReport } from '@open-tomato/rafa-effort/effort/report';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

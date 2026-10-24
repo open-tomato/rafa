@@ -23,7 +23,7 @@
  *
  * ## Unreachable and refused
  *
- * The stage's rule, which `src/effort/sync/contact.ts` reads by name:
+ * The stage's rule, which `packages/rafa-effort/src/effort/sync/contact.ts` reads by name:
  *
  *   - **{@link HubUnreachable}** (`name` `HubUnreachable`): a connect
  *     failure, the `hub.timeout` abort, or a `5xx`. The command then

@@ -18,9 +18,8 @@ import {
   planStubFromPrompt,
   stampPrompt,
 } from '@open-tomato/rafa/core/plan';
-
-import { resolveSessionPlan } from '../effort/attribution.js';
-import { classifyPromptContent } from '../effort/classify.js';
+import { resolveSessionPlan } from '@open-tomato/rafa-effort/effort/attribution';
+import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 
 const STUB = 'q16a-compose-n8n';
 
@@ -60,7 +59,7 @@ describe('stampPrompt', () => {
   it('keeps every prompt shape classifiable', () => {
     // The regression this whole placement decision exists for.
     const shapes = [
-      'Your scoped task is: Add `src/effort/classify.ts`\n* body',
+      'Your scoped task is: Add `packages/rafa-effort/src/effort/classify.ts`\n* body',
       '* Read `@progress.txt` in full.\n* body',
     ];
     for (const prompt of shapes) {

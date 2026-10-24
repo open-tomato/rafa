@@ -22,7 +22,7 @@ import type { Sync, SyncPullRequest, SyncPullResult } from '@open-tomato/rafa/po
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { createFileSync } from '../../../effort/sync/file.js';
+import { createFileSync } from '@open-tomato/rafa-effort/effort/sync/file';
 
 /** The variable naming the other device's `effort.sqlite`. */
 const OTHER_STORE_VARIABLE = 'RAFA_TEST_OTHER_STORE';

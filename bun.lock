@@ -75,6 +75,10 @@
     "packages/rafa-effort": {
       "name": "@open-tomato/rafa-effort",
       "version": "0.46.0",
+      "dependencies": {
+        "@open-tomato/rafa-core": "workspace:*",
+        "@open-tomato/rafa-inventory": "workspace:*",
+      },
       "devDependencies": {
         "@open-tomato/rafa-eslint-config": "workspace:*",
         "eslint": "^9.39.4",

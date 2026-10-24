@@ -24,7 +24,7 @@
  *      (`.rafa/effort/`) and one never ignored beside it.
  *
  * The commit `effort collect` needs is made the way `makeRepo` in
- * `src/effort/collect.test.ts` does: proof against hooks, gpg signing
+ * `src/tests/effort-coupled/effort/collect.test.ts` does: proof against hooks, gpg signing
  * and a missing identity. Every git run here, that commit and every
  * `git check-ignore`, is scoped to the fixture's own scratch HOME and a
  * `.gitconfig` beside it, global and system config switched off, so

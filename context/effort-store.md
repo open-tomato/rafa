@@ -317,7 +317,7 @@ starts from the new rows the merge brought in. The codec, `mergeStore` and
 under `packages/`.
 
 **The `service` strategy makes one contact per command through
-`createHubContact` (`src/effort/sync/contact.ts`), which never throws
+`createHubContact` (`packages/rafa-effort/src/effort/sync/contact.ts`), which never throws
 and never sets the exit code.** A contact runs `pushThenPull()` (push then
 pull) or `pull()` alone. `local` and `file` are never contacted: nothing is
 loaded, selected or written. The `service` adapter is selected once per
@@ -330,7 +330,7 @@ the end of each task, whatever its outcome, its pulls naming the run's
 session id as `SyncPullRequest.sessionId` so the merge's live-loop guard
 passes the run's own record; `rafa status`, `rafa next`
 (including `--dry-run`), and `rafa effort report` pull alone before they
-read, through `pullBeforeRead` (`src/effort/collect.ts`, `src/start.ts`,
+read, through `pullBeforeRead` (`packages/rafa-effort/src/effort/collect.ts`, `src/start.ts`,
 querying in the effort module). **The offline rule:** a push or pull that
 rejects with an error whose `name` is `HubUnreachable` (network error,
 timeout, or hub unreachable) writes exactly one line per contact, `effort
@@ -816,10 +816,10 @@ effort report`, under the repo root whatever `store` selects, and opens nothing
 when the file is absent; `readPreflightHalts` reads `preflight` back the same
 way, `readSessionBudgets` the `dispatches` rows carrying a budget, and
 `readSessionAgents` those naming an agent, for the `--by=agent` split of `rafa
-effort report --trend`. `readDocOnlyBugs` (`src/effort/report-doc-bugs.ts`)
+effort report --trend`. `readDocOnlyBugs` (`packages/rafa-effort/src/effort/report-doc-bugs.ts`)
 reads the `out_of_scope_bugs` rows of scope `rafa` the same way, for the
 report's count of those naming only documentation, and `readBugKinds`
-(`src/effort/report-kinds.ts`) every `bug_routes` row, for its count per plan of
+(`packages/rafa-effort/src/effort/report-kinds.ts`) every `bug_routes` row, for its count per plan of
 the entries routed under each kind and the share filed; it answers a `problem`
 in place of a throw when the store cannot be read. `readTaskFinishes`
 (`store/task-finishes.ts`) reads the `done` rows of `task_reports` and
@@ -883,7 +883,7 @@ by raw SQL takes it out as well, since no open has made it there yet.
 
 ### The fact rows
 
-**`readSkillFacts` (`src/effort/skill-facts.ts`) answers one row per task
+**`readSkillFacts` (`packages/rafa-effort/src/effort/skill-facts.ts`) answers one row per task
 report, joining what `rafa effort report --skills` needs.** It reads rows
 rafa already stores and nothing else: no session transcript is opened.
 It is a TypeScript reader rather than a SQL view, so the schema's table
@@ -900,7 +900,7 @@ and a plugin's `plugin:name` is kept. A session with no report (a
 
 ### The recurrence rule
 
-**`findRecurrences` (`src/effort/recurrence.ts`) answers where a failure
+**`findRecurrences` (`packages/rafa-effort/src/effort/recurrence.ts`) answers where a failure
 string appears again in rows rafa stores.** A skill's failure strings come
 from its `failure_strings:` in the frontmatter, a lesson's from its
 `artifact`. A string recurs when it appears as a case-sensitive literal
@@ -919,7 +919,7 @@ string. A string given twice is searched once.
 
 ### The signals
 
-**`skillSignals` and `lessonSignals` (`src/effort/skill-signals.ts`) say
+**`skillSignals` and `lessonSignals` (`packages/rafa-effort/src/effort/skill-signals.ts`) say
 what co-occurred with a failure string's recurrence.** Both are pure
 functions of the fact rows and the recurrence matcher; neither reads a
 path or config. A signal is checked in order, defined once, and never
@@ -942,7 +942,7 @@ null artifact and reads as `injected`.
 
 ### The SkillsReport JSON schema
 
-**`buildSkillsReport` (`src/effort/report-skills.ts`) answers the report as
+**`buildSkillsReport` (`packages/rafa-effort/src/effort/report-skills.ts`) answers the report as
 a pure structure and as JSON.** It reads the store's fact rows (narrowed to
 named plans), each skill's `failure_strings:` from the resolved tiers, and
 each held lesson's `artifact` by id. One `SkillsReportPlan` per plan the
@@ -1041,10 +1041,10 @@ in `store/dispatches.test.ts`: the `COLUMNS` list and the two
 whole-row `toEqual`s.
 
 **`skill_invocations` is written by `effort collect`, not by a task
-report.** Its collector (`src/effort/skill-use.ts`) reads the input of
+report.** Its collector (`packages/rafa-effort/src/effort/skill-use.ts`) reads the input of
 `Skill` tool calls — the one exception to the "no tool input" rule — to
 extract and count each skill a session invoked, in its main thread and in
-its sidechains. The skill half of `effort collect` (`src/effort/collect-skills.ts`)
+its sidechains. The skill half of `effort collect` (`packages/rafa-effort/src/effort/collect-skills.ts`)
 reads the `Skill` calls of each session the run read into a session row, or
 with `--skills` of every session the port holds whose log is in the
 directory, and skips a session already holding a row. It writes under
@@ -1081,7 +1081,7 @@ count that exists anywhere, and this collector is the sole source
 **The collector's exception to "no tool input".** `session-log.ts`
 and the effort port fold a session's logs into counters and identifiers
 without keeping message content. The skill-use collector in
-`src/effort/skill-use.ts` is the single exception: it reads the `skill`
+`packages/rafa-effort/src/effort/skill-use.ts` is the single exception: it reads the `skill`
 field from the input of a `Skill` tool call, mapped to a bare name with
 `bareSkillName`, and no message content otherwise — not the call's
 args, every other tool's input, every prompt, or any tool output. The

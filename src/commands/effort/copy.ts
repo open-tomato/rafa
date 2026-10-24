@@ -8,7 +8,7 @@
  * The store copied is always `<root>/.rafa/effort/`. The copy lands in
  * `--to`, resolved against the project root when relative, or in
  * `<root>/.rafa/scratch/effort-<stamp>/` by default, the stamp read off
- * the clock as `fileStamp` (`src/effort/file-stamp.ts`) spells it. The
+ * the clock as `fileStamp` (`packages/rafa-effort/src/effort/file-stamp.ts`) spells it. The
  * command prints the directory and the `RAFA_EFFORT_DIR=` line to put
  * in front of each command that should use it.
  *

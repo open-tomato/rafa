@@ -29,8 +29,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
-
-import { MODULE_SYNC_STRATEGIES } from '../effort/sync/select.js';
+import { MODULE_SYNC_STRATEGIES } from '@open-tomato/rafa-effort/effort/sync/select';
 
 import { refuseUnservedSync } from './preflight-sync.js';
 

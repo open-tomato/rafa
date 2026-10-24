@@ -98,12 +98,12 @@ import { BUNDLED_FEATURES, CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS, createRo
 /** The `src/` directory, which the phase 0 modules sit in. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
-/** The modules reading each command line, from `src/`. */
+/** The modules reading each command line, from `src/` (effort's through `../packages/rafa-effort/src/`). */
 const READERS: Readonly<Record<string, readonly string[]>> = {
   'plan create': ['plan.ts', 'board/flags.ts'],
   'loop start': ['start.ts', 'start/run-config.ts', 'start/run-setup.ts', 'start/runtime.ts', 'start/continue-args.ts'],
-  'effort collect': ['effort/collect.ts', 'effort/collect-args.ts'],
-  'effort report': ['effort/report.ts', 'effort/report-args.ts'],
+  'effort collect': ['../packages/rafa-effort/src/effort/collect.ts', '../packages/rafa-effort/src/effort/collect-args.ts'],
+  'effort report': ['../packages/rafa-effort/src/effort/report.ts', '../packages/rafa-effort/src/effort/report-args.ts'],
 };
 
 /** The outputs each command declares: text and json, each phase 0 command now writing through the active output. */

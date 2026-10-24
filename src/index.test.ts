@@ -209,12 +209,12 @@ import {
   WireExportRefusal,
   WireFormatError,
 } from '@open-tomato/rafa/store/wire';
+import effortCollect from '@open-tomato/rafa-effort/effort/collect';
+import effortReport from '@open-tomato/rafa-effort/effort/report';
 
 import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
-import effortCollect from './effort/collect.js';
-import effortReport from './effort/report.js';
 import {
   FINDING_KINDS,
   FINDING_SIGNALS,

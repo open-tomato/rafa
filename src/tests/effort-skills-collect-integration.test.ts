@@ -44,7 +44,7 @@
  * uses for them elsewhere.
  */
 import type { CapturedRun } from './cli-capture.js';
-import type { SkillsReport, SkillsReportArm } from '../effort/report-skills.js';
+import type { SkillsReport, SkillsReportArm } from '@open-tomato/rafa-effort/effort/report-skills';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -64,10 +64,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
 import { writePlanCi } from '@open-tomato/rafa/store/plan-ci';
 import { writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { sessionLogDir } from '@open-tomato/rafa-effort/effort/collect';
+import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
 import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
-
-import { sessionLogDir } from '../effort/collect.js';
-import { SKILL_USE_CLI_VERSION } from '../effort/skill-use.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';

@@ -2,7 +2,7 @@
  * Tests for the `index.ts` barrel: it exports every name `registry.ts`
  * exports, each once, as the same binding, and no other name, and it
  * loads no adapter, so the barrel, `registry.ts` and
- * `src/effort/sync/select.ts` load whichever comes first.
+ * `packages/rafa-effort/src/effort/sync/select.ts` load whichever comes first.
  *
  * The barrel spells its names, so a name added to `registry.ts` and not
  * to the barrel is a name no file outside `packages/rafa/src/core/` can import.
@@ -25,7 +25,7 @@
  * found, so it imports no adapter.
  *
  * The load cases read `packages/rafa/src/core/adapters/index.ts`, `registry.ts` and
- * `src/effort/sync/select.ts`, the three files of the cycle the barrel's
+ * `packages/rafa-effort/src/effort/sync/select.ts`, the three files of the cycle the barrel's
  * note records as gone, each imported first in a child `bun`, since this
  * file has already imported two of them by the time a case runs. Each
  * child imports the composition root `src/adapter-registry.ts` after
@@ -61,7 +61,7 @@ const ROOT = resolve(import.meta.dir, '../../../../..');
 
 const BARREL = 'packages/rafa/src/core/adapters/index.ts';
 const REGISTRY = 'packages/rafa/src/core/adapters/registry.ts';
-const SELECT = 'src/effort/sync/select.ts';
+const SELECT = 'packages/rafa-effort/src/effort/sync/select.ts';
 const ROOT_MODULE = 'src/adapter-registry.ts';
 
 /** What every member of `CORE_ADAPTER_REGISTRY` throws while nothing is registered. */

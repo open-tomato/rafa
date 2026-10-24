@@ -366,7 +366,7 @@ core barrel re-exports: a feature file that needs the whole default record or
 the whole spec record takes it from there, typed as `CONFIG_DEFAULTS` and
 `SETTINGS` are, and so imports no root file. The callers at this commit are
 `src/start/preflight.ts`, `src/start/pr-lifecycle.ts`, `src/board/roadmap.ts`,
-`src/effort/collect.ts` and `packages/rafa-inventory/src/inventory/index.ts`
+`packages/rafa-effort/src/effort/collect.ts` and `packages/rafa-inventory/src/inventory/index.ts`
 for the defaults, and `src/refs/extract.ts` and `src/refs/verify.ts` for the
 settings. Each refuses with a `ConfigSectionError` naming
 `src/config-registry.ts` while no section is registered, so a constant built
@@ -385,8 +385,9 @@ sit in the package: the console logger and the events output
 backends, `store/sqlite` and `store/ndjson`, under
 `packages/rafa/src/effort/store/`. The text output is core's own, under
 `core/output/`. The rest sit above core, under `src/adapters/` and
-`src/effort/sync/`: the json output, the local and GitHub trackers, the local
-learning adapter, the claude planner, and the file and local sync strategies.
+`packages/rafa-effort/src/effort/sync/`: the json output, the local and
+GitHub trackers, the local learning adapter, the claude planner, and the file
+and local sync strategies.
 `src/adapter-registry.ts`, outside
 `packages/rafa/src/core/`, lists them as `CORE_ADAPTERS` and registers nothing
 as it is imported: its `registerCoreAdapters()` hands them to
@@ -670,8 +671,8 @@ names come from, and the facade entry is no node.
     `packages/rafa-inventory/src/schema/instinct.ts` and
     `packages/rafa-inventory/src/tiers/serve.ts`, imported effort only for the
     frontmatter and agent-definition files, which the first decouple item moved
-    into core. Inventory has none either: its last, `src/effort/skill-use.ts`,
-    was reached from inventory's search through `src/effort/collect.ts` until
+    into core. Inventory has none either: its last, `packages/rafa-effort/src/effort/skill-use.ts`,
+    was reached from inventory's search through `packages/rafa-effort/src/effort/collect.ts` until
     the second decouple item cut that edge, and it took the facade once the
     graph was regenerated without the cycle, so the guard's inventory row is
     empty; `packages/rafa-inventory/src/start/serving.ts` is an inventory file
@@ -687,7 +688,7 @@ names come from, and the facade entry is no node.
     item took the importers it freed onto the facades: inventory's
     `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and board's
     `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
-    `preflight-drift.ts`. `src/effort/epic-cost.ts`, an effort file, sat among
+    `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an effort file, sat among
     them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
     Release has two: `src/board/project/facts.ts` and
@@ -722,8 +723,8 @@ names come from, and the facade entry is no node.
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
     Inventory has none since the 23 October 2026 swap put it first: its
-    three effort importers, `src/effort/report-skills-read.ts`,
-    `src/effort/report-skills.ts` and `src/effort/skill-facts.ts`, import it
+    three effort importers, `packages/rafa-effort/src/effort/report-skills-read.ts`,
+    `packages/rafa-effort/src/effort/report-skills.ts` and `packages/rafa-effort/src/effort/skill-facts.ts`, import it
     forward and take it by name since the second decouple item's rewire.
     Board has none:
     no effort file imports it. Release has none in the codemod's grouping,
@@ -734,7 +735,7 @@ names come from, and the facade entry is no node.
     `close.ts`), the two `src/commands/issue/` files (`create-bug.ts` and
     `create.ts`), the ten `src/commands/release/` files,
     `src/release/prepare.ts` and `src/release/verify.ts`;
-    `src/effort/report-doc-bugs.ts` left it when the first decouple item
+    `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first decouple item
     moved `packages/rafa/src/triage/doc-only.ts` into core. Each sits earlier in the move order than
     pr, so each imports it backwards, and the decouple step before pass 4 cuts
     them.
@@ -1021,7 +1022,7 @@ names come from, and the facade entry is no node.
   - `instinct.ts`, `skill.ts`, `stack.ts`, `provenance.ts`,
     `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
   - `agent.ts`: `@open-tomato/rafa` (the CLI)
-- **One upward edge survives the placement.** `src/effort/report-skills.ts`
+- **One upward edge survives the placement.** `packages/rafa-effort/src/effort/report-skills.ts`
   (rafa-effort) reads `readScopes` from
   `packages/rafa-inventory/src/schema/scope-records.ts`, which lands in
   rafa-inventory. No placement clears it, because `scope-records.ts` imports
@@ -1166,7 +1167,7 @@ crosses two packages but sits in one cluster passes it.
 **A cycle through a barrel can stay inside one cluster, and the adapters
 barrel's was retired by the registry seam.** Until then
 `packages/rafa/src/core/adapters/index.ts` was one: `registry.ts` imported
-`src/effort/sync/select.ts` by value, and `select.ts` imported the registry
+`packages/rafa-effort/src/effort/sync/select.ts` by value, and `select.ts` imported the registry
 back through the barrel. Both sat in cluster c7, so the sweep passed them,
 and a barrel over one file could not be split to step round the cycle. The
 composition root `src/adapter-registry.ts` now lists `sync/local` from

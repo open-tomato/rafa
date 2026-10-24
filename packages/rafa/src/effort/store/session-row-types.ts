@@ -2,7 +2,7 @@
  * The session row's own types: what a session was dispatched to do and
  * the stats accumulated over its log.
  *
- * Moved down from `src/effort/classify.ts` (`SessionKind`) and
+ * Moved down from `packages/rafa-effort/src/effort/classify.ts` (`SessionKind`) and
  * `packages/rafa/src/effort/session-log.ts` (`SessionStats` and the
  * `SessionUsageTotals` it names), which classify and read session logs
  * and re-export these names under the same names: the store's row types

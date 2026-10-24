@@ -21,7 +21,7 @@ package once its coupling is gone, or into the module it really tests.
 | `adapters/learning/local.test.ts` | `src/config-registry.ts` |
 | `agents/roster.test.ts` | `src/commands/agent/vendor.ts`, `src/config-registry.ts` |
 | `agents/vendorable.test.ts` | `src/config-registry.ts` |
-| `inventory/search/prompt.test.ts` | `src/effort/classify.ts` |
+| `inventory/search/prompt.test.ts` | `packages/rafa-effort/src/effort/classify.ts` |
 | `plan/risk/long-runs.test.ts` | `src/plan/risk.ts` |
 | `tiers/resolve.test.ts` | `src/commands/agent/vendor.ts`, `src/config-registry.ts` |
 | `tiers/routing.test.ts` | `src/config-registry.ts` |

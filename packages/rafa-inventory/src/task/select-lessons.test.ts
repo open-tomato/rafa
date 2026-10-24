@@ -46,7 +46,7 @@ function ids(lessons: readonly InstinctRecord[]): string[] {
 describe('selectLessons: the artifact path', () => {
   it('keeps a lesson whose artifact path the task text names, and drops one it does not', () => {
     const named = lesson('named', { artifact: 'src/start/dispatch.ts' });
-    const other = lesson('other', { artifact: 'src/effort/collect.ts' });
+    const other = lesson('other', { artifact: 'packages/rafa-effort/src/effort/collect.ts' });
 
     const kept = selectLessons(task('Make `buildTaskPrompt` in src/start/dispatch.ts take the sections'), bundle(named, other));
 

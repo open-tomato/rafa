@@ -28,7 +28,7 @@
  * ## No cycle runs through it
  *
  * Before the root, `registry.ts` imported `createLocalSync` from
- * `src/effort/sync/select.ts`, and that file imported
+ * `packages/rafa-effort/src/effort/sync/select.ts`, and that file imported
  * `CORE_ADAPTER_REGISTRY` back through this barrel: a runtime cycle of
  * three files, inside one cluster of `docs/survey/cluster-map.json`. The
  * root imports `select.ts` now and `registry.ts` imports nothing above

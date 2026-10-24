@@ -41,9 +41,9 @@ interface RewiredRow {
  * `libraryChunks`: they imported each package only through its section
  * files, `src/config-schema-<section>.ts`, which that item takes out of
  * the named lists and moves into core. Inventory's last
- * load-cycle file, `src/effort/skill-use.ts`, imports `bareSkillName` from
+ * load-cycle file, `packages/rafa-effort/src/effort/skill-use.ts`, imports `bareSkillName` from
  * `packages/rafa-inventory/src/tiers/skill-names.ts`; the import graph held the search's edge into
- * `src/effort/collect.ts`, which reaches it through `collect-skills.ts`, so
+ * `packages/rafa-effort/src/effort/collect.ts`, which reaches it through `collect-skills.ts`, so
  * the codemod read a cycle through inventory when the rewire ran. The second
  * decouple item cut that edge, and once its survey was regenerated the
  * codemod took the file onto the facade too, so inventory's row is empty.

@@ -68,6 +68,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+import { MEMBERSHIP_NOTE, renderEpicCost } from '@open-tomato/rafa-effort/effort/epic-cost';
 
 import { draftFixture } from '../../adapters/tracker/contract.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
@@ -79,7 +80,6 @@ import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../../board/projec
 import { scopeWarning } from '../../board/project/refresh-warnings.js';
 import { parseBoardListing } from '../../board/roadmap-board.js';
 import { staleDocsTitle } from '../../docs/release-issue.js';
-import { MEMBERSHIP_NOTE, renderEpicCost } from '../../effort/epic-cost.js';
 import { splitCriteria, VERIFY_PROMPT_PREFIX } from '../../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX, verifyWorktreePath } from '../../epic/verify-run.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
