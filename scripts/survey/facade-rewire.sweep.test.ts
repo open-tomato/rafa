@@ -187,7 +187,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/cleanup/groups.ts': 'loadCycle',
       'src/cleanup/steps.ts': 'loadCycle',
       'src/commands/epic/close-triage.ts': 'backEdge',
-      'src/commands/issue/ready.ts': 'backEdge',
       'src/commands/pr/merge-cleanup.ts': 'backEdge',
       'src/commands/pr/merge-followups.ts': 'backEdge',
       'src/commands/pr/merge-loop-worktree.ts': 'backEdge',
