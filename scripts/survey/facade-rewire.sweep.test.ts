@@ -74,7 +74,7 @@ interface RewiredRow {
  * `packages/rafa/src/start/branch-decision.ts` and `src/release/fragment-tree.ts` left the
  * row in the fourth decouple item: their one pr import by path was the pr
  * barrel, for core's git names and `WorkingTreeStatus`, which they take from
- * `@open-tomato/rafa/core/git` now. Its 16 back-edge files are board and
+ * `@open-tomato/rafa/core/git` now. Its 13 back-edge files are board and
  * release files, every one earlier in the move order.
  * `src/commands/issue/create.ts` left them in the same item: its one pr
  * import by path was `TRIAGE_MODULE`, which it takes from
@@ -82,6 +82,12 @@ interface RewiredRow {
  * `src/commands/issue/create-bug.ts`, whose pr imports by path were
  * `packages/rafa/src/bugs/fill.ts` and `packages/rafa/src/bugs/versions.ts`,
  * which the item's move list took into core.
+ * `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`
+ * and `src/commands/epic/close.ts` left them in the fifth decouple item:
+ * their pr imports by path were `triageReport` and its types, which they
+ * reach through core's service registry,
+ * `@open-tomato/rafa/core/services`, and its `TriagedBug` and
+ * `TriageServiceResult`.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `src/board/gate.ts`, `src/board/project/rules.ts`,
@@ -94,14 +100,18 @@ interface RewiredRow {
  * took into core. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
  * left the row in the third decouple item: their one run import by path
  * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
- * ten back-edge files are board and pr files, every one earlier in the
- * move order. `src/board/spec-source.ts` and `src/commands/epic/close.ts`
+ * eight back-edge files are pr files, every one earlier in the move
+ * order. `src/board/spec-source.ts` and `src/commands/epic/close.ts`
  * left them in the fourth decouple item: their one run import by path was
  * `src/claims/ahead.ts` and `src/epic/verify-run.ts`, which it places in
  * board by name. `src/commands/board/list.ts` and `src/commands/epic/new.ts`
  * left them in the same item: their one run import by path was
  * `defaultBoardOnce` of `src/commands/switch.ts`, which it moves into
- * board's `src/board/default-board-once.ts`.
+ * board's `src/board/default-board-once.ts`. `src/commands/issue/ready.ts`
+ * and `src/commands/epic/close-triage.ts` left them in the fifth decouple
+ * item: their run imports by path were `endWithNextStep` and
+ * `readStaleDocsVersion`, which they call through core's service
+ * registry.
  * No row keeps a file for the library build any more. Board, release, pr
  * and run each take their feature object through a commands entry,
  * `@open-tomato/rafa-<name>/commands`, which the roster alone imports, so a
@@ -150,13 +160,10 @@ const REWIRED: readonly RewiredRow[] = [
   },
   {
     allowed: {
-      'src/board/project/add-filed.ts': 'backEdge',
       'src/claims/lost.ts': 'loadCycle',
       'src/cleanup/past-head.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
       'src/commands/epic/close-docs.ts': 'backEdge',
-      'src/commands/epic/close-triage.ts': 'backEdge',
-      'src/commands/epic/close.ts': 'backEdge',
       'src/commands/release/fragment.ts': 'backEdge',
       'src/commands/release/list.ts': 'backEdge',
       'src/commands/release/publish.ts': 'backEdge',
@@ -186,7 +193,6 @@ const REWIRED: readonly RewiredRow[] = [
     allowed: {
       'src/cleanup/groups.ts': 'loadCycle',
       'src/cleanup/steps.ts': 'loadCycle',
-      'src/commands/epic/close-triage.ts': 'backEdge',
       'src/commands/pr/merge-cleanup.ts': 'backEdge',
       'src/commands/pr/merge-followups.ts': 'backEdge',
       'src/commands/pr/merge-loop-worktree.ts': 'backEdge',

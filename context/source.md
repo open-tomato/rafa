@@ -782,23 +782,26 @@ names come from, and the facade entry is no node.
     it by name since the second decouple item's rewire. Board has none: no
     effort file imports it. Release has none in the codemod's grouping, since
     `src/board/project/facts.ts`, its one board importer, now takes
-    `directoryPrefix` and `fragmentIdOf` from core. Pr has sixteen:
-    `src/board/project/add-filed.ts`, the three `src/commands/epic/` files
-    (`close-docs.ts`, `close-triage.ts` and `close.ts`), the ten
-    `src/commands/release/` files, `src/release/prepare.ts` and
-    `src/release/verify.ts`; `src/commands/issue/create.ts` and
+    `directoryPrefix` and `fragmentIdOf` from core. Pr has thirteen:
+    `src/commands/epic/close-docs.ts`, the ten `src/commands/release/`
+    files, `src/release/prepare.ts` and `src/release/verify.ts`; `src/commands/issue/create.ts` and
     `create-bug.ts` left it in the same item, when their pr imports moved
     into core;
+    `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`
+    and `src/commands/epic/close.ts` left it in the fifth, which reaches
+    `triageReport` through core's service registry and types its result
+    on core's `TriagedBug` and `TriageServiceResult`;
     `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
     the decouple step before pass 4 cuts them.
-    Run has nine: one board file (`src/commands/epic/close-triage.ts`;
-    `src/commands/board/list.ts` and `src/commands/epic/new.ts` left them
-    in the fourth decouple item, which moved `defaultBoardOnce` into
-    `src/board/default-board-once.ts`, and `src/commands/issue/ready.ts`
-    in the fifth, which calls `endWithNextStep` through core's service
-    registry), the eight `src/commands/pr/` files
+    Run has eight: no board file (`src/commands/board/list.ts` and
+    `src/commands/epic/new.ts` left them in the fourth decouple item,
+    which moved `defaultBoardOnce` into `src/board/default-board-once.ts`,
+    and `src/commands/issue/ready.ts` and
+    `src/commands/epic/close-triage.ts` in the fifth, which calls
+    `endWithNextStep` and `readStaleDocsVersion` through core's service
+    registry), and the eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and
     `wait.ts`). Each sits earlier in the move order than

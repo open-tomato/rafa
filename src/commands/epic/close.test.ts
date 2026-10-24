@@ -50,14 +50,25 @@
  * added item and no case reaches `gh`. The refused add is read beside the
  * same close with the number unset, whose exit code, bug line and
  * refusal line it matches.
+ *
+ * ## The triage service
+ *
+ * With no `triageReport` seam the close files through
+ * `activeServices().triageReport`, core's service registry, which the
+ * preload has filled with the real set. The stubbed cases register
+ * `{ ...activeServices(), triageReport: stub }`, keep what that call
+ * answered and put it back in `afterEach`; the unregistered case puts the
+ * set to none for its body and back after. The stub skips every bug, so
+ * its lines and the tracker's empty call list tell it from the real
+ * triage, which files on the planted tracker.
  */
 import type { EpicCloseSeams } from './close.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
-import type { TriageOptions, TriageResult } from '../../triage/triage.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { RafaServices, TriageServiceOptions } from '@open-tomato/rafa/core/services';
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
 
@@ -65,10 +76,11 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
-import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 import { MEMBERSHIP_NOTE, renderEpicCost } from '@open-tomato/rafa-effort/effort/epic-cost';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
+
+import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
+import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 
 import { draftFixture } from '../../adapters/tracker/contract.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
@@ -516,8 +528,8 @@ describe('rafa epic close, dispatched', () => {
     const script: Script = {
       checks: { 'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') } },
     };
-    const handed: TriageOptions[] = [];
-    const spy = (options: TriageOptions): Promise<TriageResult> => {
+    const handed: TriageServiceOptions[] = [];
+    const spy: RafaServices['triageReport'] = (options) => {
       handed.push(options);
       return triageReport(options);
     };
@@ -940,5 +952,67 @@ describe('rafa epic close, a failed check\'s bug onto the project', () => {
       .map((event) => (event as { message: string }).message)
       .filter((message) => message.includes('a project warning'));
     expect(warnings).toHaveLength(2);
+  });
+});
+
+describe('rafa epic close, the triage service', () => {
+  /** What the stub was handed, one entry per call. */
+  type TriageCall = TriageServiceOptions;
+
+  /** The set the stubbed setup replaced, put back after each case; undefined when none was set up. */
+  let replaced: RafaServices | null | undefined;
+
+  afterEach(() => {
+    if (replaced !== undefined) restoreServices(replaced);
+    replaced = undefined;
+  });
+
+  /** Registers a recording `triageReport` over the active set, skipping every bug; see the stage's stubbed setup. */
+  function stubTriage(): readonly TriageCall[] {
+    const calls: TriageCall[] = [];
+    const stub: RafaServices['triageReport'] = (options) => {
+      calls.push(options);
+      return Promise.resolve({
+        bugs: [{ channel: 'public', action: 'skipped', ref: null, problem: 'the stubbed triage skipped it' }],
+        staleDocs: [],
+      });
+    };
+    replaced = registerServices({ ...activeServices(), triageReport: stub });
+    return calls;
+  }
+
+  it('calls the registered triageReport once per failed check when no triageReport seam is planted', async () => {
+    const calls = stubTriage();
+
+    const outcome = await run(['40'], { script: FAIL_BOTH });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(calls).toHaveLength(2);
+    expect(calls.map((call) => call.report.outOfScopeBugs[0]?.what)).toEqual([
+      `Epic #40 acceptance criterion 1 fails against main: ${CRITERION_1}`,
+      `Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`,
+    ]);
+    expect(calls.map((call) => call.repoRoot)).toEqual([outcome.project.root, outcome.project.root]);
+    // The stub answered for the real triage, so the tracker saw nothing.
+    expect(outcome.trackerCalls).toEqual([]);
+    expect(linesOf(outcome.stdout)).toContain('warn: Criterion 1: not filed: the stubbed triage skipped it.');
+    expect(linesOf(outcome.stdout)).toContain('warn: Criterion 2: not filed: the stubbed triage skipped it.');
+  });
+
+  it('warns not filed, naming triageReport and the root, while no service is registered, and still refuses the close', async () => {
+    const held = registerServices({ ...activeServices() });
+    restoreServices(null);
+    let outcome: Awaited<ReturnType<typeof run>>;
+    try {
+      outcome = await run(['40'], { script: FAIL_2 });
+    } finally {
+      restoreServices(held);
+    }
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(linesOf(outcome.stdout)).toContain('warn: Criterion 2: not filed: service registry: no service is registered:'
+      + ' call registerCoreServices() from src/service-registry.ts before calling triageReport');
+    expect(outcome.trackerCalls).toEqual([]);
+    expect(outcome.stderr).toContain(`Epic #40 was not closed: against ${COMMIT}, 1 criterion failed its check, each filed as a bug.`);
   });
 });
