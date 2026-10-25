@@ -583,7 +583,9 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * into the inventory package and the learning entry came to be built
  * alone: its four modules, which sat in a chunk of their own beside an
  * empty one, now sit in the shared chunk the inventory files are in, and
- * no lazy command module entered a library entry.
+ * no lazy command module entered a library entry. It has
+ * `core/command/global-flags.d.ts` since the root help's global flags
+ * moved out of `src/cli/help.ts` into core, for board's reference check.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1307,7 +1309,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(164);
+    expect(before).toHaveLength(165);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

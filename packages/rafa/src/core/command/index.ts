@@ -1,13 +1,13 @@
 /**
  * The barrel over the command contract: every name `command.ts`,
- * `confirm.ts`, `lazy.ts`, `registry-types.ts`, `running.ts`,
- * `shared-flags.ts`, `spends.ts`, `types.ts` and `version.ts` export,
- * and nothing else.
+ * `confirm.ts`, `global-flags.ts`, `lazy.ts`, `registry-types.ts`,
+ * `running.ts`, `shared-flags.ts`, `spends.ts`, `types.ts` and
+ * `version.ts` export, and nothing else.
  *
- * A file outside `packages/rafa/src/core/` imports this file and never the nine
+ * A file outside `packages/rafa/src/core/` imports this file and never the ten
  * behind it (`scripts/survey/core-barrels.ts` measures that, and
  * `src/tests/core-barrels.sweep.test.ts` holds it against the tree). A
- * file inside `packages/rafa/src/core/` imports the nine directly and never this
+ * file inside `packages/rafa/src/core/` imports the ten directly and never this
  * file.
  *
  * ## What sits behind it
@@ -17,6 +17,8 @@
  *   - `confirm.ts`: the `Prompter` every yes-or-no question goes
  *     through, the line prompter that reads one from a stream, and the
  *     lazy prompter that opens one only to ask;
+ *   - `global-flags.ts`: `GLOBAL_FLAGS`, the flags every command reads
+ *     as the root help lists them, and `GlobalFlag`, the shape of one;
  *   - `lazy.ts`: `CommandDeclaration`, a command less its `run`, and
  *     `lazyCommand`, the command over a declaration whose `run` imports
  *     the command's module and delegates to its default export;
@@ -39,13 +41,13 @@
  *   - `version.ts`: the version the running build answers with, and the
  *     line that spells it.
  *
- * The nine hold no name in common, so each name is exported once and
+ * The ten hold no name in common, so each name is exported once and
  * from the file that declares it.
  *
- * ## Why one barrel can hold all nine
+ * ## Why one barrel can hold all ten
  *
  * A barrel that groups a file with a file outside `packages/rafa/src/core/` that
- * imports the barrel back by value is a runtime cycle. None of the nine
+ * imports the barrel back by value is a runtime cycle. None of the ten
  * imports a file outside `packages/rafa/src/core/` by value. `command.ts` takes
  * `spendsProblem` from `spends.ts` beside it, and both take
  * `describeValue` from `packages/rafa/src/core/config/config-sections.ts`.
@@ -61,7 +63,8 @@
  * by value either: it names `command.ts` with `import type`, and this
  * file exports its names with `export type`, so loading the barrel
  * never loads it. `shared-flags.ts` imports nothing by value either: it
- * names `command.ts` with `import type` alone.
+ * names `command.ts` with `import type` alone. `global-flags.ts` imports
+ * nothing at all.
  *
  * `command.ts` also names `packages/rafa/src/project/scope.ts` with `import type`,
  * which is erased before anything loads; it named
@@ -111,7 +114,7 @@
  * spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the nine files: every name any of
+ * `index.test.ts` holds the list to the ten files: every name any of
  * them exports is here once, as the same binding, and no other name is
  * here.
  */
@@ -125,6 +128,7 @@ export type {
   RafaFlagSpec,
 } from './command.js';
 export type { LazyPrompter, PromptOutput, Prompter } from './confirm.js';
+export type { GlobalFlag } from './global-flags.js';
 export type { CommandDeclaration } from './lazy.js';
 export type {
   CommandAlias,
@@ -153,6 +157,7 @@ export {
   isTopLevel,
 } from './command.js';
 export { createLinePrompter, lazyPrompter } from './confirm.js';
+export { GLOBAL_FLAGS } from './global-flags.js';
 export { lazyCommand } from './lazy.js';
 export {
   restoreRunningCommand,

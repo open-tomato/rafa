@@ -161,7 +161,8 @@
  * `name` as a flag or an alias of one, or when it is `--no-<name>` for
  * such a flag, which `parseArgs` reads as `name` false. The global
  * flags are no command's, so the roster does not hold them: their names
- * are read off `GLOBAL_FLAGS` in `src/cli/help.ts`, with `help`, which
+ * are read off `GLOBAL_FLAGS` in
+ * `packages/rafa/src/core/command/global-flags.ts`, with `help`, which
  * `src/cli/route.ts` reads as `--help` before anything else.
  *
  * ## Keys
@@ -177,11 +178,11 @@ import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { pluralOf } from '@open-tomato/rafa/cli/registry';
+import { GLOBAL_FLAGS } from '@open-tomato/rafa/core/command';
 import { registeredSettings } from '@open-tomato/rafa/core/config';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { GLOBAL_FLAGS } from '../cli/help.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';
 

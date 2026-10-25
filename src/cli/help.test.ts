@@ -75,7 +75,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
-import { commandSpelling } from '@open-tomato/rafa/core/command';
+import { commandSpelling, GLOBAL_FLAGS } from '@open-tomato/rafa/core/command';
 
 import { CORE_REGISTRY, createRosterRegistry, ROSTER_SUBJECTS } from '../commands/index.js';
 import { expectExit } from '../tests/cli-capture.js';
@@ -83,7 +83,7 @@ import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { assembleContext } from './core/assembleContext.js';
 import { dispatch } from './dispatch.js';
-import { GLOBAL_FLAGS, HELP_WIDTH, renderHelp, SPENDS_LEGEND } from './help.js';
+import { HELP_WIDTH, renderHelp, SPENDS_LEGEND } from './help.js';
 import { routeLine } from './route.js';
 
 /** Where the frozen snapshots live. */

@@ -19,7 +19,8 @@ module's note is the long form.
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
 | `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`packages/rafa/src/core/command/running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |
-| `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
+| `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry |
+| `packages/rafa/src/core/command/global-flags.ts` | `GLOBAL_FLAGS`, the four flags every command reads as the root help lists them, and `GlobalFlag`, the shape of one; core's because `src/refs/verify.ts`, a board file, reads them beside the help |
 | `packages/rafa/src/core/command/shared-flags.ts` | the flags commands of several features declare, spelled once: `HINT_FLAG`, `'hint'`, and `HINT_FLAG_SPEC`, the `--no-hint` flag the six commands that end with a hint declare by identity (`pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready`, `loop start`), and `DEFAULT_CI_TIMEOUT_MIN`, 20, the minutes the loop's `--ci-timeout` and `pr wait`'s `--timeout` default to, here because a declarations file imports core's entries alone |
 | `packages/rafa/src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `packages/rafa/src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
