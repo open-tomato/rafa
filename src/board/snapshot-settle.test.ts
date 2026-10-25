@@ -59,8 +59,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit, lazyPrompter } from '@open-tomato/rafa/core/command';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import {
   ISSUE_REFUSAL_EXIT,

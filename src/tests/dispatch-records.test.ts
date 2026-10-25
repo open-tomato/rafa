@@ -26,10 +26,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { dispatchTask, storeTaskReport } from '../start/dispatch.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 const FENCE = '```';
 const REPORTED = [

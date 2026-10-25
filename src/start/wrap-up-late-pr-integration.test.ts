@@ -233,7 +233,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { registerCoreConfigSections } from ${JSON.stringify(moduleUrl('../config-registry.ts'))};
 import { setActiveOutput } from ${JSON.stringify(fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output')))};
-import { sinkOutput } from ${JSON.stringify(moduleUrl('../tests/output-sinks.ts'))};
+import { sinkOutput } from ${JSON.stringify(fileURLToPath(import.meta.resolve('@open-tomato/rafa/tests/output-sinks')))};
 import { openCheckoutExpectation } from ${JSON.stringify(moduleUrl('./checkout-watch.ts'))};
 import { bindEventsFile } from ${JSON.stringify(moduleUrl('./loop-events.ts'))};
 import { loadRunConfig } from ${JSON.stringify(moduleUrl('./run-config.ts'))};

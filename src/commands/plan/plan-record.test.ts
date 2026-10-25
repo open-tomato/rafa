@@ -34,11 +34,11 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { SKIP_REVIEW_FLAG } from '../../board/gate.js';
 import { issueFieldLine } from '../../board/plan-field.js';
 import { REVIEW_MISSING_LINE, REVIEW_SKIPPED_LINE } from '../../board/review-stamp.js';
-import { sinkOutput } from '../../tests/output-sinks.js';
 
 import { recordMissingReview, recordPlanIssue, recordSkippedReview } from './plan-record.js';
 

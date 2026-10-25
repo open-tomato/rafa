@@ -27,12 +27,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { resolveScope } from '@open-tomato/rafa/project/scope';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { renderCancelledEpicNotice } from '../board/epic-cancel-notice.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { ghNextBoard, openNextSources } from './sources.js';
 

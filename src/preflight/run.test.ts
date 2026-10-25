@@ -32,8 +32,8 @@ import { delimiter, join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { sinkOutput } from '../tests/output-sinks.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './run.js';

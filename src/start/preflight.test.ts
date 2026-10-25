@@ -136,6 +136,7 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt , trackerPathFor } from '@open-tomato/rafa/core/plan';
 import { readPreflightHalts } from '@open-tomato/rafa/store/preflight';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 import { serveSession } from '@open-tomato/rafa-inventory/start/serving';
@@ -150,7 +151,6 @@ import {
   ghOnPathItem,
   ghUnauthenticatedMessage,
 } from '../pr/preflight-items.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { buildTaskPrompt, dispatchTask } from './dispatch.js';
 import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';

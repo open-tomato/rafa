@@ -24,9 +24,8 @@
  */
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
+import { mountKey } from '@open-tomato/rafa/cli/registry';
 import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { mountKey } from '../../cli/registry.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa module exec <module> <action> [args] [flags]';

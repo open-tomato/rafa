@@ -475,7 +475,7 @@
  * feature turned off. `skill index` is in the command tree and is not
  * registered, because nothing dispatches it yet.
  */
-import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
+import type { CommandRegistry, SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
@@ -487,7 +487,7 @@ import { RELEASE_FEATURE } from '@open-tomato/rafa-release/commands';
 import { CLAIM_SUBJECT, command as switchCommand } from '@open-tomato/rafa-run';
 import { RUN_FEATURE } from '@open-tomato/rafa-run/commands';
 
-import { createCommandRegistry } from '../cli/registry.js';
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 
 import agentList from './agent/list.js';
 import agentSearch from './agent/search.js';

@@ -13,9 +13,9 @@ import type { PullRequestDetail } from '../pr/index.js';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';
 import { bodyWithPassedOver, markForcedDraft, PASSED_OVER_HEADING, passedOverSection, refuseUndraftedPullRequest } from './forced-draft.js';

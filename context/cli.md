@@ -13,16 +13,16 @@ module's note is the long form.
 | --- | --- |
 | `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
 | `packages/rafa/src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
-| `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
+| `packages/rafa/src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
 | `packages/rafa/src/core/command/lazy.ts` | `CommandDeclaration`, a `RafaCommand` less `run`, and `lazyCommand(declaration, load, feature)`, the declaration under a `run` that imports the command's module, holds its default export to a command of the same subject and action and delegates to it; a rejected import or a wrong export exits 1 with `feature "<feature>": command "<spelling>" failed to load: <reason>` |
-| `packages/rafa/src/core/command/registry-types.ts` | the registry's contract, `CommandRegistry` and the five shapes it names, and `CommandFeature`, the name, subjects and commands one feature contributes, all seven re-exported by `src/cli/registry.ts` |
+| `packages/rafa/src/core/command/registry-types.ts` | the registry's contract, `CommandRegistry` and the five shapes it names, and `CommandFeature`, the name, subjects and commands one feature contributes, all seven re-exported by `packages/rafa/src/cli/registry.ts` |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
 | `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger, the running command recorded while it runs (`packages/rafa/src/core/command/running.ts`) and its `dangerous` phrases, the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `packages/rafa/src/core/command/shared-flags.ts` | the flags commands of several features declare, spelled once: `HINT_FLAG`, `'hint'`, and `HINT_FLAG_SPEC`, the `--no-hint` flag the six commands that end with a hint declare by identity (`pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready`, `loop start`), and `DEFAULT_CI_TIMEOUT_MIN`, 20, the minutes the loop's `--ci-timeout` and `pr wait`'s `--timeout` default to, here because a declarations file imports core's entries alone |
 | `packages/rafa/src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
-| `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
+| `packages/rafa/src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
 | `src/cli/feature-load-probe.ts` | the probe `src/cli/feature-load-cli.test.ts` spawns fresh: with no argument it registers core's sections, adapters and services, builds `createRosterRegistry()`, renders every help level and `describeRegistry`, and prints the modules `require.cache` holds under the repository root as `{ loaded, featureActions }`; `--run=<subject> <action>` runs that command's `run` over no project and no argument and prints the thrown message beside them as `refusal`; `--project=<dir> --home=<dir>` loads that project's modules and prints the adapter kinds before and after activation, building no roster |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help`, `rafa issue ready --help`, `rafa issue edit --help` and `rafa release tag --help` |
 | `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts` and `page.ts` the four prompts for text input, single selection, multi-selection and paged lists in raw mode on standard error; `confirm.ts`, the confirmation prompt, is `packages/rafa/src/core/command/confirm.ts` |
@@ -519,8 +519,8 @@ New; it replaces no earlier text. What a row or an action added to
   of `src/tests/spends-cli-surface.test.ts` and the README table
   `src/tests/readme-spenders.test.ts` reads (measured on 2026-09-24,
   registering `agent search` and `skill search`). The `describe` roster
-  reddens for no registration: `src/cli/describe.test.ts` checks every
-  command against the registry itself, so a new command passes it
+  reddens for no registration: `describe.test.ts` under `src/cli/` checks
+  every command against the registry itself, so a new command passes it
   unseen. Add an explicit `toContain` and a `spends` null expectation for
   the command there, and prove them red by unregistering it once
   (measured on 2026-09-24, registering `cleanup`).
@@ -3292,8 +3292,8 @@ the same process (#863).
   registry the line routed through, so with `features.pr` false no `pr`
   subject or action is listed (measured on 2026-10-16 with
   `createRosterRegistry({ off: ['pr'] })`).
-- **The completeness case** in `src/cli/describe.test.ts` is red when a
-  command the core registry holds, hidden ones included, or an entry of
-  its document lacks a summary, a description, an example or its
-  outputs. A blank string counts as missing: `commandProblem` checks shape
-  only, so the registry accepts an empty one.
+- **The completeness case** in `describe.test.ts` under `src/cli/` is red
+  when a command the core registry holds, hidden ones included, or an
+  entry of its document lacks a summary, a description, an example or
+  its outputs. A blank string counts as missing: `commandProblem` checks
+  shape only, so the registry accepts an empty one.

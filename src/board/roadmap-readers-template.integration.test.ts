@@ -20,10 +20,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
 import { createGitRunner } from '../pr/index.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { readHorizonChange } from './epic-horizon.js';
 import { claimsOf } from './roadmap-epic-rows.js';

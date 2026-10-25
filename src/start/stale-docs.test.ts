@@ -39,6 +39,7 @@ import {
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan , parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { renderDocUpdatePlan } from '../commands/docs/plan.js';
@@ -51,7 +52,6 @@ import {
 } from '../docs/release-issue.js';
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createStartStaleDocs, readStaleDocsVersion } from './stale-docs.js';
 

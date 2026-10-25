@@ -11,7 +11,7 @@
  * (1 of 4 done, 1 blocked, 2 open).
  */
 import type { PlantedProject } from './cli-capture.js';
-import type { SubjectSpec } from '../cli/registry.js';
+import type { SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { LoopSessionSeams } from '@open-tomato/rafa/core/loop/readings';
 

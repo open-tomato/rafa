@@ -6,7 +6,7 @@
  * controls (a word in a comment, a `gh` flag, a `claude` flag) never
  * reach the verifier as references at all.
  */
-import type { DescribeDocument, DescribedAction } from '../cli/describe.js';
+import type { DescribeDocument, DescribedAction } from '@open-tomato/rafa/cli/describe';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

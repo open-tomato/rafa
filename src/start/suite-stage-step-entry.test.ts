@@ -26,10 +26,10 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf } from '../suite/baseline.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { junitFileFor, readStageLedger, runStageStep, stageLedgerPathFor } from './suite-step.js';
 

@@ -46,10 +46,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { ensureBaseline, planOwnsReader, runPreWrapUpStep, runStageStep, runTaskStep } from './suite-step.js';
 

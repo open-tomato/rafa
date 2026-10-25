@@ -52,13 +52,14 @@
  * left behind, and after each, for the two cases that set them.
  */
 import type { DispatchOutcome } from './dispatch.js';
-import type { CommandRegistry } from './registry.js';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, Output } from '@open-tomato/rafa/ports';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import {
   CommandExit,
   restoreRunningCommand,
@@ -70,7 +71,6 @@ import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/ra
 import { createJsonOutput } from '../adapters/output/json.js';
 
 import { dispatch } from './dispatch.js';
-import { createCommandRegistry } from './registry.js';
 
 /** What a command read from inside its `run`. */
 interface Reading {

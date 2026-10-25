@@ -26,11 +26,11 @@ import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { commandSpelling } from '@open-tomato/rafa/core/command';
 
 import { createRosterRegistry } from '../commands/index.js';
 
-import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 
 /** A command with every field filled, under a subject and action. */

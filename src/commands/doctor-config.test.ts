@@ -23,9 +23,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { CONFIG_ROWS_TITLE, doctorConfigRows, loadDoctorConfig, renderDoctorConfigNotes } from './doctor-config.js';
 

@@ -115,6 +115,7 @@ import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
@@ -125,7 +126,6 @@ import { createFakeFactsGh } from '../board/project/facts-fake.js';
 import { createGhProjectPort } from '../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../board/project/project-fake.js';
 import { scopeWarning } from '../board/project/refresh-warnings.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 
 import {

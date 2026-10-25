@@ -21,7 +21,7 @@ import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sectio
 
 import { describe, expect, it } from 'bun:test';
 
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND, boardsListArgs, createGhBoardLister } from './boards.js';
 import { epicContextArgs, readEpicContext } from './epic-context.js';

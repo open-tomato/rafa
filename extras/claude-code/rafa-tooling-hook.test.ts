@@ -4,7 +4,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
-import { describeRegistry } from '../../src/cli/describe';
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
+
 import { CORE_REGISTRY } from '../../src/commands/index';
 import { PR_SHOW_JSON_FIELDS } from '../../src/commands/pr/declarations';
 

@@ -23,7 +23,7 @@
  *   - `registry-types.ts`: the contract of the dispatcher's registry,
  *     `CommandRegistry` and the five shapes it names, and
  *     `CommandFeature`, what one feature contributes to it, whose
- *     builder stays in `src/cli/registry.ts`;
+ *     builder stays in `packages/rafa/src/cli/registry.ts`;
  *   - `running.ts`: the command this process is running with its parsed
  *     flags, recorded by the dispatcher and read by the spend guard;
  *   - `shared-flags.ts`: the flags commands of several features
@@ -64,35 +64,36 @@
  * names `command.ts` with `import type` alone.
  *
  * `command.ts` also names `packages/rafa/src/project/scope.ts` with `import type`,
- * which is erased before anything loads; it named `src/cli/registry.ts`
- * the same way until the registry's contract moved into
- * `registry-types.ts`. `src/cli/registry.ts` imports this barrel by
- * value, for the shape check and the routing words, so that edge is the
- * one a value import in `command.ts` would turn into a cycle.
+ * which is erased before anything loads; it named
+ * `packages/rafa/src/cli/registry.ts` the same way until the registry's
+ * contract moved into `registry-types.ts`.
+ * `packages/rafa/src/cli/registry.ts` imports this barrel by value, for
+ * the shape check and the routing words, so that edge is the one a value
+ * import in `command.ts` would turn into a cycle.
  *
  * Measured when the three moved: the value imports of the non-test files
  * under `src/` and `packages/` held six cycles before the move and the
  * same six after it, none through a file of this folder. The control,
  * the same tree with `command.ts` taking one value (`HELP_WORD`) from
- * `src/cli/registry.ts`, held a seventh: `src/cli/registry.ts`,
- * `command.ts` and this file.
+ * `packages/rafa/src/cli/registry.ts`, held a seventh:
+ * `packages/rafa/src/cli/registry.ts`, `command.ts` and this file.
  *
  * Measured again when `types.ts` moved in, over every strongly connected
  * set of the same value imports: five cycles at the base and five after
  * the move, none through a file of this folder or of `src/cli/core/`.
- * The same `HELP_WORD` control held a sixth, `src/cli/registry.ts`,
- * `command.ts` and this file.
+ * The same `HELP_WORD` control held a sixth,
+ * `packages/rafa/src/cli/registry.ts`, `command.ts` and this file.
  *
  * Measured again when `spends.ts` moved in, the same way: five cycles at
  * the base and five after the move, none through a file of this folder
  * or of `src/cli/`. The same `HELP_WORD` control held a sixth,
- * `src/cli/registry.ts`, `command.ts` and this file.
+ * `packages/rafa/src/cli/registry.ts`, `command.ts` and this file.
  *
  * Measured again when the registry's contract moved into
  * `registry-types.ts`, the same way: five cycles at the base and five
  * after the move, none through a file of this folder or of `src/cli/`.
- * The same `HELP_WORD` control held a sixth, `src/cli/registry.ts`,
- * `command.ts` and this file.
+ * The same `HELP_WORD` control held a sixth,
+ * `packages/rafa/src/cli/registry.ts`, `command.ts` and this file.
  *
  * Measured again when `shared-flags.ts` moved in, the same way and with
  * the untracked new file read: five cycles at the base and four after

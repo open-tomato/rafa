@@ -23,8 +23,7 @@ import type { CliEvent } from '@open-tomato/rafa/ports';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { sinkOutput } from '../../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import {
   activeRetryReport,

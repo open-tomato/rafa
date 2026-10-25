@@ -53,9 +53,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 
 import { writeHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { noAlternativeMessage, notOnListingMessage, unaskedMessage } from './blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from './blocked.js';

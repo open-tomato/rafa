@@ -36,6 +36,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
@@ -44,7 +45,6 @@ import { resolveBaseBranch } from '../cleanup/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { retargetedLine, retargetPullRequest } from './pr-retarget.js';
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';

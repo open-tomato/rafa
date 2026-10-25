@@ -31,9 +31,9 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeBugRoutes } from '@open-tomato/rafa/store/bug-routes';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   fileFollowUps,

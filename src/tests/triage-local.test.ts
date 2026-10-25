@@ -56,13 +56,12 @@ import {
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '../start/dispatch.js';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** The clock every tracker call in this file stamps with. */
 const CLOCK = (): string => '2026-09-15T10:00:00.000Z';

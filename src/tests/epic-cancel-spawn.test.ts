@@ -278,7 +278,7 @@ function buildCancelProbe(): string {
     'registerCoreConfigSections();',
     'registerCoreAdapters();',
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createEpicCancelCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'epic', 'cancel.ts'))};`,
     'import { appendFileSync } from "node:fs";',
     '',

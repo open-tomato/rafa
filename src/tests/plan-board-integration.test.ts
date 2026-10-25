@@ -97,6 +97,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { notesPath as localNotesPath, specPath } from '@open-tomato/rafa/board/naming';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import {
   closedIssueMessage,
@@ -119,7 +120,6 @@ import { describeIssue, dryRunLine } from '../board/spec-source.js';
 import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
 import { hostToolDirs } from './stand-in-gh.js';
@@ -152,7 +152,7 @@ const PROBE = [
   'registerCoreAdapters();',
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
   `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
@@ -203,7 +203,7 @@ const PROBE_WITH_PROMPT = [
   'registerCoreAdapters();',
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
   `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,

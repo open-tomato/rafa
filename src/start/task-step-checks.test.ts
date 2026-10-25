@@ -24,8 +24,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { seamsOf, SIGINT_EXIT_CODE } from './suite-step.js';
 import { lintTask, taskDiffChecks, typeCheckTask } from './task-step-checks.js';

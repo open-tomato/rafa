@@ -22,9 +22,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+
 import { findStoreRuleProblems } from '../../plan/store-rules.js';
 import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
-import { sinkOutput } from '../../tests/output-sinks.js';
 
 import { bundledEditLine, findBundledEdits, notePlanBundledEdits, writeTierPins } from './bundled-check.js';
 

@@ -100,10 +100,10 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { RefsCell } from '../board/roadmap-rows.js';
-import type { DescribeDocument } from '../cli/describe.js';
 import type { RefState } from '../refs/stamp.js';
 import type { IssueRead, IssueReader, RefVerifier } from '../refs/verify.js';
 import type { CheckoutRosterReader } from './plan/refs-check.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';

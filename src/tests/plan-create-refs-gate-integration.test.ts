@@ -27,7 +27,7 @@
  * that found nothing; and the refusal leaves the copy as it was.
  */
 import type { ResolvedSpec } from '../board/spec-source.js';
-import type { DescribeDocument, DescribedAction } from '../cli/describe.js';
+import type { DescribeDocument, DescribedAction } from '@open-tomato/rafa/cli/describe';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { spawnSync } from 'node:child_process';
@@ -38,12 +38,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { checkCreateRefs, RAFA_PACKAGE_NAME } from '../commands/plan/refs-check.js';
 import { readRefsBlock } from '../refs/stamp.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-create-refs-gate-')));
 

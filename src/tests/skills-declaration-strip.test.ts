@@ -59,12 +59,11 @@ import {
 import { runClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { setActivePlanStub } from '../start/stamp.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';

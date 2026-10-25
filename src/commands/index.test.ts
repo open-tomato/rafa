@@ -82,10 +82,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
 
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { BOARD_FEATURE } from './board/index.js';

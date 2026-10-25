@@ -49,6 +49,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { rejectedPath } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import {
   enforceSpecReview,
@@ -74,8 +75,6 @@ import {
   stampReviewSkipped,
 } from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** The plan path a planner names for issue #31; the caller's spelling, as `gate.ts` takes one. */
 const PLAN_PATH = '.rafa/plans/PLAN-rafa-31.md';

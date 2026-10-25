@@ -151,6 +151,7 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { versionLine } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import { readBinPath } from '@open-tomato/rafa/project/bin-path';
@@ -169,7 +170,6 @@ import { ROADMAP_SETTING, ROADMAP_TITLE } from '../board/roadmap.js';
 import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { ROADMAP_ROW_NAME } from '../board/status.js';
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,

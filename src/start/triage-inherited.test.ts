@@ -41,11 +41,11 @@ import {
 
 import { ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { baselineOf, baselinePathFor, writeBaseline } from '../suite/baseline.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';
 
 import { createStartTriage, describeStartTriage, runStartFailures } from './triage.js';

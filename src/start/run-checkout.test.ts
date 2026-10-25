@@ -57,9 +57,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { resolveRunDirs } from './checkout.js';
 import { settleRunCheckout } from './run-checkout.js';

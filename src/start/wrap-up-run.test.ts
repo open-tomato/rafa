@@ -104,6 +104,7 @@ import ts from 'typescript';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
@@ -113,7 +114,6 @@ import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
 import { plantProjectConfig, plantScratchRepo } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 import { COMMITTED, FORECAST_LINE, prepared, PROVIDER_GH, SETTINGS, stub, VERIFIED } from '../tests/release-stage-fixtures.js';
 
 import { bindEventsFile, unbindEventsFile } from './loop-events.js';
@@ -1183,7 +1183,7 @@ describe('runWrapUp over the spawn seam', () => {
       `import { registerCoreAdapters } from '${join(here, '../adapter-registry.js')}';`,
       'registerCoreAdapters();',
       `import { setActiveOutput } from '${fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output'))}';`,
-      `import { sinkOutput } from '${join(here, '../tests/output-sinks.js')}';`,
+      `import { sinkOutput } from '${fileURLToPath(import.meta.resolve('@open-tomato/rafa/tests/output-sinks'))}';`,
       `import { runWrapUp } from '${join(here, 'wrap-up-run.js')}';`,
       'const warnings: string[] = [];',
       'setActiveOutput(sinkOutput({ warn: (line) => { warnings.push(line); } }));',

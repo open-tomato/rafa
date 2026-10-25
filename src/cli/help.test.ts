@@ -63,7 +63,7 @@
  * `0` reddened that snapshot's case alone and left the file stale, and a
  * run with it set to `1` passed and wrote the original bytes back.
  */
-import type { CommandRegistry } from './registry.js';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
@@ -74,6 +74,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { commandSpelling } from '@open-tomato/rafa/core/command';
 
 import { CORE_REGISTRY, createRosterRegistry, ROSTER_SUBJECTS } from '../commands/index.js';
@@ -83,7 +84,6 @@ import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { assembleContext } from './core/assembleContext.js';
 import { dispatch } from './dispatch.js';
 import { GLOBAL_FLAGS, HELP_WIDTH, renderHelp, SPENDS_LEGEND } from './help.js';
-import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 
 /** Where the frozen snapshots live. */

@@ -13,7 +13,7 @@
  * too, any other event to `event`, and a payload to `result`. What has
  * no sink is dropped, so `sinkOutput({})` silences a module.
  */
-import type { CliEvent, CliEventLog, Output } from '@open-tomato/rafa/ports';
+import type { CliEvent, CliEventLog, Output } from '../ports/index.js';
 
 /** A sink for the lines of one level. */
 type LineSink = (message: string) => void;

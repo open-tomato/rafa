@@ -26,9 +26,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSession, runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { eventsFileOf } from '../loop/events-file.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './session.js';
 

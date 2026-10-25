@@ -30,8 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
-
-import { sinkOutput } from '../../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import {
   aheadRequestOf,

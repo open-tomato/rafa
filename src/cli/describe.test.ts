@@ -1,7 +1,10 @@
 /**
- * Tests for the schema 2 roster (`src/cli/describe.ts`): the completeness
- * case the spec's definition of done asks for, the document over the core
- * registry, and each rule of the module note over registries built here.
+ * Tests for the schema 2 roster (`packages/rafa/src/cli/describe.ts`):
+ * the completeness case the spec's definition of done asks for, the
+ * document over the core registry, and each rule of the module note over
+ * registries built here.
+ *
+ * The file stays at `src/cli/` for the CLI's registry it reads.
  *
  * ## The completeness case
  *
@@ -45,18 +48,18 @@
  * `outputs` and a blank `description` each reddened the completeness case
  * over the core registry and nothing else.
  */
-import type { DescribedAction, DescribeDocument } from './describe.js';
-import type { CommandRegistry } from './registry.js';
+import type { DescribedAction, DescribeDocument } from '@open-tomato/rafa/cli/describe';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
+import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION, describeRegistry } from '@open-tomato/rafa/cli/describe';
+import { createCommandRegistry, mountKey } from '@open-tomato/rafa/cli/registry';
 import { commandSpelling, isTopLevel } from '@open-tomato/rafa/core/command';
 
 import { CORE_REGISTRY } from '../commands/index.js';
 
-import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION, describeRegistry } from './describe.js';
-import { createCommandRegistry, mountKey } from './registry.js';
 import { routeLine } from './route.js';
 
 /** A command with every field filled, under a subject and action. */

@@ -36,13 +36,13 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 import { parseInstinct, writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/index.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   changedSince,

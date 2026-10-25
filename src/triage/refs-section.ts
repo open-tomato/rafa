@@ -46,14 +46,14 @@
  * no section: {@link buildRefsSection} answers null and the body goes
  * from `## Artifact` straight to `## Recurrence key`.
  */
-import type { DescribeDocument } from '../cli/describe.js';
 import type { Ref } from '../refs/extract.js';
 import type { LiveReading } from '../refs/stamp.js';
 import type { RefVerifier } from '../refs/verify.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 
+import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION } from '@open-tomato/rafa/cli/describe';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION } from '../cli/describe.js';
 import { extractRefs } from '../refs/extract.js';
 import { fingerprintText } from '../refs/stamp.js';
 import { createRefVerifier, tsSymbolsOutliner } from '../refs/verify.js';

@@ -143,15 +143,16 @@
  */
 import type { RefsGateAnswer } from '../../board/refs-gate.js';
 import type { ResolvedSpec } from '../../board/spec-source.js';
-import type { DescribeDocument } from '../../cli/describe.js';
-import type { CommandRegistry } from '../../cli/registry.js';
 import type { RefVerifier } from '../../refs/verify.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { readFileSync } from 'node:fs';
 import path from 'path';
 
+import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
@@ -159,7 +160,6 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { version } from '../../../package.json';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ACCEPT_STALE_REFS_KEY, enforceRefsGate, readAcceptRefsFlag, refsAcceptance } from '../../board/refs-gate.js';
-import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '../../cli/describe.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
 
 /** The `name` in `package.json` of a project root that is rafa itself. */

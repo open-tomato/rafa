@@ -58,8 +58,9 @@
  * phase 0 commands spells them path by path, every module of `COMMAND_MODULES`
  * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths is
  * the one to read, where a list kept in this note fell behind it.
- * `describe` runs the roster builder of `src/cli/describe.ts`, which is
- * no root export. `plan show` takes `parsePlan` from the
+ * `describe` runs the roster builder of
+ * `packages/rafa/src/cli/describe.ts`, which is no root export.
+ * `plan show` takes `parsePlan` from the
  * `@open-tomato/rafa-run` facade, as `plan list`, `plan validate` and
  * `plan risk` take `listPlans`, `validatePlan` and `resolvePlanPath` from
  * it, and `plan needs` takes its readings from `src/plan/needs.ts`, which
@@ -716,8 +717,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/modules/load', ['loadModules', 'moduleSettings']],
   ]],
   ['./commands/module/exec.js', [
+    ['@open-tomato/rafa/cli/registry', ['mountKey']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../cli/registry.js', ['mountKey']],
   ]],
   ['./commands/agent/vendor.js', [
     ['@open-tomato/rafa-inventory', ['bundledAgentsDirectory', 'readAgentDirectory']],
@@ -1056,8 +1057,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../config-registry.js', ['SETTINGS']],
   ]],
   ['./commands/describe.js', [
+    ['@open-tomato/rafa/cli/describe', ['describeRegistry']],
     ['../../package.json', ['version']],
-    ['../cli/describe.js', ['describeRegistry']],
   ]],
 ];
 

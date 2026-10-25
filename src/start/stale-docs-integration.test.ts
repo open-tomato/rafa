@@ -36,10 +36,10 @@ import {
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { STALE_DOCS_MARKER, staleDocsTitle } from '../docs/release-issue.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createStartStaleDocs } from './stale-docs.js';
 

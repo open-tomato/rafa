@@ -157,6 +157,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { parsePlan } from '../plan/index.js';
@@ -164,7 +165,6 @@ import { preserveProgress } from '../start/wrap-up.js';
 
 import { expectExit } from './cli-capture.js';
 import { PLAN_DONE, PLAN_FLAG, PLAN_OPEN, RUN_TIMEOUT, runLoopStart, scratchPlanter, SESSION_FLAGS, STUB, TASK } from './loop-scratch.js';
-import { sinkOutput } from './output-sinks.js';
 import { consoleAndExitUses } from './source-uses.js';
 
 /** The `src/` directory. */

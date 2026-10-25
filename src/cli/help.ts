@@ -106,13 +106,12 @@
  * change to a core command's declaration, or to a default it reads from
  * a constant, goes red until they are regenerated and the diff read.
  */
-import type { CommandRegistry, SubjectSpec } from './registry.js';
 import type { HelpRequest } from './route.js';
+import type { CommandRegistry, SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { ArgSpec, FlagSpec , CommandExample, RafaCommand } from '@open-tomato/rafa/core/command';
 
+import { mountKey } from '@open-tomato/rafa/cli/registry';
 import { isTopLevel , SPENDS_GLYPH, spendsCondition, spendsMark } from '@open-tomato/rafa/core/command';
-
-import { mountKey } from './registry.js';
 
 /** The column help's prose is wrapped at. */
 export const HELP_WIDTH = 80;

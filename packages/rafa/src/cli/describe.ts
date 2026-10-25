@@ -64,9 +64,9 @@
  * with it.
  */
 import type { CommandRegistry } from './registry.js';
-import type { ArgSpec, FlagSpec , CommandSpend , CommandDeprecation, CommandExample, CommandOutput, RafaCommand } from '@open-tomato/rafa/core/command';
+import type { ArgSpec, FlagSpec , CommandSpend , CommandDeprecation, CommandExample, CommandOutput, RafaCommand } from '../core/command/index.js';
 
-import { isTopLevel } from '@open-tomato/rafa/core/command';
+import { isTopLevel } from '../core/command/index.js';
 
 import { mountKey } from './registry.js';
 

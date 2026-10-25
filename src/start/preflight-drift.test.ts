@@ -19,9 +19,9 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { runsDir } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { countRunRecords, createStartPreflightDrift, isDriftRun, reportStartDrift } from './preflight-drift.js';
 

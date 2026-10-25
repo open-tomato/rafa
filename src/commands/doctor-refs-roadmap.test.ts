@@ -18,9 +18,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { describeRegistry } from '../cli/describe.js';
 import { issueFingerprint, PRESENT, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
 

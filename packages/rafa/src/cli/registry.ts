@@ -74,10 +74,10 @@ import type {
   RafaCommand,
   RosterOptions,
   SubjectSpec,
-} from '@open-tomato/rafa/core/command';
+} from '../core/command/index.js';
 
-import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from '@open-tomato/rafa/core/command';
-import { describeValue } from '@open-tomato/rafa/core/config/sections';
+import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from '../core/command/index.js';
+import { describeValue } from '../core/config/sections.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'command registry';

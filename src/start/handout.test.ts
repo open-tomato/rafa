@@ -24,9 +24,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { resolveTiers } from '@open-tomato/rafa-inventory/tiers/resolve';
-
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   EMPTY_RESOLUTION,

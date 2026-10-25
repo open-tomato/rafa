@@ -147,9 +147,9 @@ import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   blockedLineSentence,

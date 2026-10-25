@@ -3,7 +3,7 @@ import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { describe, expect, test } from 'bun:test';
 
-import { sinkOutput } from '../../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { recordingFeed } from './progress-fake.js';
 import {

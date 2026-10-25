@@ -73,13 +73,13 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { describeRegistry } from '../../cli/describe.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, endingProbe } from '../../tests/ending-probe.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';

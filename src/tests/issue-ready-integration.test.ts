@@ -45,6 +45,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../board/gate.js';
@@ -56,7 +57,6 @@ import { createPlanReadyOffer } from '../commands/plan/ready-offer.js';
 import { resolveCreateSpec } from '../commands/plan/spec-route.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
 import { completeSpecBody } from './spec-bodies.js';
 
 /** A temporary directory of this file's own, for every project and every repo root it plants. */

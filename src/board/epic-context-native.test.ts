@@ -21,8 +21,9 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { epicContextArgs, readEpicContext } from './epic-context.js';
 import { createNativeRelations } from './relations/native.js';

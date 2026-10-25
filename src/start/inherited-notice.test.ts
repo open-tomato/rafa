@@ -11,8 +11,7 @@ import type { SuiteFailure } from '../suite/run.js';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { buildTaskPrompt, dispatchTask, NO_TASK_SECTIONS } from './dispatch.js';
 import {

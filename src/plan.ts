@@ -216,8 +216,8 @@
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
-import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { RouteTarget } from '@open-tomato/rafa/core/config/sections';

@@ -30,9 +30,9 @@
  * dangling.
  */
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { DescribeDocument } from '../cli/describe.js';
 import type { CheckoutRosterRead } from './plan/refs-check.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { spawnSync } from 'node:child_process';
@@ -42,14 +42,14 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { describeRegistry } from '../cli/describe.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 import { readRefsText } from '../refs/reading.js';
 import { issueFingerprint, NEW, PRESENT, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   listedIssueReader,

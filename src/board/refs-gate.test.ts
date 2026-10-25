@@ -33,12 +33,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CREATE_DANGEROUS_PHRASES } from '../commands/plan/refs-check.js';
 import { SETTINGS } from '../config-registry.js';
 import { ABSENT, blobFingerprint, issueFingerprint, NEW, PRESENT, readRefsBlock, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import {

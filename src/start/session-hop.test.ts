@@ -25,8 +25,7 @@ import { readSession } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { hop, positionAt, rehome, writePositionFile } from '@open-tomato/rafa/project/position';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { openRunSession, readAwayHopStamp } from './session.js';
 

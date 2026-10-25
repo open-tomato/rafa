@@ -42,6 +42,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseConfigText } from '@open-tomato/rafa/core/config';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createFakeFactsGh } from '../board/project/facts-fake.js';
 import { createGhProjectPort } from '../board/project/gh.js';
@@ -53,7 +54,6 @@ import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
 import { callNumber } from '../board/project/retry.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createBoardSyncCommand } from './board/sync.js';
 import {

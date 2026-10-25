@@ -36,8 +36,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { runsDir, sessionFilePath, updateSession } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { holdWhilePaused, PAUSE_POLL_MS } from './pause.js';
 

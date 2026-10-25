@@ -61,11 +61,11 @@ import type { Prompter } from '@open-tomato/rafa/core/command';
 import { describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { sinkOutput } from '../../tests/output-sinks.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 
 import { createPlanReadyOffer, offerHeadLine } from './ready-offer.js';

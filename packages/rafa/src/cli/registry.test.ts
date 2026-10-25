@@ -1,6 +1,7 @@
 /**
- * Tests for the dispatcher's registry (`src/cli/registry.ts`): what it
- * answers, what `mount` answers, and every refusal.
+ * Tests for the dispatcher's registry
+ * (`packages/rafa/src/cli/registry.ts`): what it answers, what `mount`
+ * answers, and every refusal.
  *
  * Every refusal is spelled here in full, with the error class it is
  * thrown as, and each sits beside a case the registry accepts that
@@ -22,7 +23,7 @@
  * it: it received the engine's spread error in place of the refusal.
  */
 import type { CommandRegistryInput, SubjectSpec } from './registry.js';
-import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 

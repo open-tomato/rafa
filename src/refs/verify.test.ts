@@ -27,7 +27,7 @@
  */
 import type { RefVerifySeams, SymbolOutliner } from './verify.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { DescribeDocument, DescribedAction } from '../cli/describe.js';
+import type { DescribeDocument, DescribedAction } from '@open-tomato/rafa/cli/describe';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { spawnSync } from 'node:child_process';
@@ -37,9 +37,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { describeRegistry } from '../cli/describe.js';
 import { CORE_REGISTRY } from '../commands/index.js';
 import { SETTINGS } from '../config-registry.js';
 

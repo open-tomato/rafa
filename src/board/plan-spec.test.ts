@@ -181,8 +181,8 @@ import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit, lazyPrompter } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { sinkOutput } from '../tests/output-sinks.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';

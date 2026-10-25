@@ -34,8 +34,7 @@ import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
-
-import { sinkOutput } from './output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 export const REPO = '/repo';
 export const BRANCH = 'feat/rafa-21-changelog-and-release';

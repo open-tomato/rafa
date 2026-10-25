@@ -65,7 +65,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `src/release/enabled.ts` | 5 | `rafa-release` | by rule |
 | `src/release/settle.ts` | 5 | `rafa-release` | by rule |
 | `src/release/version.ts` | 5 | `rafa-release` | by rule |
-| `src/cli/describe.ts` | 4 | `@open-tomato/rafa` | by rule |
+| `packages/rafa/src/cli/describe.ts` | 4 | `@open-tomato/rafa` | by rule |
 | `src/release/guard.ts` | 4 | `rafa-release` | by rule |
 | `src/cleanup/past-head.ts` | 3 | `rafa-release` | by rule |
 | `src/cleanup/worktrees.ts` | 3 | `rafa-run` | by rule |
@@ -73,7 +73,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `src/next/readings.ts` | 3 | `rafa-run` | by rule |
 | `src/release/forecast.ts` | 3 | `rafa-release` | by rule |
 | `src/release/prepare.ts` | 3 | `rafa-release` | by rule |
-| `src/cli/registry.ts` | 2 | `@open-tomato/rafa` | by rule |
+| `packages/rafa/src/cli/registry.ts` | 2 | `@open-tomato/rafa` | by rule |
 | `src/release/branch-forecast.ts` | 2 | `rafa-release` | by rule |
 | `src/release/release-delivery.ts` | 2 | `rafa-release` | by rule |
 | `src/start/pr-lifecycle.ts` | 2 | `rafa-run` | by rule |

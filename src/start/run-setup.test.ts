@@ -54,8 +54,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
 import { DEFAULT_CI_ATTEMPTS } from './pr-lifecycle.js';

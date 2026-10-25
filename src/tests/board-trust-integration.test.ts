@@ -66,6 +66,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { SPEC_LABEL } from '../board/issue.js';
 import { inspectRoadmapIssue, resolvePlanSpec } from '../board/plan-spec.js';
@@ -74,7 +75,6 @@ import { ghBoardTrust } from '../board/trust.js';
 import { requireTrustedResolveAuthor, readTrustedTriageComment } from '../commands/pr/triage-trust.js';
 import { TRIAGE_MARKER } from '../pr/triage/comment.js';
 
-import { sinkOutput } from './output-sinks.js';
 import { completeSpecBody } from './spec-bodies.js';
 
 /** Where `resolvePlanSpec` writes snapshots; a project's own default. */

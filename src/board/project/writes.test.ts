@@ -29,7 +29,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { sinkOutput } from '../../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createGhProjectPort } from './gh.js';
 import { matchProjectFields, ProjectPortError } from './port.js';

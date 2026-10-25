@@ -31,7 +31,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { SPEC_LABEL } from './issue.js';

@@ -80,11 +80,11 @@ import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/st
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { createGitRunner } from '../pr/index.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createStartPreflightClaim, markInDevelopment, readRunClaim, refuseUnownedClaim } from './preflight-claim.js';
 
