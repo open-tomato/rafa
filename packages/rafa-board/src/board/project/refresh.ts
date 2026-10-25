@@ -191,6 +191,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapSearch } from '../roadmap.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import '@open-tomato/rafa/config-schema-release';
 
 import { createGhBoardLister, resolveDefaultBoard } from '../boards.js';
 import { readEpics } from '../epics.js';

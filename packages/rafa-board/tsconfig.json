@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.packages.json",
+  // Composite, so `tsc --build` builds core and effort first and reads
+  // their declarations from each package's .tsbuild through the references
+  // below.
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": ".tsbuild",
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
+  },
+  "include": ["index.ts", "commands.ts", "src"],
+  // *.test.ts stays out of check-types, as at the root, until the test
+  // type-checking work lands (.rafa/specs/test-type-checking.md).
+  "exclude": ["**/*.test.ts"],
+  "references": [{ "path": "../rafa" }, { "path": "../rafa-effort" }]
+}
