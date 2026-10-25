@@ -1,7 +1,7 @@
 /**
  * The board-imports sweep: holds board's code files to no import of a
- * file of run, pr or release, by value, by type or through a facade
- * (#1336, the fifth decouple item of #808).
+ * file of run, pr, release or the CLI, by value, by type or through a
+ * facade (#1336, the fifth decouple item of #808, and pass 4c).
  *
  * Board moves third, and a package may not import a package that moves
  * after it. The files read are the `files` list of the `rafa-board` row
@@ -10,18 +10,19 @@
  * specifier of each file, read by `textImports` (which takes `import type`
  * and `export … from` as it takes a value import) and resolved as the
  * import graph resolves it, `bunResolver` of `scripts/survey/import-graph.ts`,
- * must land on no file of the `rafa-run`, `rafa-pr` or `rafa-release` row,
- * and on none of the three facades' entry files. A violation is named by
- * its importer, its specifier and its landing.
+ * must land on no file of the `rafa-run`, `rafa-pr`, `rafa-release` or
+ * `@open-tomato/rafa` row, and on none of the three facades' entry files.
+ * A violation is named by its importer, its specifier and its landing.
  *
- * One import is set aside by its importer, specifier and landing
- * ({@link KNOWN_EDGE}): a type import the plan's four edges do not name,
- * which the item reports in its notes and does not fix. The case fails
- * when it is gone, so the exception cannot outlive the import.
+ * The `@open-tomato/rafa` row is the CLI's: board moves into a package
+ * the CLI imports, so an import of a CLI file is refused too. The facade
+ * entries come from the three feature rows alone ({@link FACADE_ROWS}),
+ * since the CLI has no facade of its own.
  *
  * The count of files read is printed at load time so an empty read cannot
  * pass, and a planted tree holds one control for each failure (a relative
- * value import, a type import, a facade import) and one passing control.
+ * value import, a type import, a facade import, a relative import of a
+ * CLI file) and one passing control.
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,11 +43,14 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /** The cut table, from the repository root. */
 const CUT_TABLE = 'docs/survey/cut-table.json';
 
-/** The package rows board may not import, by their names in the cut table. */
-const FORBIDDEN_ROWS: readonly string[] = ['rafa-run', 'rafa-pr', 'rafa-release'];
+/** The feature rows board may not import, each with a facade, by their names in the cut table. */
+const FACADE_ROWS: readonly string[] = ['rafa-run', 'rafa-pr', 'rafa-release'];
+
+/** The package rows board may not import: the feature rows and the CLI's, which has no facade. */
+const FORBIDDEN_ROWS: readonly string[] = [...FACADE_ROWS, '@open-tomato/rafa'];
 
 /** The entry files of the three facades, which a bare package specifier lands on. */
-const FACADE_ENTRIES: readonly string[] = FORBIDDEN_ROWS.flatMap((name) => [
+const FACADE_ENTRIES: readonly string[] = FACADE_ROWS.flatMap((name) => [
   `packages/${name}/index.ts`,
   `packages/${name}/commands.ts`,
 ]);
@@ -137,30 +141,6 @@ function violationLine(violation: Violation): string {
   return `${violation.from} imports '${violation.specifier}', which lands on ${violation.landed}`;
 }
 
-/**
- * The one import of board onto run the item leaves: `NextBoard` and its
- * neighbours, types of `src/next/readings.ts`, read by a board file. It is
- * a fifth edge, found by this sweep, named in the close-out notes and not
- * added to the registry.
- */
-const KNOWN_EDGE: Violation = {
-  from: 'src/next/relation-readings.ts',
-  landed: 'src/next/readings.ts',
-  specifier: './readings.js',
-};
-
-/**
- * Whether a violation is {@link KNOWN_EDGE}.
- *
- * @param violation - A violation.
- * @returns `true` for that import alone.
- */
-function isKnownEdge(violation: Violation): boolean {
-  return violation.from === KNOWN_EDGE.from
-    && violation.specifier === KNOWN_EDGE.specifier
-    && violation.landed === KNOWN_EDGE.landed;
-}
-
 const rows = readRows();
 const boardFiles = [...new Set([...(rows.get('rafa-board')?.files ?? []), ...BOARD_NAMED])].filter(isBoardCode).sort();
 const forbiddenFiles = new Set([
@@ -175,7 +155,7 @@ for (const path of boardFiles) {
 const live = readBoardImports({ files: boardFiles, forbidden: forbiddenFiles, resolve: bunResolver(REPO_ROOT), sources });
 
 console.log(
-  `board-imports: read ${sources.size} board code file(s) against ${forbiddenFiles.size} run, pr and release file(s); `
+  `board-imports: read ${sources.size} board code file(s) against ${forbiddenFiles.size} run, pr, release and CLI file(s); `
   + `${live.length} violation(s)`,
 );
 
@@ -183,7 +163,8 @@ const planted: string[] = [];
 
 /**
  * Plants a tree under a fresh folder, with a `node_modules` link for the
- * facade, and reads its `board/` files against its `run/` files and facade.
+ * facade, and reads its `board/` files against its `run/` and `cli/` files
+ * and facade.
  *
  * @param tree - File text by path under the tree.
  * @returns The violations.
@@ -196,6 +177,7 @@ function readPlanted(tree: Readonly<Record<string, string>>): Violation[] {
     'node_modules/@open-tomato/rafa-run/package.json': JSON.stringify({ main: '../../../facade/index.ts', name: '@open-tomato/rafa-run' }),
     'facade/index.ts': 'export const f = 1;\n',
     'run/a.ts': 'export const a = 1;\nexport type T = number;\n',
+    'cli/a.ts': 'export const c = 1;\n',
     'board/ok.ts': 'export const ok = 1;\n',
     ...tree,
   };
@@ -206,7 +188,7 @@ function readPlanted(tree: Readonly<Record<string, string>>): Violation[] {
   }
   return readBoardImports({
     files: [...written.keys()].filter((path) => path.startsWith('board/')),
-    forbidden: new Set(['run/a.ts', 'facade/index.ts']),
+    forbidden: new Set(['run/a.ts', 'cli/a.ts', 'facade/index.ts']),
     resolve: bunResolver(root),
     sources: written,
   });
@@ -231,13 +213,9 @@ describe('the board-imports sweep', () => {
     }
   });
 
-  it('still finds the one set-aside import, so the exception is not stale', () => {
-    expect(live.filter(isKnownEdge)).toEqual([KNOWN_EDGE]);
-  });
-
-  it('lands no board import on a run, pr or release file or a facade entry', () => {
-    const lines = live.filter((violation) => !isKnownEdge(violation)).map((violation) => violationLine(violation));
-    expect(lines, `board import(s) of run, pr or release:\n${lines.join('\n')}`).toEqual([]);
+  it('lands no board import on a run, pr, release or CLI file or a facade entry', () => {
+    const lines = live.map((violation) => violationLine(violation));
+    expect(lines, `board import(s) of run, pr, release or the CLI:\n${lines.join('\n')}`).toEqual([]);
   });
 });
 
@@ -262,5 +240,10 @@ describe('the planted-tree controls', () => {
       'board/b.ts': 'import { f } from \'@open-tomato/rafa-run\';\nexport const b = f;\n',
     });
     expect(violations).toEqual([{ from: 'board/b.ts', landed: 'facade/index.ts', specifier: '@open-tomato/rafa-run' }]);
+  });
+
+  it('fails a relative import of a CLI file', () => {
+    const violations = readPlanted({ 'board/b.ts': 'import { c } from \'../cli/a.js\';\nexport const b = c;\n' });
+    expect(violations).toEqual([{ from: 'board/b.ts', landed: 'cli/a.ts', specifier: '../cli/a.js' }]);
   });
 });
