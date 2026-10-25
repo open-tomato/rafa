@@ -80,9 +80,13 @@
  *     the library build's `--root=src` would build outside `dist/`
  *     without a word (`pass-prose.ts`).
  *  6. Lists and leaves each line of a moved or parked test that builds a
- *     path from `import.meta`, since the test sits deeper now, and each
- *     line of a code file outside the move that builds one naming a moved
- *     file or folder ({@link metaPaths}), since its target has gone.
+ *     path from `import.meta`, since the test sits deeper now, or builds
+ *     one from a folder constant or as a relative string that the move
+ *     breaks; and each line of a code file outside the move that builds
+ *     one naming a moved file or folder, from `import.meta`, from a folder
+ *     constant or as a relative string, since its target has gone
+ *     (`pass-paths.ts`). A relative string that is an import specifier is
+ *     step 3's.
  *
  * ## What it refuses
  *
@@ -99,6 +103,7 @@
 import type { Edit, SiteNote } from './core-package-text';
 import type { FileMove } from './moves/types';
 import type { ParkedTest, PassMovesInput, PathMove } from './pass-moves-set';
+import type { BuiltLine, BuiltPath } from './pass-paths';
 import type { PassTarget } from './pass-target';
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -123,6 +128,7 @@ import {
 } from './core-package-text';
 import { applyTreeChanges, committableFiles, TreeError } from './core-package-tree';
 import { isOutsideRepository, readMoveSet, targetOf } from './pass-moves-set';
+import { builtPaths, codeForms, IMPORT_META_PATH, namedImports, pathTree, shiftedPath } from './pass-paths';
 import { buildNotes, CLUSTER_MAP_FILE, CODEMOD_FOLDER, isBuildScope, isProseScope, proseForms, rewriteMovedPath } from './pass-prose';
 import {
   checkWorkspaceMember,
@@ -164,6 +170,7 @@ export interface PathMentions {
 export type { SiteNote } from './core-package-text';
 export type { ParkedTest, PassMovesInput, PathMove } from './pass-moves-set';
 export type { PassTarget } from './pass-target';
+export { metaPaths } from './pass-paths';
 export {
   BUILD_FOLDER,
   BUILD_MANIFEST,
@@ -210,9 +217,9 @@ export interface PassMovesPlan {
   readonly mentions: readonly PathMentions[];
   /** Step 5: the moved paths of the build's files, left as written for the move task ({@link isBuildScope}). */
   readonly buildReads: readonly SiteNote[];
-  /** Step 6: the `import.meta` path lines of moved and parked tests, left to the move task. */
+  /** Step 6: the `import.meta` path lines of moved and parked tests, and those the move breaks, left to the move task. */
   readonly pathReads: readonly SiteNote[];
-  /** Step 6: the `import.meta` path lines outside the move that name a moved file or folder, left to the move task. */
+  /** Step 6: the path lines outside the move that name a moved file or folder, left to the move task. */
   readonly movedPathReads: readonly SiteNote[];
   /** What the codemod will not do; a run with any writes nothing. */
   readonly refusals: readonly SiteNote[];
@@ -229,39 +236,8 @@ export interface PassMovesStreams {
 /** The run could not start. */
 export class PassMovesError extends Error {}
 
-const IMPORT_META_PATH = /import\.meta\.(?:dir|dirname|url|path)\b/;
-
-/** A quoted literal on one line, with no interpolation. */
-const QUOTED_LITERAL = /(['"`])((?:(?!\1)[^\\$]|\\.)*)\1/g;
-
-/** A literal a `join` of path segments takes. */
-const PATH_SEGMENT = /^[\w.@/-]+$/;
-
 /** The `.js` form a specifier spells each TypeScript extension with. */
 const JS_FORM: Readonly<Record<string, string>> = { '.cts': '.cjs', '.mts': '.mjs', '.ts': '.js', '.tsx': '.jsx' };
-
-/**
- * The paths one line builds from `import.meta`, read from its quoted
- * literals: each opening with `./` or `../`, as `new URL('./x', import.meta.url)`
- * names it, and all of them joined, as `join(import.meta.dir, '..', 'x')`
- * names it. A line that splits its call is not read.
- *
- * @param file - The file's path.
- * @param line - The line's text.
- * @returns The repository-relative paths, none with a closing `/`.
- */
-export function metaPaths(file: string, line: string): readonly string[] {
-  if (!IMPORT_META_PATH.test(line)) {
-    return [];
-  }
-  const folder = posix.dirname(file);
-  const literals = [...line.matchAll(QUOTED_LITERAL)].map((match) => match[2] ?? '');
-  const urls = literals.filter((literal) => /^\.\.?\//.test(literal)).map((literal) => posix.join(folder, literal));
-  const joined = literals.length > 0 && literals.every((literal) => PATH_SEGMENT.test(literal))
-    ? [posix.join(folder, ...literals)]
-    : [];
-  return [...new Set([...urls, ...joined].map((path) => path.replace(/\/$/, '')))];
-}
 
 /**
  * Whether a path is a code file outside the package's source whose
@@ -272,6 +248,54 @@ function isImporterScope(target: PassTarget, path: string): boolean {
   return isCodeFile(path) && !path.startsWith(target.source)
     && (path.startsWith(SOURCE_ROOT) || path.startsWith('scripts/') || /^packages\/[^/]+\/src\//.test(path) || !path.includes('/')
       || (!target.core && /^packages\/[^/]+\/[^/]+$/.test(path)));
+}
+
+/**
+ * Whether a literal on a line of a code file is one of its import
+ * specifiers, which step 3 rewrites and step 6 leaves.
+ *
+ * @param file - The file's path.
+ * @param text - Its text.
+ * @returns The question, by line (from 1) and literal.
+ */
+function specifierAt(file: string, text: string): (line: number, literal: string) => boolean {
+  const source = parseSource(file, text);
+  const sites = new Set(specifierSites(source).map((site) => `${lineOf(source, site.node.getStart(source))}:${site.node.text}`));
+  return (line, literal) => sites.has(`${line}:${literal}`);
+}
+
+/**
+ * Step 6's reading of each file: the lines that build a path, with the
+ * folder constants it imports by name from a module that exports one
+ * built from `import.meta`, one import deep.
+ *
+ * @param input - The run's input, for the texts and the resolver.
+ * @returns The reading, by file and text.
+ */
+function pathReader(input: PassMovesInput): (file: string, text: string) => readonly BuiltLine[] {
+  const exports = new Map<string, ReadonlyMap<string, BuiltPath>>();
+  const exportedBy = (path: string): ReadonlyMap<string, BuiltPath> => {
+    const known = exports.get(path);
+    if (known !== undefined) return known;
+    const text = input.sources.get(path);
+    const read = text === undefined || !IMPORT_META_PATH.test(text)
+      ? new Map<string, BuiltPath>()
+      : builtPaths(path, text, { isSpecifier: () => false }).exported;
+    exports.set(path, read);
+    return read;
+  };
+  return (file, text) => {
+    const imported = new Map<string, BuiltPath>();
+    for (const item of namedImports(text)) {
+      if (!item.specifier.startsWith('.')) continue;
+      const landed = input.resolve(item.specifier, file);
+      const held = landed === undefined
+        ? undefined
+        : exportedBy(landed).get(item.name);
+      if (held !== undefined) imported.set(item.local, held);
+    }
+    return builtPaths(file, text, { imported, isSpecifier: specifierAt(file, text) }).lines;
+  };
 }
 
 function byFileAndLine(a: { readonly file: string; readonly line: number }, b: { readonly file: string; readonly line: number }): number {
@@ -424,8 +448,11 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
   const pathReads: SiteNote[] = [];
   const movedPathReads: SiteNote[] = [];
   const buildReads: SiteNote[] = [];
-  const namesMoved = (path: string): boolean => set.finals.has(path)
-    || set.folders.some((folder) => path === folder.from.slice(0, -1) || path.startsWith(folder.from));
+  const before = pathTree(input.files);
+  const after = pathTree(input.files.map((path) => set.finals.get(path) ?? path));
+  const breaksOnMove = (built: BuiltPath): boolean => codeForms(built.path).some((form) => before.has(form))
+    && !codeForms(shiftedPath(built.anchor, set.finals.get(built.anchor) ?? built.anchor, built.path)).some((form) => after.has(form));
+  const readPaths = pathReader(input);
   const escapes: SiteNote[] = [];
   const refusals: SiteNote[] = [...set.refusals];
   const parkedFrom = new Set(set.parked.map((test) => test.from));
@@ -449,13 +476,15 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
         refusals.push(...result.refusals);
       }
       if (set.finals.has(file) && classifyFile(file) === 'test') {
+        const broken = new Set(readPaths(file, text).filter((read) => read.paths.some(breaksOnMove))
+          .map((read) => read.line));
         text.split('\n').forEach((content, index) => {
-          if (IMPORT_META_PATH.test(content)) pathReads.push({ file, line: index + 1, text: content.trim() });
+          if (IMPORT_META_PATH.test(content) || broken.has(index + 1)) pathReads.push({ file, line: index + 1, text: content.trim() });
         });
       } else if (!set.finals.has(file) && !file.startsWith(CODEMOD_FOLDER)) {
-        text.split('\n').forEach((content, index) => {
-          if (metaPaths(file, content).some(namesMoved)) movedPathReads.push({ file, line: index + 1, text: content.trim() });
-        });
+        for (const read of readPaths(file, text)) {
+          if (read.paths.some(breaksOnMove)) movedPathReads.push({ file, line: read.line, text: read.text });
+        }
       }
     }
     if (isProseScope(file) || isBuildScope(file)) {
@@ -630,8 +659,8 @@ export function reportLines(plan: PassMovesPlan, dryRun: boolean): readonly stri
     `5. moved paths rewritten in prose, comments and strings: ${plan.mentions.reduce((sum, item) => sum + item.count, 0)}`,
     ...section('5. files whose moved paths are rewritten', plan.mentions.map((item) => `${item.file} (${item.count})`)),
     ...section('5. left to the move task: moved paths in the build\'s files, left as written', plan.buildReads.map(note)),
-    ...section('6. left to the move task: test lines building a path from import.meta', plan.pathReads.map(note)),
-    ...section('6. left to the move task: lines outside the move building a path from import.meta to a moved file', plan.movedPathReads.map(note)),
+    ...section('6. left to the move task: test lines building a path from import.meta, a folder constant or a relative string', plan.pathReads.map(note)),
+    ...section('6. left to the move task: lines outside the move building a path to a moved file', plan.movedPathReads.map(note)),
     ...section('refused', plan.refusals.map(note)),
     dryRun
       ? 'dry run, nothing written.'

@@ -264,6 +264,57 @@ describe('metaPaths', () => {
   });
 });
 
+describe('step 6 over folder constants and relative strings, in a planted tree', () => {
+  const root = plant({
+    'src/cli/probe.test.ts': lines(
+      'import { SRC_DIR } from \'../tests/dirs.js\';',
+      '',
+      'const HERE = dirname(fileURLToPath(import.meta.url));',
+      'export const local = join(HERE, \'..\', \'utils\', \'git.ts\');',
+      'export const imported = join(SRC_DIR, \'modules\', \'load.ts\');',
+      'export const row = [\'../utils/tracker.js\'];',
+      'export const kept = [\'../utils/git-extra.js\'];',
+      'export const loaded = import(\'../utils/git.js\');',
+    ),
+    'src/tests/dirs.ts': lines('export const SRC_DIR = join(import.meta.dir, \'..\');'),
+    'src/utils/tracker-open.test.ts': lines(
+      'import { tracker } from \'./tracker.js\';',
+      '',
+      'export const read = [tracker, \'./git-extra.ts\', \'./git.ts\'];',
+    ),
+  });
+  const plan = readPassMoves(root, MOVES, []);
+
+  it('lists the lines outside the move that build a moved path from a folder constant, an imported one or a relative string', () => {
+    expect(plan.movedPathReads.map((note) => [note.file, note.line])).toEqual([
+      ['src/cli/fixture.test.ts', 1],
+      ['src/cli/probe.test.ts', 4],
+      ['src/cli/probe.test.ts', 5],
+      ['src/cli/probe.test.ts', 6],
+    ]);
+  });
+
+  it('leaves a path to a file that stays and an import specifier, which step 3 rewrites', () => {
+    expect(plan.specifiers.some((item) => item.file === 'src/cli/probe.test.ts' && item.line === 8)).toBe(true);
+  });
+
+  it('lists a moved test\'s relative string to a file that stays, and not one to a file that moves with it', () => {
+    expect(plan.pathReads.map((note) => [note.file, note.line])).toEqual([
+      ['src/modules/load.test.ts', 7],
+      ['src/utils/tracker-open.test.ts', 3],
+      ['src/utils/tracker.test.ts', 7],
+    ]);
+  });
+
+  it('prints both lists under step 6', () => {
+    const printed = reportLines(plan, true);
+
+    expect(printed).toContain('6. left to the move task: lines outside the move building a path to a moved file (4)');
+    expect(printed).toContain('  src/cli/probe.test.ts:6 export const row = [\'../utils/tracker.js\'];');
+    expect(printed).toContain('6. left to the move task: test lines building a path from import.meta, a folder constant or a relative string (3)');
+  });
+});
+
 describe('the codemod under --dry-run, over a planted tree', () => {
   it('prints each list with its count and changes nothing', async () => {
     // Arrange
