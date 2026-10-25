@@ -247,18 +247,42 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { SettleReader } from './settle-step.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { EpicRelations } from '../board/epics.js';
-import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
-import type { BoardListing } from '../board/roadmap-board.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type {
+  BoardListing,
+  EpicRelations,
+  GhRunner,
+  SpecIssue,
+  SpecIssueReader,
+} from '@open-tomato/rafa-board';
 import type { EpicEndRelease, MergeGuardSettings } from '@open-tomato/rafa-release';
 
+import {
+  awayTargetOf,
+  blockedLineReadings,
+  cancelledEpicNoticeLines,
+  createGhBoardLister,
+  createGhBoardListing,
+  createGhOpenPullRequests,
+  createGhRoadmapSearch,
+  createGhRunner,
+  createGhSpecIssueReader,
+  createRoadmapReadings,
+  followHopRecord,
+  pickerFor,
+  readCurrentPlace,
+  readHopAnswer,
+  resolveDefaultBoard,
+  scanClaimBranches,
+  walkBoard,
+  walkEpic,
+  walkTarget,
+} from '@open-tomato/rafa-board';
 import { readEpicEndRelease } from '@open-tomato/rafa-release';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -268,26 +292,9 @@ import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { readRecords, resolveLoopSeams } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
-import { cancelledEpicNoticeLines } from '../board/epic-cancel-notice.js';
-import { createGhSpecIssueReader } from '../board/issue.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { readCurrentPlace } from '../board/roadmap-rows.js';
-import { createGhOpenPullRequests, createGhRoadmapSearch, createRoadmapReadings, scanClaimBranches } from '../board/roadmap.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
 import { nextOwnerGate } from './owner-gate.js';
-import {
-  awayTargetOf,
-  blockedLineReadings,
-  followHopRecord,
-  pickerFor,
-  readHopAnswer,
-  walkBoard,
-  walkEpic,
-  walkTarget,
-} from './relation-readings.js';
 import { settleReaderFor } from './settle-step.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */

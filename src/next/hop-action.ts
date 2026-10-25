@@ -60,14 +60,13 @@ import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { rmSync } from 'node:fs';
 
+import { hopMoveSentence, samePlace } from '@open-tomato/rafa-board';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { hopFilePath, readHopRecord, staleAgainst, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { goHome, positionAt, positionFilePath, readPositionFile, writePositionFile } from '@open-tomato/rafa/project/position';
 
-import { samePlace } from '../board/place.js';
-
-import { hopMoveSentence } from './hop-chain.js';
 import { dryHopSentence, placeText } from './hop-rows.js';
 
 /** The flag `hop` moves with, so the switch keeps home. */

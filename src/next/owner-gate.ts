@@ -34,21 +34,23 @@
  * holds the merge back and never lets it through.
  */
 import type { NextRoadmapSources } from './readings.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { OwnedBoard } from '../board/board-owns.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { PullRequests } from '../pr/types.js';
+import type { BoardIssue, BoardListing, GhRunner, OwnedBoard } from '@open-tomato/rafa-board';
+
+import {
+  createGhBoardLister,
+  createGhBoardListing,
+  createGhRoadmapSearch,
+  createOwnerResolver,
+  openBoards,
+  ownedBoard,
+  readCodeowners,
+  resolveDefaultBoard,
+} from '@open-tomato/rafa-board';
 
 import { readPositionFile } from '@open-tomato/rafa/project/position';
 
-import { ownedBoard } from '../board/board-owns.js';
-import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
-import { readCodeowners } from '../board/codeowners.js';
-import { openBoards } from '../board/epic-board.js';
-import { createOwnerResolver } from '../board/owner-resolve.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { createGhRoadmapSearch } from '../board/roadmap.js';
 import { createGhTeamMembership, readOwnerApproval } from '../pr/owner-approval.js';
 
 /** What {@link nextOwnerGate} reads through. */

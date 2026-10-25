@@ -61,8 +61,10 @@ interface RewiredRow {
  * item's survey regenerated, with board's back edges into run and pr gone,
  * the codemod reads none of the nineteen on a load cycle and all nineteen to
  * rewire, refusing `scanClaimBranches` of `src/board/roadmap.ts` in
- * `src/next/readings.ts` and `src/next/sources.ts`; the rows below hold the
- * path, not the group, so they stay. The same stage took
+ * `src/next/readings.ts` and `src/next/sources.ts`. The 19 load-cycle files
+ * took the facade in pass 4c, since decouple 5 ended the cycles that kept
+ * them, once those two took `scanClaimBranches` from
+ * `src/board/branch-scan.ts`, so board's row is empty. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
  * `preflight-drift.ts` onto the facade. `src/claims/ahead.ts` and
  * `src/epic/verify-run.ts` left the row in the fourth decouple item, which
@@ -136,27 +138,7 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-inventory',
   },
   {
-    allowed: {
-      'src/bugs/filed-values.ts': 'loadCycle',
-      'src/claims/drift.ts': 'loadCycle',
-      'src/claims/labels.ts': 'loadCycle',
-      'src/commands/switch.ts': 'loadCycle',
-      'src/next/hop-action.ts': 'loadCycle',
-      'src/next/hop-rows.ts': 'loadCycle',
-      'src/next/owner-gate.ts': 'loadCycle',
-      'src/next/readings.ts': 'loadCycle',
-      'src/next/relations-mode.ts': 'loadCycle',
-      'src/next/sources.ts': 'loadCycle',
-      'src/next/state.ts': 'loadCycle',
-      'src/pr/gh-close.ts': 'loadCycle',
-      'src/pr/gh.ts': 'loadCycle',
-      'src/pr/owner-approval.ts': 'loadCycle',
-      'src/start/stale-docs.ts': 'loadCycle',
-      'src/start/triage.ts': 'loadCycle',
-      'src/triage/bug-filing.ts': 'loadCycle',
-      'src/triage/refs-section.ts': 'loadCycle',
-      'src/triage/triage.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-board',
   },
   {

@@ -110,35 +110,43 @@
  *
  * It starts no session, so it declares no `spends`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardView } from '../board/epic-board.js';
-import type { EpicRelations, Epics } from '../board/epics.js';
-import type { ResolvedPlace } from '../board/place.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { Place, Position } from '@open-tomato/rafa/project/position';
+import type {
+  BoardIssue,
+  BoardView,
+  EpicRelations,
+  Epics,
+  GhRunner,
+  ResolvedPlace,
+} from '@open-tomato/rafa-board';
+
+import {
+  ROADMAP_LABEL,
+  boardOfEpic,
+  createGhBoardListing,
+  createGhRunner,
+  defaultBoardOnce,
+  firstNowEpic,
+  horizonOf,
+  issueProject,
+  issueSubjectConfig,
+  lineRefusal,
+  parseRoadmapBody,
+  readConfiguredRelations,
+  readListedEpics,
+  resolvePlace,
+  scanClaimBranches,
+} from '@open-tomato/rafa-board';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { hop, positionFilePath, rehome, writePositionFile } from '@open-tomato/rafa/project/position';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { scanClaimBranches } from '../board/branch-scan.js';
-import { readConfiguredRelations } from '../board/configured-relations.js';
-import { defaultBoardOnce } from '../board/default-board-once.js';
-import { boardOfEpic } from '../board/epic-board.js';
-import { firstNowEpic } from '../board/now-epic.js';
-import { resolvePlace } from '../board/place.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
-import { parseRoadmapBody } from '../board/roadmap.js';
-import { ROADMAP_LABEL } from '../board/setup-roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-
-import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa switch <n | -> [--no-rehome]';

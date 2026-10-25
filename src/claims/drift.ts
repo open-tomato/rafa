@@ -59,16 +59,22 @@
  * check spends one small incremental read. A listing that rejects answers
  * a report with no finding and the rejection as its one notice.
  */
-import type { BranchScan } from '../board/branch-scan.js';
-import type { BoardIssue, BoardIssueState, BoardListing } from '../board/roadmap-board.js';
+import type {
+  BoardIssue,
+  BoardIssueState,
+  BoardListing,
+  BranchScan,
+} from '@open-tomato/rafa-board';
+
+import {
+  ROADMAP_LABEL,
+  claimBranchOfRef,
+  isEpicIssue,
+  parseRoadmapBody,
+} from '@open-tomato/rafa-board';
 
 import { claimBranchIssue } from '@open-tomato/rafa/claims/git';
 import { DEFAULT_BRANCH_TEMPLATE, branchFromTemplate, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { isEpicIssue } from '../board/epic-walk.js';
-import { claimBranchOfRef } from '../board/roadmap-claims.js';
-import { parseRoadmapBody } from '../board/roadmap.js';
-import { ROADMAP_LABEL } from '../board/setup-roadmap.js';
 
 import { STAGE_LABELS } from './labels.js';
 

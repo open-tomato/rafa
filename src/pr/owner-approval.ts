@@ -72,13 +72,15 @@
  * `name[bot]`, say, which never enters an API path) are `unknown`.
  */
 import type { PullRequestReview, PullRequests } from './types.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { OwnedBoard } from '../board/board-owns.js';
-import type { Codeowners } from '../board/codeowners.js';
-import type { OwnerResolver } from '../board/owner-resolve.js';
+import type {
+  Codeowners,
+  GhResult,
+  GhRunner,
+  OwnedBoard,
+  OwnerResolver,
+} from '@open-tomato/rafa-board';
 
-import { isOwnerHandle } from '../board/board-body.js';
-import { owningBoard } from '../board/board-owns.js';
+import { isOwnerHandle, owningBoard } from '@open-tomato/rafa-board';
 
 /** The state a review is in when it approves. */
 export const APPROVED = 'APPROVED';

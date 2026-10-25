@@ -46,7 +46,7 @@
  * the command and what it wrote, the comment left out of the name.
  */
 import type { ClosePullRequestOptions } from './types.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board';
 
 import { describeValue } from '@open-tomato/rafa/core/config/sections';
 

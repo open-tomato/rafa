@@ -95,10 +95,6 @@
  * repository has no pull request, and it is left to the caller
  * unchanged.
  */
-import type { HopDecision, TakenBy } from './hop-chain.js';
-import type { BlockedLine } from '../board/blocked-line.js';
-import type { NextNowEpic } from '../board/epic-walk.js';
-import type { RoadmapLine } from '../board/roadmap.js';
 import type { PlanListing } from '../plan/list.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
@@ -108,6 +104,15 @@ import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { Position } from '@open-tomato/rafa/project/position';
 import type { BaseStanding } from '@open-tomato/rafa/start/branch-decision';
+import type {
+  BlockedLine,
+  HopDecision,
+  NextNowEpic,
+  RoadmapLine,
+  TakenBy,
+} from '@open-tomato/rafa-board';
+
+import { scanClaimBranches } from '@open-tomato/rafa-board';
 
 import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -116,7 +121,6 @@ import { isLive } from '@open-tomato/rafa/core/loop/readings';
 import { planFileName } from '@open-tomato/rafa/core/plan';
 import { parseBaseStanding, REMOTE, trackedChanges } from '@open-tomato/rafa/start/branch-decision';
 
-import { scanClaimBranches } from '../board/roadmap.js';
 import { listPlans } from '../plan/list.js';
 import { gitSaid } from '../pr/index.js';
 
