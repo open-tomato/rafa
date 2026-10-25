@@ -42,15 +42,15 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+
 import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { createAdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-
-import { draftFixture } from './contract.js';
-import { createFakeGh } from './github-fake.js';
-import { parseLocalIssue } from './local.js';
-import { resolveTracker } from './resolve.js';
+import { draftFixture } from '@open-tomato/rafa-board/adapters/tracker/contract';
+import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
+import { parseLocalIssue } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { resolveTracker } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 
 /** What `gh auth status` writes with no hosts, as the fake records it. */
 const NOT_LOGGED_IN = 'You are not logged into any GitHub hosts. To log in, run: gh auth login';

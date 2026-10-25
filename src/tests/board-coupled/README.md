@@ -23,6 +23,7 @@ package once its coupling is gone, or into the module it really tests.
 | Test file | Reaches |
 | --- | --- |
 | `adapters/tracker/github.test.ts` | `src/tests/scratch-home-env.ts` |
+| `adapters/tracker/resolve.test.ts` | `src/adapter-registry.ts` |
 | `board/owner-resolve.test.ts` | `src/pr/gh-fake-shapes.ts` |
 | `board/project/add-filed.test.ts` | `src/triage/triage.ts` |
 | `board/refs-gate.test.ts` | `src/config-registry.ts` |
