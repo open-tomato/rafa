@@ -20,7 +20,7 @@
  * could not hide behind the tracker's own listing.
  */
 import type { StaleDocsTaskInput, StartStaleDocsConfig } from './stale-docs.js';
-import type { TrackerResolution } from '../adapters/tracker/resolve.js';
+import type { TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,8 +37,8 @@ import {
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { STALE_DOCS_MARKER, staleDocsTitle } from '../docs/release-issue.js';
 
 import { createStartStaleDocs } from './stale-docs.js';

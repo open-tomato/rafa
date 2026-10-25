@@ -105,7 +105,7 @@
  * anybody else is passed over, reported on the reading
  * ({@link TriageReading.ignored}) and printed by the report, and
  * nothing in it is read. A permission lookup that FAILED is untrusted
- * too; `src/board/trust.ts` holds why.
+ * too; `packages/rafa-board/src/board/trust.ts` holds why.
  *
  * `--resolve` asks the other half of the same question: a pull request
  * whose own author is untrusted is refused with exit code 2 before any
@@ -157,7 +157,7 @@
  * `--resolve`, three more from elsewhere: exit 2 for more than one red
  * candidate (`select.ts`), for a cross-repository pull request
  * (`src/pr/worktree.ts`) and for a pull request whose author is
- * trusted with nothing (`src/board/trust.ts`), exit 1 for a head whose
+ * trusted with nothing (`packages/rafa-board/src/board/trust.ts`), exit 1 for a head whose
  * config module `origin/<base>` does not hold, unless
  * `--allow-local-config` (`./triage-config-trust.ts`), and exit 3 when
  * the attempt guard gives up.

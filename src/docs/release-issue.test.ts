@@ -21,8 +21,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { staleDocLineText } from '@open-tomato/rafa/triage/stale-doc-line';
-
-import { createLocalTracker } from '../adapters/tracker/local.js';
+import { createLocalTracker } from '@open-tomato/rafa-board/adapters/tracker/local';
 
 import {
   addStaleDocLine,

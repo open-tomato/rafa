@@ -10,8 +10,8 @@
  * sits beside the control under the default template, which finds no
  * branch and so reads nothing and names the drift.
  */
-import type { SpecIssue } from './issue.js';
-import type { BoardIssue } from './roadmap-board.js';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,11 +21,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
 import { CLAIMED_LABEL } from '@open-tomato/rafa/claims/stale';
+import { createRoadmapReadings, DEFAULT_REMOTE, scanClaimBranches } from '@open-tomato/rafa-board/board/roadmap';
 
 import { findDrift } from '../claims/drift.js';
 import { createGitRunner } from '../pr/index.js';
-
-import { createRoadmapReadings, DEFAULT_REMOTE, scanClaimBranches } from './roadmap.js';
 
 const TEMPLATE = 'work/{stub}';
 const BRANCH = 'work/rafa-20-x';

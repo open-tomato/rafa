@@ -11,7 +11,7 @@
  *  1. **A store change pinned by number** (`pinned-migration`): any
  *     line outside a fence, a code span or an HTML comment matching
  *     `PINNED_MIGRATION`, read by the readiness gate's own reader
- *     (`findPinnedMigrations` in `src/board/readiness.ts`) so a spec and
+ *     (`findPinnedMigrations` in `packages/rafa-board/src/board/readiness.ts`) so a spec and
  *     the plan written from it are held to one pattern. Asked of EVERY
  *     plan, since a plan that pins "migration 14" and never names the
  *     migration's id is the practice itself, and would otherwise escape

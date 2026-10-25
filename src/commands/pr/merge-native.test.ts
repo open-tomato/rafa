@@ -29,11 +29,11 @@
  * holds the call list to end at that reading, which is the control.
  */
 import type { MergeSeams } from './merge.js';
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -41,9 +41,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
-import { BOARDS_LIST_ARGS } from '../../board/boards.js';
-import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

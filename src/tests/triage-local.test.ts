@@ -58,8 +58,8 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '../start/dispatch.js';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 

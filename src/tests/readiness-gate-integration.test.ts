@@ -3,13 +3,13 @@
  * composed together, in the order `.specs/rafa-20-pr-commands.md` runs
  * them, and the enforcement check 3's verdict drives.
  *
- * `src/board/readiness.test.ts`, `src/board/spec-review.test.ts` and
- * `src/board/gate.test.ts` each drive their own module in isolation,
+ * `packages/rafa-board/src/board/readiness.test.ts`, `packages/rafa-board/src/board/spec-review.test.ts` and
+ * `packages/rafa-board/src/board/gate.test.ts` each drive their own module in isolation,
  * with a mutation record proving each catches the failure it exists
  * for. This file drives none of that again. It exists because the gate
  * is three modules a caller composes — `plan create` wires the label
  * check, the completeness check and check 3 together over
- * `src/board/plan-spec.ts` — and a suite that only
+ * `packages/rafa-board/src/board/plan-spec.ts` — and a suite that only
  * ever calls each alone would not catch the seam BETWEEN them: a gap
  * shape `findReadinessGaps` answers that `enforceSpecReview` does not
  * know how to post, or a `SpecReviewReading` `parseSpecReview` answers
@@ -33,12 +33,12 @@
  * plan and prerequisites files a not-ready run moves aside sit under this
  * file's own temporary directory.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { IssueBoard } from '../board/issue-board.js';
-import type { SpecIssue } from '../board/issue.js';
-import type { ReadinessGap } from '../board/readiness.js';
-import type { SpecReviewReading } from '../board/spec-review.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { IssueBoard } from '@open-tomato/rafa-board/board/issue-board';
+import type { ReadinessGap } from '@open-tomato/rafa-board/board/readiness';
+import type { SpecReviewReading } from '@open-tomato/rafa-board/board/spec-review';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,16 +50,15 @@ import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { rejectedPath } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
 import {
   enforceSpecReview,
   readGateFlags,
   SKIP_REVIEW_FLAG,
   SPEC_NEEDS_WORK_LABEL,
   SPEC_NOT_READY_EXIT,
-} from '../board/gate.js';
-import { ISSUE_VIEW_FIELDS, SPEC_LABEL } from '../board/issue.js';
-import { resolvePlanSpec } from '../board/plan-spec.js';
+} from '@open-tomato/rafa-board/board/gate';
+import { ISSUE_VIEW_FIELDS, SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { resolvePlanSpec } from '@open-tomato/rafa-board/board/plan-spec';
 import {
   findReadinessGaps,
   READINESS_REFUSAL_EXIT,
@@ -67,14 +66,14 @@ import {
   requireSpecReadyLabel,
   SPEC_READY_LABEL,
   TEMPLATE_HEADINGS,
-} from '../board/readiness.js';
+} from '@open-tomato/rafa-board/board/readiness';
 import {
   ASSUMPTIONS_HEADING,
   REVIEW_ASSUMED_LINE,
   REVIEW_SKIPPED_LINE,
   stampReviewSkipped,
-} from '../board/review-stamp.js';
-import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
+} from '@open-tomato/rafa-board/board/review-stamp';
+import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '@open-tomato/rafa-board/board/spec-review';
 
 /** The plan path a planner names for issue #31; the caller's spelling, as `gate.ts` takes one. */
 const PLAN_PATH = '.rafa/plans/PLAN-rafa-31.md';
@@ -196,7 +195,7 @@ const ASSUMED_OUTPUT = reviewOutput(
   '  - heading: "Tasks the plan must carry"',
   '    what: "the second task does not name what file it adds the check to"',
   '    blocking: false',
-  '    assumption: "the check is added to src/board/readiness.ts"',
+  '    assumption: "the check is added to packages/rafa-board/src/board/readiness.ts"',
 );
 
 /**
@@ -214,7 +213,7 @@ const ONE_BLOCKING_OUTPUT = reviewOutput(
   '  - heading: "Tasks the plan must carry"',
   '    what: "the second task does not name what file it adds the check to"',
   '    blocking: true',
-  '    assumption: "the check is added to src/board/readiness.ts"',
+  '    assumption: "the check is added to packages/rafa-board/src/board/readiness.ts"',
 );
 
 /** A verdict that lets the issue's plan stand. */
@@ -431,7 +430,7 @@ describe('the completeness check reached through plan create itself', () => {
       repoRoot: root,
       specsDir: SPECS_DIR,
       roadmapIssue: null,
-      // Check 0 runs ahead of check 2 (`src/board/plan-spec.ts`), and
+      // Check 0 runs ahead of check 2 (`packages/rafa-board/src/board/plan-spec.ts`), and
       // this suite is check 2's: the allow-list clears the author
       // without a permission lookup, so the planted `gh` answers the
       // one read the case is about and refuses every other command.
@@ -559,7 +558,7 @@ describe('a not-ready verdict on a plan the session wrote anyway', () => {
     const written = readFileSync(join(root, PLAN_PATH), 'utf8');
     expect(written.split('\n')[0]).toBe(ASSUMPTIONS_HEADING);
     expect(written).toContain('- Planned under: the label swap is verified by asserting the board call');
-    expect(written).toContain('- Planned under: the check is added to src/board/readiness.ts');
+    expect(written).toContain('- Planned under: the check is added to packages/rafa-board/src/board/readiness.ts');
     expect(written.endsWith(`${REVIEW_ASSUMED_LINE}\n\`\`\`\n\n- [ ] Do the thing\n`)).toBe(true);
 
     expect(calls.map((call) => call[0])).toEqual(['comments', 'comment']);

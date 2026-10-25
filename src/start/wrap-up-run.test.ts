@@ -105,11 +105,11 @@ import ts from 'typescript';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { assumptionsHeading } from '@open-tomato/rafa-board/board/review-stamp';
 import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 
-import { assumptionsHeading } from '../board/review-stamp.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
 import { plantProjectConfig, plantScratchRepo } from '../tests/cli-capture.js';

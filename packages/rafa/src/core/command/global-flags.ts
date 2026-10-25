@@ -3,7 +3,7 @@
  *
  * {@link GLOBAL_FLAGS} are core's rather than the CLI's because two
  * readers outside one package take them: `src/cli/help.ts`, which lists
- * them in the root help, and `src/refs/verify.ts`, a board file, which
+ * them in the root help, and `packages/rafa-board/src/refs/verify.ts`, a board file, which
  * reads their names as flags no command declares and still `present`.
  * Board imports core and no CLI file, so the flags sit here, beside the
  * command contract both readers already import.

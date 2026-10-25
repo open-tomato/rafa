@@ -75,7 +75,7 @@ const PROBE = [
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',

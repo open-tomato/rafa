@@ -55,7 +55,7 @@
  *    fail, the refusal case, the sentence over it, and the refusal
  *    asserted across the other four spellings.
  *
- * The two local-notes cases came later, with `src/board/issue.ts`,
+ * The two local-notes cases came later, with `packages/rafa-board/src/board/issue.ts`,
  * which appends that file to the snapshot it writes. They were not in
  * the 23 and no count above counts them.
  *

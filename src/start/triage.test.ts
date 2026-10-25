@@ -80,14 +80,14 @@ import type {
   StartTriageOptions,
   TaskTriageInput,
 } from './triage.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { RefreshAddedItems } from '../board/project/add-issue.js';
-import type { ProjectRefresh } from '../board/project/refresh.js';
 import type { TriageOptions, TriageResult } from '../triage/triage.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEventLog, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
+import type { RefreshAddedItems } from '@open-tomato/rafa-board/board/project/add-issue';
+import type { ProjectRefresh } from '@open-tomato/rafa-board/board/project/refresh';
 
 import {
   existsSync,
@@ -118,14 +118,14 @@ import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
+import { draftFixture } from '@open-tomato/rafa-board/adapters/tracker/contract';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { createFakeFactsGh } from '@open-tomato/rafa-board/board/project/facts-fake';
+import { createGhProjectPort } from '@open-tomato/rafa-board/board/project/gh';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '@open-tomato/rafa-board/board/project/project-fake';
+import { scopeWarning } from '@open-tomato/rafa-board/board/project/refresh-warnings';
 
 import { createJsonOutput } from '../adapters/output/json.js';
-import { draftFixture } from '../adapters/tracker/contract.js';
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { createFakeFactsGh } from '../board/project/facts-fake.js';
-import { createGhProjectPort } from '../board/project/gh.js';
-import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '../board/project/project-fake.js';
-import { scopeWarning } from '../board/project/refresh-warnings.js';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 
 import {

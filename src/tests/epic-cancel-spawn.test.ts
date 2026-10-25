@@ -43,11 +43,11 @@
  * line naming #70 and #72, and once with #72 closed, the shape a
  * `cancel` answer of `cancel` leaves it in, printing no such line at all
  * — the notice names a dependent only until it is answered
- * (`src/board/epic-cancel-notice.ts`).
+ * (`packages/rafa-board/src/board/epic-cancel-notice.ts`).
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { EpicDependent } from '../board/epic-dependents.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
+import type { EpicDependent } from '@open-tomato/rafa-board/board/epic-dependents';
+import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -56,10 +56,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { renderCancelledEpicNotice } from '../board/epic-cancel-notice.js';
-import { renderCancelComment, renderDependentComment, renderUnblockNote } from '../board/epic-trail.js';
-import { parseBoardListing } from '../board/roadmap-board.js';
-import { readEpicToCancel, dependentLines, dependentQuestion, unaskedCancelMessage } from '../commands/epic/cancel.js';
+import { renderCancelledEpicNotice } from '@open-tomato/rafa-board/board/epic-cancel-notice';
+import { renderCancelComment, renderDependentComment, renderUnblockNote } from '@open-tomato/rafa-board/board/epic-trail';
+import { parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
+import { readEpicToCancel, dependentLines, dependentQuestion, unaskedCancelMessage } from '@open-tomato/rafa-board/commands/epic/cancel';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
@@ -279,7 +279,7 @@ function buildCancelProbe(): string {
     'registerCoreAdapters();',
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
-    `import { createEpicCancelCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'epic', 'cancel.ts'))};`,
+    `import { createEpicCancelCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'epic', 'cancel.ts'))};`,
     'import { appendFileSync } from "node:fs";',
     '',
     'const [logPath, ...words] = process.argv.slice(2);',

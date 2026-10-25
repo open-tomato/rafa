@@ -19,11 +19,11 @@
  * beside a ticked #12; the same line with no position file, reading
  * the Roadmap's #13 and #11, is the control.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { Place } from '@open-tomato/rafa/project/position';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,13 +32,13 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { ISSUE_LIST_FLAGS } from '@open-tomato/rafa-board/commands/issue/declarations';
+import { createIssueListCommand } from '@open-tomato/rafa-board/commands/issue/list';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
-import { completeSpecBody } from '../tests/spec-bodies.js';
 
-import { ISSUE_LIST_FLAGS } from './issue/declarations.js';
-import { createIssueListCommand } from './issue/list.js';
 import { createRoadmapCommand, ROADMAP_FLAGS } from './roadmap.js';
 
 /** A temporary directory of this file's own. */

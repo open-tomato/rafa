@@ -2,7 +2,7 @@
  * The stage test for "The mode and the listing": a full native read, a
  * native incremental read, and a mode switch between them, all driven
  * over a real, spawned stand-in `gh` (`createGhRunner`,
- * `src/adapters/tracker/github.ts`) rather than an in-process fake.
+ * `packages/rafa-board/src/adapters/tracker/github.ts`) rather than an in-process fake.
  *
  * `board-cache.test.ts` and `board-cache-native.test.ts` drive every
  * argv and every fallback over a planted `GhRunner` function, which
@@ -30,9 +30,8 @@ import { delimiter, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-
-import { BOARD_CACHE_FILE, createCachedBoardListing } from './board-cache.js';
+import { createGhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { BOARD_CACHE_FILE, createCachedBoardListing } from '@open-tomato/rafa-board/board/board-cache';
 
 /** The keys a labels-mode row and issue carry. */
 const LABELS_ROW_KEYS = ['number', 'title', 'body', 'state', 'stateReason', 'labels'];

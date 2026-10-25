@@ -10,8 +10,8 @@
  * was blocking loses it from its Blocked by field, and in `labels` mode
  * maybe its `spec:blocked` label and so its Blocked Stage. None of those
  * writes goes through the refreshing `IssueBoard`
- * (`src/board/project/issue-board-refresh.ts`): GitHub closes the issue,
- * and the unblock reading (`src/board/unblock-after-merge.ts`) takes its
+ * (`packages/rafa-board/src/board/project/issue-board-refresh.ts`): GitHub closes the issue,
+ * and the unblock reading (`packages/rafa-board/src/board/unblock-after-merge.ts`) takes its
  * label off through a plain board. So this module refreshes them itself, in one
  * refresh, after that reading has written what it writes.
  *

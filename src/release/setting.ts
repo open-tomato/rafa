@@ -10,7 +10,7 @@
  * (`src/project/scaffold.ts`), and that file is the point: an operator
  * reads it to see what can be set and what the default is. So the
  * setting is written INTO that text, the same rule and for the same
- * reason as `src/board/setup-config.ts`, which writes `roadmap.issue`.
+ * reason as `packages/rafa-board/src/board/setup-config.ts`, which writes `roadmap.issue`.
  *
  * ## Why this is not that module
  *
@@ -39,7 +39,7 @@
  * as the flow mapping `release: {enabled: true}` — is REFUSED with null
  * rather than appended to. `Bun.YAML.parse` answers the LAST of two
  * duplicate keys and says nothing about the first (measured on
- * bun 1.3.14 by `src/board/setup-config.ts`, 2026-09-19), so an
+ * bun 1.3.14 by `packages/rafa-board/src/board/setup-config.ts`, 2026-09-19), so an
  * appended block would read back as the right answer and pass every
  * check while leaving the key in the file twice.
  *

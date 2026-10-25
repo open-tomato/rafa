@@ -29,8 +29,8 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { recordTaskReport } from '@open-tomato/rafa/report/record';
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { createPrivateTriageTracker } from '../triage/triage.js';
 

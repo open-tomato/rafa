@@ -19,7 +19,7 @@
  * SUFFIX naming the epic is asserted, byte for byte, built from
  * {@link epicEndLines} itself rather than duplicated by hand.
  *
- * ## The merge tick (`src/commands/pr/merge-tick.ts`, `src/board/epic-tick.ts`)
+ * ## The merge tick (`src/commands/pr/merge-tick.ts`, `packages/rafa-board/src/board/epic-tick.ts`)
  *
  * A real git repository, merged for real: `merge-driven.test.ts`'s own
  * shape, spawned here instead of dispatched in-process, with a stand-in
@@ -52,8 +52,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { epicTickSentence } from '../board/epic-tick.js';
-import { tickSentence } from '../board/roadmap-tick.js';
+import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
+import { tickSentence } from '@open-tomato/rafa-board/board/roadmap-tick';
+
 import { summaryLine } from '../commands/pr/merge.js';
 import { YES_FLAG } from '../next/ceiling.js';
 import { epicEndLines } from '../next/epic-end.js';

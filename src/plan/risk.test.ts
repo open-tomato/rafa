@@ -13,8 +13,8 @@
  */
 
 import type { RiskFinding, RiskPlan, RiskReport, RiskSeams } from './risk.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

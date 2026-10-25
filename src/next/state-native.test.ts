@@ -17,8 +17,8 @@
  * `unblock`, so a table that ignored the mode answers it in both.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { BlockedLine } from '../board/blocked-line.js';
 import type { GitResult } from '../pr/index.js';
+import type { BlockedLine } from '@open-tomato/rafa-board/board/blocked-line';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

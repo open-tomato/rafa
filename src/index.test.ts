@@ -216,11 +216,11 @@ import {
   WireExportRefusal,
   WireFormatError,
 } from '@open-tomato/rafa/store/wire';
+import { TRUSTED_PERMISSIONS } from '@open-tomato/rafa-board/board/trust';
 import effortCollect from '@open-tomato/rafa-effort/effort/collect';
 import effortReport from '@open-tomato/rafa-effort/effort/report';
 
 import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
-import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 import {
   FINDING_KINDS,
@@ -1057,7 +1057,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
  * exported under, and the spelling of each of its commands, in order.
  */
 const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, commands: readonly string[]])[] = [
-  ['./commands/board/index.js', 'BOARD_FEATURE', [
+  // The board's entry moved with board into its package in pass 4c (#808).
+  ['../packages/rafa-board/src/commands/board/index.js', 'BOARD_FEATURE', [
     'issue list', 'issue show', 'issue create', 'issue comment', 'issue move', 'issue ready', 'issue unblock', 'issue check', 'issue edit',
     'board list', 'board sync',
     'epic show', 'epic new', 'epic defer', 'epic promote', 'epic move', 'epic close', 'epic cancel',

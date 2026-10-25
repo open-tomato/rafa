@@ -36,7 +36,8 @@ import type { NextState } from '../next/state.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+
 import { readFollowUps } from '../commands/pr/merge-followups.js';
 import { actionInvocation } from '../next/actions.js';
 import { hintLine, nextQuestion } from '../next/hint.js';

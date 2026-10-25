@@ -44,8 +44,8 @@
  * checkout and where its home is: tracked, one clone's hop would read
  * as under way in every other, against a position it never wrote. The cache
  * directory holds what rafa read from GitHub and from `ts-symbols` to
- * spare the next command the reading (`src/board/board-cache.ts`,
- * `src/refs/outline-cache.ts`): tracked, every read would be a diff, and
+ * spare the next command the reading (`packages/rafa-board/src/board/board-cache.ts`,
+ * `packages/rafa-board/src/refs/outline-cache.ts`): tracked, every read would be a diff, and
  * a clone would start from another checkout's reading. A block
  * written before one of those lines existed is rewritten with it on the next
  * {@link writeTrackingGitignore}, as any stale block is.

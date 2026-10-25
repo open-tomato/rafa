@@ -10,12 +10,13 @@
  * board read whole, the control that shows the row could have stayed
  * quiet.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { BoardIssue, BoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { describe, expect, it } from 'bun:test';
 
-import { parseBoardListing } from '../board/roadmap-board.js';
+import { parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
+import { NATIVE_MODE } from '@open-tomato/rafa-board/commands/epic/move-native';
 
 import {
   readDoctorRelations,
@@ -23,7 +24,6 @@ import {
   renderDoctorRelations,
   truncationMessage,
 } from './doctor-relations.js';
-import { NATIVE_MODE } from './epic/move-native.js';
 
 /** The board's own repository. */
 const REPOSITORY = 'acme/board';

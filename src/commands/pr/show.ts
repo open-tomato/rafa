@@ -57,7 +57,7 @@
  * request to and closes on merge — the body's keywords and, by its
  * documentation, issues linked by hand from the Development panel. The
  * body's, {@link PrShowReading.bodyCloses}, is what `closedIssuesIn`
- * (`src/board/roadmap.ts`) reads out of the body's own words, the
+ * (`packages/rafa-board/src/board/roadmap.ts`) reads out of the body's own words, the
  * reading `rafa pr merge` and the roadmap walk act on. Each issue is
  * written once, in the provider's order and then the body's, and
  * marked where the two disagree:

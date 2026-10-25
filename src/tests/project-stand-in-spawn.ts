@@ -4,7 +4,7 @@
  * shared so each case reads the same state file and call log.
  *
  * {@link plantStandInGh} writes the program the scratch `bin/gh` execs:
- * {@link answerStandIn} (`src/board/project/sync-stand-in.ts`) answers
+ * {@link answerStandIn} (`packages/rafa-board/src/board/project/sync-stand-in.ts`) answers
  * each call from the state file at `<scratch>/board-state.json` and logs
  * its arguments to `<scratch>/gh-calls.log`. {@link callsLogged} reads that
  * log back, so a case counts what the child sent, not what the fake says
@@ -14,17 +14,17 @@
  * nothing in it until a case calls it.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { StandInState } from '../board/project/sync-stand-in.js';
+import type { StandInState } from '@open-tomato/rafa-board/board/project/sync-stand-in';
 
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SYNC_ITEM_ISSUES } from '../board/project/sync-fake.js';
-import { readStandInState, writeStandInState } from '../board/project/sync-stand-in.js';
+import { SYNC_ITEM_ISSUES } from '@open-tomato/rafa-board/board/project/sync-fake';
+import { readStandInState, writeStandInState } from '@open-tomato/rafa-board/board/project/sync-stand-in';
 
 /** The stand-in's module, which answers each `gh` call. */
-const STAND_IN_MODULE = fileURLToPath(new URL('../board/project/sync-stand-in.ts', import.meta.url));
+const STAND_IN_MODULE = fileURLToPath(new URL('../../packages/rafa-board/src/board/project/sync-stand-in.ts', import.meta.url));
 
 /** The files a case's stand-in keeps under its scratch root. */
 export interface StandInFiles {
@@ -76,13 +76,13 @@ export function callsLogged(files: StandInFiles): readonly (readonly string[])[]
     .map((line) => JSON.parse(line) as string[]);
 }
 
-/** The phase labels a progress line opens with (`src/board/project/progress.ts`). */
+/** The phase labels a progress line opens with (`packages/rafa-board/src/board/project/progress.ts`). */
 const PHASE_LABELS = ['adding issues: ', 'reading facts: ', 'writing fields: '];
 
 /**
  * `stdout` with its progress lines dropped: a spawned run is timed by the
  * system clock, so their elapsed time is not predictable, and they are
- * covered by `src/commands/board/sync.test.ts` already.
+ * covered by `src/tests/board-coupled/commands/board/sync.test.ts` already.
  */
 export function withoutProgressLines(stdout: string): string {
   return stdout

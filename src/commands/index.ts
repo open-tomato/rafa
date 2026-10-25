@@ -58,12 +58,12 @@
  * the references of a spec's saved copy, all nine sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `switch`,
- * which moves the checkout's place through `src/board/place.ts` and
+ * which moves the checkout's place through `packages/rafa-board/src/board/place.ts` and
  * `packages/rafa/src/project/position.ts`, nor `board list`, which lists the open
- * boards off the same listing through `src/board/board-body.ts` and
- * `src/board/owner-resolve.ts`, nor `board sync`, which brings the
+ * boards off the same listing through `packages/rafa-board/src/board/board-body.ts` and
+ * `packages/rafa-board/src/board/owner-resolve.ts`, nor `board sync`, which brings the
  * repository's GitHub project in step through
- * `src/board/project/sync.ts`, nor `self-update`, which installs the
+ * `packages/rafa-board/src/board/project/sync.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `packages/rafa/src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
@@ -107,19 +107,19 @@
  * `src/cleanup/` and removes the ticked ones through its steps, nor
  * `status`, which reads the six sections through `src/status/`, nor
  * `epic show`, which reads one epic's lines into the same rows as
- * `roadmap` through `src/board/roadmap-rows.ts`, nor `epic new`, which
+ * `roadmap` through `packages/rafa-board/src/board/roadmap-rows.ts`, nor `epic new`, which
  * creates an epic's label, issue and board line through
- * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `packages/rafa-board/src/board/issue-board.ts` and `packages/rafa-board/src/board/epic-checklist.ts`, nor
  * `epic defer` and `epic promote`, which move an epic between horizons
- * over `src/board/epic-horizon.ts` through `./epic/horizon-change.ts`,
+ * over `packages/rafa-board/src/board/epic-horizon.ts` through `./epic/horizon-change.ts`,
  * nor `epic move`, which moves an issue between epics through
- * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `packages/rafa-board/src/board/issue-board.ts` and `packages/rafa-board/src/board/epic-checklist.ts`, nor
  * `epic close`, which plans and runs its verification through
- * `src/epic/verify-plan.ts` and `src/epic/verify-run.ts` and closes the
- * epic through `src/board/issue-board.ts`, nor `epic cancel`, which asks
- * about the epic's dependents (`src/board/epic-dependents.ts`), applies
- * each answer through `./epic/move.ts`, `src/board/epic-checklist.ts`
- * and `src/board/issue-board.ts`, and closes the epic through the last,
+ * `packages/rafa-board/src/epic/verify-plan.ts` and `packages/rafa-board/src/epic/verify-run.ts` and closes the
+ * epic through `packages/rafa-board/src/board/issue-board.ts`, nor `epic cancel`, which asks
+ * about the epic's dependents (`packages/rafa-board/src/board/epic-dependents.ts`), applies
+ * each answer through `./epic/move.ts`, `packages/rafa-board/src/board/epic-checklist.ts`
+ * and `packages/rafa-board/src/board/issue-board.ts`, and closes the epic through the last,
  * nor the four `claim` actions, `release`, `hand`, `accept` and `take`,
  * which read an issue's claim branches and push one ownership commit on
  * them through `packages/rafa/src/claims/git.ts` and share `claim/release.ts`'s

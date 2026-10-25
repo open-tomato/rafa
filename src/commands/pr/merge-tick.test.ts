@@ -7,7 +7,7 @@
  * Every case drives a `gh` runner of its own, routing on the argument
  * list and keeping every call, so no case spawns a process or reaches
  * GitHub. The rule the tick applies and the retry it makes are
- * `src/board/roadmap-tick.test.ts`'s; what is measured here is the calls
+ * `packages/rafa-board/src/board/roadmap-tick.test.ts`'s; what is measured here is the calls
  * SENT, because the way this module passes while wrong is by spending a
  * search on a merge that ticks nothing or by failing a merge that is
  * already done.
@@ -19,14 +19,14 @@
  * epic cases read `epicCalls()`, the reads and writes of the epics'
  * bodies, and assert each sentence through `epicTickSentence` itself.
  */
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { EpicTickResult } from '../../board/epic-tick.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { EpicTickResult } from '@open-tomato/rafa-board/board/epic-tick';
 
 import { describe, expect, it } from 'bun:test';
 
-import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND } from '../../board/boards.js';
-import { epicTickProblemLine, epicTickSentence } from '../../board/epic-tick.js';
-import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
+import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND } from '@open-tomato/rafa-board/board/boards';
+import { epicTickProblemLine, epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { noBoardListsLine, tickProblemLine, tickRoadmapAfterMerge } from './merge-tick.js';
 

@@ -15,9 +15,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createPlanRefsVerifier } from '../commands/plan/refs-check.js';
-import { extractRefs } from '../refs/extract.js';
-import { ABSENT, PRESENT } from '../refs/stamp.js';
+import { createPlanRefsVerifier } from '@open-tomato/rafa-board/commands/plan/refs-check';
+import { extractRefs } from '@open-tomato/rafa-board/refs/extract';
+import { ABSENT, PRESENT } from '@open-tomato/rafa-board/refs/stamp';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-refs-readings-')));
 

@@ -8,7 +8,7 @@
  * could never print fails the control rather than passing the case.
  */
 import type { StartPreflightDrift } from './preflight-drift.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type { BoardIssue, BoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,8 +20,7 @@ import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/st
 import { runsDir } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { typeOfLabels } from '../adapters/tracker/github.js';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { countRunRecords, createStartPreflightDrift, isDriftRun, reportStartDrift } from './preflight-drift.js';
 

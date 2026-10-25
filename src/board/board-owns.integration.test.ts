@@ -1,6 +1,6 @@
 /**
  * `owningBoard` over a scratch repository read by `readBoardOwnership`
- * (`src/board/board-owns.ts`): two boards and a real CODEOWNERS file on
+ * (`packages/rafa-board/src/board/board-owns.ts`): two boards and a real CODEOWNERS file on
  * disk, read the way a command reads them, not literal text handed to a
  * pure call.
  *
@@ -17,7 +17,7 @@
  *  - A board with neither an `Owner:` naming a CODEOWNERS line nor an
  *    `Owns:` line owns every path, CODEOWNERS or not.
  */
-import type { OwnedBoard } from './board-owns.js';
+import type { OwnedBoard } from '@open-tomato/rafa-board/board/board-owns';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,8 +25,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { owningBoard, readBoardOwnership } from './board-owns.js';
-import { lastMatchingRule, ownersOf } from './codeowners.js';
+import { owningBoard, readBoardOwnership } from '@open-tomato/rafa-board/board/board-owns';
+import { lastMatchingRule, ownersOf } from '@open-tomato/rafa-board/board/codeowners';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-board-owns-integration-')));
 

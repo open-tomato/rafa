@@ -21,7 +21,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `adapters/logger/active.test.ts` | `src/tests/logger-harness.ts` |
 | `adapters/logger/console.test.ts` | `src/tests/logger-harness.ts` |
 | `adapters/logger/contract.test.ts` | `src/tests/logger-harness.ts` |
-| `bugs/record-composition.test.ts` | `src/bugs/cause-rule.ts`, `src/bugs/filed-values.ts` |
+| `bugs/record-composition.test.ts` | `packages/rafa-board/src/bugs/cause-rule.ts`, `src/bugs/filed-values.ts` |
 | `bugs/record.test.ts` | `src/triage/issue-text.ts`, `src/triage/similarity.ts` |
 | `bugs/stack-path.test.ts` | `src/tests/package-tree.ts` |
 | `commands/plan/plan-files.test.ts` | `src/config-registry.ts`, `src/tests/cli-capture.ts` |
@@ -46,7 +46,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `core/config/config.test.ts` | `src/config-registry.ts` |
 | `core/config/dangerous.test.ts` | `src/config-registry.ts` |
 | `core/config/section.test.ts` | `src/config-registry.ts` |
-| `core/loop/claude.test.ts` | nothing since `src/tests/output-sinks.ts` moved into core (#1349) |
+| `core/loop/claude.test.ts` | nothing since `output-sinks.ts` moved into core as `packages/rafa/src/tests/output-sinks.ts` (#1349) |
 | `core/output/active.test.ts` | `src/adapters/output/json.ts` |
 | `core/output/index.test.ts` | `src/adapters/output/json.ts` |
 | `core/runtime/identity.test.ts` | `package.json`, the root manifest |

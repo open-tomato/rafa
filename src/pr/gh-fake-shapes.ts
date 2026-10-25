@@ -8,7 +8,7 @@
  * pure and none of them knows which commands exist — and `./gh-fake.ts`
  * is the command surface, the repository it holds and the strictness over
  * both. Together they are the `gh pr` half of the discipline
- * `src/adapters/tracker/github-fake.ts` holds for issues.
+ * `packages/rafa-board/src/adapters/tracker/github-fake.ts` holds for issues.
  *
  * ## Recorded
  *
@@ -179,7 +179,7 @@
  * has no such licence: `gh` writes exactly the fields asked for, and so
  * does the fake.
  */
-import type { GhResult } from '../adapters/tracker/github.js';
+import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 /** Who opened a pull request, or wrote a comment, as the fake holds it. */
 export interface FakePrAuthor {

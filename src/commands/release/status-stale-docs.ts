@@ -6,7 +6,7 @@
  * ## What is read
  *
  * The tracker the chain lands on for the project, from `tracker.default`
- * and `tracker.fallback` (`src/adapters/tracker/resolve.ts`), each kind
+ * and `tracker.fallback` (`packages/rafa-board/src/adapters/tracker/resolve.ts`), each kind
  * passed over warned about as the chain always warns. Then the open
  * lines through `readOpenStaleDocLines` (`src/docs/open-lines.ts`):
  * every unticked checklist item of every open `chore` issue carrying the

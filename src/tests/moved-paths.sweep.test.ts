@@ -133,7 +133,7 @@ describe('no tracked file still names a path a move list moved away from', () =>
   });
 
   it('excludes tests, src/tests, fixtures, the changelog, the move lists and the codemod, nothing else', () => {
-    expect(isScannedPath('src/board/gate.test.ts')).toBe(false);
+    expect(isScannedPath('packages/rafa-board/src/board/gate.test.ts')).toBe(false);
     expect(isScannedPath('src/tests/moved-paths.sweep.test.ts')).toBe(false);
     expect(isScannedPath('packages/rafa/src/effort/store/testdata/a.json')).toBe(false);
     expect(isScannedPath('CHANGELOG.md')).toBe(false);
@@ -143,7 +143,7 @@ describe('no tracked file still names a path a move list moved away from', () =>
     expect(isScannedPath('context/source.md')).toBe(true);
     expect(isScannedPath('AGENTS.md')).toBe(true);
     expect(isScannedPath('.claude/skills/rafa-tooling/SKILL.md')).toBe(true);
-    expect(isScannedPath('src/board/gate.ts')).toBe(true);
+    expect(isScannedPath('packages/rafa-board/src/board/gate.ts')).toBe(true);
     expect(isScannedPath('scripts/survey/core-moves.ts')).toBe(true);
     expect(isScannedPath('packages/rafa/src/utils/git.ts')).toBe(true);
   });

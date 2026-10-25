@@ -4,7 +4,7 @@
  * the `gh` calls it sends to find them, and that nothing on the way out
  * rejects.
  *
- * The refresh itself is `src/board/project/refresh.test.ts`'s; here it
+ * The refresh itself is `packages/rafa-board/src/board/project/refresh.test.ts`'s; here it
  * is a stand-in recording the issues each call asked for, and the runner
  * is an in-process `gh` answering the repository and one board listing in
  * either mode, recording each argv, so no case spawns a process or
@@ -27,16 +27,16 @@
  *    failure and refreshes the closed issue alone.
  */
 import type { MergeProjectOptions, MergeProjectRefresh } from './merge-project.js';
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { ProjectRefresh, RefreshConfig } from '../../board/project/refresh.js';
-import type { UnblockOutcome, UnblockReport } from '../../board/unblock.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { ProjectRefresh, RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
+import type { UnblockOutcome, UnblockReport } from '@open-tomato/rafa-board/board/unblock';
 
 import { describe, expect, it } from 'bun:test';
 
-import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
-import { retryLine } from '../../board/project/project-runner.js';
-import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
-import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { retryLine } from '@open-tomato/rafa-board/board/project/project-runner';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '@open-tomato/rafa-board/board/project/retry-fake';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { blockingProblemLine, refreshProblemLine, refreshProjectAfterMerge } from './merge-project.js';
 

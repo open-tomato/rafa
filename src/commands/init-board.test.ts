@@ -10,7 +10,7 @@
  * it was closed. No case spawns a process, reaches GitHub, reads a real
  * repository or touches the home: each root is a directory under this
  * file's own temporary root, holding the bytes `rafa init` writes as its
- * config. What each part of the board comes to is `src/board/setup.ts`'s
+ * config. What each part of the board comes to is `packages/rafa-board/src/board/setup.ts`'s
  * and is held beside it; what is held here is what decides that it runs
  * at all.
  *
@@ -39,8 +39,8 @@
  *  - the `--no-board` answer dropped, so the flag that leaves the board
  *    alone sets it up: the decline case here and `init.test.ts`'s.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,9 +50,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { parseConfigText } from '@open-tomato/rafa/core/config';
+import { EPIC_GUARD_PATH, readEpicGuard } from '@open-tomato/rafa-board/board/epic-guard';
+import { BOARD_LABELS, ROADMAP_LABEL, SPEC_TEMPLATE_PATH } from '@open-tomato/rafa-board/board/setup';
 
-import { EPIC_GUARD_PATH, readEpicGuard } from '../board/epic-guard.js';
-import { BOARD_LABELS, ROADMAP_LABEL, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import {

@@ -4,7 +4,7 @@
  * the gate acts on, what a rejection ends the command with, and what
  * the plan an answer carried is weighed and stamped with.
  *
- * The enforcement itself is `src/board/gate.ts`'s and its own suite
+ * The enforcement itself is `packages/rafa-board/src/board/gate.ts`'s and its own suite
  * drives every verdict; the records are `./plan-record.ts`'s. What is
  * measured here is the wiring between them, which nothing else sees:
  * that a rejection is weighed BEFORE its own message is thrown, that
@@ -15,7 +15,7 @@
  * Every case plants a project root of its own and drives a planter that
  * answers or rejects as the case names, so nothing spawns a session.
  * The gate's own issue is null throughout: a board write is
- * `src/board/gate.test.ts`'s subject, and a route with no issue reaches
+ * `packages/rafa-board/src/board/gate.test.ts`'s subject, and a route with no issue reaches
  * every standing this module has to tell apart.
  *
  * ## What would pass while wrong
@@ -45,11 +45,11 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { SPEC_NOT_READY_EXIT } from '@open-tomato/rafa-board/board/gate';
+import { REVIEW_MISSING_LINE, REVIEW_SKIPPED_LINE } from '@open-tomato/rafa-board/board/review-stamp';
+import { parseSpecReview } from '@open-tomato/rafa-board/board/spec-review';
 
 import { ClaudePlannerError } from '../../adapters/planner/claude.js';
-import { SPEC_NOT_READY_EXIT } from '../../board/gate.js';
-import { REVIEW_MISSING_LINE, REVIEW_SKIPPED_LINE } from '../../board/review-stamp.js';
-import { parseSpecReview } from '../../board/spec-review.js';
 
 import { generateOrExit, rejectedReview, settleReview } from './review-gate.js';
 

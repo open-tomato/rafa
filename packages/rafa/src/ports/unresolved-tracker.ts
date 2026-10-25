@@ -4,7 +4,7 @@
  * `src/start/triage.ts` hands it to `triageReport` for a report whose bugs
  * are all security bugs, which meet no public tracker, and for a tracker
  * chain that landed nowhere, so each public bug fails with the chain's own
- * refusal; `src/commands/epic/close-triage.ts` uses it for the second case.
+ * refusal; `packages/rafa-board/src/commands/epic/close-triage.ts` uses it for the second case.
  * It sits beside the port it implements so that both take it from core.
  */
 

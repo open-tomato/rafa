@@ -13,9 +13,9 @@
  * reports the order it finds rather than a fixed one.
  */
 import type { RiskTotalInput, RiskTotalSeams } from './risk-total.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEvent, Output } from '@open-tomato/rafa/ports';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

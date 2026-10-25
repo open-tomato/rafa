@@ -1,8 +1,8 @@
 /**
- * The blocker locator (`src/board/blocker-epic.ts`) and the one-hop
+ * The blocker locator (`packages/rafa-board/src/board/blocker-epic.ts`) and the one-hop
  * decision (`./hop-chain.ts`) exercised over a real board listing and a
  * real open-pull-request list, both read through a stand-in `gh`
- * (`createGhRunner`, `src/adapters/tracker/github.ts`) rather than a
+ * (`createGhRunner`, `packages/rafa-board/src/adapters/tracker/github.ts`) rather than a
  * literal `BoardView` handed in, the way `hop-chain.test.ts` drives them.
  *
  * The fixture holds two boards: `#10` (home), whose checklist lists epic
@@ -20,10 +20,10 @@
  *    (`#55`) closes it: {@link decideHop} waits, read off a real
  *    `gh pr list --state open` call.
  */
-import type { TakenReadings } from './hop-chain.js';
-import type { BoardView } from '../board/epic-board.js';
-import type { SpecIssueReader } from '../board/issue.js';
 import type { Place } from '@open-tomato/rafa/project/position';
+import type { BoardView } from '@open-tomato/rafa-board/board/epic-board';
+import type { SpecIssueReader } from '@open-tomato/rafa-board/board/issue';
+import type { TakenReadings } from '@open-tomato/rafa-board/next/hop-chain';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,14 +31,14 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { locateBlockerEpic } from '../board/blocker-epic.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { createGhOpenPullRequests, createRoadmapReadings } from '../board/roadmap.js';
+import { createGhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { locateBlockerEpic } from '@open-tomato/rafa-board/board/blocker-epic';
+import { createGhOpenPullRequests, createRoadmapReadings } from '@open-tomato/rafa-board/board/roadmap';
+import { createGhBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
+import { decideHop } from '@open-tomato/rafa-board/next/hop-chain';
+
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
-
-import { decideHop } from './hop-chain.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hop-chain-integration-')));

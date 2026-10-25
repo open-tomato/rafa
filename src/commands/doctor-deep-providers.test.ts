@@ -20,7 +20,7 @@
  * No case reads the real `PATH`, the real home or the real `origin`.
  */
 import type { DeepProvidersReading, DeepProvidersSeams } from './doctor-deep-providers.js';
-import type { GhResult, GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner, GhRunnerOptions } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

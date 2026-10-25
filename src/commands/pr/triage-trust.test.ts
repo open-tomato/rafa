@@ -3,7 +3,7 @@
  * which one it passes over, and the pull request `--resolve` is refused
  * over.
  *
- * `src/board/trust.test.ts` measures the trust reading itself — the
+ * `src/tests/board-coupled/board/trust.test.ts` measures the trust reading itself — the
  * permission lookup, the allow-list and the failed lookup that is a
  * refusal. These cases measure what the triage command DOES with it,
  * over comment lists built here from literals, so every reading is a
@@ -16,8 +16,8 @@
  * failed is the pair each case comes in: the same comment list read
  * once with the author trusted and once with them not.
  */
-import type { PermissionReading, Permissions } from '../../board/trust.js';
 import type { PullRequestComment } from '../../pr/index.js';
+import type { PermissionReading, Permissions } from '@open-tomato/rafa-board/board/trust';
 
 import { describe, expect, it } from 'bun:test';
 

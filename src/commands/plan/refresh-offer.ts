@@ -1,7 +1,7 @@
 /**
  * The question `plan create --issue` and `plan create --next` ask when
  * the issue they were pointed at no longer reads as its saved copy: the
- * {@link RefreshOffer} `src/board/snapshot-settle.ts` takes.
+ * {@link RefreshOffer} `packages/rafa-board/src/board/snapshot-settle.ts` takes.
  *
  * `settleSpecSnapshot` decides WHETHER to ask — only on a changed body,
  * only without `--refresh`, only after every check has run on the body

@@ -66,7 +66,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGhPermissions } from '../../board/trust.js';
+import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
+
 import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
 import { TRIAGE_MARKER } from '../../pr/triage/comment.js';

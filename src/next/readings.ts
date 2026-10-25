@@ -96,7 +96,7 @@
  * unchanged.
  *
  * The seven interfaces the board reads with ({@link NextBoard} and its
- * neighbours) live in board's `src/next/relation-readings.ts` since pass 4c,
+ * neighbours) live in board's `packages/rafa-board/src/next/relation-readings.ts` since pass 4c,
  * and are taken from the board facade and re-exported here by type, so no
  * importer of them changes.
  */

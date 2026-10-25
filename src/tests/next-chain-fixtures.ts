@@ -20,13 +20,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
 import { describeRun, expectExit } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** This module's directory, `src/tests/`, one level under every module a probe imports. */
 const TESTS_DIR = fileURLToPath(new URL('.', import.meta.url));

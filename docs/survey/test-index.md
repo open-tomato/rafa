@@ -11,13 +11,13 @@ Coverage: 2186 of 2186 tracked files read (src/ and packages/*/src/).
 | 1 | `src/cli/help.test.ts` | 124 | 62 | `src/cli/help.test.ts`, `src/tests/cli-capture.ts` | - |
 | 2 | `src/commands/index.test.ts` | 124 | 62 | `src/tests/cli-capture.ts` | - |
 | 3 | `src/commands/module/list.test.ts` | 124 | 62 | `src/tests/cli-capture.ts` | - |
-| 4 | `src/commands/doctor-refs-roadmap.test.ts` | 122 | 61 | `src/commands/doctor-refs-roadmap.test.ts` | - |
-| 5 | `src/commands/doctor-refs.test.ts` | 122 | 61 | `src/commands/doctor-refs.test.ts` | - |
+| 4 | `src/tests/board-coupled/commands/doctor-refs-roadmap.test.ts` | 122 | 61 | `src/tests/board-coupled/commands/doctor-refs-roadmap.test.ts` | - |
+| 5 | `src/tests/board-coupled/commands/doctor-refs.test.ts` | 122 | 61 | `src/tests/board-coupled/commands/doctor-refs.test.ts` | - |
 | 6 | `src/commands/index.roster.sweep.test.ts` | 122 | 61 | `src/commands/index.roster.sweep.test.ts`, `src/tests/cli-capture.ts` | `src/adapters/output` |
-| 7 | `src/commands/issue/ready.test.ts` | 122 | 61 | `src/tests/cli-capture.ts` | `src/adapters/output` |
-| 8 | `src/commands/plan/refs-check.test.ts` | 122 | 61 | `src/commands/plan/refs-check.test.ts` | - |
-| 9 | `src/refs/reading.test.ts` | 122 | 61 | `src/refs/reading.test.ts` | - |
-| 10 | `src/refs/verify.test.ts` | 122 | 61 | `src/refs/verify.test.ts` | - |
+| 7 | `src/tests/board-coupled/commands/issue/ready.test.ts` | 122 | 61 | `src/tests/cli-capture.ts` | `src/adapters/output` |
+| 8 | `src/tests/board-coupled/commands/plan/refs-check.test.ts` | 122 | 61 | `src/tests/board-coupled/commands/plan/refs-check.test.ts` | - |
+| 9 | `src/tests/board-coupled/refs/reading.test.ts` | 122 | 61 | `src/tests/board-coupled/refs/reading.test.ts` | - |
+| 10 | `src/tests/board-coupled/refs/verify.test.ts` | 122 | 61 | `src/tests/board-coupled/refs/verify.test.ts` | - |
 | 11 | `src/release/templates-shape.test.ts` | 122 | 61 | `src/release/templates-shape.test.ts` | - |
 | 12 | `src/tests/config-parity.test.ts` | 122 | 61 | `src/tests/cli-capture.ts` | `src/adapters/output` |
 | 13 | `src/tests/refs-reading-integration.test.ts` | 122 | 61 | `src/tests/refs-reading-integration.test.ts` | - |

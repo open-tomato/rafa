@@ -4,8 +4,8 @@
  * sentence each prints, and the warning a plan that cannot take one
  * gets instead.
  *
- * The stamps themselves are `src/board/plan-field.ts`'s and
- * `src/board/review-stamp.ts`'s, and their own suites drive every shape
+ * The stamps themselves are `packages/rafa-board/src/board/plan-field.ts`'s and
+ * `packages/rafa-board/src/board/review-stamp.ts`'s, and their own suites drive every shape
  * of `rafa:plan` block there is. What is measured here is the half this
  * module owns: that the file is read and written at the path resolved
  * under the project root, that each record answers with the sentence an
@@ -35,10 +35,9 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { SKIP_REVIEW_FLAG } from '../../board/gate.js';
-import { issueFieldLine } from '../../board/plan-field.js';
-import { REVIEW_MISSING_LINE, REVIEW_SKIPPED_LINE } from '../../board/review-stamp.js';
+import { SKIP_REVIEW_FLAG } from '@open-tomato/rafa-board/board/gate';
+import { issueFieldLine } from '@open-tomato/rafa-board/board/plan-field';
+import { REVIEW_MISSING_LINE, REVIEW_SKIPPED_LINE } from '@open-tomato/rafa-board/board/review-stamp';
 
 import { recordMissingReview, recordPlanIssue, recordSkippedReview } from './plan-record.js';
 

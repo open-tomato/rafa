@@ -17,7 +17,7 @@
  * directory that is no repository reads `unread`, which proves the
  * section shows a failed reading rather than rejecting.
  */
-import type { RefVerifier } from '../refs/verify.js';
+import type { RefVerifier } from '@open-tomato/rafa-board/refs/verify';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

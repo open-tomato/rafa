@@ -1,7 +1,7 @@
 /**
  * Spawned `bun src/rafa.ts` runs proving `rafa epics` kept its output
  * when it moved under the `epic` subject as `rafa epic show`
- * (`src/commands/epic/show.ts`), reached through the subject's plural
+ * (`packages/rafa-board/src/commands/epic/show.ts`), reached through the subject's plural
  * and its lasting subject-alone alias `epic`.
  *
  * ## The pre-move capture

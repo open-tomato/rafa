@@ -21,7 +21,7 @@
  * The `native` adapter tells a blocker on this board from one on another,
  * so it is made with the board's `owner/name`, read with the one
  * `gh repo view --json nameWithOwner` `readBoardRepository` sends
- * (`src/board/repository.ts`). A repository `gh` will not name
+ * (`packages/rafa-board/src/board/repository.ts`). A repository `gh` will not name
  * throws, and `rafa next` fails with it before any turn; a hint swallows
  * it as it swallows every reading that failed.
  *

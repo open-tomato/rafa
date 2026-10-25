@@ -74,7 +74,7 @@
  *
  * A repository whose pull request provider resolves to `gh` ends with
  * the board step: one question, and the labels, the spec issue template
- * and the pinned Roadmap issue `src/board/setup.ts` makes. The decision,
+ * and the pinned Roadmap issue `packages/rafa-board/src/board/setup.ts` makes. The decision,
  * the question and the lines are `./init-board.ts`'s; what is decided
  * HERE is that it runs LAST, after the scopes are on disk, followed
  * only by the steps below, each needing a board that ran. The
@@ -109,7 +109,7 @@
  * at the top of the run with `--board`'s. The order it decides in is
  * `./init-board-project.ts`'s. Its three long phases, adding the issues,
  * reading their facts and writing their fields, print their progress as
- * they run (`src/board/project/progress.ts`): a start line with the
+ * they run (`packages/rafa-board/src/board/project/progress.ts`): a start line with the
  * total, `adding issues: 283`, a line at most every
  * `board.project.progressSeconds` with the count and the time so far, an
  * end line with the refused count, and a line for each pause between two

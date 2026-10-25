@@ -33,9 +33,9 @@
  *      with `--changed=` in its command and prints no no-check line.
  */
 import type { StepOutcome, SuiteStepContext } from './suite-step.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

@@ -33,7 +33,7 @@
  * is no claim branch of the issue, or a claim ahead whose line ahead
  * could not be claimed (both or neither: the home claim commit waits on
  * the local branch as with no remote). An answer that carries a claim
- * ahead report (`src/claims/ahead.ts`) prints it next, one line for the
+ * ahead report (`packages/rafa-board/src/claims/ahead.ts`) prints it next, one line for the
  * line ahead claimed and a warning for one not claimed. The warnings a
  * claimed or unclaimed answer carries, a label that could not be
  * written among them, are printed after it.
@@ -41,7 +41,7 @@
  * ## Claim ahead
  *
  * A `--next` spec carries what claim ahead reads (`ResolvedSpec.ahead`,
- * `src/board/spec-source.ts`). With `claims.ahead: allow` or the run's
+ * `packages/rafa-board/src/board/spec-source.ts`). With `claims.ahead: allow` or the run's
  * `--claim-ahead` ({@link ClaimRouteSeams.claimsAhead}, `aheadEnabled`),
  * {@link aheadRequestOf} reads the line after the pick and hands the
  * claim an `ahead` request naming it and the board it was walked on;
@@ -55,7 +55,7 @@
  *
  * A refused `--next` pick is printed as passed, with the reason naming
  * its owner, and the spec is resolved again with every issue refused so
- * far handed in as `passOver` (`src/board/spec-source-roadmap.ts`), which
+ * far handed in as `passOver` (`packages/rafa-board/src/board/spec-source-roadmap.ts`), which
  * reads each as taken by the branch that refused it. So the walk goes on
  * to the next line, and ends as a walk ends: on a line to plan, or
  * stopped with nothing left. An issue refused twice in one run is a

@@ -8,7 +8,7 @@
  * its answer, and printing `waiting on #C (owner review)`, are the
  * callers'. The board listing is not read again here: the caller hands
  * in the boards a turn already read (`ownedBoard` in
- * `src/board/board-owns.ts`) and the CODEOWNERS file, or null.
+ * `packages/rafa-board/src/board/board-owns.ts`) and the CODEOWNERS file, or null.
  *
  * ## The five answers
  *

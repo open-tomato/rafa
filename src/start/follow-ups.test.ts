@@ -18,10 +18,10 @@
  * line it lacks that is.
  */
 import type { FollowUpsConfig, FollowUpsInput, FollowUpsSeams } from './follow-ups.js';
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 import type { BugKind } from '@open-tomato/rafa/report/parse';
 import type { BugRoute, BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
+import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,8 +32,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeBugRoutes } from '@open-tomato/rafa/store/bug-routes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 
 import {
   fileFollowUps,

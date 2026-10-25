@@ -3,9 +3,9 @@
  * the pull-request port sends: one in-memory repository of pull requests
  * behind a {@link GhRunner}, recording every command it is handed.
  *
- * The same discipline `src/adapters/tracker/github-fake.ts` holds for
+ * The same discipline `packages/rafa-board/src/adapters/tracker/github-fake.ts` holds for
  * issues, and behind the same seam: `GhRunner` and `GhResult` are
- * declared once, in `src/adapters/tracker/github.ts`, and `src/pr/gh.ts`
+ * declared once, in `packages/rafa-board/src/adapters/tracker/github.ts`, and `src/pr/gh.ts`
  * takes one as the tracker adapter does. So no case in `src/pr/` spawns
  * a process, reaches GitHub, or reads the configuration `gh` keeps under
  * the home.
@@ -112,7 +112,7 @@ import type {
   FakePullRequestSeed,
   FakeWorkflow,
 } from './gh-fake-shapes.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import {
   CHECK_FIELDS,

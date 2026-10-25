@@ -20,7 +20,7 @@
  * `loop start`'s preflight would refuse is never announced as ready. On
  * any problem it moves the plan, and the PREREQUISITES file when there
  * is one, into `rejected/` beside them (`rejectedPath` in
- * `../../core/plan/plan-files.ts`, shared with `src/board/gate.ts` so neither
+ * `../../core/plan/plan-files.ts`, shared with `packages/rafa-board/src/board/gate.ts` so neither
  * module imports the other), where the next `loop start` does not pick them
  * up and an operator can still read what the session cost, and throws
  * `CommandExit(1)` listing one `storeRuleLine` per problem, the plan

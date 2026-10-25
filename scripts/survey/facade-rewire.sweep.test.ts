@@ -60,19 +60,22 @@ interface RewiredRow {
  * on their paths until the rewire runs. On the graph the fifth decouple
  * item's survey regenerated, with board's back edges into run and pr gone,
  * the codemod reads none of the nineteen on a load cycle and all nineteen to
- * rewire, refusing `scanClaimBranches` of `src/board/roadmap.ts` in
+ * rewire, refusing `scanClaimBranches` of `packages/rafa-board/src/board/roadmap.ts` in
  * `src/next/readings.ts` and `src/next/sources.ts`. The 19 load-cycle files
  * took the facade in pass 4c, since decouple 5 ended the cycles that kept
  * them, once those two took `scanClaimBranches` from
- * `src/board/branch-scan.ts`, so board's row was empty until the seven readings interfaces moved into
- * `src/next/relation-readings.ts`, a board file, and `src/next/readings.ts`
- * re-exports them from its path. The same stage took
+ * `packages/rafa-board/src/board/branch-scan.ts`, so board's row was
+ * empty until the seven readings interfaces moved into
+ * `packages/rafa-board/src/next/relation-readings.ts`, a board file, and
+ * `src/next/readings.ts` re-exported them from its path; it is empty again
+ * since `readings.ts` takes them from the facade by name, before the
+ * move. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
- * `preflight-drift.ts` onto the facade. `src/claims/ahead.ts` and
- * `src/epic/verify-run.ts` left the row in the fourth decouple item, which
+ * `preflight-drift.ts` onto the facade. `packages/rafa-board/src/claims/ahead.ts` and
+ * `packages/rafa-board/src/epic/verify-run.ts` left the row in the fourth decouple item, which
  * places them in board by name, and `src/claims/plan-claim.ts`, which took
  * them by path then, took the facade.
- * Release's one board importer, `src/board/project/facts.ts`, left the row
+ * Release's one board importer, `packages/rafa-board/src/board/project/facts.ts`, left the row
  * in the fourth decouple item: its one release import by path was
  * `directoryPrefix` and `fragmentIdOf`, which it takes from
  * `@open-tomato/rafa/release/fragment` now. `src/docs/release-issue.ts`
@@ -85,25 +88,25 @@ interface RewiredRow {
  * barrel, for core's git names and `WorkingTreeStatus`, which they take from
  * `@open-tomato/rafa/core/git` now. Its 12 back-edge files are release
  * files, every one earlier in the move order.
- * `src/commands/issue/create.ts` left them in the same item: its one pr
+ * `packages/rafa-board/src/commands/issue/create.ts` left them in the same item: its one pr
  * import by path was `TRIAGE_MODULE`, which it takes from
  * `@open-tomato/rafa/triage/filed-text` now. So did
- * `src/commands/issue/create-bug.ts`, whose pr imports by path were
+ * `packages/rafa-board/src/commands/issue/create-bug.ts`, whose pr imports by path were
  * `packages/rafa/src/bugs/fill.ts` and `packages/rafa/src/bugs/versions.ts`,
  * which the item's move list took into core.
- * `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`
- * and `src/commands/epic/close.ts` left them in the fifth decouple item:
+ * `packages/rafa-board/src/board/project/add-filed.ts`, `packages/rafa-board/src/commands/epic/close-triage.ts`
+ * and `packages/rafa-board/src/commands/epic/close.ts` left them in the fifth decouple item:
  * their pr imports by path were `triageReport` and its types, which they
  * reach through core's service registry,
  * `@open-tomato/rafa/core/services`, and its `TriagedBug` and
- * `TriageServiceResult`. `src/commands/epic/close-docs.ts`, the last
+ * `TriageServiceResult`. `packages/rafa-board/src/commands/epic/close-docs.ts`, the last
  * board file among them, left them in the same item: its pr import by
  * path was `addStaleDocLine`, which it reaches through the same registry.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
- * moves last. Board's `src/board/gate.ts`, `src/board/project/rules.ts`,
- * `src/board/roadmap-claims.ts` and `src/board/setup.ts` left them, and
- * `src/board/issue-edit-state.ts` left the back-edge files, in the fourth
+ * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
+ * `packages/rafa-board/src/board/roadmap-claims.ts` and `packages/rafa-board/src/board/setup.ts` left them, and
+ * `packages/rafa-board/src/board/issue-edit-state.ts` left the back-edge files, in the fourth
  * decouple item: their run imports by path were
  * `packages/rafa/src/plan/validate.ts`, `packages/rafa/src/claims/stale.ts`,
  * `packages/rafa/src/claims/git.ts` and
@@ -112,14 +115,14 @@ interface RewiredRow {
  * left the row in the third decouple item: their one run import by path
  * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
  * eight back-edge files are pr files, every one earlier in the move
- * order. `src/board/spec-source.ts` and `src/commands/epic/close.ts`
+ * order. `packages/rafa-board/src/board/spec-source.ts` and `packages/rafa-board/src/commands/epic/close.ts`
  * left them in the fourth decouple item: their one run import by path was
- * `src/claims/ahead.ts` and `src/epic/verify-run.ts`, which it places in
- * board by name. `src/commands/board/list.ts` and `src/commands/epic/new.ts`
+ * `packages/rafa-board/src/claims/ahead.ts` and `packages/rafa-board/src/epic/verify-run.ts`, which it places in
+ * board by name. `packages/rafa-board/src/commands/board/list.ts` and `packages/rafa-board/src/commands/epic/new.ts`
  * left them in the same item: their one run import by path was
  * `defaultBoardOnce` of `src/commands/switch.ts`, which it moves into
- * board's `src/board/default-board-once.ts`. `src/commands/issue/ready.ts`
- * and `src/commands/epic/close-triage.ts` left them in the fifth decouple
+ * board's `packages/rafa-board/src/board/default-board-once.ts`. `packages/rafa-board/src/commands/issue/ready.ts`
+ * and `packages/rafa-board/src/commands/epic/close-triage.ts` left them in the fifth decouple
  * item: their run imports by path were `endWithNextStep` and
  * `readStaleDocsVersion`, which they call through core's service
  * registry.
@@ -140,9 +143,7 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-inventory',
   },
   {
-    allowed: {
-      'src/next/readings.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-board',
   },
   {

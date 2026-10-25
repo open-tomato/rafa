@@ -4,7 +4,7 @@
  * the refresh for, the `gh` calls it sends to find them, and that
  * nothing on the way out rejects.
  *
- * The refresh itself is `src/board/project/refresh.test.ts`'s; here it
+ * The refresh itself is `packages/rafa-board/src/board/project/refresh.test.ts`'s; here it
  * is a stand-in recording the issues each call asked for, and the runner
  * is an in-process `gh` answering the commit query from a map of commit
  * to pull requests, shaped as `gh` 2.100.0 answered it on 2026-10-07
@@ -24,15 +24,15 @@
  *    problem line and asks no refresh.
  */
 import type { SettleProjectOptions, SettleProjectRefresh } from './settle-project.js';
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { ProjectRefresh, RefreshConfig } from '../../board/project/refresh.js';
 import type { SettleDelivered } from '../../release/settle-tag.js';
 import type { SettleBuilt, SettleFragment } from '../../release/settle.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { ProjectRefresh, RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
 
 import { describe, expect, it } from 'bun:test';
 
-import { retryLine } from '../../board/project/project-runner.js';
-import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
+import { retryLine } from '@open-tomato/rafa-board/board/project/project-runner';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '@open-tomato/rafa-board/board/project/retry-fake';
 
 import { COMMIT_BATCH, commitPullsArgs, refreshProjectAfterSettle, releasedCommits, settleProblemLine } from './settle-project.js';
 

@@ -31,7 +31,7 @@
  * ## One command per transition, save the removal
  *
  * The move to in development is ONE `swapLabels`, for the reason
- * `src/board/issue-board.ts` records: two commands can half-apply and
+ * `packages/rafa-board/src/board/issue-board.ts` records: two commands can half-apply and
  * leave the issue with neither label. The removal is two `removeLabel`
  * commands, `rafa:in-development` then `rafa:claimed`, because
  * {@link IssueBoard} has no member that takes two labels off at once,

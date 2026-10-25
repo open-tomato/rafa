@@ -18,10 +18,10 @@
  * before it, so the filter is seen to drop as well as keep.
  */
 import type { StretchItemSeams } from './item.js';
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

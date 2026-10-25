@@ -4,7 +4,7 @@
  * ready`'s own run, put where the refusal used to stand.
  *
  * Check 1 of the readiness gate is a person's decision
- * (`src/board/plan-spec.ts`, `context/pull-requests.md`), and until now
+ * (`packages/rafa-board/src/board/plan-spec.ts`, `context/pull-requests.md`), and until now
  * an operator who had made it still had to make it somewhere else — the
  * run ended with `issue #<n> is not marked spec:ready` and the next move
  * was a second command over the same issue. This module is the seam that
@@ -91,7 +91,7 @@ export interface ReadyOfferSeams {
  * with its own; see the module note.
  */
 const runIssueReadyLazily: ReadyRun = async (options) => {
-  const { runIssueReady: run } = await import('../issue/ready.js');
+  const { runIssueReady: run } = await import('@open-tomato/rafa-board/commands/issue/ready');
   return run(options);
 };
 

@@ -7,7 +7,7 @@
  * listing epic Beta (#200), a member of which is C (#203). H carries
  * `spec:blocked` and a `Blocked by: #203` line naming C, open and taken
  * by nothing, so the walk's one-hop decision is a hop to C's epic
- * (`src/next/hop-chain.ts`).
+ * (`packages/rafa-board/src/next/hop-chain.ts`).
  *
  * `next-roadmap.test.ts` already proves the chain's own wiring —
  * `--roadmap` on the words a loop step runs with, `hops` on the report,
@@ -38,8 +38,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { positionFilePath } from '@open-tomato/rafa/project/position';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

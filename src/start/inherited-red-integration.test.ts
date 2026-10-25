@@ -37,7 +37,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { localIssuesDir } from '../adapters/tracker/local.js';
+import { localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

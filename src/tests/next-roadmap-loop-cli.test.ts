@@ -52,17 +52,17 @@ import { planStub } from '@open-tomato/rafa/board/naming';
 import { parseSessionRecord, runsDir } from '@open-tomato/rafa/core/loop';
 import { hopFilePath, readHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, eventsOf, type CapturedRun, type ScratchRepo } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { SRC_DIR } from './next-chain-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-roadmap-loop-cli-')));
@@ -221,7 +221,7 @@ function buildProbe(prlistFile: string): string {
     `import { createSwitchCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'switch.ts'))};`,
     `import planCreateDeclared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
     `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-    `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+    `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
     `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
     `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
     `import { openRunSession } from ${JSON.stringify(join(SRC_DIR, 'start', 'session.ts'))};`,

@@ -20,9 +20,9 @@
  *    no position file, where the default board's listing must be sent;
  *    the log shows which of the two was asked.
  */
-import type { GhResult } from '../adapters/tracker/github.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
 import type { PullRequestReview } from '../pr/types.js';
+import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,8 +31,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
-
-import { parseBoardListing } from '../board/roadmap-board.js';
+import { parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { gateBoards, nextOwnerGate } from './owner-gate.js';
 

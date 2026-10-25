@@ -22,9 +22,9 @@
  * `gitIdentityEnv`, whose variables win over the repo's own config.
  */
 import type { ClosedIssuesRefreshOptions, RunnerPrInput, RunnerPrSeams, WorkingTreeReading } from './runner-pr.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { ProjectRefresh } from '../board/project/refresh.js';
 import type { PullRequestDraft, PullRequestSummary, PushOutcome } from '../pr/index.js';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { ProjectRefresh } from '@open-tomato/rafa-board/board/project/refresh';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

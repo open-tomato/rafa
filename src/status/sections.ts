@@ -8,7 +8,7 @@
  * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
  * | `loops` | `readSessions` (`packages/rafa/src/core/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`packages/rafa/src/core/loop/session-readings.ts`), `blockedTasks` (`src/loop/blocked-tasks.ts`) | `.rafa/runs/`, the trackers |
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
- * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
+ * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`packages/rafa-board/src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
  * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests, and for the open ones when an unmerged branch is on `origin` alone |
  *
@@ -52,7 +52,7 @@
  *
  * - **Each `gh` command** goes through a runner opened with the time
  *   still left as its `timeoutMs` (`createGhRunner`,
- *   `src/adapters/tracker/github.ts`), so a command still running at the
+ *   `packages/rafa-board/src/adapters/tracker/github.ts`), so a command still running at the
  *   deadline is killed rather than left holding the process open. Past
  *   the deadline a command is not spawned at all: it answers `ok: false`
  *   saying so. A section's commands run one after another, so a runner
@@ -84,7 +84,7 @@
  * `type:roadmap`. A project with neither gets no `place` key at all, so
  * its text and its JSON are what they were before boards.
  *
- * The board listing (`createGhBoardListing`, `src/board/roadmap-board.ts`)
+ * The board listing (`createGhBoardListing`, `packages/rafa-board/src/board/roadmap-board.ts`)
  * is read once per `rafa status`: the same memoised read is handed to
  * `ghNextBoard` as its `listing`, so a walk that meets an epic line
  * spends no second one. The place is `resolvePlace` over that listing,

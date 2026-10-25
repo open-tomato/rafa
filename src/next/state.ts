@@ -76,7 +76,7 @@
  *    refuses with "GitHub may still be computing the merge"
  *    (`src/pr/merge.ts`) — which is a wait.
  *  - Row 10 also requires the line NOT to be blocked. `spec:ready` and
- *    `spec:blocked` are independent facts (`src/board/blocked.ts`), so
+ *    `spec:blocked` are independent facts (`packages/rafa-board/src/board/blocked.ts`), so
  *    an issue can carry both; without the conjunct the first-match rule
  *    would answer `plan` for an issue whose work waits on another, and
  *    row 11 would never be reached for it.

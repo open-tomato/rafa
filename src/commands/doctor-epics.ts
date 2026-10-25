@@ -11,7 +11,7 @@
  * An issue belongs to exactly one epic, and a mistyped slug drops a
  * member from its epic without a trace, so the epic reads done early
  * (`.rafa/specs/rafa-244-epics-group-issues-features.md`). Both faults
- * are found by `readEpicProblems` (`src/board/epic-problems.ts`), the
+ * are found by `readEpicProblems` (`packages/rafa-board/src/board/epic-problems.ts`), the
  * only reader of them, and each is printed as that module's
  * `epicProblemMessage` spells it: this module never respells a fault. It
  * keeps the two kinds the spec gives `doctor`, `several-epic-labels` and
@@ -21,7 +21,7 @@
  * ## One command
  *
  * The labels are read from the one board listing the roadmap and epic
- * views read (`src/board/roadmap-board.ts`):
+ * views read (`packages/rafa-board/src/board/roadmap-board.ts`):
  *
  * ```
  * gh issue list --state all --limit 1000 --json number,title,body,state,stateReason,labels

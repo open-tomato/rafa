@@ -15,7 +15,7 @@
  *
  * Every `gh` this module runs is spawned with {@link DeepProvidersSeams.env}
  * as its WHOLE environment, and found on that environment's `PATH`
- * (`createGhRunner`'s `env` option, `src/adapters/tracker/github.ts`).
+ * (`createGhRunner`'s `env` option, `packages/rafa-board/src/adapters/tracker/github.ts`).
  * `--deep` hands it the environment a loop session would run with
  * (`./doctor-deep-env.ts`), which is the point of the section: a `gh`
  * that is found and logged in from the shell can still be missing from
@@ -27,7 +27,7 @@
  *
  *   1. **The tracker chain**: `tracker.default` then `tracker.fallback`,
  *      a kind named twice listed once, as `resolveTracker` tries them
- *      (`src/adapters/tracker/resolve.ts`). Of the core kinds `github`
+ *      (`packages/rafa-board/src/adapters/tracker/resolve.ts`). Of the core kinds `github`
  *      alone goes through `gh` ({@link GH_TRACKER_KINDS}); an add-on
  *      kind is listed and not probed, since what it needs is its own.
  *   2. **The pull request provider**: `resolvePrProvider`
@@ -44,7 +44,7 @@
  *        - the active login for that host, read off
  *          `gh auth status --active --hostname <host> --json hosts`,
  *          and its permission on the repository through
- *          `createGhPermissions` (`src/board/trust.ts`), judged by
+ *          `createGhPermissions` (`packages/rafa-board/src/board/trust.ts`), judged by
  *          `readAuthorTrust` with an empty allow-list so the rule for
  *          which permissions are write access is spelled once.
  *

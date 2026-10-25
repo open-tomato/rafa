@@ -64,12 +64,12 @@
  * the same report without `checkout` beside it as its control.
  */
 import type { TriageOptions, TriageResult } from './triage.js';
-import type { RefVerifier } from '../refs/verify.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
+import type { RefVerifier } from '@open-tomato/rafa-board/refs/verify';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -95,8 +95,7 @@ import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker
 import { bugKeyOf, legacyBugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
-
-import { createLocalTracker, localIssuesDir, parseLocalIssue } from '../adapters/tracker/local.js';
+import { createLocalTracker, localIssuesDir, parseLocalIssue } from '@open-tomato/rafa-board/adapters/tracker/local';
 
 import { DEFAULT_BUG_RULES } from './bug-filing.js';
 import { ISSUE_OPENING, supersedesSection } from './issue-text.js';

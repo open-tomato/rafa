@@ -112,9 +112,9 @@
  *    so none of them notices row 9 firing where row 13 should.
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
-import type { BlockedLine } from '../board/blocked-line.js';
 import type { ChecksVerdict, GitResult, Mergeability, PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { BlockedLine } from '@open-tomato/rafa-board/board/blocked-line';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

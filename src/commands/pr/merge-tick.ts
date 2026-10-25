@@ -4,7 +4,7 @@
  * and the one tick per board that writes their lines — and, before the
  * boards, the tick of each closed issue's line on its epic's checklist.
  *
- * The rule and the writes are `src/board/roadmap-tick.ts`'s; this
+ * The rule and the writes are `packages/rafa-board/src/board/roadmap-tick.ts`'s; this
  * module is the half that decides whether there is anything to tick at
  * all, and on which boards, and turns everything that can go wrong on
  * the way into a warning.
@@ -19,7 +19,7 @@
  * answered, lists one of the closed issues — ticked already or not, so
  * a line somebody ticked by hand is still reported as ticked already.
  * The boards are found by ONE `gh issue list --label type:roadmap`
- * (`createGhBoardLister`, `src/board/boards.ts`), and a board whose
+ * (`createGhBoardLister`, `packages/rafa-board/src/board/boards.ts`), and a board whose
  * checklist lists none of them is neither read nor written.
  *
  * `roadmap.issue` is the project's word for its default board and is not
@@ -74,14 +74,14 @@
  * nor an epic the boards. Its one board listing is sent only for a pull
  * request that closes an issue.
  *
- * The epic tick itself is the library half, `src/board/epic-tick.ts`:
+ * The epic tick itself is the library half, `packages/rafa-board/src/board/epic-tick.ts`:
  * `tickEpics`, which epics it finds and what it warns about, its result
  * type `EpicTickResult`, and its two sentences, `epicTickSentence` and
  * `epicTickProblemLine`. This file is the command half: it calls
  * `tickEpics` with {@link MergeTickOptions.epicTicked}, which is handed
  * each epic's result as it lands, and `pr merge` prints
  * `epicTickSentence` for it. The `labels` relationships adapter
- * (`src/board/relations/labels.ts`) reaches the same tick through the
+ * (`packages/rafa-board/src/board/relations/labels.ts`) reaches the same tick through the
  * library half, without this file. The boards are not a relationship
  * and stay here alone.
  *

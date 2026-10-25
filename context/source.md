@@ -34,7 +34,7 @@ spells out, and the shapes the lint config forces.
   name order, "every sibling before every parent", nor path depth first,
   as this bullet read until 2026-09-24. `src/plan/risk.ts` puts its two
   `./risk/` lines first and its `../core/` and `../utils/` lines after,
-  while `src/board/project/rules.ts` puts `./options.js` last, after its
+  while `packages/rafa-board/src/board/project/rules.ts` puts `./options.js` last, after its
   `../` lines. Both pass eslint. Take the order from
   `bunx eslint --fix-dry-run --format json <file>`, not from this page.
   Value imports differ: the `parent` group (`../`) comes before the
@@ -389,10 +389,10 @@ functions of `section.ts`. The two registered readers are
 core barrel re-exports: a feature file that needs the whole default record or
 the whole spec record takes it from there, typed as `CONFIG_DEFAULTS` and
 `SETTINGS` are, and so imports no root file. The callers at this commit are
-`src/start/preflight.ts`, `src/start/pr-lifecycle.ts`, `src/board/roadmap.ts`,
+`src/start/preflight.ts`, `src/start/pr-lifecycle.ts`, `packages/rafa-board/src/board/roadmap.ts`,
 `packages/rafa-effort/src/effort/collect.ts` and
 `packages/rafa-inventory/src/inventory/index.ts` for the defaults, and
-`src/refs/extract.ts` and `src/refs/verify.ts` for the settings. Each refuses
+`packages/rafa-board/src/refs/extract.ts` and `packages/rafa-board/src/refs/verify.ts` for the settings. Each refuses
 with a `ConfigSectionError` naming `src/config-registry.ts` while no section is
 registered, so a constant built as a module loads, before an entry registers,
 reads the section file that defines its value instead. A registration that
@@ -554,7 +554,7 @@ as the Packages section below lists.
 hold the root files that reach each feature package, each sorted by UTF-16 code
 unit. At the base `BOARD_NAMED`, `PR_NAMED` and `RUN_NAMED` held 20, 15 and 20
 files. Since rafa-1333 (the fourth decouple item) `BOARD_NAMED` holds 22, having
-taken `src/claims/ahead.ts` and `src/epic/verify-run.ts` by pass 1's rule
+taken `packages/rafa-board/src/claims/ahead.ts` and `packages/rafa-board/src/epic/verify-run.ts` by pass 1's rule
 (verify-run from `RUN_NAMED`); `PR_NAMED` holds 13, with
 `packages/rafa/src/bugs/fill.ts` and `packages/rafa/src/bugs/versions.ts` gone
 for core; and `RUN_NAMED` holds 18, with `packages/rafa/src/plan/validate.ts`
@@ -779,9 +779,9 @@ names come from, and the facade entry is no node.
     gone, the dry run reads none of the nineteen on a load cycle and all
     nineteen to rewire, and refuses two statements, `src/next/readings.ts:119`
     and `src/next/sources.ts:277`, which take `scanClaimBranches` from
-    `src/board/roadmap.ts` while the facade lists it under another file; the
+    `packages/rafa-board/src/board/roadmap.ts` while the facade lists it under another file; the
     guard checks the path, not the group, so its row is unchanged.
-    `src/claims/ahead.ts` and `src/epic/verify-run.ts` left them in the fourth
+    `packages/rafa-board/src/claims/ahead.ts` and `packages/rafa-board/src/epic/verify-run.ts` left them in the fourth
     decouple item (rafa-1333), which places both in board by name, and
     `src/claims/plan-claim.ts`, which took them by path, took the facade. The
     second decouple item took the importers it freed onto the facades:
@@ -790,7 +790,7 @@ names come from, and the facade entry is no node.
     `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an
     effort file, sat among them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
-    Release has one: `src/docs/release-issue.ts`. `src/board/project/facts.ts`
+    Release has one: `src/docs/release-issue.ts`. `packages/rafa-board/src/board/project/facts.ts`
     left the group in the fourth decouple item: its one release import by path,
     of `directoryPrefix` and `fragmentIdOf`, now comes from core's
     `@open-tomato/rafa/release/fragment`. Pr has thirteen:
@@ -807,7 +807,7 @@ names come from, and the facade entry is no node.
     edges the decouple step before pass 4 cuts, and they sit in this group
     because the load-cycle group comes first. Run has nine:
     `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/next/epic-end.ts`,
-    `src/next/owner-gate.ts`, `src/next/relation-readings.ts`,
+    `src/next/owner-gate.ts`, `packages/rafa-board/src/next/relation-readings.ts`,
     `src/next/settle-step.ts`, `src/next/sources.ts`, `src/triage/base-run.ts`
     and `src/triage/inherited.ts`. All nine are files of packages earlier in
     `MOVE_ORDER` of `scripts/survey/coupling.ts`, by the cut table's unit, and
@@ -824,14 +824,14 @@ names come from, and the facade entry is no node.
     `packages/rafa-effort/src/effort/skill-facts.ts`, import it forward and take
     it by name since the second decouple item's rewire. Board has none: no
     effort file imports it. Release has none in the codemod's grouping, since
-    `src/board/project/facts.ts`, its one board importer, now takes
+    `packages/rafa-board/src/board/project/facts.ts`, its one board importer, now takes
     `directoryPrefix` and `fragmentIdOf` from core. Pr has twelve: the ten
     `src/commands/release/` files, `src/release/prepare.ts` and
-    `src/release/verify.ts`; `src/commands/issue/create.ts` and
+    `src/release/verify.ts`; `packages/rafa-board/src/commands/issue/create.ts` and
     `create-bug.ts` left it in the same item, when their pr imports moved
     into core;
-    `src/board/project/add-filed.ts`, `src/commands/epic/close-triage.ts`,
-    `src/commands/epic/close.ts` and `src/commands/epic/close-docs.ts` left it
+    `packages/rafa-board/src/board/project/add-filed.ts`, `packages/rafa-board/src/commands/epic/close-triage.ts`,
+    `packages/rafa-board/src/commands/epic/close.ts` and `packages/rafa-board/src/commands/epic/close-docs.ts` left it
     in the fifth decouple item: the first three type what they read on core's
     declarations, and `close-triage.ts` and `close-docs.ts` reach `triageReport`
     and `addStaleDocLine` through core's service registry;
@@ -839,11 +839,11 @@ names come from, and the facade entry is no node.
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
     the decouple step before pass 4 cuts them.
-    Run has eight: no board file (`src/commands/board/list.ts` and
-    `src/commands/epic/new.ts` left them in the fourth decouple item,
-    which moved `defaultBoardOnce` into `src/board/default-board-once.ts`,
-    and `src/commands/issue/ready.ts` and
-    `src/commands/epic/close-triage.ts` in the fifth decouple item, each
+    Run has eight: no board file (`packages/rafa-board/src/commands/board/list.ts` and
+    `packages/rafa-board/src/commands/epic/new.ts` left them in the fourth decouple item,
+    which moved `defaultBoardOnce` into `packages/rafa-board/src/board/default-board-once.ts`,
+    and `packages/rafa-board/src/commands/issue/ready.ts` and
+    `packages/rafa-board/src/commands/epic/close-triage.ts` in the fifth decouple item, each
     calling one run function through core's service registry (`ready.ts`
     calls `endWithNextStep`, `close-triage.ts` calls `readStaleDocsVersion`),
     and the eight `src/commands/pr/` files
@@ -883,14 +883,14 @@ names come from, and the facade entry is no node.
   The codemod matches a binding by name and file against the facade, so a
   statement is refused whichever side names the other file. A binding taken
   through a re-exporting module of the package, such as
-  `packages/rafa-inventory/src/learning/index.ts`, `src/board/setup.ts` or
-  `src/board/gate.ts`, is refused by the codemod and is pointed at its origin
+  `packages/rafa-inventory/src/learning/index.ts`, `packages/rafa-board/src/board/setup.ts` or
+  `packages/rafa-board/src/board/gate.ts`, is refused by the codemod and is pointed at its origin
   file by hand before the run: pass 3a did that three times, inventory's rewire
   six, and board's eight; release's rewire refused no statement. The second
   decouple item's rewires pointed four refused bindings on three statements by
   hand before the run: two statements through the library's `index.ts` (now
   `packages/rafa-inventory/src/learning/index.ts`) and one through
-  `src/board/roadmap.ts`. Pr's rewire refused 21 bindings on 20 statements that
+  `packages/rafa-board/src/board/roadmap.ts`. Pr's rewire refused 21 bindings on 20 statements that
   took `PullRequests`, `resolvePrProvider`, `ResolvePrProviderOptions`,
   `PrProviderReading`, `ghPreflightItems`, `ghHostOf` and `ChecksVerdict` from
   their defining files while the facade lists them under `src/pr/index.ts`, and
@@ -1151,7 +1151,7 @@ names come from, and the facade entry is no node.
   stamp). A sixth, `unknown`, is a cross-repository target the
   provider cannot read; it is listed and never refuses. Nothing spawns a process: `gh`, `git` and
   `ts-symbols` arrive through seams (`GhRunner` from
-  `src/adapters/tracker/github.ts`, `GitRunner`, a symbol lookup),
+  `packages/rafa-board/src/adapters/tracker/github.ts`, `GitRunner`, a symbol lookup),
   so unit cases drive fakes and planted repositories under `tmpdir`
   only. Sha256 uses `node:crypto` or `Bun.CryptoHasher`.
   `check-command.ts` spells `rafa issue check <n>`, the fix a report
@@ -1259,7 +1259,7 @@ the sweep passes at this commit.
 rafa-903.** That cycle spanned five clusters (c1: board, pr, triage; c6:
 plan gate and `rafa next`; c2: CLI and commands; c3: task run; c4:
 inventory), held by one dynamic import (`import('../index.js')` in
-`src/commands/plan/refs-check.ts` for `coreRoster`) and three small
+`packages/rafa-board/src/commands/plan/refs-check.ts` for `coreRoster`) and three small
 symbols: `firstNowEpic` (board/place.ts importing from commands/epic/show.ts),
 `issueCheckCommand` (board/roadmap-rows.ts from commands/doctor-refs.ts),
 and `BOARD_REFUSAL_EXIT` (board/refs-gate.ts from board/plan-spec.ts

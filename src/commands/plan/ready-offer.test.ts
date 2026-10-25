@@ -34,7 +34,7 @@
  * ## What passes while wrong
  *
  * Three mutations were driven on 2026-09-21, one at a time, over
- * `env -u CLAUDECODE bun test src/board/plan-spec.test.ts
+ * `env -u CLAUDECODE bun test packages/rafa-board/src/board/plan-spec.test.ts
  * ./ready-offer.test.ts`, the module restored from a scratch copy and
  * verified with `shasum -c` each time, against 38 pass and 0 fail
  * either side:
@@ -52,21 +52,20 @@
  *    run, since the planted runner answers no `issue view`. That is the
  *    reading which holds the no-second-read claim.
  */
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { SpecIssue } from '../../board/issue.js';
-import type { BoardTrust } from '../../board/trust.js';
-import type { ReadyOptions, ReadyReport } from '../issue/ready.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { BoardTrust } from '@open-tomato/rafa-board/board/trust';
+import type { ReadyOptions, ReadyReport } from '@open-tomato/rafa-board/commands/issue/ready';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
-import { SPEC_LABEL } from '../../board/issue.js';
-import { SPEC_READY_LABEL } from '../../board/readiness.js';
-import { completeSpecBody } from '../../tests/spec-bodies.js';
+import { SPEC_NEEDS_WORK_LABEL } from '@open-tomato/rafa-board/board/gate';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
 import { createPlanReadyOffer, offerHeadLine } from './ready-offer.js';
 

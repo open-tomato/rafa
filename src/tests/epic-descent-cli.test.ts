@@ -4,9 +4,9 @@
  * scratch `bin/` and a real git repository with a bare `origin` beside
  * it (`.rafa/specs/rafa-244-epics-group-issues-features.md`).
  *
- * `src/board/epic-walk.test.ts` drives the descent itself over planted
+ * `packages/rafa-board/src/board/epic-walk.test.ts` drives the descent itself over planted
  * fakes, `src/next/sources.test.ts` drives `ghNextBoard`'s wiring of it
- * the same way, and `src/board/spec-source-roadmap.test.ts` drives
+ * the same way, and `packages/rafa-board/src/board/spec-source-roadmap.test.ts` drives
  * `pickRoadmapIssue`'s. None of the three runs the real, registered
  * `rafa next` or `rafa plan create` command over a real `gh` on the
  * `PATH`, so none of them can see the two commands agree, or that a
@@ -29,8 +29,8 @@
  * rather than silently passing.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { SpecIssue } from '../board/issue.js';
-import type { RoadmapLine } from '../board/roadmap.js';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { RoadmapLine } from '@open-tomato/rafa-board/board/roadmap';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -40,18 +40,18 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plural } from '@open-tomato/rafa/core/plan';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { parseRoadmapBody } from '@open-tomato/rafa-board/board/roadmap';
+import { describeIssue, dryRunLine } from '@open-tomato/rafa-board/board/spec-source';
+import { pickLine, roadmapHeaderLine } from '@open-tomato/rafa-board/board/spec-source-roadmap';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { parseRoadmapBody } from '../board/roadmap.js';
-import { pickLine, roadmapHeaderLine } from '../board/spec-source-roadmap.js';
-import { describeIssue, dryRunLine } from '../board/spec-source.js';
 import { DRY_RUN_FLAG as NEXT_DRY_RUN_FLAG } from '../next/lines.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-descent-cli-')));

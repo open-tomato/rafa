@@ -56,12 +56,13 @@
  *     `tsc -p tsconfig.config-types.json` follow them and write the
  *     declarations of the `./config` subpath, the one entry whose types
  *     the manifest publishes; see "The config subpath's declarations".
- *   - `src/PROMPT.md`, `src/plan-prompt.md` and `src/epic-verify-prompt.md`
- *     are copied into `dist/`. `start.ts` and `plan.ts` find the first two
- *     beside themselves through `import.meta.url`, and a bundle inlining
- *     either module answers its OWN directory. The two built files reading
- *     `import.meta.url` are `cli.js` and `index.js`, both directly in
- *     `dist/`. `epic/verify-plan.ts` sits one directory below its prompt
+ *   - `src/PROMPT.md`, `src/plan-prompt.md` and
+ *     `packages/rafa-board/src/epic-verify-prompt.md` (moved with board's
+ *     files in pass 4c) are copied into `dist/`. `start.ts` and `plan.ts`
+ *     find the first two beside themselves through `import.meta.url`, and
+ *     a bundle inlining either module answers its OWN directory. The two
+ *     built files reading `import.meta.url` are `cli.js` and `index.js`,
+ *     both directly in `dist/`. `epic/verify-plan.ts` sits one directory below its prompt
  *     in a checkout, so it looks beside itself first and in its parent
  *     second, and a case resolves the prompt through `readVerifyPrompt`
  *     pointed at `dist/`. Dropping it from the `cp` was driven on
@@ -132,7 +133,9 @@
  * The two templates above are named files; the pinned resolve plans,
  * the board templates and the release workflow templates are
  * DIRECTORIES, so the build script ends with a loop over a table of
- * `<source under src>:<name under dist>` pairs. Three readings shape it:
+ * `<source>:<name under dist>` pairs, each source a path from the package
+ * root since pass 4c moved the board tree to
+ * `packages/rafa-board/src/board/templates/`. Three readings shape it:
  *
  *   - It copies `*.md` and `*.yml` and nothing else. `src/pr/plans/`
  *     holds `load.ts` and `load.test.ts` beside the four plans, and
@@ -140,9 +143,10 @@
  *     publishes all of `dist`. A case reads `dist/plans` for a `.ts`
  *     file and names the two source modules that would land there.
  *     The `*.yml` copy is for the epic guard workflow
- *     `src/board/templates/epic-guard.yml` and the release ladder's
- *     `src/release/templates/*.yml`, and a case resolves each through
- *     `readEpicGuard` and `readReleaseTemplate` pointed at `dist/`.
+ *     `packages/rafa-board/src/board/templates/epic-guard.yml` and the
+ *     release ladder's `src/release/templates/*.yml`, and a case resolves
+ *     each through `readEpicGuard` and `readReleaseTemplate` pointed at
+ *     `dist/`.
  *     Each pattern is copied file by file behind an `[ -e ]` guard, so
  *     a tree holding no YAML (`src/pr/plans/`) or no markdown
  *     (`src/release/templates/`) is not a failure.
@@ -158,14 +162,15 @@
  *     bytes.
  *   - A tree that is not there is SKIPPED, and a tree that is there
  *     with neither markdown nor YAML in it fails the build: the loop
- *     counts what it copied and exits 1 on none. `src/board/templates/`
- *     now carries `spec.md`, the spec issue template, and carried no
- *     tracked file when the clause was written: `cp
- *     src/board/templates/*.md` against an absent directory would have
- *     stopped the build, and the guard is what the next empty tree
- *     needs too. Measured
- *     on bun 1.3.14, in a probe package carrying this clause alone:
- *     with the directory absent, the `[ -d ]` guard skipped it and the
+ *     counts what it copied and exits 1 on none. The board tree
+ *     (`src/board/templates/` then, and
+ *     `packages/rafa-board/src/board/templates/` since pass 4c) now
+ *     carries `spec.md`, the spec issue template, and carried no tracked
+ *     file when the clause was written: `cp src/board/templates/*.md`
+ *     against an absent directory would have stopped the build, and the
+ *     guard is what the next empty tree needs too. Measured on bun
+ *     1.3.14, in a probe package carrying this clause alone: with the
+ *     directory absent, the `[ -d ]` guard skipped it and the
  *     run exited 0; with it present and holding no markdown, the `cp`
  *     matched nothing and the run exited 1. So the skip cannot hide a
  *     tree that is there and ships nothing. When the release tree
@@ -178,9 +183,9 @@
  *
  * That last reading is why the board tree's case reads a PLANTED file:
  * `beforeAll` writes {@link PLANTED_BOARD_TEMPLATE} into the scratch
- * package's `src/board/templates/` before the build runs, and it was
- * how the clause was read on a tree with a file in it while this
- * repository carried none. It is kept now that `spec.md` is tracked,
+ * package's `packages/rafa-board/src/board/templates/` before the build
+ * runs, and it was how the clause was read on a tree with a file in it
+ * while this repository carried none. It is kept now that `spec.md` is tracked,
  * since it is the one file in either tree whose presence the case
  * itself guarantees: both tree cases list whatever markdown the scratch
  * package's source tree holds — the real template included — and hold
@@ -488,11 +493,11 @@ import ts from 'typescript';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import * as portsSource from '@open-tomato/rafa/ports';
 import * as storeSource from '@open-tomato/rafa/store';
+import { EPIC_GUARD_FILE, readEpicGuard } from '@open-tomato/rafa-board/board/epic-guard';
+import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '@open-tomato/rafa-board/epic/verify-plan';
 import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
 
-import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
 import * as configSource from '../config/index.js';
-import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
 import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
@@ -764,7 +769,7 @@ const ROOT_SEAM_NAMES = [
 const TEMPLATES: [string, string][] = [
   ['src/PROMPT.md', 'PROMPT.md'],
   ['src/plan-prompt.md', 'plan-prompt.md'],
-  ['src/epic-verify-prompt.md', 'epic-verify-prompt.md'],
+  ['packages/rafa-board/src/epic-verify-prompt.md', 'epic-verify-prompt.md'],
   ['src/continue-decision-prompt.md', 'continue-decision-prompt.md'],
   ['src/continue-criteria.md', 'continue-criteria.md'],
 ];
@@ -776,7 +781,7 @@ const TEMPLATES: [string, string][] = [
  */
 const ASSET_TREES: [string, string][] = [
   ['src/pr/plans', 'plans'],
-  ['src/board/templates', 'templates'],
+  ['packages/rafa-board/src/board/templates', 'templates'],
   ['src/release/templates', RELEASE_TEMPLATES_DIRNAME],
 ];
 
@@ -854,7 +859,7 @@ beforeAll(() => {
   linkFacades(PACKAGE_DIR);
   linkDefineConfig(PACKAGE_DIR);
   linkTypeScript(PACKAGE_DIR);
-  const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
+  const boardTemplates = join(PACKAGE_DIR, 'packages', 'rafa-board', 'src', 'board', 'templates');
   mkdirSync(boardTemplates, { recursive: true });
   writeFileSync(join(boardTemplates, PLANTED_BOARD_TEMPLATE), PLANTED_BOARD_BODY, 'utf8');
   writeFileSync(STALE_CHUNK, 'export const stale = true;\n', 'utf8');
@@ -1709,7 +1714,7 @@ describe('the prompt templates in the build', () => {
   });
 
   it('lands the epic verification prompt where readVerifyPrompt looks for it from a bundle in dist', () => {
-    const source = readFileSync(join(PACKAGE_DIR, 'src', VERIFY_PROMPT_FILE), 'utf8');
+    const source = readFileSync(join(PACKAGE_DIR, 'packages', 'rafa-board', 'src', VERIFY_PROMPT_FILE), 'utf8');
 
     expect(readVerifyPrompt(DIST)).toBe(source);
   });
@@ -1935,7 +1940,7 @@ describe('the asset trees in the build', () => {
   });
 
   it('lands the epic guard workflow where readEpicGuard looks for it from a bundle in dist', () => {
-    const source = readFileSync(join(PACKAGE_DIR, 'src/board/templates', EPIC_GUARD_FILE), 'utf8');
+    const source = readFileSync(join(PACKAGE_DIR, 'packages/rafa-board/src/board/templates', EPIC_GUARD_FILE), 'utf8');
 
     expect(readEpicGuard(DIST)).toBe(source);
   });

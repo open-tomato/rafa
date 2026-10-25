@@ -22,8 +22,8 @@
  * relations on fails the native case, and one that read the repository
  * or the native fields in labels mode fails the control.
  */
-import type { IssueSeams } from './issue/issue-tracker.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { IssueSeams } from '@open-tomato/rafa-board/commands/issue/issue-tracker';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,10 +31,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ROADMAP_REFUSAL_EXIT } from '../board/roadmap.js';
+import { ROADMAP_REFUSAL_EXIT } from '@open-tomato/rafa-board/board/roadmap';
+import { createIssueListCommand } from '@open-tomato/rafa-board/commands/issue/list';
+
 import { dispatchInProject } from '../tests/cli-capture.js';
 
-import { createIssueListCommand } from './issue/list.js';
 import { createRoadmapCommand } from './roadmap.js';
 
 /** A temporary directory of this file's own. */

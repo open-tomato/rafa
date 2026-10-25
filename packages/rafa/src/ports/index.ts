@@ -54,7 +54,7 @@
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
  *     which are values and the GitHub adapter's projections, and
  *     `LedgerEntry`, the local ledger's line. rafa ports no OPT ledger,
- *     so the degradation chain (`src/adapters/tracker/resolve.ts`)
+ *     so the degradation chain (`packages/rafa-board/src/adapters/tracker/resolve.ts`)
  *     arrived without it, and the `local` adapter records the reason the
  *     chain hands it in each issue file instead.
  *   - {@link Store}: the effort store port phase 0 already built, in
@@ -278,7 +278,7 @@ export interface IssueDraft {
    * rafa's own field, absent from the source: true when the issue waits
    * on other issues of the board, which the `github` adapter files as
    * the board's `spec:blocked` label (`SPEC_BLOCKED_LABEL` in
-   * `src/board/blocked.ts`) and the `local` adapter records in the issue
+   * `packages/rafa-board/src/board/blocked.ts`) and the `local` adapter records in the issue
    * file. Absent or false files no such mark. Not {@link blockedBy},
    * which names OPT ledger numbers.
    */
@@ -701,7 +701,7 @@ export interface GeneratedPlan {
    * What the planner's own session said about the spec BEFORE it
    * planned, read out of that session's output: the `rafa:spec-review`
    * block of the readiness gate's check 3
-   * (`src/board/spec-review.ts`).
+   * (`packages/rafa-board/src/board/spec-review.ts`).
    *
    * Optional, because a planner that reads no session output has judged
    * nothing and must still satisfy this port — the fixture planners the

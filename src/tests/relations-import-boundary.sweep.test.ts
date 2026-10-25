@@ -7,7 +7,7 @@
  * ## The import boundary
  *
  * The plan's hard rule reads: "no module outside
- * `src/board/relations/labels.ts` (and the move and doctor modules that
+ * `packages/rafa-board/src/board/relations/labels.ts` (and the move and doctor modules that
  * look for the OTHER mode's marks) reads an `epic:` label,
  * `spec:blocked`, or a `Blocked by:` line to learn a relationship." The
  * stage task that asks for this file widens "labels.ts" to the whole
@@ -68,16 +68,23 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SRC_ROOT = join(REPO_ROOT, 'src');
 
+/** Board's `src/`, which holds its files since pass 4c and mirrors the layout under `src/`. */
+const BOARD_SRC_ROOT = join(REPO_ROOT, 'packages', 'rafa-board', 'src');
+
+/** The folders scanned, each file keyed by its path below the one holding it. */
+const SOURCE_ROOTS: readonly string[] = [SRC_ROOT, BOARD_SRC_ROOT];
+
 /** The two modules that define the four names this file tracks. */
-const EPICS_MODULE = join(SRC_ROOT, 'board', 'epics.ts');
-const BLOCKED_MODULE = join(SRC_ROOT, 'board', 'blocked.ts');
+const EPICS_MODULE = join(BOARD_SRC_ROOT, 'board', 'epics.ts');
+const BLOCKED_MODULE = join(BOARD_SRC_ROOT, 'board', 'blocked.ts');
 
 /** The four names the stage's hard rule names. */
 const TRACKED_NAMES = ['EPIC_LABEL_PREFIX', 'SPEC_BLOCKED_LABEL', 'groupByEpicLabel', 'readBlockedBy'] as const;
 
 /**
  * Every file outside `src/board/relations/` allowed to import a tracked
- * name, each with why. A path is relative to `src/`, forward-slashed.
+ * name, each with why. A path is relative to `src/`, or to
+ * `packages/rafa-board/src/` for board's files, forward-slashed.
  */
 const ALLOWED_IMPORTERS: Readonly<Record<string, string>> = Object.freeze({
   'board/epics.ts': 'the labels-family module itself; its own labels-mode source calls readBlockedBy on a member',
@@ -186,15 +193,16 @@ function trackedImportsOf(filePath: string, text: string): string[] {
   return found;
 }
 
-/** `path`, relative to `src/`, forward-slashed regardless of platform. */
+/** `path`, relative to the {@link SOURCE_ROOTS} folder holding it, forward-slashed regardless of platform. */
 function srcRelative(path: string): string {
-  return relative(SRC_ROOT, path)
+  const root = SOURCE_ROOTS.find((folder) => !relative(folder, path).startsWith('..')) ?? SRC_ROOT;
+  return relative(root, path)
     .split('\\')
     .join(posix.sep);
 }
 
 describe('the board relationship symbols stay behind the port', () => {
-  const files = listSourceFiles(SRC_ROOT);
+  const files = SOURCE_ROOTS.flatMap((root) => listSourceFiles(root));
   const importers = new Map<string, string[]>();
   for (const file of files) {
     const tracked = trackedImportsOf(file, readFileSync(file, 'utf8'));

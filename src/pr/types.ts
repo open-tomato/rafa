@@ -139,7 +139,7 @@ export interface PullRequestSummary {
  * documentation, the ones linked by hand from the pull request's
  * Development panel — so it can hold an issue the body never mentions.
  * Reading the body's keywords is `closedIssuesIn` in
- * `src/board/roadmap.ts`, a separate reading a caller compares this one
+ * `packages/rafa-board/src/board/roadmap.ts`, a separate reading a caller compares this one
  * with.
  *
  * An issue can live in another repository — `GoogleCloudPlatform/scion#2453`

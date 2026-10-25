@@ -21,9 +21,9 @@
  * the module they cover.
  */
 import type { MergeSeams, PrMergeResult } from './merge.js';
-import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

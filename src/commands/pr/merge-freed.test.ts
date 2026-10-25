@@ -7,7 +7,7 @@
  * Every case drives an in-process `gh` runner answering the repository
  * and one native board listing, recording each argv, so no case spawns
  * a process or reaches GitHub. The rule for "freed" is the port's and
- * `src/board/relations/freed.test.ts` holds it; what is measured here is
+ * `packages/rafa-board/src/board/relations/freed.test.ts` holds it; what is measured here is
  * the listing READ, the calls SENT and the lines PRINTED, since this
  * module passes while wrong by writing to the board, by listing once per
  * blocker, or by failing a merge that is already done.
@@ -24,11 +24,11 @@
  *  - Each failure case asserts the warning AND the calls that were not
  *    sent after it.
  */
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
 
-import { boardListingCommand, BOARD_LISTING_LIMIT } from '../../board/roadmap-board.js';
+import { boardListingCommand, BOARD_LISTING_LIMIT } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { INDENT } from './merge-cleanup.js';
 import { freedAfterMerge, freedHeaderLine, freedIssueLine, freedProblemLine } from './merge-freed.js';

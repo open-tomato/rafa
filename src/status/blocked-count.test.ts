@@ -33,13 +33,13 @@
  */
 import type { BlockedCountOptions } from './blocked-count.js';
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { BlockedReading } from '../board/blocked.js';
-import type { BoardIssue, BoardIssueLink, BoardIssueLinks, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { NextBoardOptions } from '../next/sources.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { BlockedReading } from '@open-tomato/rafa-board/board/blocked';
+import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
+import type { BoardIssue, BoardIssueLink, BoardIssueLinks, BoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,10 +47,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { typeOfLabels } from '../adapters/tracker/github.js';
-import { createLabelsRelations } from '../board/relations/labels.js';
-import { createNativeRelations } from '../board/relations/native.js';
-import { nativeBoardListFields } from '../board/roadmap-board.js';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { createLabelsRelations } from '@open-tomato/rafa-board/board/relations/labels';
+import { createNativeRelations } from '@open-tomato/rafa-board/board/relations/native';
+import { nativeBoardListFields } from '@open-tomato/rafa-board/board/roadmap-board';
+
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { BRANCH, plantDemoProject } from '../tests/loop-session-fixtures.js';
 

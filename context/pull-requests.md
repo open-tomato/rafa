@@ -259,7 +259,7 @@ sentence replaces nothing.
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
    about each one whose blockers have all closed and removing the label on a
-   yes (`src/board/unblock-after-merge.ts`, over `rafa issue unblock`'s own
+   yes (`packages/rafa-board/src/board/unblock-after-merge.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
    it is a warning rather than an exit code. Under
    `board.relationships: native` step 5 ticks no epic checklist and this
@@ -500,16 +500,16 @@ someone allowed to change the repo. EIGHT routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
 the pull request's author for `pr triage --resolve`. Four are
 `requireTrustedBoardAuthor`'s — the board entry point in
-`src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list and
-the repo label. Two of those are `plan create`'s: `src/board/plan-spec.ts`'s
+`packages/rafa-board/src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list and
+the repo label. Two of those are `plan create`'s: `packages/rafa-board/src/board/plan-spec.ts`'s
 `inspectSpecIssue` calls it ahead of the label check, the leak refusal and
 the completeness refusal, and its `inspectRoadmapIssue` calls it on the
 ROADMAP issue a `--next` walk reads its order off, before a line is parsed
 out of that body and before either taken reading is spent. The third is
-`rafa issue ready <n>` (`src/commands/issue/ready.ts`), which calls it
+`rafa issue ready <n>` (`packages/rafa-board/src/commands/issue/ready.ts`), which calls it
 before the completeness check and before its own question, so an outsider's
 issue is refused with exit 2 and nobody is asked anything. The login all
-three ask about is `SpecIssue.author`, which `src/board/issue.ts`'s
+three ask about is `SpecIssue.author`, which `packages/rafa-board/src/board/issue.ts`'s
 `ISSUE_VIEW_FIELDS` fetches.
 
 **Every body a `plan create` run reads is checked**: the issue `--issue=<n>`
@@ -518,10 +518,10 @@ roadmap runs check 0 alone — it carries no `spec:ready` label and fills no
 template, and what a planted line in it takes is the ORDER, not a prompt.
 Its refusal is the shared sentence, so it names the roadmap as `issue #<n>`
 and closes with the issue remedy, "a member must open the spec"; a remedy of
-its own would mean a third `BoardItemKind` in `src/board/trust.ts`.
+its own would mean a third `BoardItemKind` in `packages/rafa-board/src/board/trust.ts`.
 
 The SIXTH is the `rafa:spec-review` comment
-(`src/board/review-comment.ts`), and it IGNORES rather than refuses.
+(`packages/rafa-board/src/board/review-comment.ts`), and it IGNORES rather than refuses.
 Nothing in that comment is ever read back into a prompt, so what a planted
 one would take is the EDIT: the gate keeps one comment per issue, GitHub
 refuses an edit of another account's comment, and the gap list would be lost
@@ -532,7 +532,7 @@ through the gate's warnings and left alone, and the gaps go in a comment
 posted beside them. The trust is the one check 0 already built, carried on
 `GateIssue` beside the number and the board.
 
-The SEVENTH is `rafa issue edit <n>` (`src/commands/issue/issue-tracker.ts`),
+The SEVENTH is `rafa issue edit <n>` (`packages/rafa-board/src/commands/issue/issue-tracker.ts`),
 which amends the issue body in place. It gates on two ownership checks
 through `requireTrustedBoardAuthor`: who edits (the login `gh api user`
 answers) and whose issue (the issue's author). A lookup that fails refuses
@@ -613,8 +613,8 @@ the session check 3 is part of, so a refusal from it spends no session:
    a write. The leak refusal runs before the offer, since the offer quotes
    headings off the body.
 2. Code: BOTH halves are wired and both refuse, the leak first. The leak
-   refusal is `src/board/leak.ts`. The heading-completeness half is
-   `requireCompleteSpec` (`src/board/readiness.ts`) — every template
+   refusal is `packages/rafa-board/src/board/leak.ts`. The heading-completeness half is
+   `requireCompleteSpec` (`packages/rafa-board/src/board/readiness.ts`) — every template
    heading present and non-empty, "Tasks the plan must carry" and
    "Definition of done" each holding at least one list item, no
    placeholder surviving (`TBD`, `TODO`, `???`, an unfilled template
@@ -622,10 +622,10 @@ the session check 3 is part of, so a refusal from it spends no session:
    `schema version 9`) outside a fence or code span, each gap listed
    with its heading, exit 2 before the
    snapshot. It refuses every spec opened before
-   `src/board/templates/spec.md` existed, which is the cost the spec
-   chose to pay: such a body carries none of the six headings, so the
-   refusal names all six and the issue needs one hand edit before it can
-   be planned from. The warning that used to run in its place,
+   `packages/rafa-board/src/board/templates/spec.md` existed, which is
+   the cost the spec chose to pay: such a body carries none of the six
+   headings, so the refusal names all six and the issue needs one hand
+   edit before it can be planned from. The warning that used to run in its place,
    `warnOnThinListSections`, is gone with it — every gap it named is one
    this refusal throws on — and `findListSectionGaps` and
    `listSectionWarning` are left with no caller outside their own
@@ -663,7 +663,7 @@ the session check 3 is part of, so a refusal from it spends no session:
    assumption it was planned under, its `rafa:plan` block records
    `review: assumed`, the gaps go up as the same marker comment in a body
    that says a plan was written, and no label moves. The gate does both
-   writes itself (`src/board/gate.ts`, `src/board/review-stamp.ts`), so
+   writes itself (`packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/review-stamp.ts`), so
    the standing it answers is `assumed` and the command does not refuse.
 
    Whatever the verdict, each issue the reader filed against the block is
@@ -681,14 +681,14 @@ the session check 3 is part of, so a refusal from it spends no session:
    and exits 3. The rule until 2026-09-20 was the opposite — an unread
    block was a `not-ready` verdict — and it deleted a valid 22-task plan
    of this repository's own over a prompt the session had no place to
-   answer (`src/board/gate.ts` holds the reading).
+   answer (`packages/rafa-board/src/board/gate.ts` holds the reading).
 
-4. References (`src/board/refs-gate.ts`, placed on the command by
-   `src/commands/plan/refs-check.ts`): every reference the saved copy's
+4. References (`packages/rafa-board/src/board/refs-gate.ts`, placed on the command by
+   `packages/rafa-board/src/commands/plan/refs-check.ts`): every reference the saved copy's
    body names — an issue `#<n>`, `rafa-<n>` or `owner/repo#<n>`, and in
    backticks a path, a symbol at declaration position, a `rafa <subject> <action>`
    command and a config key, and a flag only inside a code span opening with
-   `rafa` (the seven kinds of `src/refs/extract.ts`) — read against the
+   `rafa` (the seven kinds of `packages/rafa-board/src/refs/extract.ts`) — read against the
    stamp the copy keeps for it in its `<!-- rafa:refs` block. It runs on
    `--issue` and `--next` only, once checks 0–2 have passed and the snapshot
    has settled and once the plan-already-there refusal has passed, and before
@@ -733,7 +733,7 @@ the session check 3 is part of, so a refusal from it spends no session:
    line for the key, written when the config is loaded and so before any
    board read, ending `; check 4 re-stamps every reference of the spec as
    reviewed and refuses none on this run` (the phrase `plan create`
-   declares, `src/commands/plan/refs-check.ts`), so a forgotten setting is
+   declares, `packages/rafa-board/src/commands/plan/refs-check.ts`), so a forgotten setting is
    seen before anything is spent. It is printed on every `plan create` run
    with the key on, a `--spec` or `--dry-run` one included. When both are
    on, the flag is the one named.
@@ -759,7 +759,7 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   asking, the old copy moved to `<specs.dir>/previous/` first. If the body has
   changed and a terminal is present, the run offers a question: update the
   saved copy and plan from the new version? The `--refresh` flag (`REFRESH_FLAG`,
-  `src/board/flags.ts`) keeps working and never asks. Without a terminal and
+  `packages/rafa-board/src/board/flags.ts`) keeps working and never asks. Without a terminal and
   without `--refresh`, the changed-body refusal stands. A local file
   `<specs.dir>/rafa-<n>-notes.md`, when present, is appended under "Local notes":
   machine paths and private hosts live there and never on the board. The plan's
@@ -773,7 +773,7 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   `- [ ] #<n>` in order. A line is DONE when it is ticked or its issue is
   closed. A line is TAKEN when a branch `feat/rafa-<n>-*` exists locally or
   on the remote, or an open PR closes it. A branch the remote holds is read
-  for its claim (`src/board/roadmap-claims.ts`): a released claim does not
+  for its claim (`packages/rafa-board/src/board/roadmap-claims.ts`): a released claim does not
   take the line, a stale `rafa:claimed` claim passes it as a takeover
   candidate ("#20 takeover candidate: branch <b>, claimed by <store>, has
   stood idle 4d"), and a stale `rafa:in-development` claim keeps it taken
@@ -788,7 +788,7 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   A pick that is BLOCKED is the one line the walk offers its way past.
   Its issue carries `spec:blocked` and its `Blocked by:` line names a
   blocker the board still holds open, or one whose state this run could
-  not read (`src/board/blocked-line.ts`). Such a line is neither planned
+  not read (`packages/rafa-board/src/board/blocked-line.ts`). Such a line is neither planned
   nor stepped over silently: the run says `#57 is blocked by #24 (open)`,
   walks on for the first line under it that is ready, not blocked and not
   taken, names that one and asks `Plan #58 instead? [y/N]` through
@@ -810,7 +810,7 @@ no issue carries the label, after the merge (GitHub closes the issue; it does
 not tick a task-list box). Before the boards it ticks the same line on the
 checklist of the open epic the issue's `epic:<slug>` label names, printing one
 sentence per epic (`src/commands/pr/merge-tick.ts`, which runs
-`tickEpics` of `src/board/epic-tick.ts`).
+`tickEpics` of `packages/rafa-board/src/board/epic-tick.ts`).
 An edit conflict re-reads and retries once — and the only conflict signal
 there is, is the body the PATCH answers with. The issues REST API takes no
 `If-Match` and `gh` sends no conditional request, so a lost update comes
@@ -832,7 +832,7 @@ session's gap report is filed under; `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
 The Roadmap issue is opened with `--label type:roadmap`, and an open issue
 titled "Roadmap" that it adopts instead gets that label added when it
-lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup-roadmap.ts`).
+lacks it (`gh issue edit <n> --add-label type:roadmap`, `packages/rafa-board/src/board/setup-roadmap.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.
@@ -1035,7 +1035,7 @@ foreign blocker of A#14 read as
 
 What follows for the native mode: the listing reads a linked issue's
 repository off its `url` (`https://<host>/<owner>/<name>/issues/<n>`),
-and `parseBoardListing` (`src/board/roadmap-board.ts`) refuses a node
+and `parseBoardListing` (`packages/rafa-board/src/board/roadmap-board.ts`) refuses a node
 whose `url` is not issue `number`'s. A read that asks GraphQL directly
 may take `repository.nameWithOwner`, but it must answer the same row
 shape as the listing.
@@ -1043,7 +1043,7 @@ shape as the listing.
 #### The incremental read in the native mode
 
 Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)`, read-only,
-with the argv `nativeChangedArgs` (`src/board/board-cache-native.ts`)
+with the argv `nativeChangedArgs` (`packages/rafa-board/src/board/board-cache-native.ts`)
 builds: `gh api graphql --paginate` over
 `repository.issues(first: 100, filterBy: {since})`, asking for the
 listing's six fields, `updatedAt` and the five relationship fields, with
@@ -1075,10 +1075,10 @@ times out, and a page cost on a board whose issues hold many links.
 #### The read by number after a relationship write
 
 A relationship write moves no `updated_at` (above), so the kept listing
-drops the rows `invalidateRows` (`src/board/board-cache.ts`) is given and
+drops the rows `invalidateRows` (`packages/rafa-board/src/board/board-cache.ts`) is given and
 reads them again by number on the next read. Measured 2026-09-30 with
 `gh version 2.100.0 (2026-09-03)`, read-only, on `RAFA_340_SCRATCH_A`,
-with the argv `nativeIssuesArgs` (`src/board/board-cache-native.ts`)
+with the argv `nativeIssuesArgs` (`packages/rafa-board/src/board/board-cache-native.ts`)
 builds: one `gh api graphql` query aliasing each number as
 `i<n>: issue(number: n) { ...row }`, the fragment asking what the `since`
 read asks.
@@ -1095,21 +1095,21 @@ listing falls back to a full one.
 
 The sixth step of `pr merge` (lines 163–181) differs between modes:
 
-In **`labels` mode** (the default), the unblock reading (`src/board/unblock-after-merge.ts`)
+In **`labels` mode** (the default), the unblock reading (`packages/rafa-board/src/board/unblock-after-merge.ts`)
 runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
 `Blocked by:` line names an issue this PR closes. For each such issue whose
 blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove
-spec:blocked? [y/N]` and removes the label on a yes (`src/board/relations/labels.ts`'s
+spec:blocked? [y/N]` and removes the label on a yes (`packages/rafa-board/src/board/relations/labels.ts`'s
 `afterMerge`). `--yes` does not answer that question; every failure is a warning.
 Each blocker's state is read the way `rafa issue unblock` reads it
-(`src/board/blocker-states.ts`): one `gh issue list --state all --limit 500`,
+(`packages/rafa-board/src/board/blocker-states.ts`): one `gh issue list --state all --limit 500`,
 then one `gh issue view <n> --json number,state` for each blocker that a full
 listing did not hold. A blocker whose state is not read counts as not cleared,
 so its issue keeps the label and the run names it `#<n> (state not read)`.
 
 In **`native` mode**, the freed reading (`src/commands/pr/merge-freed.ts`) prints
 the open issues the merge freed, read through the port's `freedBy`, and sends no
-write (`src/board/relations/native.ts`'s `afterMerge`). An issue is freed when it
+write (`packages/rafa-board/src/board/relations/native.ts`'s `afterMerge`). An issue is freed when it
 is open, waits on blockers, and has at least one blocker among the closed issues
 and would not wait on anything once those count as closed. The output is silence
 when the merge freed nothing; otherwise a header line naming the mode, the count,
@@ -1123,11 +1123,11 @@ sends one warning and prints nothing, as the merge has already happened.
 
 The freed reading in native mode sends two `gh` calls from the one board listing
 the command already holds: the board's repository (one `gh repo view --json
-nameWithOwner`, `readBoardRepository`, `src/board/repository.ts`) to
+nameWithOwner`, `readBoardRepository`, `packages/rafa-board/src/board/repository.ts`) to
 tell the board's issues from foreign blockers; and one native board listing (`gh
 api graphql` with `filterBy: {since}` on an incremental read, or a full listing
 on the first read). No per-blocker `gh issue view` is sent; a blocker's state
-comes from its `blockedBy` node (`src/board/relations/native.ts`, the port
+comes from its `blockedBy` node (`packages/rafa-board/src/board/relations/native.ts`, the port
 definition).
 
 An issue stays waiting when it has a blocker in the closed issues BUT its
@@ -1201,7 +1201,7 @@ reported.
 
 **Drift check:** Every second `loop start` and on each `rafa switch` without
 cache invalidation, a report-only drift check reads the board through
-`src/board/board-cache.ts` and verifies that the stage label on each open
+`packages/rafa-board/src/board/board-cache.ts` and verifies that the stage label on each open
 claim's issue matches its claim state. A mismatched label (a label in the
 wrong stage or both stage labels present) is reported, and the check never
 edits a label or a body. A board that is not `gh` or a label write that

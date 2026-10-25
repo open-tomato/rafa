@@ -4,4 +4,4 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-board --commands`.
  */
 
-export { BOARD_FEATURE } from '../../src/commands/board/index.js';
+export { BOARD_FEATURE } from './src/commands/board/index.js';

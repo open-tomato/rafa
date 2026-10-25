@@ -45,8 +45,8 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { getCurrentBranch } from '@open-tomato/rafa/utils/git';
+import { assumptionsHeading } from '@open-tomato/rafa-board/board/review-stamp';
 
-import { assumptionsHeading } from '../board/review-stamp.js';
 import { verifyRelease } from '../release/verify.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import {

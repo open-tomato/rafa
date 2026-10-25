@@ -15,25 +15,24 @@
  * mode is refused, which proves the mode reached the parser and not only
  * the argv. Every `gh` answer is planted; nothing spawns.
  */
-import type { EpicRelations } from './epics.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { EpicRelations } from '@open-tomato/rafa-board/board/epics';
 
 import { describe, expect, it } from 'bun:test';
 
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND, boardsListArgs, createGhBoardLister } from './boards.js';
-import { epicContextArgs, readEpicContext } from './epic-context.js';
-import { LABELS_READS } from './relations/labels.js';
-import { createNativeRelations } from './relations/native.js';
+import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND, boardsListArgs, createGhBoardLister } from '@open-tomato/rafa-board/board/boards';
+import { epicContextArgs, readEpicContext } from '@open-tomato/rafa-board/board/epic-context';
+import { LABELS_READS } from '@open-tomato/rafa-board/board/relations/labels';
+import { createNativeRelations } from '@open-tomato/rafa-board/board/relations/native';
 import {
   BOARD_LIST_FIELDS,
   boardListFields,
   boardListingCommand,
   createGhBoardListing,
   nativeBoardListFields,
-} from './roadmap-board.js';
+} from '@open-tomato/rafa-board/board/roadmap-board';
 
 /** The labels-mode `--json` list, as the default has always sent it. */
 const LABELS_FIELDS = 'number,title,body,state,stateReason,labels';

@@ -10,7 +10,7 @@
  */
 import type { FakePrGh } from './gh-fake.js';
 import type { PullRequestDraft, PullRequests } from './types.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
 

@@ -5,7 +5,7 @@ each `stale_docs` entry to the `docs` channel. The six kinds are `bug`,
 `own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them only a
 `bug` reaches a tracker as an issue of its own. The loop calls `triageReport`
 from `src/start/triage.ts` and `rafa epic close` from
-`src/commands/epic/close-triage.ts`. The triage writer stores every bug and its
+`packages/rafa-board/src/commands/epic/close-triage.ts`. The triage writer stores every bug and its
 action in the effort store, keyed by the bug's recurrence key, not the
 artifact the report's findings use, and each routed entry leaves one row in
 the `bug_routes` table (`packages/rafa/src/effort/store/bug-routes.ts`) naming
@@ -156,7 +156,7 @@ section, when the similarity step filed one, comes after those two.
 plan <stub>`, or ``seen while running `<command>` `` for a dispatch with no
 plan stub. The record never holds `unknown` there.
 
-`Cause` follows the cause rule (`src/bugs/cause-rule.ts`), which never refuses
+`Cause` follows the cause rule (`packages/rafa-board/src/bugs/cause-rule.ts`), which never refuses
 a session's words. A code of the list is kept as written. A shaped code the
 list lacks is `<family>:new-context`, with the code kept as `Proposed cause`,
 or `unknown:new-context` when its family is unlisted. Any other text is

@@ -11,8 +11,8 @@
  * `src/start/triage.ts`, `src/start/release-stage.ts`,
  * `src/start/retry-budget.ts`, `src/start/continue-run.ts`,
  * `src/start/forced-draft.ts`,
- * `src/adapters/tracker/resolve.ts`,
- * `src/adapters/tracker/local.ts`,
+ * `packages/rafa-board/src/adapters/tracker/resolve.ts`,
+ * `packages/rafa-board/src/adapters/tracker/local.ts`,
  * `src/start/pr-lifecycle.ts`, `packages/rafa/src/core/loop/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
  * in their code, and each calls `activeOutput()`, or `activeLogger()`,
@@ -170,7 +170,7 @@ import { consoleAndExitUses } from './source-uses.js';
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
-/** The modules held to the active output, from `src/`. */
+/** The modules held to the active output, from `src/` (core's and board's through their packages). */
 const ROUTED_MODULES: string[] = [
   'start.ts',
   'start/run-config.ts',
@@ -189,8 +189,8 @@ const ROUTED_MODULES: string[] = [
   'start/retry-budget.ts',
   'start/continue-run.ts',
   'start/forced-draft.ts',
-  'adapters/tracker/resolve.ts',
-  'adapters/tracker/local.ts',
+  '../packages/rafa-board/src/adapters/tracker/resolve.ts',
+  '../packages/rafa-board/src/adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
   '../packages/rafa/src/core/loop/claude.ts',
   'utils/schedule.ts',

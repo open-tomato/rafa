@@ -30,7 +30,7 @@ requests and release fragments.
 **Horizon** (single select, optional): Later, Next, Now, Done, Cancelled.
 Only epics get a Horizon; issues do not. The Horizon is computed from the
 epic's own label (`epic:`) on the open `type:roadmap` board and the board's
-horizontal place (`src/board/roadmap-rows.ts` and `src/board/epics.ts` read
+horizontal place (`packages/rafa-board/src/board/roadmap-rows.ts` and `packages/rafa-board/src/board/epics.ts` read
 the order).
 
 **Rank** (number, optional): A zero-based position on the list where the issue
@@ -47,7 +47,7 @@ native mode reads them from `blockedBy` nodes). An issue with no blockers
 leaves the field empty.
 
 **Progress** (text, optional): A count like `6 / 11` when the item is an epic
-(the done and total counts from `src/board/epics.ts`). Only epics carry a
+(the done and total counts from `packages/rafa-board/src/board/epics.ts`). Only epics carry a
 Progress. Issues leave the field empty. An epic with no members shows `0 / 0`.
 
 ### The Stage outline
@@ -83,7 +83,7 @@ compares each with the project's current item values, and writes only those
 that differ. It does nothing and sends no call when `board.project.number` is
 unset.
 
-The refresh reads the issues' facts through `src/board/project/facts.ts`: each
+The refresh reads the issues' facts through `packages/rafa-board/src/board/project/facts.ts`: each
 issue's close state, close reason, labels, and the pull requests that close
 or link it (with their base branch and added release fragment, and whether that
 fragment is still on the base branch). It runs each value through its rule
@@ -130,13 +130,13 @@ sync finds its item on the project and fills it in its first pass.
 
 `rafa issue create` fills its new issue the same way: it keeps the item its
 add answered and hands it to its refresh as a known item
-(`addAndRefreshIssue`, `src/board/project/add-issue.ts`). When that refresh
+(`addAndRefreshIssue`, `packages/rafa-board/src/board/project/add-issue.ts`). When that refresh
 answers the issue in `notFilled`, the same line is printed after the
 refresh's own, at `warn`, and the create still exits 0: the issue is filed
 and sits on the project with no value until the next `rafa board sync`.
 
 The bugs rafa files itself take the same step. `addFiledBugs`
-(`src/board/project/add-filed.ts`) takes the result of one `triageReport`,
+(`packages/rafa-board/src/board/project/add-filed.ts`) takes the result of one `triageReport`,
 a loop task's report or a failed check of `rafa epic close`, and adds each
 bug settled `filed` on the public `github` tracker, in the order filed,
 through `addAndRefreshIssue`. It passes over every other bug: one
@@ -169,7 +169,7 @@ release fragments or epic membership call the refresh on the affected issues
 once their writes land. They pass the issues the refresh needs and print the
 refresh's warning lines after their own output.
 
-The `IssueBoard` wrapper at `src/board/project/issue-board-refresh.ts`
+The `IssueBoard` wrapper at `packages/rafa-board/src/board/project/issue-board-refresh.ts`
 wraps the GitHub issue board's label writes (`swapLabels`, `addLabel`,
 `removeLabel`), so every label write through the board is followed by a
 refresh. This covers the claim stages, the readiness gate and labels-mode
@@ -177,7 +177,7 @@ refresh. This covers the claim stages, the readiness gate and labels-mode
 covered: it goes through the Tracker port and writes no label.
 
 Native-mode blocker writes do not go through `IssueBoard`, so
-`src/commands/issue/unblock-native.ts` calls the refresh itself.
+`packages/rafa-board/src/commands/issue/unblock-native.ts` calls the refresh itself.
 
 ### Network errors and retry
 
@@ -229,19 +229,19 @@ Commands that call the refresh outside the label wrapper:
   <reason>` when the refresh did not fill it
 - `rafa start` (each task's triage) — the same add-then-refresh for each bug
   the task's report filed on the public `github` tracker, through
-  `addFiledBugs` (`src/board/project/add-filed.ts`, called from
+  `addFiledBugs` (`packages/rafa-board/src/board/project/add-filed.ts`, called from
   `src/start/triage.ts`), every line a `Triage: ` warning after the triage's
   own
 - `rafa epic close` (the gate) — the same for each bug a failed check filed
   on the public `github` tracker, through `addFiledBugs`, called from
-  `src/commands/epic/close-triage.ts`, every line a warning after the
+  `packages/rafa-board/src/commands/epic/close-triage.ts`, every line a warning after the
   failure's own
 - `rafa issue unblock` (native mode) — refresh the unblocked issue
 - `rafa pr merge` — refresh the issues the pull request closes and the
   issues they were blocking; an epic whose member it closes is not
   refreshed, so its Progress stays stale until `rafa board sync`
 - `rafa issue move` — refresh the moved issue after the Tracker port's move,
-  since the move writes no label (`src/commands/issue/move-project.ts`)
+  since the move writes no label (`packages/rafa-board/src/commands/issue/move-project.ts`)
 - `rafa start` (runner PR step) — refresh the issues the pull request closes
 - `rafa release settle` — refresh the issues closed by the pull requests
   whose fragments were folded (a push delivery only; PR delivery sends no
@@ -299,7 +299,7 @@ The five `board.project.*` keys for retry and progress, all optional, are under
 | `writePauseMs` | the pause between two write requests | 1000 | 0 to 60000 |
 
 `writeBatchSize` and `writePauseMs` replace the two constants in
-`src/board/project/port.ts`, with the same defaults.
+`packages/rafa-board/src/board/project/port.ts`, with the same defaults.
 
 Config examples, from empty up:
 

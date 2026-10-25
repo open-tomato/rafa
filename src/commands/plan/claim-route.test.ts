@@ -10,17 +10,17 @@
  * plants, so nothing here reaches git, GitHub or a store. What the claim
  * itself answers over a remote is `src/claims/plan-claim.test.ts`'s; the
  * walk reading a passed-over issue as taken is
- * `src/board/spec-source-roadmap.test.ts`'s.
+ * `packages/rafa-board/src/board/spec-source-roadmap.test.ts`'s.
  *
  * The last block builds the run's claim context for real over a scratch
  * directory under `tmpdir`, whose provider and store the config names.
  */
 import type { ClaimRouteSeams, PassOver } from './claim-route.js';
-import type { PlanSpecResolution } from '../../board/plan-spec.js';
-import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { SpecLineAhead, SpecSourceKind } from '../../board/spec-source.js';
-import type { AheadCandidate } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimRequest } from '../../claims/plan-claim.js';
+import type { PlanSpecResolution } from '@open-tomato/rafa-board/board/plan-spec';
+import type { RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
+import type { SpecLineAhead, SpecSourceKind } from '@open-tomato/rafa-board/board/spec-source';
+import type { AheadCandidate } from '@open-tomato/rafa-board/claims/ahead';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

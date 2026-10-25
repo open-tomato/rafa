@@ -29,9 +29,9 @@
  *     tracker's `create`, the issue directory holding one file only.
  */
 import type { StartTriageOptions, TaskTriageInput } from './triage.js';
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
+import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 
 import {
   existsSync,
@@ -59,9 +59,9 @@ import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { resolveTracker } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { resolveTracker } from '../adapters/tracker/resolve.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { detail, PROVIDER_GH, SUMMARY } from '../tests/release-stage-fixtures.js';

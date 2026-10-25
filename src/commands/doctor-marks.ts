@@ -21,12 +21,12 @@
  *
  *  - an `epic:` label on an issue that is not `type:epic`. An epic's
  *    own `epic:<slug>` label is not a mark: it names the epic, and is
- *    the slug a move back to `labels` reads (`src/board/relations/move.ts`,
+ *    the slug a move back to `labels` reads (`packages/rafa-board/src/board/relations/move.ts`,
  *    "The old mode's marks");
  *  - a `spec:blocked` label, with whether a `Blocked by:` line sits
  *    beside it. A `Blocked by:` line WITHOUT the label is not named:
  *    the `labels` mode reads the line only while the label is on
- *    (`src/board/relations/labels.ts`), so such a line records no
+ *    (`packages/rafa-board/src/board/relations/labels.ts`), so such a line records no
  *    relationship, `rafa issue unblock` leaves it behind when it takes
  *    the label off, and `rafa init --board` neither moves nor removes
  *    it — naming it would point at a command that does nothing to it.

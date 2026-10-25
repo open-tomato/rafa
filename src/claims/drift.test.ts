@@ -9,13 +9,12 @@
  * find anything fails the control rather than passing the case.
  */
 import type { DriftBranches } from './drift.js';
-import type { BoardIssue, BoardIssueState } from '../board/roadmap-board.js';
+import type { BoardIssue, BoardIssueState } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
-
-import { typeOfLabels } from '../adapters/tracker/github.js';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { checkDrift, checklistIssues, driftLines, findDrift } from './drift.js';
 

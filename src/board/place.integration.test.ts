@@ -12,7 +12,7 @@
  * that. The answer is the default board's fallback place, and the one
  * notice names the closed board and the fallback it fell to.
  */
-import type { BoardIssue } from './roadmap-board.js';
+import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,10 +21,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
-
-import { typeOfLabels } from '../adapters/tracker/github.js';
-
-import { resolvePlace } from './place.js';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { resolvePlace } from '@open-tomato/rafa-board/board/place';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-place-integration-')));
 

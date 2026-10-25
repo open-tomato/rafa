@@ -29,7 +29,7 @@
  * verdict no gap of which blocked planning — is written by the GATE
  * itself, in the same write that opens the plan with the assumptions,
  * because the two together are what that verdict does
- * (`src/board/gate.ts`). Nothing in this module runs for it.
+ * (`packages/rafa-board/src/board/gate.ts`). Nothing in this module runs for it.
  *
  * ## A record that fails is a warning, never a refusal
  *

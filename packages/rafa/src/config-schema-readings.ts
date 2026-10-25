@@ -31,7 +31,7 @@
  * ## The `board` section
  *
  * `.rafa/specs/rafa-20-pr-commands.md` names `board.trustedAuthors` as the
- * allow-list beside the permission reading `src/board/trust.ts` makes:
+ * allow-list beside the permission reading `packages/rafa-board/src/board/trust.ts` makes:
  * text off the board reaches an agent's prompt, so its author must hold
  * write access on the repository or be listed here. Two readings it
  * leaves to this module:
@@ -97,7 +97,7 @@
  *   - It defaults to NULL, and null means "nobody has said" as it does
  *     for `pr.provider` and `pr.base`. The fallback the spec names — the
  *     issue titled `Roadmap` — is a number only a repository can answer,
- *     and `src/board/roadmap.ts` asks it at use. Writing a literal here
+ *     and `packages/rafa-board/src/board/roadmap.ts` asks it at use. Writing a literal here
  *     would point every repository that has not run `rafa init --board`
  *     at one project's issue number.
  *   - It is a number and not a string. `gh issue view <n>` takes the

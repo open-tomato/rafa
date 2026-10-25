@@ -1,5 +1,5 @@
 /**
- * Integration of the references reading (`src/refs/reading.ts`) over a
+ * Integration of the references reading (`packages/rafa-board/src/refs/reading.ts`) over a
  * planted git repository under the temp directory and a fake `gh`
  * runner answering `gh issue view` from a table. Nothing reaches GitHub.
  *
@@ -9,7 +9,7 @@
  * copy with no block stamped and read `ok`, and a re-stamp that turns
  * suspect and dangling rows `ok`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,11 +20,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { readCopyRefs, restampCopyRefs } from '@open-tomato/rafa-board/refs/reading';
+import { readRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
+import { createRefVerifier, ghIssueReader } from '@open-tomato/rafa-board/refs/verify';
 
 import { CORE_REGISTRY } from '../commands/index.js';
-import { readCopyRefs, restampCopyRefs } from '../refs/reading.js';
-import { readRefsBlock } from '../refs/stamp.js';
-import { createRefVerifier, ghIssueReader } from '../refs/verify.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-refs-integration-')));
 
