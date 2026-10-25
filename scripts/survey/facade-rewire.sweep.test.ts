@@ -64,7 +64,9 @@ interface RewiredRow {
  * `src/next/readings.ts` and `src/next/sources.ts`. The 19 load-cycle files
  * took the facade in pass 4c, since decouple 5 ended the cycles that kept
  * them, once those two took `scanClaimBranches` from
- * `src/board/branch-scan.ts`, so board's row is empty. The same stage took
+ * `src/board/branch-scan.ts`, so board's row was empty until the seven readings interfaces moved into
+ * `src/next/relation-readings.ts`, a board file, and `src/next/readings.ts`
+ * re-exports them from its path. The same stage took
  * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
  * `preflight-drift.ts` onto the facade. `src/claims/ahead.ts` and
  * `src/epic/verify-run.ts` left the row in the fourth decouple item, which
@@ -138,7 +140,9 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-inventory',
   },
   {
-    allowed: {},
+    allowed: {
+      'src/next/readings.ts': 'loadCycle',
+    },
     packageName: 'rafa-board',
   },
   {
@@ -191,7 +195,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/pr/wait.ts': 'backEdge',
       'src/next/epic-end.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
-      'src/next/relation-readings.ts': 'loadCycle',
       'src/next/settle-step.ts': 'loadCycle',
       'src/next/sources.ts': 'loadCycle',
       'src/triage/base-run.ts': 'loadCycle',
