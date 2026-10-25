@@ -59,11 +59,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '@open-tomato/rafa/cli/describe';
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { dangerousPassLines, resolveConfig, runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { version } from '../../../package.json';
 import { BOARD_REFUSAL_EXIT } from '../../board/exit-codes.js';
 import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '../../refs/stamp.js';
 import { CORE_REGISTRY } from '../index.js';
@@ -556,8 +555,8 @@ const HUB_PUSH: RafaCommand = {
 
 describe('registryRoster', () => {
   it('is describeRegistry over the registry handed in, stamped with this package\'s version', () => {
-    expect(registryRoster(CORE_REGISTRY)).toEqual(describeRegistry(CORE_REGISTRY, version));
-    expect(CORE_ROSTER.version).toBe(version);
+    expect(registryRoster(CORE_REGISTRY)).toEqual(describeRegistry(CORE_REGISTRY, RAFA_VERSION));
+    expect(CORE_ROSTER.version).toBe(RAFA_VERSION);
   });
 
   it('holds a mounted module\'s actions, so a flag only the module declares reads present where the core registry\'s reads it absent', async () => {
