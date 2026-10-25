@@ -482,6 +482,15 @@ export {
   oneHopAllows,
 } from '../../src/next/hop-chain.js';
 
+export type {
+  DryEpic,
+  HopTarget,
+  NextBoard,
+  NextHopReading,
+  NextRoadmapReading,
+  TakenBlocker,
+  WaitingLine,
+} from '../../src/next/relation-readings.js';
 export {
   awayTargetOf,
   blockedLineReadings,

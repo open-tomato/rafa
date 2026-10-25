@@ -96,17 +96,17 @@
  * unchanged.
  *
  * The seven interfaces the board reads with ({@link NextBoard} and its
- * neighbours) live in board's `./relation-readings.ts` since pass 4c,
- * and are re-exported here by type, so no importer of them changes.
+ * neighbours) live in board's `src/next/relation-readings.ts` since pass 4c,
+ * and are taken from the board facade and re-exported here by type, so no
+ * importer of them changes.
  */
-import type { NextBoard, NextRoadmapReading } from './relation-readings.js';
 import type { PlanListing } from '../plan/list.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { BaseStanding } from '@open-tomato/rafa/start/branch-decision';
-import type { BlockedLine, RoadmapLine } from '@open-tomato/rafa-board';
+import type { BlockedLine, NextBoard, NextRoadmapReading, RoadmapLine } from '@open-tomato/rafa-board';
 
 import { scanClaimBranches } from '@open-tomato/rafa-board';
 
@@ -134,7 +134,7 @@ export type {
   NextRoadmapReading,
   TakenBlocker,
   WaitingLine,
-} from './relation-readings.js';
+} from '@open-tomato/rafa-board';
 
 /** What the readings are taken over; see the module note. */
 export interface NextSources {

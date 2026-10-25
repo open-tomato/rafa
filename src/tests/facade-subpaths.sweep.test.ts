@@ -19,6 +19,15 @@
  * counts are printed once, at load, so a read that found nothing cannot
  * pass as a clean one, and a planted text holding a subpath import is held
  * to be named, so the check could fail.
+ *
+ * Two files are excepted, by name, from the rule, and only for a dynamic
+ * `import()` of a subpath (see {@link LAZY_SUBPATH_FILES}): each is a CLI
+ * command module that loads one board command module lazily, which neither
+ * the facade nor its `commands` entry can carry without loading it with
+ * them. A static subpath import in either file is still refused, as is the
+ * same dynamic import in any other file; planted controls hold both. The
+ * exception names files, not a folder or a pattern, and a third case goes
+ * to the person before it joins the list.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,6 +50,22 @@ const FACADE_NAMES: readonly string[] = ['board', 'effort', 'inventory', 'pr', '
 /** The one subpath a non-test file may take a facade by. */
 const ALLOWED_SUBPATH = 'commands';
 
+/**
+ * The files that may take a facade subpath by a dynamic `import()`, each
+ * with its reason. Nothing else is excepted: a static import or an
+ * `export … from` of a subpath stays refused here, and no other file may
+ * load a subpath at all. A third file goes to the person, not onto this
+ * list.
+ */
+const LAZY_SUBPATH_FILES: ReadonlyMap<string, string> = new Map([
+  // Loads board's `issue list` command module (`runIssueList`) when the
+  // command runs; the facade cannot export it without loading it with them.
+  ['src/commands/roadmap.ts', 'loads the issue list command module lazily'],
+  // Loads board's `issue ready` command module (`runIssueReady`) when the
+  // offer runs; the facade exports it by type only, to keep the roster lazy.
+  ['src/commands/plan/ready-offer.ts', 'loads the issue ready command module lazily'],
+]);
+
 const CODE_EXTENSION = /\.(?:ts|tsx|mts|js|mjs)$/;
 
 /** A bare facade specifier: its facade name, then an optional subpath. */
@@ -54,6 +79,31 @@ interface FacadeImport {
   readonly specifier: string;
   /** The part after the facade's name, or `undefined` for the name alone. */
   readonly subpath: string | undefined;
+  /** Whether the specifier is the argument of a dynamic `import()`. */
+  readonly dynamic: boolean;
+}
+
+/**
+ * The start offsets of the string specifiers a text passes to a dynamic
+ * `import()`, read off its syntax tree.
+ *
+ * @param text - A source text.
+ * @returns The offset each such specifier's opening quote stands at.
+ */
+function dynamicImportStarts(text: string): ReadonlySet<number> {
+  const source = ts.createSourceFile('read.ts', text, ts.ScriptTarget.Latest, true);
+  const starts = new Set<number>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const [argument] = node.arguments;
+      if (argument !== undefined && ts.isStringLiteralLike(argument)) {
+        starts.add(argument.getStart(source));
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return starts;
 }
 
 /**
@@ -66,6 +116,7 @@ interface FacadeImport {
  */
 function facadeImports(text: string): FacadeImport[] {
   const { importedFiles } = ts.preProcessFile(text, true, true);
+  const dynamicStarts = dynamicImportStarts(text);
   const found: FacadeImport[] = [];
   for (const { fileName, pos } of importedFiles) {
     const match = FACADE_SPECIFIER.exec(fileName);
@@ -73,14 +124,17 @@ function facadeImports(text: string): FacadeImport[] {
       continue;
     }
     const line = text.slice(0, pos).split('\n').length;
-    found.push({ line, specifier: fileName, subpath: match[2] });
+    // The pre-processor's offset is the specifier's opening quote.
+    const dynamic = dynamicStarts.has(pos);
+    found.push({ dynamic, line, specifier: fileName, subpath: match[2] });
   }
   return found;
 }
 
 /**
  * The refusals of one non-test file: each facade import on a subpath other
- * than `commands`, as `<file>:<line>: <specifier>`.
+ * than `commands`, as `<file>:<line>: <specifier>`, but for a dynamic
+ * `import()` in a file of {@link LAZY_SUBPATH_FILES}.
  *
  * @param path - The file's repository-relative path.
  * @param text - Its text.
@@ -89,6 +143,7 @@ function facadeImports(text: string): FacadeImport[] {
 function subpathRefusals(path: string, text: string): string[] {
   return facadeImports(text)
     .filter(({ subpath }) => subpath !== undefined && subpath !== ALLOWED_SUBPATH)
+    .filter(({ dynamic }) => !(dynamic && LAZY_SUBPATH_FILES.has(path)))
     .map(({ line, specifier }) => `${path}:${line}: ${specifier}`);
 }
 
@@ -175,6 +230,46 @@ describe('the subpath reading', () => {
       'src/planted.ts:3: @open-tomato/rafa-inventory/tiers/resolve',
       'src/planted.ts:5: @open-tomato/rafa-effort/report',
       'src/planted.ts:6: @open-tomato/rafa-run/loop',
+    ]);
+  });
+
+  test('the exception names exactly the two lazy loaders, each with its reason', () => {
+    expect([...LAZY_SUBPATH_FILES.keys()]).toEqual(['src/commands/roadmap.ts', 'src/commands/plan/ready-offer.ts']);
+    for (const reason of LAZY_SUBPATH_FILES.values()) {
+      expect(reason).not.toBe('');
+    }
+  });
+
+  test('a dynamic subpath import in a named file is accepted', () => {
+    const planted = [
+      'const { runIssueList } = await import(\'@open-tomato/rafa-board/commands/issue/list\');',
+      'const { runIssueReady: run } = await import(\'@open-tomato/rafa-board/commands/issue/ready\');',
+    ].join('\n');
+
+    expect(subpathRefusals('src/commands/roadmap.ts', planted)).toEqual([]);
+    expect(subpathRefusals('src/commands/plan/ready-offer.ts', planted)).toEqual([]);
+  });
+
+  test('control: the same dynamic subpath import in a third file is still refused', () => {
+    const planted = 'const { runIssueList } = await import(\'@open-tomato/rafa-board/commands/issue/list\');';
+
+    expect(subpathRefusals('src/commands/third.ts', planted)).toEqual([
+      'src/commands/third.ts:1: @open-tomato/rafa-board/commands/issue/list',
+    ]);
+  });
+
+  test('control: a static or re-exported subpath import in a named file is still refused', () => {
+    const planted = [
+      'import { runIssueList } from \'@open-tomato/rafa-board/commands/issue/list\';',
+      'import type { ReadyReport } from \'@open-tomato/rafa-board/commands/issue/ready\';',
+      'export { runIssueList } from \'@open-tomato/rafa-board/commands/issue/list\';',
+      'const lazy = await import(\'@open-tomato/rafa-board/commands/issue/list\');',
+    ].join('\n');
+
+    expect(subpathRefusals('src/commands/roadmap.ts', planted)).toEqual([
+      'src/commands/roadmap.ts:1: @open-tomato/rafa-board/commands/issue/list',
+      'src/commands/roadmap.ts:2: @open-tomato/rafa-board/commands/issue/ready',
+      'src/commands/roadmap.ts:3: @open-tomato/rafa-board/commands/issue/list',
     ]);
   });
 });
