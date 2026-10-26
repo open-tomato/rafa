@@ -12,7 +12,7 @@
  *
  * Every case plants a situation and asks for the one state it answers.
  * The fakes are a `GitRunner` answering by argv, the pull request
- * double (`src/pr/pull-requests-double.ts`), a board of plain
+ * double (`packages/rafa/src/pr/pull-requests-double.ts`), a board of plain
  * functions, and a plans directory of its own under a temporary root,
  * so nothing here spawns `git`, spawns `gh` or reaches GitHub.
  *
@@ -124,8 +124,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { isPrecondition, NEXT_PRECONDITIONS, NEXT_STATES, readNextState } from './state.js';
 

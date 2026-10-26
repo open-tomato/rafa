@@ -32,10 +32,10 @@ import type {
   PullRequestComment,
   PullRequestDetail,
 } from '../../pr/index.js';
-import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -43,7 +43,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import {
   NO_WORKFLOW_WARNING,
   noPullRequestWorkflowLine,

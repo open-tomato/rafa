@@ -41,11 +41,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { settleState } from '../next/settle-step.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';

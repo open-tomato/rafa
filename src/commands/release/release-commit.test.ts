@@ -21,8 +21,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../../pr/index.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { readReleaseCommit } from './release-commit.js';
 

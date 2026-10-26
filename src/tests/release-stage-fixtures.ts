@@ -165,7 +165,7 @@ export const FORECAST_LINE: string = 'Release forecast: this branch ships as the
 /**
  * What `resolvePrProvider` answers for a repository with no GitHub
  * origin: the resolution the stage must read before it reaches for
- * `gh` at all. See `src/pr/provider.ts`.
+ * `gh` at all. See `packages/rafa/src/pr/provider.ts`.
  */
 export const PROVIDER_NONE: PrProviderReading = { provider: 'none', source: 'remote', remote: null, host: null };
 

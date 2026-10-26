@@ -19,9 +19,9 @@
  * where the same probe sees a write.
  */
 import type { ReleaseSettleSeams } from './settle.js';
-import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { WorkspaceWorld } from '../../tests/workspace-world.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,7 +29,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   BOTH_SUBJECT,

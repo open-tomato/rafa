@@ -19,11 +19,11 @@
  * `PullRequests`, and a member added to the port reddens the types gate
  * here, in one place, rather than passing silently in eight.
  *
- * It is a test helper all the same — bun runs nothing in it until a
- * `*.test.ts` calls it — so it is NOT re-exported from `./index.js`, for
- * the reason the barrel's note gives for `./gh-fake.js`: a barrel
- * carrying it would put it into the import graph of the loop itself.
- * Import it as `../pr/pull-requests-double.js`.
+ * It is a test helper all the same — bun runs nothing in it until a `*.test.ts`
+ * calls it — so it is NOT re-exported from `./index.js`, for the reason the
+ * barrel's note gives for `./gh-fake.js`: a barrel carrying it would put it
+ * into the import graph of the loop itself. Import it as
+ * `@open-tomato/rafa/pr/pull-requests-double`.
  *
  * ## What the double is for, and what it is not
  *

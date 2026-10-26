@@ -18,11 +18,12 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
 import { plantProjectConfig } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** The `src/` directory. */

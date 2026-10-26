@@ -24,8 +24,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
 import { openNdjsonStore } from '@open-tomato/rafa/store';
-
-import { scratchHomeEnv } from './scratch-home-env.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 /** The command every run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

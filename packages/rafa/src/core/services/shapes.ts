@@ -1,12 +1,13 @@
 /**
  * The shapes the service registry's function types are written over:
- * what a board call site hands each service and what it reads back,
- * declared in core so the call site states neither from run nor from pr.
+ * what a board or release call site hands each service and what it
+ * reads back, declared in core so the call site states none of them
+ * from run or from pr.
  *
  * ## Why each is narrow
  *
- * Each declaration holds the fields a board call site passes and the
- * fields it reads, and no more. The higher package's function is checked
+ * Each declaration holds the fields a call site passes and the fields it
+ * reads, and no more. The higher package's function is checked
  * against the service type at the root's registration, where
  * `CORE_SERVICES` of `src/service-registry.ts` `satisfies RafaServices`:
  * a function that stops taking a field passed here, or answers a value
@@ -30,9 +31,17 @@
  * them and imports them from `@open-tomato/rafa/core/services`. They are
  * the whole shape of that function, so core states it with no copy.
  *
+ * ## The pull request provider
+ *
+ * {@link PullRequestsInService} answers core's `PullRequests` port,
+ * declared in `packages/rafa/src/pr/types.ts`, which moved into core's
+ * package before the service entered, so the key is written over the
+ * port itself and no shape of it is spelled here. `rafa release settle`
+ * (`src/commands/release/settle.ts`) reads the provider through it.
+ *
  * ## The service types
  *
- * The four function types `RafaServices` (`./registry.ts`) is keyed by
+ * The five function types `RafaServices` (`./registry.ts`) is keyed by
  * close the file, one per service, named for its key. They are declared
  * here rather than in the registry, so the registry imports from this
  * file alone.
@@ -44,6 +53,7 @@ import type {
   FindingsWriterSeams,
 } from '../../effort/store/findings.js';
 import type { IssueRef, Tracker } from '../../ports/index.js';
+import type { PullRequests } from '../../pr/types.js';
 import type { TaskReport } from '../../report/parse.js';
 import type { NamedSecret, SecretEnvironment } from '../../triage/filed-text.js';
 import type { StaleDocEntry } from '../../triage/stale-doc-line.js';
@@ -204,6 +214,13 @@ export interface AddStaleDocLineOptions {
  * nothing of what it answers, so the answer is `unknown`.
  */
 export type EndWithNextStepService = (context: RafaContext, seams?: EndingSeams) => Promise<unknown>;
+
+/**
+ * The pull request provider for the repository at `root`. The real
+ * function spawns `gh` there; the call site reads only the port it
+ * answers.
+ */
+export type PullRequestsInService = (root: string) => PullRequests;
 
 /** Triages one report: files, comments on or skips each out-of-scope bug. */
 export type TriageReportService = (options: TriageServiceOptions) => Promise<TriageServiceResult>;

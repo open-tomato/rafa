@@ -71,7 +71,7 @@
  * that JSON, and a login that is not one GitHub login (a bot's
  * `name[bot]`, say, which never enters an API path) are `unknown`.
  */
-import type { PullRequestReview, PullRequests } from './types.js';
+import type { PullRequestReview, PullRequests } from '@open-tomato/rafa/pr/types';
 import type {
   Codeowners,
   GhResult,

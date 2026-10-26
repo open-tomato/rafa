@@ -58,15 +58,15 @@ export const BOARD_NAMED: readonly string[] = [
  * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
  * item (rafa-1333) moved `packages/rafa/src/bugs/fill.ts` and
  * `packages/rafa/src/bugs/versions.ts` into core's package too, and the
- * same folder places them.
+ * same folder places them. The sixth decouple item (rafa-1362) moved the
+ * stale-docs files `src/docs/open-lines.ts` and `src/docs/release-issue.ts`
+ * to the release list, since each reaches only release and core.
  */
 export const PR_NAMED: readonly string[] = [
   'src/bugs/filed-values.ts',
   'src/cleanup/branches.ts',
   'src/cleanup/groups.ts',
   'src/cleanup/steps.ts',
-  'src/docs/open-lines.ts',
-  'src/docs/release-issue.ts',
   'src/docs/task-reading.ts',
   'src/next/owner-gate.ts',
   'src/next/relations-mode.ts',
@@ -115,10 +115,17 @@ export const RUN_NAMED: readonly string[] = [
  * release package. The section file `config-schema-release.ts` left the
  * list in the third decouple item (rafa-1325), which moves it into core's
  * package, where the `packages/rafa/` folder of `CUT_RULES` places it.
+ * The sixth decouple item (rafa-1362) placed the two stale-docs files
+ * here by pass 1's rule: each reaches only release and core
+ * (`release-issue.ts` the release forecast and version helpers,
+ * `open-lines.ts` only `release-issue.ts`), and a file goes with the
+ * latest package it reaches.
  */
 export const RELEASE_NAMED: readonly string[] = [
   'src/cleanup/past-head.ts',
   'src/commands/doctor-ladder.ts',
+  'src/docs/open-lines.ts',
+  'src/docs/release-issue.ts',
   'src/next/epic-end.ts',
   'src/project/lock.ts',
 ];

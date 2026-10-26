@@ -2604,22 +2604,7 @@
     },
     {
       "kind": "test",
-      "path": "src/tests/git-identity-spawn.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/tests/git-identity.sweep.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
-      "path": "src/tests/git-identity.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test-support",
-      "path": "src/tests/git-identity.ts",
       "upwardEdgesIn": 0
     },
     {
@@ -3219,16 +3204,6 @@
     },
     {
       "kind": "test",
-      "path": "src/tests/scratch-home-env.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test-support",
-      "path": "src/tests/scratch-home-env.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/tests/self-update-live-loop-integration.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3524,9 +3499,9 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 198,
-        "test": 138,
-        "testSupport": 7
+        "source": 201,
+        "test": 144,
+        "testSupport": 9
       },
       "files": [
         "packages/rafa/src/adapters/logger/active.ts",
@@ -3826,6 +3801,12 @@
         "packages/rafa/src/ports/spec-review.ts",
         "packages/rafa/src/ports/unresolved-tracker.test.ts",
         "packages/rafa/src/ports/unresolved-tracker.ts",
+        "packages/rafa/src/pr/provider.test.ts",
+        "packages/rafa/src/pr/provider.ts",
+        "packages/rafa/src/pr/pull-requests-double.test.ts",
+        "packages/rafa/src/pr/pull-requests-double.ts",
+        "packages/rafa/src/pr/types.test.ts",
+        "packages/rafa/src/pr/types.ts",
         "packages/rafa/src/project/bin-path.test.ts",
         "packages/rafa/src/project/bin-path.ts",
         "packages/rafa/src/project/package-of.ts",
@@ -3850,8 +3831,13 @@
         "packages/rafa/src/start/branch-decision.test.ts",
         "packages/rafa/src/start/branch-decision.ts",
         "packages/rafa/src/start/worktree-dir.ts",
+        "packages/rafa/src/tests/git-identity-spawn.test.ts",
+        "packages/rafa/src/tests/git-identity.test.ts",
+        "packages/rafa/src/tests/git-identity.ts",
         "packages/rafa/src/tests/output-sinks.test.ts",
         "packages/rafa/src/tests/output-sinks.ts",
+        "packages/rafa/src/tests/scratch-home-env.test.ts",
+        "packages/rafa/src/tests/scratch-home-env.ts",
         "packages/rafa/src/triage/bug-key.test.ts",
         "packages/rafa/src/triage/bug-key.ts",
         "packages/rafa/src/triage/doc-only.test.ts",
@@ -3874,7 +3860,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 343
+        "packages/rafa/": 354
       },
       "folders": [
         "packages/rafa/"
@@ -4610,20 +4596,6 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/docs/release-issue.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/release/forecast.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/docs/release-issue.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/release/version.ts",
-          "toPackage": "rafa-release"
-        },
-        {
           "from": "src/next/owner-gate.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
@@ -4744,8 +4716,8 @@
         }
       ],
       "fileCounts": {
-        "source": 87,
-        "test": 115,
+        "source": 82,
+        "test": 110,
         "testSupport": 2
       },
       "files": [
@@ -4836,10 +4808,6 @@
         "src/commands/pr/wait-grace-driven.test.ts",
         "src/commands/pr/wait.test.ts",
         "src/commands/pr/wait.ts",
-        "src/docs/open-lines.test.ts",
-        "src/docs/open-lines.ts",
-        "src/docs/release-issue.test.ts",
-        "src/docs/release-issue.ts",
         "src/docs/task-reading.test.ts",
         "src/docs/task-reading.ts",
         "src/next/owner-gate.test.ts",
@@ -4887,10 +4855,6 @@
         "src/pr/plans/validate.test.ts",
         "src/pr/preflight-items.test.ts",
         "src/pr/preflight-items.ts",
-        "src/pr/provider.test.ts",
-        "src/pr/provider.ts",
-        "src/pr/pull-requests-double.test.ts",
-        "src/pr/pull-requests-double.ts",
         "src/pr/settle-waiting.test.ts",
         "src/pr/settle-waiting.ts",
         "src/pr/triage/attempts.test.ts",
@@ -4913,8 +4877,6 @@
         "src/pr/triage/select.ts",
         "src/pr/triage/version-convert.test.ts",
         "src/pr/triage/version-convert.ts",
-        "src/pr/types.test.ts",
-        "src/pr/types.ts",
         "src/pr/unchecked.test.ts",
         "src/pr/unchecked.ts",
         "src/pr/workflow-triggers.test.ts",
@@ -4957,7 +4919,7 @@
       "filesByFolder": {
         "packages/rafa-pr/": 0,
         "src/commands/pr/": 79,
-        "src/pr/": 65,
+        "src/pr/": 59,
         "src/triage/": 32
       },
       "folders": [
@@ -4972,8 +4934,6 @@
         "src/cleanup/branches.ts",
         "src/cleanup/groups.ts",
         "src/cleanup/steps.ts",
-        "src/docs/open-lines.ts",
-        "src/docs/release-issue.ts",
         "src/docs/task-reading.ts",
         "src/next/owner-gate.ts",
         "src/next/relations-mode.ts",
@@ -4984,8 +4944,8 @@
         "src/pr/index.ts"
       ],
       "rank": 6,
-      "remaining": 50,
-      "upwardEdges": 50
+      "remaining": 48,
+      "upwardEdges": 48
     },
     {
       "clearedByIssue118": 0,
@@ -5058,6 +5018,13 @@
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/release/version.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/start/stale-docs.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "src/docs/release-issue.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -5427,8 +5394,8 @@
         "src/runtime/install.ts"
       ],
       "rank": 7,
-      "remaining": 18,
-      "upwardEdges": 18
+      "remaining": 19,
+      "upwardEdges": 19
     },
     {
       "clearedByIssue118": 0,
@@ -5442,8 +5409,8 @@
         }
       ],
       "fileCounts": {
-        "source": 54,
-        "test": 69,
+        "source": 56,
+        "test": 71,
         "testSupport": 0
       },
       "files": [
@@ -5493,6 +5460,10 @@
         "src/commands/release/workflows.levels.test.ts",
         "src/commands/release/workflows.test.ts",
         "src/commands/release/workflows.ts",
+        "src/docs/open-lines.test.ts",
+        "src/docs/open-lines.ts",
+        "src/docs/release-issue.test.ts",
+        "src/docs/release-issue.ts",
         "src/next/epic-end.test.ts",
         "src/next/epic-end.ts",
         "src/project/lock.test.ts",
@@ -5585,6 +5556,8 @@
       "named": [
         "src/cleanup/past-head.ts",
         "src/commands/doctor-ladder.ts",
+        "src/docs/open-lines.ts",
+        "src/docs/release-issue.ts",
         "src/next/epic-end.ts",
         "src/project/lock.ts"
       ],
@@ -5755,8 +5728,8 @@
       "edges": [],
       "fileCounts": {
         "source": 176,
-        "test": 532,
-        "testSupport": 24
+        "test": 529,
+        "testSupport": 22
       },
       "files": [
         "src/adapter-registry.test.ts",
@@ -6319,10 +6292,7 @@
         "src/tests/facade-subpaths.sweep.test.ts",
         "src/tests/findNextTask.test.ts",
         "src/tests/finished-task.test.ts",
-        "src/tests/git-identity-spawn.test.ts",
         "src/tests/git-identity.sweep.test.ts",
-        "src/tests/git-identity.test.ts",
-        "src/tests/git-identity.ts",
         "src/tests/hint-tool-names.test.ts",
         "src/tests/import-cycle.sweep.test.ts",
         "src/tests/init-board-project-spawned.test.ts",
@@ -6442,8 +6412,6 @@
         "src/tests/roadmap-rows-integration.test.ts",
         "src/tests/routing-table-agents.sweep.test.ts",
         "src/tests/schema-records.test.ts",
-        "src/tests/scratch-home-env.test.ts",
-        "src/tests/scratch-home-env.ts",
         "src/tests/self-update-live-loop-integration.test.ts",
         "src/tests/serve-spawned.test.ts",
         "src/tests/skill-gap-section.test.ts",
@@ -6514,11 +6482,11 @@
   "totals": {
     "clearedByIssue118": 0,
     "files": 2193,
-    "leftToPlace": 692,
-    "nonTestEdges": 4864,
+    "leftToPlace": 687,
+    "nonTestEdges": 4867,
     "unassignedFiles": 28,
     "unrankedEdges": 75,
-    "upwardEdges": 71
+    "upwardEdges": 70
   },
   "unassigned": [
     {
@@ -6560,9 +6528,9 @@
       },
       "importsFrom": {
         "@open-tomato/rafa": 2,
-        "@open-tomato/rafa-core": 20,
+        "@open-tomato/rafa-core": 21,
         "rafa-board": 4,
-        "rafa-pr": 5,
+        "rafa-pr": 4,
         "rafa-run": 1,
         "src/ci/": 1,
         "src/stretch/": 12

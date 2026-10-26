@@ -14,8 +14,8 @@
  * answers 0, so a probe that always failed would not read as a working
  * check here.
  */
-import type { PrProviderReading } from './provider.js';
 import type { PreflightCheck } from '../preflight/run.js';
+import type { PrProviderReading } from '@open-tomato/rafa/pr/provider';
 
 import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

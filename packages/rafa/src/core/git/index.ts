@@ -58,13 +58,13 @@
  * before the move; the working tree reader and `unquoteGitPath`, which
  * came here later from `src/pr/merge.ts`, it does not re-export.
  * `config-sections.ts` imports
- * `src/pr/types.ts` directly and not that barrel, which is why the edge
+ * `packages/rafa/src/pr/types.ts` directly and not that barrel, which is why the edge
  * closes nothing.
  *
  * Measured when the two moved: the value imports of the non-test files
  * under `src/` and `packages/` held six cycles before the move and the
  * same six after it, none through a file of this folder. The control,
- * the same tree with `src/pr/types.ts` taking one value (`gitSaid`) from
+ * the same tree with `packages/rafa/src/pr/types.ts` taking one value (`gitSaid`) from
  * this barrel, held a seventh: that file, `config-sections.ts`, `git.ts`
  * and this one. No load order of the control was run.
  *

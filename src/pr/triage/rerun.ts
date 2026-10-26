@@ -125,7 +125,7 @@
 import type { MergeReading } from './classify.js';
 import type { TriageBlock } from './comment.js';
 import type { CheckRow, ChecksVerdict } from '../checks.js';
-import type { PullRequestComment } from '../types.js';
+import type { PullRequestComment } from '@open-tomato/rafa/pr/types';
 
 import { verdictOf } from '../checks.js';
 

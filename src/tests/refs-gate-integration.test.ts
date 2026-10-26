@@ -33,6 +33,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from '@open-tomato/rafa/board/naming';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { BOARD_REFUSAL_EXIT } from '@open-tomato/rafa-board/board/exit-codes';
 import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
@@ -41,8 +43,6 @@ import { readRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
 import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** `src/`, where every module the probe imports lives. */

@@ -61,8 +61,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { consoleAndExitUses } from './source-uses.js';
 import { hostToolDirs } from './stand-in-gh.js';
 

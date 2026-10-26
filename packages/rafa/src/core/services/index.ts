@@ -15,9 +15,9 @@
  * `registerServices`, `restoreServices` and `activeServices`, the last a
  * frozen facade whose members refuse, naming the root
  * `src/service-registry.ts`, while nothing is registered. `shapes.ts`:
- * the types the four service types are written over, the three
+ * the types the five service types are written over, the three
  * stale-docs line types `src/docs/release-issue.ts` declared before
- * among them, and the four service types themselves.
+ * among them, and the five service types themselves.
  *
  * ## Why one barrel can hold both
  *
@@ -41,6 +41,7 @@ export type {
   AddStaleDocLineService,
   EndingSeams,
   EndWithNextStepService,
+  PullRequestsInService,
   ReadStaleDocsVersionService,
   StaleDocLineResult,
   StaleDocsTracker,

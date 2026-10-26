@@ -125,7 +125,7 @@ import { dirname, join } from 'node:path';
 
 import { ADMIN_FILES, GIT_DIR } from '@open-tomato/rafa-run';
 
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 /** The moment the default build is built around: every commit is dated it, except `stale`'s. */
 export const SCRATCH_NOW: Date = new Date('2026-09-24T12:00:00Z');

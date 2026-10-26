@@ -13,9 +13,9 @@
  * `package.json`, the changelog section and `rafa.lock` at that version.
  */
 import type { ReleaseSettleSeams } from './settle.js';
-import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,13 +24,13 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { projectLockText } from '../../project/lock.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createReleaseSettleCommand } from './settle.js';
 

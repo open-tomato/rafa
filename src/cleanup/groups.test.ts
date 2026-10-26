@@ -8,8 +8,8 @@ import type { BranchesRead, LocalBranch } from './branches.js';
 import type { BranchGroups, BranchGroupsReading, MergedRow, ProviderMerges } from './groups.js';
 import type { PastHeadRead } from './past-head.js';
 import type { WorktreeBlocker, WorktreeRow } from './worktrees.js';
-import type { MergedPullRequest } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { MergedPullRequest } from '@open-tomato/rafa/pr/types';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -19,9 +19,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { readBranches } from './branches.js';
 import {

@@ -35,7 +35,7 @@
  * repository that names nothing. The ids are not read: nothing in the
  * port answers a provider's node id.
  */
-import type { ClosingIssue } from './types.js';
+import type { ClosingIssue } from '@open-tomato/rafa/pr/types';
 
 import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 

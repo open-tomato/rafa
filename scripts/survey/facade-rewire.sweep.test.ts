@@ -79,7 +79,9 @@ interface RewiredRow {
  * in the fourth decouple item: its one release import by path was
  * `directoryPrefix` and `fragmentIdOf`, which it takes from
  * `@open-tomato/rafa/release/fragment` now. `src/docs/release-issue.ts`
- * stays, for `SettleForecast` and `nextVersion`.
+ * stayed, for `SettleForecast` and `nextVersion`, until the sixth decouple
+ * item placed it in release by name, so its imports are inside release
+ * and the row is empty.
  * Pr's 13 load-cycle files are claims, cleanup, next, start and release files
  * pr's files reach, three of them release files that are back edges the
  * load-cycle group takes first. `packages/rafa/src/claims/git.ts`,
@@ -102,6 +104,23 @@ interface RewiredRow {
  * `TriageServiceResult`. `packages/rafa-board/src/commands/epic/close-docs.ts`, the last
  * board file among them, left them in the same item: its pr import by
  * path was `addStaleDocLine`, which it reaches through the same registry.
+ * The sixth decouple item took ten back-edge and three load-cycle files
+ * off the row, the release commands, `src/next/epic-end.ts`,
+ * `src/release/branch-forecast.ts`, `prepare.ts` and `verify.ts`: their
+ * one pr import by path was the pr barrel, for core's git names, which
+ * they take from `@open-tomato/rafa/core/git` now. `src/cleanup/past-head.ts`
+ * left it in the same item: its one pr import by path was
+ * `MergedPullRequest` of `packages/rafa/src/pr/types.ts`, which the item's
+ * core move list took into core. `src/release/settle-pr.ts` left it in
+ * the same item: its one pr import by path was the pr barrel, for the port
+ * types it takes from `@open-tomato/rafa/pr/types` now.
+ * `src/commands/release/status-stale-docs.ts` left it in the same item:
+ * its one pr import by path was `src/docs/open-lines.ts`, which the item
+ * placed in release by name. `src/commands/release/settle.ts`, the last
+ * release file on the row, left it in the same item: its one pr import
+ * by path was `ghPullRequestsIn`, which it reaches through core's service
+ * registry as `pullRequestsIn`. So the row keeps 8 load-cycle files and
+ * no back-edge file.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -147,35 +166,16 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-board',
   },
   {
-    allowed: {
-      'src/docs/release-issue.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-release',
   },
   {
     allowed: {
       'src/claims/lost.ts': 'loadCycle',
-      'src/cleanup/past-head.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
-      'src/commands/release/fragment.ts': 'backEdge',
-      'src/commands/release/list.ts': 'backEdge',
-      'src/commands/release/publish.ts': 'backEdge',
-      'src/commands/release/release-commit.ts': 'backEdge',
-      'src/commands/release/settle.ts': 'backEdge',
-      'src/commands/release/status-fragments.ts': 'loadCycle',
-      'src/commands/release/status-packages.ts': 'backEdge',
-      'src/commands/release/status-stale-docs.ts': 'backEdge',
-      'src/commands/release/status.ts': 'backEdge',
-      'src/commands/release/tag-units.ts': 'backEdge',
-      'src/commands/release/tag.ts': 'backEdge',
-      'src/next/epic-end.ts': 'loadCycle',
       'src/next/hint.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/readings.ts': 'loadCycle',
-      'src/release/branch-forecast.ts': 'loadCycle',
-      'src/release/prepare.ts': 'backEdge',
-      'src/release/settle-pr.ts': 'loadCycle',
-      'src/release/verify.ts': 'backEdge',
       'src/start/pr-lifecycle.ts': 'loadCycle',
       'src/start/pr-retarget.ts': 'loadCycle',
       'src/start/suite-blocker.ts': 'loadCycle',
@@ -194,7 +194,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/pr/triage-resolve.ts': 'backEdge',
       'src/commands/pr/triage.ts': 'backEdge',
       'src/commands/pr/wait.ts': 'backEdge',
-      'src/next/epic-end.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
       'src/next/settle-step.ts': 'loadCycle',
       'src/next/sources.ts': 'loadCycle',

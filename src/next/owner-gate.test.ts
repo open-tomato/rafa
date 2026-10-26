@@ -20,7 +20,7 @@
  *    no position file, where the default board's listing must be sent;
  *    the log shows which of the two was asked.
  */
-import type { PullRequestReview } from '../pr/types.js';
+import type { PullRequestReview } from '@open-tomato/rafa/pr/types';
 import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
 

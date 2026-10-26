@@ -37,14 +37,14 @@
  *
  * ## The `none` provider
  *
- * Once it has a branch, and before anything is asked of `gh`, the gate
- * reads which provider the repository gets
- * ({@link PrLifecycleSeams.readProvider}, over `pr/provider.ts`). A reading of `none` has no CLI to open a pull
- * request with and so nothing to poll, and it takes the whole of the
- * gate's other path: the branch is PUSHED, the compare URL printed, and
- * the CI wait skipped and said to be skipped (`pr/none.ts`). No PR is
- * looked for, no check is polled and no repair session is spent, so
- * `pr.provider: none` costs a `git push` and nothing else.
+ * Once it has a branch, and before anything is asked of `gh`, the gate reads
+ * which provider the repository gets ({@link PrLifecycleSeams.readProvider},
+ * over `packages/rafa/src/pr/provider.ts`). A reading of `none` has no CLI to
+ * open a pull request with and so nothing to poll, and it takes the whole of
+ * the gate's other path: the branch is PUSHED, the compare URL printed, and the
+ * CI wait skipped and said to be skipped (`pr/none.ts`). No PR is looked for,
+ * no check is polled and no repair session is spent, so `pr.provider: none`
+ * costs a `git push` and nothing else.
  *
  * That reading comes before {@link PrLifecycleSeams.isGhUsable} on
  * purpose. The two skips are different facts and say different things:

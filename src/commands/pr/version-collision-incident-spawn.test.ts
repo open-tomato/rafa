@@ -60,9 +60,9 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { expectExit, plantProjectConfig, runRafa } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 import { hostToolDirs } from '../../tests/stand-in-gh.js';
 
 /** A temporary directory of this file's own. */

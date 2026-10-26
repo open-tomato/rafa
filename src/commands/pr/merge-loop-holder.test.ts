@@ -32,8 +32,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { WORKTREE_STATUS } from '../../cleanup/worktrees.js';
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
 import { createPrMergeCommand } from './merge.js';

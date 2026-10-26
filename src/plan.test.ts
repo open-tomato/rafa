@@ -188,6 +188,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from '@open-tomato/rafa/board/naming';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { epicContextArgs } from '@open-tomato/rafa-board/board/epic-context';
 import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
 import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
@@ -208,7 +209,6 @@ import {
 } from './plan.js';
 import { projectConfigText } from './project/scaffold.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
-import { scratchHomeEnv } from './tests/scratch-home-env.js';
 import { hostToolDirs } from './tests/stand-in-gh.js';
 
 /** This file's directory, `src/`, where the modules the probe imports sit. */

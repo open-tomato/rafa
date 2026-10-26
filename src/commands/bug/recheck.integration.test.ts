@@ -25,10 +25,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
-import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
 import { rerunOf } from '../../triage/bug-filing.js';
 
 import { recheckBug } from './recheck-run.js';

@@ -28,9 +28,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once the case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-switch-drift-')));

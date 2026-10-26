@@ -22,18 +22,18 @@
  *    the cases that stop early assert the reads they did NOT send.
  */
 import type { GatedOwner, OwnerApproval, OwnerApprovalRequest, TeamMembership } from './owner-approval.js';
-import type { PullRequestReview } from './types.js';
+import type { PullRequestReview } from '@open-tomato/rafa/pr/types';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { OwnedBoard } from '@open-tomato/rafa-board/board/board-owns';
 import type { OwnerResolution } from '@open-tomato/rafa-board/board/owner-resolve';
 
 import { describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { parseCodeowners } from '@open-tomato/rafa-board/board/codeowners';
 
 import { httpFailure, notFound } from './gh-fake-shapes.js';
 import { createGhTeamMembership, readOwnerApproval, teamMembershipArgs } from './owner-approval.js';
-import { createPullRequestsDouble } from './pull-requests-double.js';
 
 const MEMBERSHIP_DOCS = 'https://docs.github.com/rest/teams/members#get-team-membership-for-a-user';
 

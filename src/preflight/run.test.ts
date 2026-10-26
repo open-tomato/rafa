@@ -33,8 +33,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './run.js';
 

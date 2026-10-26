@@ -53,6 +53,7 @@ describe('registerCoreServices', () => {
     const stubs = {
       addStaleDocLine: async () => { calls.push('addStaleDocLine'); return {} as never; },
       endWithNextStep: async () => { calls.push('endWithNextStep'); },
+      pullRequestsIn: () => { calls.push('pullRequestsIn'); return {} as never; },
       readStaleDocsVersion: () => { calls.push('readStaleDocsVersion'); return 'stub'; },
       triageReport: async () => { calls.push('triageReport'); return {} as never; },
     } satisfies RafaServices;

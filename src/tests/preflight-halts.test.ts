@@ -61,13 +61,13 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { resolveConfig } from '@open-tomato/rafa/core/config';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { forkWorktree } from '../preflight/fork.js';
 import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { builtPath, plantGitOnlyDir, plantStandInGh } from './stand-in-gh.js';
 
 /** The CLI entry every spawned case runs. */

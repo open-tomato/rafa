@@ -56,14 +56,14 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { renderCancelledEpicNotice } from '@open-tomato/rafa-board/board/epic-cancel-notice';
 import { renderCancelComment, renderDependentComment, renderUnblockNote } from '@open-tomato/rafa-board/board/epic-trail';
 import { parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 import { readEpicToCancel, dependentLines, dependentQuestion, unaskedCancelMessage } from '@open-tomato/rafa-board/commands/epic/cancel';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** This module's own directory, `src/tests/`. */
 const TESTS_DIR = fileURLToPath(new URL('.', import.meta.url));

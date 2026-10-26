@@ -34,6 +34,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
 import { parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 import { createPlanDirNames, readRoadmapRows } from '@open-tomato/rafa-board/board/roadmap-rows';
@@ -44,7 +45,6 @@ import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-roadmap-epics-cli-')));

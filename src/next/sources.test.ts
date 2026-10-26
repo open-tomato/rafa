@@ -108,11 +108,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
 import { resolveScope } from '@open-tomato/rafa/project/scope';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { ghNextBoard, openNextSources } from './sources.js';
 

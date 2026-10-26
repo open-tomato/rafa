@@ -45,12 +45,12 @@ import { fileURLToPath } from 'node:url';
 
 import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { dispatch } from '../cli/dispatch.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { builtPath, hostToolDirs, plantGitOnlyDir } from './stand-in-gh.js';
 
 /** The CLI entry a spawned run executes. */

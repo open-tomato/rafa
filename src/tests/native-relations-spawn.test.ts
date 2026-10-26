@@ -28,6 +28,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
 import { EPIC_GUARD_PATH } from '@open-tomato/rafa-board/board/epic-guard';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
@@ -39,7 +40,6 @@ import { EPIC_GUARD_NATIVE_REFUSAL } from '../commands/init-board.js';
 import { freedHeaderLine, freedIssueLine } from '../commands/pr/merge-freed.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-native-relations-spawn-')));

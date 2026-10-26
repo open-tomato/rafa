@@ -85,13 +85,12 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { draftFixture, runTrackerContract } from '@open-tomato/rafa-board/adapters/tracker/contract';
 import { createGhRunner, createGithubTracker, GITHUB_LABELS } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
 import { OPEN_ISSUES_LIMIT } from '@open-tomato/rafa-board/adapters/tracker/github-open-issues';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
-
-import { scratchHomeEnv } from '../../../scratch-home-env.js';
 
 /** The URL of issue 1 in the fake's default repository. */
 const ISSUE_1_URL = 'https://github.com/open-tomato/rafa/issues/1';

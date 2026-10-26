@@ -90,7 +90,7 @@
  *
  * The one thing NOT carried is a provider that could not be ASKED. The
  * port answers null for a pull request that is not there and THROWS when
- * it could not look (`src/pr/types.ts`), so a throw out of `findOpen`,
+ * it could not look (`packages/rafa/src/pr/types.ts`), so a throw out of `findOpen`,
  * `get` or `checks` means the provider is unusable rather than that the
  * repository has no pull request, and it is left to the caller
  * unchanged.

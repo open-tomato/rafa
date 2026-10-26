@@ -41,11 +41,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { INDENT } from './merge-cleanup.js';

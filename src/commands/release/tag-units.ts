@@ -38,8 +38,8 @@
  * two would otherwise import each other's values.
  */
 import type { TagDecision, TagInputs, TagReady, TagRefused } from './tag.js';
-import type { GitRunner } from '../../pr/index.js';
 import type { WorkspacePackage } from '../../release/workspace-packages.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

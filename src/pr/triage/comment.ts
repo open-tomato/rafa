@@ -128,8 +128,8 @@ import type { TriageClass } from './classes.js';
 import type { TriageAssessment } from './classify.js';
 import type { FailedLogEvidence } from './evidence.js';
 import type { FollowUpPullRequest } from './follow-up.js';
-import type { PullRequestComment, PullRequests } from '../types.js';
 import type { Mapping } from '@open-tomato/rafa/core/config/sections';
+import type { PullRequestComment, PullRequests } from '@open-tomato/rafa/pr/types';
 
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';

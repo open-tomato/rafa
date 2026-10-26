@@ -176,17 +176,17 @@ import type {
   PullRequestState,
   PullRequestSummary,
   PullRequests,
-} from './types.js';
+} from '@open-tomato/rafa/pr/types';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board';
 
 import { createGhRunner } from '@open-tomato/rafa-board';
 
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import { MERGE_METHODS, isMergeMethod } from '@open-tomato/rafa/pr/types';
 
 import { parseChecks, verdictOf } from './checks.js';
 import { closePullRequest } from './gh-close.js';
 import { CLOSING_ISSUES_FIELD, readClosingIssues } from './gh-closing-issues.js';
-import { MERGE_METHODS, isMergeMethod } from './types.js';
 
 /** What every refusal opens with. */
 const PREFIX = 'gh pull requests';

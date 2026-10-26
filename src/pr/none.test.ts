@@ -43,7 +43,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { compareUrl, pushBranch } from './none.js';
 

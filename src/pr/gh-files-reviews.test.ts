@@ -15,7 +15,7 @@
  * adapter reading either as an empty list would tell the owner gate
  * "touches nothing" or "nobody reviewed".
  */
-import type { PullRequests } from './types.js';
+import type { PullRequests } from '@open-tomato/rafa/pr/types';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';

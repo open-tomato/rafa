@@ -27,13 +27,13 @@
  *
  * ## What the compare URL is built from
  *
- * {@link compareUrl} builds GitHub's `.../compare/<branch>?expand=1`
- * shape from `origin` and the branch. It takes the path through
- * `normalizeRemote` (`schema/project-id.ts`), the one remote parser in
- * this repository, so the scheme, any embedded credentials, an
- * scp-style colon and a trailing `.git` are stripped by the same code
- * `projectId` and `pr/provider.ts` use rather than by a second parser
- * that can disagree.
+ * {@link compareUrl} builds GitHub's `.../compare/<branch>?expand=1` shape from
+ * `origin` and the branch. It takes the path through `normalizeRemote`
+ * (`schema/project-id.ts`), the one remote parser in this repository, so the
+ * scheme, any embedded credentials, an scp-style colon and a trailing `.git`
+ * are stripped by the same code `projectId` and
+ * `packages/rafa/src/pr/provider.ts` use rather than by a second parser that
+ * can disagree.
  *
  * Two consequences of that choice are measured in `none.test.ts` and
  * not incidental. `normalizeRemote` LOWERCASES a network remote, so
@@ -59,9 +59,8 @@
  */
 import { spawnSync } from 'node:child_process';
 
+import { remoteHost } from '@open-tomato/rafa/pr/provider';
 import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
-
-import { remoteHost } from './provider.js';
 
 /** The query GitHub's compare page takes to open the PR form. */
 const COMPARE_QUERY = '?expand=1';

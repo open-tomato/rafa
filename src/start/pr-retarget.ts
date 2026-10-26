@@ -2,14 +2,14 @@
  * The retarget of a delivered pull request opened against another base
  * than the run's (rafa-628, #627).
  *
- * A wrap-up session can open its pull request into `main` while the run
- * was resolved against another base — `stretch/1` in the incident — and
- * the CI wait would then read checks GitHub ran against the wrong base.
- * {@link retargetPullRequest} is the step that closes that gap: handed
- * the pull request `deliverPullRequest` answered as `delivered` and the
- * run's base, it compares the two EXACTLY (`pull.baseRefName !== base`)
- * and, only where they differ, edits the pull request's base through the
- * provider's `editBase` (`pr/types.ts`).
+ * A wrap-up session can open its pull request into `main` while the run was
+ * resolved against another base — `stretch/1` in the incident — and the CI wait
+ * would then read checks GitHub ran against the wrong base. {@link
+ * retargetPullRequest} is the step that closes that gap: handed the pull
+ * request `deliverPullRequest` answered as `delivered` and the run's base, it
+ * compares the two EXACTLY (`pull.baseRefName !== base`) and, only where they
+ * differ, edits the pull request's base through the provider's `editBase`
+ * (`packages/rafa/src/pr/types.ts`).
  *
  * ## What it says, and what it never does
  *

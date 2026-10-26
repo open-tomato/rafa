@@ -265,7 +265,7 @@ function progressPreservedOpen(number: number): string {
  * and answers the skip sentence below; step 3 then reports that same
  * sentence and says where it did not go. No scratch repository here has
  * an `origin`, so the provider the stage resolves is `none`
- * (`src/pr/provider.ts`) and no `gh` is spawned at all — which is what
+ * (`packages/rafa/src/pr/provider.ts`) and no `gh` is spawned at all — which is what
  * makes the third line deterministic: it names the reading and the
  * sentence, not a temporary directory and whatever a spawn refused
  * with, so all three are read byte for byte.

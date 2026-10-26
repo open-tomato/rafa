@@ -80,13 +80,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry every case spawns. */

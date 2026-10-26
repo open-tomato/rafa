@@ -77,7 +77,7 @@ import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { IssueSeams } from '@open-tomato/rafa-board';
-import type { OpenStaleDocLine } from '@open-tomato/rafa-pr';
+import type { OpenStaleDocLine } from '@open-tomato/rafa-release';
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -87,7 +87,7 @@ import {
   DOC_UPDATE_TASK_PREFIX,
   DOC_UPDATE_TITLE,
   readOpenStaleDocLines,
-} from '@open-tomato/rafa-pr';
+} from '@open-tomato/rafa-release';
 
 import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';

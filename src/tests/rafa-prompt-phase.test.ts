@@ -16,7 +16,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
-import { scratchHomeEnv } from './scratch-home-env.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 const EXTRAS = join(import.meta.dir, '..', '..', 'extras', 'zsh');
 const PLUGIN = join(EXTRAS, 'rafa-prompt', 'rafa-prompt.plugin.zsh');

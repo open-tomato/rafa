@@ -31,13 +31,13 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { createGhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { locateBlockerEpic } from '@open-tomato/rafa-board/board/blocker-epic';
 import { createGhOpenPullRequests, createRoadmapReadings } from '@open-tomato/rafa-board/board/roadmap';
 import { createGhBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 import { decideHop } from '@open-tomato/rafa-board/next/hop-chain';
 
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 /** This suite's temporary directory, removed once every case has run. */

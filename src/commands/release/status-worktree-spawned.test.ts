@@ -14,8 +14,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-status-worktree-')));
 

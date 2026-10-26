@@ -4,7 +4,7 @@
  * two refusals it decides, the warning and the question, and the comment
  * posted after the merge.
  *
- * Every case drives the port double (`src/pr/pull-requests-double.ts`)
+ * Every case drives the port double (`packages/rafa/src/pr/pull-requests-double.ts`)
  * and a prompter of its own that records each question, so "asked
  * nothing" and "posted nothing" are readings off what was recorded, not
  * inferences from a message. The way this module passes while wrong is by
@@ -27,8 +27,8 @@ import type { Prompter } from '@open-tomato/rafa/core/command';
 import { describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import {
   NO_WORKFLOW_WARNING,
   UNCHECKED_MERGE_SENTENCE,

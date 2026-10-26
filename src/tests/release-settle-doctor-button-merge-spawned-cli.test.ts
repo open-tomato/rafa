@@ -26,9 +26,9 @@ import { delimiter, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** A temporary directory of this file's own. */

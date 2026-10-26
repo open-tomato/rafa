@@ -32,16 +32,16 @@
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
 import type { PackageRow, PackagesReading } from './status-packages.js';
 import type { ReleaseSeams, VersionFileReading } from './status.js';
-import type { GitRunner } from '../../pr/index.js';
 import type { TagReading } from '../../release/status-readings.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { createGitRunner } from '../../pr/index.js';
 import { readTags } from '../../release/status-readings.js';
 import { readManifestName } from '../../release/version.js';
 

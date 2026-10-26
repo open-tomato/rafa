@@ -30,15 +30,15 @@
  *      and so no PREREQUISITES file: `--plan` is how a plan's items reach
  *      the report.
  *   3. **The pull request provider's automatic items**
- *      (`pr/preflight-items.ts`): `gh` on `PATH` and `gh auth status`
- *      for `origin`'s host, both REQUIRED, when the provider resolves
- *      to `gh` (`pr/provider.ts`). They go AHEAD of the configured
+ *      (`pr/preflight-items.ts`): `gh` on `PATH` and `gh auth status` for
+ *      `origin`'s host, both REQUIRED, when the provider resolves to `gh`
+ *      (`packages/rafa/src/pr/provider.ts`). They go AHEAD of the configured
  *      required tier, exactly as `runStartPreflight` puts them
- *      (`start/preflight.ts`), because this command answers what
- *      `loop start` would do and would say the wrong thing if it
- *      checked a different set in a different order. A configured
- *      `pr.provider: none` contributes none and reads no remote at
- *      all; every other reading spawns the `origin` probe once.
+ *      (`start/preflight.ts`), because this command answers what `loop start`
+ *      would do and would say the wrong thing if it checked a different set in
+ *      a different order. A configured `pr.provider: none` contributes none and
+ *      reads no remote at all; every other reading spawns the `origin` probe
+ *      once.
  *   4. **The plan's start-only `[start]` items**
  *      (`preflight/prerequisites-md.ts`), between the provider's items
  *      and the configured required tier, exactly where

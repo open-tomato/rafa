@@ -23,8 +23,8 @@ import type { DoctorCleanupReading } from './doctor-cleanup.js';
 import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { DoctorCleanupInput } from '../cleanup/settings.js';
-import type { PullRequests } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { PullRequests } from '@open-tomato/rafa/pr/types';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { join } from 'node:path';

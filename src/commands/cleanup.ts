@@ -11,7 +11,7 @@
  * `src/cleanup/`'s {@link readCleanup}, fetch included, over the
  * config's `pr.base` and `cleanup.*` settings, git run in the directory
  * the command runs from, and the pull request provider
- * `resolvePrProvider` (`src/pr/provider.ts`) resolves for the project
+ * `resolvePrProvider` (`packages/rafa/src/pr/provider.ts`) resolves for the project
  * root: `gh` gives the provider {@link ghPullRequestsIn} makes there,
  * `none` gives none, and the Stale and Not-pushed rows then say
  * `merged state unknown`. The run records are the ones

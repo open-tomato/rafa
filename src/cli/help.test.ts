@@ -76,10 +76,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { commandSpelling, GLOBAL_FLAGS } from '@open-tomato/rafa/core/command';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { CORE_REGISTRY, createRosterRegistry, ROSTER_SUBJECTS } from '../commands/index.js';
 import { expectExit } from '../tests/cli-capture.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { assembleContext } from './core/assembleContext.js';
 import { dispatch } from './dispatch.js';

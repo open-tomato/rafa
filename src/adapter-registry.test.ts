@@ -107,6 +107,7 @@ import {
   registerConfigSections,
   restoreConfigSections,
 } from '@open-tomato/rafa/core/config';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { draftFixture } from '@open-tomato/rafa-board/adapters/tracker/contract';
 import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
 import { parseLocalIssue } from '@open-tomato/rafa-board/adapters/tracker/local';
@@ -114,7 +115,6 @@ import { parseSpecReview } from '@open-tomato/rafa-board/board/spec-review';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 
 import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
-import { scratchHomeEnv } from './tests/scratch-home-env.js';
 
 /** The module that registers the config defaults, as a child process imports it. */
 const CONFIG_REGISTRY_ENTRY = fileURLToPath(new URL('./config-registry.ts', import.meta.url));

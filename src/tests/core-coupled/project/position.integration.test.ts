@@ -35,10 +35,10 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionAt, positionFilePath, readPositionFile, writePositionFile } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { writeTrackingGitignore } from '../../../project/gitignore.js';
 import { expectExit } from '../../cli-capture.js';
-import { gitIdentityEnv } from '../../git-identity.js';
 
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-position-integration-')));
 /** The home and XDG config directory every git here runs with; see the module note. */

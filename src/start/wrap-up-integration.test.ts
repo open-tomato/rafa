@@ -10,10 +10,10 @@
  *
  * The release fragment cases: `prepareReleaseStage` and `finishRelease`
  * (`./release-stage.js`) run over a real scratch repository with a bare
- * `origin`, exactly as `src/tests/release-stage-integration.test.ts`
- * drives them, but the pull request is a `PullRequests` double
- * (`../pr/pull-requests-double.js`) rather than the `gh` fake, since the
- * subject there is what the stage SENDS a provider — the forecast in
+ * `origin`, exactly as `src/tests/release-stage-integration.test.ts` drives
+ * them, but the pull request is a `PullRequests` double
+ * (`packages/rafa/src/pr/pull-requests-double.ts`) rather than the `gh` fake,
+ * since the subject there is what the stage SENDS a provider — the forecast in
  * the body — and not a provider's own read-modify-write.
  *
  * The `pr.base` case (rafa-628, #627): under `pr.base: integration`, the
@@ -35,6 +35,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
@@ -44,7 +45,6 @@ import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { retargetedLine, retargetPullRequest } from './pr-retarget.js';
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';

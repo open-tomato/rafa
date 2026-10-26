@@ -13,9 +13,9 @@
  * none of the remote-only calls past that listing proves none ran.
  */
 import type { CleanupSeams, CleanupSettings } from './index.js';
-import type { MergedPullRequest, PullRequestSummary } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { MergedPullRequest, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,10 +26,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { EVENTS_EXTENSION, eventsFilePath } from '../start/loop-events.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { BRANCH_FORMAT } from './branches.js';
 import { unreachableNote } from './groups.js';

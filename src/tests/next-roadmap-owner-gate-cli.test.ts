@@ -185,7 +185,7 @@ function buildProbe(options: ProbeOptions): string {
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
     `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
     `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
-    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, 'pr', 'pull-requests-double.ts'))};`,
+    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',
     'const events = [];',

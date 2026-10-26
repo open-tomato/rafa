@@ -49,7 +49,7 @@
  * through its barrel `core/config/sections.js`. `MergeMethod`, the type
  * of {@link RafaConfig.prMergeMethod}, is `merge-method.ts`'s, exported
  * by that barrel and re-exported by the pull request port
- * (`src/pr/types.ts`); this module does not re-export it.
+ * (`packages/rafa/src/pr/types.ts`); this module does not re-export it.
  *
  *   - `config-sections.ts` holds every rule about a VALUE: the readers,
  *     the closed lists of values, and why nothing is coerced.

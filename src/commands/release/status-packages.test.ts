@@ -13,8 +13,8 @@
  */
 import type { WaitingFragment, WaitingReading, WaitingSettings } from './status-fragments.js';
 import type { PackagesReading } from './status-packages.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { TagReading } from '../../release/status-readings.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

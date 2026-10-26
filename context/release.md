@@ -274,7 +274,9 @@ branch and opens or updates one pending release pull request, titled with the
 commit's subject. Its body lists each unit's move and ends with one changelog
 section per unit, each under a line naming the unit. Closing that PR
 undoes the release before it lands. This is the delivery method for a protected
-base branch that requires review.
+base branch that requires review. The provider it opens that request through
+comes from core's service registry (`pullRequestsIn`, which the root registers),
+not from an import of pr.
 
 `--dry-run` prints the fragments, their order, the strategy, and the version
 that would settle, and writes nothing to the tree or remote.
@@ -494,7 +496,9 @@ last fetched) and prints:
   `src/commands/release/status-stale-docs.ts`), `none` at zero, and `?` with
   the reason under the block when the chain lands nowhere or the listing
   fails. It is the one reading that can reach the network, and no count
-  changes the exit code
+  changes the exit code. Its two files, `src/docs/open-lines.ts` and
+  `src/docs/release-issue.ts`, are release's by name since the sixth decouple
+  item.
 
 Exits 0. Never writes. Implemented in `src/commands/release/status.ts`; the
 readers other folders import (`compareVersions`, `changelogVersions`,

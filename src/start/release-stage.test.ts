@@ -43,12 +43,12 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { getCurrentBranch } from '@open-tomato/rafa/utils/git';
 import { assumptionsHeading } from '@open-tomato/rafa-board/board/review-stamp';
 
 import { verifyRelease } from '../release/verify.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 import {
   BRANCH,
   COMMITTED,

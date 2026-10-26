@@ -173,9 +173,10 @@
  * so each declares the pair the library clamps every lesson's confidence to,
  * and `src/tests/learning-contract.test.ts` holds the two equal.
  *
- * The reader of `pr.mergeMethod`, over the pull request port's three
- * methods, is not here: it sits with the setting it reads, in
- * `config-schema-release.ts`, so no core file imports `pr/types.ts`.
+ * The reader of `pr.mergeMethod`, over the pull request port's three methods,
+ * is not here: it sits with the setting it reads, in
+ * `config-schema-release.ts`, so this file imports nothing from
+ * `packages/rafa/src/pr/types.ts`.
  */
 import type { SkillTier } from '../../schema/tiers.js';
 
@@ -291,10 +292,10 @@ export type ClaudeSettingSource = (typeof CLAUDE_SETTING_SOURCES)[number];
 /**
  * The pull request providers a file may name: the GitHub CLI, and none.
  *
- * `none` is a provider and not an absence: under it the loop pushes the
- * branch, prints the compare URL and skips the CI wait, which is a
- * behaviour an operator chooses, where a setting left unnamed is one
- * `pr/provider.ts` resolves off the `origin` remote.
+ * `none` is a provider and not an absence: under it the loop pushes the branch,
+ * prints the compare URL and skips the CI wait, which is a behaviour an
+ * operator chooses, where a setting left unnamed is one
+ * `packages/rafa/src/pr/provider.ts` resolves off the `origin` remote.
  */
 export const PR_PROVIDERS = ['gh', 'none'] as const;
 

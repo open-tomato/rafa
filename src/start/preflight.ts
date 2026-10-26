@@ -254,13 +254,13 @@
  *
  * ## The automatic items
  *
- * {@link automaticItems} resolves the provider (`pr/provider.ts`) from
- * `settings.prProvider` and the repo root's `origin`, and answers what
- * that reading contributes (`pr/preflight-items.ts`): two items for
- * `gh`, none for `none`. They are prepended to the required tier, so
- * they are checked first, they are counted in the line the preflight
- * opens with, they are stored as rows like any other check, and one
- * that fails halts the run before a session is paid for.
+ * {@link automaticItems} resolves the provider
+ * (`packages/rafa/src/pr/provider.ts`) from `settings.prProvider` and the repo
+ * root's `origin`, and answers what that reading contributes
+ * (`pr/preflight-items.ts`): two items for `gh`, none for `none`. They are
+ * prepended to the required tier, so they are checked first, they are counted
+ * in the line the preflight opens with, they are stored as rows like any other
+ * check, and one that fails halts the run before a session is paid for.
  *
  * A configured `pr.provider: none` answers with no item and reads no
  * remote at all: the operator has said, and `resolvePrProvider` would

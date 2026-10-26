@@ -512,15 +512,14 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * the pull request itself, which is what the line says.
  *
  * `provider` is the run's `pr.provider` as the caller resolved it
- * (`resolvePrProvider`, `pr/provider.ts`). Under `none` neither lookup
- * is made, whatever `extras` holds: the prompt, handed the provider,
- * asks for no pull request ({@link buildWrapUpPrompt}), and the line
- * printed is {@link PROGRESS_PRESERVED_NO_PROVIDER},
- * which promises no retry because the caller delivers no pull request
- * under that provider. It is handed on to {@link runWrapUpSession}, so
- * the promotion check asks `gh` for no pull request either (#1051). It
- * is required, as `checkout` is: a default of
- * `gh` would ask `gh` in a repository that has none to ask.
+ * (`resolvePrProvider`, `packages/rafa/src/pr/provider.ts`). Under `none`
+ * neither lookup is made, whatever `extras` holds: the prompt, handed the
+ * provider, asks for no pull request ({@link buildWrapUpPrompt}), and the line
+ * printed is {@link PROGRESS_PRESERVED_NO_PROVIDER}, which promises no retry
+ * because the caller delivers no pull request under that provider. It is handed
+ * on to {@link runWrapUpSession}, so the promotion check asks `gh` for no pull
+ * request either (#1051). It is required, as `checkout` is: a default of `gh`
+ * would ask `gh` in a repository that has none to ask.
  *
  * `extras` holds `stepOnly`, the test files the run's suite steps read
  * red only in the step, which the prompt lists for the pull request

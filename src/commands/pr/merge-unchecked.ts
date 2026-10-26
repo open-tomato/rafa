@@ -50,7 +50,7 @@
  * ## A count that could not be read
  *
  * The port answers null for it and never throws
- * (`PullRequests.workflowCount`, `src/pr/types.ts`). A provider that
+ * (`PullRequests.workflowCount`, `packages/rafa/src/pr/types.ts`). A provider that
  * throws anyway is read here as null too, rather than failing the
  * command: null is the riskier reading, the one that refuses `--yes`,
  * so nothing an outage does can relax the rule.

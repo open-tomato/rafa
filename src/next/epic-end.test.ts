@@ -22,8 +22,8 @@
  *    none from the next watched answer, which must forget the first: a
  *    watch that never reset would pass the first alone.
  */
-import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
+import type { NextBoard, NextRoadmapReading } from '@open-tomato/rafa-board';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -167,8 +167,8 @@ function boardAnswering(reading: NextRoadmapReading): { readonly board: NextBoar
 }
 
 /** Sources holding `board` and nothing a case reads besides. */
-function sourcesOver(board: NextBoard): NextSources {
-  return { board } as unknown as NextSources;
+function sourcesOver(board: NextBoard): { readonly board: NextBoard } {
+  return { board };
 }
 
 describe('the watch', () => {

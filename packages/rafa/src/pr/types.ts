@@ -40,7 +40,7 @@
  *     reportable rather than be flattened into a wrong verdict. That is
  *     the same rule {@link CheckRow} already keeps for check states.
  *   - The check-row readers are NOT the port's. `parseChecks`,
- *     `verdictOf` and `waitForChecks` in `./checks.js` are pure, they
+ *     `verdictOf` and `waitForChecks` in `src/pr/checks.ts` are pure, they
  *     work on any provider's rows, and a provider re-implementing them
  *     could disagree with the wrap-up gate about what green means. The
  *     port answers rows and the verdict over them ({@link ChecksReading});
@@ -66,10 +66,10 @@
  * with method signatures accepting the same adapter. The store port
  * (`packages/rafa/src/effort/store/types.ts`) is spelled this way for the same reason.
  */
-import type { CheckRow, ChecksVerdict } from './checks.js';
-import type { MergeMethod } from '@open-tomato/rafa/core/config/sections';
+import type { MergeMethod } from '../core/config/sections.js';
+import type { CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
 
-export type { CheckRow, ChecksVerdict } from './checks.js';
+export type { CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
 /**
  * How a merge is made, and the list and guard beside it. They live in
  * core's `packages/rafa/src/core/config/merge-method.ts`, read through
@@ -77,8 +77,8 @@ export type { CheckRow, ChecksVerdict } from './checks.js';
  * them without reaching this port; they are re-exported here under the
  * same names for the port's importers.
  */
-export type { MergeMethod } from '@open-tomato/rafa/core/config/sections';
-export { isMergeMethod, MERGE_METHODS } from '@open-tomato/rafa/core/config/sections';
+export type { MergeMethod } from '../core/config/sections.js';
+export { isMergeMethod, MERGE_METHODS } from '../core/config/sections.js';
 
 /**
  * Where a pull request stands. `merged` is its own member rather than a
@@ -172,7 +172,7 @@ export interface PullRequestDetail extends PullRequestSummary {
    * NOT the push time, so a commit made earlier and pushed just now
    * reads as old. `rafa pr wait` reads it for the grace a young head
    * gets before zero checks reads as none (`FIRST_CHECK_GRACE_MS` in
-   * `./checks.js`), and null means no grace.
+   * `src/pr/checks.ts`), and null means no grace.
    */
   readonly headCommittedAt: string | null;
   readonly mergeable: Mergeability;

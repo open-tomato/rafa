@@ -29,11 +29,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { createGhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { readBoardOwnership } from '@open-tomato/rafa-board/board/board-owns';
 import { createOwnerResolver } from '@open-tomato/rafa-board/board/owner-resolve';
 
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 import { createGhPullRequests } from './gh.js';

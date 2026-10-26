@@ -62,7 +62,7 @@
  * label is repository configuration, absent on a repository that never
  * set one up, and its absence must not make a bump unrecognisable.
  */
-import type { PullRequestSummary } from '../types.js';
+import type { PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 /**
  * What one triage concluded about one pull request.

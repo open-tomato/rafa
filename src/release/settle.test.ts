@@ -28,9 +28,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { LOCK_FILE, projectLockText } from '../project/lock.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { RAFA_PACKAGE_NAME } from './settle-lock.js';
 import { withSettleWorktree } from './settle-worktree.js';

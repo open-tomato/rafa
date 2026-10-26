@@ -390,7 +390,7 @@ export type OpenPullRequestLister = () => Promise<readonly RoadmapPullRequest[]>
  * `gh pr list --state open --json number,headRefName,body`, capped at
  * {@link OPEN_PULL_REQUEST_LIMIT}.
  *
- * `PullRequests` (`src/pr/types.ts`) already lists open pull requests
+ * `PullRequests` (`packages/rafa/src/pr/types.ts`) already lists open pull requests
  * and is NOT used, for the reason `./issue-board.ts` gives for its own
  * narrow interface: its `list` answers a summary with no BODY, and the
  * closing keywords live in the body. Reading one `get` per open pull

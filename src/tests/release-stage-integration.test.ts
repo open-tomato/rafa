@@ -44,13 +44,13 @@ import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
 
 import { expectExit } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The branch this suite checks out its release from. */
 const BRANCH = 'feat/scratch-release-e2e';
@@ -59,7 +59,7 @@ const BRANCH = 'feat/scratch-release-e2e';
  * The provider reading the body cases run under.
  *
  * A scratch repository's `origin` is a filesystem path, which reads as
- * NOT GitHub (`src/pr/provider.ts`), so the default seam would resolve
+ * NOT GitHub (`packages/rafa/src/pr/provider.ts`), so the default seam would resolve
  * `none` here and the stage would build no provider at all — which is a
  * reading about this planting, not about the write these cases measure.
  * `source: 'config'` is how a repository whose origin says nothing still

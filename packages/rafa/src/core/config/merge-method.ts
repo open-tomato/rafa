@@ -3,12 +3,12 @@
  * {@link MERGE_METHODS} list a reader validates against and the
  * {@link isMergeMethod} guard.
  *
- * They sat in `src/pr/types.ts`, the pull request port, until the
+ * They sat in `packages/rafa/src/pr/types.ts`, the pull request port, until the
  * monorepo cut: the `pr.mergeMethod` setting in
  * `packages/rafa/src/config-schema-release.ts` read them there, which tied the
  * release section to `src/pr/`. Here they are a core leaf, importing
  * nothing, so the section and the port both read them from the sections
- * barrel `./sections.ts`, and `src/pr/types.ts` re-exports them under
+ * barrel `./sections.ts`, and `packages/rafa/src/pr/types.ts` re-exports them under
  * the same names for the port's own importers.
  *
  * The setting's reader, `mergeMethod`, stays in

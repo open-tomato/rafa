@@ -43,12 +43,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { describeRun, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry the second start spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

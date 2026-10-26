@@ -16,7 +16,7 @@
  * ## The provider, and the one refusal
  *
  * {@link openPrContext} resolves `pr.provider` through
- * `resolvePrProvider` (`src/pr/provider.ts`) with the PROJECT ROOT as
+ * `resolvePrProvider` (`packages/rafa/src/pr/provider.ts`) with the PROJECT ROOT as
  * the repository, and hands the reading to `requireGhProvider`, which
  * throws `CommandExit(2, PR_NEEDS_GH)` for anything but `gh`. The
  * message is a constant there, so every one of the ten refuses a

@@ -11,8 +11,8 @@
  * check's.
  */
 import type { TagDecision, TagInputs, TagRefused } from './tag.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { ReleaseTag } from '../../release/status-readings.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -22,7 +22,7 @@ package once its coupling is gone, or into the module it really tests.
 
 | Test file | Reaches |
 | --- | --- |
-| `adapters/tracker/github.test.ts` | `src/tests/scratch-home-env.ts` |
+| `adapters/tracker/github.test.ts` | nothing since `scratch-home-env.ts` moved into core as `packages/rafa/src/tests/scratch-home-env.ts` (#1362) |
 | `adapters/tracker/resolve.test.ts` | `src/adapter-registry.ts` |
 | `board/owner-resolve.test.ts` | `src/pr/gh-fake-shapes.ts` |
 | `board/project/add-filed.test.ts` | `src/triage/triage.ts` |

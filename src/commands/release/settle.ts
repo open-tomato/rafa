@@ -28,7 +28,9 @@
  *     `settleByPush` (`src/release/settle-push.ts`) for `push`, the
  *     default, and `settleByPr` (`src/release/settle-pr.ts`) for `pr`,
  *     which first resolves the `gh` provider as every `pr` action does
- *     and is refused with exit code 2 without one. Then `tagSettle`
+ *     and is refused with exit code 2 without one; the provider comes
+ *     through core's service registry (`pullRequestsIn`), registered by
+ *     the root, `src/service-registry.ts`. Then `tagSettle`
  *     (`src/release/settle-tag.ts`) applies `release.tag`.
  *
  * ## What it prints
@@ -88,13 +90,14 @@
  * It starts no Claude session and declares no `spends`.
  */
 import type { SettleProjectRefresh } from './settle-project.js';
-import type { GitRunner, PullRequests } from '../../pr/index.js';
 import type { SettleLockPlan } from '../../release/settle-lock.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
 import type { SettleBuild, SettleFragment, SettleReading, SettleSettings, SettleUnitFold } from '../../release/settle.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PullRequests } from '@open-tomato/rafa/pr/types';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { GhRunner, RefreshItems } from '@open-tomato/rafa-board';
 
@@ -104,8 +107,10 @@ import { commandRetrySeams, createGhRunner } from '@open-tomato/rafa-board';
 
 import { expectNoArgument, readSwitch, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeServices } from '@open-tomato/rafa/core/services';
+import { requireGhProvider, resolvePrProvider } from '@open-tomato/rafa/pr/provider';
 
-import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { releaseCommitSubject } from '../../release/release-move.js';
 import { settleByPr } from '../../release/settle-pr.js';
 import { settleByPush } from '../../release/settle-push.js';
@@ -135,7 +140,7 @@ export interface ReleaseSettleSeams {
   readonly git?: (root: string) => GitRunner;
   /** Where the scratch worktree's directory is made. The system temporary directory when left out. */
   readonly scratchRoot?: string;
-  /** The provider a `pr` delivery opens its pull request through. `ghPullRequestsIn` when left out. */
+  /** The provider a `pr` delivery opens its pull request through. `activeServices().pullRequestsIn`, the service registry's, when left out. */
   readonly pullRequests?: (root: string) => PullRequests;
   /** The `origin` probe `resolvePrProvider` takes. `gitRemoteUrl` when left out. */
   readonly readRemote?: (dir: string) => string | null;
@@ -353,7 +358,7 @@ export function settledResult(
 /** The provider a `pr` delivery needs, refused with exit code 2 when it is not `gh`. */
 function providerFor(project: ProjectFound, config: RafaConfig, seams: ReleaseSettleSeams): PullRequests {
   requireGhProvider(resolvePrProvider({ configured: config.prProvider, dir: project.root, readRemote: seams.readRemote }));
-  return (seams.pullRequests ?? ghPullRequestsIn)(project.root);
+  return (seams.pullRequests ?? activeServices().pullRequestsIn)(project.root);
 }
 
 /** One whole run: the line, the config, the worktree and what ran in it; see the module note. */

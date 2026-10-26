@@ -37,7 +37,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';

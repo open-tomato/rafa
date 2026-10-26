@@ -171,7 +171,7 @@ Importers outside the folder, by future package:
 **rafa-pr**
 - `src/commands/pr/triage-trust.ts`: value, cluster c1
 - `src/pr/none.ts`: value, cluster c1
-- `src/pr/provider.ts`: value, cluster c1
+- `packages/rafa/src/pr/provider.ts`: value, cluster c1
 
 **@open-tomato/rafa-cli (what is left)**
 - `src/commands/init.ts`: value, cluster c1

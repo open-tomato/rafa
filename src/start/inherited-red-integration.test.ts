@@ -37,11 +37,11 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 import { INHERITED_HEADING, INHERITED_SENTENCE } from './inherited-notice.js';

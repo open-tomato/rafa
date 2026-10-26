@@ -17,9 +17,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { createScratchRepository } from '../cleanup/scratch-repository.js';
 import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 const SPAWN_TIMEOUT = 60_000;
 

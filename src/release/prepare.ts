@@ -95,9 +95,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '@open-tomato/rafa/release/fragment';
-
-import { gitSaid } from '../pr/index.js';
 
 import { groupChangeNotes, renderNoteLines } from './changelog.js';
 import { resolveReleaseEnabled } from './enabled.js';

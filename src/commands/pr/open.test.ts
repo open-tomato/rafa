@@ -4,13 +4,13 @@
  * opened, the refusals of the line and of the body file, and what the
  * command writes in each mode.
  *
- * Every dispatching case runs the real command from a project of its
- * own beside a home of its own under this file's temporary directory
- * (`tests/cli-capture.ts`), so the config read is the one the case
- * planted and no case reads the real home. No case reaches GitHub or
- * spawns `gh`: the provider is the adapter over the recorded fake
- * (`pr/gh-fake.ts`) or the port double (`pr/pull-requests-double.ts`),
- * and the `origin` probe is a seam.
+ * Every dispatching case runs the real command from a project of its own beside
+ * a home of its own under this file's temporary directory
+ * (`tests/cli-capture.ts`), so the config read is the one the case planted and
+ * no case reads the real home. No case reaches GitHub or spawns `gh`: the
+ * provider is the adapter over the recorded fake (`pr/gh-fake.ts`) or the port
+ * double (`packages/rafa/src/pr/pull-requests-double.ts`), and the `origin`
+ * probe is a seam.
  *
  * Two controls keep a refusal from passing while wrong: the provider
  * factory records each root it was made for, so "a refused line makes
@@ -30,9 +30,10 @@ import { isAbsolute, join, relative } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { createPrOpenCommand, readOpenBody } from './open.js';

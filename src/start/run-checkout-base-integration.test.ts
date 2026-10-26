@@ -23,9 +23,8 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { settleRunCheckout } from './run-checkout.js';
 import { addRunWorktree } from './worktree.js';

@@ -17,7 +17,7 @@
  *   would fail rather than naming a remote.
  * - **Its visibility** is `gh repo view <host>/<owner>/<repo> --json
  *   nameWithOwner,visibility`, asked only when the push URL names a
- *   GitHub host (`isGitHubRemote`, `src/pr/provider.ts`). `gh` answers
+ *   GitHub host (`isGitHubRemote`, `packages/rafa/src/pr/provider.ts`). `gh` answers
  *   `{"nameWithOwner":"open-tomato/rafa","visibility":"PUBLIC"}` for
  *   this repository and exits 1 with `GraphQL: Could not resolve to a
  *   Repository with the name '…'` for one that does not exist, both
@@ -62,9 +62,8 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { GhRunner } from '@open-tomato/rafa-board';
 import type { RiskLevel } from '@open-tomato/rafa-inventory';
 
+import { isGitHubRemote, remoteHost, resolvePrProvider } from '@open-tomato/rafa/pr/provider';
 import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
-
-import { isGitHubRemote, remoteHost, resolvePrProvider } from '../../pr/provider.js';
 
 /** The remote the loop pushes a branch to; see the module note. */
 export const PUSH_REMOTE = 'origin';

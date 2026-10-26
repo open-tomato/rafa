@@ -4,12 +4,12 @@
  * with `--yes` and with no terminal, the one close it sends with and
  * without `--delete-branch`, and the json result.
  *
- * Every dispatching case runs the real command from a project of its own
- * beside a home of its own under this file's temporary directory
- * (`tests/cli-capture.ts`), so no case reads the real home. No case
- * reaches GitHub or spawns `gh`: the provider is the adapter over the
- * recorded fake (`pr/gh-fake.ts`) or the port double
- * (`pr/pull-requests-double.ts`).
+ * Every dispatching case runs the real command from a project of its own beside
+ * a home of its own under this file's temporary directory
+ * (`tests/cli-capture.ts`), so no case reads the real home. No case reaches
+ * GitHub or spawns `gh`: the provider is the adapter over the recorded fake
+ * (`pr/gh-fake.ts`) or the port double
+ * (`packages/rafa/src/pr/pull-requests-double.ts`).
  *
  * Controls: "it closed nothing" is read off the fake's own call log and
  * the state the pull request is left in, beside a case under `--yes`
@@ -32,10 +32,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { closeQuestion, createPrCloseCommand, readCloseLine, summaryLines } from './close.js';

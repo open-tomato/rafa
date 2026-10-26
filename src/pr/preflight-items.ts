@@ -54,8 +54,8 @@
  * string. A host of plain word characters is left unquoted so the halt
  * line stays readable.
  */
-import type { PrProviderReading } from './provider.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { PrProviderReading } from '@open-tomato/rafa/pr/provider';
 
 import { shellQuote } from '@open-tomato/rafa/utils/shell';
 

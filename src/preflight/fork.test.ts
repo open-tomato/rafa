@@ -48,7 +48,7 @@ import { delimiter, dirname, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { forkWorktree, spawnCommand } from './fork.js';
 

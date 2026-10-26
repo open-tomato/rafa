@@ -13,8 +13,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { CORE_REGISTRY } from '../commands/index.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-shape-')));
 

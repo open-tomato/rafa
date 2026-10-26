@@ -22,11 +22,12 @@
  * number unset and a dry run with it set, each opening no `gh` runner.
  */
 import type { ReleaseSettleSeams } from './settle.js';
-import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleBuilt, SettleFolded, SettleFragment, SettleUnitFold } from '../../release/settle.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { RafaServices } from '@open-tomato/rafa/core/services';
+import type { PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
@@ -35,14 +36,15 @@ import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createReleaseSettleCommand, dryRunResult, settledResult } from './settle.js';
 
@@ -653,25 +655,25 @@ describe('rafa release settle, the push delivery', () => {
   });
 });
 
-describe('rafa release settle, the pr delivery', () => {
-  /** A double with no release pull request open, opening #12. */
-  function opening(): ReturnType<typeof createPullRequestsDouble> {
-    return createPullRequestsDouble({
-      findOpen: () => Promise.resolve(null),
-      create: (draft: PullRequestDraft) => Promise.resolve({
-        number: 12,
-        title: draft.title,
-        url: 'https://github.com/open-tomato/demo/pull/12',
-        state: 'open',
-        headRefName: draft.head,
-        baseRefName: draft.base,
-        author: { login: 'rafa', isBot: false },
-        isCrossRepository: false,
-        updatedAt: SETUP_DATE,
-      } satisfies PullRequestSummary),
-    });
-  }
+/** A double with no release pull request open, opening #12. */
+function opening(): ReturnType<typeof createPullRequestsDouble> {
+  return createPullRequestsDouble({
+    findOpen: () => Promise.resolve(null),
+    create: (draft: PullRequestDraft) => Promise.resolve({
+      number: 12,
+      title: draft.title,
+      url: 'https://github.com/open-tomato/demo/pull/12',
+      state: 'open',
+      headRefName: draft.head,
+      baseRefName: draft.base,
+      author: { login: 'rafa', isBot: false },
+      isCrossRepository: false,
+      updatedAt: SETUP_DATE,
+    } satisfies PullRequestSummary),
+  });
+}
 
+describe('rafa release settle, the pr delivery', () => {
   it('pushes rafa/release and opens the release pull request, leaving main alone', async () => {
     const w = world('release:\n  settle: pr\n');
     landTwo(w);
@@ -697,6 +699,76 @@ describe('rafa release settle, the pr delivery', () => {
     expect(run.exitCode).toBe(2);
     expect(double.sent()).toEqual([]);
     expect(() => w.git(w.origin, ['rev-parse', '--verify', 'refs/heads/rafa/release'])).toThrow();
+  });
+});
+
+describe('the pullRequestsIn service', () => {
+  /** The set the stubbed setup replaced, put back after each case; undefined when none was set up. */
+  let replaced: RafaServices | null | undefined;
+
+  afterEach(() => {
+    if (replaced !== undefined) restoreServices(replaced);
+    replaced = undefined;
+  });
+
+  /** Registers a `pullRequestsIn` answering `double`'s port over the active set, recording each root; see the stage's stubbed setup. */
+  function stubPullRequestsIn(double: ReturnType<typeof createPullRequestsDouble>): readonly string[] {
+    const roots: string[] = [];
+    const stub: RafaServices['pullRequestsIn'] = (root) => {
+      roots.push(root);
+      return double.pulls;
+    };
+    replaced = registerServices({ ...activeServices(), pullRequestsIn: stub });
+    return roots;
+  }
+
+  it('opens the release pull request through the registered provider, called once with the project root, when no seam is passed', async () => {
+    const w = world('release:\n  settle: pr\n');
+    landTwo(w);
+    const double = opening();
+    const roots = stubPullRequestsIn(double);
+
+    const run = await settle(w, [], { readRemote: () => GITHUB_REMOTE });
+
+    expect(run.exitCode).toBe(0);
+    expect(roots).toEqual([w.project.root]);
+    expect(run.stdout).toContain('✅ Release pull request #12 opened, "chore: release 0.5.0" into main');
+    expect(double.sent()[0]).toBe('findOpen rafa/release');
+    expect(originSubject(w, 'rafa/release')).toBe('chore: release 0.5.0');
+  });
+
+  it('refuses a pr delivery, naming the key and the root, while no service is registered', async () => {
+    const w = world('release:\n  settle: pr\n');
+    landTwo(w);
+    const held = registerServices({ ...activeServices() });
+    restoreServices(null);
+    let run: Awaited<ReturnType<typeof settle>>;
+    try {
+      run = await settle(w, [], { readRemote: () => GITHUB_REMOTE });
+    } finally {
+      restoreServices(held);
+    }
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('service registry:');
+    expect(run.stderr).toContain('pullRequestsIn');
+    expect(run.stderr).toContain('src/service-registry.ts');
+    expect(() => w.git(w.origin, ['rev-parse', '--verify', 'refs/heads/rafa/release'])).toThrow();
+  });
+
+  it('never calls the registered provider under --dry-run or a push delivery', async () => {
+    const dry = world('release:\n  settle: pr\n');
+    landTwo(dry);
+    const pushed = world();
+    landTwo(pushed);
+    const roots = stubPullRequestsIn(opening());
+
+    const dryRun = await settle(dry, ['--dry-run'], { readRemote: () => GITHUB_REMOTE });
+    const push = await settle(pushed, [], { readRemote: () => GITHUB_REMOTE });
+
+    expect([dryRun.exitCode, push.exitCode]).toEqual([0, 0]);
+    expect(push.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
+    expect(roots).toEqual([]);
   });
 });
 

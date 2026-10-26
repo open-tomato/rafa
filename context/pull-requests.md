@@ -174,8 +174,8 @@ and a row with a null `mergedAt` is refused. The fake stamps
 
 **For a test whose subject is the CALLER, build the provider with
 `createPullRequestsDouble()`** — imported from
-`../pr/pull-requests-double.js`, never from the barrel, which keeps a
-test helper out of the loop's import graph as `./gh-fake.js` is kept out.
+`@open-tomato/rafa/pr/pull-requests-double`, never from the barrel, which keeps
+a test helper out of the loop's import graph as `./gh-fake.js` is kept out.
 It answers the members the case names, refuses every other one, and
 records each call either way, refusals included, so "it refused and
 merged nothing" is read off `calls()` rather than inferred from a

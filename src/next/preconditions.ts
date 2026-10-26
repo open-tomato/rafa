@@ -20,7 +20,7 @@
  *    provider could not be ASKED — no network, no authentication, a
  *    `gh` that did not run. The port answers null for a pull request
  *    that is not there and throws when it could not look
- *    (`src/pr/types.ts`), so a throw is this condition and never an
+ *    (`packages/rafa/src/pr/types.ts`), so a throw is this condition and never an
  *    empty repository. The proposal names `rafa doctor`, which is the
  *    command that reports what the provider needs.
  *

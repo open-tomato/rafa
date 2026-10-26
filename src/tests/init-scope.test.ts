@@ -50,12 +50,12 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { initHint } from '@open-tomato/rafa/project/scope';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-scope-')));

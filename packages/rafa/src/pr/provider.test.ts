@@ -1,5 +1,5 @@
 /**
- * Tests for the pull request provider (`src/pr/provider.ts`).
+ * Tests for the pull request provider (`packages/rafa/src/pr/provider.ts`).
  *
  * The remote probe is a seam, so every case but one hands over its own
  * `readRemote` and no case reads the checkout this suite runs in. The
@@ -23,8 +23,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
-
+import { CommandExit } from '../core/command/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {

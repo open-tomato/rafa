@@ -45,7 +45,7 @@
  * `TypeError` raised before `gh` is run. A failed command rejects naming
  * the command and what it wrote, the comment left out of the name.
  */
-import type { ClosePullRequestOptions } from './types.js';
+import type { ClosePullRequestOptions } from '@open-tomato/rafa/pr/types';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board';
 
 import { describeValue } from '@open-tomato/rafa/core/config/sections';

@@ -12,7 +12,7 @@
  * is not asked at all off the base.
  *
  * Every case drives fakes: a `GitRunner` answering by the argv it was
- * handed, the pull request double (`src/pr/pull-requests-double.ts`),
+ * handed, the pull request double (`packages/rafa/src/pr/pull-requests-double.ts`),
  * a board of plain functions, and a plans directory planted under a
  * temporary root. Nothing here spawns `git`, spawns `gh`, or reaches
  * GitHub.
@@ -93,9 +93,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { scanClaimBranches } from '@open-tomato/rafa-board/board/roadmap';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {
   branchLabel,

@@ -24,7 +24,7 @@
  *
  * WHICH provider the write goes through is a reading, not a constant.
  * {@link ReleaseBodySeams.readProvider} answers it —
- * `resolvePrProvider` (`src/pr/provider.ts`), the one reading in this
+ * `resolvePrProvider` (`packages/rafa/src/pr/provider.ts`), the one reading in this
  * repository that says `gh` or `none` — and it is taken BEFORE
  * {@link ReleaseBodySeams.pulls} is called, so a repository that
  * resolves to `none` spawns no `gh` at all rather than spawning one and

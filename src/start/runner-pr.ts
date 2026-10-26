@@ -6,18 +6,18 @@
  *
  * ## Only on a clean tree and a pushed branch
  *
- * The wrap-up session is the one that merges the base, commits and
- * pushes, and it did not finish. So the runner does not trust what it
- * left: {@link openRunnerPullRequest} reads the working tree first and
- * opens nothing over uncommitted edits, since a pull request opened then
- * would publish a branch that is not what the checkout holds, half a
- * merge among the possibilities. It then pushes the branch itself,
- * `--set-upstream` to `origin` (`pr/none.ts`), because the provider's
- * `create` never pushes (`pr/types.ts`, `PullRequestDraft`) and a branch
- * the session never pushed has no head on the remote to open from.
- * A push of a branch already up to date is git's own no-op, so pushing
- * unconditionally costs nothing and needs no second reading of the
- * remote. Only then is the pull request created.
+ * The wrap-up session is the one that merges the base, commits and pushes, and
+ * it did not finish. So the runner does not trust what it left: {@link
+ * openRunnerPullRequest} reads the working tree first and opens nothing over
+ * uncommitted edits, since a pull request opened then would publish a branch
+ * that is not what the checkout holds, half a merge among the possibilities. It
+ * then pushes the branch itself, `--set-upstream` to `origin` (`pr/none.ts`),
+ * because the provider's `create` never pushes
+ * (`packages/rafa/src/pr/types.ts`, `PullRequestDraft`) and a branch the
+ * session never pushed has no head on the remote to open from. A push of a
+ * branch already up to date is git's own no-op, so pushing unconditionally
+ * costs nothing and needs no second reading of the remote. Only then is the
+ * pull request created.
  *
  * The three steps run in that order and the first to fail ends the
  * attempt: {@link RunnerPrOutcome} answers either the pull request as

@@ -25,8 +25,9 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 import { plantStandInGh } from '../tests/stand-in-gh.js';
 
 const SESSION = '20261012-101500-beef';
