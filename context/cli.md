@@ -1,8 +1,8 @@
 ## CLI
 
-How a line reaches a command under `src/cli/`: `RafaCommand`, the
-registry, routing, module command entries, the dispatcher, help and
-`describe`.
+How a line reaches a command under `src/cli/` and `packages/rafa/src/cli/`:
+`RafaCommand`, the registry, routing, module command entries, the
+dispatcher, help and `describe`.
 A specs directory owns the command tree, the aliases, the help
 levels and `describe`; this page holds what the code does. Each
 module's note is the long form.
