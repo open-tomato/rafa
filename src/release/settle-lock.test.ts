@@ -16,9 +16,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { LOCK_FILE, projectLockText, readProjectLock } from '../project/lock.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { RAFA_PACKAGE_NAME, readSettleLock, writeSettleLock } from './settle-lock.js';
 

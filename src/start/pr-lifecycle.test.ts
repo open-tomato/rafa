@@ -121,14 +121,14 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { runClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt } from '@open-tomato/rafa/core/plan';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { getCurrentBranch, readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {
   CI_POLL_INTERVAL_MS,

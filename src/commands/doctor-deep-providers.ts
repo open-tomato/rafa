@@ -31,7 +31,7 @@
  *      alone goes through `gh` ({@link GH_TRACKER_KINDS}); an add-on
  *      kind is listed and not probed, since what it needs is its own.
  *   2. **The pull request provider**: `resolvePrProvider`
- *      (`src/pr/provider.ts`), whose reading carries `origin`'s host.
+ *      (`packages/rafa/src/pr/provider.ts`), whose reading carries `origin`'s host.
  *      `pr.provider: none` reads no remote, as plain `doctor` does —
  *      unless the tracker goes through `gh`, which then needs the host.
  *   3. **When either goes through `gh`**, three probes, each run only

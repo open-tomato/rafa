@@ -21,9 +21,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { createGitRunner } from '../../pr/index.js';
 import { RELEASE_PR_BRANCH } from '../../release/settle-pr.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { readTriageGuard, triageVerdict } from './triage-guard.js';
 

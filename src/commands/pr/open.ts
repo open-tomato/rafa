@@ -32,7 +32,7 @@
  * `findOpen(head)` is asked before `create`, and an open pull request it
  * answers is printed and returned with `opened: false`, exit 0: running
  * the line twice opens one pull request. The port's `create` does not
- * look first (`src/pr/types.ts`), and `gh pr create` refuses a second
+ * look first (`packages/rafa/src/pr/types.ts`), and `gh pr create` refuses a second
  * pull request for the same head and base, so asking is what makes a
  * repeat a reading rather than a failure. An open pull request on the
  * head INTO ANOTHER BASE is printed the same way, with a warning naming

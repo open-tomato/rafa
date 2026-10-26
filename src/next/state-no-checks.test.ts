@@ -6,7 +6,7 @@
  * `./state.test.ts` holds the other twelve rows and is over 800 lines,
  * so this row's cases live here, over fakes of their own: a
  * `GitRunner` answering by argv, the pull request double
- * (`src/pr/pull-requests-double.ts`), a board that answers nothing, and
+ * (`packages/rafa/src/pr/pull-requests-double.ts`), a board that answers nothing, and
  * an empty plans directory under a temporary root. Nothing here spawns
  * `git`, spawns `gh` or reaches GitHub.
  *
@@ -46,8 +46,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { NEXT_STATES, readNextState } from './state.js';
 

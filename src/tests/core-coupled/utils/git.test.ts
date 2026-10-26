@@ -22,9 +22,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { getCurrentBranch, readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
-
-import { gitIdentityEnv } from '../../git-identity.js';
 
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-utils-git-')));
 

@@ -493,6 +493,7 @@ import ts from 'typescript';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import * as portsSource from '@open-tomato/rafa/ports';
 import * as storeSource from '@open-tomato/rafa/store';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { EPIC_GUARD_FILE, readEpicGuard } from '@open-tomato/rafa-board/board/epic-guard';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '@open-tomato/rafa-board/epic/verify-plan';
 import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
@@ -506,7 +507,6 @@ import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } 
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** The repository root: this file sits in `src/tests/`. */

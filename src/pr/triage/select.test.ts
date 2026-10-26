@@ -73,7 +73,7 @@
  *   - `describeAge` always saying days: 3 fail.
  */
 import type { TriageSelectionDecision, TriageSelectionInput } from './select.js';
-import type { PullRequestSummary } from '../types.js';
+import type { PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 import { describe, expect, it } from 'bun:test';
 

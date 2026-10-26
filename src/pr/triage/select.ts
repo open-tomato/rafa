@@ -86,7 +86,7 @@
  * port answers newest first and a list that reorders itself between runs
  * is one an operator cannot scan.
  */
-import type { PullRequestSummary } from '../types.js';
+import type { PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 /**
  * What the selection concluded. Exactly one of these is the answer; the

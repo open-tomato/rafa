@@ -65,9 +65,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { parseSemanticVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { DEFAULT_REGISTRY, followUpsFor } from './tag-follow-ups.js';
 import {

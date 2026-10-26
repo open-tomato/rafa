@@ -4,7 +4,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { scratchHomeEnv } from '../../src/tests/scratch-home-env.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 /**
  * The two operator shell scripts: `scripts/stretch/stretch.sh`, the

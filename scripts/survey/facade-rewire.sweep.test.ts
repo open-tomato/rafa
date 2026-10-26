@@ -106,8 +106,11 @@ interface RewiredRow {
  * off the row, the release commands, `src/next/epic-end.ts`,
  * `src/release/branch-forecast.ts`, `prepare.ts` and `verify.ts`: their
  * one pr import by path was the pr barrel, for core's git names, which
- * they take from `@open-tomato/rafa/core/git` now, so the row keeps 10
- * load-cycle and 2 back-edge files.
+ * they take from `@open-tomato/rafa/core/git` now. `src/cleanup/past-head.ts`
+ * left it in the same item: its one pr import by path was
+ * `MergedPullRequest` of `packages/rafa/src/pr/types.ts`, which the item's
+ * core move list took into core. So the row keeps 9 load-cycle and 2
+ * back-edge files.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -161,7 +164,6 @@ const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
       'src/claims/lost.ts': 'loadCycle',
-      'src/cleanup/past-head.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
       'src/commands/release/settle.ts': 'backEdge',
       'src/commands/release/status-stale-docs.ts': 'backEdge',

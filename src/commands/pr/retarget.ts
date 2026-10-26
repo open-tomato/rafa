@@ -14,7 +14,7 @@
  * `gh`, the rule `pr-context.ts` keeps for every `pr` action.
  *
  * Then `get(n)`, for the base the pull request is on now: `editBase`
- * answers nothing (`src/pr/types.ts`), so the comparison needs the read
+ * answers nothing (`packages/rafa/src/pr/types.ts`), so the comparison needs the read
  * first. A pull request the repository does not hold is refused naming
  * its number. One already on `base` (compared exactly, as
  * `retargetPullRequest` in `src/start/pr-retarget.ts` compares) sends no

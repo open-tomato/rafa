@@ -36,10 +36,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {

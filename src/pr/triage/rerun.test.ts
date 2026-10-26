@@ -81,7 +81,7 @@
  */
 import type { RerunDecision, RerunInput } from './rerun.js';
 import type { CheckRow } from '../checks.js';
-import type { PullRequestComment } from '../types.js';
+import type { PullRequestComment } from '@open-tomato/rafa/pr/types';
 
 import { describe, expect, it } from 'bun:test';
 

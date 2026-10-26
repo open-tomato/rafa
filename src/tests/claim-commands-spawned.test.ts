@@ -55,11 +55,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
 import { formatClaimMessage, parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's own temporary directory, removed once every case has run. */

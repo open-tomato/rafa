@@ -37,12 +37,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createReleaseSettleCommand, dryRunResult, settledResult } from './settle.js';
 

@@ -1310,9 +1310,10 @@ New; it replaces no earlier text. What a row or an action added to
   relationships move and the project step after it, and only where
   there is a board**
   (`src/commands/init-board.ts`). The provider is resolved from
-  `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and
-  anything but `gh` ends the step before a runner is opened, with a
-  warning only when `--board` asked for one. `--no-board` declines,
+  `pr.provider` and the root's `origin`
+  (`packages/rafa/src/pr/provider.ts`), and anything but `gh` ends the
+  step before a runner is opened, with a warning only when `--board`
+  asked for one. `--no-board` declines,
   `--board` runs without asking, no terminal leaves the board alone and
   prints the line naming `rafa init --board`, and otherwise the one
   question `Set up the GitHub board for this repo? [y/N]` is asked

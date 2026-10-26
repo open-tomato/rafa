@@ -35,9 +35,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createReleaseListCommand, RELEASE_LIST_USAGE, renderList } from './list.js';
 import { UNTAGGED } from './status-packages.js';

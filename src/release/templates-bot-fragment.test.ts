@@ -23,8 +23,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { isMapping } from '@open-tomato/rafa/core/config/sections';
-
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { BOT_FRAGMENT_WORKFLOW, LADDER_WORKFLOWS } from './ladder.js';
 import { RELEASE_BOT_FRAGMENT_FILE, readReleaseTemplate, writeReleaseWorkflow } from './templates.js';

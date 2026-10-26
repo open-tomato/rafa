@@ -61,6 +61,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
@@ -69,7 +70,6 @@ import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-relations-labels-baseline-')));

@@ -146,7 +146,7 @@
 import type { TriageClass } from './classes.js';
 import type { FailedStep } from './evidence.js';
 import type { CheckRow, ChecksVerdict } from '../checks.js';
-import type { PullRequestDetail } from '../types.js';
+import type { PullRequestDetail } from '@open-tomato/rafa/pr/types';
 import type { GuardVerdict } from '@open-tomato/rafa-release';
 
 import { failingRows, verdictOf } from '../checks.js';

@@ -52,13 +52,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readHopRecord, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
 
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, eventsOf, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-roadmap-continue-cli-')));

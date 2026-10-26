@@ -59,9 +59,8 @@
  */
 import { spawnSync } from 'node:child_process';
 
+import { remoteHost } from '@open-tomato/rafa/pr/provider';
 import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
-
-import { remoteHost } from './provider.js';
 
 /** The query GitHub's compare page takes to open the PR form. */
 const COMPARE_QUERY = '?expand=1';

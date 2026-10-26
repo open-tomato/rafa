@@ -18,8 +18,8 @@
  */
 import type { MergeSeams, PrMergeResult } from './merge.js';
 import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
-import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,10 +28,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { RELEASE_PR_BRANCH } from '../../release/settle-pr.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createPrMergeCommand } from './merge.js';
 

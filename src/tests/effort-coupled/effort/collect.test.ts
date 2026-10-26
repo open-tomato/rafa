@@ -130,6 +130,7 @@ import { ConfigError } from '@open-tomato/rafa/core/config';
 import { stampPrompt } from '@open-tomato/rafa/core/plan';
 import { listSessionLogs, projectLogDirName, sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
 import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { PROMPT_SHAPES } from '@open-tomato/rafa-effort/effort/classify';
 import {
   collectEffort,
@@ -143,7 +144,6 @@ import {
 } from '@open-tomato/rafa-effort/effort/collect';
 
 import { expectExit } from '../../cli-capture.js';
-import { scratchHomeEnv } from '../../scratch-home-env.js';
 
 /** The task prompt's prefix, taken from the shape that declares it. */
 const TASK_PREFIX = PROMPT_SHAPES

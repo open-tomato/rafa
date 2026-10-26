@@ -88,7 +88,8 @@ import type { StretchRecord } from './start.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
-import type { MergedPullRequest, PrSeams } from '@open-tomato/rafa-pr';
+import type { MergedPullRequest } from '@open-tomato/rafa/pr/types';
+import type { PrSeams } from '@open-tomato/rafa-pr';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

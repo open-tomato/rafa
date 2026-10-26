@@ -19,9 +19,10 @@ import type { Prompter } from '@open-tomato/rafa/core/command';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { createScratchRepository, SCRATCH_LATER, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { createCleanupCommand } from '../commands/cleanup.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { dispatchInProject, plantProjectConfig } from './cli-capture.js';
 

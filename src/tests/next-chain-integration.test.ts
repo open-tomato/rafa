@@ -166,7 +166,7 @@ function buildProbe(): string {
     `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
     `import { offerRunBranch } from ${JSON.stringify(join(SRC_DIR, 'start', 'branch.ts'))};`,
     `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
-    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, 'pr', 'pull-requests-double.ts'))};`,
+    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'plan', 'plan-stamp.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',

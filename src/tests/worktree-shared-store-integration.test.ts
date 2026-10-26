@@ -41,13 +41,13 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry every spawn in this file runs. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

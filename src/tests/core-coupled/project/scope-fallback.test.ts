@@ -59,8 +59,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { initHint, resolveScope, ScopeError } from '@open-tomato/rafa/project/scope';
 import { mainCheckoutOf, WorktreeRootError } from '@open-tomato/rafa/project/worktree-root';
-
-import { gitIdentityEnv } from '../../git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-scope-fallback-')));
 const gitHome = join(tempRoot, 'git-home');

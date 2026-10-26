@@ -45,11 +45,12 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { describeRun, expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostGitDir } from './stand-in-gh.js';
 
 /** The CLI entry the second start spawns. */

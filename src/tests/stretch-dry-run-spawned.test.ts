@@ -22,8 +22,9 @@ import { join } from 'node:path';
 
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { expectExit, plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 

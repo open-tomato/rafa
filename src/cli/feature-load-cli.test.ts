@@ -32,9 +32,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { expectExit } from '../tests/cli-capture.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 /** The repository root: the probe's working directory. */
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));

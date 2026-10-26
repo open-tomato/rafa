@@ -30,8 +30,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { createNextCommand } from '../commands/next.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject } from '../tests/cli-capture.js';
 
 import { nextStepHint } from './hint.js';

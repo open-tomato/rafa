@@ -54,8 +54,7 @@ import {
   SQLITE_MIGRATIONS,
 } from '@open-tomato/rafa/store/migrations';
 import LOCK_FILE from '@open-tomato/rafa/store/migrations.lock.json';
-
-import { gitIdentityEnv } from '../../../git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 const LOCK: MigrationLock = LOCK_FILE;
 

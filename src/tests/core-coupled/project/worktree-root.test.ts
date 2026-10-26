@@ -18,8 +18,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { NOT_A_REPOSITORY } from '@open-tomato/rafa/project/roots';
 import { mainCheckoutOf, WORKTREE_LIST_ARGS, WorktreeRootError } from '@open-tomato/rafa/project/worktree-root';
-
-import { gitIdentityEnv } from '../../git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-worktree-root-')));
 const gitHome = join(tempRoot, 'git-home');

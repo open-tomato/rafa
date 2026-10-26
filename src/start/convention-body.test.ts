@@ -16,15 +16,15 @@
  */
 import type { ConventionBodyInput, ConventionBodySeams } from './convention-body.js';
 import type { PrProviderReading, PullRequests } from '../pr/index.js';
-import type { PullRequestsDouble } from '../pr/pull-requests-double.js';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import type { BugRoute, BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { detail, PROVIDER_GH, PROVIDER_NONE, SUMMARY } from '../tests/release-stage-fixtures.js';
 
 import {

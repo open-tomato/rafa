@@ -130,8 +130,8 @@
  */
 import type { BranchesRead, BranchesUnread, LocalBranch } from './branches.js';
 import type { WorktreeBlockKind, WorktreeRow } from './worktrees.js';
-import type { MergedPullRequest, PullRequests } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { MergedPullRequest, PullRequests } from '@open-tomato/rafa/pr/types';
 import type { PastHeadRead, PastHeadReading, PastHeadSettings } from '@open-tomato/rafa-release';
 
 import { basename } from 'node:path';

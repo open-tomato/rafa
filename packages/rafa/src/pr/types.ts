@@ -66,10 +66,10 @@
  * with method signatures accepting the same adapter. The store port
  * (`packages/rafa/src/effort/store/types.ts`) is spelled this way for the same reason.
  */
-import type { MergeMethod } from '@open-tomato/rafa/core/config/sections';
-import type { CheckRow, ChecksVerdict } from '@open-tomato/rafa/store/check-rows';
+import type { MergeMethod } from '../core/config/sections.js';
+import type { CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
 
-export type { CheckRow, ChecksVerdict } from '@open-tomato/rafa/store/check-rows';
+export type { CheckRow, ChecksVerdict } from '../effort/store/check-rows.js';
 /**
  * How a merge is made, and the list and guard beside it. They live in
  * core's `packages/rafa/src/core/config/merge-method.ts`, read through
@@ -77,8 +77,8 @@ export type { CheckRow, ChecksVerdict } from '@open-tomato/rafa/store/check-rows
  * them without reaching this port; they are re-exported here under the
  * same names for the port's importers.
  */
-export type { MergeMethod } from '@open-tomato/rafa/core/config/sections';
-export { isMergeMethod, MERGE_METHODS } from '@open-tomato/rafa/core/config/sections';
+export type { MergeMethod } from '../core/config/sections.js';
+export { isMergeMethod, MERGE_METHODS } from '../core/config/sections.js';
 
 /**
  * Where a pull request stands. `merged` is its own member rather than a

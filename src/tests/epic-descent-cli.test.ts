@@ -40,6 +40,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plural } from '@open-tomato/rafa/core/plan';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
 import { parseRoadmapBody } from '@open-tomato/rafa-board/board/roadmap';
@@ -51,7 +52,6 @@ import { DRY_RUN_FLAG as NEXT_DRY_RUN_FLAG } from '../next/lines.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-descent-cli-')));

@@ -14,9 +14,9 @@
 import type { SettlePrOutcome } from './settle-pr.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleSettings } from './settle.js';
-import type { PullRequestsAnswers, PullRequestsDouble } from '../pr/pull-requests-double.js';
-import type { PullRequestDetail, PullRequestDraft, PullRequestSummary } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { PullRequestsAnswers, PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import type { PullRequestDetail, PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
@@ -27,10 +27,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { RELEASE_PR_BRANCH, releasePullBody, settleByPr } from './settle-pr.js';
 import { PUSH_SAID_NOTHING } from './settle-push.js';

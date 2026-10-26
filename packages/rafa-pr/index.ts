@@ -168,8 +168,6 @@ export {
 
 export { parseFailedLogLine } from '../../src/pr/triage/evidence.js';
 
-export type { MergedPullRequest } from '../../src/pr/types.js';
-
 export type {
   BaseRunAnswer,
   NamedTest,

@@ -74,8 +74,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { prepareRelease } from './prepare.js';
 import { verifyRelease } from './verify.js';

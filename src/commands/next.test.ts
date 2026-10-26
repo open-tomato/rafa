@@ -144,6 +144,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
@@ -151,7 +152,6 @@ import { actionOutput } from '../next/ending.js';
 import { epicEndLines } from '../next/epic-end.js';
 import { nextQuestion } from '../next/hint.js';
 import { CLAIM_AHEAD_FLAG, DRY_RUN_FLAG, MAX_ACTIONS, NEXT_USAGE, ROADMAP_FLAG } from '../next/lines.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';

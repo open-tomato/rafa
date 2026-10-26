@@ -48,10 +48,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** The file holding the pre-move captures; see the module note. */
 const PRE_MOVE_FILE = join(import.meta.dir, 'fixtures', 'epics-pre-move.json');

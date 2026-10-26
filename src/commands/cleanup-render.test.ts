@@ -35,9 +35,10 @@ import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { defaultCleanupSeams, readCleanup, remoteOnlyReason } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {
   CLEANUP_GROUP_TITLES,

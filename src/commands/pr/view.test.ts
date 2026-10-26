@@ -20,10 +20,10 @@
  */
 import type { PrSeams } from './pr-context.js';
 import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
-import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,9 +31,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { SEPARATOR } from './current.js';

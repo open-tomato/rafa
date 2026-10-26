@@ -3,14 +3,17 @@
  *
  * `src/utils/pr.ts`, deleted with this barrel, was the one module the
  * wrap-up stage reached `gh` through, and it named the CLI in every
- * signature. This barrel is what replaced it: `./types.js` declares what a provider answers, `./gh.js` is the
+ * signature. This barrel is what replaced it: `@open-tomato/rafa/pr/types`
+ * (core's `packages/rafa/src/pr/types.ts` since #1362) declares what a
+ * provider answers, `./gh.js` is the
  * adapter over the GitHub CLI, `./checks.js` holds the check-row
  * readers, which are pure and belong to no provider,
  * `./merge.js` holds what `pr merge` refuses on and the clean-up steps
  * it runs afterwards, both as data, `../core/git/index.js` is the runner
  * those steps are spawned through, git being the merge command's own
  * half and no provider's, and
- * `./provider.js` answers which provider a repository gets and holds
+ * `@open-tomato/rafa/pr/provider` (core's `packages/rafa/src/pr/provider.ts`
+ * since #1362) answers which provider a repository gets and holds
  * the one exit-2 refusal every `pr` action shares,
  * `./preflight-items.js` builds the two required preflight items a `gh`
  * provider contributes, and `./none.js` is what a `none` provider gets
@@ -28,7 +31,7 @@
  *
  * `MergeMethod`, `MERGE_METHODS` and `isMergeMethod` are core's
  * (`packages/rafa/src/core/config/merge-method.ts`), re-exported by
- * `./types.js` and listed here under the same names. The config's
+ * `@open-tomato/rafa/pr/types` and listed here under the same names. The config's
  * `pr.mergeMethod` setting (`packages/rafa/src/config-schema-release.ts`) takes them
  * from core's sections barrel and imports nothing under `src/pr/`: this
  * barrel carries the `gh` adapter and its spawner, which would sit
@@ -56,7 +59,7 @@ export type {
   PullRequests,
   PullRequestState,
   PullRequestSummary,
-} from './types.js';
+} from '@open-tomato/rafa/pr/types';
 export type { GhPullRequestsOptions } from './gh.js';
 export type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 export type {
@@ -75,7 +78,7 @@ export type {
   PrProviderReading,
   PrProviderSource,
   ResolvePrProviderOptions,
-} from './provider.js';
+} from '@open-tomato/rafa/pr/provider';
 
 export {
   classifyState,
@@ -86,7 +89,7 @@ export {
   verdictOf,
   waitForChecks,
 } from './checks.js';
-export { isMergeMethod, MERGE_METHODS } from './types.js';
+export { isMergeMethod, MERGE_METHODS } from '@open-tomato/rafa/pr/types';
 export {
   cleanUpSteps,
   commandLine,
@@ -116,4 +119,4 @@ export {
   remoteHost,
   requireGhProvider,
   resolvePrProvider,
-} from './provider.js';
+} from '@open-tomato/rafa/pr/provider';

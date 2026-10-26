@@ -48,6 +48,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests } from '../../pr/index.js';
 import {
@@ -58,7 +60,6 @@ import {
   workflowCountLine,
 } from '../../pr/unchecked.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createPrMergeCommand } from './merge.js';
 

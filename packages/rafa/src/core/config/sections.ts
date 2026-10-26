@@ -33,9 +33,9 @@
  * `DEFAULT_BRANCH_TEMPLATE` without reaching `rafa next`'s composition.
  *
  * `merge-method.ts` joined with the words `pr.mergeMethod` takes, its
- * list and its guard, moved out of `src/pr/types.ts` so the release
+ * list and its guard, moved out of `packages/rafa/src/pr/types.ts` so the release
  * section reads them without reaching the pull request port. It imports
- * nothing, so it is a leaf too, and `src/pr/types.ts` re-exports its
+ * nothing, so it is a leaf too, and `packages/rafa/src/pr/types.ts` re-exports its
  * names from here.
  *
  * ## What it exports

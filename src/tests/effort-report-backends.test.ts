@@ -35,11 +35,11 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { collectEffort } from '@open-tomato/rafa-effort/effort/collect';
 import { buildReport } from '@open-tomato/rafa-effort/effort/report';
 
 import { expectExit } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The command a spawned case executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

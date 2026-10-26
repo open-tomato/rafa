@@ -27,8 +27,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { readNextState } from './state.js';
 

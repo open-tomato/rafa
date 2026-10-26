@@ -17,9 +17,9 @@ import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { PullRequestDetail, PullRequestState } from '../pr/types.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { PullRequestDetail, PullRequestState } from '@open-tomato/rafa/pr/types';
 import type { Position } from '@open-tomato/rafa/project/position';
 import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
@@ -32,10 +32,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { writePositionFile } from '@open-tomato/rafa/project/position';
 import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { BRANCH, plantDemoProject } from '../tests/loop-session-fixtures.js';
 
 import { renderStatus } from './render.js';

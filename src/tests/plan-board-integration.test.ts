@@ -98,6 +98,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { notesPath as localNotesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import {
   closedIssueMessage,
   missingSpecLabelMessage,
@@ -121,7 +122,6 @@ import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's directory, `src/tests/`, one level under the modules the probe imports. */

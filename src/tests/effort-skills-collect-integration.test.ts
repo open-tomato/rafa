@@ -64,12 +64,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
 import { writePlanCi } from '@open-tomato/rafa/store/plan-ci';
 import { writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { sessionLogDir } from '@open-tomato/rafa-effort/effort/collect';
 import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
 import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** The command every run executes. */

@@ -24,10 +24,10 @@ import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
-import type { PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/types.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { PullRequestDetail, PullRequests, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 import type { Position } from '@open-tomato/rafa/project/position';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
@@ -41,6 +41,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { runsDir } from '@open-tomato/rafa/core/loop';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
 import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { readBlockedBy } from '@open-tomato/rafa-board/board/blocked';
@@ -48,7 +49,6 @@ import { readBlockedBy } from '@open-tomato/rafa-board/board/blocked';
 import { defaultCleanupSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { readDoctorCleanup } from '../commands/doctor-cleanup.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import {
   BRANCH,
   DEMO_TRACKER_PATH,

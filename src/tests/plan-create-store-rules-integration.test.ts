@@ -28,12 +28,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** `src/`, where the modules the probe imports sit. */
 const SRC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), '..');

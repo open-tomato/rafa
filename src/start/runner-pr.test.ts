@@ -33,8 +33,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import {
   fragmentNotesIn,

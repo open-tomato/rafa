@@ -44,13 +44,13 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
 import { createIssueReadyCommand } from '@open-tomato/rafa-board/commands/issue/ready';
 import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
 import { createNextCommand } from '../commands/next.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
 

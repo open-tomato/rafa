@@ -70,14 +70,14 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { eventsFileOf, readEventsFrom } from './loop/events-file.js';
 import { CHECKOUT_MOVED } from './start/checkout-guard.js';
 import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
-import { gitIdentityEnv } from './tests/git-identity.js';
-import { scratchHomeEnv } from './tests/scratch-home-env.js';
 import { hostToolDirs } from './tests/stand-in-gh.js';
 
 /** One call inside the branch, as the source writes it. */

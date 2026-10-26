@@ -135,8 +135,8 @@
  * shell quoter here, and a second one could disagree with it.
  */
 import type { CheckRow, ChecksVerdict } from './checks.js';
-import type { Mergeability } from './types.js';
 import type { WorkingTreeStatus } from '@open-tomato/rafa/core/git';
+import type { Mergeability } from '@open-tomato/rafa/pr/types';
 
 import { unquoteGitPath } from '@open-tomato/rafa/core/git';
 import { shellQuote } from '@open-tomato/rafa/utils/shell';

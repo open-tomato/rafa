@@ -20,7 +20,7 @@ import { statSync } from 'node:fs';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { openUnknownNote } from './remote-only.js';
 import {

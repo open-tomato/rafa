@@ -42,10 +42,10 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry an asynchronously spawned run executes; mirrors `cli-capture.ts`'s own. */

@@ -41,9 +41,9 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { expectExit, plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import {
   forwardLine,

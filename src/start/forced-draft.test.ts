@@ -13,9 +13,8 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';
 import { bodyWithPassedOver, markForcedDraft, PASSED_OVER_HEADING, passedOverSection, refuseUndraftedPullRequest } from './forced-draft.js';

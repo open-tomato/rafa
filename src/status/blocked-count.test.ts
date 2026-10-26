@@ -47,12 +47,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { createLabelsRelations } from '@open-tomato/rafa-board/board/relations/labels';
 import { createNativeRelations } from '@open-tomato/rafa-board/board/relations/native';
 import { nativeBoardListFields } from '@open-tomato/rafa-board/board/roadmap-board';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { BRANCH, plantDemoProject } from '../tests/loop-session-fixtures.js';
 
 import { readBlockedCount } from './blocked-count.js';

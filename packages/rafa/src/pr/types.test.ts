@@ -1,5 +1,5 @@
 /**
- * Tests for the pull request port (`src/pr/types.ts`).
+ * Tests for the pull request port (`packages/rafa/src/pr/types.ts`).
  *
  * The port is almost all types, and a type-level claim made with a test
  * assertion would prove nothing here: the root tsconfig excludes every
@@ -71,11 +71,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-/** The `src/` directory the probes import from. */
+/** Core's `src/` directory, `packages/rafa/src/`, the probes import from. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
 /** The repository root, whose tsconfig the probes compile under. */
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 /** The port, as a quoted absolute specifier. */
 const PORT = JSON.stringify(join(SRC_DIR, 'pr', 'types.js'));

@@ -34,8 +34,9 @@ import type { CapturedRun } from '../tests/cli-capture.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { cleanupGroups, cleanupQuestion, createCleanupCommand } from '../commands/cleanup.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, plantProjectConfig } from '../tests/cli-capture.js';
 
 import { createScratchRepository, REMOTE_ONLY_BRANCHES, REMOTE_ONLY_COMMITS, SCRATCH_NOW } from './scratch-repository.js';

@@ -68,6 +68,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { renderCloseComment } from '@open-tomato/rafa-board/board/epic-trail';
 import { BOARD_LIST_FIELDS, BOARD_LISTING_LIMIT } from '@open-tomato/rafa-board/board/roadmap-board';
 import { EPIC_CLOSE_REFUSAL_EXIT } from '@open-tomato/rafa-board/commands/epic/close';
@@ -77,7 +78,6 @@ import { CHECK_PROMPT_PREFIX } from '@open-tomato/rafa-board/epic/verify-run';
 import { MEMBERSHIP_NOTE, renderEpicCost } from '@open-tomato/rafa-effort/effort/epic-cost';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-close-spawn-')));

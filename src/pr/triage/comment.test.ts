@@ -52,7 +52,7 @@ import type { TriageAssessment } from './classify.js';
 import type { TriageCommentInput } from './comment.js';
 import type { FailedLogEvidence, FailedStep } from './evidence.js';
 import type { FollowUpPullRequest } from './follow-up.js';
-import type { PullRequestComment } from '../types.js';
+import type { PullRequestComment } from '@open-tomato/rafa/pr/types';
 
 import { describe, expect, it } from 'bun:test';
 

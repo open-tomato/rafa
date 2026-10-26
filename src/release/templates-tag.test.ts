@@ -20,8 +20,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { isMapping } from '@open-tomato/rafa/core/config/sections';
-
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { TAG_WORKFLOW } from './ladder.js';
 import { RELEASE_PR_BRANCH } from './settle-pr.js';

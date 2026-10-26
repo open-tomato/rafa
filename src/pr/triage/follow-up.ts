@@ -81,7 +81,7 @@
 import type { TriageClass } from './classes.js';
 import type { TriageAssessment } from './classify.js';
 import type { FailedLogEvidence } from './evidence.js';
-import type { PullRequestDetail } from '../types.js';
+import type { PullRequestDetail } from '@open-tomato/rafa/pr/types';
 
 import { FAILED_LOG_TAIL_LINES } from './evidence.js';
 

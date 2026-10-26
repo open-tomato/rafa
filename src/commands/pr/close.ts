@@ -18,7 +18,7 @@
  *
  * Then `get(n)`, the one read of the run. It answers the state, and the
  * port leaves the state to its caller: what a provider answers to a close
- * of a pull request that is not open is not held there (`src/pr/types.ts`),
+ * of a pull request that is not open is not held there (`packages/rafa/src/pr/types.ts`),
  * so no close is ever sent for one. A pull request the repository does
  * not hold, one already merged and one already closed are each refused
  * naming which it is.

@@ -35,7 +35,7 @@
  */
 import type { NextRoadmapSources } from './readings.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { PullRequests } from '../pr/types.js';
+import type { PullRequests } from '@open-tomato/rafa/pr/types';
 import type { BoardIssue, BoardListing, GhRunner, OwnedBoard } from '@open-tomato/rafa-board';
 
 import {

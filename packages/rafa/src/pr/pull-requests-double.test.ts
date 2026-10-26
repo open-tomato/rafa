@@ -1,5 +1,5 @@
 /**
- * Tests for the pull request double (`src/pr/pull-requests-double.ts`).
+ * Tests for the pull request double (`packages/rafa/src/pr/pull-requests-double.ts`).
  *
  * The double has one job a case relies on and cannot see: a member the
  * case did not name must REFUSE rather than answer something invented.
@@ -235,7 +235,7 @@ describe('the pull request double', () => {
   });
 });
 
-describe('the double against the declaration in src/pr/types.ts', () => {
+describe('the double against the declaration in packages/rafa/src/pr/types.ts', () => {
   /**
    * The function-typed members the `PullRequests` interface declares in
    * `source`, in declaration order. Reads the AST the way

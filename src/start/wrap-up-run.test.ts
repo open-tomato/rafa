@@ -104,6 +104,7 @@ import ts from 'typescript';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { assumptionsHeading } from '@open-tomato/rafa-board/board/review-stamp';
 import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
@@ -113,7 +114,6 @@ import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
 import { plantProjectConfig, plantScratchRepo } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 import { COMMITTED, FORECAST_LINE, prepared, PROVIDER_GH, SETTINGS, stub, VERIFIED } from '../tests/release-stage-fixtures.js';
 
 import { bindEventsFile, unbindEventsFile } from './loop-events.js';

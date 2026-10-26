@@ -52,6 +52,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
 import { tickSentence } from '@open-tomato/rafa-board/board/roadmap-tick';
 
@@ -61,7 +62,6 @@ import { epicEndLines } from '../next/epic-end.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-end-merge-tick-spawn-')));

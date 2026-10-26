@@ -57,11 +57,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { positionFilePath } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-relations-native-cli-')));

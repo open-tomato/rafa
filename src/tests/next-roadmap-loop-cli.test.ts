@@ -52,6 +52,8 @@ import { planStub } from '@open-tomato/rafa/board/naming';
 import { parseSessionRecord, runsDir } from '@open-tomato/rafa/core/loop';
 import { hopFilePath, readHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
@@ -60,9 +62,7 @@ import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, eventsOf, type CapturedRun, type ScratchRepo } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 import { SRC_DIR } from './next-chain-fixtures.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-roadmap-loop-cli-')));

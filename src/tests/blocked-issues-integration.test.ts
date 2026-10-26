@@ -55,12 +55,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { KNOWN_LIST_LIMIT } from '@open-tomato/rafa-board/board/blocked-issues';
 import { createIssueUnblockCommand } from '@open-tomato/rafa-board/commands/issue/unblock';
 
 import { createPrMergeCommand } from '../commands/pr/merge.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
 

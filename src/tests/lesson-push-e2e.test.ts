@@ -25,8 +25,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { describeRun, expectExit, plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 const STUB = 'lesson-loop';

@@ -18,13 +18,14 @@
  */
 import { describe, expect, it } from 'bun:test';
 
+import * as provider from '@open-tomato/rafa/pr/provider';
+import * as types from '@open-tomato/rafa/pr/types';
+
 import * as checks from './checks.js';
 import * as gh from './gh.js';
 import * as merge from './merge.js';
 import * as none from './none.js';
 import * as preflightItems from './preflight-items.js';
-import * as provider from './provider.js';
-import * as types from './types.js';
 
 import * as barrel from './index.js';
 
@@ -39,7 +40,7 @@ describe('the pull request barrel', () => {
     expect(barrel.FIRST_CHECK_GRACE_MS).toBe(checks.FIRST_CHECK_GRACE_MS);
   });
 
-  it('answers the port values of ./types.js themselves', () => {
+  it('answers the port values of @open-tomato/rafa/pr/types themselves', () => {
     expect(barrel.MERGE_METHODS).toBe(types.MERGE_METHODS);
     expect(barrel.isMergeMethod).toBe(types.isMergeMethod);
   });
@@ -65,7 +66,7 @@ describe('the pull request barrel', () => {
     expect(barrel.pushBranch).toBe(none.pushBranch);
   });
 
-  it('answers the provider readers of ./provider.js themselves', () => {
+  it('answers the provider readers of @open-tomato/rafa/pr/provider themselves', () => {
     expect(barrel.isGitHubRemote).toBe(provider.isGitHubRemote);
     expect(barrel.PR_NEEDS_GH).toBe(provider.PR_NEEDS_GH);
     expect(barrel.PR_REFUSAL_EXIT).toBe(provider.PR_REFUSAL_EXIT);

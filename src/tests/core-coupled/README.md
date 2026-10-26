@@ -57,7 +57,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `effort/store/location.test.ts` | `src/tests/cli-capture.ts` |
 | `effort/store/merge-commit-gaps.test.ts` | `packages/rafa-effort/src/effort/commits.ts` |
 | `effort/store/merge-rules.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
-| `effort/store/migrations.test.ts` | `src/tests/git-identity.ts` |
+| `effort/store/migrations.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |
 | `effort/store/move.test.ts` | `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |
 | `effort/store/origins.test.ts` | `packages/rafa-effort/src/effort/skill-facts.ts` |
 | `effort/store/preflight.test.ts` | `src/preflight/run.ts` |
@@ -67,17 +67,17 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `effort/store/store-sources.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
 | `errors/rafa-codes.test.ts` | `src/cli/dispatch.ts`, `src/cli/route.ts`, `src/errors/match.ts`, `packages/rafa-inventory/src/schema/failure-strings.ts`, `packages/rafa-inventory/src/schema/skill.ts` |
 | `modules/load.test.ts` | `src/config-registry.ts` |
-| `next/hop-record.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts`, `src/tests/git-identity.ts` |
+| `next/hop-record.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts` |
 | `plan/doc-task.test.ts` | `src/plan/index.ts`, `packages/rafa/src/plan/validate.ts` |
 | `ports/index.test.ts` | `src/plan/index.ts` |
 | `project/package-of.test.ts` | `src/tests/package-tree.ts` |
-| `project/position.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts`, `src/tests/git-identity.ts` |
-| `project/scope-fallback.test.ts` | `src/tests/git-identity.ts` |
+| `project/position.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts` |
+| `project/scope-fallback.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |
 | `project/scope.test.ts` | `src/config-registry.ts` |
-| `project/worktree-root.test.ts` | `src/tests/git-identity.ts` |
+| `project/worktree-root.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |
 | `report/parse.test.ts` | `packages/rafa-inventory/src/schema/instinct.ts` |
-| `schema/project-id.test.ts` | `src/tests/git-identity.ts` |
+| `schema/project-id.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |
 | `start/worktree-dir.test.ts` | `src/config-registry.ts` |
-| `utils/git.test.ts` | `src/tests/git-identity.ts` |
+| `utils/git.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |
 | `utils/progress.test.ts` | `scripts/control-byte-gate/control-byte-gate.ts`, `src/plan.ts` |
 | `utils/tracker.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `src/plan/index.ts`, `src/start/commit.ts`, `src/start/dispatch.ts`, `src/start/stamp.ts` |

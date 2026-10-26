@@ -140,6 +140,7 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { projectConfigText } from '../project/scaffold.js';
 import {
@@ -150,7 +151,6 @@ import {
 } from '../start/dispatch.js';
 
 import { plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** What a run with no config spawns every session under, spelled out. */

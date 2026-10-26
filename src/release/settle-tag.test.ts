@@ -26,8 +26,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
-
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { PUSH_SAID_NOTHING, settleByPush } from './settle-push.js';
 import { RELEASE_TAG_COMMAND, tagSettle } from './settle-tag.js';

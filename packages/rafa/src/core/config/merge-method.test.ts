@@ -2,7 +2,7 @@
  * Tests for the merge methods (`merge-method.ts`): the list GitHub's
  * three flags make, frozen, and the guard that accepts exactly them.
  *
- * The type is held by the compiled probes of `src/pr/types.test.ts`,
+ * The type is held by the compiled probes of `packages/rafa/src/pr/types.test.ts`,
  * which read it through the port's re-export.
  */
 import { describe, expect, it } from 'bun:test';

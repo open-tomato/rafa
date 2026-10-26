@@ -33,10 +33,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { readGuard } from '../../release/guard.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createReleaseFragmentCommand, noteLine, readNoteValues, RELEASE_FRAGMENT_USAGE } from './fragment.js';
 
