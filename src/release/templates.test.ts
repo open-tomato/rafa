@@ -91,7 +91,7 @@ describe('the shipped publish workflow', () => {
     expect(at(stepNamed(steps, 'Checkout'), ['with', 'ref'])).toBe('${{ inputs.ref || github.ref }}');
     expect(at(stepNamed(steps, 'Set up bun'), ['uses'])).toBe('oven-sh/setup-bun@v2');
     expect(at(stepNamed(steps, 'Set up bun'), ['with', 'bun-version-file'])).toBe('package.json');
-    expect(at(stepNamed(steps, 'Set up node'), ['uses'])).toBe('actions/setup-node@v4');
+    expect(at(stepNamed(steps, 'Set up node'), ['uses'])).toBe('actions/setup-node@v7');
     expect(at(stepNamed(steps, 'Set up node'), ['with', 'node-version'])).toBe(24);
     expect(at(stepNamed(steps, 'Set up node'), ['with', 'registry-url'])).toBe('https://registry.npmjs.org');
   });
