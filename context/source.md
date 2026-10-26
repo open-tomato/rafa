@@ -144,10 +144,11 @@ confirm prompt; `output/` the active output; `adapters/` the adapter registry;
 parser and the plan-file readers; `loop/` the loop's session helpers, its
 session readings and the Claude spawner; `runtime/` the reading of which build
 is running. The ninth, `services/`, moved nothing in: it was written there
-(#1336) and holds the service registry, the functions of run and pr that board
-calls, registered by the root. Pass 4c (rafa-1349) added two folders beside the
-nine: `cli/`, the command registry and the describe document, `registry.ts` and
-`describe.ts` with their tests, which board's refs check and doctor read, and
+(#1336) and holds the service registry, the functions of run, pr and release
+that board and release call, registered by the root. Pass 4c (rafa-1349)
+added two folders beside the nine: `cli/`, the command registry and the
+describe document, `registry.ts` and `describe.ts` with their tests, which
+board's refs check and doctor read, and
 `tests/`, the output sinks test helper, `output-sinks.ts`, with its test, which
 the tests take; `GLOBAL_FLAGS` went into `command/`, in `global-flags.ts`. A
 file keeps its base name when it moves. A moved file keeps no re-export at its
@@ -441,8 +442,8 @@ and its mapped type makes a key with no reason a `tsc` failure. A new entry
 names the lower and higher package, the function's file and its reach on the
 import graph, and why the function cannot move into core, and it needs a check
 on the import graph that the function cannot move there. A function that is
-pure, or that reaches nothing past core, moves into core instead. The four
-entries are board's calls, each into a higher package:
+pure, or that reaches nothing past core, moves into core instead. The five
+entries are calls of a lower package, board or release, each into a higher one:
 
 - `addStaleDocLine`, release's, in `src/docs/release-issue.ts` (reach 6 at
   aec5e4a, the figure the registry records; a second method read 95, so the
@@ -456,9 +457,13 @@ entries are board's calls, each into a higher package:
   `rafa epic close`, which titles the stale-docs issue by the release forecast.
 - `triageReport`, pr's, in `src/triage/triage.ts` (reach 66), for
   `rafa epic close`, which files each failed criterion as a bug.
+- `pullRequestsIn`, pr's `ghPullRequestsIn`, in `src/pr/gh.ts` (reach 9 on the
+  graph decouple 6's base held, last written at 76ebfc2), for release's
+  `rafa release settle`, which opens its release pull request through the gh
+  provider, reaching board's gh runner and pr's check readers.
 
 The root is `src/service-registry.ts`, outside `packages/rafa/src/core/`. It
-lists the four as `CORE_SERVICES`, and `registerCoreServices()` hands them to
+lists the five as `CORE_SERVICES`, and `registerCoreServices()` hands them to
 `registerServices` and answers `activeServices()`, a frozen facade whose members
 call the active set. `src/rafa.ts` and `src/index.ts` call it straight after
 `registerCoreAdapters`, and `bun test` calls it once per process from

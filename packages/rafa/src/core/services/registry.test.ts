@@ -19,6 +19,7 @@
  */
 import type { RafaServices } from './registry.js';
 import type { StaleDocLineResult, TriageServiceResult } from './shapes.js';
+import type { PullRequests } from '../../pr/types.js';
 import type { RafaContext } from '../command/command.js';
 
 import { existsSync } from 'node:fs';
@@ -35,8 +36,8 @@ import {
 
 const ROOT = resolve(import.meta.dir, '../../../../..');
 
-/** The four keys, sorted, spelled here so a reading that drifts fails. */
-const KEYS = ['addStaleDocLine', 'endWithNextStep', 'readStaleDocsVersion', 'triageReport'];
+/** The five keys, sorted, spelled here so a reading that drifts fails. */
+const KEYS = ['addStaleDocLine', 'endWithNextStep', 'pullRequestsIn', 'readStaleDocsVersion', 'triageReport'];
 
 /** What a member of the facade throws while nothing is registered. */
 function unregistered(key: string): string {
@@ -47,13 +48,23 @@ function unregistered(key: string): string {
 /** A context no stub reads. */
 const CONTEXT = {} as RafaContext;
 
+/**
+ * What a stub `pullRequestsIn` answers: the port cast over a tag, which
+ * {@link answers} reads and no case calls a member of.
+ */
+interface TaggedPullRequests extends PullRequests {
+  readonly tag: string;
+}
+
 /** A full set of stubs, each answering a value naming `tag`. */
 function stubs(tag: string): RafaServices {
   const kept: StaleDocLineResult = { action: 'kept', title: tag, reason: tag };
   const triaged: TriageServiceResult = { bugs: [], staleDocs: [] };
+  const provider = { tag } as TaggedPullRequests;
   return {
     addStaleDocLine: async () => kept,
     endWithNextStep: async () => tag,
+    pullRequestsIn: () => provider,
     readStaleDocsVersion: () => tag,
     triageReport: async () => triaged,
   };
@@ -69,6 +80,7 @@ async function answers(services: RafaServices): Promise<Record<string, unknown>>
   return {
     addStaleDocLine: added.title,
     endWithNextStep: await services.endWithNextStep(CONTEXT),
+    pullRequestsIn: (services.pullRequestsIn('/nonexistent') as TaggedPullRequests).tag,
     readStaleDocsVersion: services.readStaleDocsVersion({
       repoRoot: '/nonexistent',
       checkout: '/nonexistent',
@@ -97,6 +109,7 @@ describe('the facade while nothing is registered', () => {
       expect(() => services.addStaleDocLine({ tracker: null, version: 'next', entry: { where: null, what: 'x' } }))
         .toThrow(unregistered('addStaleDocLine'));
       expect(() => services.endWithNextStep(CONTEXT)).toThrow(unregistered('endWithNextStep'));
+      expect(() => services.pullRequestsIn('/nonexistent')).toThrow(unregistered('pullRequestsIn'));
       expect(() => services.readStaleDocsVersion({} as Parameters<RafaServices['readStaleDocsVersion']>[0]))
         .toThrow(unregistered('readStaleDocsVersion'));
       expect(() => services.triageReport({} as Parameters<RafaServices['triageReport']>[0]))
@@ -107,6 +120,7 @@ describe('the facade while nothing is registered', () => {
       expect(await answers(activeServices())).toEqual({
         addStaleDocLine: 'one',
         endWithNextStep: 'one',
+        pullRequestsIn: 'one',
         readStaleDocsVersion: 'one',
         triageReport: 0,
       });
@@ -217,13 +231,13 @@ describe('registering and restoring a set', () => {
 });
 
 describe('SERVICE_REASONS', () => {
-  it('holds the four keys, sorted', () => {
+  it('holds the five keys, sorted', () => {
     expect(Object.keys(SERVICE_REASONS)).toEqual(KEYS);
   });
 
-  it('names board as lower, run, pr or release as higher, a home under src/ and a reach above zero for every key', () => {
+  it('names board or release as lower, run, pr or release as higher, a home under src/ and a reach above zero for every key', () => {
     for (const [key, reason] of Object.entries(SERVICE_REASONS)) {
-      expect([key, reason.lower]).toEqual([key, 'board']);
+      expect([key, ['board', 'release'].includes(reason.lower)]).toEqual([key, true]);
       expect([key, ['run', 'pr', 'release'].includes(reason.higher)]).toEqual([key, true]);
       expect([key, reason.home.startsWith('src/')]).toEqual([key, true]);
       expect([key, existsSync(resolve(ROOT, reason.home))]).toEqual([key, true]);

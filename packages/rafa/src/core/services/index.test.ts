@@ -93,6 +93,7 @@ describe('the services barrel', () => {
     const services: RafaServices = {
       addStaleDocLine: async () => ({ action: 'kept', title: 'barrel', reason: 'barrel' }),
       endWithNextStep: async () => 'barrel',
+      pullRequestsIn: () => ({}) as ReturnType<RafaServices['pullRequestsIn']>,
       readStaleDocsVersion: () => 'barrel',
       triageReport: async () => ({ bugs: [], staleDocs: [] }),
     };

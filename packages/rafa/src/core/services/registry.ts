@@ -6,10 +6,12 @@
  * ## Why it exists
  *
  * A package may not import a package that moves after it. Board moves
- * before run, pr and release, and four of its commands call a function
- * of theirs that reaches too far into its package to move into core.
- * Each such function is a key of {@link RafaServices}; board calls it
- * through {@link activeServices}, and the composition root
+ * before run, pr and release, and release before pr and run, and a
+ * command of a lower package, board or release, calls a function of a
+ * higher one that reaches too far into its package to move into core:
+ * four of board's commands and release's `rafa release settle`. Each
+ * such function is a key of {@link RafaServices}; the lower package
+ * calls it through {@link activeServices}, and the composition root
  * `src/service-registry.ts`, outside `packages/rafa/src/core/`, imports
  * the real function from the higher package's facade and registers it.
  * This module is the registry in the form of the adapter registry
@@ -23,7 +25,10 @@
  * in {@link SERVICE_REASONS}: the lower package, the higher one, the
  * function's file and its reach, the count of files outside
  * `packages/rafa/` that file reaches on `docs/survey/import-graph.json`
- * over value and type edges, tests excluded, read at aec5e4a. The
+ * over value and type edges, tests excluded, the home itself not
+ * counted, read at aec5e4a for board's four keys and on the graph the
+ * base of decouple 6 held, last written at 76ebfc2, for release's
+ * `pullRequestsIn`. The
  * mapped type of {@link SERVICE_REASONS} makes a key with no reason a
  * `tsc` failure. A function that is pure, or reaches nothing past core,
  * moves into core instead and is no key here.
@@ -61,6 +66,7 @@
 import type {
   AddStaleDocLineService,
   EndWithNextStepService,
+  PullRequestsInService,
   ReadStaleDocsVersionService,
   TriageReportService,
 } from './shapes.js';
@@ -80,6 +86,8 @@ export interface RafaServices {
   readonly addStaleDocLine: AddStaleDocLineService;
   /** run's `endWithNextStep`, for `rafa issue ready`. */
   readonly endWithNextStep: EndWithNextStepService;
+  /** pr's `ghPullRequestsIn`, for `rafa release settle`. */
+  readonly pullRequestsIn: PullRequestsInService;
   /** run's `readStaleDocsVersion`, for `rafa epic close`. */
   readonly readStaleDocsVersion: ReadStaleDocsVersionService;
   /** pr's `triageReport`, for `rafa epic close`. */
@@ -88,11 +96,11 @@ export interface RafaServices {
 
 /** Why one key is a service and not a move into core; see the module note. */
 export interface ServiceReason {
-  /** The package whose command calls the service. */
-  readonly lower: 'board';
+  /** The lower package whose command calls the service, board or release. */
+  readonly lower: 'board' | 'release';
   /** The package the function lives in. */
   readonly higher: 'pr' | 'release' | 'run';
-  /** The function's file, repository-relative, as it stood at aec5e4a. */
+  /** The function's file, repository-relative, as it stood when the key's reach was read; see the module note. */
   readonly home: string;
   /** The files outside `packages/rafa/` the home reaches on the import graph; see the module note. */
   readonly reach: number;
@@ -117,6 +125,14 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
     reach: 119,
     why: 'rafa issue ready ends naming the next step, which reads the whole next-step state and runs its action'
       + ' through run\'s dispatch.',
+  }),
+  pullRequestsIn: Object.freeze<ServiceReason>({
+    lower: 'release',
+    higher: 'pr',
+    home: 'src/pr/gh.ts',
+    reach: 9,
+    why: 'rafa release settle opens its release pull request through the gh provider, which reaches board\'s gh runner'
+      + ' and pr\'s check readers.',
   }),
   readStaleDocsVersion: Object.freeze<ServiceReason>({
     lower: 'board',
@@ -176,6 +192,7 @@ function accept(services: RafaServices): RafaServices {
   return Object.freeze<RafaServices>({
     addStaleDocLine: services.addStaleDocLine,
     endWithNextStep: services.endWithNextStep,
+    pullRequestsIn: services.pullRequestsIn,
     readStaleDocsVersion: services.readStaleDocsVersion,
     triageReport: services.triageReport,
   });
@@ -224,6 +241,7 @@ function held(key: keyof RafaServices): RafaServices {
 const FACADE: RafaServices = Object.freeze<RafaServices>({
   addStaleDocLine: (options) => held('addStaleDocLine').addStaleDocLine(options),
   endWithNextStep: (context, seams) => held('endWithNextStep').endWithNextStep(context, seams),
+  pullRequestsIn: (root) => held('pullRequestsIn').pullRequestsIn(root),
   readStaleDocsVersion: (options) => held('readStaleDocsVersion').readStaleDocsVersion(options),
   triageReport: (options) => held('triageReport').triageReport(options),
 });

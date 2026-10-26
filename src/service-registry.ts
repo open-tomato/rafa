@@ -1,13 +1,14 @@
 /**
- * The composition root of the service registry: the four functions of
- * run, pr and release that board's commands call, listed here and handed
- * to core when {@link registerCoreServices} is called.
+ * The composition root of the service registry: the five functions of
+ * run, pr and release that a lower package's commands call, four of them
+ * board's and one release's, listed here and handed to core when
+ * {@link registerCoreServices} is called.
  *
  * Core declares the registry (`packages/rafa/src/core/services/registry.ts`)
- * and imports no service: each function sits in run, pr or release, above
- * board, and reaches too far into its package to move into core, so board
- * calling it directly would be an edge into a package that moves after
- * it. This module, outside `packages/rafa/src/core/`, is the one place
+ * and imports no service: each function sits in a package above the lower
+ * package, board or release, that calls it, and reaches too far into its
+ * package to move into core, so the lower package calling it directly
+ * would be an edge into a package that moves after it. This module, outside `packages/rafa/src/core/`, is the one place
  * they are listed, {@link CORE_SERVICES}, each taken from its package's
  * facade (`@open-tomato/rafa-run`, `@open-tomato/rafa-pr` and
  * `@open-tomato/rafa-release`) as `src/adapter-registry.ts` takes core's
@@ -26,10 +27,10 @@
  *
  * `bun test` calls it once for the test process, from
  * `src/tests/preload.ts`, which `bunfig.toml` names under
- * `[test] preload`: a test that reaches a board command's default path
- * calls the real service whether it runs alone or behind another file,
- * and a test that wants a stub registers one over the active set and
- * restores the previous set after. A child process a test spawns runs
+ * `[test] preload`: a test that reaches a board or release command's
+ * default path calls the real service whether it runs alone or behind
+ * another file, and a test that wants a stub registers one over the
+ * active set and restores the previous set after. A child process a test spawns runs
  * no preload, and reads the registration of the entry it runs.
  *
  * A second call, from an entry a test imports or from both entries in
@@ -44,7 +45,7 @@
  */
 import type { RafaServices } from '@open-tomato/rafa/core/services';
 
-import { triageReport } from '@open-tomato/rafa-pr';
+import { ghPullRequestsIn, triageReport } from '@open-tomato/rafa-pr';
 import { addStaleDocLine } from '@open-tomato/rafa-release';
 import { endWithNextStep, readStaleDocsVersion } from '@open-tomato/rafa-run';
 
@@ -52,13 +53,15 @@ import { activeServices, registerServices, restoreServices } from '@open-tomato/
 
 /**
  * The services core registers, keys sorted as `SERVICE_REASONS` sorts
- * them: release's `addStaleDocLine`, run's `endWithNextStep`, run's
- * `readStaleDocsVersion` and pr's `triageReport`.
+ * them: release's `addStaleDocLine`, run's `endWithNextStep`, pr's
+ * `ghPullRequestsIn` as `pullRequestsIn`, run's `readStaleDocsVersion`
+ * and pr's `triageReport`.
  * {@link registerCoreServices} hands them to core.
  */
 export const CORE_SERVICES: RafaServices = Object.freeze({
   addStaleDocLine,
   endWithNextStep,
+  pullRequestsIn: ghPullRequestsIn,
   readStaleDocsVersion,
   triageReport,
 } satisfies RafaServices);
