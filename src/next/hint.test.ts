@@ -54,13 +54,13 @@ import type { RafaContext } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, HINT_FLAG } from '@open-tomato/rafa/core/command';
 
 import { createCommandRegistry } from '../cli/registry.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { actionInvocation } from './actions.js';
-import { commandWords, HINT_FLAG, HINT_TIMEOUT_MS, hintLine, nextQuestion, nextStepHint, wantsHint } from './hint.js';
+import { commandWords, HINT_TIMEOUT_MS, hintLine, nextQuestion, nextStepHint, wantsHint } from './hint.js';
 
 /** The base every state that names one is read against. */
 const BASE = 'main';

@@ -26,6 +26,10 @@
  * `ResolvedConfig.provenance` (`packages/rafa/src/core/config/config-origins.ts`)
  * records them. A YAML file is one entry, so its every setting is entry
  * 0. A setting no file answers names the layer `default` and no file.
+ * A setting a config template answered, which no file's own key
+ * outranked, names the layer `template:<name>`, `template:escalation`
+ * for the one template, with the file whose `templates` key named it and
+ * the entry of that file that set `templates`.
  *
  * The settings come in one order in both views: the registry's
  * (`SETTING_NAMES`, `src/config-registry.ts`), each key grouped under the
@@ -34,11 +38,17 @@
  *
  * ## The layers
  *
+ * A scope is read from two layers: its module file (`rafa.config.ts` or
+ * `rafa.config.mjs`), the person's file rafa never writes, and its
+ * `.rafa/config.yaml` over it key by key, the local layer rafa writes.
  * A layer is named as the plan's scopes name it, not as `ConfigSource`
- * spells it: `project` for the project's file (`file` in `sources`),
- * `user` for `~/.rafa/`'s, and `default`. `cli` is kept for a value a
- * command line gave, which this command never passes, so it does not
- * appear in practice.
+ * spells it: `local` for the project's `.rafa/config.yaml` (`local` in
+ * `sources`), `project` for the project's module file (`file` in
+ * `sources`), `user` for both of `~/.rafa/`'s, `template:<name>` for a
+ * template a file named (`template` in `sources`, the name read off
+ * `provenance`), and `default`. `cli` is kept for a value a command line
+ * gave, which this command never passes, so it does not appear in
+ * practice.
  *
  * ## Exit codes
  *
@@ -52,12 +62,12 @@
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ConfigSetting, ConfigSource, ResolvedConfig } from '@open-tomato/rafa/core/config';
 
+import { expectNoArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
 import { SETTING_BY_KEY, SETTING_NAMES, SETTINGS } from '../../config-registry.js';
-import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa config show';
@@ -75,7 +85,7 @@ const INDENT = '  ';
 export type ConfigShowView = 'resolved' | 'sources';
 
 /** A layer as this command names it; see "The layers". */
-export type ConfigShowLayer = 'cli' | 'project' | 'user' | 'default';
+export type ConfigShowLayer = 'cli' | 'local' | 'project' | 'user' | 'default' | `template:${string}`;
 
 /** The settings nested as a config file spells them. */
 export interface ConfigTree {
@@ -90,9 +100,9 @@ export interface ConfigShowSource {
   readonly value: unknown;
   /** The layer that answered it. */
   readonly layer: ConfigShowLayer;
-  /** The file that answered it, or null for a default. */
+  /** The file that answered it, the one naming the template for a template's, or null for a default. */
   readonly file: string | null;
-  /** The zero-based entry of that file that last set it, or null with no file. */
+  /** The zero-based entry of that file that last set it, or `templates` for a template's; null with no file. */
   readonly entry: number | null;
 }
 
@@ -101,9 +111,10 @@ export type ConfigShowResult =
   | { readonly view: 'resolved'; readonly config: ConfigTree }
   | { readonly view: 'sources'; readonly settings: readonly ConfigShowSource[] };
 
-/** The layer names of each `ConfigSource`. */
-const LAYER_OF: Readonly<Record<ConfigSource, ConfigShowLayer>> = Object.freeze({
+/** The layer names of each `ConfigSource` but `template`, which {@link layerOf} names. */
+const LAYER_OF: Readonly<Record<Exclude<ConfigSource, 'template'>, ConfigShowLayer>> = Object.freeze({
   cli: 'cli',
+  local: 'local',
   file: 'project',
   user: 'user',
   default: 'default',
@@ -177,6 +188,14 @@ function settingOf(key: string): ConfigSetting {
   return setting;
 }
 
+/** The layer `setting` is named by: `template:<name>` for a template's, else its source's layer name. */
+function layerOf(resolved: ResolvedConfig, setting: ConfigSetting): ConfigShowLayer {
+  const source = resolved.sources[setting];
+  return source === 'template'
+    ? `template:${resolved.provenance[setting]?.template ?? 'unnamed'}`
+    : LAYER_OF[source];
+}
+
 /** Every setting with its value, its layer and the file and entry that answered it; see the module note. */
 export function sourceRows(resolved: ResolvedConfig): ConfigShowSource[] {
   return leafKeys(resolvedTree(resolved.config)).map((key) => {
@@ -185,7 +204,7 @@ export function sourceRows(resolved: ResolvedConfig): ConfigShowSource[] {
     return {
       key,
       value: plainValue(resolved.config[setting]),
-      layer: LAYER_OF[resolved.sources[setting]],
+      layer: layerOf(resolved, setting),
       file: origin?.file ?? null,
       entry: origin?.entry ?? null,
     };
@@ -257,13 +276,16 @@ export function createConfigShowCommand(): RafaCommand {
     action: 'show',
     summary: 'print every setting with its merged value, or with the layer, file and entry it came from',
     description: 'Prints every setting the config reads, resolved as every command resolves it: the'
-      + ' project\'s file over the user scope\'s under `~/.rafa/`, each over the default, the file of a'
-      + ' scope being the first of `rafa.config.ts`, `rafa.config.mjs` and `.rafa/config.yaml` that exists.'
+      + ' project\'s files over the user scope\'s under `~/.rafa/`, each over the default. A scope is read'
+      + ' from two layers: its `.rafa/config.yaml`, the local layer rafa writes, over its `rafa.config.ts`'
+      + ' or `rafa.config.mjs`, the module file rafa never writes, key by key.'
       + ' With no flag or `--resolved`, every setting with its merged value, nested as a config file spells'
       + ' it and printed as YAML, each value written as JSON. With `--sources`, one line per setting by its'
-      + ' dotted key: its value, the layer that answered it (`project`, `user` or `default`) and, for a'
-      + ' file, the file and the zero-based entry of it that last set the setting; a YAML file is one'
-      + ' entry, entry 0. Exit code 1 for an argument, for both flags at once, and for a config that'
+      + ' dotted key: its value, the layer that answered it (`local` for the project\'s YAML file,'
+      + ' `project` for its module file, `user`, `default`, or'
+      + ' `template:<name>` for a config template a file named) and, for a file, the file and the'
+      + ' zero-based entry of it that last set the setting, for a template the file that named it;'
+      + ' a YAML file is one entry, entry 0. Exit code 1 for an argument, for both flags at once, and for a config that'
       + ' cannot be used, each problem named. With `--output=json` the view is the data of the terminal'
       + ' result event: the nested settings under `config`, or the rows under `settings`. Starts no session.',
     args: [],

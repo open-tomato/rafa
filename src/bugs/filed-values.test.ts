@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
+import { DEFAULT_BUG_TITLE, renderTitle, titleRoundTrips } from '@open-tomato/rafa/bugs/title';
+
 import { GITHUB_LABEL_MAX_LENGTH, GITHUB_LABELS } from '../adapters/tracker/github.js';
 
 import { boundaryValueOf, summaryOf } from './filed-values.js';
-import { DEFAULT_BUG_TITLE, renderTitle, titleRoundTrips } from './title.js';
 
 /** The longest module whose `module:` label GitHub accepts. */
 const LONGEST_MODULE = GITHUB_LABEL_MAX_LENGTH - GITHUB_LABELS.modulePrefix.length;

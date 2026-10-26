@@ -86,12 +86,12 @@
  * place a first `rafa switch` resolves as home.
  */
 import type { HopDecision, HopHalt, HopMove } from './hop-chain.js';
-import type { HopKind, HopRecord } from './hop-record.js';
 import type { DryEpic, NextHopReading, NextRoadmapReading, NextRoadmapSources, NextWorld } from './readings.js';
 import type { NextStateId, RowAnswer } from './state.js';
 import type { NextNowEpic } from '../board/epic-walk.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { Place } from '../project/position.js';
+import type { HopKind, HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 

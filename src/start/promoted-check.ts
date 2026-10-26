@@ -95,9 +95,9 @@
  * library. With no line to report, a null `pulls` prints nothing.
  */
 import type { PromotedReading, SkippedWithReason } from './promoted.js';
-import type { InstinctRecord } from '../learning/index.js';
 import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
 import type { Learning } from '@open-tomato/rafa/ports';
+import type { InstinctRecord } from '@open-tomato/rafa-inventory';
 
 import { isAbsolute, posix, relative } from 'node:path';
 

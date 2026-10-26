@@ -36,17 +36,17 @@
  * project root as a real path too, so the root `init` writes under is the
  * root every later command resolves.
  */
+import type { Prompter } from '@open-tomato/rafa/core/command';
 import type {
   CandidateSource,
   RefusalSeams,
   RootCandidate,
   RootCandidates,
-} from './roots.js';
-import type { Prompter } from '@open-tomato/rafa/core/command';
+} from '@open-tomato/rafa/project/roots';
 
 import { resolve } from 'node:path';
 
-import { DISK_ROOTS_FILE_SYSTEM, rootRefusal } from './roots.js';
+import { DISK_ROOTS_FILE_SYSTEM, rootRefusal } from '@open-tomato/rafa/project/roots';
 
 /** Where a chosen root came from: a candidate's source, `--root`, or a path typed at the prompt. */
 export type RootSource = CandidateSource | 'root-flag' | 'typed';

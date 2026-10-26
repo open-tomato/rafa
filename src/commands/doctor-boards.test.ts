@@ -12,7 +12,7 @@
  * where the same fixture, changed in the one fact, names it.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Position } from '../project/position.js';
+import type { Position } from '@open-tomato/rafa/project/position';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,9 +20,10 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { writePositionFile } from '@open-tomato/rafa/project/position';
+
 import { unlabelledRoadmapMessage } from '../board/boards.js';
 import { BOARD_LIST_FIELDS, createGhBoardListing } from '../board/roadmap-board.js';
-import { writePositionFile } from '../project/position.js';
 
 import { BOARDS_HEADING, readDoctorBoards, renderDoctorBoards, unresolvedOwnerMessage } from './doctor-boards.js';
 

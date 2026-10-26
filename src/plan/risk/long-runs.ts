@@ -44,8 +44,9 @@
 import type { RiskLevel } from './commands.js';
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
 
+import { COMMAND_WRAPPERS } from '@open-tomato/rafa/plan/risk/patterns';
+
 import { shellTokens } from './commands.js';
-import { COMMAND_WRAPPERS } from './patterns.js';
 
 /** What a finding says to do; the text after its subject. */
 export const LONG_RUN_FIX =

@@ -94,19 +94,18 @@
  * a destination already there without `--force`, and for a copy that
  * failed, the message naming the file and what the error said.
  */
-import type { AgentDefinitionFile } from '../../agents/roster.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { SkillTier } from '@open-tomato/rafa/schema/tiers';
+import type { AgentDefinitionFile } from '@open-tomato/rafa-inventory';
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { AGENT_DEFINITION_DIR, readFrontmatter } from '@open-tomato/rafa-effort';
+import { bundledAgentsDirectory, readAgentDirectory } from '@open-tomato/rafa-inventory';
 
-import { readAgentDirectory } from '../../agents/roster.js';
-import { bundledAgentsDirectory } from '../../inventory/trees.js';
-import { AGENT_DEFINITION_DIR, readFrontmatter } from '../../utils/agent-definition.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 /** The usage line a refusal names. */
 export const USAGE = 'rafa agent vendor <name>... [--force]';

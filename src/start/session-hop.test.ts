@@ -11,9 +11,9 @@
  * undefined as a key left out.
  */
 import type { RunSessionOptions } from './session.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { Place } from '../project/position.js';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,9 +23,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSession } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { hop, positionAt, rehome, writePositionFile } from '@open-tomato/rafa/project/position';
 
-import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
-import { hop, positionAt, rehome, writePositionFile } from '../project/position.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { openRunSession, readAwayHopStamp } from './session.js';

@@ -92,18 +92,26 @@
  * false, the epic tick sends nothing, not even its listing, and the
  * boards are ticked exactly as above.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { EpicTickOptions } from '../../board/epic-tick.js';
-import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
+import type {
+  BoardIssue,
+  EpicTickOptions,
+  GhRunner,
+  RoadmapTickResult,
+} from '@open-tomato/rafa-board';
+
+import {
+  ROADMAP_LABEL,
+  closedIssuesIn,
+  createGhBoardLister,
+  createGhRoadmapBody,
+  createGhRoadmapSearch,
+  parseRoadmapBody,
+  resolveDefaultBoard,
+  tickEpics,
+  tickRoadmapIssue,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
-import { tickEpics } from '../../board/epic-tick.js';
-import { createGhRoadmapBody, tickRoadmapIssue } from '../../board/roadmap-tick.js';
-import { closedIssuesIn, createGhRoadmapSearch, parseRoadmapBody } from '../../board/roadmap.js';
-import { ROADMAP_LABEL } from '../../board/setup.js';
 
 /** What {@link tickRoadmapAfterMerge} is asked: what the epic tick reads, and what the boards add. */
 export interface MergeTickOptions extends EpicTickOptions {

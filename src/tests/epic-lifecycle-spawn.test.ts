@@ -61,7 +61,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { positionAt, writePositionFile } from '../project/position.js';
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

@@ -113,13 +113,13 @@
  * `runNextChain` takes as an argument and does not parse. They are one
  * rule read at two boundaries, and `ceiling.test.ts` measures both.
  */
-import type { NextActionId } from './state.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { NextActionId } from '@open-tomato/rafa-run';
+
+import { LABELS_ONLY_ACTIONS, NEXT_COMMAND_ACTIONS } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { LABELS_ONLY_ACTIONS, NEXT_COMMAND_ACTIONS } from './actions.js';
 
 /** The flag that names the actions which may run unasked. */
 export const YES_FLAG = 'yes';

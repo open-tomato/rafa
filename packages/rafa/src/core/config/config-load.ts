@@ -1,32 +1,37 @@
 /**
- * Finding and reading rafa's config files, one per scope, and printing
+ * Finding and reading rafa's config files, two per scope, and printing
  * what they warn about: the disk half of the config, over the pure half
  * in `config.ts`, which reads each file's document and ranks the layers.
  *
  * The file is `config-load.ts` and not `config/load.ts` for the reason
  * `config-sections.ts` gives: while both sat in `src/`, a `src/config/`
  * directory beside `config.ts` would have set the trap
- * `context/source.md` records for `./plan`.
+ * `context/source.md` records for `./plan`. The helpers a module file is
+ * read through sit beside it in `config-load-module.ts`.
  *
- * ## Two scopes, one file each
+ * ## Two scopes, two layers each
  *
  * The PROJECT scope sits at the repo root and the USER scope at
  * `~/.rafa/`, the two scopes of `.rafa/specs/phase-1-installable.md`.
- * Each is read from one file, the first of three that is a file:
+ * Each is read from two places, its MODULE place and its LOCAL place
+ * over it:
  *
- * | Scope   | Directory | Looked up, in order                                        |
- * |---------|-----------|------------------------------------------------------------|
- * | user    | `~/.rafa` | `rafa.config.ts`, `rafa.config.mjs`, `config.yaml`         |
- * | project | the root  | `rafa.config.ts`, `rafa.config.mjs`, `.rafa/config.yaml`   |
+ * | Scope   | Directory | Module place, first that is a file      | Local place          |
+ * |---------|-----------|-----------------------------------------|----------------------|
+ * | user    | `~/.rafa` | `rafa.config.ts`, `rafa.config.mjs`     | `config.yaml`        |
+ * | project | the root  | `rafa.config.ts`, `rafa.config.mjs`     | `.rafa/config.yaml`  |
  *
- * The YAML file of each scope is where it always was. The lists differ,
- * so each scope has a loader of its own: `createLoader` from
- * `@open-tomato/define-config` shares one lookup list across its layers.
- * {@link loadConfig} hands both files to `resolveConfig`, which ranks the
- * project's over the user's key by key, each over the default: a setting
- * neither file answers resolves to its default with source `default`,
- * and no record names it in `provenance`. The defaults are laid under
- * here, not as an entry of either file.
+ * The YAML file of each scope is where it always was. Each place has a
+ * loader of its own: `createLoader` from `@open-tomato/define-config`
+ * shares one lookup list across its layers, and the two places of a
+ * scope are two layers that list could not tell apart. {@link loadConfig}
+ * hands the four files to `resolveConfig`: the project's YAML file as
+ * `local`, its module file as `file`, the user scope's YAML file as
+ * `userLocal` and its module file as `user`. `resolveConfig` ranks them
+ * in that order key by key, each over the default: a setting no file
+ * answers resolves to its default with source `default`, and no record
+ * names it in `provenance`. The defaults are laid under there, not as an
+ * entry of any file.
  *
  * A module file (`.ts` or `.mjs`) goes through `import()`, which is why
  * {@link loadConfig} is asynchronous. Its default export is a list of
@@ -35,11 +40,17 @@
  * config twice sees an edit to a module file as it sees one to a YAML
  * file, at the cost of one module kept per distinct content.
  *
- * ## Shadowed files
+ * ## The local layer
  *
- * A scope holding a module file and its YAML file is read from the
- * module file alone. The YAML file is named in `shadowed` and warned
- * about once per load, since its keys stopped applying without a word.
+ * A scope's module file is the person's file: they write it, it may be
+ * tracked, and rafa never writes it. Its YAML file is the scope's LOCAL
+ * layer, read over the module file key by key: the file rafa writes
+ * (`rafa config set`, and `pr.base` from `stretch start` and
+ * `stretch end`). It is the interim form of #893's local layer, until
+ * #893's generated file under `.rafa/` replaces it. No file shadows
+ * another, so a scope holding both reads both: a key set in both
+ * resolves to the YAML file's value, and every key the YAML file leaves
+ * out to the module file's.
  *
  * ## Reading a scope's file
  *
@@ -66,11 +77,35 @@
  * The section schemas (`standard-schema.ts`) validate the merged value
  * too. Their issues are the readers' own sentences, and a subset of what
  * `readConfigDocument` finds, which also judges a `false` and a flat
- * spelling; a scope is refused with the reading's problems, or with the
+ * spelling; a file is refused with the reading's problems, or with the
  * schema's where the reading found none. No file reaches that second
  * refusal while both judge through the same readers: turned off, it
  * reddens no case of `config-load.test.ts`. It is the guard against the
  * two drifting apart.
+ *
+ * ## Templates
+ *
+ * A file holding `templates` reads each template it names as an entry
+ * ahead of its own: the active template hook (`activeConfigTemplateHook`,
+ * `section.ts`) answers the entry a name stands for, and
+ * `layTemplatesUnder` (`config.ts`) lays each under the file, a later
+ * name over an earlier one. Each of the four files has its own templates
+ * laid under it alone, so a file's own keys outrank its templates, and
+ * a YAML file's templates outrank its scope's module file, as the
+ * project's module file's templates outrank the user's files. A setting
+ * a template answered and no file outranked reports source `template`,
+ * its `provenance` naming the template and the file that named it. The
+ * entries are laid here, after define-config's merge of the file: the
+ * loader reads a file's entries and nothing else, and a template's
+ * `false` is a value, as a YAML file's is, with no removal to set back.
+ *
+ * Each template's entry is judged as a file is, labelled with the file
+ * and the template, and a key in it that names no setting is refused
+ * rather than warned about: the template is rafa's, not the operator's.
+ * A name the hook does not know is refused naming the file and the names
+ * the hook carries (`ConfigTemplateHook.names`), and so is a `templates`
+ * key naming any template while no hook is set, the known names then
+ * none. Core imports no template: `src/config-registry.ts` sets the hook.
  *
  * ## Refusals
  *
@@ -78,11 +113,12 @@
  * whatever outranks it: an unusable `store` in the user's file is refused
  * even where the project's names one, because the next project without
  * one would run on it. The user scope is read and judged first, then the
- * project's, then a key set twice in one file, and the command line last.
+ * project's, each its module file before its YAML file; then a key set
+ * twice in one file, and the command line last.
  *
- *   - `flows` and `steps` in the user layer, naming the layer and the
- *     file: a flow is a project's decision. In the project layer both are
- *     unknown keys until #119 defines them.
+ *   - `flows` and `steps` in either file of the user scope, naming the
+ *     layer and the file: a flow is a project's decision. In the project
+ *     scope both are unknown keys until #119 defines them.
  *   - A module file that imports a module it cannot find, naming the
  *     file, the module and the install. A file whose rafa is installed
  *     globally finds no `@open-tomato/rafa` at run time; `import type`
@@ -93,15 +129,25 @@
  *
  * Two entries of one file setting one key is a `duplicate-key`
  * diagnostic, raised at `warn`. The level is then taken from the merged
- * `merge.duplicates`, the project file's over the user file's: `warn`
- * prints it, `error` refuses the load with every one, `allow` drops it.
- * The level is read off the files' mappings rather than a setting, so
- * one load decides it: define-config's loader takes its `duplicates`
- * option before it reads a file.
+ * `merge.duplicates`, the highest of the four files naming one deciding:
+ * `warn` prints it, `error` refuses the load with every one, `allow`
+ * drops it. The level is read off the files' mappings rather than a
+ * setting, so one load decides it: define-config's loader takes its
+ * `duplicates` option before it reads a file.
  *
  * A root that IS the home, compared after symlinks are followed, is read
  * as the project scope alone. Read as both, it would read
  * `~/.rafa/config.yaml` twice and warn twice about each unknown key.
+ *
+ * ## The project's two files alone
+ *
+ * {@link readProjectScope} reads the project scope's two places as
+ * {@link loadConfig} does, templates laid and every refusal raised, and
+ * answers the two files without ranking them: no user scope is read, no
+ * warning is printed, the load hook is not called and the store's
+ * settings are not touched. It is for a caller that reads the project's
+ * files and no command's config, such as a script under `scripts/`;
+ * like {@link loadConfig}, it needs the registry's sections registered.
  *
  * ## The home is a seam
  *
@@ -134,19 +180,19 @@
  *
  * define-config's lookup passes over a directory at a lookup name. Only
  * absence is absorbed here — the rule `effort/store/ndjson-files.ts`
- * applies to its own files — so a scope whose loader found no file, while something
- * stands at one of its names, is refused naming it: a
+ * applies to its own files — so a place whose loader found no file,
+ * while something stands at one of its names, is refused naming it: a
  * `.rafa/config.yaml` that is a directory would otherwise pass for no
  * config, and the run would go on at defaults. {@link readConfigFile}
  * reads the YAML file alone by the same rule, deciding existence with
  * `existsSync`: `Bun.file(path).exists()` answers false for a directory.
  */
-import type { ConfigScopeName, ShadowedFile } from './config-origins.js';
+import type { ConfigScopeName } from './config-origins.js';
 import type { DuplicatesLevel, Mapping } from './config-sections.js';
-import type { ConfigFile, ConfigOverrides, ConfigSetting, ResolvedConfig } from './config.js';
-import type { Diagnostic, LoadResult, Provenance } from '@open-tomato/define-config';
+import type { ConfigFile, ConfigOverrides, ResolvedConfig, TemplateLayer } from './config.js';
+import type { Diagnostic, LoadResult } from '@open-tomato/define-config';
 
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 
 import { createLoader } from '@open-tomato/define-config';
@@ -154,18 +200,20 @@ import { createLoader } from '@open-tomato/define-config';
 import { setActiveStoreSettings } from '../../effort/store/settings.js';
 import { activeOutput } from '../output/active.js';
 
+import { entriesOf, missingModuleProblem, restoredMapping } from './config-load-module.js';
 import { describeValue, DUPLICATE_LEVELS, isMapping, messageOf } from './config-sections.js';
 import {
   CONFIG_FILE,
   ConfigError,
   configFilePath,
+  layTemplatesUnder,
   parseConfigDocument,
   parseConfigText,
   readConfigDocument,
   resolveConfig,
 } from './config.js';
 import { writeDangerousPassLines } from './dangerous.js';
-import { activeConfigLoadHook, activeSections, activeSettingByKey, activeSettings } from './section.js';
+import { activeConfigLoadHook, activeConfigTemplateHook, activeSections, activeSettings } from './section.js';
 import { schemaSectionsOf } from './standard-schema.js';
 
 /** The two directories {@link loadConfig} reads a config file under. */
@@ -176,44 +224,62 @@ export interface ConfigRoots {
   readonly home: string;
 }
 
-/** The module files a scope is looked up for, ahead of its YAML file. */
-const MODULE_FILES: readonly string[] = ['rafa.config.ts', 'rafa.config.mjs'];
+/** The project scope's two files, each read with its templates laid under; see {@link readProjectScope}. */
+export interface ProjectScopeFiles {
+  /** The project's YAML file, its local layer, or null when there is none. */
+  readonly local: ConfigFile | null;
+  /** The project's module file, `rafa.config.ts` or `rafa.config.mjs`, or null when there is none. */
+  readonly file: ConfigFile | null;
+}
 
-/** The package a config module imports its types from. */
-const RAFA_PACKAGE = '@open-tomato/rafa';
+/** The module files a scope's module place is looked up for, in order. */
+const MODULE_FILES: readonly string[] = ['rafa.config.ts', 'rafa.config.mjs'];
 
 /** The keys only a project's file may hold; see the module note. */
 const PROJECT_ONLY_KEYS: readonly string[] = ['flows', 'steps'];
 
-/** One scope to read: its layer, its directory and its lookup names, the YAML file last. */
+/** One place of a scope to read: its scope, its directory and its lookup names. */
 interface ScopePlace {
   readonly layer: ConfigScopeName;
   readonly dir: string;
   readonly lookup: readonly string[];
 }
 
+/** One scope's two places: its module file's, and its YAML file's over it. */
+interface ScopePlaces {
+  readonly layer: ConfigScopeName;
+  readonly module: ScopePlace;
+  readonly local: ScopePlace;
+}
+
 /** What the YAML host loader made of one file: its document, or the refusal. */
 type YamlRead = { readonly document: unknown } | { readonly error: unknown };
 
-/** One scope, read and judged. */
+/** One place, read and judged. */
 interface ScopeReading {
-  /** The file read, or null when the scope holds none. */
+  /** The file read, or null when the place holds none. */
   readonly file: ConfigFile | null;
   /** The file's mapping, as {@link ScopeReading.file} was read from. */
   readonly mapping: Mapping;
   /** One line per key two entries of the file set, the file named. */
   readonly duplicates: readonly string[];
-  /** The YAML file the module file left unread, or null. */
-  readonly shadowed: ShadowedFile | null;
 }
 
-/** A scope that holds no file. */
+/** One scope's two places, read and judged. */
+interface ScopeReadings {
+  readonly module: ScopeReading;
+  readonly local: ScopeReading;
+}
+
+/** A place that holds no file. */
 const NO_FILE: ScopeReading = Object.freeze({
   file: null,
   mapping: Object.freeze({}),
   duplicates: Object.freeze([]),
-  shadowed: null,
 });
+
+/** A scope that holds no file in either place. */
+const NO_SCOPE: ScopeReadings = Object.freeze({ module: NO_FILE, local: NO_FILE });
 
 /**
  * Reads `.rafa/config.yaml` under `root`, or answers null when nothing
@@ -252,25 +318,34 @@ function isSameDirectory(first: string, second: string): boolean {
   }
 }
 
+/** The two places of the scope `layer` under `dir`, the YAML file `yaml` there its local place. */
+function placesOf(layer: ConfigScopeName, dir: string, yaml: string): ScopePlaces {
+  return {
+    layer,
+    module: { layer, dir, lookup: MODULE_FILES },
+    local: { layer, dir, lookup: [yaml] },
+  };
+}
+
+/** The project scope's two places under `root`. */
+function projectPlaces(root: string): ScopePlaces {
+  return placesOf('project', root, CONFIG_FILE);
+}
+
 /**
  * The scopes to read, the user's first: none for the user when the home
  * is the root. Refuses a home that is not an absolute path; see the
  * module note.
  */
-function scopesOf({ root, home }: ConfigRoots): readonly ScopePlace[] {
+function scopesOf({ root, home }: ConfigRoots): readonly ScopePlaces[] {
   if (!isAbsolute(home)) {
     throw new ConfigError([
       `home directory is ${describeValue(home)}, expected an absolute path`,
     ]);
   }
-  const project: ScopePlace = { layer: 'project', dir: root, lookup: [...MODULE_FILES, CONFIG_FILE] };
+  const project = projectPlaces(root);
   if (isSameDirectory(root, home)) return [project];
-  const user: ScopePlace = {
-    layer: 'user',
-    dir: join(home, dirname(CONFIG_FILE)),
-    lookup: [...MODULE_FILES, basename(CONFIG_FILE)],
-  };
-  return [user, project];
+  return [placesOf('user', join(home, dirname(CONFIG_FILE)), basename(CONFIG_FILE)), project];
 }
 
 /**
@@ -300,30 +375,6 @@ function isYamlFile(path: string): boolean {
   return extname(path) === '.yaml';
 }
 
-/**
- * The package a bare specifier installs, or null for a relative, an
- * absolute or a `node:` one.
- */
-function packageOf(specifier: string): string | null {
-  if (/^(?:[./]|node:)/.test(specifier)) return null;
-  const parts = specifier.split('/');
-  return specifier.startsWith('@')
-    ? parts.slice(0, 2).join('/')
-    : parts[0] ?? null;
-}
-
-/** The refusal of a module file importing `specifier`, which cannot be found from it. */
-function missingModuleProblem(path: string, specifier: string): string {
-  const installed = packageOf(specifier);
-  const install = installed === null
-    ? ''
-    : `; install ${installed} in the project (bun add -d ${installed})`;
-  const typesOnly = installed === RAFA_PACKAGE
-    ? `, or import its types alone (import type { Config } from '${RAFA_PACKAGE}/config'), which need nothing at run time`
-    : '';
-  return `${path}: imports ${specifier}, which cannot be found from this file${install}${typesOnly}`;
-}
-
 /** The {@link ConfigError} a `load-failed` diagnostic for the file at `path` turns into. */
 function loadRefusal(path: string, diagnostic: Diagnostic, held: YamlRead | undefined): ConfigError {
   if (held !== undefined && 'error' in held) {
@@ -344,7 +395,7 @@ function loadRefusal(path: string, diagnostic: Diagnostic, held: YamlRead | unde
 }
 
 /**
- * Refuses a scope whose loader found no file while something stands at
+ * Refuses a place whose loader found no file while something stands at
  * one of its lookup names; see the module note.
  */
 function refuseUnreadableName(place: ScopePlace): void {
@@ -352,80 +403,6 @@ function refuseUnreadableName(place: ScopePlace): void {
     const path = join(place.dir, name);
     if (existsSync(path)) readOrRefuse(path);
   }
-}
-
-/** True when a later entry than `entry` removed or replaced a mapping above `path`. */
-function wipedAbove(path: string, entry: number, provenance: Provenance): boolean {
-  const parts = path.split('.');
-  return parts.some((_, depth) => {
-    const records = provenance.get(parts.slice(0, depth).join('.')) ?? [];
-    return records.some((record) => record.entry > entry && record.kind !== 'set');
-  });
-}
-
-/** `mapping` with `false` at `path`, where every mapping above it stands and the key is absent. */
-function withFalseAt(mapping: Mapping, path: readonly string[]): Mapping {
-  const [head, ...rest] = path;
-  if (head === undefined) return mapping;
-  const present = Object.hasOwn(mapping, head);
-  if (rest.length === 0) {
-    return present
-      ? mapping
-      : { ...mapping, [head]: false };
-  }
-  const child = present
-    ? mapping[head]
-    : undefined;
-  return isMapping(child)
-    ? { ...mapping, [head]: withFalseAt(child, rest) }
-    : mapping;
-}
-
-/**
- * False when `path` is an id of a keyed map whose reader refuses `false`
- * there, such as `logger.modules.<module>`: a `false` at such an id
- * removes it, as `src/config/entry.ts` documents. True anywhere else.
- */
-function isFalseAValueAt(path: readonly string[]): boolean {
-  const setting = activeSettingByKey().get(path.slice(0, -1).join('.'));
-  const spec = setting === undefined
-    ? undefined
-    : activeSettings()[setting];
-  const id = path.at(-1);
-  if (spec === undefined || id === undefined) return true;
-  return spec.read({ [id]: false }, { label: spec.key, key: spec.key }).problems.length === 0;
-}
-
-/** A module file's merged value with each `false` the merge removed set back; see the module note. */
-function restoredMapping({ config, provenance }: LoadResult): Mapping {
-  const removed = [...provenance]
-    .flatMap(([path, records]) => {
-      const last = records.at(-1);
-      return path === '' || last?.kind !== 'remove' || wipedAbove(path, last.entry, provenance)
-        ? []
-        : [path.split('.')];
-    })
-    .filter(isFalseAValueAt)
-    .sort((first, second) => first.length - second.length);
-  return removed.reduce(withFalseAt, config);
-}
-
-/**
- * The last entry that touched each registered setting of a module file,
- * its key or a key below it: what `provenance` names.
- */
-function entriesOf(provenance: Provenance): ReadonlyMap<ConfigSetting, number> {
-  const entries = new Map<ConfigSetting, number>();
-  for (const [setting, spec] of Object.entries(activeSettings())) {
-    if (spec === undefined) continue;
-    const below = `${spec.key}.`;
-    for (const [path, records] of provenance) {
-      if (path !== spec.key && !path.startsWith(below)) continue;
-      const last = Math.max(...records.map((record) => record.entry));
-      entries.set(setting as ConfigSetting, Math.max(last, entries.get(setting as ConfigSetting) ?? 0));
-    }
-  }
-  return entries;
 }
 
 /** Refuses `flows` or `steps` in the user layer, naming the layer and the file. */
@@ -436,19 +413,6 @@ function refuseProjectOnlyKeys(place: ScopePlace, path: string, mapping: Mapping
   if (found.length === 0) return;
   throw new ConfigError(found.map((name) => `${path}: ${name} is refused in the user layer; `
     + `${name} are a project's decision and belong in the project's config file`));
-}
-
-/** The YAML file a module file at `path` leaves unread in `place`, or null. */
-function shadowedBy(place: ScopePlace, path: string): ShadowedFile | null {
-  if (isYamlFile(path)) return null;
-  const yaml = join(place.dir, place.lookup.at(-1) ?? CONFIG_FILE);
-  try {
-    return statSync(yaml).isFile()
-      ? Object.freeze({ layer: place.layer, path: yaml, by: path })
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -475,7 +439,53 @@ async function loadScope(place: ScopePlace, held: Map<string, YamlRead>): Promis
   }
 }
 
-/** Reads and judges one scope's file; see the module note. */
+/**
+ * One template's entry read as `place`'s file is, labelled with the file
+ * at `path` and the template, and refused for a key that names no
+ * setting; see "Templates" in the module note.
+ */
+function readTemplate(place: ScopePlace, path: string, name: string, entry: Mapping): TemplateLayer {
+  const label = `${path} (template ${name})`;
+  refuseProjectOnlyKeys(place, label, entry);
+  const read = readConfigDocument(entry, label);
+  if (read.extras.length > 0) {
+    throw new ConfigError(read.extras.map((extra) => `${label}: ${extra.key} names no setting`));
+  }
+  return { name, values: read.values };
+}
+
+/** The refusal of the template names in `unknown`, which the file at `path` gives; see the module note. */
+function unknownTemplates(path: string, unknown: readonly string[]): ConfigError {
+  const hook = activeConfigTemplateHook();
+  const known = hook?.names ?? [];
+  const listed = known.length === 0
+    ? 'none'
+    : known.join(', ');
+  const why = hook === null
+    ? 'but no template hook is set to read it'
+    : 'which no template holds';
+  return new ConfigError(unknown.map((name) => `${path}: templates names ${JSON.stringify(name)}, ${why} `
+    + `(known templates: ${listed})`));
+}
+
+/**
+ * `file` with each template its `templates` key names laid under its
+ * own keys, read through the active template hook; see "Templates" in
+ * the module note.
+ */
+function withNamedTemplates(place: ScopePlace, file: ConfigFile): ConfigFile {
+  const names = file.values.templates ?? [];
+  if (names.length === 0) return file;
+  const hook = activeConfigTemplateHook();
+  const found = names.map((name) => ({ name, entry: hook?.(name) ?? null }));
+  const unknown = found.filter(({ entry }) => entry === null).map(({ name }) => name);
+  if (unknown.length > 0) throw unknownTemplates(file.path, unknown);
+  return layTemplatesUnder(file, found.flatMap(({ name, entry }) => entry === null
+    ? []
+    : [readTemplate(place, file.path, name, entry)]));
+}
+
+/** Reads and judges the file of one place of a scope, its templates laid under; see the module note. */
 async function readScope(place: ScopePlace): Promise<ScopeReading> {
   const held = new Map<string, YamlRead>();
   const result = await loadScope(place, held);
@@ -498,16 +508,15 @@ async function readScope(place: ScopePlace): Promise<ScopeReading> {
   if (schema.length > 0) throw new ConfigError(schema.map((diagnostic) => `${path}: ${diagnostic.message}`));
 
   return {
-    file: yaml === undefined
+    file: withNamedTemplates(place, yaml === undefined
       ? { ...read, entries: entriesOf(result.provenance) }
-      : read,
+      : read),
     mapping: isMapping(document)
       ? document
       : {},
     duplicates: result.diagnostics
       .filter((diagnostic) => diagnostic.code === 'duplicate-key')
       .map((diagnostic) => `${path}: ${diagnostic.message}`),
-    shadowed: shadowedBy(place, path),
   };
 }
 
@@ -526,8 +535,10 @@ function duplicatesLevelIn(mapping: Mapping): DuplicatesLevel | undefined {
 
 /**
  * The duplicate-key lines to warn about at the merged level, the
- * project file's `merge.duplicates` over the user file's, or a
+ * `merge.duplicates` of the highest file naming one, or a
  * {@link ConfigError} with every one at `error`.
+ *
+ * @param readings - The places read, lowest ranked first.
  */
 function duplicateWarnings(readings: readonly ScopeReading[]): readonly string[] {
   const level = [...readings].reverse()
@@ -539,12 +550,6 @@ function duplicateWarnings(readings: readonly ScopeReading[]): readonly string[]
   return lines.map((line) => `rafa config: ${line}`);
 }
 
-/** The sentence an operator reads about one shadowed YAML file. */
-function shadowWarning({ layer, path, by }: ShadowedFile): string {
-  return `rafa config: ${path} is not read: ${by} holds the ${layer} scope's config, `
-    + `so move its keys into ${basename(by)} and remove it`;
-}
-
 /**
  * The default warning sink: the active output's `warn`
  * (`core/output/active.ts`), read at each warning, so a command
@@ -554,14 +559,55 @@ function printWarning(message: string): void {
   activeOutput().warn(message);
 }
 
+/** Refuses a read by `caller` while no config section is registered. */
+function requireRegisteredSections(caller: string): void {
+  if (Object.keys(activeSettings()).length === 0) {
+    throw new Error(`no config section is registered: call registerCoreConfigSections from src/config-registry.ts before ${caller}`);
+  }
+}
+
+/** Reads and judges one scope's two places, its module file first. */
+async function readPlaces(places: ScopePlaces): Promise<ScopeReadings> {
+  const module = await readScope(places.module);
+  const local = await readScope(places.local);
+  return { module, local };
+}
+
 /**
- * Reads the user scope's file under `roots.home` and the project's
- * under `roots.root`, ranks both against `cli`, and prints a warning
- * per shadowed YAML file, per key set twice in one file and per unknown
- * key through `warn`, the active output's `warn` when none is given.
- * After them it writes one pass line per `dangerous.*` key set off its
- * default (`dangerous.ts`), once per invocation: the active output's
- * when `warn` is the default, the sink's own when one is given.
+ * Reads the project scope's two files under `root`, each with the
+ * templates it names laid under it, and answers them unranked: no user
+ * scope, no warning printed, no load hook called and no store setting
+ * touched. Every refusal {@link loadConfig} raises for either file is
+ * raised here, a key set twice in one file at the `merge.duplicates`
+ * of the two files included. See the module note.
+ *
+ * @param root - The project root: the module file sits here and the
+ *   YAML file under its `.rafa/`.
+ * @returns The YAML file as `local` and the module file as `file`, each
+ *   null when the project holds none.
+ * @throws {ConfigError} For a file the load refuses.
+ * @throws {Error} When no config section is registered.
+ */
+export async function readProjectScope(root: string): Promise<ProjectScopeFiles> {
+  requireRegisteredSections('readProjectScope');
+  const { module, local } = await readPlaces(projectPlaces(root));
+  duplicateWarnings([module, local]);
+  return { local: local.file, file: module.file };
+}
+
+/**
+ * Reads the user scope's two files under `roots.home` and the project's
+ * two under `roots.root`, ranks the four against `cli`, and prints a
+ * warning per key set twice in one file and per unknown key through
+ * `warn`, the active output's `warn` when none is given. After them it
+ * writes one pass line per `dangerous.*` key set off its default
+ * (`dangerous.ts`), once per invocation: the active output's when
+ * `warn` is the default, the sink's own when one is given.
+ *
+ * Each scope's YAML file is its local layer, ranked over its module
+ * file key by key: the project's as `local` over its module file as
+ * `file`, the user scope's as `userLocal` over its module file as
+ * `user`. See "The local layer" in the module note.
  *
  * The resolved config is handed to the load hook (`activeConfigLoadHook`
  * in `section.ts`) before any warning is printed. The registry,
@@ -574,39 +620,37 @@ function printWarning(message: string): void {
  * (`effort/store/settings.ts`), so every store open after this call
  * waits that long for a lock.
  *
+ * Each file has the templates its `templates` key names laid under its
+ * own keys, read through the active template hook; a name the hook does
+ * not know is refused. See "Templates" in the module note.
+ *
  * The files are read and judged before the command line is looked at,
- * the user's first, so a run with problems in all three reports the
- * user file's alone. See the module note for the home, the lookup and
- * every refusal.
+ * the user's first and each scope's module file before its YAML file,
+ * so a run with problems in every layer reports the first file's alone.
+ * See the module note for the home, the lookup and every refusal.
  *
  * @returns The resolution, with `provenance` naming the file and entry
- *   of each setting a file answered, and `shadowed` the YAML files a
- *   module file left unread.
+ *   of each setting a file answered.
  */
 export async function loadConfig(
   roots: ConfigRoots,
   cli: ConfigOverrides = {},
   warn: (message: string) => void = printWarning,
 ): Promise<ResolvedConfig> {
-  if (Object.keys(activeSettings()).length === 0) {
-    throw new Error('no config section is registered: call registerCoreConfigSections from src/config-registry.ts before loadConfig');
-  }
-  const places = scopesOf(roots);
-  const readings = new Map<ConfigScopeName, ScopeReading>();
-  for (const place of places) readings.set(place.layer, await readScope(place));
-  const all = [...readings.values()];
-  const duplicates = duplicateWarnings(all);
+  requireRegisteredSections('loadConfig');
+  const readings = new Map<ConfigScopeName, ScopeReadings>();
+  for (const places of scopesOf(roots)) readings.set(places.layer, await readPlaces(places));
+  const user = readings.get('user') ?? NO_SCOPE;
+  const project = readings.get('project') ?? NO_SCOPE;
+  const duplicates = duplicateWarnings([user.module, user.local, project.module, project.local]);
   const resolved = resolveConfig({
     cli,
-    file: readings.get('project')?.file ?? null,
-    user: readings.get('user')?.file ?? null,
+    local: project.local.file,
+    file: project.module.file,
+    userLocal: user.local.file,
+    user: user.module.file,
   });
-  const shadowed = all.flatMap((reading) => reading.shadowed ?? []);
-  const loaded: ResolvedConfig = {
-    ...resolved,
-    shadowed,
-    warnings: [...shadowed.map(shadowWarning), ...duplicates, ...resolved.warnings],
-  };
+  const loaded: ResolvedConfig = { ...resolved, warnings: [...duplicates, ...resolved.warnings] };
   activeConfigLoadHook()?.(loaded.config);
   for (const warning of loaded.warnings) warn(warning);
   writeDangerousPassLines(loaded, warn, warn === printWarning

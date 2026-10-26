@@ -150,14 +150,13 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import {
   DEFAULT_BRANCH_TEMPLATE,
   describeValue,
   isMapping,
   messageOf,
 } from '@open-tomato/rafa/core/config/sections';
-
-import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { branchClaims } from './branch-scan.js';
 import {
@@ -458,7 +457,7 @@ export interface RoadmapReadingsOptions {
   readonly branches: BranchScan;
   /** The open pull requests, read once on the first line that asks. */
   readonly pullRequests: OpenPullRequestLister;
-  /** `claims.staleAfter`; its default, `CONFIG_DEFAULTS.claimsStaleAfter`, when left out. */
+  /** `claims.staleAfter`; its default, `registeredDefaults().claimsStaleAfter`, when left out. */
   readonly staleAfter?: ClaimsStaleAfter;
   /** The clock a claim's idle time is read against; the system's when left out. */
   readonly now?: () => Date;
@@ -484,7 +483,7 @@ function decidingBranch(read: readonly BranchClaimReading[]): BranchClaimReading
 export function createRoadmapReadings(options: RoadmapReadingsOptions): RoadmapReadings {
   const { issues, branches, pullRequests } = options;
   const template = branches.branchTemplate ?? DEFAULT_BRANCH_TEMPLATE;
-  const staleAfter = options.staleAfter ?? CONFIG_DEFAULTS.claimsStaleAfter;
+  const staleAfter = options.staleAfter ?? registeredDefaults().claimsStaleAfter;
   const now = options.now ?? ((): Date => new Date());
   let open: Promise<readonly RoadmapPullRequest[]> | null = null;
 

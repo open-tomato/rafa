@@ -34,15 +34,16 @@
  * result, as `rafa effort merge` writes it.
  */
 import type { MergeCommandSeams } from './merge.js';
-import type { FileSyncOptions } from '../../effort/sync/file.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { Sync } from '@open-tomato/rafa/ports';
 import type { MergeResult } from '@open-tomato/rafa/store/merge-store';
+import type { FileSyncOptions } from '@open-tomato/rafa-effort';
 
 import { resolve } from 'node:path';
 
-import { createFileSync } from '../../effort/sync/file.js';
-import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
+import { createFileSync } from '@open-tomato/rafa-effort';
+
+import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 
 import { mergeRefusalExit, mergeTargetPath, renderMerge } from './merge.js';
 

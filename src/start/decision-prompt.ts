@@ -63,7 +63,7 @@
  * the session.
  */
 import type { ContinueCriteriaMode } from '../config-schema-loop-continue.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

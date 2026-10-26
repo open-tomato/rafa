@@ -14,8 +14,6 @@ import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

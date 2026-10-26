@@ -14,8 +14,6 @@
 import type { ScratchRepository } from './scratch-repository.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 
-import '../adapter-registry.js';
-
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 

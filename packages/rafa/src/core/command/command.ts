@@ -30,7 +30,7 @@
  * second one.
  *
  * And it carries `project`, the project the command runs in as
- * `resolveScope` answers it (`src/project/scope.ts`): its root, the home,
+ * `resolveScope` answers it (`packages/rafa/src/project/scope.ts`): its root, the home,
  * and both scopes' paths. A command runs inside a project unless it
  * declares `needsProject: false`. The dispatcher resolves the project
  * before any other command runs, and runs none outside a project, so

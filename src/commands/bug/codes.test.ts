@@ -10,8 +10,6 @@ import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

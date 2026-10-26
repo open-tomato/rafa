@@ -28,9 +28,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { resolveScope } from '@open-tomato/rafa/project/scope';
+
 import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { openNextSources } from './sources.js';

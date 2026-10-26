@@ -40,11 +40,11 @@
  *    (`./lines.ts`): 27 pass and 2 fail, both in `lines.test.ts`.
  */
 import type { HopActionWorld } from './hop-action.js';
-import type { HopRecord } from './hop-record.js';
 import type { HopHome, HopOpening, HopOut } from './hop-rows.js';
 import type { NextState } from './state.js';
-import type { Place, Position } from '../project/position.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -53,15 +53,15 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { hopFilePath, readHopRecord, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { hop, positionFilePath, readPositionFile, writePositionFile } from '@open-tomato/rafa/project/position';
+import { resolveScope } from '@open-tomato/rafa/project/scope';
 
 import { createCommandRegistry } from '../cli/registry.js';
-import { hop, positionFilePath, readPositionFile, writePositionFile } from '../project/position.js';
-import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { runAction } from './actions.js';
 import { homeLogLine, hopLogLine, NO_REHOME, runHome, runHop } from './hop-action.js';
-import { hopFilePath, readHopRecord, writeHopRecord } from './hop-record.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hop-action-')));

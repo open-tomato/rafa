@@ -56,25 +56,31 @@
  * alike, after the pairs in text mode.
  */
 import type { CodeProposal, CodeSuggestion, NearDuplicate } from '../../errors/match.js';
-import type { ProjectFound } from '../../project/scope.js';
-import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ErrorCodeEntry } from '@open-tomato/rafa/errors/codes';
 import type { ListedCode } from '@open-tomato/rafa/errors/rafa-codes';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { IssueSeams } from '@open-tomato/rafa-board';
 
+import {
+  DEFAULT_ISSUE_SEAMS,
+  createGhRunner,
+  issueName,
+  lineRefusal,
+  readNonBlankFlag,
+  resolveTracker,
+} from '@open-tomato/rafa-board';
+
+import { activeLogger } from '@open-tomato/rafa/adapters/logger/active';
+import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
+import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { familyOf, NEW_CONTEXT_LEAF, UNKNOWN_FAMILY } from '@open-tomato/rafa/errors/codes';
 import { FAMILY_DESCRIPTIONS, listedCodes } from '@open-tomato/rafa/errors/rafa-codes';
 
-import { activeLogger } from '../../adapters/logger/active.js';
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { resolveTracker } from '../../adapters/tracker/resolve.js';
-import { parseBugRecord } from '../../bugs/record.js';
 import { nearDuplicates, suggestWithProposals } from '../../errors/match.js';
-import { DEFAULT_ISSUE_SEAMS, issueName, lineRefusal, readNonBlankFlag } from '../issue/issue-tracker.js';
-import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa bug codes';

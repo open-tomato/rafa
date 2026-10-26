@@ -64,9 +64,10 @@ import type { LayoutEntry } from '../check/layout.js';
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
+import { readFrontmatterDocument } from '@open-tomato/rafa-effort';
+
 import { SKILL_FILE, scanLayout } from '../check/layout.js';
 import { sourceHash } from '../demote/report.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 import { countCharacters, DESCRIPTION_LIMIT } from '../schema/skill.js';
 
 import { triggerSentence } from './derive.js';

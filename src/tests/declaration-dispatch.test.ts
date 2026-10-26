@@ -146,10 +146,10 @@
  * pairs the default with such sources over the same roots.
  */
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {
   mkdirSync,

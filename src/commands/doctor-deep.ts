@@ -61,16 +61,17 @@
  */
 import type { EnvDifference, EnvLayer, PathDifference, SessionEnvReading } from './doctor-deep-env.js';
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
-import type { ModuleLoadSeams } from '../modules/load.js';
 import type { NeedsSeams, NeedsWarning } from '../plan/needs.js';
-import type { ResolvePrProviderOptions } from '../pr/provider.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { GhRunner, GhRunnerOptions } from '@open-tomato/rafa-board';
+import type { ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
 
-import { pathDirectories } from '../check/references.js';
-import { loadModules, moduleSettings } from '../modules/load.js';
+import { pathDirectories } from '@open-tomato/rafa-inventory';
+
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 import { PATH_KEY, readSessionEnv, SETTINGS_ENV_KEY } from './doctor-deep-env.js';
 import { planNeedsSection, readDeepPlanNeeds, readDeepStackTools, stackToolsSection } from './doctor-deep-needs.js';

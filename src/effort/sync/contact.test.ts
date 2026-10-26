@@ -4,7 +4,7 @@
  * A fixture `service` strategy is registered on a registry of this
  * file's own and handed to the loader as its base, so a config naming no
  * module still selects it through `loadModules`; one case loads the
- * `sync-fixture` module under `src/modules/testdata/` through `modules:`
+ * `sync-fixture` module under `packages/rafa/src/modules/testdata/` through `modules:`
  * and `allowList:` instead. Every line a contact writes is captured, and
  * each case reads the lines whole, so "one unreachable line" is a count
  * of the lines written and not a search of them.
@@ -25,7 +25,6 @@ import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { Sync, SyncPullRequest, SyncPushRequest } from '@open-tomato/rafa/ports';
 
 import '../../config-registry.js';
-import '../../adapter-registry.js';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -63,7 +62,7 @@ const HOME = join(tempBase, 'home');
 const HUB_URL = 'http://127.0.0.1:7373';
 
 /** The module whose `git` sync adapter one case loads through `modules:`. */
-const FIXTURE_MODULE = fileURLToPath(new URL('../../modules/testdata/sync-fixture', import.meta.url));
+const FIXTURE_MODULE = fileURLToPath(new URL('../../../packages/rafa/src/modules/testdata/sync-fixture', import.meta.url));
 
 /** The manifest seams the fixture module is held to. */
 const MANIFEST_SEAMS = { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS };

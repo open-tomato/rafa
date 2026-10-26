@@ -67,36 +67,18 @@
  * (`packages/rafa/src/effort/store/types.ts`) is spelled this way for the same reason.
  */
 import type { CheckRow, ChecksVerdict } from './checks.js';
+import type { MergeMethod } from '@open-tomato/rafa/core/config/sections';
 
 export type { CheckRow, ChecksVerdict } from './checks.js';
-
 /**
- * How a merge is made. GitHub's three, and no other: `gh pr merge`
- * takes exactly `--squash`, `--merge` and `--rebase`, and a provider
- * that cannot do one of them refuses the call rather than substituting
- * another, which would rewrite history the operator did not ask for.
+ * How a merge is made, and the list and guard beside it. They live in
+ * core's `packages/rafa/src/core/config/merge-method.ts`, read through
+ * the sections barrel, so the config's `pr.mergeMethod` setting reads
+ * them without reaching this port; they are re-exported here under the
+ * same names for the port's importers.
  */
-export type MergeMethod = 'squash' | 'merge' | 'rebase';
-
-/**
- * The merge methods, in the order a refusal lists them.
- *
- * A runtime value beside the type so the config reader and the
- * `--method` flag validate against one list rather than each spelling
- * the three words again. Frozen: a caller that pushed onto it would
- * change what every later refusal says it accepts.
- */
-export const MERGE_METHODS: readonly MergeMethod[] = Object.freeze([
-  'squash',
-  'merge',
-  'rebase',
-] as const);
-
-/** Whether a value is one of {@link MERGE_METHODS}. */
-export function isMergeMethod(value: unknown): value is MergeMethod {
-  return typeof value === 'string'
-    && (MERGE_METHODS as readonly string[]).includes(value);
-}
+export type { MergeMethod } from '@open-tomato/rafa/core/config/sections';
+export { isMergeMethod, MERGE_METHODS } from '@open-tomato/rafa/core/config/sections';
 
 /**
  * Where a pull request stands. `merged` is its own member rather than a

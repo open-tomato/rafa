@@ -57,7 +57,7 @@
  * `rafa next --roadmap` passes `--roadmap` to the `loop start` it runs
  * (`src/next/actions.ts`), and {@link RunSessionOptions.roadmap} carries
  * it here. The open then reads the hop record (`.rafa/hop.json`,
- * `src/next/hop-record.ts`) and the position file, and stamps the record
+ * `packages/rafa/src/next/hop-record.ts`) and the position file, and stamps the record
  * as the new record's `hop` when it is AWAY ({@link readAwayHopStamp}):
  * stored `away`, of either kind, and its home still the position's. A
  * record whose home a person's `rafa switch` has since moved is stale and
@@ -111,8 +111,6 @@
  * warning above.
  */
 import type { PassOverList } from './pass-over.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type {
   PidProbe,
   SessionChange,
@@ -121,6 +119,8 @@ import type {
   SessionReadSeams,
   SessionRecord,
 } from '@open-tomato/rafa/core/loop';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { randomUUID } from 'node:crypto';
 import { relative } from 'node:path';
@@ -141,10 +141,10 @@ import {
 } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { stripTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { readHopRecord, staleAgainst } from '@open-tomato/rafa/next/hop-record';
+import { readPositionFile } from '@open-tomato/rafa/project/position';
 
 import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
-import { readHopRecord, staleAgainst } from '../next/hop-record.js';
-import { readPositionFile } from '../project/position.js';
 
 /** The last line of every refusal the open throws. */
 export const NOTHING_DISPATCHED = '   Nothing was checked and nothing was dispatched.';

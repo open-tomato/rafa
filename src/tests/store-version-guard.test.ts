@@ -45,7 +45,7 @@
  * log directory for the scratch repo, the way `collect.test.ts`'s two
  * command cases already do. The scratch repo root is resolved with
  * `realpathSync` before that directory is derived: the dispatcher answers
- * the root as a real path (`src/project/scope.ts`), which resolves
+ * the root as a real path (`packages/rafa/src/project/scope.ts`), which resolves
  * `/var`'s symlink to `/private/var` on macOS, so a directory keyed on
  * the unresolved path would sit beside the one the command actually looks
  * under, and the session half would throw on a missing directory instead

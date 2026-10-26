@@ -35,15 +35,15 @@ import type { SqliteMigration } from '@open-tomato/rafa/store/migrations';
 
 import { join } from 'node:path';
 
+import { fileStamp } from '@open-tomato/rafa-effort';
+
+import { expectNoArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { DevelopmentBuildRefusedError } from '@open-tomato/rafa/store/development-build';
 import { effortStoreDir } from '@open-tomato/rafa/store/location';
 import { migrateStore, MigrateRefusal } from '@open-tomato/rafa/store/migrate';
 import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
-
-import { fileStamp } from '../../effort/file-stamp.js';
-import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
 import { keepsIdLine } from './fix-schema.js';
 

@@ -46,19 +46,19 @@
  * every verdict, since the dispatcher drops a result's payload on a
  * non-zero exit, and is the terminal result's data when the run is green.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { CiStatusReading } from '../../ci/status-reading.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
+import { createGhRunner, readNonBlankFlag, readRequiredFlag } from '@open-tomato/rafa-board';
+
+import { requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
 import { readFailedCases } from '../../ci/failed-cases.js';
 import { readNewestRun } from '../../ci/runs.js';
 import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../../ci/status-reading.js';
-import { readNonBlankFlag, readRequiredFlag } from '../issue/issue-tracker.js';
-import { requireProject } from '../plan/plan-files.js';
 
 /** The usage line every refusal names. */
 export const CI_STATUS_USAGE = 'rafa ci status --branch=<branch> [--workflow=<name>]';

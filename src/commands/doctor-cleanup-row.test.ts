@@ -14,11 +14,14 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createScratchRepository } from '../cleanup/scratch-repository.js';
+import { createScratchRepository, SCRATCH_NOW, STALE_AGE_DAYS } from '../cleanup/scratch-repository.js';
+import { projectConfigText } from '../project/scaffold.js';
 import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 const SPAWN_TIMEOUT = 60_000;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-doctor-cleanup-')));
 
@@ -32,13 +35,27 @@ function around(repo: string, home: string): ScratchRepo {
   return { ...planted, repo, home };
 }
 
+/**
+ * The project config with a `cleanup.staleDays` read off the real clock.
+ * The spawned doctor reads ages against `new Date()`, not
+ * {@link SCRATCH_NOW}, so with the default 30 days every branch dated
+ * {@link SCRATCH_NOW} read stale from 2026-10-24 12:00 UTC on. The days
+ * since {@link SCRATCH_NOW}, plus half of {@link STALE_AGE_DAYS}, keep
+ * `stale` past the line and every other branch short of it on any date.
+ */
+function clockProofConfig(): string {
+  const elapsedDays = Math.ceil((Date.now() - SCRATCH_NOW.getTime()) / MS_PER_DAY);
+  const staleDays = Math.max(elapsedDays, 0) + STALE_AGE_DAYS / 2;
+  return `${projectConfigText()}cleanup:\n  staleDays: ${String(staleDays)}\n`;
+}
+
 describe('rafa doctor over the cleanup scratch repository', () => {
   let scratch: ScratchRepository;
   let target: ScratchRepo;
 
   beforeAll(() => {
     scratch = createScratchRepository();
-    plantProjectConfig(scratch.clone);
+    plantProjectConfig(scratch.clone, clockProofConfig());
     target = around(scratch.clone, scratch.home);
   });
 

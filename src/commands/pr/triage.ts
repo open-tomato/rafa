@@ -168,11 +168,11 @@ import type { TriageGuardReader } from './triage-guard.js';
 import type { TriageReading } from './triage-report.js';
 import type { ResolveResult } from './triage-resolve.js';
 import type { IgnoredTriageComment, TriageTrust, TrustedTriageComment } from './triage-trust.js';
-import type { Permissions } from '../../board/trust.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, PullRequestComment, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { TriageSelection } from '../../pr/triage/select.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Permissions } from '@open-tomato/rafa-board';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

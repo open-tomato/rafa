@@ -79,13 +79,13 @@ interface SplitModule {
  * it, `packages/rafa/src/core/loop/readings.ts`. A file outside `packages/rafa/src/core/` imports the
  * barrel and nothing deeper, so the barrel is what an `export … from` of
  * that half resolves to, and a row naming the file behind it would hold
- * nothing. The same holds for `src/commands/plan/plan-files.ts`, whose
+ * nothing. The same holds for `packages/rafa/src/commands/plan/plan-files.ts`, whose
  * half is `packages/rafa/src/core/plan/plan-files.ts` behind `packages/rafa/src/core/plan/index.ts`.
  * Both barrels are spelled under the subject folders of
  * `scripts/survey/core-moves.ts`, so the rows follow core when it moves.
  */
 const SPLIT_MODULES: readonly SplitModule[] = [
-  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: `${subjectFolder('plan')}index.ts` },
+  { commandFile: 'packages/rafa/src/commands/plan/plan-files.ts', libraryHalf: `${subjectFolder('plan')}index.ts` },
   { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: `${subjectFolder('loop')}readings.ts` },
   { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
   { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },
@@ -104,7 +104,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/release/version-tag.ts' },
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
   { commandFile: 'src/commands/pr/merge-cleanup.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
-  { commandFile: 'src/commands/self-update.ts', libraryHalf: 'src/runtime/live-loops.ts' },
+  { commandFile: 'src/commands/self-update.ts', libraryHalf: 'packages/rafa/src/runtime/live-loops.ts' },
 ];
 
 /**

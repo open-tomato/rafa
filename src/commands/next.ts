@@ -255,25 +255,46 @@
  * whose `pr.provider` is not `gh`, and whatever an action threw for an
  * action that failed, or the native-mode repository read threw.
  */
-import type { PullBeforeReadInput } from '../effort/sync/contact.js';
-import type { NextActionOptions, NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
-import type { NextHopStep } from '../next/hop-rows.js';
 import type { NextDryRun, NextStop } from '../next/lines.js';
-import type { DryEpic, NextSources } from '../next/readings.js';
-import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
-import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { PullBeforeReadInput } from '@open-tomato/rafa-effort';
+import type { NextSourceSeams, OpenedNextSources } from '@open-tomato/rafa-pr';
+import type {
+  DryEpic,
+  NextActionId,
+  NextActionOptions,
+  NextAnswerId,
+  NextHopStep,
+  NextInvocation,
+  NextSources,
+  NextState,
+} from '@open-tomato/rafa-run';
 
+import { pullBeforeRead } from '@open-tomato/rafa-effort';
+import {
+  followsMerge,
+  openNextRelations,
+  openNextSources,
+  readSettleAfterMerge,
+} from '@open-tomato/rafa-pr';
+import { epicEndLines, watchDryEpic } from '@open-tomato/rafa-release';
+import {
+  REMOTE,
+  actionInvocation,
+  actionOutput,
+  commandWords,
+  nextQuestion,
+  readHomeAfterLoop,
+  readNextState,
+  runAction,
+} from '@open-tomato/rafa-run';
+
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { pullBeforeRead } from '../effort/sync/contact.js';
-import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
-import { actionOutput } from '../next/ending.js';
-import { epicEndLines, watchDryEpic } from '../next/epic-end.js';
-import { commandWords, nextQuestion } from '../next/hint.js';
 import {
   CLAIM_AHEAD_FLAG,
   DRY_RUN_FLAG,
@@ -288,14 +309,7 @@ import {
   stateLine,
   stopLine,
 } from '../next/lines.js';
-import { openNextRelations } from '../next/relations-mode.js';
-import { followsMerge, readSettleAfterMerge } from '../next/settle-step.js';
-import { openNextSources } from '../next/sources.js';
-import { readHomeAfterLoop, readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
-import { REMOTE } from '../start/branch-decision.js';
-
-import { expectNoArgument } from './plan/plan-files.js';
 
 /** The actions that hand the checkout to a loop, after which the chain stops. */
 const LOOP_ACTIONS: readonly NextActionId[] = Object.freeze(['start', 'resume']);

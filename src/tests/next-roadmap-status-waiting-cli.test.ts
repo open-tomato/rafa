@@ -44,8 +44,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { hopFilePath } from '../next/hop-record.js';
-import { positionFilePath } from '../project/position.js';
+import { hopFilePath } from '@open-tomato/rafa/next/hop-record';
+import { positionFilePath } from '@open-tomato/rafa/project/position';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

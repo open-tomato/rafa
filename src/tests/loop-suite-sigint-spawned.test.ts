@@ -158,7 +158,7 @@ function plantLoopProject(markers: (scratch: ScratchRepo) => Markers): ScratchRe
   writeFileSync(join(scratch.repo, 'held.test.ts'), heldTestText(held), 'utf8');
   git(scratch, 'add', '-A');
   git(scratch, 'commit', '-q', '--no-verify', '-m', 'seed');
-  plantProjectConfig(scratch.repo, 'pr:\n  provider: none\n');
+  plantProjectConfig(scratch.repo, 'pr:\n  provider: none\nchecks:\n  task: [affected]\n');
   plantSessionClaude(scratch, held);
   git(scratch, 'checkout', '-q', '-b', 'feat/sigint');
   mkdirSync(join(scratch.repo, '.plans'));

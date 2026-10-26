@@ -52,13 +52,13 @@ import type { GitResult } from '../pr/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
-import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from './pr-lifecycle.js';
+import { DEFAULT_CI_ATTEMPTS } from './pr-lifecycle.js';
 import {
   guardRunBranch,
   readRunArgs,

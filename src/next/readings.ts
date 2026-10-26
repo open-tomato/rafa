@@ -96,18 +96,18 @@
  * unchanged.
  */
 import type { HopDecision, TakenBy } from './hop-chain.js';
-import type { HopRecord } from './hop-record.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { NextNowEpic } from '../board/epic-walk.js';
 import type { RoadmapLine } from '../board/roadmap.js';
 import type { PlanListing } from '../plan/list.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { Position } from '../project/position.js';
 import type { BaseStanding } from '../start/branch-decision.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Position } from '@open-tomato/rafa/project/position';
 
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isLive } from '@open-tomato/rafa/core/loop/readings';

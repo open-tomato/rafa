@@ -9,6 +9,10 @@
  * its closing bracket removed, so the working file is its control: the
  * same entry, loaded, beside the one that is skipped.
  *
+ * `importModuleEntry`, the default importer, is the module loader's
+ * (`packages/rafa/src/modules/load.ts`), and its cases are in `src/tests/core-coupled/modules/load.test.ts`;
+ * this file holds only that the name re-exported here is the same one.
+ *
  * Each warning is spelled in full but for the part Bun writes, which is
  * held to be present and not spelled, since its wording is Bun's to
  * change.
@@ -25,8 +29,11 @@ import type { CommandRegistry } from './registry.js';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import * as load from '@open-tomato/rafa/modules/load';
 
 import { importModuleEntry, loadModuleCommands } from './modules.js';
 import { createCommandRegistry, mountKey } from './registry.js';
@@ -125,7 +132,7 @@ describe('loading module command entries', () => {
 
   it('imports each absolute entry once through the importer it is handed, and never a relative one', async () => {
     const imported: string[] = [];
-    const commands = await importModuleEntry(entryFile('commands.ts', commandsSource('next')));
+    const commands: unknown = await import(pathToFileURL(entryFile('commands.ts', commandsSource('next'))).href);
 
     const loaded = await loadModuleCommands(
       coreRegistry(),
@@ -154,5 +161,9 @@ describe('loading module command entries', () => {
     expect(loaded.warnings).toEqual([
       'module "linear": skipped "/modules/linear/commands.ts": import failed: first line that holds text',
     ]);
+  });
+
+  it('re-exports the default importer of the module loader under its own name', () => {
+    expect(importModuleEntry).toBe(load.importModuleEntry);
   });
 });

@@ -41,8 +41,6 @@ import type { FakePrCheck, FakePullRequestSeed, FakeWorkflow } from '../../pr/gh
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
-import '../../adapter-registry.js';
-
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

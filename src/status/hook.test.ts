@@ -22,8 +22,8 @@
 import type { StatusHookConfig, StatusHookSeams } from './hook.js';
 import type { SeenInput, SeenReading, SeenSnapshot } from './seen.js';
 import type { CommandRoute } from '../cli/route.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,8 +31,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { resolveScope } from '@open-tomato/rafa/project/scope';
+
 import { projectConfigText } from '../project/scaffold.js';
-import { resolveScope } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 

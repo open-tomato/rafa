@@ -54,7 +54,7 @@ import path from 'path';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
-import { SKIP_REVIEW_FLAG } from '../../board/gate.js';
+import { SKIP_REVIEW_FLAG } from '../../board/flags.js';
 import { issueFieldLine, stampPlanIssue } from '../../board/plan-field.js';
 import {
   REVIEW_MISSING_LINE,

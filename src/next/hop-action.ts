@@ -1,7 +1,7 @@
 /**
  * The `hop` and `home` actions of `rafa next --roadmap`: the two steps the
  * hop rows propose (`./hop-rows.ts`) that write the hop record
- * (`./hop-record.ts`) and move the position (`src/project/position.ts`).
+ * (`./hop-record.ts`) and move the position (`packages/rafa/src/project/position.ts`).
  * Like `sync` (`./sync.ts`) neither is a registered command of its own
  * name; `./actions.ts` runs both in-process and hands them the
  * {@link HopActionWorld} they write through.
@@ -54,20 +54,20 @@
  * command it is handed, and both write the two files through their own
  * modules' atomic writers.
  */
-import type { HopReading, HopRecord } from './hop-record.js';
 import type { HopHome, HopOpening, HopOut } from './hop-rows.js';
-import type { Place, Position } from '../project/position.js';
+import type { HopReading, HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { rmSync } from 'node:fs';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { hopFilePath, readHopRecord, staleAgainst, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { goHome, positionAt, positionFilePath, readPositionFile, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { samePlace } from '../board/place.js';
-import { goHome, positionAt, positionFilePath, readPositionFile, writePositionFile } from '../project/position.js';
 
 import { hopMoveSentence } from './hop-chain.js';
-import { hopFilePath, readHopRecord, staleAgainst, writeHopRecord } from './hop-record.js';
 import { dryHopSentence, placeText } from './hop-rows.js';
 
 /** The flag `hop` moves with, so the switch keeps home. */

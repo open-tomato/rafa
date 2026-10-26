@@ -30,9 +30,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { ABSENT } from '../refs/stamp.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { docsWhereOf } from './kind-route.js';
 import { LEFTOVER_MARKER } from './leftover-repair.js';

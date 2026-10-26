@@ -145,9 +145,9 @@
  */
 import type { TriageClass } from './classes.js';
 import type { FailedStep } from './evidence.js';
-import type { GuardVerdict } from '../../release/guard.js';
 import type { CheckRow, ChecksVerdict } from '../checks.js';
 import type { PullRequestDetail } from '../types.js';
+import type { GuardVerdict } from '@open-tomato/rafa-release';
 
 import { failingRows, verdictOf } from '../checks.js';
 import { workflowCountLine } from '../unchecked.js';
