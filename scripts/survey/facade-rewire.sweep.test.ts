@@ -194,7 +194,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/commands/pr/triage-resolve.ts': 'backEdge',
       'src/commands/pr/triage.ts': 'backEdge',
       'src/commands/pr/wait.ts': 'backEdge',
-      'src/next/epic-end.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
       'src/next/settle-step.ts': 'loadCycle',
       'src/next/sources.ts': 'loadCycle',

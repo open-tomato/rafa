@@ -27,7 +27,8 @@
  *
  * {@link watchDryEpic} wraps one answer's board so the reading its walk
  * makes is remembered without being made twice: the command reads the
- * listing once, as every command here does. The wrap reads nothing of
+ * listing once, as every command here does. The watch is generic over
+ * any sources that carry a board, and answers them as their own type. The wrap reads nothing of
  * its own, so a turn whose rows never walked the roadmap — off the base
  * branch, say — remembers no epic and prints no line.
  * {@link readEpicEndRelease} runs `git tag --list` and reads the
@@ -43,8 +44,8 @@
  * the sentence of what failed, which the caller writes as a warning,
  * and the release line is left out rather than guessed.
  */
-import type { DryEpic, NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { DryEpic, NextBoard, NextRoadmapReading } from '@open-tomato/rafa-board';
 
 import { readTags, readUntagged } from '../release/status-readings.js';
 
@@ -123,7 +124,7 @@ export function epicEndLines(epic: DryEpic, release: EpicEndRelease | null): rea
 /** The dry epic the last watched walk answered, and the watch itself. */
 export interface DryEpicWatch {
   /** `sources` with its board's walk remembered; the last watched answer resets what was remembered. */
-  readonly watch: (sources: NextSources) => NextSources;
+  readonly watch: <S extends { readonly board: NextBoard }>(sources: S) => S;
   /** The dry epic of the last watched answer's walk, or null when it walked none dry or walked nothing. */
   readonly last: () => DryEpic | null;
 }
@@ -132,7 +133,7 @@ export interface DryEpicWatch {
 export function watchDryEpic(): DryEpicWatch {
   let last: DryEpic | null = null;
   return {
-    watch: (sources: NextSources): NextSources => {
+    watch: <S extends { readonly board: NextBoard }>(sources: S): S => {
       last = null;
       const { board } = sources;
       const watched: NextBoard = {
