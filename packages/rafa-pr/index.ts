@@ -116,7 +116,6 @@ export type {
   Mergeability,
   PrProviderReading,
   PullRequestDetail,
-  PullRequestDraft,
   PullRequestSummary,
   PullRequests,
   PushOutcome,
@@ -138,7 +137,6 @@ export {
   gitSaid,
   parseWorktrees,
   pushBranch,
-  requireGhProvider,
   resolvePrProvider,
   waitForChecks,
 } from '../../src/pr/index.js';

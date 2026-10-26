@@ -167,7 +167,6 @@ export {
   RELEASE_BASE_BRANCH,
   RELEASE_REMOTE,
   gitPathOf,
-  nextVersion,
   parseSemanticVersion,
   readManifestVersion,
   replaceManifestVersion,
