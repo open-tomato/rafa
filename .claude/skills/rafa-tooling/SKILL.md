@@ -131,8 +131,10 @@ that a running loop may be using, so run `rafa loop list` and
   `rafa pr wait <n>`, waiting for the checks to pass or fail, then
   `rafa pr merge <n>`. Never use `--skip-checks` on either.
 - **Pull request into `stretch/**`.** A pull request into a `stretch/` branch
-  reports no check. Merge by handing over `rafa pr merge <n>
-  --skip-checks`.
+  reports the `fragment` check, so `--skip-checks` is refused on it as on
+  the two above. Merge by handing over `rafa pr merge <n>`. `rafa stretch
+  item --wait` still passes that flag at its merge step; after its refusal
+  there, run `rafa pr merge <n>` by hand.
 - **A dirty tree.** It refuses on uncommitted changes, which a loop running
   in the same checkout leaves. Check `git status` in the checkout the
   command is for.
