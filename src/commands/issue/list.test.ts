@@ -35,8 +35,6 @@ import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { Issue, IssueDraft } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

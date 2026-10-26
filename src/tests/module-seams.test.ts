@@ -2,15 +2,15 @@
  * Tests over the module seams `.specs/modules-and-addons.md` asks phase 1
  * to carry: a project's `.rafa/config.yaml` naming a module's `path`
  * source and its `allowList:`, run the same way `src/rafa.ts` does —
- * `loadInvocationModules` (`src/modules/load.ts`) first, then `dispatch`
+ * `loadInvocationModules` (`packages/rafa/src/modules/load.ts`) first, then `dispatch`
  * (`src/cli/dispatch.ts`) over the core registry — so what a case reads
  * is what a real invocation would.
  *
- * `seam-fixture` (`src/modules/testdata/seam-fixture/`) is the
+ * `seam-fixture` (`packages/rafa/src/modules/testdata/seam-fixture/`) is the
  * well-behaved fixture: a commands-only manifest one action,
  * `seam ping`, reached as `rafa module exec seam-fixture ping`. Its files
  * live in the tree because they must pass `tsc` and `eslint`, which read
- * every file under `src`. `port-mismatch` (`src/modules/testdata/
+ * every file under `src`. `port-mismatch` (`packages/rafa/src/modules/testdata/
  * port-mismatch/`) is a `package.json` alone: its manifest states a
  * tracker port version core does not serve, so its entry files are never
  * resolved and need not exist. The module with a syntax error in its
@@ -29,8 +29,6 @@ import type { ModuleListing } from '../commands/module/list.js';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, CliEventLog, CliEventResult } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -38,10 +36,11 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { loadInvocationModules } from '@open-tomato/rafa/modules/load';
+
 import { dispatch } from '../cli/dispatch.js';
 import { renderHelp } from '../cli/help.js';
 import { createRosterRegistry } from '../commands/index.js';
-import { loadInvocationModules } from '../modules/load.js';
 
 /** A temporary directory of this file's own, holding one project per case. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-module-seams-')));
@@ -51,10 +50,10 @@ afterAll(() => {
 });
 
 /** The well-behaved fixture module: a commands-only manifest with one action. */
-const SEAM_FIXTURE = fileURLToPath(new URL('../modules/testdata/seam-fixture', import.meta.url));
+const SEAM_FIXTURE = fileURLToPath(new URL('../../packages/rafa/src/modules/testdata/seam-fixture', import.meta.url));
 
 /** The fixture whose manifest states a tracker port version core does not serve. */
-const PORT_MISMATCH_FIXTURE = fileURLToPath(new URL('../modules/testdata/port-mismatch', import.meta.url));
+const PORT_MISMATCH_FIXTURE = fileURLToPath(new URL('../../packages/rafa/src/modules/testdata/port-mismatch', import.meta.url));
 
 /** A stream collecting what is written to it. */
 function memoryStream(): { stream: OutputStream; text: () => string } {

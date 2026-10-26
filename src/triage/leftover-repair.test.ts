@@ -12,9 +12,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { parsePlan , parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { findNextTask, listTrackerTasks } from '@open-tomato/rafa/utils/tracker';
 
 import { isRepairTask, REPAIR_AGENT } from '../start/suite-blocker.js';
-import { findNextTask, listTrackerTasks } from '../utils/tracker.js';
 
 import {
   countLeftoverRepairs,

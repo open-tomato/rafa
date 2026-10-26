@@ -63,18 +63,22 @@
  * network error is sent again, each retry reported to `retry.onRetry`
  * before its wait, and only a call that still fails is a problem line.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RefreshItems } from '../../board/project/add-issue.js';
-import type { ProjectRunnerSeams } from '../../board/project/project-runner.js';
-import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { SettleDelivered } from '../../release/settle-tag.js';
+import type {
+  GhRunner,
+  ProjectRunnerSeams,
+  RefreshConfig,
+  RefreshItems,
+} from '@open-tomato/rafa-board';
+
+import {
+  BOARD_SYNC_FIX,
+  closedIssuesIn,
+  openProjectRunner,
+  refreshIssueItems,
+} from '@open-tomato/rafa-board';
 
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
-import { openProjectRunner } from '../../board/project/project-runner.js';
-import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
-import { closedIssuesIn } from '../../board/roadmap.js';
 
 /** How many commits one pull request query names. */
 export const COMMIT_BATCH = 20;

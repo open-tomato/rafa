@@ -6,7 +6,6 @@
  * both issues in `detail.closes`, with the body reading naming #7 alone, and
  * the text marks #9 as not named by the body.
  */
-import '../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

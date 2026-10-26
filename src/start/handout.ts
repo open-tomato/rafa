@@ -44,10 +44,10 @@ import type { TaskLearning } from './dispatch.js';
 import type { BlessedBundle, InstinctRecord } from '../learning/index.js';
 import type { ResolvedSkill, TaskInput } from '../task/resolve-skills.js';
 import type { Resolution } from '../tiers/resolve.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { LessonSwitch, SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
 import type { Learning } from '@open-tomato/rafa/ports';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { activeOutput } from '@open-tomato/rafa/core/output';

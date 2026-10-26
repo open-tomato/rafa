@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/rafa",
-  "version": "0.45.0",
+  "version": "0.47.0",
   "description": "Alpha. Runs a plan through the ralph loop: one Claude Code session per task, one commit per task, then a pull request and a CI wait.",
   "private": false,
   "publishConfig": {
@@ -72,6 +72,21 @@
     },
     "./store/check-rows": {
       "types": "./dist/effort/store/check-rows.d.ts"
+    },
+    "./bugs/record": {
+      "types": "./dist/bugs/record.d.ts"
+    },
+    "./config-schema-bugs": {
+      "types": "./dist/config-schema-bugs.d.ts"
+    },
+    "./config-schema-errors": {
+      "types": "./dist/config-schema-errors.d.ts"
+    },
+    "./config-schema-features": {
+      "types": "./dist/config-schema-features.d.ts"
+    },
+    "./config-schema-logger": {
+      "types": "./dist/config-schema-logger.d.ts"
     }
   },
   "files": [
@@ -98,8 +113,14 @@
     "@eslint/js": "^9.39.4",
     "@eslint/markdown": "^8.0.3",
     "@open-tomato/define-config": "0.5.0",
+    "@open-tomato/rafa-board": "workspace:*",
     "@open-tomato/rafa-core": "workspace:*",
+    "@open-tomato/rafa-effort": "workspace:*",
     "@open-tomato/rafa-eslint-config": "workspace:*",
+    "@open-tomato/rafa-inventory": "workspace:*",
+    "@open-tomato/rafa-pr": "workspace:*",
+    "@open-tomato/rafa-release": "workspace:*",
+    "@open-tomato/rafa-run": "workspace:*",
     "@open-tomato/rafa-typescript-config": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/bun": "^1.4.0",

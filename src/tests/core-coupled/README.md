@@ -18,35 +18,55 @@ file: back into the package once its coupling is gone, or into the module it rea
 
 | Test file | Reaches |
 | --- | --- |
+| `adapters/logger/active.test.ts` | `src/tests/logger-harness.ts` |
+| `adapters/logger/console.test.ts` | `src/tests/logger-harness.ts` |
+| `adapters/logger/contract.test.ts` | `src/tests/logger-harness.ts` |
+| `bugs/record-composition.test.ts` | `src/bugs/cause-rule.ts`, `src/bugs/filed-values.ts` |
+| `bugs/record.test.ts` | `src/triage/issue-text.ts`, `src/triage/similarity.ts` |
+| `bugs/stack-path.test.ts` | `src/tests/package-tree.ts` |
+| `commands/plan/plan-files.test.ts` | `src/config-registry.ts`, `src/tests/cli-capture.ts` |
+| `config-schema-bugs.test.ts` | `src/config-registry.ts` |
+| `config-schema-errors.test.ts` | `src/config-registry.ts` |
+| `config-schema-features-integration.test.ts` | `src/config-registry.ts` |
+| `config-schema-logger.test.ts` | `src/config-registry.ts`, `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |
 | `core/command/version.test.ts` | `package.json`, the root manifest |
-| `core/config/config-load.test.ts` | `src/adapters/logger/settings.ts`, `src/config-registry.ts`, `src/tests/output-sinks.ts` |
+| `core/config/config-load-templates.test.ts` | `src/config-registry.ts` |
+| `core/config/config-load.test.ts` | `src/config-registry.ts`, `src/tests/output-sinks.ts` |
 | `core/config/config-schema-board.test.ts` | `src/config-registry.ts` |
 | `core/config/config.test.ts` | `src/config-registry.ts` |
 | `core/config/dangerous.test.ts` | `src/config-registry.ts`, `src/tests/output-sinks.ts` |
 | `core/config/section.test.ts` | `src/config-registry.ts` |
 | `core/loop/claude.test.ts` | `src/tests/output-sinks.ts` |
-| `core/loop/sessions-hop.test.ts` | `src/next/hop-record.ts` |
 | `core/output/active.test.ts` | `src/adapters/output/json.ts` |
 | `core/output/index.test.ts` | `src/adapters/output/json.ts` |
-| `core/plan/parse.test.ts` | `src/utils/tracker.ts` |
 | `core/runtime/identity.test.ts` | `package.json`, the root manifest |
 | `effort/store/changes.test.ts` | `src/tests/merged-stores.ts` |
 | `effort/store/fixture-extract.test.ts` | `src/fixtures/scrub.ts`, `src/triage/local-paths.ts` |
-| `effort/store/forward-compat.test.ts` | `src/effort/skill-facts.ts`, `src/utils/progress.ts` |
+| `effort/store/forward-compat.test.ts` | `src/effort/skill-facts.ts` |
 | `effort/store/index.test.ts` | `src/adapter-registry.ts` |
 | `effort/store/location.test.ts` | `src/tests/cli-capture.ts` |
 | `effort/store/merge-commit-gaps.test.ts` | `src/effort/commits.ts` |
 | `effort/store/merge-rules.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
 | `effort/store/migrations.test.ts` | `src/tests/git-identity.ts` |
 | `effort/store/move.test.ts` | `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |
-| `effort/store/origins.test.ts` | `src/effort/skill-facts.ts`, `src/utils/progress.ts` |
+| `effort/store/origins.test.ts` | `src/effort/skill-facts.ts` |
 | `effort/store/preflight.test.ts` | `src/preflight/run.ts` |
 | `effort/store/search-row.test.ts` | `src/effort/collect.ts`, `src/effort/report.ts` |
 | `effort/store/settings.test.ts` | `src/config-registry.ts` |
 | `effort/store/stale-docs.test.ts` | `src/tests/merged-stores.ts` |
 | `effort/store/store-sources.sweep.test.ts` | `src/tests/sweep-timeout.ts` |
-| `effort/store/tracker-refs.test.ts` | `src/utils/progress.ts` |
 | `errors/rafa-codes.test.ts` | `src/cli/dispatch.ts`, `src/cli/route.ts`, `src/errors/match.ts`, `src/schema/failure-strings.ts`, `src/schema/skill.ts` |
+| `modules/load.test.ts` | `src/config-registry.ts` |
+| `next/hop-record.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts`, `src/tests/git-identity.ts` |
+| `plan/doc-task.test.ts` | `src/plan/index.ts`, `src/plan/validate.ts` |
 | `ports/index.test.ts` | `src/plan/index.ts` |
+| `project/package-of.test.ts` | `src/tests/package-tree.ts` |
+| `project/position.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts`, `src/tests/git-identity.ts` |
+| `project/scope-fallback.test.ts` | `src/tests/git-identity.ts` |
+| `project/scope.test.ts` | `src/config-registry.ts` |
+| `project/worktree-root.test.ts` | `src/tests/git-identity.ts` |
 | `report/parse.test.ts` | `src/schema/instinct.ts` |
 | `schema/project-id.test.ts` | `src/tests/git-identity.ts` |
+| `utils/git.test.ts` | `src/tests/git-identity.ts` |
+| `utils/progress.test.ts` | `scripts/control-byte-gate/control-byte-gate.ts`, `src/plan.ts` |
+| `utils/tracker.test.ts` | `src/effort/classify.ts`, `src/plan/index.ts`, `src/start/commit.ts`, `src/start/dispatch.ts`, `src/start/stamp.ts`, `src/tests/output-sinks.ts` |

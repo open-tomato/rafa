@@ -21,8 +21,6 @@
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import '../adapter-registry.js';
-
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

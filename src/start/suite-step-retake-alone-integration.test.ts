@@ -48,10 +48,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { runStageStep } from './suite-step.js';
 
@@ -179,7 +179,7 @@ async function drive(options: { readonly retake: boolean; readonly broken: boole
     checkout: repo,
     trackerPath,
     sessionId: SESSION,
-    settings: { testsFullSuiteTriggers: [], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: options.retake },
+    settings: { testsFullSuiteTriggers: [], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: options.retake, testsContract: [], checksTask: ['affected'], checksStage: ['related', 'integration'], checksLoop: ['full'] },
     owns: () => Promise.resolve(['leak']),
     seams: { git: gitChanging(options.changed ?? UNTESTED), appendStep: (step) => steps.push(step) },
   };

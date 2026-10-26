@@ -14,8 +14,8 @@
  *
  * "Runtime" and "non-test" are both filters on the graph the sweep walks,
  * read the way `scripts/survey/import-graph.ts` reads it
- * (`readMetafile`, `buildImportGraph`, the file set from
- * `scripts/survey/files.ts`):
+ * (`readMetafile`, `buildImportGraph` handed the facade tables
+ * `readFacadeTables` reads, the file set from `scripts/survey/files.ts`):
  *
  *   - only `value` edges are kept, the ones `bun build --metafile` records
  *     (a dynamic `import()` included). A `type` edge — `import type`, a
@@ -45,6 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 
 import { crossClusterCycles } from '../../scripts/survey/cluster-cycles.js';
+import { readFacadeTables } from '../../scripts/survey/facade-tables.js';
 import { classifyFile, coverageLine, listTrackedFiles } from '../../scripts/survey/files.js';
 import { buildImportGraph, bunResolver, readMetafile } from '../../scripts/survey/import-graph.js';
 
@@ -94,6 +95,7 @@ describe('the import cycle sweep', () => {
         sources.set(path, readFileSync(join(REPO_ROOT, path), 'utf8'));
       }
       const graph = buildImportGraph({
+        facades: readFacadeTables(REPO_ROOT),
         files: tracked.all,
         metafile,
         resolve: bunResolver(REPO_ROOT),

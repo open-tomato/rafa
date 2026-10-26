@@ -49,16 +49,20 @@
  */
 import type { PrContext } from './pr-context.js';
 import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
-import type { GuardReaction } from '../../release/guard-merge.js';
-import type { GuardAnswer, GuardReading } from '../../release/guard.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GuardAnswer, GuardReaction, GuardReading } from '@open-tomato/rafa-release';
+
+import {
+  guardLines,
+  guardReaction,
+  localPlanNotes,
+  readMergeGuard,
+  releaseDeliveryLine,
+  releaseDeliveryOf,
+  resolveReleaseEnabled,
+} from '@open-tomato/rafa-release';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { resolveReleaseEnabled } from '../../release/enabled.js';
-import { guardReaction, readMergeGuard } from '../../release/guard-merge.js';
-import { guardLines, localPlanNotes } from '../../release/guard.js';
-import { releaseDeliveryLine, releaseDeliveryOf } from '../../release/release-delivery.js';
 
 /** The answers that mean yes to a question spelled `[y/N]`. */
 const YES_ANSWERS: readonly string[] = ['y', 'yes'];

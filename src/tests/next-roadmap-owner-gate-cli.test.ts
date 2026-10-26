@@ -47,7 +47,7 @@
  * and the row's `proposal` print.
  */
 import type { Scratch } from './next-chain-fixtures.js';
-import type { Place, Position } from '../project/position.js';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import {
   mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
@@ -56,7 +56,7 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { positionFilePath, writePositionFile } from '../project/position.js';
+import { positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { plantProjectConfig } from './cli-capture.js';
 import {

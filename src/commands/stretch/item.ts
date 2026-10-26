@@ -81,21 +81,21 @@ import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-import { isPidAlive, readSessions } from '@open-tomato/rafa/core/loop';
-import { plansDirAt, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
+import { boardId, createGhRunner, createGithubTracker } from '@open-tomato/rafa-board';
 
-import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
-import { boardId } from '../../board/naming.js';
-import { stretchFolder } from '../../stretch/folder.js';
-import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
 import {
   expectOneArgument,
   readSwitch,
   requireProject,
   resolveProjectConfig,
-} from '../plan/plan-files.js';
+} from '@open-tomato/rafa/commands/plan/plan-files';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { isPidAlive, readSessions } from '@open-tomato/rafa/core/loop';
+import { plansDirAt, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
+
+import { stretchFolder } from '../../stretch/folder.js';
+import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
 
 import { afterLoopWait, mergeDryRunLines } from './item-merge.js';
 import { PR_BASE_KEY, STRETCH_BRANCH_PREFIX } from './start.js';

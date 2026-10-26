@@ -37,9 +37,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+
 import { withSourceHeader } from '../commands/agent/vendor.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import {
   BUILT_IN_AGENTS,

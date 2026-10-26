@@ -125,12 +125,12 @@ describe('dangerousPassLines', () => {
     ]);
   });
 
-  it('names nothing for a file spelling the default, though its sources name the file', async () => {
+  it('names nothing for a file spelling the default, though its sources name the local file', async () => {
     const project = yamlProject('dangerous:\n  acceptStaleRefs: false\n  selfUpdateDuringLoop: false\n');
 
     const { resolved } = await loadCollecting(project);
 
-    expect(resolved.sources.dangerousAcceptStaleRefs).toBe('file');
+    expect(resolved.sources.dangerousAcceptStaleRefs).toBe('local');
     expect(dangerousPassLines(resolved)).toEqual([]);
   });
 

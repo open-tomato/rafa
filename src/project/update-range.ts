@@ -16,8 +16,7 @@
  * moves a lock past its own release candidate, and a release candidate
  * installed over its release is a downgrade.
  */
-import { compareVersions } from '../release/status-readings.js';
-import { parseSemanticVersion } from '../release/version.js';
+import { compareVersions, parseSemanticVersion } from '@open-tomato/rafa-release';
 
 /** Why a move was refused. */
 export type RangeRefusal = 'newer-minor' | 'newer-major' | 'older' | 'unreadable';

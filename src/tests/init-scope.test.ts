@@ -49,9 +49,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { initHint } from '@open-tomato/rafa/project/scope';
+
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
-import { initHint } from '../project/scope.js';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

@@ -29,13 +29,13 @@ import type { EffortCopyResult } from '@open-tomato/rafa/store/copy';
 
 import { join, resolve } from 'node:path';
 
+import { fileStamp } from '@open-tomato/rafa-effort';
+
+import { expectNoArgument, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { copyEffortStore, EffortCopyFailure, EffortCopyRefusal } from '@open-tomato/rafa/store/copy';
 import { EFFORT_DIR_VARIABLE } from '@open-tomato/rafa/store/location';
 import { EFFORT_STORE_DIR } from '@open-tomato/rafa/store/ndjson-files';
-
-import { fileStamp } from '../../effort/file-stamp.js';
-import { expectNoArgument, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort copy';

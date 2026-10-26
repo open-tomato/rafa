@@ -12,14 +12,16 @@
  * asserted to sit under the temporary root.
  */
 import type { RootReading } from './root-choice.js';
-import type { RootCandidate, RootCandidates } from './roots.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { RootCandidate, RootCandidates } from '@open-tomato/rafa/project/roots';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { rootCandidates } from '@open-tomato/rafa/project/roots';
 
 import {
   candidateLines,
@@ -30,7 +32,6 @@ import {
   readRootAnswer,
   rootQuestion,
 } from './root-choice.js';
-import { rootCandidates } from './roots.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-root-choice-')));

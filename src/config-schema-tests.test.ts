@@ -27,6 +27,7 @@ import {
 } from '@open-tomato/rafa/core/config';
 import { flag } from '@open-tomato/rafa/core/config/sections';
 
+import { templateEntry } from './config/templates.js';
 import { CONFIG_DEFAULTS, SETTINGS } from './config-registry.js';
 import { globList, TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
 
@@ -41,14 +42,20 @@ const EXPECTED_GLOB = 'expected a glob pattern relative to the repository root';
 
 /** The four glob settings, their file keys and their defaults, in schema order. */
 const GLOB_KEYS: readonly (readonly [ConfigSetting, string, readonly string[]])[] = [
+  ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers', []],
+  ['testsIntegration', 'tests.integration', []],
+  ['testsContract', 'tests.contract', []],
+  ['testsAlwaysRun', 'tests.alwaysRun', ['src/**/*.sweep.test.ts']],
+];
+
+/**
+ * The three glob keys whose default is empty, their leaf under `tests`,
+ * and the values the `escalation` template holds for them.
+ */
+const TEMPLATE_GLOBS: readonly (readonly ['fullSuiteTriggers' | 'integration' | 'contract', readonly string[]])[] = [
+  ['fullSuiteTriggers', ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb']],
   [
-    'testsFullSuiteTriggers',
-    'tests.fullSuiteTriggers',
-    ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
-  ],
-  [
-    'testsIntegration',
-    'tests.integration',
+    'integration',
     [
       '**/*-integration.test.ts',
       '**/*.integration.test.ts',
@@ -56,8 +63,7 @@ const GLOB_KEYS: readonly (readonly [ConfigSetting, string, readonly string[]])[
       '**/*-cli.test.ts',
     ],
   ],
-  ['testsContract', 'tests.contract', ['**/*.contract.test.ts']],
-  ['testsAlwaysRun', 'tests.alwaysRun', ['src/**/*.sweep.test.ts']],
+  ['contract', ['**/*.contract.test.ts']],
 ];
 
 /** Reads `raw` through the spec `SETTINGS` holds for `setting`. */
@@ -101,6 +107,24 @@ describe('the four glob keys', () => {
   it('names no preload file in the trigger default, which is read off bunfig.toml at run time', () => {
     expect(CONFIG_DEFAULTS.testsFullSuiteTriggers.filter((glob) => glob.includes('preload'))).toEqual([]);
   });
+
+  it.each(TEMPLATE_GLOBS)('finds tests.%s\'s old default in the escalation template, read by globList', (leaf, value) => {
+    const written = templateEntry('escalation')?.tests?.[leaf];
+
+    expect(written).toEqual(value);
+    expect(globList(written, { label: `F: tests.${leaf}`, key: `tests.${leaf}` })).toEqual({
+      value,
+      problems: [],
+      extras: [],
+    });
+  });
+
+  it('names no preload file in the template\'s triggers either', () => {
+    const triggers = templateEntry('escalation')?.tests?.fullSuiteTriggers ?? [];
+
+    expect(triggers.length).toBeGreaterThan(0);
+    expect(triggers.filter((glob) => glob.includes('preload'))).toEqual([]);
+  });
 });
 
 describe.each(GLOB_KEYS)('%s', (setting, key) => {
@@ -140,7 +164,7 @@ describe.each(GLOB_KEYS)('%s', (setting, key) => {
 });
 
 describe('tests.contract', () => {
-  it('matches a contract test\'s name in any folder with its default glob, and a plain test\'s not', () => {
+  it('matches a contract test\'s name in any folder with the template\'s glob, and a plain test\'s not', () => {
     const glob = new Bun.Glob('**/*.contract.test.ts');
 
     expect(glob.match('packages/rafa/src/config/load.contract.test.ts')).toBe(true);
@@ -279,9 +303,9 @@ describe('the section', () => {
       ['testsRetakeRedAlone', 'tests.retakeRedAlone'],
     ]);
     expect(TESTS_SECTION.defaults).toEqual({
-      testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
-      testsIntegration: ['**/*-integration.test.ts', '**/*.integration.test.ts', '**/*-spawned*.test.ts', '**/*-cli.test.ts'],
-      testsContract: ['**/*.contract.test.ts'],
+      testsFullSuiteTriggers: [],
+      testsIntegration: [],
+      testsContract: [],
       testsAlwaysRun: ['src/**/*.sweep.test.ts'],
       testsRetakeRedAlone: true,
     });

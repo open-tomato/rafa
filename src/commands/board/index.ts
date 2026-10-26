@@ -13,7 +13,7 @@
  *
  * The subjects and the commands are in roster order, the order
  * `ROSTER_SUBJECTS` lists the subjects in and `createRosterRegistry`
- * (`src/commands/index.ts`) registers the commands in. `index.test.ts`
+ * (`src/commands/index.ts`) registers the commands in. `index-integration.test.ts`
  * holds each command's spelling to its declaration's, and each loaded
  * module's command to its declaration.
  */

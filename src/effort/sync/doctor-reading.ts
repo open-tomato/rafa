@@ -40,15 +40,14 @@
  * ({@link EFFORT_SYNC_ROW}) opening it, so a caller that names the row
  * itself never says it twice.
  */
-import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { baseAdapterRegistry } from '../../modules/activate.js';
-import { loadModules, moduleSettings } from '../../modules/load.js';
+import { baseAdapterRegistry } from '@open-tomato/rafa/modules/activate';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 
 import { SyncModuleMissing, selectSync } from './select.js';
 

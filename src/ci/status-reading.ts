@@ -36,7 +36,7 @@
  */
 import type { FailedCaseFile } from './failed-cases.js';
 import type { BranchRun } from './runs.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
 /** What a run reads as. */
 export type CiVerdict = 'green' | 'red' | 'none' | 'running';

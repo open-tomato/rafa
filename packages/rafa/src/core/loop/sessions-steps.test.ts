@@ -261,7 +261,7 @@ describe('parseSessionRecord and the steps field', () => {
     ['steps set to an object', recordText({ steps: {} }), 'steps is {}, expected a list of steps'],
     ['a step that is no object', recordText({ steps: [7] }), 'steps[0] is 7, expected a step'],
     ['an unknown kind', stepText({ kind: 'nightly' }), 'steps[0].kind is "nightly", expected one of baseline, task, stage, pre-wrap-up'],
-    ['an unknown scope', stepText({ scope: 'everything' }), 'steps[0].scope is "everything", expected one of affected, module, full or a list of paths'],
+    ['an unknown scope', stepText({ scope: 'everything' }), 'steps[0].scope is "everything", expected one of affected, module, full, none or a list of paths'],
     ['a scope with an empty path', stepText({ scope: ['src', ''] }), 'steps[0].scope is ["src",""], expected'],
     ['an empty command', stepText({ command: [] }), 'steps[0].command is [], expected a non-empty list of arguments'],
     ['a command as one string', stepText({ command: 'bun test' }), 'steps[0].command is "bun test", expected'],

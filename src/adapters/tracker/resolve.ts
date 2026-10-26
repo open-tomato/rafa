@@ -81,7 +81,7 @@
  *     that core did not write.
  *   - Reporting. With no `log` named, each failure is a `warn` entry of
  *     a child logger bound to module `tracker` and action `chain`
- *     (`src/adapters/logger/active.ts`), read when the report is made,
+ *     (`packages/rafa/src/adapters/logger/active.ts`), read when the report is made,
  *     carrying the cause code `tracker:unavailable`. It reads
  *     `warn: tracker chain: <kind> unavailable: <reason>
  *     [tracker:unavailable]` in text mode, and is the module the logger
@@ -104,10 +104,9 @@ import type { AdapterContext, AdapterRegistry } from '@open-tomato/rafa/core/ada
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PreflightResult, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 
+import { activeLogger } from '@open-tomato/rafa/adapters/logger/active';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { activeLogger } from '../logger/active.js';
 
 /** What every report and refusal opens with. */
 const PREFIX = 'tracker chain';

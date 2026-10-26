@@ -167,11 +167,10 @@ import type { NextActionId, NextState } from './state.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
-import { CommandExit, commandSpelling } from '@open-tomato/rafa/core/command';
+import { CommandExit, commandSpelling, HINT_FLAG } from '@open-tomato/rafa/core/command';
 
 import { parseArgs } from '../cli/core/parseArgs.js';
 
-import { HINT_FLAG } from './hint.js';
 import { runHome, runHop } from './hop-action.js';
 
 /** What a defect and a refusal this module raises open with. */

@@ -39,10 +39,11 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+
 import { createGitRunner } from '../../pr/index.js';
 import { readTags } from '../../release/status-readings.js';
 import { readManifestName } from '../../release/version.js';
-import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { RELEASE_LIST_DECLARATION } from './declarations.js';
 import { readWaiting, waitingSettingsOf } from './status-fragments.js';

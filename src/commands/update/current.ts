@@ -41,24 +41,25 @@
  * {@link UpdateCurrentSeams}, so a case plants a project and drives a
  * recorded `gh` with no network.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { BoardAccess, UpdateApplied, UpdatePlan } from '../../project/update-current.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
+import { createGhRunner } from '@open-tomato/rafa-board';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
+import { LOCK_FILE, readProjectLock } from '@open-tomato/rafa-release';
+
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit , createLinePrompter , RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { mainCheckoutOf } from '@open-tomato/rafa/project/worktree-root';
 import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { resolvePrProvider } from '../../pr/provider.js';
-import { LOCK_FILE, readProjectLock } from '../../project/lock.js';
 import { scaffoldConflicts } from '../../project/scaffold.js';
 import { applyUpdatePlan, planChanges, readUpdatePlan, UpdateStepError } from '../../project/update-current.js';
 import { readCurrentRange } from '../../project/update-range.js';
-import { mainCheckoutOf } from '../../project/worktree-root.js';
-import { expectNoArgument } from '../plan/plan-files.js';
 
 /** The usage line a refusal ends with. */
 const USAGE = 'rafa update current [--dry-run] [--yes]';

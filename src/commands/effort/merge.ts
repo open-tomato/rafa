@@ -39,6 +39,9 @@ import type { ProjectIdentity } from '@open-tomato/rafa/store/store-identity';
 
 import { join, resolve } from 'node:path';
 
+import { fileStamp } from '@open-tomato/rafa-effort';
+
+import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { DevelopmentBuildRefusedError } from '@open-tomato/rafa/store/development-build';
@@ -47,9 +50,6 @@ import { MergeRefusal, mergeStore } from '@open-tomato/rafa/store/merge-store';
 import { UnionSchemaMismatch } from '@open-tomato/rafa/store/merge-union';
 import { RebuildRefusal } from '@open-tomato/rafa/store/rebuild-aside';
 import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
-
-import { fileStamp } from '../../effort/file-stamp.js';
-import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { keepsIdLine } from './fix-schema.js';
 

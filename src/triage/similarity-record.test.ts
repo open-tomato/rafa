@@ -13,7 +13,7 @@ import type { OpenIssue } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
-import { EMPTY_BUG_RECORD } from '../bugs/record.js';
+import { EMPTY_BUG_RECORD } from '@open-tomato/rafa/bugs/record';
 
 import { bugKeyOf } from './bug-key.js';
 import { ISSUE_OPENING, issueText, possibleDuplicatesSection } from './issue-text.js';

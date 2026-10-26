@@ -38,7 +38,6 @@ import type { PreflightCheck, PreflightReport, ProbeRun } from '../../../../pref
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
 
 import '../../../../config-registry.js';
-import '../../../../adapter-registry.js';
 
 import {
   existsSync,

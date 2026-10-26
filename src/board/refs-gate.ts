@@ -82,10 +82,10 @@ import type { Output } from '@open-tomato/rafa/ports';
 import { readFileSync } from 'node:fs';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CORE_SECTION } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 
-import { SETTINGS } from '../config-registry.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../refs/reading.js';
 import { RefsBlockError } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';
@@ -99,8 +99,15 @@ import { ACCEPT_REFS_FLAG } from './flags.js';
  */
 export { ACCEPT_REFS_FLAG };
 
-/** The config key that accepts every reference on every run, as `SETTINGS` spells it. */
-export const ACCEPT_STALE_REFS_KEY: string = SETTINGS.dangerousAcceptStaleRefs.key;
+/**
+ * The config key that accepts every reference on every run, as core's
+ * section spells it: the spec `SETTINGS` and the registered settings
+ * hold for `dangerousAcceptStaleRefs`. Read off `CORE_SECTION` and not
+ * `registeredSettings()`, since this constant is built as the module
+ * loads, before an entry registers the sections, and that read refuses
+ * until then.
+ */
+export const ACCEPT_STALE_REFS_KEY: string = CORE_SECTION.settings.dangerousAcceptStaleRefs.key;
 
 /**
  * Why check 4 refuses nothing on a run: nobody said so, `--accept-refs`

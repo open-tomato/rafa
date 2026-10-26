@@ -42,13 +42,13 @@
  * file is left byte for byte as it is, whatever it holds, and a
  * directory at the path is refused. Nothing here reaches GitHub.
  */
-import type { BoardPart } from '../board/setup.js';
+import type { BoardPart } from '@open-tomato/rafa-board';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { TEMPLATES_DIRNAME, writeShippedFile } from '../board/setup.js';
+import { TEMPLATES_DIRNAME, writeShippedFile } from '@open-tomato/rafa-board';
 
 /** This module's own directory: where the shipped templates are looked for. */
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));

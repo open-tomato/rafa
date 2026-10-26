@@ -90,10 +90,10 @@ import type {
   StaleRow,
   WorktreeBlockKind,
   WorktreeRow,
-} from '../cleanup/index.js';
+} from '@open-tomato/rafa-run';
 
-import { cleanupCounts } from '../cleanup/index.js';
-import { shellQuote } from '../pr/preflight-items.js';
+import { shellQuote } from '@open-tomato/rafa-pr';
+import { cleanupCounts } from '@open-tomato/rafa-run';
 
 /** The six group headings, in the order they are listed. */
 export const CLEANUP_GROUP_TITLES: Readonly<{

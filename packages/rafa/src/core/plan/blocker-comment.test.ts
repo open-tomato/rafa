@@ -3,7 +3,7 @@
  * trails, written by `blockerComment`, escaped and unescaped by the
  * escape pair, and read back by `splitBlockerComment`.
  *
- * These cases moved here with the family from `src/utils/tracker.test.ts`,
+ * These cases moved here with the family from `src/tests/core-coupled/utils/tracker.test.ts`,
  * which keeps the cases that drive the comment through a tracker file:
  * the blocker written, the line ticked, a repair inserted and the
  * dispatch that hands the text on. Each near miss is paired with the

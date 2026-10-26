@@ -11,7 +11,8 @@
  */
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import report from '../../effort/report.js';
+import { report } from '@open-tomato/rafa-effort';
+
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
 const command: RafaCommand = wrapPhaseZeroCommand({

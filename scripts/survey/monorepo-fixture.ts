@@ -42,7 +42,7 @@
  * identity nor their hooks reach it.
  *
  * `--out` defaults to a fresh directory under the OS temp directory. An
- * `--out` inside this repository is refused: `src/project/roots.ts` takes
+ * `--out` inside this repository is refused: `packages/rafa/src/project/roots.ts` takes
  * the outermost folder holding a monorepo marker, and rafa's own
  * `package.json` has `workspaces`, so a fixture there would report rafa's
  * root. A variant folder that already exists is refused rather than

@@ -25,7 +25,7 @@
  * vacuously.
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -48,10 +48,10 @@ import {
 
 import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '@open-tomato/rafa/core/git';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
 

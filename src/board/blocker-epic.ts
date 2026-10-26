@@ -90,7 +90,7 @@ import type { BoardView } from './epic-board.js';
 import type { EpicRelations } from './epics.js';
 import type { RelatedIssue } from './relations/port.js';
 import type { BoardIssue } from './roadmap-board.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { boardListsEpic, boardOfEpic } from './epic-board.js';
 import { readEpics } from './epics.js';

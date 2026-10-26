@@ -32,13 +32,14 @@
  */
 import type { ConflictRefs } from './triage-read.js';
 import type { GitRunner } from '../../pr/index.js';
-import type { MergeGuardSettings } from '../../release/guard-merge.js';
-import type { GuardReading, GuardVerdict } from '../../release/guard.js';
-import type { ReleaseDelivery } from '../../release/release-delivery.js';
+import type {
+  GuardReading,
+  GuardVerdict,
+  MergeGuardSettings,
+  ReleaseDelivery,
+} from '@open-tomato/rafa-release';
 
-import { resolveReleaseEnabled } from '../../release/enabled.js';
-import { readGuard } from '../../release/guard.js';
-import { releaseDeliveryOf } from '../../release/release-delivery.js';
+import { readGuard, releaseDeliveryOf, resolveReleaseEnabled } from '@open-tomato/rafa-release';
 
 import { baseCandidates, headCandidates, resolvesRef } from './triage-read.js';
 

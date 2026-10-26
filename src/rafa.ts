@@ -20,11 +20,11 @@
  *
  * The module holds nothing but the dispatch, the modules loaded for it
  * and the command hook handed to it. It first loads the modules of the project the working directory is
- * in (`src/modules/load.ts`), so a module's actions route, render help
+ * in (`packages/rafa/src/modules/load.ts`), so a module's actions route, render help
  * and are described, and hands the dispatcher their command entries and
  * the loader's warnings. Before it dispatches, it makes the adapters
  * those modules registered the active registry with
- * `activateModuleAdapters` (`src/modules/activate.ts`), so a module's
+ * `activateModuleAdapters` (`packages/rafa/src/modules/activate.ts`), so a module's
  * kind resolves through `CORE_ADAPTER_REGISTRY` for the invocation.
  * It then builds the registry it dispatches through with
  * `createRosterRegistry` (`src/commands/index.ts`), core's commands
@@ -58,13 +58,14 @@
  */
 import { homedir } from 'node:os';
 
+import { activateModuleAdapters } from '@open-tomato/rafa/modules/activate';
+import { loadInvocationModules } from '@open-tomato/rafa/modules/load';
+
 import { registerCoreAdapters } from './adapter-registry.js';
 import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
 import { createRosterRegistry } from './commands/index.js';
 import { registerCoreConfigSections } from './config-registry.js';
-import { activateModuleAdapters } from './modules/activate.js';
-import { loadInvocationModules } from './modules/load.js';
 import { createStatusHook } from './status/hook.js';
 
 registerCoreConfigSections();

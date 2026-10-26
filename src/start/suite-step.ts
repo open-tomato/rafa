@@ -17,10 +17,10 @@
  *
  * | Step | Runs | Blocks |
  * |---|---|---|
- * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing; halts the run when it failed outside any test case |
- * | task ({@link runTaskStep}) | `taskStepScope` (`suite/scope.ts`) over the task's diff | a repair task it inserts, or the repair it followed |
- * | stage ({@link runStageStep}) | `stageStepScope` over the stage's diff | a repair task it inserts |
- * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
+ * | baseline ({@link ensureBaseline}) | the full suite, once per plan; nothing when no check-point entry names a check | nothing; halts the run when it failed outside any test case |
+ * | task ({@link runTaskStep}, `suite-task-step.ts`) | `resolveChecks` (`suite/checks.ts`) of `checks.task` over the task's diff; nothing for an empty entry | a repair task it inserts, or the repair it followed |
+ * | stage ({@link runStageStep}, `suite-stage-step.ts`) | `resolveChecks` of `checks.stage` over the stage's diff; nothing for an empty entry | a repair task it inserts |
+ * | pre-wrap-up ({@link runPreWrapUpStep}) | `resolveChecks` of `checks.loop` over the plan's diff; nothing for an empty entry | a repair task it inserts, or the ticked one it inserted before |
  *
  * **The baseline** is read from `SUITE_BASELINE-<stub>.json` beside the
  * tracker (`suite/baseline.ts`) and reused on a resumed run, which then
@@ -36,21 +36,42 @@
  * stored baseline of that shape is recorded again, with a line saying
  * so (`suite-outside-case.ts` holds the lines and their account).
  *
- * **A task step** runs the scope `taskStepScope` answers from the task
- * line's `tests=` value and the diff from the task's base commit to
- * HEAD: `full` with no paths, `module` over its test files, `affected`
- * as `bun test --changed=<base>`. The plan's `Owns:` folders and the
- * project's test files are read only for a `tests=module` line, the one
- * answer that needs them. A diff git will not answer runs the full
- * suite, the scope that can miss nothing. A `module` or `affected` step
- * also runs the tracked files `tests.alwaysRun` names, the content
- * sweeps no changed file selects (`task-always-run.ts`): `module` in its
- * own path list, and `affected` as a second run, since Bun filters a
+ * **No baseline** is taken when `checks.task`, `checks.stage` and
+ * `checks.loop` are all empty: {@link ensureBaseline} reads no file,
+ * runs and records nothing, enters no stage in the ledger, prints
+ * `📏 No check-point entry names a check; no suite baseline is taken.`
+ * and answers a null baseline, over which each step is a `none` step.
+ * One non-empty entry is enough to take it.
+ *
+ * **A task step** runs what `resolveChecks` answers for the entry
+ * `checks.task` from the task line's `tests=` value and the diff from the
+ * task's base commit to HEAD: `full` with no paths, `affected` as `bun
+ * test --changed=<base>`, and a path list as one `bun test` over its
+ * files, recorded as `module` when a `tests=module` line read the entry's
+ * `affected` as `related`, and as the files run otherwise. The plan's
+ * `Owns:` folders are read only when `related` is in play (named, or
+ * read so), and the project's test files only when a path check is. A
+ * diff git will not answer runs the full suite, the scope that can miss
+ * nothing. A task step also runs the tracked files `tests.alwaysRun`
+ * names, the content sweeps no changed file selects
+ * (`task-always-run.ts`): a path list takes them in its own list when
+ * `related` is in play or `affectedToo` is set, and takes none
+ * otherwise; `affected` takes them as a second run, since Bun filters a
  * path list by `--changed`, written to {@link alwaysRunJunitFileFor} and
- * folded into the first run's result before the step is settled. Once
+ * folded into the first run's result before the step is settled. A
+ * path list that comes out empty runs nothing and records no step, and
+ * the step prints that it had nothing to run. Once
  * settled, a step not read as a stop prints one line naming each of
  * those files its JUnit file times over `SLOW_SWEEP_SECONDS`
  * (`sweep-timing.ts`), and no line when none is.
+ *
+ * **An empty `checks.task`** runs no suite and reads no diff: the step is
+ * recorded at once as a `none` step (`core/loop/sessions.ts`), reason
+ * `no-check`, with the line's `tests=` value under `declared` when it had
+ * one, and prints `🧪 task step: no check configured (checks.task is
+ * empty); nothing ran.`, with `(tests=<value> set aside)` after it for
+ * such a line. The lint and the type step below still run after it, as
+ * after a green run, and settle the step ({@link Settling.recorded}).
  *
  * Unless its test run was a stop, a task step then lints the task's diff
  * (`lint-step.ts`: `bunx eslint --no-warn-ignored`, red on a nonzero
@@ -63,33 +84,66 @@
  *
  * **A stage step** runs over the stage's diff: from the commit the last
  * stage step was taken at (the stage ledger, below) or, before any, the
- * baseline's commit, to HEAD. Without `Owns:` folders `stageStepScope`
- * answers `affected`, reason `fallback`, run as `bun test
+ * baseline's commit, to HEAD. It resolves the entry `checks.stage`
+ * through `resolveChecks`, with no `tests=` value; the `Owns:` folders
+ * are read only when the entry names `related`, the test files only when
+ * it names a path check, and the preload files only when it names
+ * `affected`. `full` runs the whole project. `affected` runs `bun test
  * --changed=<since>` from that same commit, with the `tests.alwaysRun`
  * files joined as a task step's `affected` run joins them: a second run,
  * its JUnit file {@link alwaysRunJunitFileFor} of `stage`, folded into
- * the first before the step is settled and recorded as `affected`. With
- * `Owns:` folders it answers the test files under the folders the diff
- * touched plus the integration tier, and no always-run run is added. An
- * empty list runs nothing and records no step, since a step's command
- * is never empty. With neither commit, or a diff git will not answer,
- * the full suite runs.
+ * the first before the step is settled and recorded as `affected`. So
+ * does a path list an `affected` stands beside (`affectedToo`): the
+ * stage runs that `affected` alone, which is how a `related` without
+ * `Owns:` folders falls back, reason `fallback`. A path list alone runs
+ * those files, the touched `Owns:` folders' and each named tier's, each
+ * once, and no always-run run is added. An empty list runs nothing,
+ * records no step and prints that it had nothing to run, since a step's
+ * command is never empty. With neither commit, or a diff git will not
+ * answer, the full suite runs.
+ *
+ * **An empty `checks.stage`** runs no suite and reads no diff: the step
+ * is recorded at once as a `none` step, reason `no-check`, prints
+ * `🧪 stage step for "<stage>": no check configured (checks.stage is
+ * empty); nothing ran.`, is never red and so inserts no repair, and is
+ * entered in the stage ledger as a step that ran.
  *
  * **The recorded reason.** A task or stage step's {@link SessionStep}
  * carries `reason` beside `scope`, so a fallback reads apart from a wide
  * change. A task step records its scope's own reason (`declared`,
- * `trigger`, `fallback` or `no-module-tests`, `suite/scope.ts`), and
- * `declared` for a `module` answer, which only its own `tests=module`
- * line reaches. A stage step records `fallback` for its `--changed` run
- * without `Owns:` folders and `stage` for its `Owns:` path list. A step
- * whose diff git would not answer, or a stage step with no commit to
- * take its diff from, runs the full suite by no scope rule and records
- * no reason; nor do the baseline and the pre-wrap-up step, which always
- * run the full suite.
+ * `trigger`, `fallback` or `no-module-tests`, `suite/checks.ts`), and
+ * for a path list `declared`, or `unit` when `checks.task` names `unit`
+ * and no `tests=module` line read its `affected`; a `none` step records
+ * `no-check`. A stage step records `stage` for a path list, its
+ * answer's own reason for `full` (`declared` or `trigger`) and for
+ * `affected` (`declared`, or `fallback` for a `related` without `Owns:`
+ * folders), and `no-check` for a `none` step. A pre-wrap-up step
+ * records as a task step does: its answer's own reason for `full` and
+ * `affected`, `declared` (or `unit`) for a path list, `no-check` for a
+ * `none` step. A step whose diff git would not answer, or a stage or
+ * pre-wrap-up step with no commit to take its diff from, runs the full
+ * suite by no scope rule and records no reason; nor does the baseline.
  *
- * **The pre-wrap-up step** runs the full suite, and stands in for the
- * last stage's stage step, so {@link dueStages} never answers a stage
- * once no task is left open. A red one inserts a repair task after the
+ * **The pre-wrap-up step** resolves `checks.loop` through
+ * `resolveChecks`, with no `tests=` value, over the plan's diff: from the
+ * baseline's commit to HEAD. An entry naming `full` runs the whole
+ * project and reads no diff; with no baseline commit, or a diff git will
+ * not answer, the full suite runs too. A path list or `affected` runs as
+ * a task step's does, from that commit: the list as one run, the
+ * `tests.alwaysRun` files joined when `related` is in play or
+ * `affectedToo` is set, and `affected` as `bun test --changed=<commit>`
+ * with those files as a second run ({@link alwaysRunJunitFileFor} of
+ * `pre-wrap-up`). A list empty of files runs nothing, records no step,
+ * prints that it had nothing to run, and lets the wrap-up start.
+ *
+ * **An empty `checks.loop`** runs no suite and reads no diff: the step
+ * is recorded as a `none` step, reason `no-check`, prints `🧪
+ * pre-wrap-up step: no check configured (checks.loop is empty); nothing
+ * ran.`, is never red, and the wrap-up starts on it.
+ *
+ * The pre-wrap-up step stands in for the last stage's stage step, so
+ * {@link dueStages} never answers a stage once no task is left open. A
+ * red one inserts a repair task after the
  * checklist's last task, or, when the tracker holds a ticked pre-wrap-up
  * repair already, writes its blocker on that line again and inserts
  * nothing ({@link StepOutcome.repairInserted} false), so one repair
@@ -113,7 +167,7 @@
  * Known failures are printed as known and never make a step red. The
  * error rule compares a scoped run's count against the FULL baseline's,
  * so an inherited load error outside the scope can hide a new one inside
- * it; the pre-wrap-up step, a full run, catches it.
+ * it; a pre-wrap-up step over `[full]` catches it.
  *
  * A task, stage or pre-wrap-up step whose only red is that excess of
  * errors outside any test (no new failure, a summary read, no red lint
@@ -198,28 +252,9 @@
  *
  * ## The stage ledger
  *
- * The run record is new for every run, so whether a stage's step ran is
- * kept beside the tracker, as the baseline is: `SUITE_STAGES-<stub>.json`
- * ({@link stageLedgerPathFor}), one entry per stage whose step was taken,
- * red or green, with the commit it was taken at. A red step counts as
- * taken: its failures are on its repair task's blocker, and running it
- * again before that repair would only insert a second one.
- *
- * {@link dueStages} answers the stages whose every task is ticked, that
- * hold a task at all, and that the ledger does not name, while an open
- * task is left. The caller asks before each dispatch, so the same call
- * is the step after a stage's last task and the catch-up for a stage
- * whose step an interrupted run never took. A stage is named by its
- * index and heading together, so an edit that moves stages makes their
- * steps due again rather than skipping one. Two stages due at once run
- * in order, the first over both stages' changes and the second over
- * none. When the baseline is first recorded, every stage already
- * complete is entered as covered by it (`via: 'baseline'`), so a plan
- * adopting these steps midway runs no step for its finished stages.
- *
- * A ledger that does not read is warned about and read as empty, which
- * makes a finished stage's step run again: the safe side. Both files are
- * written through a temporary file renamed into place.
+ * Whether a stage's step was taken is kept beside the tracker across
+ * runs, in `SUITE_STAGES-<stub>.json`; its account and code are in
+ * `suite-stage-ledger.ts`, re-exported here.
  *
  * ## Seams
  *
@@ -230,14 +265,16 @@
  * at most once per run. Every line goes through the active output
  * (`core/output/active.ts`).
  *
- * ## Where the stage step lives
+ * ## Where the task and stage steps live
  *
- * The stage step's code is in `suite-stage-step.ts` and re-exported
- * here; this note stays its account. The helpers it shares with the
- * other steps ({@link seamsOf}, {@link readHead}, {@link readDiff},
- * {@link addToLedger}, {@link runOne}, {@link runWithAlwaysRun},
- * {@link settleStep}, {@link Settling} and {@link StepRuns}) are
- * exported for it alone.
+ * The task step's code is in `suite-task-step.ts`, the stage step's in
+ * `suite-stage-step.ts`, both re-exported here; this note stays their
+ * account. The helpers they share with the other steps ({@link seamsOf},
+ * {@link readHead}, {@link readDiff}, {@link recordStep}, {@link runOne},
+ * {@link runWithAlwaysRun}, {@link settleStep}, {@link planDiffReader},
+ * {@link Settling} and {@link StepRuns}) are exported for them. The
+ * pre-wrap-up step imports back `entryChecksOf` from the stage step's
+ * file and `checkRunsOf` from the task step's.
  *
  * ## Where the task step's diff checks live
  *
@@ -252,21 +289,21 @@
  * {@link retakeOnErrors} and the two JUnit file paths, exported for it.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
-import type { RepairSite, StepVerdict } from './suite-blocker.js';
+import type { RepairSite, RepairStepKind, StepVerdict } from './suite-blocker.js';
 import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
+import type { CheckName, ChecksSettings } from '../config-schema-checks.js';
 import type { TestsSettings } from '../config-schema-tests.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
-import type { PreloadReading, TaskStepScope } from '../suite/scope.js';
+import type { PreloadReading } from '../suite/scope.js';
 import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '@open-tomato/rafa/core/loop';
-import type { TestScope } from '@open-tomato/rafa/core/plan';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { constants } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runsDir, updateSession } from '@open-tomato/rafa/core/loop';
@@ -275,7 +312,6 @@ import { parsePlan } from '@open-tomato/rafa/core/plan';
 
 import { createGitRunner, gitSaid } from '../pr/index.js';
 import {
-  BASELINE_FILE_PREFIX,
   baselineOf,
   baselinePathFor,
   readBaseline,
@@ -284,31 +320,32 @@ import {
 } from '../suite/baseline.js';
 import { readPlanOwns } from '../suite/owns.js';
 import { runSuite } from '../suite/run.js';
-import {
-  listTestFiles,
-  readPreloadFiles,
-  taskStepScope,
-} from '../suite/scope.js';
-import { findNextTask } from '../utils/tracker.js';
+import { listTestFiles, readPreloadFiles } from '../suite/scope.js';
 
 import { runEslint } from './lint-step.js';
-import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
+import { blockerText, unhandledNames, writeRepairTask } from './suite-blocker.js';
 import { failedOutsideAnyCase, outsideCaseRecord, storedOutsideCaseLine } from './suite-outside-case.js';
 import { announceStepOnly, stillRedIn, takeRetakes, withoutStepOnly } from './suite-retake-alone.js';
-import { reportSlowSweeps } from './sweep-timing.js';
-import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
-import { taskDiffChecks } from './task-step-checks.js';
+import { addToLedger, completeStages } from './suite-stage-ledger.js';
+import { entryChecksOf } from './suite-stage-step.js';
+import { checkRunsOf } from './suite-task-step.js';
+import { foldResults, readTaskAlwaysRun } from './task-always-run.js';
 import { runTsc } from './type-step.js';
 
 export { blockerText } from './suite-blocker.js';
+export {
+  addToLedger,
+  dueStages,
+  readStageLedger,
+  STAGE_LEDGER_PREFIX,
+  STAGE_LEDGER_VERSION,
+  stageLedgerPathFor,
+} from './suite-stage-ledger.js';
 export { runDueStageSteps, runStageStep } from './suite-stage-step.js';
+export { runTaskStep } from './suite-task-step.js';
 export type { StepVerdict } from './suite-blocker.js';
-
-/** The stage ledger's file name before its stub. */
-export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';
-
-/** The version the ledger is written at, and the only one read. */
-export const STAGE_LEDGER_VERSION = 1;
+export type { DueStage, StageLedgerEntry } from './suite-stage-ledger.js';
+export type { TaskStepInput } from './suite-task-step.js';
 
 /** The exit code `Bun.spawn` answers for a child ended by SIGINT: 128 plus its number. See the module note. */
 export const SIGINT_EXIT_CODE: number = 128 + constants.signals.SIGINT;
@@ -346,7 +383,9 @@ export interface SuiteStepContext {
   readonly trackerPath: string;
   /** The run's session id, naming its record. */
   readonly sessionId: string;
-  readonly settings: Pick<TestsSettings, 'testsAlwaysRun' | 'testsFullSuiteTriggers' | 'testsIntegration' | 'testsRetakeRedAlone'>;
+  /** The `tests.*` keys the steps read, and the check-point entries (`checks.*`) they resolve. */
+  readonly settings: Pick<TestsSettings, 'testsAlwaysRun' | 'testsContract' | 'testsFullSuiteTriggers' | 'testsIntegration' | 'testsRetakeRedAlone'>
+    & Pick<ChecksSettings, 'checksLoop' | 'checksStage' | 'checksTask'>;
   /** The plan's `Owns:` folders, or null without any; see {@link planOwnsReader}. */
   readonly owns: () => Promise<readonly string[] | null>;
   /** True once the runner has received SIGINT; never, when left out. See the module note. */
@@ -373,43 +412,14 @@ export interface StepOutcome {
 
 /** What {@link ensureBaseline} answered. */
 export interface BaselineOutcome {
-  /** The baseline every later step is split against. */
-  readonly baseline: SuiteBaseline;
+  /** The baseline every later step is split against, or null when no check-point entry names a check and none was taken. */
+  readonly baseline: SuiteBaseline | null;
   /** The step recorded, or null when a stored baseline was reused. */
   readonly step: SessionStep | null;
   /** True when the run was read as a stop on SIGINT: the baseline was not written. */
   readonly interrupted: boolean;
   /** True when the run failed outside any test case: the baseline was not written, and the run stops. See the module note. */
   readonly halted: boolean;
-}
-
-/** One stage whose step was taken, or that the baseline covered. */
-export interface StageLedgerEntry {
-  /** Its index among the plan's stages. */
-  readonly stage: number;
-  /** Its heading's name. */
-  readonly name: string;
-  /** The commit the step was taken at, or null when HEAD was not read. */
-  readonly commit: string | null;
-  /** `step` for a step taken, `baseline` for a stage complete when the baseline was recorded. */
-  readonly via: 'step' | 'baseline';
-}
-
-/** A stage a step is due for. */
-export interface DueStage {
-  readonly stage: number;
-  readonly name: string;
-}
-
-/** What {@link runTaskStep} is handed about the task just committed. */
-export interface TaskStepInput {
-  readonly baseline: SuiteBaseline | null;
-  /** The commit the task started from, which its diff and `--changed` are taken against. */
-  readonly base: string;
-  /** The task line's `tests=` value, or its default. */
-  readonly declared: TestScope;
-  /** The task's sentence, for the blocker text. */
-  readonly task: string;
 }
 
 /** The seams, each filled with the system's own. */
@@ -434,104 +444,9 @@ export function junitFileFor(repoRoot: string, sessionId: string, kind: SessionS
   return join(runsDir(repoRoot), sessionId, 'suite', `${kind}.junit.xml`);
 }
 
-/** Where a task step's, or a stage step's fallback's, second run over the `tests.alwaysRun` files has Bun write its JUnit file. */
-export function alwaysRunJunitFileFor(repoRoot: string, sessionId: string, kind: 'task' | 'stage' = 'task'): string {
+/** Where a task step's, a stage step's fallback's or a pre-wrap-up step's second run over the `tests.alwaysRun` files has Bun write its JUnit file. */
+export function alwaysRunJunitFileFor(repoRoot: string, sessionId: string, kind: RepairStepKind = 'task'): string {
   return join(runsDir(repoRoot), sessionId, 'suite', `${kind}-always-run.junit.xml`);
-}
-
-/** The ledger beside the tracker (or plan) at `trackerPath`; throws as `baselinePathFor` does. */
-export function stageLedgerPathFor(trackerPath: string): string {
-  const baselinePath = baselinePathFor(trackerPath);
-  const name = basename(baselinePath).replace(BASELINE_FILE_PREFIX, STAGE_LEDGER_PREFIX);
-  return join(dirname(baselinePath), name);
-}
-
-/** True when `value` is a whole ledger entry. */
-function isLedgerEntry(value: unknown): value is StageLedgerEntry {
-  if (typeof value !== 'object' || value === null) return false;
-  const entry = value as Record<string, unknown>;
-  return Number.isInteger(entry['stage'])
-    && typeof entry['name'] === 'string'
-    && (entry['commit'] === null || typeof entry['commit'] === 'string')
-    && (entry['via'] === 'step' || entry['via'] === 'baseline');
-}
-
-/** The ledger's entries, or the reason it does not read. */
-function parseLedger(text: string): readonly StageLedgerEntry[] | string {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return 'not JSON';
-  }
-  const record = (typeof parsed === 'object' && parsed !== null
-    ? parsed
-    : {}) as Record<string, unknown>;
-  if (record['version'] !== STAGE_LEDGER_VERSION) return `version ${JSON.stringify(record['version'])}, expected ${STAGE_LEDGER_VERSION}`;
-  const stages = record['stages'];
-  if (!Array.isArray(stages) || !stages.every(isLedgerEntry)) return 'field stages is missing or malformed';
-  return stages;
-}
-
-/** The ledger at `path`: none when missing, and none with a warning when it does not read. */
-export function readStageLedger(path: string): readonly StageLedgerEntry[] {
-  if (!existsSync(path)) return [];
-  let parsed: readonly StageLedgerEntry[] | string;
-  try {
-    parsed = parseLedger(readFileSync(path, 'utf8'));
-  } catch (error) {
-    parsed = messageOf(error);
-  }
-  if (typeof parsed !== 'string') return parsed;
-  activeOutput().warn(`⚠️  ${basename(path)} does not read (${parsed}); every finished stage's step is taken again.`);
-  return [];
-}
-
-/** Writes `entries` to the ledger at `path`, whole. */
-function writeStageLedger(path: string, entries: readonly StageLedgerEntry[]): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify({ version: STAGE_LEDGER_VERSION, stages: entries }, null, 2)}\n`, 'utf8');
-  renameSync(temporary, path);
-}
-
-/** Adds `added` to the ledger, each stage not already in it; a failed write is a warning. */
-export function addToLedger(trackerPath: string, added: readonly StageLedgerEntry[]): void {
-  if (added.length === 0) return;
-  const path = stageLedgerPathFor(trackerPath);
-  const entries = readStageLedger(path);
-  const fresh = added.filter((entry) => !entries.some((held) => sameStage(held, entry)));
-  try {
-    writeStageLedger(path, [...entries, ...fresh]);
-  } catch (error) {
-    activeOutput().warn(`⚠️  Could not write ${basename(path)} (${messageOf(error)}); the next run takes these stage steps again.`);
-  }
-}
-
-/** True when two entries name one stage: index and heading both. */
-function sameStage(a: DueStage, b: DueStage): boolean {
-  return a.stage === b.stage && a.name === b.name;
-}
-
-/** The stages of `trackerContent` holding tasks, every one ticked. */
-function completeStages(trackerContent: string): readonly DueStage[] {
-  const plan = parsePlan(trackerContent);
-  return plan.stages.flatMap((stage, index) => {
-    const tasks = plan.tasks.filter((task) => task.stage === index);
-    const complete = tasks.length > 0 && tasks.every((task) => task.status === 'done');
-    return complete
-      ? [{ stage: index, name: stage.name }]
-      : [];
-  });
-}
-
-/**
- * The stages a step is due for, in order: complete, not in `ledger`,
- * while an open task is left. See the module note.
- */
-export function dueStages(trackerContent: string, ledger: readonly StageLedgerEntry[]): readonly DueStage[] {
-  if (findNextTask(trackerContent) === null) return [];
-  return completeStages(trackerContent).filter((stage) => !ledger.some((entry) => sameStage(entry, stage)));
 }
 
 /** HEAD in the checkout, or null when git does not answer. */
@@ -612,7 +527,7 @@ function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: S
 }
 
 /** Appends `step` to the run record; a record that cannot be written is a warning. */
-function recordStep(seams: Required<SuiteStepSeams>, step: SessionStep): void {
+export function recordStep(seams: Required<SuiteStepSeams>, step: SessionStep): void {
   try {
     seams.appendStep(step);
   } catch (error) {
@@ -649,6 +564,13 @@ export interface Settling {
   readonly types?: TypeOutcome;
   /** What the step's newly red files read when run alone, once they were (`suite-retake-alone.ts`). */
   readonly alone?: AloneReading;
+  /**
+   * Set on a step that ran no suite: the step its caller recorded and
+   * printed before its diff checks ran, or null when it recorded none.
+   * {@link settleStep} then records and prints no run, and settles the
+   * diff checks alone. See the module note.
+   */
+  readonly recorded?: SessionStep | null;
 }
 
 /** The task step's diff checks `settling` carries, in the order their blockers are written. */
@@ -670,7 +592,11 @@ function checkBlockers(settling: Pick<Settling, 'lint' | 'types'>): readonly str
 
 /** Records an interrupted step and says the run stops on it, writing no blocker; see the module note. */
 function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
-  const { kind, label, result } = settling;
+  const { kind, label, result, recorded } = settling;
+  if (recorded !== undefined) {
+    activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as failures, so no task is marked blocked.`);
+    return { kind, step: recorded, red: false, interrupted: true, blocker: null, blockedLine: null, repairInserted: false };
+  }
   const step: SessionStep = { ...stepOf(settling, result, { fresh: [], outsideCase: false }), interrupted: true };
   recordStep(seams, step);
   activeOutput().info(`🧪 ${label}: ${result.command.join(' ')} exited ${result.exitCode}; ${result.summary ?? 'no summary line'}`);
@@ -678,14 +604,22 @@ function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling):
   return { kind, step, red: false, interrupted: true, blocker: null, blockedLine: null, repairInserted: false };
 }
 
+/** Records `settling`'s run with `verdict`, prints it, and answers the step recorded. */
+function recordRun(seams: Required<SuiteStepSeams>, settling: Settling, verdict: StepVerdict): SessionStep {
+  const step = stepOf(settling, settling.result, verdict, settling.alone?.stepOnly);
+  recordStep(seams, step);
+  announce(settling.label, settling.result, verdict.known);
+  return step;
+}
+
 /** Records, prints and, when red and `blocks`, writes the blocker; see the module note. */
 export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result, baseline, alone } = settling;
   if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settleInterrupted(seams, settling);
   const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
-  const step = stepOf(settling, result, verdict, alone?.stepOnly);
-  recordStep(seams, step);
-  announce(label, result, verdict.known);
+  const step = settling.recorded === undefined
+    ? recordRun(seams, settling, verdict)
+    : settling.recorded;
   announceStepOnly(context, settling);
   const checked = checkBlockers(settling);
   if (!isRed(verdict) && checked.length === 0) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };
@@ -749,9 +683,16 @@ export function runOne(context: SuiteStepContext, seams: Required<SuiteStepSeams
  * The baseline the run's steps are split against: the stored one, or a
  * full run recorded now, with its step, and the stages already complete
  * entered in the ledger; or, for a run that failed outside any test
- * case, that run unwritten and answered as halted. See the module note.
+ * case, that run unwritten and answered as halted; or none, with nothing
+ * run, read or recorded, when no check-point entry names a check. See
+ * the module note.
  */
 export async function ensureBaseline(context: SuiteStepContext): Promise<BaselineOutcome> {
+  const { checksTask, checksStage, checksLoop } = context.settings;
+  if ([checksTask, checksStage, checksLoop].every((entry) => entry.length === 0)) {
+    activeOutput().info('📏 No check-point entry names a check; no suite baseline is taken.');
+    return { baseline: null, step: null, interrupted: false, halted: false };
+  }
   const seams = seamsOf(context);
   const path = baselinePathFor(context.trackerPath);
   const reading = readBaseline(path);
@@ -785,55 +726,12 @@ export async function ensureBaseline(context: SuiteStepContext): Promise<Baselin
   return { baseline, step: outcome.step, interrupted: false, halted: false };
 }
 
-/** The runs a task step or a stage step's fallback makes: its own, and the paths of a second run over the always-run files, or none. */
+/** The runs a task, stage or pre-wrap-up step makes: its own, and the paths of a second run over the always-run files, or none. */
 export interface StepRuns {
   readonly narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>;
   readonly alwaysRun: readonly string[];
   /** The always-run files either run holds, whose times the step reads (`sweep-timing.ts`). */
   readonly timed: readonly string[];
-}
-
-/** The runs a task scope asks for, with the `tests.alwaysRun` files `alwaysRun` added; see the module note. */
-function taskNarrowing(scope: TaskStepScope, base: string, alwaysRun: readonly string[]): StepRuns {
-  if (scope.scope === 'full') return { narrowing: {}, alwaysRun: [], timed: [] };
-  if (scope.scope === 'module') return { narrowing: { paths: withAlwaysRun(scope.paths, alwaysRun) }, alwaysRun: [], timed: alwaysRun };
-  return { narrowing: { changedSince: base }, alwaysRun, timed: alwaysRun };
-}
-
-/**
- * The reason the run record holds for a task scope: the scope's own, or
- * `declared` for a `module` answer, which only a `tests=module` line
- * reaches; none for a diff that did not read. See the module note.
- */
-function taskStepReason(scope: TaskStepScope | null): SessionStepReason | undefined {
-  if (scope === null) return undefined;
-  return scope.scope === 'module'
-    ? 'declared'
-    : scope.reason;
-}
-
-/** The preload files, with a warning when `bunfig.toml` does not read. */
-function preloadOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>): readonly string[] {
-  const reading = seams.readPreloadFiles(context.checkout);
-  if (reading.state === 'unreadable') activeOutput().warn(`⚠️  bunfig.toml does not read (${reading.reason}); no preload file is a full-suite trigger.`);
-  return reading.files;
-}
-
-/** The task step's scope over `diff`, the task's own, or null when that did not read. */
-async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput, diff: readonly string[] | null): Promise<TaskStepScope | null> {
-  if (diff === null) return null;
-  const moduleLine = input.declared === 'module';
-  return taskStepScope({
-    declared: input.declared,
-    diff,
-    triggers: { globs: context.settings.testsFullSuiteTriggers, preload: preloadOf(context, seams) },
-    owns: moduleLine
-      ? await context.owns()
-      : null,
-    testFiles: moduleLine
-      ? seams.listTestFiles(context.checkout)
-      : [],
-  });
 }
 
 /**
@@ -842,7 +740,7 @@ async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepS
  * pre-wrap-up step, and the task step of a repair task, check their
  * files green alone against (`suite-retake-alone.ts`).
  */
-function planDiffReader(seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null, without: readonly string[] | null): () => readonly string[] | null {
+export function planDiffReader(seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null, without: readonly string[] | null): () => readonly string[] | null {
   const commit = baseline?.commit ?? null;
   return () => (commit === null
     ? without
@@ -850,7 +748,7 @@ function planDiffReader(seams: Required<SuiteStepSeams>, baseline: SuiteBaseline
 }
 
 /** Runs the step's own run, then its always-run run unless there is none or the first was a stop, folded into one result. */
-export async function runWithAlwaysRun(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: 'task' | 'stage', runs: StepRuns): Promise<SuiteResult> {
+export async function runWithAlwaysRun(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: RepairStepKind, runs: StepRuns): Promise<SuiteResult> {
   const first = await runOne(context, seams, kind, runs.narrowing);
   if (runs.alwaysRun.length === 0 || isStepInterrupted(context, first)) return first;
   const junitFile = alwaysRunJunitFileFor(context.repoRoot, context.sessionId, kind);
@@ -858,36 +756,70 @@ export async function runWithAlwaysRun(context: SuiteStepContext, seams: Require
   return foldResults(first, second, SIGINT_EXIT_CODE);
 }
 
-/** Runs the task step after a task commits; see the module note. */
-export async function runTaskStep(context: SuiteStepContext, input: TaskStepInput): Promise<StepOutcome> {
-  const seams = seamsOf(context);
-  const diff = readDiff(seams.git, input.base);
-  const scope = await taskScopeOf(context, seams, input, diff);
-  const runs = scope === null || scope.scope === 'full'
-    ? { narrowing: {}, alwaysRun: [], timed: [] }
-    : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
-  const recorded = scope?.scope ?? 'full';
-  const result = await runWithAlwaysRun(context, seams, 'task', runs);
-  const label = `task step after "${input.task}"`;
-  const checks = await taskDiffChecks(context, seams, input, result);
-  const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...checks };
-  const touched = isRepairTask(input.task)
-    ? planDiffReader(seams, input.baseline, diff)
-    : () => diff;
-  const outcome = settleStep(context, seams, await takeRetakes(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs), touched));
-  const timedIn = runs.alwaysRun.length > 0
-    ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
-    : junitFileFor(context.repoRoot, context.sessionId, 'task');
-  if (!outcome.interrupted) reportSlowSweeps(timedIn, runs.timed);
-  return outcome;
+/** The runs of a pre-wrap-up step that runs the whole project. */
+const FULL_RUNS: StepRuns = Object.freeze({ narrowing: {}, alwaysRun: [], timed: [] });
+
+/** What a pre-wrap-up step over a non-empty `checks.loop` runs and records, and how it reads the plan's diff for its files green alone. */
+interface LoopRun {
+  readonly runs: StepRuns;
+  readonly scope: SessionStep['scope'];
+  readonly reason: SessionStepReason | undefined;
+  readonly touched: () => readonly string[] | null;
 }
 
-/** Runs the full suite before the wrap-up; a red one writes its blocker on a pre-wrap-up repair. See the module note. */
+/**
+ * `checks.loop`'s run over the plan's diff from the baseline's commit:
+ * an entry naming `full` reads no diff, and with no commit or a diff git
+ * will not answer the whole project runs, with no reason. See the module note.
+ */
+async function loopRunOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null, names: readonly CheckName[]): Promise<LoopRun> {
+  const commit = baseline?.commit ?? null;
+  if (names.includes('full')) return { runs: FULL_RUNS, scope: 'full', reason: 'declared', touched: planDiffReader(seams, baseline, null) };
+  const diff = commit === null
+    ? null
+    : readDiff(seams.git, commit);
+  if (commit === null || diff === null) return { runs: FULL_RUNS, scope: 'full', reason: undefined, touched: () => diff };
+  const checks = await entryChecksOf(context, seams, names, diff);
+  const runs = checkRunsOf(checks, names.includes('related'), commit, () => readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun, 'pre-wrap-up'));
+  if (checks.kind !== 'paths') {
+    const scope = checks.kind === 'affected'
+      ? 'affected'
+      : 'full';
+    return { runs, scope, reason: checks.reason, touched: () => diff };
+  }
+  const reason = names.includes('unit')
+    ? 'unit'
+    : 'declared';
+  return { runs, scope: runs.narrowing.paths ?? checks.paths, reason, touched: () => diff };
+}
+
+/** What a pre-wrap-up step that blocked nothing answers, holding `step` or none. */
+function preWrapUpQuietly(step: SessionStep | null): StepOutcome {
+  return { kind: 'pre-wrap-up', step, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };
+}
+
+/**
+ * Runs what `checks.loop` names before the wrap-up, or records a `none`
+ * step for an empty entry; a red one writes its blocker on a pre-wrap-up
+ * repair. See the module note.
+ */
 export async function runPreWrapUpStep(context: SuiteStepContext, baseline: SuiteBaseline | null): Promise<StepOutcome> {
   const seams = seamsOf(context);
-  const result = await runOne(context, seams, 'pre-wrap-up', {});
-  const settling: Settling = { kind: 'pre-wrap-up', scope: 'full', label: 'pre-wrap-up step', result, baseline, repair: { kind: 'pre-wrap-up' } };
-  return settleStep(context, seams, await takeRetakes(context, seams, settling, () => runOne(context, seams, 'pre-wrap-up', {}), planDiffReader(seams, baseline, null)));
+  const names = context.settings.checksLoop;
+  if (names.length === 0) {
+    const step: SessionStep = { kind: 'pre-wrap-up', scope: 'none', reason: 'no-check', command: [], exitCode: 0, summary: null, failures: [], newFailures: [] };
+    recordStep(seams, step);
+    activeOutput().info('🧪 pre-wrap-up step: no check configured (checks.loop is empty); nothing ran.');
+    return preWrapUpQuietly(step);
+  }
+  const { runs, scope, reason, touched } = await loopRunOf(context, seams, baseline, names);
+  if (runs.narrowing.paths?.length === 0) {
+    activeOutput().info('🧪 pre-wrap-up step: no test file in the paths checks.loop names; nothing to run.');
+    return preWrapUpQuietly(null);
+  }
+  const result = await runWithAlwaysRun(context, seams, 'pre-wrap-up', runs);
+  const settling: Settling = { kind: 'pre-wrap-up', scope, reason, label: 'pre-wrap-up step', result, baseline, repair: { kind: 'pre-wrap-up' } };
+  return settleStep(context, seams, await takeRetakes(context, seams, settling, () => runWithAlwaysRun(context, seams, 'pre-wrap-up', runs), touched));
 }
 
 /** What {@link planOwnsReader} reads the folders with. */

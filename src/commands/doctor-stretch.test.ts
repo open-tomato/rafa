@@ -34,8 +34,6 @@ import type { StretchFolderSeams, StretchFs } from '../stretch/folder.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { Output } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

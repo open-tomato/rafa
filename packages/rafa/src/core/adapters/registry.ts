@@ -10,8 +10,8 @@
  * composition root `src/adapter-registry.ts` (see "What core
  * registers"). Enabling a module is phase 7's work; until then an
  * add-on reaches the registry through {@link AdapterRegistry.register},
- * which `src/modules/load.ts` calls for each module `allowList:` names
- * from a `path` source. `src/modules/activate.ts` hands the registry it
+ * which `packages/rafa/src/modules/load.ts` calls for each module `allowList:` names
+ * from a `path` source. `packages/rafa/src/modules/activate.ts` hands the registry it
  * answers to {@link restoreAdapters} for an invocation of the CLI, so
  * every caller below, resolving through {@link CORE_ADAPTER_REGISTRY},
  * finds a loaded module's kind.

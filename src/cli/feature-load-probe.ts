@@ -37,12 +37,12 @@ import { fileURLToPath } from 'node:url';
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { commandSpelling, isTopLevel } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activateModuleAdapters } from '@open-tomato/rafa/modules/activate';
+import { loadInvocationModules } from '@open-tomato/rafa/modules/load';
 
 import { registerCoreAdapters } from '../adapter-registry.js';
 import { BUNDLED_FEATURES, createRosterRegistry } from '../commands/index.js';
 import { registerCoreConfigSections } from '../config-registry.js';
-import { activateModuleAdapters } from '../modules/activate.js';
-import { loadInvocationModules } from '../modules/load.js';
 
 import { describeRegistry } from './describe.js';
 import { renderHelp } from './help.js';

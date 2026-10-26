@@ -50,11 +50,13 @@
 import type { CommandDeclaration } from '../wrap.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
+import { CREATE_DANGEROUS_PHRASES, registryRoster } from '@open-tomato/rafa-board';
+import { endingWith } from '@open-tomato/rafa-run';
+
+import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
+
 import plan from '../../plan.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
-
-import { CREATE_DANGEROUS_PHRASES, registryRoster } from './refs-check.js';
 
 const declaration: CommandDeclaration = {
   name: 'plan create',

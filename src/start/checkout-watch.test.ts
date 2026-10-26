@@ -24,9 +24,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { commitTaskWork } from '@open-tomato/rafa/core/git';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { CHECKOUT_MOVED } from './checkout-guard.js';
 import { advanceExpectation, expectWrapUpCommits, haltIfCheckoutMoved, haltIfWrapUpMoved, openCheckoutExpectation } from './checkout-watch.js';

@@ -120,7 +120,7 @@ const BUG_ARTIFACT_LINES: readonly string[] = [
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
 /** The project config: `local` issues, and `pr.provider: none` so the wrap-up's push costs no `gh`. */
-const CONFIG = 'pr:\n  provider: none\ntracker:\n  default: local\n';
+const CONFIG = 'pr:\n  provider: none\ntracker:\n  default: local\nchecks:\n  task: [affected]\n';
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {

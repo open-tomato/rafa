@@ -1,14 +1,14 @@
 /**
- * The registry: the fourteen sections of the config schema, handed to
+ * The registry: the fifteen sections of the config schema, handed to
  * core when {@link registerCoreConfigSections} is called, and the merged schema read off
  * them, {@link SETTINGS}, {@link CONFIG_DEFAULTS}, {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and {@link knownKeysAbove}.
  *
  * Core declares the section contract (`packages/rafa/src/core/config/section.ts`) and
  * names no section. This module, outside `packages/rafa/src/core/`, is the one place
- * the fourteen are listed, {@link CONFIG_SECTIONS}: core's own
- * (`CORE_SECTION`) and the thirteen files `src/config-schema-*.ts` that
- * each export one.
+ * the fifteen are listed, {@link CONFIG_SECTIONS}: core's own
+ * (`CORE_SECTION`) and the fourteen files `config-schema-*.ts` that
+ * each export one, under `src/` (ten) or, for four, under `packages/rafa/src/`.
  *
  * Importing it registers nothing. {@link registerCoreConfigSections}
  * calls `registerConfigSections` once, with that list cut into the runs
@@ -30,7 +30,11 @@
  * The call also sets core's load hook (`setConfigLoadHook` in
  * `packages/rafa/src/core/config/section.ts`) to {@link handConfigToLogger}, so every
  * config `loadConfig` resolves hands the logger its `logger` settings
- * without core importing the logger's section file.
+ * without core importing the logger's section file. It sets core's
+ * template hook too (`setConfigTemplateHook`, same file) to
+ * `templateEntry` from `src/config/templates.ts`, so the loader reads a
+ * template a file names by calling the active hook, and core imports no
+ * template file.
  *
  * ## The order
  *
@@ -48,7 +52,7 @@
  * in (`inSettingOrder`), each cut under its section's package and a
  * section's checks on its first cut, and core's registry holds every
  * setting in this order. Registering the list whole would put core's
- * forty-two first, and the warning recorded in
+ * forty-five first, and the warning recorded in
  * `src/tests/fixtures/config-parity/` would list `hub` after `task`.
  * `config-registry.test.ts` holds that the registry holds the same
  * settings, in the same order, as the same specs, and the same defaults,
@@ -68,7 +72,11 @@
  *
  * This module is the one place the six names are built: the core barrel
  * `packages/rafa/src/core/config/index.ts` exports none of them, and a file outside
- * `packages/rafa/src/core/` imports them from here. Core reads the registered
+ * `packages/rafa/src/core/` imports them from here. A feature file reads
+ * the whole {@link SETTINGS} or {@link CONFIG_DEFAULTS} record off the
+ * registration instead, through core's `registeredSettings()` and
+ * `registeredDefaults()`, so it imports nothing of the root.
+ * Core reads the registered
  * settings and defaults through `activeSettings()` and
  * `activeDefaults()`, and the key indexes through `activeSettingByKey()`,
  * `activeSectionPaths()` and `activeKnownKeysAbove()`, all in
@@ -86,30 +94,33 @@ import type {
   SettingSpec,
 } from '@open-tomato/rafa/core/config';
 
-import {
-  activeSettings,
-  CORE_SECTION,
-  registerConfigSections,
-  setConfigLoadHook,
-} from '@open-tomato/rafa/core/config';
-
-import { setActiveLoggerSettings } from './adapters/logger/settings.js';
-import {
-  BOARD_PROJECT_LIMIT_DEFAULTS,
-  BOARD_PROJECT_LIMIT_SETTINGS,
-  BOARD_PROJECT_SECTION,
-} from './config-schema-board-project.js';
-import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from './config-schema-bugs.js';
-import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from './config-schema-errors.js';
-import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from './config-schema-features.js';
-import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from './config-schema-hub.js';
-import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from './config-schema-issues.js';
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
+import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from '@open-tomato/rafa/config-schema-bugs';
+import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from '@open-tomato/rafa/config-schema-errors';
+import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from '@open-tomato/rafa/config-schema-features';
 import {
   LOGGER_DEFAULTS,
   LOGGER_SECTION,
   LOGGER_SETTINGS,
   loggerSettingsOf,
-} from './config-schema-logger.js';
+} from '@open-tomato/rafa/config-schema-logger';
+import {
+  activeSettings,
+  CORE_SECTION,
+  registerConfigSections,
+  setConfigLoadHook,
+  setConfigTemplateHook,
+} from '@open-tomato/rafa/core/config';
+
+import { templateEntry } from './config/templates.js';
+import {
+  BOARD_PROJECT_LIMIT_DEFAULTS,
+  BOARD_PROJECT_LIMIT_SETTINGS,
+  BOARD_PROJECT_SECTION,
+} from './config-schema-board-project.js';
+import { CHECKS_DEFAULTS, CHECKS_SECTION, CHECKS_SETTINGS } from './config-schema-checks.js';
+import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from './config-schema-hub.js';
+import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from './config-schema-issues.js';
 import {
   LOOP_CONTINUE_DEFAULTS,
   LOOP_CONTINUE_SECTION,
@@ -133,7 +144,7 @@ import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-t
 import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from './config-schema-triage.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
 
-/** The fourteen sections, core's first, in the order they are registered. */
+/** The fifteen sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   CORE_SECTION,
   HUB_SECTION,
@@ -148,6 +159,7 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   LOGGER_SECTION,
   ISSUES_SECTION,
   TESTS_SECTION,
+  CHECKS_SECTION,
   FEATURES_SECTION,
 ]);
 
@@ -206,7 +218,7 @@ const CORE_CLEANUP = [
   'dangerousAcceptStaleRefs',
 ] as const;
 
-/** Core's settings from the second consent to `task.lessons`, before `tests`. */
+/** Core's settings from the second consent to `templates`, before `tests`. */
 const CORE_TAIL = [
   'dangerousSelfUpdateDuringLoop',
   'statusNotice',
@@ -218,6 +230,7 @@ const CORE_TAIL = [
   'taskLessons',
   'mergeDuplicates',
   'namingBranch',
+  'templates',
 ] as const;
 
 /**
@@ -259,6 +272,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...DANGEROUS_RELEASE_DEFAULTS,
   ...run(CORE_VALUES, CORE_TAIL),
   ...TESTS_DEFAULTS,
+  ...CHECKS_DEFAULTS,
   ...FEATURES_DEFAULTS,
 });
 
@@ -289,6 +303,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = Objec
   ...DANGEROUS_RELEASE_SETTINGS,
   ...run(CORE_SPECS, CORE_TAIL),
   ...TESTS_SETTINGS,
+  ...CHECKS_SETTINGS,
   ...FEATURES_SETTINGS,
 });
 
@@ -342,20 +357,22 @@ function holdsCoreSections(): boolean {
 
 /**
  * Registers {@link CONFIG_SECTIONS} with core, cut into the runs
- * {@link SETTINGS} holds them in, and sets core's load hook to
- * {@link handConfigToLogger}.
+ * {@link SETTINGS} holds them in, sets core's load hook to
+ * {@link handConfigToLogger}, and sets core's template hook to
+ * `templateEntry` (`src/config/templates.ts`).
  *
  * When core's registry holds every setting already, each as the same
- * spec, it registers nothing and leaves the load hook as it is, so the
+ * spec, it registers nothing and leaves both hooks as they are, so the
  * preload and an entry may both call it in one process. Throws what
  * `registerConfigSections` throws on a section core refuses, such as a
  * setting another package registered first, leaving the registry and
- * the load hook as they were.
+ * both hooks as they were.
  */
 export function registerCoreConfigSections(): void {
   if (holdsCoreSections()) return;
   registerConfigSections(inSettingOrder(CONFIG_SECTIONS, SETTING_NAMES));
   setConfigLoadHook(handConfigToLogger);
+  setConfigTemplateHook(templateEntry);
 }
 
 /** Setting names by the dotted key the file spells them with. */

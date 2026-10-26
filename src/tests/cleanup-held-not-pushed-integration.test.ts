@@ -16,8 +16,6 @@ import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CleanupCommandSeams } from '../commands/cleanup.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 
-import '../adapter-registry.js';
-
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 

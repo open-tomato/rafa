@@ -10,8 +10,6 @@ import type { CapturedRun, ScratchRepo } from '../../tests/cli-capture.js';
 import type { SqliteMigration } from '@open-tomato/rafa/store/migrations';
 import type { SchemaReport } from '@open-tomato/rafa/store/schema-report';
 
-import '../../adapter-registry.js';
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

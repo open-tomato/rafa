@@ -1,6 +1,6 @@
 /**
  * The ESLint run in the runner's task step (`runTaskStep`,
- * `suite-step.ts`): `bunx eslint --no-warn-ignored` over every file the
+ * `suite-task-step.ts`): `bunx eslint --no-warn-ignored` over every file the
  * task changed since its base commit, read as red on a nonzero exit.
  *
  * ## Why the step lints

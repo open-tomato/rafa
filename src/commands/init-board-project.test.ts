@@ -35,8 +35,6 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { FakeFactsIssue } from '../board/project/facts-fake.js';
 import type { FakeProjectField, FakeProjectGh } from '../board/project/project-fake.js';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

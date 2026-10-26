@@ -28,12 +28,12 @@
  *
  * Both functions are pure; redacting the text they keep is the caller's.
  */
-import type { TitleValues } from './title.js';
+import type { TitleValues } from '@open-tomato/rafa/bugs/title';
+
+import { ACTION_SHAPE, MODULE_SHAPE, titleRoundTrips, UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 
 import { GITHUB_LABEL_MAX_LENGTH, GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { oneLine } from '../triage/bug-key.js';
-
-import { ACTION_SHAPE, MODULE_SHAPE, titleRoundTrips, UNKNOWN_VALUE } from './title.js';
 
 /** The two fields the boundary rule reads. */
 export type BoundaryField = 'module' | 'action';

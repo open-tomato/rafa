@@ -30,17 +30,17 @@ import type { EpicsResult } from './show.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicProblem } from '../../board/epic-problems.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { Place } from '../../project/position.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
-
-import '../../adapter-registry.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
+
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { typeOfLabels } from '../../adapters/tracker/github.js';
 import { BOARDS_LIST_ARGS } from '../../board/boards.js';
@@ -49,7 +49,6 @@ import { readEpics } from '../../board/epics.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { unweighedPositionNotice } from '../../board/roadmap-rows.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
-import { positionAt, writePositionFile } from '../../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 

@@ -13,17 +13,16 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { Logger } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { activeLogger, setActiveLogger } from '../adapters/logger/active.js';
-import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { requireProject, resolveProjectConfig } from '../commands/plan/plan-files.js';
+import { activeLogger, setActiveLogger } from '@open-tomato/rafa/adapters/logger/active';
+import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
+import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 

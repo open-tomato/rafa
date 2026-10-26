@@ -61,8 +61,6 @@ import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/l
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

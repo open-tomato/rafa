@@ -1,8 +1,9 @@
 /**
  * The roster's identity: each module `src/commands/index.ts` imports by
- * name default-exports the very object `CORE_COMMANDS` holds, each
- * feature and each feature subject it imports by name is the one
- * `BUNDLED_FEATURES` and `ROSTER_SUBJECTS` hold, and `rafa describe`
+ * name default-exports the very object `CORE_COMMANDS` holds, as does
+ * the one it takes from a feature package's facade under an alias, each
+ * feature and each feature subject it imports by name from a facade is
+ * the one `BUNDLED_FEATURES` and `ROSTER_SUBJECTS` hold, and `rafa describe`
  * lists the subjects of `ROSTER_SUBJECTS` in its order and the command
  * names it listed at `origin/stretch/102`, with `docs plan` registered
  * since after `bug codes`, `config show` since after `config set`,
@@ -28,7 +29,10 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..');
 const DEFAULT_IMPORT = /^import (\w+) from '(\.\/[^']+)\.js';$/gm;
-const NAMED_IMPORT = /^import \{ (\w+) \} from '(\.\/[^']+\/(?:declarations|index))\.js';$/gm;
+/** A feature package's facade import, its bindings on one line, as `board`'s features and subjects come (#808). */
+const FACADE_IMPORT = /^import \{ ([\w, ]+) \} from '(@open-tomato\/rafa-[a-z]+)';$/gm;
+/** One binding of a facade import taken under an alias, as `command as switchCommand` comes from run's facade. */
+const ALIASED_BINDING = /^(\w+) as (\w+)$/;
 
 /** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan`, `config show`, `release list`, `release publish`, `release workflows`, `release fragment` and `bug recheck` added: `<subject> <action>`, then top-level names. */
 const BASE_NAMES: readonly string[] = [
@@ -153,10 +157,17 @@ describe('the commands roster', () => {
   it('holds, for each module it imports, the object that module default-exports', async () => {
     // Arrange
     const source = readFileSync(resolve(HERE, 'index.ts'), 'utf8');
-    const imports = [...source.matchAll(DEFAULT_IMPORT)].map((match) => ({ local: match[1], path: match[2] }));
+    const imports = [
+      ...[...source.matchAll(DEFAULT_IMPORT)].map((match) => ({ name: 'default', path: `${match[2] ?? ''}.js` })),
+      ...[...source.matchAll(FACADE_IMPORT)].flatMap((match) => (match[1] ?? '')
+        .split(', ')
+        .map((binding) => ALIASED_BINDING.exec(binding)?.[1])
+        .filter((name) => name !== undefined)
+        .map((name) => ({ name, path: match[2] ?? '' }))),
+    ];
 
     // Act
-    const modules = await Promise.all(imports.map(async ({ path }) => (await import(`${path}.js`)).default as unknown));
+    const modules = await Promise.all(imports.map(async ({ name, path }) => (await import(path) as Record<string, unknown>)[name]));
 
     // Assert
     expect(imports.length).toBeGreaterThan(60);
@@ -170,11 +181,14 @@ describe('the commands roster', () => {
   it('holds, for each feature and feature subject it imports by name, the object BUNDLED_FEATURES or ROSTER_SUBJECTS holds', async () => {
     // Arrange
     const source = readFileSync(resolve(HERE, 'index.ts'), 'utf8');
-    const imports = [...source.matchAll(NAMED_IMPORT)].map((match) => ({ local: match[1] ?? '', path: match[2] ?? '' }));
+    const imports = [...source.matchAll(FACADE_IMPORT)].flatMap((match) => (match[1] ?? '')
+      .split(', ')
+      .filter((local) => /_(?:FEATURE|SUBJECT)$/.test(local))
+      .map((local) => ({ local, specifier: match[2] ?? '' })));
     const held: readonly unknown[] = [...BUNDLED_FEATURES, ...ROSTER_SUBJECTS];
 
     // Act
-    const values = await Promise.all(imports.map(async ({ local, path }) => (await import(`${path}.js`) as Record<string, unknown>)[local]));
+    const values = await Promise.all(imports.map(async ({ local, specifier }) => (await import(specifier) as Record<string, unknown>)[local]));
 
     // Assert
     expect(imports.map(({ local }) => local).filter((local) => local.endsWith('_FEATURE'))).toHaveLength(BUNDLED_FEATURES.length);

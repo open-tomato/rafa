@@ -7,7 +7,7 @@
  * `context/source.md`; the command still owns every other field of its
  * `RafaCommand`, and this module holds the text alone.
  */
-import { PROBE_TIMEOUT_MS } from '../preflight/run.js';
+import { PROBE_TIMEOUT_MS } from '@open-tomato/rafa-run';
 
 /** What `rafa doctor` checks, reads and prints, and when it exits 1. */
 export const DOCTOR_DESCRIPTION: string = 'Checks the prerequisites `rafa loop start` checks before its first session and prints each'

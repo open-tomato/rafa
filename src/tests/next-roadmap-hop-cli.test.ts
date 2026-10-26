@@ -37,8 +37,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { positionFilePath } from '@open-tomato/rafa/project/position';
+
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
