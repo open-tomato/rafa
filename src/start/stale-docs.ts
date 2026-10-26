@@ -100,30 +100,28 @@ import type { StaleDocsWriteResult } from '@open-tomato/rafa/store/stale-docs';
 import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 import type { StaleDocEntry } from '@open-tomato/rafa/triage/stale-doc-line';
 import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board';
-import type { GitRunner, StaleDocTickResult } from '@open-tomato/rafa-pr';
-import type { FoldFragment, SettleForecast } from '@open-tomato/rafa-release';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+import type { FoldFragment, SettleForecast, StaleDocTickResult } from '@open-tomato/rafa-release';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve as resolvePath } from 'node:path';
 
 import { resolveTracker } from '@open-tomato/rafa-board';
+import { createGitRunner } from '@open-tomato/rafa-pr';
 import {
   DOC_UPDATE_TITLE,
-  addStaleDocLine,
-  createGitRunner,
-  docUpdateLineText,
-  staleDocsVersion,
-  tickStaleDocLine,
-} from '@open-tomato/rafa-pr';
-import {
   RELEASE_BASE_BRANCH,
   RELEASE_REMOTE,
+  addStaleDocLine,
+  docUpdateLineText,
   forecastSettle,
   readFragmentTree,
   readManifestVersion,
   releaseStrategyFor,
   resolveReleaseEnabled,
+  staleDocsVersion,
+  tickStaleDocLine,
   versionAt,
 } from '@open-tomato/rafa-release';
 

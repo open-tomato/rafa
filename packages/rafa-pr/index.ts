@@ -68,22 +68,6 @@ export {
   openPrContext,
 } from '../../src/commands/pr/pr-context.js';
 
-export type {
-  OpenLinesTracker,
-  OpenStaleDocLine,
-} from '../../src/docs/open-lines.js';
-export { readOpenStaleDocLines } from '../../src/docs/open-lines.js';
-
-export type { StaleDocTickResult } from '../../src/docs/release-issue.js';
-export {
-  DOC_UPDATE_TASK_PREFIX,
-  DOC_UPDATE_TITLE,
-  addStaleDocLine,
-  docUpdateLineText,
-  staleDocsVersion,
-  tickStaleDocLine,
-} from '../../src/docs/release-issue.js';
-
 export type { DocTaskInputOptions } from '../../src/docs/task-reading.js';
 export {
   readDocTaskInput,

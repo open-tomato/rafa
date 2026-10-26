@@ -946,7 +946,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/docs/plan.js', [
     ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'resolveTracker']],
-    ['@open-tomato/rafa-pr', ['DOC_UPDATE_TASK_PREFIX', 'DOC_UPDATE_TITLE', 'readOpenStaleDocLines']],
+    ['@open-tomato/rafa-release', ['DOC_UPDATE_TASK_PREFIX', 'DOC_UPDATE_TITLE', 'readOpenStaleDocLines']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],

@@ -79,7 +79,9 @@ interface RewiredRow {
  * in the fourth decouple item: its one release import by path was
  * `directoryPrefix` and `fragmentIdOf`, which it takes from
  * `@open-tomato/rafa/release/fragment` now. `src/docs/release-issue.ts`
- * stays, for `SettleForecast` and `nextVersion`.
+ * stayed, for `SettleForecast` and `nextVersion`, until the sixth decouple
+ * item placed it in release by name, so its imports are inside release
+ * and the row is empty.
  * Pr's 13 load-cycle files are claims, cleanup, next, start and release files
  * pr's files reach, three of them release files that are back edges the
  * load-cycle group takes first. `packages/rafa/src/claims/git.ts`,
@@ -111,8 +113,11 @@ interface RewiredRow {
  * `MergedPullRequest` of `packages/rafa/src/pr/types.ts`, which the item's
  * core move list took into core. `src/release/settle-pr.ts` left it in
  * the same item: its one pr import by path was the pr barrel, for the port
- * types it takes from `@open-tomato/rafa/pr/types` now. So the row keeps 8
- * load-cycle and 2 back-edge files.
+ * types it takes from `@open-tomato/rafa/pr/types` now.
+ * `src/commands/release/status-stale-docs.ts` left it in the same item:
+ * its one pr import by path was `src/docs/open-lines.ts`, which the item
+ * placed in release by name. So the row keeps 8 load-cycle files and 1
+ * back-edge file.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -158,9 +163,7 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-board',
   },
   {
-    allowed: {
-      'src/docs/release-issue.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-release',
   },
   {
@@ -168,7 +171,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/claims/lost.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
       'src/commands/release/settle.ts': 'backEdge',
-      'src/commands/release/status-stale-docs.ts': 'backEdge',
       'src/next/hint.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/readings.ts': 'loadCycle',

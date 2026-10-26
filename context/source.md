@@ -444,7 +444,7 @@ on the import graph that the function cannot move there. A function that is
 pure, or that reaches nothing past core, moves into core instead. The four
 entries are board's calls, each into a higher package:
 
-- `addStaleDocLine`, pr's, in `src/docs/release-issue.ts` (reach 6 at
+- `addStaleDocLine`, release's, in `src/docs/release-issue.ts` (reach 6 at
   aec5e4a, the figure the registry records; a second method read 95, so the
   figure is unsettled and was not re-measured), for `rafa epic close`, which
   adds a line to the release's stale-docs issue, whose module reads the

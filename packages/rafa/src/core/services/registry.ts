@@ -6,10 +6,10 @@
  * ## Why it exists
  *
  * A package may not import a package that moves after it. Board moves
- * before run and pr, and four of its commands call a function of theirs
- * that reaches too far into its package to move into core. Each such
- * function is a key of {@link RafaServices}; board calls it through
- * {@link activeServices}, and the composition root
+ * before run, pr and release, and four of its commands call a function
+ * of theirs that reaches too far into its package to move into core.
+ * Each such function is a key of {@link RafaServices}; board calls it
+ * through {@link activeServices}, and the composition root
  * `src/service-registry.ts`, outside `packages/rafa/src/core/`, imports
  * the real function from the higher package's facade and registers it.
  * This module is the registry in the form of the adapter registry
@@ -76,7 +76,7 @@ const COMPOSITION_ROOT = 'src/service-registry.ts';
  * Each member is a property signature, as every port function is.
  */
 export interface RafaServices {
-  /** pr's `addStaleDocLine`, for `rafa epic close`. */
+  /** release's `addStaleDocLine`, for `rafa epic close`. */
   readonly addStaleDocLine: AddStaleDocLineService;
   /** run's `endWithNextStep`, for `rafa issue ready`. */
   readonly endWithNextStep: EndWithNextStepService;
@@ -91,7 +91,7 @@ export interface ServiceReason {
   /** The package whose command calls the service. */
   readonly lower: 'board';
   /** The package the function lives in. */
-  readonly higher: 'pr' | 'run';
+  readonly higher: 'pr' | 'release' | 'run';
   /** The function's file, repository-relative, as it stood at aec5e4a. */
   readonly home: string;
   /** The files outside `packages/rafa/` the home reaches on the import graph; see the module note. */
@@ -104,7 +104,7 @@ export interface ServiceReason {
 export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReason } = Object.freeze({
   addStaleDocLine: Object.freeze<ServiceReason>({
     lower: 'board',
-    higher: 'pr',
+    higher: 'release',
     home: 'src/docs/release-issue.ts',
     reach: 6,
     why: 'rafa epic close adds a docs-only criterion to the stale-docs issue, whose module reads the release version'

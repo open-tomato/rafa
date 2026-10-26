@@ -1,17 +1,17 @@
 /**
  * The composition root of the service registry: the four functions of
- * run and pr that board's commands call, listed here and handed to core
- * when {@link registerCoreServices} is called.
+ * run, pr and release that board's commands call, listed here and handed
+ * to core when {@link registerCoreServices} is called.
  *
  * Core declares the registry (`packages/rafa/src/core/services/registry.ts`)
- * and imports no service: each function sits in run or pr, above board,
- * and reaches too far into its package to move into core, so board
+ * and imports no service: each function sits in run, pr or release, above
+ * board, and reaches too far into its package to move into core, so board
  * calling it directly would be an edge into a package that moves after
  * it. This module, outside `packages/rafa/src/core/`, is the one place
  * they are listed, {@link CORE_SERVICES}, each taken from its package's
- * facade (`@open-tomato/rafa-run` and `@open-tomato/rafa-pr`) as
- * `src/adapter-registry.ts` takes core's adapters from theirs. Each key's
- * reason is `SERVICE_REASONS`, in core.
+ * facade (`@open-tomato/rafa-run`, `@open-tomato/rafa-pr` and
+ * `@open-tomato/rafa-release`) as `src/adapter-registry.ts` takes core's
+ * adapters from theirs. Each key's reason is `SERVICE_REASONS`, in core.
  *
  * Importing it registers nothing. {@link registerCoreServices} calls
  * `registerServices` with that set, so every member of `activeServices()`
@@ -44,14 +44,15 @@
  */
 import type { RafaServices } from '@open-tomato/rafa/core/services';
 
-import { addStaleDocLine, triageReport } from '@open-tomato/rafa-pr';
+import { triageReport } from '@open-tomato/rafa-pr';
+import { addStaleDocLine } from '@open-tomato/rafa-release';
 import { endWithNextStep, readStaleDocsVersion } from '@open-tomato/rafa-run';
 
 import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 
 /**
  * The services core registers, keys sorted as `SERVICE_REASONS` sorts
- * them: pr's `addStaleDocLine`, run's `endWithNextStep`, run's
+ * them: release's `addStaleDocLine`, run's `endWithNextStep`, run's
  * `readStaleDocsVersion` and pr's `triageReport`.
  * {@link registerCoreServices} hands them to core.
  */

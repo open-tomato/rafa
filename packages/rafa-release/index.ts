@@ -30,6 +30,19 @@ export {
   waitingSettingsOf,
 } from '../../src/commands/release/status-fragments.js';
 
+export type { OpenStaleDocLine } from '../../src/docs/open-lines.js';
+export { readOpenStaleDocLines } from '../../src/docs/open-lines.js';
+
+export type { StaleDocTickResult } from '../../src/docs/release-issue.js';
+export {
+  DOC_UPDATE_TASK_PREFIX,
+  DOC_UPDATE_TITLE,
+  addStaleDocLine,
+  docUpdateLineText,
+  staleDocsVersion,
+  tickStaleDocLine,
+} from '../../src/docs/release-issue.js';
+
 export type { EpicEndRelease } from '../../src/next/epic-end.js';
 export {
   epicEndLines,

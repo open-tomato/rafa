@@ -221,10 +221,10 @@ describe('SERVICE_REASONS', () => {
     expect(Object.keys(SERVICE_REASONS)).toEqual(KEYS);
   });
 
-  it('names board as lower, run or pr as higher, a home under src/ and a reach above zero for every key', () => {
+  it('names board as lower, run, pr or release as higher, a home under src/ and a reach above zero for every key', () => {
     for (const [key, reason] of Object.entries(SERVICE_REASONS)) {
       expect([key, reason.lower]).toEqual([key, 'board']);
-      expect([key, ['run', 'pr'].includes(reason.higher)]).toEqual([key, true]);
+      expect([key, ['run', 'pr', 'release'].includes(reason.higher)]).toEqual([key, true]);
       expect([key, reason.home.startsWith('src/')]).toEqual([key, true]);
       expect([key, existsSync(resolve(ROOT, reason.home))]).toEqual([key, true]);
       expect([key, reason.reach > 0]).toEqual([key, true]);
