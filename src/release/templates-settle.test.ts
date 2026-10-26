@@ -88,7 +88,7 @@ describe('the shipped settle workflow', () => {
   });
 
   it('checks the pushed branch out with full history, and sets up bun from package.json', () => {
-    expect(at(stepNamed('Checkout'), ['uses'])).toBe('actions/checkout@v4');
+    expect(at(stepNamed('Checkout'), ['uses'])).toBe('actions/checkout@v7');
     expect(at(stepNamed('Checkout'), ['with'])).toEqual({ 'ref': '${{ github.ref_name }}', 'fetch-depth': 0 });
     expect(at(stepNamed('Set up bun'), ['uses'])).toBe('oven-sh/setup-bun@v2');
     expect(at(stepNamed('Set up bun'), ['with', 'bun-version-file'])).toBe('package.json');

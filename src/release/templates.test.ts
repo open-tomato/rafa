@@ -87,7 +87,7 @@ describe('the shipped publish workflow', () => {
   it('checks out the ref or the pushed tag, and sets up bun from package.json and node 24 for the registry', () => {
     const steps = publishSteps();
 
-    expect(at(stepNamed(steps, 'Checkout'), ['uses'])).toBe('actions/checkout@v4');
+    expect(at(stepNamed(steps, 'Checkout'), ['uses'])).toBe('actions/checkout@v7');
     expect(at(stepNamed(steps, 'Checkout'), ['with', 'ref'])).toBe('${{ inputs.ref || github.ref }}');
     expect(at(stepNamed(steps, 'Set up bun'), ['uses'])).toBe('oven-sh/setup-bun@v2');
     expect(at(stepNamed(steps, 'Set up bun'), ['with', 'bun-version-file'])).toBe('package.json');

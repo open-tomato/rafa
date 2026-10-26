@@ -167,13 +167,13 @@ describe('the shipped bot fragment workflow', () => {
   });
 
   it('checks the base out under base/ and the head branch under head/ with credentials, both with full history', () => {
-    expect(at(stepNamed('Checkout the base'), ['uses'])).toBe('actions/checkout@v4');
+    expect(at(stepNamed('Checkout the base'), ['uses'])).toBe('actions/checkout@v7');
     expect(at(stepNamed('Checkout the base'), ['with'])).toEqual({
       'ref': '${{ github.event.pull_request.base.ref }}',
       'path': 'base',
       'fetch-depth': 0,
     });
-    expect(at(stepNamed('Checkout the head'), ['uses'])).toBe('actions/checkout@v4');
+    expect(at(stepNamed('Checkout the head'), ['uses'])).toBe('actions/checkout@v7');
     expect(at(stepNamed('Checkout the head'), ['with'])).toEqual({
       'ref': '${{ github.event.pull_request.head.ref }}',
       'path': 'head',
