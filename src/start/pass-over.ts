@@ -55,11 +55,10 @@
  * and a defer whose task it waits on is done.
  */
 import type { ContinueDecision } from './decision-parse.js';
-import type { TaskInfo, TrackerTask } from '../utils/tracker.js';
+import type { TaskInfo, TrackerTask } from '@open-tomato/rafa/utils/tracker';
 
 import { stripTaskDeclaration , splitBlockerComment } from '@open-tomato/rafa/core/plan';
-
-import { listOpenTasks, listTrackerTasks } from '../utils/tracker.js';
+import { listOpenTasks, listTrackerTasks } from '@open-tomato/rafa/utils/tracker';
 
 /** A task as an entry names it: its identity and the line it was last read at. */
 export interface TaskRef {

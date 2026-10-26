@@ -353,6 +353,7 @@ import { homedir } from 'node:os';
 import { basename, join } from 'path';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { trackerPathFor } from '@open-tomato/rafa/core/plan';
@@ -360,6 +361,7 @@ import { effortStoreDir } from '@open-tomato/rafa/store/location';
 import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '@open-tomato/rafa/store/schema-report';
 import { SQLITE_STORE_FILE_NAME } from '@open-tomato/rafa/store/sqlite';
+import { listOpenTasks } from '@open-tomato/rafa/utils/tracker';
 
 import {
   collidingPlanSkills,
@@ -370,7 +372,6 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../agents/roster.js';
-import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
@@ -381,7 +382,6 @@ import {
   prerequisitesPathForPlan,
 } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
-import { listOpenTasks } from '../utils/tracker.js';
 
 import { markInDevelopment, refuseUnownedClaim } from './preflight-claim.js';
 import { reportStartDrift } from './preflight-drift.js';
@@ -517,11 +517,12 @@ function refuseUnresolvableAgents(options: StartPreflightOptions): void {
   if (markdown === null) return;
 
   const agents = options.agents ?? {};
+  const defaults = registeredDefaults();
   const settings: TierSettings = {
-    settingSources: agents.settingSources ?? CONFIG_DEFAULTS.settingSources,
-    tiersRafa: agents.tiersRafa ?? CONFIG_DEFAULTS.tiersRafa,
-    tiersSkills: agents.tiersSkills ?? CONFIG_DEFAULTS.tiersSkills,
-    tiersAgents: agents.tiersAgents ?? CONFIG_DEFAULTS.tiersAgents,
+    settingSources: agents.settingSources ?? defaults.settingSources,
+    tiersRafa: agents.tiersRafa ?? defaults.tiersRafa,
+    tiersSkills: agents.tiersSkills ?? defaults.tiersSkills,
+    tiersAgents: agents.tiersAgents ?? defaults.tiersAgents,
   };
   const roots = {
     repoRoot: options.repoRoot,

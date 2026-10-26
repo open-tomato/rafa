@@ -24,9 +24,9 @@
  * `rafa doctor: effort sync: <problem>`, the row's name said once since
  * the reading's `problem` comes without it.
  */
-import type { DoctorEffortSyncReading } from '../effort/sync/doctor-reading.js';
+import type { DoctorEffortSyncReading } from '@open-tomato/rafa-effort';
 
-import { EFFORT_SYNC_ROW } from '../effort/sync/doctor-reading.js';
+import { EFFORT_SYNC_ROW } from '@open-tomato/rafa-effort';
 
 /** The lines text mode writes for the row; see the module note. */
 export function renderDoctorEffortSync(reading: DoctorEffortSyncReading): readonly string[] {

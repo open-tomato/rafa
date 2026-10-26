@@ -3,10 +3,13 @@
  *
  * The rows are read off a real `loadConfig` over scratch scopes: a
  * project holding `rafa.config.ts` beside `.rafa/config.yaml`, the
- * module file setting an unknown key and `dangerous.selfUpdateDuringLoop`.
- * Each reading has its control: a clean config writes nothing, a
- * dangerous key spelled at its default writes no note, and json mode
- * writes no note and passes each line on as a warning. That a YAML
+ * module file setting an unknown key, `pr.base` and
+ * `dangerous.selfUpdateDuringLoop`, the YAML file `pr.base` over it.
+ * Both files are read, so neither is a row: the YAML file is the local
+ * layer over the module file, not a file it shadows. Each reading has
+ * its control: a clean config writes nothing, a dangerous key spelled at
+ * its default writes no note, and json mode writes no note and passes
+ * each line on as a warning. That a YAML
  * project reads `doctor` as before is `src/tests/config-parity.test.ts`'s.
  * The registry is the one `src/config-registry.ts` registers on import.
  */
@@ -89,21 +92,22 @@ function unknownKeyWarning(resolved: ResolvedConfig, file: string): string {
 }
 
 /** A module file exporting one entry. */
-const MODULE = 'export default { nonesuch: 1, dangerous: { selfUpdateDuringLoop: true } };\n';
+const MODULE = 'export default { nonesuch: 1, pr: { base: \'ts-base\' }, dangerous: { selfUpdateDuringLoop: true } };\n';
+
+/** A YAML file setting the one key {@link MODULE} sets that it also sets. */
+const YAML = 'pr:\n  base: yaml-base\n';
 
 describe('loadDoctorConfig in text mode', () => {
-  it('writes the shadowed file and the unknown key as warn rows, and the dangerous pass as a note', async () => {
-    const scratch = project({ ts: MODULE, yaml: 'store: ndjson\n' });
+  it('writes the unknown key as a warn row and the dangerous pass as a note, and no row for the YAML file over the module file', async () => {
+    const scratch = project({ ts: MODULE, yaml: YAML });
 
     const { resolved, info, warn } = await run(scratch);
 
-    expect(resolved.config.dangerousSelfUpdateDuringLoop).toBe(true);
-    expect(resolved.shadowed).toEqual([{ layer: 'project', path: scratch.yaml, by: scratch.ts }]);
-    expect(warn).toEqual([
-      `rafa config: ${scratch.yaml} is not read: ${scratch.ts} holds the project scope's config, `
-        + 'so move its keys into rafa.config.ts and remove it',
-      unknownKeyWarning(resolved, scratch.ts),
-    ]);
+    expect([resolved.config.prBase, resolved.sources.prBase, resolved.provenance.prBase])
+      .toEqual(['yaml-base', 'local', { file: scratch.yaml, entry: 0 }]);
+    expect([resolved.config.dangerousSelfUpdateDuringLoop, resolved.sources.dangerousSelfUpdateDuringLoop])
+      .toEqual([true, 'file']);
+    expect(warn).toEqual([unknownKeyWarning(resolved, scratch.ts)]);
     expect(info).toEqual([
       CONFIG_ROWS_TITLE,
       `  note  dangerous.selfUpdateDuringLoop: true (${scratch.ts}, entry 0)`,
@@ -116,11 +120,11 @@ describe('loadDoctorConfig in text mode', () => {
     expect([info, warn]).toEqual([[], []]);
   });
 
-  it('writes no note for a dangerous key spelled at its default, nor a shadow row for a YAML file alone', async () => {
+  it('writes no note for a dangerous key a YAML file spells at its default', async () => {
     const atDefault = CONFIG_DEFAULTS.dangerousSelfUpdateDuringLoop;
     const { resolved, info, warn } = await run(project({ yaml: `dangerous:\n  selfUpdateDuringLoop: ${String(atDefault)}\n` }));
 
-    expect(resolved.sources.dangerousSelfUpdateDuringLoop).toBe('file');
+    expect(resolved.sources.dangerousSelfUpdateDuringLoop).toBe('local');
     expect([info, warn]).toEqual([[], []]);
   });
 
@@ -138,14 +142,12 @@ describe('loadDoctorConfig in text mode', () => {
 
 describe('loadDoctorConfig in json mode', () => {
   it('writes no note and passes each line the load wrote on as a warning', async () => {
-    const scratch = project({ ts: MODULE, yaml: 'store: ndjson\n' });
+    const scratch = project({ ts: MODULE, yaml: YAML });
 
     const { resolved, info, warn } = await run(scratch, 'json');
 
     expect(info).toEqual([]);
     expect(warn).toEqual([
-      `rafa config: ${scratch.yaml} is not read: ${scratch.ts} holds the project scope's config, `
-        + 'so move its keys into rafa.config.ts and remove it',
       unknownKeyWarning(resolved, scratch.ts),
       `dangerous.selfUpdateDuringLoop: true (${scratch.ts}, entry 0)`,
     ]);
@@ -155,7 +157,7 @@ describe('loadDoctorConfig in json mode', () => {
 describe('doctorConfigRows', () => {
   it('keeps the warnings in their order and words, and makes each pass line a note named by its key', () => {
     const warnings = [
-      'rafa config: /h/.rafa/config.yaml is not read: /h/.rafa/rafa.config.mjs holds the user scope\'s config',
+      'rafa config: unknown key "nonesuch" in /h/.rafa/config.yaml has no effect in this version',
       'rafa config: /p/rafa.config.ts: key "a" set twice',
     ];
     const written = [...warnings, 'dangerous.acceptStaleRefs: true (/p/rafa.config.ts, entry 1)'];

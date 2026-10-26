@@ -86,23 +86,26 @@
  * resolves answers a path it never writes. A pin that cannot be written
  * is warned about and refuses nothing, as no edit does.
  */
-import type { InventoryKind } from '../../inventory/record.js';
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
 import type { GeneratedPlan, Output } from '@open-tomato/rafa/ports';
+import type { InventoryKind } from '@open-tomato/rafa-inventory';
 
 import { readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
+
+import {
+  BUNDLED_AGENTS_DIR,
+  SKILL_FILE,
+  pinLine,
+  readAgentDirectory,
+} from '@open-tomato/rafa-inventory';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { isFile, parsePlan } from '@open-tomato/rafa/core/plan';
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
 
-import { readAgentDirectory } from '../../agents/roster.js';
-import { BUNDLED_AGENTS_DIR } from '../../inventory/trees.js';
 import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
-import { pinLine } from '../../tiers/resolve.js';
-import { SKILL_FILE } from '../../tiers/serve.js';
 
 /** The folder of the checkout the bundled roots sit in. */
 const SOURCE_DIR = 'src';

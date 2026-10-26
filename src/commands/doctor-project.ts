@@ -52,18 +52,24 @@
  * network error is sent again, each retry reported to `retry.onRetry`
  * before its wait, and only a call that still fails is an `unknown` row.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { Project } from '../board/project/port.js';
-import type { ProjectRetryConfig, ProjectRunnerSeams } from '../board/project/project-runner.js';
-import type { BoardStatusOutcome } from '../board/status.js';
+import type {
+  BoardStatusOutcome,
+  GhRunner,
+  Project,
+  ProjectRetryConfig,
+  ProjectRunnerSeams,
+} from '@open-tomato/rafa-board';
+
+import {
+  PROJECT_SCOPE_FIX,
+  createGhProjectPort,
+  isMissingProjectScope,
+  matchProjectFields,
+  openProjectRunner,
+  readBoardRepository,
+} from '@open-tomato/rafa-board';
 
 import { isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { createGhProjectPort } from '../board/project/gh.js';
-import { matchProjectFields } from '../board/project/port.js';
-import { openProjectRunner } from '../board/project/project-runner.js';
-import { isMissingProjectScope, PROJECT_SCOPE_FIX } from '../board/project/refresh-warnings.js';
-import { readBoardRepository } from '../board/repository.js';
 
 import { holdsProjectScope, PROJECT_HEADING, PROJECT_SCOPE, PROJECT_STEP_FIX, SCOPE_ARGS } from './init-board-project.js';
 

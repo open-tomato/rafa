@@ -166,7 +166,7 @@ function plantEslint(repo: string): void {
  * prompt, and whose later calls only answer.
  */
 function plantFixture(payload: Payload, eslint: EslintPlanting = 'stand-in'): Scratch {
-  const scratch = planter.plant({ branch: 'feat/probe', plan: PLAN_OPEN, config: 'pr:\n  provider: none\n' });
+  const scratch = planter.plant({ branch: 'feat/probe', plan: PLAN_OPEN, config: 'pr:\n  provider: none\nchecks:\n  task: [affected]\n' });
   if (eslint === 'stand-in') plantEslint(scratch.repo);
   writeTree(scratch.repo, {
     '.gitignore': 'progress.txt\n.plans/\n.rafa/\nnode_modules\n',

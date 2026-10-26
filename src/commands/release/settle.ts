@@ -88,23 +88,23 @@
  * It starts no Claude session and declares no `spends`.
  */
 import type { SettleProjectRefresh } from './settle-project.js';
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RefreshItems } from '../../board/project/add-issue.js';
 import type { GitRunner, PullRequests } from '../../pr/index.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { SettleLockPlan } from '../../release/settle-lock.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
 import type { SettleBuild, SettleFragment, SettleReading, SettleSettings, SettleUnitFold } from '../../release/settle.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { GhRunner, RefreshItems } from '@open-tomato/rafa-board';
 
 import { relative } from 'node:path';
 
+import { commandRetrySeams, createGhRunner } from '@open-tomato/rafa-board';
+
+import { expectNoArgument, readSwitch, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { releaseCommitSubject } from '../../release/release-move.js';
 import { settleByPr } from '../../release/settle-pr.js';
@@ -113,7 +113,6 @@ import { tagSettle } from '../../release/settle-tag.js';
 import { withSettleWorktree } from '../../release/settle-worktree.js';
 import { CHANGELOG_TITLE, readSettle, settleMoves } from '../../release/settle.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
-import { expectNoArgument, readSwitch, resolveProjectConfig } from '../plan/plan-files.js';
 
 import { RELEASE_SETTLE_DECLARATION, RELEASE_SETTLE_DRY_RUN_FLAG } from './declarations.js';
 import { refreshProjectAfterSettle } from './settle-project.js';

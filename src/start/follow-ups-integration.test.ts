@@ -33,8 +33,6 @@ import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/track
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import {
   existsSync,
   mkdirSync,

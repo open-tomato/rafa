@@ -40,6 +40,8 @@ import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { PullRequests } from '../pr/types.js';
 
+import { readPositionFile } from '@open-tomato/rafa/project/position';
+
 import { ownedBoard } from '../board/board-owns.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
 import { readCodeowners } from '../board/codeowners.js';
@@ -48,7 +50,6 @@ import { createOwnerResolver } from '../board/owner-resolve.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { createGhRoadmapSearch } from '../board/roadmap.js';
 import { createGhTeamMembership, readOwnerApproval } from '../pr/owner-approval.js';
-import { readPositionFile } from '../project/position.js';
 
 /** What {@link nextOwnerGate} reads through. */
 export interface NextOwnerGateOptions {

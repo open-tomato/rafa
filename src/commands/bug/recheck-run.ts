@@ -31,14 +31,14 @@
  * tests plant one; left out it is `runSuite` (`../../suite/run.ts`).
  */
 import type { RunOutcome } from '../../bugs/recheck-verdict.js';
-import type { SuiteResult, SuiteRunOptions } from '../../suite/run.js';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
+import type { SuiteResult, SuiteRunOptions } from '@open-tomato/rafa-run';
 
 import { join } from 'node:path';
 
+import { createDeadlineSpawner, runSuite } from '@open-tomato/rafa-run';
+
 import { runOutcomeOf, verdictOf } from '../../bugs/recheck-verdict.js';
-import { createDeadlineSpawner } from '../../suite/deadline-spawn.js';
-import { runSuite } from '../../suite/run.js';
 
 /** The runner {@link recheckBug} drives: `runSuite`'s shape. */
 export type RecheckSuiteRunner = (options: SuiteRunOptions) => Promise<SuiteResult>;

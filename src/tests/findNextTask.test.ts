@@ -6,13 +6,13 @@
  * its behavior over various checklist formats, rafa block handling, and edge cases.
  */
 
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { describe, expect, it } from 'bun:test';
 
 // ── Pure unit tests for tracker helpers ──────────────────────────────────────
  
-import { findNextTask } from '../utils/tracker.js';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 describe('findNextTask', () => {
   it('returns null when tracker has no tasks', () => {

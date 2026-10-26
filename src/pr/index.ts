@@ -26,14 +26,13 @@
  * recorded fixtures of every `gh` answer into the import graph of the
  * loop itself.
  *
- * One caller outside `src/pr/` reaches past this barrel on purpose:
- * `packages/rafa/src/core/config/config-sections.ts` takes `MERGE_METHODS` and
- * `MergeMethod` from `./types.js` directly, for `pr.mergeMethod`.
- * `./gh.js` imports that module through its barrel,
- * `packages/rafa/src/core/config/sections.ts`, so this barrel would put the `gh`
- * adapter and its spawner
- * behind every config read and make the graph cyclic. Its note records
- * the readings behind that choice; nothing else bypasses this file.
+ * `MergeMethod`, `MERGE_METHODS` and `isMergeMethod` are core's
+ * (`packages/rafa/src/core/config/merge-method.ts`), re-exported by
+ * `./types.js` and listed here under the same names. The config's
+ * `pr.mergeMethod` setting (`src/config-schema-release.ts`) takes them
+ * from core's sections barrel and imports nothing under `src/pr/`: this
+ * barrel carries the `gh` adapter and its spawner, which would sit
+ * behind every config read.
  */
 
 export type {

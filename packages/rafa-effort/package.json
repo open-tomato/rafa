@@ -1,0 +1,22 @@
+{
+  "name": "@open-tomato/rafa-effort",
+  "version": "0.46.0",
+  "description": "Facade of the effort package (#808, pass 2): re-exports today's files from src/ under the package's final name, and becomes its own index at its move.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4"
+  }
+}

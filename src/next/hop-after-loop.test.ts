@@ -20,9 +20,9 @@
  *  - Sources with no `roadmap` answer null without walking the board,
  *    counted.
  */
-import type { HopRecord } from './hop-record.js';
 import type { HopTarget, NextHopReading, NextRoadmapReading, NextSources } from './readings.js';
 import type { PullRequests } from '../pr/index.js';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 
 import { describe, expect, it } from 'bun:test';
 

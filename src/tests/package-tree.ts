@@ -1,11 +1,11 @@
 /**
  * A project tree in memory for the cases that ask which package a file
- * belongs to (`src/project/package-of.test.ts`, `src/bugs/stack-path.test.ts`):
+ * belongs to (`src/tests/core-coupled/project/package-of.test.ts`, `src/tests/core-coupled/bugs/stack-path.test.ts`):
  * a root package with two workspaces, one manifest with no name, one that
  * is not JSON, a dependency, and a manifest ABOVE the root that no walk
  * may reach.
  */
-import type { PackageFileSystem } from '../project/package-of.js';
+import type { PackageFileSystem } from '@open-tomato/rafa/project/package-of';
 
 /** A file system over a map of absolute path to text. */
 export function plantFiles(files: Readonly<Record<string, string>>): PackageFileSystem {

@@ -22,8 +22,6 @@
 import type { StaleDocsTaskInput, StartStaleDocsConfig } from './stale-docs.js';
 import type { TrackerResolution } from '../adapters/tracker/resolve.js';
 
-import '../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -49,14 +49,12 @@
  * and their inner run writes a plan or runs a whole loop, so neither is
  * driven here. What IS held: the wrapper's own behaviour, over a stub
  * inner command, in the block above; and, in the last block, that all
- * six declare {@link HINT_FLAG_SPEC}, the three `pr` commands and
- * `issue ready` as an equal copy (`src/commands/pr/declarations.ts` and
- * `src/commands/issue/declarations.ts`, which import no module under
- * `src/`) and the other two by IDENTITY, with no other core command
- * declaring the flag as the control. That the two modules reach
- * `endingWith` and that spec at all is held a third way, by the import
- * case of `src/index.test.ts`, which spells the imports each command
- * module takes.
+ * six declare {@link HINT_FLAG_SPEC} by IDENTITY, the one value core's
+ * command barrel holds, with no other core command declaring the flag
+ * as the control. That the two wrapped modules reach `endingWith` and
+ * that spec at all is held a third way, by the import case of
+ * `src/index.test.ts`, which spells the imports each command module
+ * takes.
  */
 import type { NextEndingSeams } from './ending.js';
 import type { NextState } from './state.js';
@@ -65,7 +63,7 @@ import type { Output } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CommandExit, HINT_FLAG, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
 import { createCommandRegistry } from '../cli/registry.js';
 import issueReady from '../commands/issue/ready.js';
@@ -76,8 +74,7 @@ import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { DEFAULT_ENDING_SEAMS, endingWith, endWithNextStep, HINT_FLAG_SPEC } from './ending.js';
-import { HINT_FLAG } from './hint.js';
+import { DEFAULT_ENDING_SEAMS, endingWith, endWithNextStep } from './ending.js';
 
 /** The base every state that names one is read against. */
 const BASE = 'main';
@@ -463,11 +460,8 @@ describe('the six commands that end with it', () => {
   /** The six, as the modules that declare them export them. */
   const SIX: readonly RafaCommand[] = [prMerge, prWait, prTriage, planCreate, issueReady, loopStart];
 
-  it('declares this flag spec on all six, the pr commands and issue ready as their declarations\' copy, so their help reads the same', () => {
-    const declared = SIX.map((command) => command.flags.some((flag) => Bun.deepEquals(flag, HINT_FLAG_SPEC, true)));
-
-    expect(declared).toEqual(SIX.map(() => true));
-    expect(SIX.map((command) => command.flags.includes(HINT_FLAG_SPEC))).toEqual([false, false, false, true, false, true]);
+  it('declares this flag spec itself on all six, so their help reads the same', () => {
+    expect(SIX.map((command) => command.flags.includes(HINT_FLAG_SPEC))).toEqual([true, true, true, true, true, true]);
     expect(SIX.map((command) => `${command.subject} ${command.action}`)).toEqual([
       'pr merge',
       'pr wait',

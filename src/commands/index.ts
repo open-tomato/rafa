@@ -14,8 +14,12 @@
  * ## The features
  *
  * {@link BUNDLED_FEATURES} lists the four features, each imported by
- * name from the `index.ts` of its folder: `board` (the `issue`, `board`
- * and `epic` subjects), `pr`, `run` (the `claim` subject) and `release`.
+ * name from its package's facade: `board` (the `issue`, `board` and
+ * `epic` subjects) from `@open-tomato/rafa-board`, and `pr`, `run` (the
+ * `claim` subject) and `release` from `@open-tomato/rafa-pr`,
+ * `@open-tomato/rafa-run` and `@open-tomato/rafa-release`, one subject
+ * each. The `switch` command comes from run's facade too, under its
+ * `command` name.
  * A feature's commands are `lazyCommand`s over their declarations, so
  * importing this file loads the declaration files and no feature command
  * module: such a module is imported when its command runs.
@@ -49,13 +53,13 @@
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `switch`,
  * which moves the checkout's place through `src/board/place.ts` and
- * `src/project/position.ts`, nor `board list`, which lists the open
+ * `packages/rafa/src/project/position.ts`, nor `board list`, which lists the open
  * boards off the same listing through `src/board/board-body.ts` and
  * `src/board/owner-resolve.ts`, nor `board sync`, which brings the
  * repository's GitHub project in step through
  * `src/board/project/sync.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
- * `module exec`, which read the modules `src/modules/load.ts` loads and
+ * `module exec`, which read the modules `packages/rafa/src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
  * definitions through `src/agents/roster.ts`, nor `agent list`, which
  * lists the agents `buildInventory` (`src/inventory/`) reads, nor
@@ -467,19 +471,20 @@
 import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
 import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 
+import { BOARD_FEATURE, BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
+import { PR_FEATURE, PR_SUBJECT } from '@open-tomato/rafa-pr';
+import { RELEASE_FEATURE, RELEASE_SUBJECT } from '@open-tomato/rafa-release';
+import { CLAIM_SUBJECT, RUN_FEATURE, command as switchCommand } from '@open-tomato/rafa-run';
+
 import { createCommandRegistry } from '../cli/registry.js';
 
 import agentList from './agent/list.js';
 import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
-import { BOARD_SUBJECT } from './board/declarations.js';
-import { BOARD_FEATURE } from './board/index.js';
 import bugCodes from './bug/codes.js';
 import bugRecheck from './bug/recheck.js';
 import ciStatus from './ci/status.js';
-import { CLAIM_SUBJECT } from './claim/declarations.js';
-import { RUN_FEATURE } from './claim/index.js';
 import cleanup from './cleanup.js';
 import configSet from './config/set.js';
 import configShow from './config/show.js';
@@ -496,14 +501,12 @@ import effortMigrate from './effort/migrate.js';
 import effortMove from './effort/move.js';
 import effortReport from './effort/report.js';
 import effortSchema from './effort/schema.js';
-import { EPIC_SUBJECT } from './epic/declarations.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
 import instinctList from './instinct/list.js';
 import instinctPromote from './instinct/promote.js';
 import instinctShow from './instinct/show.js';
-import { ISSUE_SUBJECT } from './issue/declarations.js';
 import loopList from './loop/list.js';
 import loopPause from './loop/pause.js';
 import loopResume from './loop/resume.js';
@@ -520,10 +523,6 @@ import planNeeds from './plan/needs.js';
 import planRisk from './plan/risk.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
-import { PR_SUBJECT } from './pr/declarations.js';
-import { PR_FEATURE } from './pr/index.js';
-import { RELEASE_SUBJECT } from './release/declarations.js';
-import { RELEASE_FEATURE } from './release/index.js';
 import roadmap from './roadmap.js';
 import selfUpdate from './self-update.js';
 import skillBackfill from './skill/backfill.js';
@@ -536,7 +535,6 @@ import status from './status.js';
 import stretchEnd from './stretch/end.js';
 import stretchItem from './stretch/item.js';
 import stretchStart from './stretch/start.js';
-import switchCommand from './switch.js';
 import updateBoard from './update/board.js';
 import updateCurrent from './update/current.js';
 import updateLatest from './update/latest.js';

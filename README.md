@@ -594,20 +594,51 @@ rafa· no pr            no open pull request for feat/rafa-485
 
 ## Configuration
 
-rafa reads its settings from one file per scope. The project scope is
+rafa reads its settings from two files per scope. The project scope is
 the repository's root; the user scope is `~/.rafa/`, read under every
-project on the machine. In each scope the lookup takes the first of
-three names that is a file, and the others are not read:
+project on the machine. Each scope reads both of its files, when they
+are there:
 
-1. `rafa.config.ts`, a TypeScript module
-2. `rafa.config.mjs`, a JavaScript module
-3. `.rafa/config.yaml` in the project, `~/.rafa/config.yaml` for the user
+1. Its module file: `rafa.config.ts`, a TypeScript module, or else
+   `rafa.config.mjs`, a JavaScript module. This is your file, which rafa
+   never writes.
+2. Its YAML file, `.rafa/config.yaml` in the project and
+   `~/.rafa/config.yaml` for the user: the local layer, read over the
+   module file key by key. It is the file rafa writes, with `config set`,
+   `stretch start` and `stretch end`.
 
-The layers stack: rafa's defaults, under the user scope's file, under the
-project's. A setting the project's file names outranks the same one in
-the user's, key by key; a setting neither file names takes its default.
+The layers stack: rafa's defaults, under the user scope's two files,
+under the project's two. A setting the project's files name outranks the
+same one in the user's, key by key, and within a scope the YAML file's
+value outranks the module file's; a setting no file names takes its
+default.
 `rafa init` writes both YAML files with every setting commented out at
 its default, so uncomment a line, with its section line, to change it.
+
+Two keys choose the tests a check point runs: `checks`, one list per
+check point, and `templates`, which adopts a named set of values. A
+project with no entries runs no check at any check point:
+
+```yaml
+# .rafa/config.yaml
+checks:
+  task: []
+```
+
+`templates: [escalation]` adopts the `escalation` template, which sets
+`checks.task: [affected]`, `checks.stage: [related, integration]` and
+`checks.loop: [full]`, and restores the steps rafa ran before these keys
+existed:
+
+```yaml
+# .rafa/config.yaml
+templates: [escalation]
+```
+
+This repository's own `rafa.config.ts` is its person's file: it carries
+the `templates` key and decision 0009's `checks` table, which
+`context/verification.md` records. The `.rafa/config.yaml` of a checkout
+keeps only what rafa writes there.
 
 Tab indentation in `.rafa/config.yaml` is refused with rafa's own error
 on every Bun version, before the parser sees the file. The error names
@@ -629,10 +660,10 @@ Pick the lightest form your situation needs:
 - **A JS or TS project that installs rafa as a dev dependency.** Write
   `satisfies Config` or `defineConfig`, both from
   `@open-tomato/rafa/config`, and your editor checks the entries.
-- **A project moving from YAML to TypeScript.** For a while both files
-  sit side by side. The TypeScript file is read, and a warning names the
-  YAML file as not read; `rafa doctor` lists it until its keys have
-  moved, and then it can be removed.
+- **A project moving from YAML to TypeScript.** Both files can sit side
+  by side for as long as you like. Both are read, the YAML file's keys
+  over the TypeScript file's, so a key moves to the TypeScript file once
+  it is removed from the YAML file.
 
 The same setting in each form:
 
@@ -666,37 +697,36 @@ package installed where the file runs. For this iteration it can be
 solved with something simple attacking the type project specifically,
 but the bigger issue remains.
 
-Some routes were set aside, each for one reason. Merging both files of
-one scope is not done: a scope reads one file, so one answer per key.
-A Bun plugin redirecting the import does not resolve, as measured.
+Some routes were set aside, each for one reason. A Bun plugin redirecting the import does not resolve, as measured.
 Setting `NODE_PATH` and starting rafa again is not done: it would start
 a second process to load one file. Requiring a local install, as ESLint
 and Vite do, is not done: it would refuse the global Python case above.
 
-### Shadowed YAML and `rafa config show`
+### Both files of a scope and `rafa config show`
 
-When a scope holds a module file and a YAML file, the YAML file is not
-read, and every load says so:
-
-```text
-rafa config: /repo/.rafa/config.yaml is not read: /repo/rafa.config.ts holds the project scope's config, so move its keys into rafa.config.ts and remove it
-```
+When a scope holds a module file and a YAML file, both are read and
+neither is warned about: the YAML file is the local layer over the
+module file, the interim form of #893's local layer until a file rafa
+generates under `.rafa/` replaces it.
 
 `rafa config show` prints every setting with its merged value, nested
 as a config file spells it. `rafa config show --sources` prints one line
-per setting instead: its value, the layer that answered (`project`,
-`user` or `default`) and, for a file, the file and the zero-based entry
-that last set it; a YAML file is entry 0. `--output=json` carries the
-same data for a script. The two views are refused together.
+per setting instead, with the layer that answered it and the file each
+key came from. The layer is `local` for the project's YAML file,
+`project` for its module file, `user` for either of the user scope's two
+files, `default` for a setting no file names, and `template:<name>` for a
+setting a config template answered. For a file, the line names the file
+and the zero-based entry that last set the setting; a YAML file is
+entry 0. `--output=json` carries the same data for a script. The two
+views are refused together.
 
 ### Changing a key with `config set`
 
-`rafa config set <key>=<value>` edits the project's `.rafa/config.yaml`
-in place and keeps its comments. In a project whose config is
-`rafa.config.ts` or `rafa.config.mjs`, it refuses with exit 1, naming
-that file and writing nothing, because a module is code the command does
-not rewrite. Edit the module by hand until #893 gives the command a file
-to write.
+`rafa config set <key>=<value>` edits the local layer, the project's
+`.rafa/config.yaml`, in place and keeps its comments. Beside a
+`rafa.config.ts` or `rafa.config.mjs` it still edits that YAML file, and
+the key it sets wins over the module file's value, key by key. rafa never
+writes the module file.
 
 ### `dangerous.*` settings
 

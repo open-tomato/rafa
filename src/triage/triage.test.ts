@@ -85,9 +85,9 @@ import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 import { writeFindings } from '@open-tomato/rafa/store/findings';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { createLocalTracker, localIssuesDir, parseLocalIssue } from '../adapters/tracker/local.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { DEFAULT_BUG_RULES } from './bug-filing.js';
 import { ISSUE_OPENING, supersedesSection } from './issue-text.js';

@@ -138,17 +138,16 @@ import type { RetryRefusal, RetryTask, RunRetries } from './retry-budget.js';
 import type { NeededDecision, RunSession } from './session.js';
 import type { StepOutcome } from './suite-step.js';
 import type { BeforeSessionAnswer } from './suite-steps-run.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource, OutputMode } from '@open-tomato/rafa/core/config/sections';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { existsSync, readFileSync } from 'node:fs';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
-
-import { findNextTask, listOpenTasks, writeTrackerBlocker } from '../utils/tracker.js';
+import { findNextTask, listOpenTasks, writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 
 import { heldOnNothingLeftBehind } from './commit.js';
 import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';

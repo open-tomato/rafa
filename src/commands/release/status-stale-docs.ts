@@ -23,12 +23,13 @@
  * code, and no count refuses a release.
  */
 import type { OpenLinesTracker } from '../../docs/open-lines.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+
+import { resolveTracker } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { readOpenStaleDocLines } from '../../docs/open-lines.js';
 
 /** A run of white space, the line separators included. */

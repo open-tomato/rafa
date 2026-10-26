@@ -53,12 +53,12 @@
  * moves whatever HEAD names — so the precondition for calling this is
  * that HEAD IS the base, and the row is what holds it.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+
+import { gitSaid } from '@open-tomato/rafa-pr';
+import { hasDiverged, parseBaseStanding } from '@open-tomato/rafa-run';
 
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { gitSaid } from '../pr/index.js';
-import { hasDiverged, parseBaseStanding } from '../start/branch-decision.js';
 
 /** The indent a refusal's following lines carry, as `src/start/branch-decision.ts` indents its own. */
 const INDENT = '   ';

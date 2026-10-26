@@ -30,7 +30,7 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssueReader } from '../board/issue.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueState } from '../board/roadmap-board.js';
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
-import type { Position } from '../project/position.js';
+import type { Position } from '@open-tomato/rafa/project/position';
 
 import { describe, expect, it } from 'bun:test';
 

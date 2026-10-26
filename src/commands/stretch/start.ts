@@ -94,15 +94,17 @@ import type { PidProbe } from '@open-tomato/rafa/core/loop';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { lineRefusal, readChoiceFlag, readTextFlag } from '@open-tomato/rafa-board';
+import { DEFAULT_BASE_BRANCH, readRemoteHead } from '@open-tomato/rafa-pr';
+
+import { expectNoArgument, readSwitch, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 
-import { readRemoteHead } from '../../cleanup/branches.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import {
   agentFilePath,
   defaultSeams,
@@ -133,8 +135,6 @@ import {
   operatorsCopyPath,
 } from '../../stretch/operators.js';
 import { defaultPromptSeams, engineerPrompt } from '../../stretch/prompt.js';
-import { lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
-import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa stretch start';

@@ -44,14 +44,20 @@
  * the key exists and what it takes, which is the whole point of a
  * template of commented settings.
  *
- * The `tiers`, `routing`, `task` and `tests` sections close the
- * template. `tiers.skills` and `tiers.agents` are written as `{}`, their
+ * The `tiers`, `routing`, `task`, `tests` and `checks` sections close
+ * the template. `tiers.skills` and `tiers.agents` are written as `{}`, their
  * empty default, and `routing` as one line per row of
  * `tiers/routing.ts`'s `DEFAULT_ROUTES`, so the template cannot drift
  * from the defaults the schema answers. `task.skills` and `task.lessons`
  * are written from `CONFIG_DEFAULTS`, at `planner` and `on`, and all three
  * `tests` lists from `CONFIG_DEFAULTS` too, each pattern double-quoted:
- * a flow-list entry opening with `*` would parse as a YAML alias.
+ * a flow-list entry opening with `*` would parse as a YAML alias. The
+ * `fullSuiteTriggers`, `integration` and `contract` lines show their
+ * empty default and name the `escalation` template, which holds the
+ * values a project adopting it takes. The
+ * seven `checks` lists are written from `CONFIG_DEFAULTS` as flow lists of
+ * bare names, empty by default, and the first names the six check names
+ * a list may hold.
  *
  * A file is written only when nothing is at its path, with the `wx` flag,
  * so a file that appears between the check and the write is refused by
@@ -69,18 +75,19 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { configFilePath } from '@open-tomato/rafa/core/config';
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { DEFAULT_ROUTES } from '@open-tomato/rafa-inventory';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
   RELEASE_FRAGMENT_LINES,
-} from '../release/scaffold.js';
-import { DEFAULT_ROUTES } from '../tiers/routing.js';
+} from '@open-tomato/rafa-release';
+import { CHECK_NAMES } from '@open-tomato/rafa-run';
 
-import { scopeAt } from './scope.js';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { scopeAt } from '@open-tomato/rafa/project/scope';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 /** The directories of a project tree, under `<root>/.rafa/`, in the order they are written. */
 export const PROJECT_TREE: readonly ['specs', 'plans', 'runs', 'effort', 'instincts'] = Object.freeze(['specs', 'plans', 'runs', 'effort', 'instincts'] as const);
@@ -93,11 +100,17 @@ function globsLine(patterns: readonly string[]): string {
   return `[${patterns.map((pattern) => JSON.stringify(pattern)).join(', ')}]`;
 }
 
+/** `names` as a YAML flow list of bare check names. */
+function checksLine(names: readonly string[]): string {
+  return `[${names.join(', ')}]`;
+}
+
 /**
  * Every setting of the schema but `version`, commented out at its
  * default, in the order of the spec's block. See the module note.
  */
 export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
+  `# templates: [${CONFIG_DEFAULTS.templates.join(', ')}]                # the config templates this file adopts, by name`,
   `# store: ${CONFIG_DEFAULTS.store}                  # sqlite | ndjson`,
   '# effort:',
   `#   busyTimeoutMs: ${String(CONFIG_DEFAULTS.effortBusyTimeoutMs)}          # 1..60000 ms; how long a store open waits for another process's lock`,
@@ -232,11 +245,19 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   skills: ${CONFIG_DEFAULTS.taskSkills}                # planner | tag | none, the resolver that picks a task's skills`,
   `#   lessons: ${CONFIG_DEFAULTS.taskLessons}                    # on | off, whether blessed lessons join a task's prompt`,
   '# tests:',
-  `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
-  `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
-  `#   contract: ${globsLine(CONFIG_DEFAULTS.testsContract)}  # contract tests, each checking the promise a package makes to others`,
+  `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite; empty, the escalation template names five`,
+  `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs; empty, the escalation template names four`,
+  `#   contract: ${globsLine(CONFIG_DEFAULTS.testsContract)}  # contract tests, each checking the promise a package makes to others; empty, the escalation template names one`,
   `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
   `#   retakeRedAlone: ${String(CONFIG_DEFAULTS.testsRetakeRedAlone)}  # whether a step reruns each newly red test file alone; false turns off that retake and nothing else`,
+  '# checks:',
+  `#   task: ${checksLine(CONFIG_DEFAULTS.checksTask)}                     # the checks a task step runs, each one of: ${CHECK_NAMES.join(', ')}`,
+  `#   stage: ${checksLine(CONFIG_DEFAULTS.checksStage)}                    # the checks a stage step runs`,
+  `#   loop: ${checksLine(CONFIG_DEFAULTS.checksLoop)}                     # the checks the loop runs before its wrap-up`,
+  `#   pullRequest: ${checksLine(CONFIG_DEFAULTS.checksPullRequest)}              # the checks a pull request's CI runs`,
+  `#   stretch: ${checksLine(CONFIG_DEFAULTS.checksStretch)}                  # the checks a stretch of work runs`,
+  `#   releasePullRequest: ${checksLine(CONFIG_DEFAULTS.checksReleasePullRequest)}       # the checks a release pull request's CI runs`,
+  `#   publish: ${checksLine(CONFIG_DEFAULTS.checksPublish)}                  # the checks a publish runs`,
 ]);
 
 /** The line every file opens its settings with. */

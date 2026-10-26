@@ -94,7 +94,7 @@ import type { PlanNames } from '../../board/roadmap-rows.js';
 import type { RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
@@ -295,21 +295,6 @@ function isNo(answer: string | null): boolean {
   return answer !== null && NO_ANSWERS.includes(answer.trim().toLowerCase());
 }
 
-/** The prompter a run asks through, opened on the first question and closed by `close`. */
-function lazyPrompter(open: () => Prompter): { ask: (question: string) => Promise<string | null>; close: () => void } {
-  let prompter: Prompter | null = null;
-  return {
-    ask: async (question) => {
-      prompter ??= open();
-      return prompter.ask(question);
-    },
-    close: () => {
-      prompter?.close();
-      prompter = null;
-    },
-  };
-}
-
 /** Reads what `read` answers; a refusal with {@link EPIC_HORIZON_REFUSAL_EXIT} when it fails. */
 async function readOrRefuse<T>(what: string, read: () => Promise<T>): Promise<T> {
   try {
@@ -389,7 +374,7 @@ export async function changeEpicHorizon(context: RafaContext, action: HorizonAct
   const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
   const prompter = lazyPrompter(seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr)));
   const ask = isTerminal()
-    ? prompter.ask
+    ? prompter.askLine
     : null;
   try {
     const reason = await readReason(reading.change, line.reason, ask);

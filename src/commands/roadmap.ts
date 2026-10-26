@@ -27,11 +27,10 @@
  *
  * It starts no session, so it declares no `spends`.
  */
-import type { IssueSeams } from './issue/issue-tracker.js';
 import type { RafaCommand, RafaFlagSpec } from '@open-tomato/rafa/core/command';
+import type { IssueSeams } from '@open-tomato/rafa-board';
 
-import { ISSUE_LIST_FLAGS } from './issue/declarations.js';
-import { DEFAULT_ISSUE_SEAMS } from './issue/issue-tracker.js';
+import { DEFAULT_ISSUE_SEAMS, ISSUE_LIST_FLAGS } from '@open-tomato/rafa-board';
 
 /** The `issue list` flags `rafa roadmap` leaves undeclared: the one it sets, and the one refused beside it. */
 const NOT_DECLARED: readonly string[] = ['roadmap', 'state'];

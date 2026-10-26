@@ -28,10 +28,10 @@
  */
 import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { NamedSecret } from '../triage/triage.js';
-import type { TaskInfo } from '../utils/tracker.js';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {
   existsSync,
@@ -56,11 +56,11 @@ import {
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '../start/dispatch.js';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
-import { findNextTask } from '../utils/tracker.js';
 
 import { sinkOutput } from './output-sinks.js';
 

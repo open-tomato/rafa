@@ -53,7 +53,7 @@
 import type { NextRoadmapReading } from './readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '../pr/index.js';
-import type { Place, Position } from '../project/position.js';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -61,9 +61,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { writePositionFile } from '../project/position.js';
+import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { writePositionFile } from '@open-tomato/rafa/project/position';
 
-import { hopFilePath, writeHopRecord } from './hop-record.js';
 import { ghNextBoard } from './sources.js';
 
 /** A temporary directory of this file's own. */

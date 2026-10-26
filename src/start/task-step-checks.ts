@@ -1,7 +1,7 @@
 /**
- * The checks the runner's task step (`runTaskStep`, `suite-step.ts`)
- * takes over the task's diff once its test run is done: the lint
- * ({@link lintTask}, `lint-step.ts`), then the type step
+ * The checks the runner's task step (`runTaskStep`,
+ * `suite-task-step.ts`) takes over the task's diff once its test run is
+ * done: the lint ({@link lintTask}, `lint-step.ts`), then the type step
  * ({@link typeCheckTask}, `type-step.ts`). {@link taskDiffChecks} runs
  * them in that order and answers what {@link Settling} carries of them,
  * which `settleStep` reads into the step's verdict and blocker.

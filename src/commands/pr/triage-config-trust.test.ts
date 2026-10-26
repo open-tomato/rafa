@@ -18,8 +18,6 @@ import type { TriageSeams } from './triage.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

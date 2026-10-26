@@ -40,12 +40,12 @@ import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { Learning } from '@open-tomato/rafa/ports';
 
+import { expectTwoArguments } from '@open-tomato/rafa-board';
+
+import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { expectTwoArguments } from '../issue/issue-tracker.js';
-import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 /** The command's name, as a refusal opens with it. */
 const NAME = 'rafa instinct flag';

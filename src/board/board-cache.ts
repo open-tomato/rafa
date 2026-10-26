@@ -109,8 +109,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { isMapping } from '@open-tomato/rafa/core/config/sections';
-
-import { SCOPE_DIR } from '../project/scope.js';
+import { SCOPE_DIR } from '@open-tomato/rafa/project/scope';
 
 import { nativeChangedArgs, nativeIssuesArgs, nativeRowFields } from './board-cache-native.js';
 import { BOARD_LISTING_LIMIT, createGhBoardListing, parseBoardListing } from './roadmap-board.js';

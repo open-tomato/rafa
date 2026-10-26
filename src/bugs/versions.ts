@@ -10,7 +10,7 @@
  *     `unknown`.
  *   - **The `Versions` section** holds one `name: value` line for the
  *     rafa version, the code version, the package the error's file
- *     belongs to (`src/project/package-of.ts`) and that file's path,
+ *     belongs to (`packages/rafa/src/project/package-of.ts`) and that file's path,
  *     relative to the project root. The last two are left out when there
  *     is none.
  *   - **The error line** is the artifact's first line that is not blank,
@@ -18,8 +18,8 @@
  *     (`keyText`, `../triage/bug-key.ts`), so two runs of one failure
  *     give one line.
  */
-import type { PackageOwner } from '../project/package-of.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PackageOwner } from '@open-tomato/rafa/project/package-of';
 
 import { keyText } from '../triage/bug-key.js';
 

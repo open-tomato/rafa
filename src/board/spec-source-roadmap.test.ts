@@ -133,9 +133,9 @@ import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { RoadmapSeams } from './spec-source-roadmap.js';
 import type { ResolvedSpec, SpecSourceResolution } from './spec-source.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { Place, Position } from '../project/position.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -144,10 +144,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
-import { positionAt, writePositionFile } from '../project/position.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

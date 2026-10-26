@@ -29,8 +29,6 @@ import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { WorkspaceWorld } from '../../tests/workspace-world.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

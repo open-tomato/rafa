@@ -201,13 +201,14 @@ import type { ReleaseSeams } from './status.js';
 import type { ReleaseFollowUp } from './tag-follow-ups.js';
 import type { ChangelogReading, UnitDecision, UnitReadings, VersionReading } from './tag-units.js';
 import type { GitRunner } from '../../pr/index.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
 import type { TagReading } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ReleasePublishMode } from '@open-tomato/rafa/core/config/sections';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
+import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
@@ -217,7 +218,6 @@ import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { readTags } from '../../release/status-readings.js';
 import { pushTag, trackedRemote } from '../../release/tag-push.js';
 import { packageTag, versionTag } from '../../release/version-tag.js';
-import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { RELEASE_TAG_DECLARATION, RELEASE_TAG_PUSH_FLAG } from './declarations.js';
 import { readReleaseCommit } from './release-commit.js';

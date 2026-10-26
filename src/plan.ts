@@ -221,15 +221,17 @@ import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
 import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
-import type { TierSettings } from './tiers/resolve.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { RouteTarget } from '@open-tomato/rafa/core/config/sections';
+import type { TierSettings } from '@open-tomato/rafa-inventory';
 
 import fs from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+import { DEFAULT_ROUTING, renderSkillIndex } from '@open-tomato/rafa-inventory';
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -254,8 +256,6 @@ import { enforceStoreRules } from './commands/plan/store-check.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { branchNameFor } from './start/branch-decision.js';
 import { resolveSessionTiers } from './start/serving.js';
-import { renderSkillIndex } from './task/skill-index.js';
-import { DEFAULT_ROUTING } from './tiers/routing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

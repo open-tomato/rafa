@@ -120,6 +120,7 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { runClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt } from '@open-tomato/rafa/core/plan';
+import { getCurrentBranch, readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 
 import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
@@ -128,12 +129,10 @@ import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { getCurrentBranch, readCheckedOutBranch } from '../utils/git.js';
 
 import {
   CI_POLL_INTERVAL_MS,
   DEFAULT_CI_ATTEMPTS,
-  DEFAULT_CI_TIMEOUT_MIN,
   NO_PHASES,
   PR_LIFECYCLE_SEAMS,
   prLifecycleSeamsIn,
@@ -1226,7 +1225,6 @@ describe('the gate as start() calls it, through runWrapUp', () => {
 
 describe('the CI constants', () => {
   it('keep the defaults the start usage documents, and a 20 s poll', () => {
-    expect(DEFAULT_CI_TIMEOUT_MIN).toBe(20);
     expect(DEFAULT_CI_ATTEMPTS).toBe(2);
     expect(CI_POLL_INTERVAL_MS).toBe(20_000);
   });

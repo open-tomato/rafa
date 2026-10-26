@@ -54,7 +54,7 @@
 import { existsSync, realpathSync, statSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
-import { isInside } from '../project/package-of.js';
+import { isInside } from '@open-tomato/rafa/project/package-of';
 
 /** A `Rerun` value recheck can run: a test file and an optional `-t` pattern. */
 export interface RunnableReference {

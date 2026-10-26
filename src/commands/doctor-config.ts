@@ -4,7 +4,6 @@
  * is loaded and before any item is probed.
  *
  * ```text
- * warn: rafa config: /repo/.rafa/config.yaml is not read: /repo/rafa.config.ts holds the project scope's config, so move its keys into rafa.config.ts and remove it
  * warn: rafa config: unknown key "nonesuch" in /repo/rafa.config.ts has no effect in this version (known keys: …)
  * Config:
  *   note  dangerous.selfUpdateDuringLoop: true (/repo/rafa.config.ts, entry 0)
@@ -15,12 +14,9 @@
  *   - One `warn` row per config warning the load wrote, in its order and
  *     in its words, written as a warning, as `doctor`'s stretch, release
  *     and install rows are. A key set twice in one file, an unknown key
- *     and a tier pin no tier loads are each one.
- *   - Among them, first, one `warn` row per YAML file a `rafa.config.ts`
- *     or `rafa.config.mjs` of its scope leaves unread
- *     (`ResolvedConfig.shadowed`): the load's sentence names the YAML
- *     file, the module file read in its place, and the fix, to move its
- *     keys into that file and remove it.
+ *     and a tier pin no tier loads are each one. A scope holding a
+ *     module file beside its `.rafa/config.yaml` writes no row for it:
+ *     the load reads both, the YAML file over the module file.
  *   - One `note` row per `dangerous.*` key set off its default, under
  *     the `Config:` title as the `Skill tiers` notes sit under theirs
  *     (`./doctor-deep-row.ts`): the key, then its value, file and entry,
@@ -84,8 +80,8 @@ function passRow(line: string): DeepRow {
  * note.
  *
  * @param written - Every line the load wrote, in its order.
- * @returns The warnings, in the load's order and words, the shadowed
- *   files' first, and a `note` row per pass line.
+ * @returns The warnings, in the load's order and words, and a `note`
+ *   row per pass line.
  */
 export function doctorConfigRows(written: readonly string[]): DoctorConfigRows {
   return {

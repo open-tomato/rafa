@@ -22,17 +22,16 @@
  * lines through `info`, and a refused commit and what held a task
  * through `error`.
  */
-import type { TaskInfo } from '../utils/tracker.js';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 import type { ReportPresent } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { commitTaskWork } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { stripTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { parseReport } from '@open-tomato/rafa/report/parse';
-
-import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
+import { updateTrackerLine, writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 
 import { readBackgroundWait } from './background-wait.js';
 

@@ -107,8 +107,6 @@ import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, Output } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -127,11 +125,11 @@ import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousP
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/rafa/core/output';
 import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
+import { initHint } from '@open-tomato/rafa/project/scope';
 
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';

@@ -33,7 +33,7 @@
  * is the one place that is fixed, and no probe here guesses at it.
  *
  * A config `loadConfig` refuses is refused with exit code 1 naming
- * `rafa next`, in the words `src/commands/plan/plan-files.ts` refuses
+ * `rafa next`, in the words `packages/rafa/src/commands/plan/plan-files.ts` refuses
  * one with; the six other commands that read a config of their own
  * spell it the same way.
  *
@@ -253,12 +253,12 @@ import type { EpicRelations } from '../board/epics.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';

@@ -39,9 +39,9 @@
  * That is what lets `not.toContain('skills')` stand for the whole string
  * rather than for one line of it.
  */
-import type { TaskInfo } from '../utils/tracker.js';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

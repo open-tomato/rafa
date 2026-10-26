@@ -1,12 +1,12 @@
 /**
  * The shapes of the hop record and of a place, with the checks that read
- * them from parsed JSON: the part of `src/next/hop-record.ts` and
- * `src/project/position.ts` a session record needs (`sessions.ts` keeps a
+ * them from parsed JSON: the part of `packages/rafa/src/next/hop-record.ts` and
+ * `packages/rafa/src/project/position.ts` a session record needs (`sessions.ts` keeps a
  * hop record in its `hop` field).
  *
  * It sits in core so `sessions.ts` reads them without importing above
- * core. `src/project/position.ts` re-exports `Place` and `asPlace`, and
- * `src/next/hop-record.ts` re-exports `HopKind`, `HopState`, `HopRecord`
+ * core. `packages/rafa/src/project/position.ts` re-exports `Place` and `asPlace`, and
+ * `packages/rafa/src/next/hop-record.ts` re-exports `HopKind`, `HopState`, `HopRecord`
  * and `asHopRecord`, each under the same name; the reading and writing of
  * `.rafa/position.json` and `.rafa/hop.json`, and the module notes that
  * describe both files, stay there. `isRecord` is exported for the
@@ -27,7 +27,7 @@ export type HopKind = 'blocker' | 'dry';
 /** Where the hop stands: working its target, back home waiting on it or with it merged, or back home from a halt. */
 export type HopState = 'away' | 'waiting' | 'merged' | 'halted';
 
-/** The record `.rafa/hop.json` holds; see the module note of `src/next/hop-record.ts`. */
+/** The record `.rafa/hop.json` holds; see the module note of `packages/rafa/src/next/hop-record.ts`. */
 export interface HopRecord {
   readonly kind: HopKind;
   readonly home: Place;
@@ -84,7 +84,7 @@ function issuesMatchKind(kind: HopKind, blocked: number | null, target: number |
 
 /**
  * `value` as a hop record, or null when it is not one: the check
- * `readHopRecord` (`src/next/hop-record.ts`) makes on the parsed file,
+ * `readHopRecord` (`packages/rafa/src/next/hop-record.ts`) makes on the parsed file,
  * which the session record makes on its `hop` field (`sessions.ts`).
  */
 export function asHopRecord(value: unknown): HopRecord | null {

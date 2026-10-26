@@ -133,8 +133,8 @@
  * points every path under a temporary directory of its own, never runs
  * the real build, and answers a live loop without a process of its own.
  */
-import type { TaskInfo } from '../utils/tracker.js';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import {
   chmodSync,
@@ -153,13 +153,12 @@ import { basename, delimiter, dirname, join, relative, resolve } from 'node:path
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { RAFA_BIN_DIR } from '@open-tomato/rafa/project/bin-path';
+import { liveLoopsOf } from '@open-tomato/rafa/runtime/live-loops';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { name as RAFA_PACKAGE_NAME } from '../../package.json';
-import { RAFA_BIN_DIR } from '../project/bin-path.js';
 import { RUNTIME_ENTRY, RUNTIME_SUBDIR, VERSION_SHAPE } from '../start/runtime.js';
-import { findNextTask } from '../utils/tracker.js';
-
-import { liveLoopsOf } from './live-loops.js';
 
 export { RAFA_PACKAGE_NAME };
 

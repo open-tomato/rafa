@@ -29,7 +29,7 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardView } from '../board/epic-board.js';
 import type { EpicRelations } from '../board/epics.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueState } from '../board/roadmap-board.js';
-import type { Place } from '../project/position.js';
+import type { Place } from '@open-tomato/rafa/project/position';
 
 import { describe, expect, it } from 'bun:test';
 

@@ -20,7 +20,6 @@
  * in the same scope, which is shown and exits 0: a command that
  * refused everything would pass the first half on its own.
  */
-import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

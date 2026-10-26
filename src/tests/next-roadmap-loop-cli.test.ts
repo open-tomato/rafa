@@ -49,13 +49,13 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseSessionRecord, runsDir } from '@open-tomato/rafa/core/loop';
+import { hopFilePath, readHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { positionFilePath } from '@open-tomato/rafa/project/position';
 
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_LABEL } from '../board/issue.js';
 import { planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { hopFilePath, readHopRecord } from '../next/hop-record.js';
-import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, eventsOf, type CapturedRun, type ScratchRepo } from './cli-capture.js';

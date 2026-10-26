@@ -26,8 +26,6 @@ import type { RefVerifier } from '../../refs/verify.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
