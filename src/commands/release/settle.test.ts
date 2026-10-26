@@ -22,11 +22,11 @@
  * number unset and a dry run with it set, each opening no `gh` runner.
  */
 import type { ReleaseSettleSeams } from './settle.js';
-import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleBuilt, SettleFolded, SettleFragment, SettleUnitFold } from '../../release/settle.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 

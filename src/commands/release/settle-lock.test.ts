@@ -13,9 +13,9 @@
  * `package.json`, the changelog section and `rafa.lock` at that version.
  */
 import type { ReleaseSettleSeams } from './settle.js';
-import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

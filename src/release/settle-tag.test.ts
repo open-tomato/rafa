@@ -12,9 +12,9 @@
 import type { SettleDelivered, SettleTagOutcome } from './settle-tag.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuilt, SettleSettings } from './settle.js';
-import type { PullRequestSummary } from '../pr/index.js';
 import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { PullRequestSummary } from '@open-tomato/rafa/pr/types';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
