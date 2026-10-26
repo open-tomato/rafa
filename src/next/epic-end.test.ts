@@ -22,7 +22,7 @@
  *    none from the next watched answer, which must forget the first: a
  *    watch that never reset would pass the first alone.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { NextBoard, NextRoadmapReading } from '@open-tomato/rafa-board';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
