@@ -445,11 +445,12 @@ on the import graph that the function cannot move there. A function that is
 pure, or that reaches nothing past core, moves into core instead. The five
 entries are calls of a lower package, board or release, each into a higher one:
 
-- `addStaleDocLine`, release's, in `src/docs/release-issue.ts` (reach 6 at
-  aec5e4a, the figure the registry records; a second method read 95, so the
-  figure is unsettled and was not re-measured), for `rafa epic close`, which
-  adds a line to the release's stale-docs issue, whose module reads the
-  release version helpers of `src/release/`.
+- `addStaleDocLine`, release's, in `src/docs/release-issue.ts`, a file release
+  holds by name since the sixth decouple item (reach 6 at aec5e4a, the figure
+  the registry records; a second method read 95, so the figure is unsettled and
+  was not re-measured), for `rafa epic close`, which adds a line to the
+  release's stale-docs issue, whose module reads the release version helpers of
+  `src/release/`.
 - `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for
   `rafa issue ready`, which ends naming the next step and runs its action
   through run's dispatch.
@@ -816,10 +817,12 @@ names come from, and the facade entry is no node.
     `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an
     effort file, sat among them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
-    Release has one: `src/docs/release-issue.ts`. `packages/rafa-board/src/board/project/facts.ts`
-    left the group in the fourth decouple item: its one release import by path,
+    Release had one, `src/docs/release-issue.ts`; the sixth decouple item placed
+    that file in release by name, so release has none now.
+    `packages/rafa-board/src/board/project/facts.ts` left the group in the
+    fourth decouple item: its one release import by path,
     of `directoryPrefix` and `fragmentIdOf`, now comes from core's
-    `@open-tomato/rafa/release/fragment`. Pr has thirteen:
+    `@open-tomato/rafa/release/fragment`. Pr had thirteen:
     `src/claims/lost.ts`, `src/cleanup/past-head.ts`,
     `src/cleanup/worktrees.ts`, `src/commands/release/status-fragments.ts`,
     `src/next/epic-end.ts`, `src/next/hint.ts`, `src/next/hop-rows.ts`,
@@ -830,16 +833,23 @@ names come from, and the facade entry is no node.
     `src/next/epic-end.ts`, `src/release/branch-forecast.ts` and
     `src/release/settle-pr.ts`, are release files by the cut table's unit that
     import pr from a package earlier in the move order; their edges are back
-    edges the decouple step before pass 4 cuts, and they sit in this group
-    because the load-cycle group comes first. Run has nine:
+    edges the decouple step before pass 4 cuts, and they sat in this group
+    because the load-cycle group comes first. The sixth decouple item
+    (rafa-1362) cut all five off pr: each takes core's git names,
+    `MergedPullRequest` or the port from core now, so pr reads the eight left,
+    `src/claims/lost.ts`, `src/cleanup/worktrees.ts`, `src/next/hint.ts`,
+    `src/next/hop-rows.ts`, `src/next/readings.ts`, `src/start/pr-lifecycle.ts`,
+    `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. Run had nine:
     `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/next/epic-end.ts`,
     `src/next/owner-gate.ts`, `packages/rafa-board/src/next/relation-readings.ts`,
     `src/next/settle-step.ts`, `src/next/sources.ts`, `src/triage/base-run.ts`
-    and `src/triage/inherited.ts`. All nine are files of packages earlier in
-    `MOVE_ORDER` of `scripts/survey/coupling.ts`, by the cut table's unit, and
-    they sit in this group because the load-cycle group comes first. Their edges
-    to run are back edges the decouple step before pass 4 cuts, since run moves
-    last and no package imports it forward.
+    and `src/triage/inherited.ts`. The sixth decouple item cut `epic-end.ts` off
+    run, since `watchDryEpic` reads only its board field, so run has eight. All
+    eight are files of packages earlier in `MOVE_ORDER` of
+    `scripts/survey/coupling.ts`, by the cut table's unit, and they sit in this
+    group because the load-cycle group comes first. Their edges to run are back
+    edges the decouple step before pass 4 cuts, since run moves last and no
+    package imports it forward.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
@@ -851,7 +861,7 @@ names come from, and the facade entry is no node.
     it by name since the second decouple item's rewire. Board has none: no
     effort file imports it. Release has none in the codemod's grouping, since
     `packages/rafa-board/src/board/project/facts.ts`, its one board importer, now takes
-    `directoryPrefix` and `fragmentIdOf` from core. Pr has twelve: the ten
+    `directoryPrefix` and `fragmentIdOf` from core. Pr had twelve: the ten
     `src/commands/release/` files, `src/release/prepare.ts` and
     `src/release/verify.ts`; `packages/rafa-board/src/commands/issue/create.ts` and
     `create-bug.ts` left it in the same item, when their pr imports moved
@@ -864,7 +874,10 @@ names come from, and the facade entry is no node.
     `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
-    the decouple step before pass 4 cuts them.
+    the decouple step before pass 4 cuts them. The sixth decouple item
+    (rafa-1362) cut the release files off pr too: the ten
+    `src/commands/release/` files, `prepare.ts` and `verify.ts` take core's
+    names or the registry's provider now, so release has no edge into pr.
     Run has eight: no board file (`packages/rafa-board/src/commands/board/list.ts` and
     `packages/rafa-board/src/commands/epic/new.ts` left them in the fourth decouple item,
     which moved `defaultBoardOnce` into `packages/rafa-board/src/board/default-board-once.ts`,
