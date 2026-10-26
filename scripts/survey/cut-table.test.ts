@@ -491,7 +491,7 @@ describe('buildCutTable: files', () => {
       rank: 6,
     });
     expect(rowOf(table, CORE_PACKAGE).files).toEqual(['packages/rafa/src/report/parse.test.ts', 'packages/rafa/src/report/parse.ts']);
-    expect(rowOf(table, 'rafa-board').filesByFolder).toMatchObject({ 'packages/rafa-board/': 2, 'src/board/': 0, 'src/board/project/': 0 });
+    expect(rowOf(table, 'rafa-board').filesByFolder).toMatchObject({ 'packages/rafa-board/': 2, 'src/board/': 0 });
   });
 
   it('lists the files no rule holds as left to place, each with the upward edges that end on it', () => {

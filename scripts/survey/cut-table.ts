@@ -298,14 +298,16 @@ export const CUT_RULES: CutRules = {
       named: INVENTORY_NAMED,
     },
     {
+      // #1349: pass 4c emptied `src/adapters/tracker/`,
+      // `src/board/project/` and `src/refs/`, so they leave the list.
+      // `src/board/`, `src/commands/board/`, `src/commands/epic/` and
+      // `src/commands/issue/` stay for their integration tests, at the
+      // root until #913, as `src/tiers/` stays for inventory's.
       folders: ['packages/rafa-board/', 
-        'src/adapters/tracker/',
         'src/board/',
-        'src/board/project/',
         'src/commands/board/',
         'src/commands/epic/',
         'src/commands/issue/',
-        'src/refs/',
       ],
       name: 'rafa-board',
       named: BOARD_NAMED,

@@ -1669,6 +1669,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/board-coupled/adapters/tracker/resolve.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/board-coupled/board/owner-resolve.test.ts",
       "upwardEdgesIn": 0
     },
@@ -4035,7 +4040,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 138,
+        "test": 137,
         "testSupport": 8
       },
       "files": [
@@ -4055,7 +4060,6 @@
         "packages/rafa-board/src/adapters/tracker/issue-values.ts",
         "packages/rafa-board/src/adapters/tracker/local.test.ts",
         "packages/rafa-board/src/adapters/tracker/local.ts",
-        "packages/rafa-board/src/adapters/tracker/resolve.test.ts",
         "packages/rafa-board/src/adapters/tracker/resolve.ts",
         "packages/rafa-board/src/board/blocked-issues.test.ts",
         "packages/rafa-board/src/board/blocked-issues.ts",
@@ -4343,24 +4347,18 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 253,
-        "src/adapters/tracker/": 0,
+        "packages/rafa-board/": 252,
         "src/board/": 6,
-        "src/board/project/": 0,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,
-        "src/commands/issue/": 1,
-        "src/refs/": 0
+        "src/commands/issue/": 1
       },
       "folders": [
         "packages/rafa-board/",
-        "src/adapters/tracker/",
         "src/board/",
-        "src/board/project/",
         "src/commands/board/",
         "src/commands/epic/",
-        "src/commands/issue/",
-        "src/refs/"
+        "src/commands/issue/"
       ],
       "name": "rafa-board",
       "named": [
@@ -5757,7 +5755,7 @@
       "edges": [],
       "fileCounts": {
         "source": 176,
-        "test": 531,
+        "test": 532,
         "testSupport": 24
       },
       "files": [
@@ -6134,6 +6132,7 @@
         "src/tests/backfill-pipeline.test.ts",
         "src/tests/blocked-issues-integration.test.ts",
         "src/tests/board-coupled/adapters/tracker/github.test.ts",
+        "src/tests/board-coupled/adapters/tracker/resolve.test.ts",
         "src/tests/board-coupled/board/owner-resolve.test.ts",
         "src/tests/board-coupled/board/project/add-filed.test.ts",
         "src/tests/board-coupled/board/refs-gate.test.ts",
@@ -6515,8 +6514,8 @@
   "totals": {
     "clearedByIssue118": 0,
     "files": 2193,
-    "leftToPlace": 691,
-    "nonTestEdges": 4863,
+    "leftToPlace": 692,
+    "nonTestEdges": 4864,
     "unassignedFiles": 28,
     "unrankedEdges": 75,
     "upwardEdges": 71
