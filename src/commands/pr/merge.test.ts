@@ -32,7 +32,6 @@
  * opened under `--yes`, so "the question was skipped" is measured.
  */
 import type { MergeSeams } from './merge.js';
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type {
   ChecksReading,
   GitResult,
@@ -46,6 +45,7 @@ import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -53,10 +53,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
-import { BOARDS_LIST_ARGS } from '../../board/boards.js';
-import { epicTickSentence } from '../../board/epic-tick.js';
-import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
+import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+
 import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';

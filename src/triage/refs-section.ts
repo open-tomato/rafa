@@ -12,7 +12,7 @@
  *
  * ## What is read
  *
- * The artifact is read with `extractRefs` (`src/refs/extract.ts`), and
+ * The artifact is read with `extractRefs` (`packages/rafa-board/src/refs/extract.ts`), and
  * only the `path` and `symbol` references it answers are kept: those are
  * what an error string or a stack line points at, and the other kinds —
  * an issue, a command, a flag, a key — would need the board or the
@@ -27,7 +27,7 @@
  * ## The stamps
  *
  * Each reference is read through a {@link RefVerifier}, the verifier of
- * `src/refs/verify.ts`, and stamped with the word `fingerprintText`
+ * `packages/rafa-board/src/refs/verify.ts`, and stamped with the word `fingerprintText`
  * answers for it: `blob:<sha>` for a committed file, `present` for a
  * directory, a file not yet committed or a name some file declares,
  * and `absent` for a target the tree does not hold.
@@ -46,17 +46,18 @@
  * no section: {@link buildRefsSection} answers null and the body goes
  * from `## Artifact` straight to `## Recurrence key`.
  */
-import type { DescribeDocument } from '../cli/describe.js';
-import type { Ref } from '../refs/extract.js';
-import type { LiveReading } from '../refs/stamp.js';
-import type { RefVerifier } from '../refs/verify.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
+import type { LiveReading, Ref, RefVerifier } from '@open-tomato/rafa-board';
 
+import {
+  createRefVerifier,
+  extractRefs,
+  fingerprintText,
+  tsSymbolsOutliner,
+} from '@open-tomato/rafa-board';
+
+import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION } from '@open-tomato/rafa/cli/describe';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-
-import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION } from '../cli/describe.js';
-import { extractRefs } from '../refs/extract.js';
-import { fingerprintText } from '../refs/stamp.js';
-import { createRefVerifier, tsSymbolsOutliner } from '../refs/verify.js';
 
 /** The heading the section is written under. */
 export const REFS_HEADING = 'Refs';

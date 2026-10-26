@@ -87,7 +87,7 @@
  * {@link NextActionOptions.claimAhead} as well, and `plan` alone carries
  * {@link CLAIM_AHEAD_WORD} after `--roadmap`: `plan create --next
  * --roadmap --claim-ahead` also claims the line after its pick
- * (`src/claims/ahead.ts`). `start` and `resume` claim nothing ahead, so
+ * (`packages/rafa-board/src/claims/ahead.ts`). `start` and `resume` claim nothing ahead, so
  * their words are unchanged, and without `roadmap` the option adds no
  * word to any action.
  *

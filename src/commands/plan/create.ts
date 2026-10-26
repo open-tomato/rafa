@@ -9,7 +9,7 @@
  * (`src/cli/route.ts`). `src/plan.ts` reads its own flags, and the ones
  * declared here are those it reads: `--spec`, `--stub` and
  * `--no-progress` in that module, and the board's ten words in
- * `src/board/flags.ts`, which records why they sit in one module.
+ * `packages/rafa-board/src/board/flags.ts`, which records why they sit in one module.
  *
  * Three of them name the one spec a run plans from and are mutually
  * exclusive — `--spec`, `--issue` and `--next` — so none is `required`

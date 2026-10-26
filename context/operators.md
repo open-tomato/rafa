@@ -116,7 +116,7 @@ between two items is listed, while the open-bug count still reads
 `openIssues('bug')` alone. Each bug's filed time is the `createdAt` that listing
 carries, so no `gh issue view` runs per bug. GitHub answers it from `gh issue
 list --state all --search created:>=<since>`
-(`src/adapters/tracker/github-filed-issues.ts`), whose search index can lag a
+(`packages/rafa-board/src/adapters/tracker/github-filed-issues.ts`), whose search index can lag a
 filing by seconds, so a bug filed in the moments before the reading may be
 missing from the line; the local tracker answers the record's `capturedAt`, the
 time the issue was created, not a file's time on disk. A bug whose time does not

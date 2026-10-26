@@ -25,10 +25,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf } from '../suite/baseline.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { OUTSIDE_CASE_REASON } from './suite-outside-case.js';
 import {

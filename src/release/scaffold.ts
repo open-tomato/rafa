@@ -13,7 +13,7 @@
  * an entry registers the config sections, so they read the section and
  * not core's `registeredDefaults()`: that read refuses until the
  * registration, and `rafa --version` exited 1 with it in a load-time
- * constant of `src/board/refs-gate.ts`, measured on 2026-10-20.
+ * constant of `packages/rafa-board/src/board/refs-gate.ts`, measured on 2026-10-20.
  *
  * This is the library half of the release step of `rafa init`; its
  * command half, `src/commands/init-release.ts`, holds the one question

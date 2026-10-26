@@ -108,7 +108,7 @@ function buildProbe(): string {
     'registerCoreConfigSections();',
     'registerCoreAdapters();',
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
     `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
     `import { createReleaseSettleCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'release', 'settle.ts'))};`,

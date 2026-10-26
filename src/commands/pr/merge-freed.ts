@@ -4,9 +4,9 @@
  * and never written to.
  *
  * In the `labels` mode, the default, that step is the unblock reading
- * (`src/board/unblock-after-merge.ts`), which asks about each freed
- * issue and takes `spec:blocked` off; with the epic tick (`src/board/epic-tick.ts`) it is what
- * the `labels` adapter's `afterMerge` runs (`src/board/relations/labels.ts`).
+ * (`packages/rafa-board/src/board/unblock-after-merge.ts`), which asks about each freed
+ * issue and takes `spec:blocked` off; with the epic tick (`packages/rafa-board/src/board/epic-tick.ts`) it is what
+ * the `labels` adapter's `afterMerge` runs (`packages/rafa-board/src/board/relations/labels.ts`).
  * In the `native` mode a blocker is GitHub's blocked-by link, which
  * GitHub clears by itself when the blocking issue closes, and the
  * `native` adapter's `afterMerge` writes nothing. So this module asks no
@@ -17,11 +17,11 @@
  * ## Read from one listing, through the port
  *
  * {@link freedAfterMerge} makes the `native` adapter through
- * `selectBoardRelations` (`src/board/relations/select.ts`), reads ONE
+ * `selectBoardRelations` (`packages/rafa-board/src/board/relations/select.ts`), reads ONE
  * board listing with the fields that mode asks for, and answers the
  * port's `freedBy` over it for the issues the merged pull request closes
  * ({@link closedIssuesIn}). The rule for "freed" is the port's alone
- * (`src/board/relations/freed.ts`): an open issue one of whose blockers
+ * (`packages/rafa-board/src/board/relations/freed.ts`): an open issue one of whose blockers
  * is among the closed issues, and which waits on nothing once they count
  * as closed. A blocker still open, a truncated `blockedBy` list and a
  * blocker on this board whose state was not read all keep an issue
@@ -45,7 +45,7 @@
  * ## Why every failure is a warning
  *
  * The merge has already happened by the time this runs, as
- * `src/board/unblock-after-merge.ts` records for its own reading. A
+ * `packages/rafa-board/src/board/unblock-after-merge.ts` records for its own reading. A
  * repository `gh` will not name and a listing it will not answer are each one
  * {@link freedProblemLine} warning, and `pr merge` keeps its exit code.
  */

@@ -22,9 +22,9 @@ import type { BugRoute, BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 import { detail, PROVIDER_GH, PROVIDER_NONE, SUMMARY } from '../tests/release-stage-fixtures.js';
 
 import {

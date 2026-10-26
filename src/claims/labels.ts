@@ -31,7 +31,7 @@
  * ## One command per transition, save the removal
  *
  * The move to in development is ONE `swapLabels`, for the reason
- * `src/board/issue-board.ts` records: two commands can half-apply and
+ * `packages/rafa-board/src/board/issue-board.ts` records: two commands can half-apply and
  * leave the issue with neither label. The removal is two `removeLabel`
  * commands, `rafa:in-development` then `rafa:claimed`, because
  * {@link IssueBoard} has no member that takes two labels off at once,
@@ -47,7 +47,7 @@
  * the removal answers a warning naming that label while the label it
  * did carry is still taken off.
  */
-import type { IssueBoard } from '../board/issue-board.js';
+import type { IssueBoard } from '@open-tomato/rafa-board';
 
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

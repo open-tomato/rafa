@@ -28,9 +28,8 @@ import type { CapturedSpawnOptions } from '@open-tomato/rafa/core/loop';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
-
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { withStamp } from './stamp.js';
 import { runStepOnlyOf, STEP_ONLY_HEADING, stepOnlySection } from './step-only-report.js';

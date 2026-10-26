@@ -1,6 +1,6 @@
 /**
  * Spawned `bun src/rafa.ts` runs of `rafa next --roadmap --yes` over three
- * fixtures where the one-hop decision (`src/next/hop-chain.ts`) HALTS
+ * fixtures where the one-hop decision (`packages/rafa-board/src/next/hop-chain.ts`) HALTS
  * rather than hops or comes home clean: C itself blocked by an open B
  * (the chain `#H ← #C ← #B`), H and C blocked by each other (the mutual
  * chain `#H ← #C ← #H`), and, with a hop already away, C's own spec
@@ -44,8 +44,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { hopFilePath } from '@open-tomato/rafa/next/hop-record';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

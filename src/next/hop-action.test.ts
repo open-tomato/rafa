@@ -52,13 +52,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { hopFilePath, readHopRecord, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
 import { hop, positionFilePath, readPositionFile, writePositionFile } from '@open-tomato/rafa/project/position';
 import { resolveScope } from '@open-tomato/rafa/project/scope';
-
-import { createCommandRegistry } from '../cli/registry.js';
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { runAction } from './actions.js';
 import { homeLogLine, hopLogLine, NO_REHOME, runHome, runHop } from './hop-action.js';

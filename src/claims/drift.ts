@@ -36,9 +36,9 @@
  * ## Which branches count
  *
  * Every ref the branch scan answered (`scanClaimBranches`,
- * `src/board/branch-scan.ts`): this checkout's branches and remote-tracking
+ * `packages/rafa-board/src/board/branch-scan.ts`): this checkout's branches and remote-tracking
  * refs, and the remote's heads. A ref counts when `claimBranchOfRef`
- * (`src/board/roadmap-claims.ts`) reads a claim branch in it under the
+ * (`packages/rafa-board/src/board/roadmap-claims.ts`) reads a claim branch in it under the
  * scan's own template (`BranchScan.branchTemplate`): the `naming.branch`
  * template with the stub, `feat/rafa-<n>-<slug>` by default. So a branch
  * held only by this checkout — a plan written with no network, its claim
@@ -55,20 +55,26 @@
  * ## The board
  *
  * The listing arrives as a {@link BoardListing}, the seam
- * `createCachedBoardListing` (`src/board/board-cache.ts`) answers, so a
+ * `createCachedBoardListing` (`packages/rafa-board/src/board/board-cache.ts`) answers, so a
  * check spends one small incremental read. A listing that rejects answers
  * a report with no finding and the rejection as its one notice.
  */
-import type { BranchScan } from '../board/branch-scan.js';
-import type { BoardIssue, BoardIssueState, BoardListing } from '../board/roadmap-board.js';
+import type {
+  BoardIssue,
+  BoardIssueState,
+  BoardListing,
+  BranchScan,
+} from '@open-tomato/rafa-board';
+
+import {
+  ROADMAP_LABEL,
+  claimBranchOfRef,
+  isEpicIssue,
+  parseRoadmapBody,
+} from '@open-tomato/rafa-board';
 
 import { claimBranchIssue } from '@open-tomato/rafa/claims/git';
 import { DEFAULT_BRANCH_TEMPLATE, branchFromTemplate, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { isEpicIssue } from '../board/epic-walk.js';
-import { claimBranchOfRef } from '../board/roadmap-claims.js';
-import { parseRoadmapBody } from '../board/roadmap.js';
-import { ROADMAP_LABEL } from '../board/setup-roadmap.js';
 
 import { STAGE_LABELS } from './labels.js';
 

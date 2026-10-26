@@ -34,8 +34,8 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
 
-import { createGhPermissions } from '../../board/trust.js';
 import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
 import { createGhPullRequests } from '../../pr/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';

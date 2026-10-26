@@ -38,10 +38,11 @@
  * of each action in roster order, then the second of each, until two are
  * taken.
  *
- * The global flags are {@link GLOBAL_FLAGS}: the two `assembleContext`
- * reads for every command, and `--version`, which routing reads and which
- * takes no subject beside it (`route.ts`). The spec's `--runtime=<v>` is
- * left out: `loop start` alone reads it, and declares it, since a flag
+ * The global flags are {@link GLOBAL_FLAGS}, held in
+ * `packages/rafa/src/core/command/global-flags.ts`: the two
+ * `assembleContext` reads for every command, and `--version`, which
+ * routing reads and which takes no subject beside it (`route.ts`). The
+ * spec's `--runtime=<v>` is left out: `loop start` alone reads it, and declares it, since a flag
  * typed ahead of the subject never reaches the words a wrapped command is
  * handed.
  *
@@ -106,13 +107,12 @@
  * change to a core command's declaration, or to a default it reads from
  * a constant, goes red until they are regenerated and the diff read.
  */
-import type { CommandRegistry, SubjectSpec } from './registry.js';
 import type { HelpRequest } from './route.js';
+import type { CommandRegistry, SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { ArgSpec, FlagSpec , CommandExample, RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { isTopLevel , SPENDS_GLYPH, spendsCondition, spendsMark } from '@open-tomato/rafa/core/command';
-
-import { mountKey } from './registry.js';
+import { mountKey } from '@open-tomato/rafa/cli/registry';
+import { GLOBAL_FLAGS, isTopLevel , SPENDS_GLYPH, spendsCondition, spendsMark } from '@open-tomato/rafa/core/command';
 
 /** The column help's prose is wrapped at. */
 export const HELP_WIDTH = 80;
@@ -122,26 +122,6 @@ export const HELP_TAGLINE = 'run a plan through the ralph loop, one task per ses
 
 /** How many examples a subject's help lists. */
 export const SUBJECT_EXAMPLES = 2;
-
-/** A flag every command reads, as the root help lists it. */
-export interface GlobalFlag {
-  /** The spellings, as a person types them. */
-  readonly spelling: string;
-  /** What the flag does, in a phrase. */
-  readonly note: string;
-}
-
-/**
- * The flags the root help lists: the two `assembleContext` reads for
- * every command, typed ahead of the subject or after the action, then
- * `--version`, which `routeLine` reads and which is typed alone.
- */
-export const GLOBAL_FLAGS: readonly GlobalFlag[] = Object.freeze([
-  { spelling: '--output=json', note: 'NDJSON events instead of text (also RAFA_OUTPUT=json)' },
-  { spelling: '--output=events', note: 'one rafa· line per loop event (also RAFA_OUTPUT=events)' },
-  { spelling: '-v, --verbose', note: 'up to 3 times, or --verbose=N (also RAFA_VERBOSITY=N)' },
-  { spelling: '--version', note: 'print "rafa <version>" and exit; typed alone, no short form' },
-]);
 
 /** The root help's closing line, saying what the spend mark means. */
 export const SPENDS_LEGEND: string = `${SPENDS_GLYPH}  starts Claude Code sessions, which spend your Claude usage`;

@@ -76,6 +76,8 @@ import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { ReportBug } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
+import { causeOf } from '@open-tomato/rafa-board';
+
 import { suggestedEnvironment } from '@open-tomato/rafa/bugs/places';
 import { EMPTY_BUG_RECORD } from '@open-tomato/rafa/bugs/record';
 import { firstProjectPath } from '@open-tomato/rafa/bugs/stack-path';
@@ -88,7 +90,6 @@ import { packageOf, rootPackageOf } from '@open-tomato/rafa/project/package-of';
 import { artifactOf, hasText } from '@open-tomato/rafa/triage/bug-key';
 import { testFailureOf } from '@open-tomato/rafa/triage/test-failure';
 
-import { causeOf } from '../bugs/cause-rule.js';
 import { boundaryValueOf, summaryOf } from '../bugs/filed-values.js';
 
 export type { ReportedWords };

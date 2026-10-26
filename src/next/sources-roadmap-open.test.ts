@@ -18,9 +18,9 @@
  * option must carry no `hop` key and send the same `gh` commands it
  * sent before the flag existed, which the recorded calls pin.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '../pr/index.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,11 +28,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { resolveScope } from '@open-tomato/rafa/project/scope';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { openNextSources } from './sources.js';
 

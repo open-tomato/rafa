@@ -13,7 +13,7 @@
  * says is `./doctor-relations.test.ts`'s; these cases hold only the
  * wiring.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,7 +21,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BOARD_LIST_FIELDS, nativeBoardListFields } from '../board/roadmap-board.js';
+import { BOARD_LIST_FIELDS, nativeBoardListFields } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
 import { readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';

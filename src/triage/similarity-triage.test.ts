@@ -28,7 +28,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createLocalTracker } from '../adapters/tracker/local.js';
+import { createLocalTracker } from '@open-tomato/rafa-board/adapters/tracker/local';
 
 import { triageReport } from './triage.js';
 

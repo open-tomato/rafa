@@ -5,7 +5,7 @@
  *
  * Its own seam, apart from the pull-request port in `src/pr/gh.ts`, so
  * that file (near the 800-line cap) and its fake do not grow. The seam is
- * the {@link GhRunner} declared once in `src/adapters/tracker/github.ts`:
+ * the {@link GhRunner} declared once in `packages/rafa-board/src/adapters/tracker/github.ts`:
  * the command spawns `gh` through `createGhRunner`, and the tests hand
  * over the recorded fake in `./runs-fake.ts`, so no case reaches GitHub.
  *

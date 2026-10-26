@@ -22,9 +22,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { parsePlan , parseTaskDeclaration , unescapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 
-import { createFakeGh } from '../../adapters/tracker/github-fake.js';
-import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
 import { STALE_DOCS_MARKER } from '../../docs/release-issue.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

@@ -105,7 +105,7 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
     outputs: ['text', 'json'],
     run: async (context) => {
       // Imported here, not at the top: `issue list` is the `board` feature's command module, loaded when it is used.
-      const { runIssueList } = await import('./issue/list.js');
+      const { runIssueList } = await import('@open-tomato/rafa-board/commands/issue/list');
       await runIssueList({ ...context, flags: { ...context.flags, roadmap: true } }, seams);
     },
   };

@@ -6,11 +6,11 @@
  * The found cases are the control that the reader can answer folders at
  * all, so a none elsewhere is the link under test and not a dead reader.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
 
-import { epicContextArgs } from '../board/epic-context.js';
+import { epicContextArgs } from '@open-tomato/rafa-board/board/epic-context';
 
 import { readPlanOwns } from './owns.js';
 

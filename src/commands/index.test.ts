@@ -82,13 +82,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
+import { BOARD_FEATURE } from '@open-tomato/rafa-board/commands/board/index';
 
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
-import { BOARD_FEATURE } from './board/index.js';
 import { RUN_FEATURE } from './claim/index.js';
 import { PR_FEATURE } from './pr/index.js';
 import { RELEASE_FEATURE } from './release/index.js';
@@ -98,9 +98,9 @@ import { BUNDLED_FEATURES, CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS, createRo
 /** The `src/` directory, which the phase 0 modules sit in. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
-/** The modules reading each command line, from `src/` (effort's through `../packages/rafa-effort/src/`). */
+/** The modules reading each command line, from `src/` (effort's and board's through their packages' `src/`). */
 const READERS: Readonly<Record<string, readonly string[]>> = {
-  'plan create': ['plan.ts', 'board/flags.ts'],
+  'plan create': ['plan.ts', '../packages/rafa-board/src/board/flags.ts'],
   'loop start': ['start.ts', 'start/run-config.ts', 'start/run-setup.ts', 'start/runtime.ts', 'start/continue-args.ts'],
   'effort collect': ['../packages/rafa-effort/src/effort/collect.ts', '../packages/rafa-effort/src/effort/collect-args.ts'],
   'effort report': ['../packages/rafa-effort/src/effort/report.ts', '../packages/rafa-effort/src/effort/report-args.ts'],

@@ -18,7 +18,7 @@
  * `<home>/.rafa/worktrees/` (`WORKTREES_SUBDIR`,
  * `packages/rafa/src/start/worktree-dir.ts`),
  * which holds `rafa pr triage --resolve`'s `pr-<n>` and the epic
- * verification run's detached `epic-<n>` (`src/epic/verify-run.ts`), the
+ * verification run's detached `epic-<n>` (`packages/rafa-board/src/epic/verify-run.ts`), the
  * second left there only when its run could not remove it, and the
  * loop's own `loop.worktreeDir`, `.rafa/worktrees/<stub>` unless a layer
  * names another, resolved from the project root by `worktreeDirAt`

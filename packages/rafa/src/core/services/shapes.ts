@@ -83,7 +83,7 @@ export interface EndingSeams {
 
 /**
  * What the `triageReport` service is handed for one report: the fields
- * `rafa epic close` passes (`src/commands/epic/close-triage.ts`), each
+ * `rafa epic close` passes (`packages/rafa-board/src/commands/epic/close-triage.ts`), each
  * one pr's `TriageOptions` (`src/triage/triage.ts`) takes.
  */
 export interface TriageServiceOptions {
@@ -139,8 +139,8 @@ export type TriagedAction =
 
 /**
  * What board reads of one triaged bug, pr's `BugTriage`: the fields
- * `bugLine` (`src/commands/epic/close-triage.ts`) and `filedIssueNumber`
- * (`src/board/project/add-filed.ts`) read.
+ * `bugLine` (`packages/rafa-board/src/commands/epic/close-triage.ts`) and `filedIssueNumber`
+ * (`packages/rafa-board/src/board/project/add-filed.ts`) read.
  */
 export interface TriagedBug {
   readonly channel: TriagedChannel;

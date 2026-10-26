@@ -3,7 +3,7 @@
 Every bug has the same fields under the same headings, and a title
 rendered from them (#951). Two writers build the record. `rafa issue
 create --type=bug` reads its flags into one (`src/bugs/`, and
-`src/commands/issue/create-bug.ts`) and refuses a record missing a
+`packages/rafa-board/src/commands/issue/create-bug.ts`) and refuses a record missing a
 required field, naming it. Triage builds the same record for a bug the
 loop files, from a session's report, in `src/triage/bug-filing.ts`
 (#991), and never refuses one over its fields: a value it cannot use is
@@ -18,7 +18,7 @@ dispatch and the checkout:
 - **Reproduce**, when the session gives none or `unknown`: "seen while
   running task <line> of plan <stub>", or "seen while running `<the
   command>`" for a dispatch with no plan stub.
-- **Cause**, by the cause rule (`src/bugs/cause-rule.ts`): a code of the
+- **Cause**, by the cause rule (`packages/rafa-board/src/bugs/cause-rule.ts`): a code of the
   list is kept as written; a shaped code the list lacks is
   `<family>:new-context` with the code as `proposed`, or
   `unknown:new-context` when its family is unlisted; any other text is
@@ -181,7 +181,7 @@ are, and refuses one whose label would pass GitHub's 50 characters. The
 
 `rafa issue list --type=bug` prints a header and the columns id, state,
 module, action and summary, the last three read back from each title
-(`renderBugList`, `src/commands/issue/list.ts`). A part a title lacks is
+(`renderBugList`, `packages/rafa-board/src/commands/issue/list.ts`). A part a title lacks is
 `-`, so a bug filed before the template lists whole under summary. Json
 mode is unchanged.
 

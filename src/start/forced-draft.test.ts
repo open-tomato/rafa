@@ -7,15 +7,15 @@
  * written again, the same body without it being the control.
  */
 import type { PassedOverTask } from './loop-events.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { PullRequestDetail } from '../pr/index.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';
 import { bodyWithPassedOver, markForcedDraft, PASSED_OVER_HEADING, passedOverSection, refuseUndraftedPullRequest } from './forced-draft.js';

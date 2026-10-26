@@ -417,7 +417,7 @@ export interface CapturedSpawnOptions {
    * The session's working directory, or the loop's own when absent. The
    * search session (`packages/rafa-inventory/src/inventory/search/index.ts`) names the scratch
    * copy of its candidates, each check session of the epic verification
-   * run (`src/epic/verify-run.ts`) a detached worktree of main, the plan
+   * run (`packages/rafa-board/src/epic/verify-run.ts`) a detached worktree of main, the plan
    * session of the `claude` planner (`src/adapters/planner/claude.ts`)
    * the project root it writes the plan under, and the loop's task,
    * wrap-up and CI repair sessions the run's checkout

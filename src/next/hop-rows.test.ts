@@ -19,14 +19,14 @@
  * answered without `roadmap` would fail the first kind; a row that
  * answered for a situation it does not name would fail the second.
  */
-import type { HopDecision, HopHalt, HopMove } from './hop-chain.js';
 import type { NextBoard, NextHopReading, NextRoadmapReading, NextSources } from './readings.js';
-import type { BlockedLine } from '../board/blocked-line.js';
-import type { NextNowEpic } from '../board/epic-walk.js';
 import type { ChecksVerdict, GitResult, Mergeability, PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { Position } from '@open-tomato/rafa/project/position';
+import type { BlockedLine } from '@open-tomato/rafa-board/board/blocked-line';
+import type { NextNowEpic } from '@open-tomato/rafa-board/board/epic-walk';
+import type { HopDecision, HopHalt, HopMove } from '@open-tomato/rafa-board/next/hop-chain';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -41,13 +41,13 @@
  *    instead?" would collect a yes for the one issue that cannot be
  *    planned.
  */
-import type { BlockedLine } from '../../board/blocked-line.js';
-import type { RoadmapLine } from '../../board/roadmap.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { BlockedLine } from '@open-tomato/rafa-board/board/blocked-line';
+import type { RoadmapLine } from '@open-tomato/rafa-board/board/roadmap';
 
 import { describe, expect, it } from 'bun:test';
 
-import { alternativeQuestion } from '../../board/blocked-line.js';
+import { alternativeQuestion } from '@open-tomato/rafa-board/board/blocked-line';
 
 import { createPlanBlockedOffer } from './blocked-offer.js';
 

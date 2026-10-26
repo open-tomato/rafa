@@ -5,7 +5,7 @@
  * the spec issue and the issues it names), and a fixture planner
  * standing in for a Claude Code session.
  *
- * `src/board/refs-gate.test.ts` and `src/commands/plan/refs-check.test.ts`
+ * `src/tests/board-coupled/board/refs-gate.test.ts` and `src/tests/board-coupled/commands/plan/refs-check.test.ts`
  * drive the gate over fake verifiers; `./refs-reading-integration.test.ts`
  * drives the reading over a planted repository. This file drives the
  * seam across them and `src/plan.ts`: that a refusal is printed in the
@@ -33,17 +33,16 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from '@open-tomato/rafa/board/naming';
-
-import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { ACCEPT_REFS_FLAG } from '../board/refs-gate.js';
-import { readRefsBlock } from '../refs/stamp.js';
+import { BOARD_REFUSAL_EXIT } from '@open-tomato/rafa-board/board/exit-codes';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { ACCEPT_REFS_FLAG } from '@open-tomato/rafa-board/board/refs-gate';
+import { readRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
-import { completeSpecBody } from './spec-bodies.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** `src/`, where every module the probe imports lives. */
@@ -78,10 +77,10 @@ const PROBE = [
   'registerCoreAdapters();',
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',

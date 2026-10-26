@@ -2,9 +2,9 @@
  * An integration test over one stubbed `gh`, for the board routes of
  * `rafa plan create` and the roadmap tick `rafa pr merge` writes.
  *
- * `src/board/issue.ts`, `src/board/roadmap.ts`, `src/board/spec-source.ts`,
- * `src/board/spec-source-roadmap.ts`, `src/board/plan-spec.ts`,
- * `src/board/roadmap-tick.ts` and `src/commands/pr/merge-tick.ts` each
+ * `packages/rafa-board/src/board/issue.ts`, `packages/rafa-board/src/board/roadmap.ts`, `packages/rafa-board/src/board/spec-source.ts`,
+ * `packages/rafa-board/src/board/spec-source-roadmap.ts`, `packages/rafa-board/src/board/plan-spec.ts`,
+ * `packages/rafa-board/src/board/roadmap-tick.ts` and `src/commands/pr/merge-tick.ts` each
  * drive their own module, or a pair of them, over planted fakes; this
  * file drives none of that again. It exists for the SEAM across all of
  * them, which `src/plan.test.ts` names in its own module note and does
@@ -16,19 +16,19 @@
  *    line.
  *  - `--next` is "not driven [in `plan.test.ts`] — its walk is three more
  *    `gh` and `git` reads, driven over planted runners in
- *    `src/board/plan-spec.test.ts` and end to end in the integration
+ *    `packages/rafa-board/src/board/plan-spec.test.ts` and end to end in the integration
  *    suite." This is that suite: a real roadmap body, walked by the
  *    real command, over a real (if bare) git repository, past a done
  *    reading, a closed reading, a branch taken and a pull request taken,
  *    to the line it picks.
  *  - `rafa pr merge` ticks a roadmap line after a merge
- *    (`src/commands/pr/merge-tick.test.ts`, `src/board/roadmap-tick.test.ts`),
+ *    (`src/commands/pr/merge-tick.test.ts`, `packages/rafa-board/src/board/roadmap-tick.test.ts`),
  *    and `plan create --next` reads a ticked line as done
- *    (`src/board/roadmap.test.ts`). Nothing anywhere plays the two in
+ *    (`src/tests/board-coupled/board/roadmap.test.ts`). Nothing anywhere plays the two in
  *    sequence over the SAME board: a tick written by one, read as done
  *    by the other. That is the second half of this file.
  *  - the epic context the `--next` walk hands the planner
- *    (`src/board/epic-context.ts`, `src/plan.ts`) is unit-tested over an
+ *    (`packages/rafa-board/src/board/epic-context.ts`, `src/plan.ts`) is unit-tested over an
  *    in-process `gh` fake and its `{EPIC_CONTEXT}` slot rendering is
  *    tested over a template string in `src/plan.test.ts`, but neither
  *    proves that a real `--next` run, walked over a stubbed `gh` naming
@@ -41,7 +41,7 @@
  * The first half spawns `bun src/rafa.ts plan create` in a scratch git
  * repository, exactly as `src/plan.test.ts` does and for the same
  * reason: the board routes build their own `gh` and `git` runners
- * (`src/board/plan-spec.ts`) unless the caller hands one over, and the
+ * (`packages/rafa-board/src/board/plan-spec.ts`) unless the caller hands one over, and the
  * route the command resolves through (`src/commands/plan/spec-route.ts`)
  * hands none over, so only a real process with a stand-in
  * `gh` first on its PATH drives them without reaching GitHub. The
@@ -66,18 +66,18 @@
  * Both halves answer check 0, the author's trust: every planted issue
  * carries an author, and both stubs answer
  * `gh api repos/{owner}/{repo}/collaborators/<login>/permission` with
- * `admin`. That check runs first (`src/board/plan-spec.ts`), so a board
+ * `admin`. That check runs first (`packages/rafa-board/src/board/plan-spec.ts`), so a board
  * that did not answer it would refuse every case here for its author
  * and no case could reach the reading it is about. `--next` also reads
  * `origin` through `git` for the label a refusal would carry, which a
  * scratch repository answers with no remote.
  */
 import type { CapturedRun } from './cli-capture.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { EpicTickResult } from '../board/epic-tick.js';
-import type { SpecIssue } from '../board/issue.js';
-import type { RoadmapLine, RoadmapSkip } from '../board/roadmap.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { EpicTickResult } from '@open-tomato/rafa-board/board/epic-tick';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { RoadmapLine, RoadmapSkip } from '@open-tomato/rafa-board/board/roadmap';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -97,7 +97,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { notesPath as localNotesPath, specPath } from '@open-tomato/rafa/board/naming';
-
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import {
   closedIssueMessage,
   missingSpecLabelMessage,
@@ -105,23 +105,23 @@ import {
   snapshotDiffersMessage,
   snapshotText,
   SPEC_LABEL,
-} from '../board/issue.js';
-import { resolvePlanSpec } from '../board/plan-spec.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
+} from '@open-tomato/rafa-board/board/issue';
+import { resolvePlanSpec } from '@open-tomato/rafa-board/board/plan-spec';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
 import {
   noRoadmapMessage,
   parseRoadmapBody,
   severalRoadmapsMessage,
-} from '../board/roadmap.js';
-import { pickLine, roadmapHeaderLine, skipLine } from '../board/spec-source-roadmap.js';
-import { describeIssue, dryRunLine } from '../board/spec-source.js';
+} from '@open-tomato/rafa-board/board/roadmap';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+import { describeIssue, dryRunLine } from '@open-tomato/rafa-board/board/spec-source';
+import { pickLine, roadmapHeaderLine, skipLine } from '@open-tomato/rafa-board/board/spec-source-roadmap';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
+
 import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
-import { completeSpecBody } from './spec-bodies.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's directory, `src/tests/`, one level under the modules the probe imports. */
@@ -152,10 +152,10 @@ const PROBE = [
   'registerCoreAdapters();',
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',
@@ -203,10 +203,10 @@ const PROBE_WITH_PROMPT = [
   'registerCoreAdapters();',
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',
@@ -259,7 +259,7 @@ function git(args: readonly string[], cwd: string): void {
 /**
  * A planted issue, every field filled in unless `over` says otherwise.
  * The default body is EMPTY, which the readiness gate refuses whole
- * (`src/board/plan-spec.ts`): an issue a case means `plan create` to
+ * (`packages/rafa-board/src/board/plan-spec.ts`): an issue a case means `plan create` to
  * plan FROM carries {@link completeSpecBody} instead, and the ones left
  * empty are the roadmap itself and the lines the walk skips, neither of
  * which is ever inspected.

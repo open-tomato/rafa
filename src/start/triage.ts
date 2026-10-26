@@ -190,10 +190,6 @@
  */
 import type { TaskDispatch } from './dispatch.js';
 import type { KindReader, StartKindOptions } from './triage-kinds.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { RefreshAddedItems } from '../board/project/add-issue.js';
-import type { RefreshConfig } from '../board/project/refresh.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { IssuesConfigSettings } from '@open-tomato/rafa/config-schema-issues';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
@@ -202,6 +198,13 @@ import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
 import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
+import type {
+  GhRunner,
+  RefreshAddedItems,
+  RefreshConfig,
+  ResolveTrackerOptions,
+  TrackerResolution,
+} from '@open-tomato/rafa-board';
 import type {
   BugTriage,
   InheritedTriage,
@@ -212,6 +215,12 @@ import type {
 
 import { homedir } from 'node:os';
 
+import {
+  addFiledBugs,
+  createGhRunner,
+  openProjectRunner,
+  resolveTracker,
+} from '@open-tomato/rafa-board';
 import {
   blockerTextOf,
   checkedKindOf,
@@ -231,10 +240,6 @@ import { artifactOf, hasText } from '@open-tomato/rafa/triage/bug-key';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { addFiledBugs } from '../board/project/add-filed.js';
-import { openProjectRunner } from '../board/project/project-runner.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 
 import { emitLoopEvent } from './loop-events.js';

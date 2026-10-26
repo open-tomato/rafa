@@ -94,20 +94,21 @@
  * `get` or `checks` means the provider is unusable rather than that the
  * repository has no pull request, and it is left to the caller
  * unchanged.
+ *
+ * The seven interfaces the board reads with ({@link NextBoard} and its
+ * neighbours) live in board's `packages/rafa-board/src/next/relation-readings.ts` since pass 4c,
+ * and are taken from the board facade and re-exported here by type, so no
+ * importer of them changes.
  */
-import type { HopDecision, TakenBy } from './hop-chain.js';
-import type { BlockedLine } from '../board/blocked-line.js';
-import type { NextNowEpic } from '../board/epic-walk.js';
-import type { RoadmapLine } from '../board/roadmap.js';
 import type { PlanListing } from '../plan/list.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
-import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
-import type { Position } from '@open-tomato/rafa/project/position';
 import type { BaseStanding } from '@open-tomato/rafa/start/branch-decision';
+import type { BlockedLine, NextBoard, NextRoadmapReading, RoadmapLine } from '@open-tomato/rafa-board';
+
+import { scanClaimBranches } from '@open-tomato/rafa-board';
 
 import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -116,7 +117,6 @@ import { isLive } from '@open-tomato/rafa/core/loop/readings';
 import { planFileName } from '@open-tomato/rafa/core/plan';
 import { parseBaseStanding, REMOTE, trackedChanges } from '@open-tomato/rafa/start/branch-decision';
 
-import { scanClaimBranches } from '../board/roadmap.js';
 import { listPlans } from '../plan/list.js';
 import { gitSaid } from '../pr/index.js';
 
@@ -126,109 +126,15 @@ const DETACHED = 'HEAD';
 /** Where the path starts in a `git status --porcelain` line; see {@link changedPaths}. */
 const PORCELAIN_PATH_AT = 3;
 
-/** What one walk of the roadmap answered. */
-export interface NextRoadmapReading {
-  /** The roadmap issue the walk read, as the last row names it. */
-  readonly roadmap: number;
-  /** The first line neither done nor taken, or null when the roadmap has none left. */
-  readonly line: RoadmapLine | null;
-  /** How many lines the walk passed to reach it. */
-  readonly passed: number;
-  /** One sentence per reading that failed, carried and never thrown. */
-  readonly problems: readonly string[];
-  /**
-   * The epic the walk ran dry in: walked into, or named by the current
-   * place, with every line done or taken. The key is LEFT OUT, not set
-   * to undefined, when no epic ran dry, so a board with no epic reads
-   * with the four keys it always had.
-   */
-  readonly dryEpic?: DryEpic;
-  /**
-   * What the walk read for `rafa next --roadmap`: the hop record, the
-   * away target, the lines passed as waiting, the one-hop decision and
-   * the next `now` epic. The key is LEFT OUT, not set to undefined, on a
-   * board built without `roadmap` (`./sources.ts`), so a walk without
-   * the flag answers the keys it always did.
-   */
-  readonly hop?: NextHopReading;
-}
-
-/** One blocker of a waiting line, and what took it. */
-export interface TakenBlocker {
-  /** The blocker's issue number. */
-  readonly issue: number;
-  /** The branch or the open pull request that took it. */
-  readonly taken: TakenBy;
-}
-
-/** A line the walk passed because every open blocker it waits on is taken. */
-export interface WaitingLine {
-  /** The line passed: H. */
-  readonly line: RoadmapLine;
-  /** Each open or unread blocker of H, in line order, with what took it. */
-  readonly blockers: readonly TakenBlocker[];
-}
-
-/** The away hop's target C, as this turn read it. */
-export interface HopTarget {
-  /** C, the record's `target`. */
-  readonly issue: number;
-  /** True when C is closed. */
-  readonly closed: boolean;
-  /** The open pull request closing C, or null; not read once C is closed. */
-  readonly pullRequest: number | null;
-}
-
-/** What {@link NextRoadmapReading.hop} holds; `./sources.ts` holds how each is read. */
-export interface NextHopReading {
-  /** The hop record this turn follows, or null: none, unset, or dropped as stale. */
-  readonly record: HopRecord | null;
-  /** A record read and dropped because the position's home is not its home, else null. */
-  readonly stale: HopRecord | null;
-  /** The position file as read, or null when it reads unset. */
-  readonly position: Position | null;
-  /** C and its state while a blocker hop is away, else null. */
-  readonly target: HopTarget | null;
-  /** The lines passed as waiting, in walk order. */
-  readonly waiting: readonly WaitingLine[];
-  /** The one-hop decision for the line the walk answered when it is blocked, else null. */
-  readonly decision: HopDecision | null;
-  /** The next `now` epic after the epic that ran dry, else null. */
-  readonly nextEpic: NextNowEpic | null;
-}
-
-/** An epic whose every line is done or taken, as {@link NextRoadmapReading.dryEpic} names it. */
-export interface DryEpic {
-  /** The epic issue's number. */
-  readonly number: number;
-  /** The epic issue's title. */
-  readonly title: string;
-}
-
-/**
- * The board, as the roadmap rows read it: the next line, and the two
- * readings over that line's issue.
- *
- * The three are the walk `plan create --next` makes
- * (`src/board/spec-source-roadmap.ts`) and the readings beside it
- * (`src/board/blocked-line.ts`), behind one interface, so neither this
- * module nor the table composes any `gh` of its own.
- */
-export interface NextBoard {
-  /** The roadmap walked once. */
-  readonly next: () => Promise<NextRoadmapReading>;
-  /** Why the issue waits on other issues, or null when it does not. */
-  readonly blocking: (issue: number) => Promise<BlockedLine | null>;
-  /** Whether the issue carries `spec:ready`. */
-  readonly isReady: (issue: number) => Promise<boolean>;
-  /**
-   * `native` when the board reads its relationships natively, where the
-   * tracker clears a blocker when it closes and `./state.ts` proposes no
-   * `unblock`. The key is LEFT OUT, not set to undefined, in `labels`
-   * mode, the default.
-   */
-  readonly mode?: Extract<BoardRelationshipMode, 'native'>;
-}
+export type {
+  DryEpic,
+  HopTarget,
+  NextBoard,
+  NextHopReading,
+  NextRoadmapReading,
+  TakenBlocker,
+  WaitingLine,
+} from '@open-tomato/rafa-board';
 
 /** What the readings are taken over; see the module note. */
 export interface NextSources {

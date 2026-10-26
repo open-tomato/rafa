@@ -1,7 +1,7 @@
 /**
  * Integration tests for check 4 of `rafa plan create` end to end
- * (`checkCreateRefs` over `enforceRefsGate`, `src/commands/plan/refs-check.ts`
- * and `src/board/refs-gate.ts`), over planted repositories and the
+ * (`checkCreateRefs` over `enforceRefsGate`, `packages/rafa-board/src/commands/plan/refs-check.ts`
+ * and `packages/rafa-board/src/board/refs-gate.ts`), over planted repositories and the
  * verifier `plan create` builds for them: real git, the real extractor
  * and the real stamp codec, and a real rafa checkout whose own `describe`
  * is run for the roster. Only the `gh` issue reader is out of it, because
@@ -26,9 +26,9 @@
  * as the passing one, so a gate that read nothing cannot pass for one
  * that found nothing; and the refusal leaves the copy as it was.
  */
-import type { ResolvedSpec } from '../board/spec-source.js';
-import type { DescribeDocument, DescribedAction } from '../cli/describe.js';
+import type { DescribeDocument, DescribedAction } from '@open-tomato/rafa/cli/describe';
 import type { Output } from '@open-tomato/rafa/ports';
+import type { ResolvedSpec } from '@open-tomato/rafa-board/board/spec-source';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,12 +38,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
-import { checkCreateRefs, RAFA_PACKAGE_NAME } from '../commands/plan/refs-check.js';
-import { readRefsBlock } from '../refs/stamp.js';
-
-import { sinkOutput } from './output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { BOARD_REFUSAL_EXIT } from '@open-tomato/rafa-board/board/exit-codes';
+import { checkCreateRefs, RAFA_PACKAGE_NAME } from '@open-tomato/rafa-board/commands/plan/refs-check';
+import { readRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-create-refs-gate-')));
 

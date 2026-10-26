@@ -3,7 +3,7 @@
  * dry inside an epic, the next steps that are no row of the state table.
  *
  * A dry epic is one whose every line is done or taken though the epic is
- * not done (`src/board/epic-walk.ts`), carried out of the walk as
+ * not done (`packages/rafa-board/src/board/epic-walk.ts`), carried out of the walk as
  * {@link NextRoadmapReading.dryEpic} (`./sources.ts`). Row 13,
  * `nothing-left`, then reads a roadmap with no line left and proposes a
  * new spec issue; what the person actually does next is close the epic,

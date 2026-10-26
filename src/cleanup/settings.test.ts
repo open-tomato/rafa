@@ -15,7 +15,7 @@
  * same settings either way, so the runner reaches no setting).
  */
 import type { DoctorCleanupInput } from './settings.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { join } from 'node:path';
 

@@ -13,11 +13,10 @@ import type { CommandDeclaration, RafaCommand } from '@open-tomato/rafa/core/com
 
 import { describe, expect, it } from 'bun:test';
 
-import { REASON_FLAG } from '../../board/epic-trail.js';
-import { HORIZONS } from '../../board/roadmap-epic-rows.js';
-
-import epicCancel from './cancel.js';
-import epicClose from './close.js';
+import { REASON_FLAG } from '@open-tomato/rafa-board/board/epic-trail';
+import { HORIZONS } from '@open-tomato/rafa-board/board/roadmap-epic-rows';
+import epicCancel from '@open-tomato/rafa-board/commands/epic/cancel';
+import epicClose from '@open-tomato/rafa-board/commands/epic/close';
 import {
   DEFAULT_HORIZON,
   DEFER_TARGETS,
@@ -32,13 +31,13 @@ import {
   EPIC_SHOW_DECLARATION,
   EPIC_SUBJECT,
   PROMOTE_TARGETS,
-} from './declarations.js';
-import epicDefer from './defer.js';
-import { DEFER_ACTION, PROMOTE_ACTION } from './horizon-change.js';
-import epicMove from './move.js';
-import epicNew from './new.js';
-import epicPromote from './promote.js';
-import epicShow from './show.js';
+} from '@open-tomato/rafa-board/commands/epic/declarations';
+import epicDefer from '@open-tomato/rafa-board/commands/epic/defer';
+import { DEFER_ACTION, PROMOTE_ACTION } from '@open-tomato/rafa-board/commands/epic/horizon-change';
+import epicMove from '@open-tomato/rafa-board/commands/epic/move';
+import epicNew from '@open-tomato/rafa-board/commands/epic/new';
+import epicPromote from '@open-tomato/rafa-board/commands/epic/promote';
+import epicShow from '@open-tomato/rafa-board/commands/epic/show';
 
 /**
  * A command less its `run`: the fields its declaration carries.

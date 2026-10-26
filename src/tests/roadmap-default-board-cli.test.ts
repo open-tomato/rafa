@@ -9,7 +9,7 @@
  *
  * "A project with no `type:roadmap` label and no position file behaves
  * exactly as before: `rafa roadmap` ... print byte-identical output."
- * `src/board/roadmap-rows.ts` and `src/commands/issue/roadmap-table.ts`
+ * `packages/rafa-board/src/board/roadmap-rows.ts` and `packages/rafa-board/src/commands/issue/roadmap-table.ts`
  * are untouched by this stage, so calling them directly, over a
  * `resolveDefaultBoard` that degrades to the title rule the way it does
  * with nothing labelled, reproduces the exact bytes the PRE-CHANGE
@@ -30,7 +30,7 @@
  * planted to answer.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { SpecIssue } from '../board/issue.js';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -40,17 +40,17 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
+import { createPlanDirNames, readRoadmapRows } from '@open-tomato/rafa-board/board/roadmap-rows';
+import { ROADMAP_LABEL } from '@open-tomato/rafa-board/board/setup';
+import { renderRoadmapTable } from '@open-tomato/rafa-board/commands/issue/roadmap-table';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { parseBoardListing } from '../board/roadmap-board.js';
-import { createPlanDirNames, readRoadmapRows } from '../board/roadmap-rows.js';
-import { ROADMAP_LABEL } from '../board/setup.js';
-import { renderRoadmapTable } from '../commands/issue/roadmap-table.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-roadmap-default-board-cli-')));

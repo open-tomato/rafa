@@ -62,11 +62,11 @@
  * template (1).
  */
 import type { RunClaim, StartPreflightClaim } from './preflight-claim.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { GitRunner } from '../pr/index.js';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
 
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -80,11 +80,11 @@ import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/st
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createGhIssueBoard } from '@open-tomato/rafa-board/board/issue-board';
 
-import { createGhIssueBoard } from '../board/issue-board.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { createGitRunner } from '../pr/index.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createStartPreflightClaim, markInDevelopment, readRunClaim, refuseUnownedClaim } from './preflight-claim.js';
 

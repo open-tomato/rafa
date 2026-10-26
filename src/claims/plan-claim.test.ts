@@ -12,10 +12,10 @@
  * back-dating commits, and each stale case keeps a control whose only
  * difference is the clock, the labels or the setting.
  */
-import type { AheadCandidate, AheadRequest } from './ahead.js';
 import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from './plan-claim.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '../pr/index.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { AheadCandidate, AheadRequest } from '@open-tomato/rafa-board/claims/ahead';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,8 +27,8 @@ import { branchName } from '@open-tomato/rafa/board/naming';
 import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@open-tomato/rafa/claims/git';
 import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+import { createGhIssueBoard } from '@open-tomato/rafa-board/board/issue-board';
 
-import { createGhIssueBoard } from '../board/issue-board.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { claimPlanIssue, resolveClaimTarget } from './plan-claim.js';

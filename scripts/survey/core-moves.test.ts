@@ -134,7 +134,7 @@ describe('isCoreRead', () => {
   });
 
   it('refuses a file outside core, another test under src/tests/ and a folder that only shares the parked prefix', () => {
-    expect(isCoreRead('src/board/place.ts')).toBe(false);
+    expect(isCoreRead('packages/rafa-board/src/board/place.ts')).toBe(false);
     expect(isCoreRead('src/tests/core-barrels.sweep.test.ts')).toBe(false);
     expect(isCoreRead('src/tests/core-coupled-notes.ts')).toBe(false);
   });

@@ -645,7 +645,7 @@ export const claimsAhead: Reader<ClaimsAhead> = oneOf(CLAIMS_AHEAD);
  *
  * The shape is narrow on purpose. A login read from this setting is put
  * into `repos/{owner}/{repo}/collaborators/<login>/permission` by
- * `src/board/trust.ts`, so anything carrying `/`, `.`, `%`, whitespace
+ * `packages/rafa-board/src/board/trust.ts`, so anything carrying `/`, `.`, `%`, whitespace
  * or a leading `-` would either move that path or arrive at `gh` where a
  * flag goes. It refuses the `app/<name>` spelling `gh --json author`
  * writes for an app account for the same reason: that is `gh`'s

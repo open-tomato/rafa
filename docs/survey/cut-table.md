@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2186 files, 2158 of them in 12 packages (651 left to place) and 28 in 3 unassigned folders. Of the 4857 edges between two files neither of which is a test, value and type alike, 79 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2193 files, 2165 of them in 12 packages (692 left to place) and 28 in 3 unassigned folders. Of the 4864 edges between two files neither of which is a test, value and type alike, 71 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -12,16 +12,16 @@ An upward edge leaves a package for one further down this table. A file left to 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `rafa-eslint-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2 | `rafa-typescript-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 3 | `@open-tomato/rafa-core` | 336 | 195 | 135 | 6 | 0 | 0 | 0 |
+| 3 | `@open-tomato/rafa-core` | 343 | 198 | 138 | 7 | 0 | 0 | 0 |
 | 4 | `rafa-inventory` | 105 | 56 | 49 | 0 | 0 | 0 | 0 |
-| 5 | `rafa-board` | 343 | 156 | 180 | 7 | 9 | 0 | 9 |
-| 6 | `rafa-pr` | 204 | 87 | 115 | 2 | 51 | 0 | 51 |
-| 7 | `rafa-run` | 261 | 109 | 152 | 0 | 18 | 0 | 18 |
+| 5 | `rafa-board` | 301 | 156 | 137 | 8 | 2 | 0 | 2 |
+| 6 | `rafa-pr` | 204 | 87 | 115 | 2 | 50 | 0 | 50 |
+| 7 | `rafa-run` | 265 | 111 | 154 | 0 | 18 | 0 | 18 |
 | 8 | `rafa-release` | 123 | 54 | 69 | 0 | 1 | 0 | 1 |
 | 9 | `rafa-effort` | 51 | 32 | 19 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 12 | `@open-tomato/rafa` | 694 | 178 | 490 | 26 | 0 | 0 | 0 |
+| 12 | `@open-tomato/rafa` | 732 | 176 | 532 | 24 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
@@ -31,27 +31,24 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | --- | --- | --- |
 | `rafa-eslint-config` | `packages/eslint-config/` (0) | - |
 | `rafa-typescript-config` | `packages/typescript-config/` (0) | - |
-| `@open-tomato/rafa-core` | `packages/rafa/` (336) | - |
+| `@open-tomato/rafa-core` | `packages/rafa/` (343) | - |
 | `rafa-inventory` | `packages/rafa-inventory/` (104), `src/tiers/` (1), `src/bundled/` (0), `src/inventory/` (0), `src/schema/` (0) | - |
-| `rafa-board` | `src/board/` (138), `src/commands/issue/` (44), `src/board/project/` (43), `src/commands/epic/` (35), `src/adapters/tracker/` (19), `src/refs/` (13), `src/commands/board/` (8), `packages/rafa-board/` (0) | `src/board/flags.ts`, `src/board/gate.ts`, `src/board/issue.ts`, `src/board/leak.ts`, `src/board/plan-field.ts`, `src/board/plan-spec.ts`, `src/board/previous-copy.ts`, `src/board/readiness.ts`, `src/board/review-comment.ts`, `src/board/review-stamp.ts`, `src/board/snapshot-settle.ts`, `src/board/spec-review.ts`, `src/board/spec-source.ts`, `src/board/trust.ts`, `src/bugs/cause-rule.ts`, `src/claims/ahead.ts`, `src/commands/doctor-refs.ts`, `src/commands/plan/refs-check.ts`, `src/epic/verify-plan.ts`, `src/epic/verify-run.ts`, `src/next/hop-chain.ts`, `src/next/relation-readings.ts` |
+| `rafa-board` | `packages/rafa-board/` (252), `src/board/` (6), `src/commands/board/` (1), `src/commands/epic/` (1), `src/commands/issue/` (1) | `packages/rafa-board/src/board/flags.ts`, `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/issue.ts`, `packages/rafa-board/src/board/leak.ts`, `packages/rafa-board/src/board/plan-field.ts`, `packages/rafa-board/src/board/plan-spec.ts`, `packages/rafa-board/src/board/previous-copy.ts`, `packages/rafa-board/src/board/readiness.ts`, `packages/rafa-board/src/board/review-comment.ts`, `packages/rafa-board/src/board/review-stamp.ts`, `packages/rafa-board/src/board/snapshot-settle.ts`, `packages/rafa-board/src/board/spec-review.ts`, `packages/rafa-board/src/board/spec-source.ts`, `packages/rafa-board/src/board/trust.ts`, `packages/rafa-board/src/bugs/cause-rule.ts`, `packages/rafa-board/src/claims/ahead.ts`, `packages/rafa-board/src/commands/doctor-refs.ts`, `packages/rafa-board/src/commands/plan/refs-check.ts`, `packages/rafa-board/src/epic/verify-plan.ts`, `packages/rafa-board/src/epic/verify-run.ts`, `packages/rafa-board/src/next/hop-chain.ts`, `packages/rafa-board/src/next/relation-readings.ts` |
 | `rafa-pr` | `src/commands/pr/` (79), `src/pr/` (65), `src/triage/` (32), `packages/rafa-pr/` (0) | `src/bugs/filed-values.ts`, `src/cleanup/branches.ts`, `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/docs/open-lines.ts`, `src/docs/release-issue.ts`, `src/docs/task-reading.ts`, `src/next/owner-gate.ts`, `src/next/relations-mode.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`, `src/plan/risk.ts`, `src/plan/risk/accounts.ts`, `src/pr/index.ts` |
-| `rafa-run` | `src/start/` (175), `src/suite/` (18), `src/commands/claim/` (15), `src/claims/` (11), `src/preflight/` (8), `packages/rafa-run/` (0) | `src/cleanup/index.ts`, `src/cleanup/remote-only.ts`, `src/cleanup/runs.ts`, `src/cleanup/worktrees.ts`, `src/commands/switch.ts`, `src/loop/events-file.ts`, `src/next/actions.ts`, `src/next/ending.ts`, `src/next/hint.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/preconditions.ts`, `src/next/readings.ts`, `src/next/state.ts`, `src/plan/index.ts`, `src/plan/list.ts`, `src/plan/store-rules.ts`, `src/runtime/install.ts` |
+| `rafa-run` | `src/start/` (177), `src/suite/` (18), `src/commands/claim/` (15), `src/claims/` (11), `src/preflight/` (10), `packages/rafa-run/` (0) | `src/cleanup/index.ts`, `src/cleanup/remote-only.ts`, `src/cleanup/runs.ts`, `src/cleanup/worktrees.ts`, `src/commands/switch.ts`, `src/loop/events-file.ts`, `src/next/actions.ts`, `src/next/ending.ts`, `src/next/hint.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/preconditions.ts`, `src/next/readings.ts`, `src/next/state.ts`, `src/plan/index.ts`, `src/plan/list.ts`, `src/plan/store-rules.ts`, `src/runtime/install.ts` |
 | `rafa-release` | `src/release/` (73), `src/commands/release/` (42), `packages/rafa-release/` (0) | `src/cleanup/past-head.ts`, `src/commands/doctor-ladder.ts`, `src/next/epic-end.ts`, `src/project/lock.ts` |
 | `rafa-effort` | `packages/rafa-effort/` (51) | - |
 | `rafa-hub` | `packages/rafa-hub/` (31) | - |
 | `rafa-sync-service` | `packages/rafa-sync-service/` (10) | - |
-| `@open-tomato/rafa` | `src/cli/` (35) | `src/commands/index.ts`, `src/effort/store/index.ts`, `src/inventory/browse.ts`, `src/rafa.ts`, `src/schema/agent.ts` |
+| `@open-tomato/rafa` | `src/cli/` (32) | `src/commands/index.ts`, `src/effort/store/index.ts`, `src/inventory/browse.ts`, `src/rafa.ts`, `src/schema/agent.ts` |
 
 ## Upward edges by pair of packages
 
 | From | Into | Edges |
 | --- | --- | --- |
-| `rafa-board` | `rafa-run` | 1 |
 | `rafa-board` | `rafa-effort` | 2 |
-| `rafa-board` | `@open-tomato/rafa` | 6 |
 | `rafa-pr` | `rafa-run` | 18 |
 | `rafa-pr` | `rafa-release` | 32 |
-| `rafa-pr` | `@open-tomato/rafa` | 1 |
 | `rafa-run` | `rafa-release` | 16 |
 | `rafa-run` | `rafa-effort` | 1 |
 | `rafa-run` | `@open-tomato/rafa` | 1 |
@@ -65,15 +62,13 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `src/release/enabled.ts` | 5 | `rafa-release` | by rule |
 | `src/release/settle.ts` | 5 | `rafa-release` | by rule |
 | `src/release/version.ts` | 5 | `rafa-release` | by rule |
-| `src/cli/describe.ts` | 4 | `@open-tomato/rafa` | by rule |
 | `src/release/guard.ts` | 4 | `rafa-release` | by rule |
 | `src/cleanup/past-head.ts` | 3 | `rafa-release` | by rule |
 | `src/cleanup/worktrees.ts` | 3 | `rafa-run` | by rule |
 | `src/next/ending.ts` | 3 | `rafa-run` | by rule |
-| `src/next/readings.ts` | 3 | `rafa-run` | by rule |
 | `src/release/forecast.ts` | 3 | `rafa-release` | by rule |
 | `src/release/prepare.ts` | 3 | `rafa-release` | by rule |
-| `src/cli/registry.ts` | 2 | `@open-tomato/rafa` | by rule |
+| `src/next/readings.ts` | 2 | `rafa-run` | by rule |
 | `src/release/branch-forecast.ts` | 2 | `rafa-release` | by rule |
 | `src/release/release-delivery.ts` | 2 | `rafa-release` | by rule |
 | `src/start/pr-lifecycle.ts` | 2 | `rafa-run` | by rule |
@@ -81,6 +76,8 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `packages/rafa-effort/src/effort/attribution.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-effort/src/effort/epic-cost.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-effort/src/effort/file-stamp.ts` | 1 | `rafa-effort` | by rule |
+| `packages/rafa-effort/src/effort/sync/doctor-reading.ts` | 1 | `rafa-effort` | by rule |
+| `src/cleanup/remote-only.ts` | 1 | `rafa-run` | by rule |
 
 ## Edges #118 clears
 
@@ -90,7 +87,7 @@ None.
 
 ## Files left to place
 
-No rule holds these 651 files. By folder, with the upward edges that end on its files:
+No rule holds these 692 files. By folder, with the upward edges that end on its files:
 
 | Folder | Files | Not tests | Upward edges in |
 | --- | --- | --- | --- |
@@ -99,7 +96,7 @@ No rule holds these 651 files. By folder, with the upward edges that end on its 
 | `src/adapters/planner/` | 2 | 1 | 0 |
 | `src/bugs/` | 4 | 2 | 0 |
 | `src/cleanup/` | 6 | 2 | 0 |
-| `src/commands/` | 93 | 39 | 0 |
+| `src/commands/` | 92 | 39 | 0 |
 | `src/commands/agent/` | 7 | 4 | 0 |
 | `src/commands/bug/` | 9 | 4 | 0 |
 | `src/commands/ci/` | 2 | 1 | 0 |
@@ -118,13 +115,22 @@ No rule holds these 651 files. By folder, with the upward edges that end on its 
 | `src/loop/` | 6 | 3 | 0 |
 | `src/modules/` | 1 | 0 | 0 |
 | `src/modules/testdata/pull-merge-sync/` | 1 | 1 | 0 |
-| `src/next/` | 18 | 3 | 0 |
+| `src/next/` | 16 | 3 | 0 |
 | `src/notices/` | 3 | 2 | 0 |
 | `src/plan/` | 2 | 1 | 0 |
 | `src/ports/` | 1 | 1 | 0 |
 | `src/project/` | 11 | 6 | 0 |
 | `src/status/` | 19 | 9 | 0 |
-| `src/tests/` | 233 | 23 | 0 |
+| `src/tests/` | 230 | 21 | 0 |
+| `src/tests/board-coupled/adapters/tracker/` | 2 | 0 | 0 |
+| `src/tests/board-coupled/board/` | 8 | 0 | 0 |
+| `src/tests/board-coupled/board/project/` | 1 | 0 | 0 |
+| `src/tests/board-coupled/commands/` | 2 | 0 | 0 |
+| `src/tests/board-coupled/commands/board/` | 2 | 0 | 0 |
+| `src/tests/board-coupled/commands/epic/` | 13 | 0 | 0 |
+| `src/tests/board-coupled/commands/issue/` | 16 | 0 | 0 |
+| `src/tests/board-coupled/commands/plan/` | 1 | 0 | 0 |
+| `src/tests/board-coupled/refs/` | 2 | 0 | 0 |
 | `src/tests/core-coupled/` | 14 | 0 | 0 |
 | `src/tests/core-coupled/adapters/logger/` | 3 | 0 | 0 |
 | `src/tests/core-coupled/bugs/` | 3 | 0 | 0 |

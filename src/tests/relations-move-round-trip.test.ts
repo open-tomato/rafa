@@ -49,9 +49,9 @@
  * relations/move.test.ts` and `../commands/init-board-move.test.ts` open
  * their own labels-to-native cases with.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { DoctorSeams } from '../commands/doctor.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

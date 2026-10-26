@@ -43,13 +43,13 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
 
 import { expectExit } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The branch this suite checks out its release from. */
@@ -250,7 +250,7 @@ const SYSTEM_PATH = ['/usr/bin', '/bin'].join(delimiter);
  */
 const RELEASE_STAGE_MODULE = fileURLToPath(new URL('../start/release-stage.ts', import.meta.url));
 const OUTPUT_ACTIVE_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output'));
-const OUTPUT_SINKS_MODULE = fileURLToPath(new URL('./output-sinks.ts', import.meta.url));
+const OUTPUT_SINKS_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa/tests/output-sinks'));
 
 /**
  * A standalone script that calls the real `finishRelease` and prints the

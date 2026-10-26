@@ -11,7 +11,7 @@
  *     board id upper-cased (`RAFA-246` for #246);
  *   - `planStub`, equal to a member's board id or opening with it and a
  *     hyphen (`rafa-246` or `rafa-246-epic-lifecycle` for #246), the rule
- *     `hasPlanFor` (`src/board/roadmap-rows.ts`) applies to plan files. So
+ *     `hasPlanFor` (`packages/rafa-board/src/board/roadmap-rows.ts`) applies to plan files. So
  *     `rafa-2460-other` does not name #246.
  *
  * A row naming a member in both fields, or two members at once, is one

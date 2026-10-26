@@ -13,7 +13,8 @@
  * answer the case scripts, and it records being opened and closed, so
  * "nothing was asked" is a reading and not an assumption.
  *
- * The output is a sink per level (`src/tests/output-sinks.ts`).
+ * The output is a sink per level
+ * (`packages/rafa/src/tests/output-sinks.ts`).
  *
  * ## The controls
  *
@@ -63,16 +64,16 @@ import type { Output } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit, HINT_FLAG, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import issueReady from '@open-tomato/rafa-board/commands/issue/ready';
 
-import { createCommandRegistry } from '../cli/registry.js';
-import issueReady from '../commands/issue/ready.js';
 import loopStart from '../commands/loop/start.js';
 import planCreate from '../commands/plan/create.js';
 import prMerge from '../commands/pr/merge.js';
 import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { DEFAULT_ENDING_SEAMS, endingWith, endWithNextStep } from './ending.js';
 

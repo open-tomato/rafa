@@ -21,7 +21,7 @@
  * The `native` adapter tells a blocker on this board from one on another,
  * so it is made with the board's `owner/name`, read with the one
  * `gh repo view --json nameWithOwner` `readBoardRepository` sends
- * (`src/board/repository.ts`). A repository `gh` will not name
+ * (`packages/rafa-board/src/board/repository.ts`). A repository `gh` will not name
  * throws, and `rafa next` fails with it before any turn; a hint swallows
  * it as it swallows every reading that failed.
  *
@@ -34,17 +34,15 @@
  * reason: `openNextSources` reads it again and warns once.
  */
 import type { NextSourceSeams } from './sources.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { EpicRelations } from '../board/epics.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { EpicRelations, GhRunner } from '@open-tomato/rafa-board';
+
+import { createGhRunner, readBoardRepository, selectBoardRelations } from '@open-tomato/rafa-board';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { selectBoardRelations } from '../board/relations/select.js';
-import { readBoardRepository } from '../board/repository.js';
 import { resolvePrProvider } from '../pr/index.js';
 
 /** The settings the mode is read from, or null where `openNextSources` refuses the config. */

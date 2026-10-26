@@ -108,7 +108,7 @@
  * and does not tick the `- [ ] #<n>` box naming it on the roadmap, so
  * this command ticks it (per the PR commands spec), on every open board
  * whose checklist lists it. The rule and the two `gh` calls per board are
- * `src/board/roadmap-tick.ts`'s and the decision to make them at all, and
+ * `packages/rafa-board/src/board/roadmap-tick.ts`'s and the decision to make them at all, and
  * on which boards, is `./merge-tick.ts`'s; what is decided HERE is WHEN, and
  * it is straight after the provider merged, before the clean-up. The
  * clean-up is local git and can fail, and a tick behind it would be the
@@ -116,7 +116,7 @@
  * where the board write has nothing to do with this checkout and is as
  * true then as it is after. Before the boards, the closed issue's line
  * is ticked on the checklist of the epic its `epic:` label names, one
- * line printed per epic (`src/board/epic-tick.ts`, `epicTickSentence`).
+ * line printed per epic (`packages/rafa-board/src/board/epic-tick.ts`, `epicTickSentence`).
  *
  * Nothing it comes to fails the command, so a roadmap that cannot be
  * read, an edit that would not land and a pull request closing no issue
@@ -128,7 +128,7 @@
  * issue's blocker, so after the clean-up the command runs the reading
  * `rafa issue unblock` runs, over every open issue whose `Blocked by:` line
  * names an issue this pull request closes
- * (`src/board/unblock-after-merge.ts`, per the spec). Like the tick, nothing it comes to changes the exit code.
+ * (`packages/rafa-board/src/board/unblock-after-merge.ts`, per the spec). Like the tick, nothing it comes to changes the exit code.
  *
  * Unlike the tick it runs after the clean-up, and only the follow-ups
  * come after it, for two reasons. It ASKS, and a question in the middle of the
@@ -157,9 +157,9 @@
  * (`./merge-freed.ts`). What that reading came to is the result's
  * `freed`, a key the `labels` mode leaves out; `unblocked` is null there.
  * The `labels` mode, the default, runs `./merge-tick.ts` and
- * `src/board/unblock-after-merge.ts` exactly as above: they are what that
+ * `packages/rafa-board/src/board/unblock-after-merge.ts` exactly as above: they are what that
  * mode's
- * `afterMerge` is (`src/board/relations/labels.ts`), called here at the
+ * `afterMerge` is (`packages/rafa-board/src/board/relations/labels.ts`), called here at the
  * two points their own notes name.
  *
  * ## The project refresh

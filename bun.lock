@@ -67,9 +67,14 @@
     "packages/rafa-board": {
       "name": "@open-tomato/rafa-board",
       "version": "0.46.0",
+      "dependencies": {
+        "@open-tomato/rafa-core": "workspace:*",
+        "@open-tomato/rafa-effort": "workspace:*",
+      },
       "devDependencies": {
         "@open-tomato/rafa-eslint-config": "workspace:*",
         "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
       },
     },
     "packages/rafa-effort": {

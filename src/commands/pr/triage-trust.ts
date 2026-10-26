@@ -3,7 +3,7 @@
  * from an author allowed to change the repository, and the pull request
  * `--resolve` refuses to act on when its author is not.
  *
- * `src/board/trust.ts` answers WHETHER a login is trusted — the one
+ * `packages/rafa-board/src/board/trust.ts` answers WHETHER a login is trusted — the one
  * permission reading, the `board.trustedAuthors` allow-list, and the
  * failed lookup that is a refusal rather than a pass. This module is
  * what the triage command DOES with that answer, which the PR commands

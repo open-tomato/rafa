@@ -58,8 +58,9 @@
  * phase 0 commands spells them path by path, every module of `COMMAND_MODULES`
  * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths is
  * the one to read, where a list kept in this note fell behind it.
- * `describe` runs the roster builder of `src/cli/describe.ts`, which is
- * no root export. `plan show` takes `parsePlan` from the
+ * `describe` runs the roster builder of
+ * `packages/rafa/src/cli/describe.ts`, which is no root export.
+ * `plan show` takes `parsePlan` from the
  * `@open-tomato/rafa-run` facade, as `plan list`, `plan validate` and
  * `plan risk` take `listPlans`, `validatePlan` and `resolvePlanPath` from
  * it, and `plan needs` takes its readings from `src/plan/needs.ts`, which
@@ -215,11 +216,11 @@ import {
   WireExportRefusal,
   WireFormatError,
 } from '@open-tomato/rafa/store/wire';
+import { TRUSTED_PERMISSIONS } from '@open-tomato/rafa-board/board/trust';
 import effortCollect from '@open-tomato/rafa-effort/effort/collect';
 import effortReport from '@open-tomato/rafa-effort/effort/report';
 
 import { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
-import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 import {
   FINDING_KINDS,
@@ -716,8 +717,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/modules/load', ['loadModules', 'moduleSettings']],
   ]],
   ['./commands/module/exec.js', [
+    ['@open-tomato/rafa/cli/registry', ['mountKey']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['../../cli/registry.js', ['mountKey']],
   ]],
   ['./commands/agent/vendor.js', [
     ['@open-tomato/rafa-inventory', ['bundledAgentsDirectory', 'readAgentDirectory']],
@@ -975,23 +976,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'ISSUE_LIST_FLAGS']],
   ]],
   ['./commands/switch.js', [
+    ['@open-tomato/rafa-board', ['ROADMAP_LABEL', 'boardOfEpic', 'createGhBoardListing', 'createGhRunner', 'defaultBoardOnce', 'firstNowEpic', 'horizonOf', 'issueProject', 'issueSubjectConfig', 'lineRefusal', 'parseRoadmapBody', 'readConfiguredRelations', 'readListedEpics', 'resolvePlace', 'scanClaimBranches']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
     ['@open-tomato/rafa/project/position', ['hop', 'positionFilePath', 'rehome', 'writePositionFile']],
-    ['../adapters/tracker/github.js', ['createGhRunner']],
-    ['../board/branch-scan.js', ['scanClaimBranches']],
-    ['../board/configured-relations.js', ['readConfiguredRelations']],
-    ['../board/default-board-once.js', ['defaultBoardOnce']],
-    ['../board/epic-board.js', ['boardOfEpic']],
-    ['../board/now-epic.js', ['firstNowEpic']],
-    ['../board/place.js', ['resolvePlace']],
-    ['../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../board/roadmap-epic-rows.js', ['horizonOf', 'readListedEpics']],
-    ['../board/roadmap.js', ['parseRoadmapBody']],
-    ['../board/setup-roadmap.js', ['ROADMAP_LABEL']],
     ['../claims/drift.js', ['checkDrift', 'driftLines']],
-    ['./issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/init.js', [
     ['@open-tomato/rafa-board', ['commandProgressFeed', 'commandRetrySeams', 'createGhRunner']],
@@ -1056,8 +1046,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../config-registry.js', ['SETTINGS']],
   ]],
   ['./commands/describe.js', [
+    ['@open-tomato/rafa/cli/describe', ['describeRegistry']],
     ['../../package.json', ['version']],
-    ['../cli/describe.js', ['describeRegistry']],
   ]],
 ];
 
@@ -1067,7 +1057,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
  * exported under, and the spelling of each of its commands, in order.
  */
 const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, commands: readonly string[]])[] = [
-  ['./commands/board/index.js', 'BOARD_FEATURE', [
+  // The board's entry moved with board into its package in pass 4c (#808).
+  ['../packages/rafa-board/src/commands/board/index.js', 'BOARD_FEATURE', [
     'issue list', 'issue show', 'issue create', 'issue comment', 'issue move', 'issue ready', 'issue unblock', 'issue check', 'issue edit',
     'board list', 'board sync',
     'epic show', 'epic new', 'epic defer', 'epic promote', 'epic move', 'epic close', 'epic cancel',

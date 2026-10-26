@@ -21,10 +21,6 @@
  * was, so a section that always answered `read: false` would fail.
  */
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { BlockedLine } from '../board/blocked-line.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
@@ -33,6 +29,10 @@ import type { PlantedProject } from '../tests/cli-capture.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { Position } from '@open-tomato/rafa/project/position';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
+import type { BlockedLine } from '@open-tomato/rafa-board/board/blocked-line';
+import type { BoardIssue, BoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,9 +42,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { runsDir } from '@open-tomato/rafa/core/loop';
 import { positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { readBlockedBy } from '@open-tomato/rafa-board/board/blocked';
 
-import { typeOfLabels } from '../adapters/tracker/github.js';
-import { readBlockedBy } from '../board/blocked.js';
 import { defaultCleanupSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { readDoctorCleanup } from '../commands/doctor-cleanup.js';

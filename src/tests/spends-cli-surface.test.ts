@@ -13,7 +13,7 @@
  * holding only a `bin/` of the case's own and git's directory, so `claude`
  * resolves to nothing and no case reaches a real session.
  */
-import type { DescribeDocument } from '../cli/describe.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';

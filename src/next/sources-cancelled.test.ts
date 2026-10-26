@@ -17,9 +17,9 @@
  *  - A walk that sends no listing (the epic is `later`) prints none, and
  *    the recorded calls hold no listing, so the notice costs no read.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '../pr/index.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,12 +27,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { resolveScope } from '@open-tomato/rafa/project/scope';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { renderCancelledEpicNotice } from '@open-tomato/rafa-board/board/epic-cancel-notice';
 
-import { renderCancelledEpicNotice } from '../board/epic-cancel-notice.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { ghNextBoard, openNextSources } from './sources.js';
 

@@ -4,7 +4,7 @@
  *
  * Every member sends one `gh` command and reads what it wrote. The
  * adapter spawns nothing itself — it is made with the same runner seam
- * the github tracker takes (`src/adapters/tracker/github.ts`), so the
+ * the github tracker takes (`packages/rafa-board/src/adapters/tracker/github.ts`), so the
  * cases in `./gh.test.ts` drive it through the recorded fake in
  * `./gh-fake.ts` and none of them reaches GitHub, spawns a process, or
  * reads the configuration `gh` keeps under the home. Authentication is
@@ -177,11 +177,11 @@ import type {
   PullRequestSummary,
   PullRequests,
 } from './types.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board';
+
+import { createGhRunner } from '@open-tomato/rafa-board';
 
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { createGhRunner } from '../adapters/tracker/github.js';
 
 import { parseChecks, verdictOf } from './checks.js';
 import { closePullRequest } from './gh-close.js';

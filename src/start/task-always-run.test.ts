@@ -10,8 +10,7 @@ import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { failedOutsideAnyCase } from './suite-outside-case.js';
 import { FOLDED_COMMAND_JOINER, foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';

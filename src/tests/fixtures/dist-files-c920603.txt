@@ -49,6 +49,7 @@ continue-criteria.md
 continue-decision-prompt.md
 core/command/command.d.ts
 core/command/confirm.d.ts
+core/command/global-flags.d.ts
 core/command/index.d.ts
 core/command/lazy.d.ts
 core/command/registry-types.d.ts

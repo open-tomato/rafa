@@ -18,8 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { beginSession, sessionFilePath, updateSession } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import {
   announceRunStepOnly,

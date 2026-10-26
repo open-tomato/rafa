@@ -67,7 +67,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGhPermissions } from '../../board/trust.js';
+import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
+
 import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../../pr/index.js';
 import { hasConflictMessage, readConflict } from '../../pr/triage/conflict.js';

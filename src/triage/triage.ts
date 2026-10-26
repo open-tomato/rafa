@@ -285,8 +285,6 @@ import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
 import type { ComparedText, ScoredIssue, SimilarityWeights } from './similarity.js';
-import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
-import type { RefVerifier } from '../refs/verify.js';
 import type { BugRecord, BugRules } from '@open-tomato/rafa/bugs/record';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
@@ -300,9 +298,12 @@ import type {
 import type { MachineFault } from '@open-tomato/rafa/store/machine-fault';
 import type { TrackerRefWriteAction } from '@open-tomato/rafa/store/tracker-refs';
 import type { NamedSecret, SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
+import type { LocalTrackerOptions, RefVerifier } from '@open-tomato/rafa-board';
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+
+import { createLocalTracker } from '@open-tomato/rafa-board';
 
 import { bugTitle } from '@open-tomato/rafa/bugs/record';
 import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
@@ -313,8 +314,6 @@ import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from '@open-tomato/rafa
 import { redactSecrets, TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 import { writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
-
-import { createLocalTracker } from '../adapters/tracker/local.js';
 
 import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';

@@ -7,7 +7,7 @@
  * what it wrote. What it no longer carries is this: the usage refusal a
  * line naming no source gets, the candidate rule `--spec` looks a file
  * up with, and the call that turns `--issue` or `--next` into one spec
- * path. The board side of that call is `src/board/plan-spec.ts`, which
+ * path. The board side of that call is `packages/rafa-board/src/board/plan-spec.ts`, which
  * builds the `gh` and `git` runners and runs the cheap checks; this
  * module is what `plan create` hands it.
  *

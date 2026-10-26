@@ -48,12 +48,11 @@ import {
 
 import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '@open-tomato/rafa/core/git';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';

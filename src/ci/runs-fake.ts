@@ -55,7 +55,7 @@
  * the answer a reader asking by commit must never get.
  */
 import type { RunState } from './runs.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 /** The fields `gh run list --json` accepts, as its refusal lists them. */
 export const RUN_LIST_JSON_FIELDS = [

@@ -34,6 +34,7 @@ import { createRequire } from 'node:module';
 import { isAbsolute, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { commandSpelling, isTopLevel } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -45,7 +46,6 @@ import { BUNDLED_FEATURES, createRosterRegistry } from '../commands/index.js';
 import { registerCoreConfigSections } from '../config-registry.js';
 import { registerCoreServices } from '../service-registry.js';
 
-import { describeRegistry } from './describe.js';
 import { renderHelp } from './help.js';
 
 /** The repository root, with a trailing separator. */

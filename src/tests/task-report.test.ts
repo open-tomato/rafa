@@ -139,6 +139,7 @@ import { CLAUDE_BASE_ARGS, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { projectConfigText } from '../project/scaffold.js';
 import {
@@ -149,7 +150,6 @@ import {
 } from '../start/dispatch.js';
 
 import { plantProjectConfig } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 

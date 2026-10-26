@@ -93,13 +93,13 @@ import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:tes
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { createGhPullRequests } from '../pr/index.js';
 import { PLAN_DONE, scratchPlanter, STUB } from '../tests/loop-scratch.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { NO_PROVIDER_REASON } from './promoted-check.js';
 import { parsePromoted } from './promoted.js';

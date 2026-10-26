@@ -23,15 +23,13 @@ import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
-
-import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
-import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
-import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
-import { SPEC_READY_LABEL } from '../../board/readiness.js';
-
-import issueCheck from './check.js';
-import issueComment from './comment.js';
-import issueCreate from './create.js';
+import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from '@open-tomato/rafa-board/adapters/tracker/issue-values';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { SPEC_NEEDS_WORK_LABEL } from '@open-tomato/rafa-board/board/gate';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import issueCheck from '@open-tomato/rafa-board/commands/issue/check';
+import issueComment from '@open-tomato/rafa-board/commands/issue/comment';
+import issueCreate from '@open-tomato/rafa-board/commands/issue/create';
 import {
   ISSUE_BLOCKED_LABEL,
   ISSUE_CHECK_DECLARATION,
@@ -50,13 +48,13 @@ import {
   ISSUE_TRIAGE_MODULE,
   ISSUE_TYPE_WORDS,
   ISSUE_UNBLOCK_DECLARATION,
-} from './declarations.js';
-import issueEdit from './edit.js';
-import issueList from './list.js';
-import issueMove from './move.js';
-import issueReady from './ready.js';
-import issueShow from './show.js';
-import issueUnblock from './unblock.js';
+} from '@open-tomato/rafa-board/commands/issue/declarations';
+import issueEdit from '@open-tomato/rafa-board/commands/issue/edit';
+import issueList from '@open-tomato/rafa-board/commands/issue/list';
+import issueMove from '@open-tomato/rafa-board/commands/issue/move';
+import issueReady from '@open-tomato/rafa-board/commands/issue/ready';
+import issueShow from '@open-tomato/rafa-board/commands/issue/show';
+import issueUnblock from '@open-tomato/rafa-board/commands/issue/unblock';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TRIAGE_PATH = join(HERE, '..', '..', '..', 'packages', 'rafa', 'src', 'triage', 'filed-text.ts');

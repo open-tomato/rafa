@@ -19,9 +19,9 @@
  *   prose mention of the same words, in the SAME fence and file,
  *   neither of which is reported.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { RiskFinding, RiskSeams } from '../plan/risk.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

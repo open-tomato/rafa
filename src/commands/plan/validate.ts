@@ -79,7 +79,7 @@
  * `PREREQUISITES-<stub>.md` beside it, read by `./store-check.ts`, the
  * one reading `rafa plan create` refuses a generated plan with too. They
  * need no project, so they run whether or not one was found; like the
- * roster, they are the command's and not `validatePlan`'s, which `src/board/gate.ts` weighs a
+ * roster, they are the command's and not `validatePlan`'s, which `packages/rafa-board/src/board/gate.ts` weighs a
  * planner's plan with and which reads one file only.
  *
  * ## The bundled-item edits

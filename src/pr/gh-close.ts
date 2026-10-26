@@ -22,7 +22,7 @@
  *     checked out was not measured.
  *
  * The comment travels in the `--flag=value` form, the spelling
- * `closePullRequest` of `src/board/issue-board.ts` already sends, so a
+ * `closePullRequest` of `packages/rafa-board/src/board/issue-board.ts` already sends, so a
  * comment opening with `-` is the flag's value and never read as a flag
  * of its own. No `--repo` is sent, for the reason `./gh.ts` gives.
  *
@@ -46,7 +46,7 @@
  * the command and what it wrote, the comment left out of the name.
  */
 import type { ClosePullRequestOptions } from './types.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board';
 
 import { describeValue } from '@open-tomato/rafa/core/config/sections';
 

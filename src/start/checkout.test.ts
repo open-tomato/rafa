@@ -34,9 +34,9 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { announceRunDirs, resolveRunDirs } from './checkout.js';
 

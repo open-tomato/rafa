@@ -20,7 +20,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { describeRegistry } from '../cli/describe.js';
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
+
 import { CORE_REGISTRY } from '../commands/index.js';
 
 /** The repository root, read from this file's own location. */

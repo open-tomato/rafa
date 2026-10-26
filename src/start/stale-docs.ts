@@ -91,7 +91,6 @@
  * through `warn`.
  */
 import type { TaskDispatch } from './dispatch.js';
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { StaleDocLineResult, StaleDocsTracker } from '@open-tomato/rafa/core/services';
 import type { IssueRef } from '@open-tomato/rafa/ports';
@@ -100,6 +99,7 @@ import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/stor
 import type { StaleDocsWriteResult } from '@open-tomato/rafa/store/stale-docs';
 import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 import type { StaleDocEntry } from '@open-tomato/rafa/triage/stale-doc-line';
+import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board';
 import type { GitRunner, StaleDocTickResult } from '@open-tomato/rafa-pr';
 import type { FoldFragment, SettleForecast } from '@open-tomato/rafa-release';
 
@@ -107,6 +107,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve as resolvePath } from 'node:path';
 
+import { resolveTracker } from '@open-tomato/rafa-board';
 import {
   DOC_UPDATE_TITLE,
   addStaleDocLine,
@@ -134,8 +135,6 @@ import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 import { staleDocLineText } from '@open-tomato/rafa/triage/stale-doc-line';
-
-import { resolveTracker } from '../adapters/tracker/resolve.js';
 
 /** What every line this module prints opens with, after its indent. */
 const LINE_PREFIX = 'Stale docs: ';

@@ -12,7 +12,7 @@
  * `string`, `readonly SubjectSpec[]` and `readonly RafaCommand[]`; that
  * a feature is a `CommandRegistryInput`, so one feature's lists build a
  * registry as they stand; and that the command barrel and
- * `src/cli/registry.ts` both export it as the same type as
+ * `packages/rafa/src/cli/registry.ts` both export it as the same type as
  * `registry-types.ts` declares. It must compile with no diagnostic.
  *
  * Every refusal probe changes one thing and is held to exactly one
@@ -70,7 +70,7 @@ const EQUALS = [
 const CONFORMING_PROBE = probeSource(
   `import type * as C from ${specifierOf(join(COMMAND_DIR, 'command.js'))};`,
   `import type * as B from ${specifierOf(join(COMMAND_DIR, 'index.js'))};`,
-  `import type * as L from ${specifierOf(join(REPO_ROOT, 'src', 'cli', 'registry.js'))};`,
+  `import type * as L from ${specifierOf(join(REPO_ROOT, 'packages', 'rafa', 'src', 'cli', 'registry.js'))};`,
   ...EQUALS,
   'export const nameIsExact: Equals<R.CommandFeature["name"], string> = true;',
   'export const subjectsAreExact: Equals<R.CommandFeature["subjects"], readonly R.SubjectSpec[]> = true;',

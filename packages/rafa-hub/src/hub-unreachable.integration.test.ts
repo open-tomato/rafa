@@ -152,13 +152,13 @@ const NEXT_TASK_TITLE = 'Ship the hub-unreachable acceptance case';
 /** The login every planted issue is authored by, trusted through the stand-in permission answer. */
 const NEXT_AUTHOR_LOGIN = 'octocat';
 
-/** Mirrors `src/board/issue.ts`'s `SPEC_LABEL`; duplicated since a package reaches core only through its two subpaths. */
+/** Mirrors `packages/rafa-board/src/board/issue.ts`'s `SPEC_LABEL`; duplicated since a package reaches core only through its two subpaths. */
 const SPEC_LABEL = 'type:spec';
 
-/** Mirrors `src/board/readiness.ts`'s `SPEC_READY_LABEL`; same reason. */
+/** Mirrors `packages/rafa-board/src/board/readiness.ts`'s `SPEC_READY_LABEL`; same reason. */
 const SPEC_READY_LABEL = 'spec:ready';
 
-/** A spec body carrying every heading `src/board/readiness.ts`'s `TEMPLATE_HEADINGS` names, each with content, so the readiness gate finds no gap; the two `LIST_HEADINGS` each carry a list item. */
+/** A spec body carrying every heading `packages/rafa-board/src/board/readiness.ts`'s `TEMPLATE_HEADINGS` names, each with content, so the readiness gate finds no gap; the two `LIST_HEADINGS` each carry a list item. */
 const NEXT_TASK_BODY = [
   `# ${NEXT_TASK_TITLE}\n`,
   '## What you get\n\nWritten so the readiness gate finds no gap here.\n',

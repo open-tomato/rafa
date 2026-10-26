@@ -114,7 +114,7 @@
  * WHO wrote the comment. {@link findTriageComment} and
  * {@link triageComments} answer every marker comment they were handed,
  * whoever wrote it, because nothing here may spawn and the trust
- * reading is a `gh api` call (`src/board/trust.ts`).
+ * reading is a `gh api` call (`packages/rafa-board/src/board/trust.ts`).
  *
  * `src/commands/pr/triage-trust.ts` is where that check lives, and
  * `rafa pr triage` reads its marker comment through it: a comment from

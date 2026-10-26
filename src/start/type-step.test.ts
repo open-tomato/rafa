@@ -22,10 +22,10 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 import { realNodeModules } from '../tests/real-node-modules.js';
 
 import { TYPE_CHECK_FILE, TYPE_CHECK_SCRATCH, typeCheckLines } from './task-gate-lines.js';

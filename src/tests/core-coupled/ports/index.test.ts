@@ -190,8 +190,8 @@ const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 /** Core's source directory, `packages/rafa/src/`, which `./ports` is resolved from. */
 const SRC_DIR = join(REPO_ROOT, 'packages', 'rafa', 'src');
 
-/** The root's `src/`, for the one probe import above core. */
-const ROOT_SRC_DIR = join(REPO_ROOT, 'src');
+/** Board's `src/` since pass 4c, for the one probe import above core. */
+const BOARD_SRC_DIR = join(REPO_ROOT, 'packages', 'rafa-board', 'src');
 
 /** The entry under test, as the compiler holds it. */
 const ENTRY_FILE = join(SRC_DIR, 'ports', 'index.ts');
@@ -376,7 +376,7 @@ function instinctLiteral(signal: string): string {
 const CONFORMING_PROBE = probeSource(
   `import { openNdjsonStore } from ${specifierOf('effort', 'store', 'ndjson.js')};`,
   `import { openSqliteStore } from ${specifierOf('effort', 'store', 'sqlite.js')};`,
-  `import { parseSpecReview } from ${JSON.stringify(join(ROOT_SRC_DIR, 'board', 'spec-review.js'))};`,
+  `import { parseSpecReview } from ${JSON.stringify(join(BOARD_SRC_DIR, 'board', 'spec-review.js'))};`,
   `import { copyEffortStore } from ${specifierOf('effort', 'store', 'copy.js')};`,
   `import { mergeStore } from ${specifierOf('effort', 'store', 'merge-store.js')};`,
   ...trackerLiteral('"obsidian"', 'async () => ({})'),

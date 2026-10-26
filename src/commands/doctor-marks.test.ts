@@ -11,8 +11,8 @@
  * reaches GitHub or spawns `gh`. Each board holding marks is paired with
  * one holding none, the control that shows the row could stay quiet.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { BoardIssue, BoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BOARD_LIST_FIELDS, nativeBoardListFields, parseBoardListing } from '../board/roadmap-board.js';
+import { BOARD_LIST_FIELDS, nativeBoardListFields, parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { MARKS_HEADING, markMessage, otherModeOf, readDoctorMarks, renderDoctorMarks } from './doctor-marks.js';

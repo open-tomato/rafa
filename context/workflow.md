@@ -647,7 +647,7 @@ loop already running — unless `--no-hint` turns off the hint.
 ### Board relationships: labels and native modes
 
 **Epics and blockers are recorded through the board relationships port**
-(`src/board/relations/port.ts`), which offers two modes selected by the
+(`packages/rafa-board/src/board/relations/port.ts`), which offers two modes selected by the
 `board.relationships` config key. The **default is `labels`**, today's
 system unchanged; setting it to **`native`** uses GitHub's sub-issue and
 blocked-by links. Both modes are read through the same interface, so every
@@ -672,7 +672,7 @@ it with no question, from a script or an agent, and every refusal stays.
 closing issue #24 automatically unblocks any issue naming it in a
 `Blocked by:` line, with no extra commands needed. An `owner/repo#<n>`
 token on the line is kept as written in `BlockedReading.foreign`
-(`src/board/blocked.ts`) and never read as local `#<n>`; a line naming
+(`packages/rafa-board/src/board/blocked.ts`) and never read as local `#<n>`; a line naming
 only such tokens reads as the `no-ids` fault, so `issue unblock` never
 takes a foreign-only line for "every blocker closed" and drops the label.
 
@@ -702,8 +702,8 @@ In `labels` mode an issue belongs to one epic at most, and
 `.github/workflows/epic-guard.yml` can hold that on GitHub as labels
 land: when an issue gains an `epic:` label while it carries another, the
 guard removes the one just added and comments why. It is rafa's
-template (`src/board/templates/epic-guard.yml`, the file
-`rafa init --board --epic-guard` writes) committed unchanged, and
+template (`packages/rafa-board/src/board/templates/epic-guard.yml`, the
+file `rafa init --board --epic-guard` writes) committed unchanged, and
 `src/tests/epic-guard-workflow.test.ts` holds the two identical.
 
 It is installed **disabled**: while only rafa writes epic labels, no

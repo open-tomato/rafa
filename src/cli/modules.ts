@@ -39,7 +39,7 @@
  * command entries of the modules `packages/rafa/src/modules/load.ts` loaded: those
  * `allowList:` names from a `path` source whose manifest checked out.
  */
-import type { CommandRegistry } from './registry.js';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { ModuleCommandEntry, ModuleImporter } from '@open-tomato/rafa/modules/load';
 

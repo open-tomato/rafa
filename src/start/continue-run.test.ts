@@ -28,9 +28,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
-
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
 import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';

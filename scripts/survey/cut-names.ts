@@ -1,9 +1,10 @@
 /**
  * The files the cut table names for each feature package (#808, pass 1):
  * root files that reach a feature package, placed by name whatever their
- * folder. They keep their path; no named file moves. Each list is sorted
- * by UTF-16 code unit, and `CUT_RULES` of `cut-table.ts` reads them, so
- * a file named here is placed in its package and is not left to place.
+ * folder. A named file keeps its path until its package moves; the board
+ * list follows its files since pass 4c. Each list is sorted by UTF-16
+ * code unit, and `CUT_RULES` of `cut-table.ts` reads them, so a file
+ * named here is placed in its package and is not left to place.
  *
  * @module
  */
@@ -13,37 +14,40 @@
  * `docs/survey/cluster-map.json` puts in cluster c6, and the eight root
  * files that reach the board. The fifteenth reaches only core and moved
  * into it in the first decouple item, as `packages/rafa/src/board/naming.ts`.
- * The section files `config-schema-board-project.ts` and
- * `config-schema-issues.ts` left the list in the third decouple item
+ * Since pass 4c the list names each file at its path in board's package,
+ * `packages/rafa-board/src/`, where the `packages/rafa-board/` folder of
+ * `CUT_RULES` would place it too; the order is the one it had, since the
+ * paths share the prefix. The section files `config-schema-board-project.ts`
+ * and `config-schema-issues.ts` left the list in the third decouple item
  * (rafa-1325), which moves them into core's package, where the
  * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
- * item (rafa-1333) added `src/claims/ahead.ts` and `src/epic/verify-run.ts`
- * by pass 1's rule: once its cuts are made, each reaches only board and
- * core, so each is board's.
+ * item (rafa-1333) added `packages/rafa-board/src/claims/ahead.ts` and
+ * `packages/rafa-board/src/epic/verify-run.ts` by pass 1's rule: once its
+ * cuts are made, each reaches only board and core, so each is board's.
  */
 export const BOARD_NAMED: readonly string[] = [
-  'src/board/flags.ts',
-  'src/board/gate.ts',
-  'src/board/issue.ts',
-  'src/board/leak.ts',
-  'src/board/plan-field.ts',
-  'src/board/plan-spec.ts',
-  'src/board/previous-copy.ts',
-  'src/board/readiness.ts',
-  'src/board/review-comment.ts',
-  'src/board/review-stamp.ts',
-  'src/board/snapshot-settle.ts',
-  'src/board/spec-review.ts',
-  'src/board/spec-source.ts',
-  'src/board/trust.ts',
-  'src/bugs/cause-rule.ts',
-  'src/claims/ahead.ts',
-  'src/commands/doctor-refs.ts',
-  'src/commands/plan/refs-check.ts',
-  'src/epic/verify-plan.ts',
-  'src/epic/verify-run.ts',
-  'src/next/hop-chain.ts',
-  'src/next/relation-readings.ts',
+  'packages/rafa-board/src/board/flags.ts',
+  'packages/rafa-board/src/board/gate.ts',
+  'packages/rafa-board/src/board/issue.ts',
+  'packages/rafa-board/src/board/leak.ts',
+  'packages/rafa-board/src/board/plan-field.ts',
+  'packages/rafa-board/src/board/plan-spec.ts',
+  'packages/rafa-board/src/board/previous-copy.ts',
+  'packages/rafa-board/src/board/readiness.ts',
+  'packages/rafa-board/src/board/review-comment.ts',
+  'packages/rafa-board/src/board/review-stamp.ts',
+  'packages/rafa-board/src/board/snapshot-settle.ts',
+  'packages/rafa-board/src/board/spec-review.ts',
+  'packages/rafa-board/src/board/spec-source.ts',
+  'packages/rafa-board/src/board/trust.ts',
+  'packages/rafa-board/src/bugs/cause-rule.ts',
+  'packages/rafa-board/src/claims/ahead.ts',
+  'packages/rafa-board/src/commands/doctor-refs.ts',
+  'packages/rafa-board/src/commands/plan/refs-check.ts',
+  'packages/rafa-board/src/epic/verify-plan.ts',
+  'packages/rafa-board/src/epic/verify-run.ts',
+  'packages/rafa-board/src/next/hop-chain.ts',
+  'packages/rafa-board/src/next/relation-readings.ts',
 ];
 
 /**
@@ -82,8 +86,8 @@ export const PR_NAMED: readonly string[] = [
  * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
  * item (rafa-1333) moved `packages/rafa/src/plan/validate.ts` into core's
  * package too, and the same folder places it, and placed
- * `src/epic/verify-run.ts` in board by name, since it reaches only board
- * and core.
+ * `packages/rafa-board/src/epic/verify-run.ts` in board by name, since it
+ * reaches only board and core.
  */
 export const RUN_NAMED: readonly string[] = [
   'src/cleanup/index.ts',

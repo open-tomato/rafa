@@ -17,11 +17,11 @@
  * one-listing case holds the listing count at exactly one, so a filter
  * that matched no call, reading zero, fails it as a second listing does.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { Place, Position } from '@open-tomato/rafa/project/position';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,9 +30,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionFilePath, readPositionFile, writePositionFile } from '@open-tomato/rafa/project/position';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { readEpics } from '@open-tomato/rafa-board/board/epics';
 
-import { typeOfLabels } from '../adapters/tracker/github.js';
-import { readEpics } from '../board/epics.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
 import {

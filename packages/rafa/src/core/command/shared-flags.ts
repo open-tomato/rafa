@@ -6,7 +6,7 @@
  * `pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready` and
  * `loop start`. They belong to four features, and three of them are
  * declared in a declarations file (`src/commands/pr/declarations.ts`,
- * `src/commands/issue/declarations.ts`), which imports core's entries
+ * `packages/rafa-board/src/commands/issue/declarations.ts`), which imports core's entries
  * alone and no module under `src/`. So the flag lives here, where every
  * one of the six can reach it, and each declares this value itself
  * rather than a copy its tests would have to hold equal.

@@ -94,10 +94,10 @@
  *    dry epic on the roadmap walk.
  */
 import type { NextRoadmapReading, NextSources } from './readings.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { Place } from '@open-tomato/rafa/project/position';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -105,14 +105,14 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
 import { resolveScope } from '@open-tomato/rafa/project/scope';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { createCommandRegistry } from '../cli/registry.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { ghNextBoard, openNextSources } from './sources.js';
 

@@ -58,7 +58,7 @@
  * {@link ghNextBoard} answers the three readings {@link NextBoard}
  * declares over one `gh` runner and one memoised issue reader, out of
  * the pieces `plan create --next` walks the roadmap with: the roadmap
- * issue resolved by `resolveDefaultBoard` (`src/board/boards.ts`:
+ * issue resolved by `resolveDefaultBoard` (`packages/rafa-board/src/board/boards.ts`:
  * `roadmap.issue`, else the lowest-numbered open `type:roadmap` board,
  * else the one open issue titled `Roadmap`, after one
  * `gh issue list --label type:roadmap`), its body parsed, and the walk's
@@ -70,7 +70,7 @@
  * are `./relation-readings.ts`'s; this module wires them, and this note
  * stays the authority on what each answers.
  *
- * The walk is `pickDescendedLine`'s (`src/board/epic-walk.ts`), the one
+ * The walk is `pickDescendedLine`'s (`packages/rafa-board/src/board/epic-walk.ts`), the one
  * `plan create --next` takes, spelled as its two halves,
  * `descendRoadmap` and then the pick, so that the pick can pass waiting
  * lines under `roadmap` (see "The hop"); without it the pick is
@@ -99,9 +99,9 @@
  *
  * The default board is resolved first, as above, and then, with
  * {@link NextBoardOptions.root} handed in, the CURRENT PLACE is read by
- * `readCurrentPlace` (`src/board/roadmap-rows.ts`), the reading
+ * `readCurrentPlace` (`packages/rafa-board/src/board/roadmap-rows.ts`), the reading
  * `rafa roadmap` and `rafa epics` take: nothing at all when the root
- * holds no position file, else `resolvePlace` (`src/board/place.ts`) over
+ * holds no position file, else `resolvePlace` (`packages/rafa-board/src/board/place.ts`) over
  * the one listing, a place that no longer stands falling back by its
  * rule. `rafa next` hands its project root; `rafa status` hands none, so
  * its walk starts from the default board as before.
@@ -112,7 +112,7 @@
  *   same way, descending into its first open `now` epic, and
  *   {@link NextRoadmapReading.roadmap} names that board.
  * - A place naming an epic: that epic's lines alone are walked, in the
- *   order `epicLines` (`src/board/epic-walk.ts`) gives them, WHATEVER
+ *   order `epicLines` (`packages/rafa-board/src/board/epic-walk.ts`) gives them, WHATEVER
  *   its horizon, since a switch chose it; no board body is read, and
  *   `passed` counts the epic's lines passed. Every line done or taken
  *   answers no line, as a dry epic does on the roadmap walk, and names
@@ -125,7 +125,7 @@
  * walked unweighed.
  *
  * With {@link NextBoardOptions.noticeCancelled} set, as `rafa next` sets
- * it, the cancelled-epic notice (`src/board/epic-cancel-notice.ts`) is
+ * it, the cancelled-epic notice (`packages/rafa-board/src/board/epic-cancel-notice.ts`) is
  * carried out as problems after the place's notices, one line per epic
  * closed as not planned that open issues outside it still wait on — but
  * only when the walk or the place read the listing already, so it costs
@@ -177,7 +177,7 @@
  *   `from` and `home`, C's branch not taking it, so C blocked in turn
  *   answers the halt with the chain `#H ← #C ← #B`.
  * - **The next `now` epic.** For an epic that ran dry, `nextNowEpic`
- *   (`src/board/epic-walk.ts`) after it on the walked board.
+ *   (`packages/rafa-board/src/board/epic-walk.ts`) after it on the walked board.
  *
  * The decision and the next epic are read over the ONE listing the
  * walk shares, with the default board already resolved, and a reading
@@ -192,7 +192,7 @@
  * reason and its suite counts the reads; `./sources.test.ts` counts them
  * here.
  *
- * It runs NO trust check. `src/board/trust.ts` is wired where board text
+ * It runs NO trust check. `packages/rafa-board/src/board/trust.ts` is wired where board text
  * reaches a prompt or a snapshot — `plan create --issue`, `--next`,
  * the spec-review comment and `issue ready` — and nothing here reaches
  * either: the roadmap body is read for the ids of its unticked lines, a
@@ -212,7 +212,7 @@
  * Every relationship the board reads — what a line waits on, an epic's
  * members and their order, the hop's decision and the next `now` epic —
  * is asked of the board's relationships port
- * (`src/board/relations/port.ts`), {@link NextBoardOptions.relations}.
+ * (`packages/rafa-board/src/board/relations/port.ts`), {@link NextBoardOptions.relations}.
  * {@link openNextSources} hands every board it opens the relations
  * {@link NextSourcesOptions.relations} carries, which `rafa next` and a
  * command's hint read in the configured mode (`./relations-mode.ts`).
@@ -228,9 +228,9 @@
  *   per-blocker `gh issue view` is read, and the listing is read the
  *   first time a line is asked about even with no epic line and no
  *   position file. An issue the listing does not hold is blocked with a
- *   fault (`notOnListingMessage`, `src/board/blocked-line.ts`);
+ *   fault (`notOnListingMessage`, `packages/rafa-board/src/board/blocked-line.ts`);
  * - an epic's lines are its open sub-issues in the epic's order
- *   (`epicLines`, `src/board/epic-walk.ts`);
+ *   (`epicLines`, `packages/rafa-board/src/board/epic-walk.ts`);
  * - without `roadmap`, the pick PASSES every blocked line, fault or not,
  *   and picks the next, counting it in `passed`: the tracker clears a
  *   blocker when it closes, so there is nothing to unblock, and the line
@@ -247,18 +247,42 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { SettleReader } from './settle-step.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { EpicRelations } from '../board/epics.js';
-import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
-import type { BoardListing } from '../board/roadmap-board.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type {
+  BoardListing,
+  EpicRelations,
+  GhRunner,
+  SpecIssue,
+  SpecIssueReader,
+} from '@open-tomato/rafa-board';
 import type { EpicEndRelease, MergeGuardSettings } from '@open-tomato/rafa-release';
 
+import {
+  awayTargetOf,
+  blockedLineReadings,
+  cancelledEpicNoticeLines,
+  createGhBoardLister,
+  createGhBoardListing,
+  createGhOpenPullRequests,
+  createGhRoadmapSearch,
+  createGhRunner,
+  createGhSpecIssueReader,
+  createRoadmapReadings,
+  followHopRecord,
+  pickerFor,
+  readCurrentPlace,
+  readHopAnswer,
+  resolveDefaultBoard,
+  scanClaimBranches,
+  walkBoard,
+  walkEpic,
+  walkTarget,
+} from '@open-tomato/rafa-board';
 import { readEpicEndRelease } from '@open-tomato/rafa-release';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -268,26 +292,9 @@ import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { readRecords, resolveLoopSeams } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { createGhBoardLister, resolveDefaultBoard } from '../board/boards.js';
-import { cancelledEpicNoticeLines } from '../board/epic-cancel-notice.js';
-import { createGhSpecIssueReader } from '../board/issue.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { readCurrentPlace } from '../board/roadmap-rows.js';
-import { createGhOpenPullRequests, createGhRoadmapSearch, createRoadmapReadings, scanClaimBranches } from '../board/roadmap.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
 import { nextOwnerGate } from './owner-gate.js';
-import {
-  awayTargetOf,
-  blockedLineReadings,
-  followHopRecord,
-  pickerFor,
-  readHopAnswer,
-  walkBoard,
-  walkEpic,
-  walkTarget,
-} from './relation-readings.js';
 import { settleReaderFor } from './settle-step.js';
 
 /** What a refusal and a defect here name, being the one command that composes these. */

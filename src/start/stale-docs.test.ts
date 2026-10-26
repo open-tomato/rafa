@@ -17,10 +17,10 @@
  * that holds the kept lines.
  */
 import type { StaleDocsTaskInput, StartStaleDocsConfig, StartStaleDocsOptions } from './stale-docs.js';
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { GitRunner } from '../pr/index.js';
 import type { OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
+import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -39,8 +39,9 @@ import {
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan , parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { renderDocUpdatePlan } from '../commands/docs/plan.js';
 import {
   addStaleDocLine,
@@ -51,7 +52,6 @@ import {
 } from '../docs/release-issue.js';
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createStartStaleDocs, readStaleDocsVersion } from './stale-docs.js';
 

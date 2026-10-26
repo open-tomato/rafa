@@ -11,11 +11,11 @@
  * cheapest way to measure that a composition that refuses ends the
  * hint in silence rather than in an exit code.
  *
- * The output is a sink per level (`src/tests/output-sinks.ts`), so a
- * case reads the bytes the hint wrote and at which level it wrote
- * them. A case that measures silence pairs it with a control that
- * prints, since "no line" is what a hint that never ran looks like
- * too.
+ * The output is a sink per level
+ * (`packages/rafa/src/tests/output-sinks.ts`), so a case reads the bytes
+ * the hint wrote and at which level it wrote them. A case that measures
+ * silence pairs it with a control that prints, since "no line" is what a
+ * hint that never ran looks like too.
  *
  * ## What passes while wrong
  *
@@ -54,10 +54,9 @@ import type { RafaContext } from '@open-tomato/rafa/core/command';
 
 import { describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit, HINT_FLAG } from '@open-tomato/rafa/core/command';
-
-import { createCommandRegistry } from '../cli/registry.js';
-import { sinkOutput } from '../tests/output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { actionInvocation } from './actions.js';
 import { commandWords, HINT_TIMEOUT_MS, hintLine, nextQuestion, nextStepHint, wantsHint } from './hint.js';

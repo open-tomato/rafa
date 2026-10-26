@@ -9,13 +9,14 @@
  */
 import type { CommandDeclaration, RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
-
+import { BOARD_LIST_DECLARATION, BOARD_SUBJECT, BOARD_SYNC_DECLARATION } from '@open-tomato/rafa-board/commands/board/declarations';
+import { BOARD_FEATURE } from '@open-tomato/rafa-board/commands/board/index';
 import {
   EPIC_CANCEL_DECLARATION,
   EPIC_CLOSE_DECLARATION,
@@ -25,7 +26,7 @@ import {
   EPIC_PROMOTE_DECLARATION,
   EPIC_SHOW_DECLARATION,
   EPIC_SUBJECT,
-} from '../epic/declarations.js';
+} from '@open-tomato/rafa-board/commands/epic/declarations';
 import {
   ISSUE_CHECK_DECLARATION,
   ISSUE_COMMENT_DECLARATION,
@@ -37,13 +38,10 @@ import {
   ISSUE_SHOW_DECLARATION,
   ISSUE_SUBJECT,
   ISSUE_UNBLOCK_DECLARATION,
-} from '../issue/declarations.js';
+} from '@open-tomato/rafa-board/commands/issue/declarations';
 
-import { BOARD_LIST_DECLARATION, BOARD_SUBJECT, BOARD_SYNC_DECLARATION } from './declarations.js';
-
-import { BOARD_FEATURE } from './index.js';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
+/** The board entry's folder, which each module path below is read from: in board's package since pass 4c. */
+const ENTRY_DIR = fileURLToPath(new URL('../../../packages/rafa-board/src/commands/board/', import.meta.url));
 
 /** Each declaration in roster order, beside the module its command is the default export of. */
 const DECLARED: readonly (readonly [string, CommandDeclaration])[] = [
@@ -125,7 +123,7 @@ describe('BOARD_FEATURE', () => {
   });
 
   it.each(DECLARED)('loads from %s the command its declaration spells, that declaration under a run', async (path, declaration) => {
-    const loaded = await import(join(HERE, path)) as { default: RafaCommand };
+    const loaded = await import(join(ENTRY_DIR, path)) as { default: RafaCommand };
 
     expect(commandSpelling(loaded.default)).toBe(commandSpelling(declaration));
     expect(lessRun(loaded.default)).toEqual(declaration);

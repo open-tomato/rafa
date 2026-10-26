@@ -11,11 +11,11 @@
  * own in `suite-stage-ledger.test.ts`.
  */
 import type { SuiteStepContext, SuiteStepSeams } from './suite-step.js';
-import type { GhResult } from '../adapters/tracker/github.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,10 +25,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   alwaysRunJunitFileFor,

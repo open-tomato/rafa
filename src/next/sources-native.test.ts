@@ -23,9 +23,9 @@
  * that read a blocker one issue at a time.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { EpicRelations } from '../board/epics.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { EpicRelations } from '@open-tomato/rafa-board/board/epics';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,8 +35,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
 import { writePositionFile } from '@open-tomato/rafa/project/position';
+import { createNativeRelations } from '@open-tomato/rafa-board/board/relations/native';
 
-import { createNativeRelations } from '../board/relations/native.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { ghNextBoard } from './sources.js';

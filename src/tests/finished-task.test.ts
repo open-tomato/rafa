@@ -119,11 +119,10 @@ import {
 } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { commitFinishedTask, finishCleanExit, NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** The first open task in every planted tracker. */
 const FIRST_TASK = 'Capture the three gates into per-run capture files';

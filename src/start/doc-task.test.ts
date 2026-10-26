@@ -21,9 +21,9 @@ import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { DOC_TASK_HEADING, NO_SIGHTINGS_LINE } from '../docs/task-reading.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { dispatchTask } from './dispatch.js';
 import { docTaskBaseRef, docTaskPrompt } from './doc-task.js';

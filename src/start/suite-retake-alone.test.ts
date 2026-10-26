@@ -33,10 +33,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf } from '../suite/baseline.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { blockerText, TOUCHED_BEFORE_NAMED } from './suite-blocker.js';
 import { aloneJunitFileFor, RETAKE_ALONE_MAX_FILES, STEP_ONLY_BEFORE } from './suite-retake-alone.js';

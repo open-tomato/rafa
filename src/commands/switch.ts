@@ -7,25 +7,25 @@
  * ## One board listing
  *
  * The command reads the board listing once (`createGhBoardListing`,
- * `src/board/roadmap-board.ts`: every issue, open and closed, through
+ * `packages/rafa-board/src/board/roadmap-board.ts`: every issue, open and closed, through
  * `BOARD_LIST_FIELDS` and `parseBoardListing`), and everything it
  * decides, the drift report included, is read off that one answer. The labelled boards the default
  * board is ranked from are the listing's open `type:roadmap` rows, not a
  * second `gh issue list --label`. The default board (`defaultBoardOnce`,
- * `src/board/default-board-once.ts`, over `resolveDefaultBoard`,
- * `src/board/boards.ts`) is asked at most once and only when an answer
+ * `packages/rafa-board/src/board/default-board-once.ts`, over `resolveDefaultBoard`,
+ * `packages/rafa-board/src/board/boards.ts`) is asked at most once and only when an answer
  * needs it, so its title search is spent only then; its refusal keeps
  * {@link SWITCH_REFUSAL_EXIT}'s value as `DEFAULT_BOARD_REFUSAL_EXIT`.
  *
  * ## The relationships mode
  *
  * Which issues are in an epic is read in the mode `board.relationships`
- * names (`readConfiguredRelations`, `src/board/configured-relations.ts`).
+ * names (`readConfiguredRelations`, `packages/rafa-board/src/board/configured-relations.ts`).
  * In `labels`, the default, nothing more is sent and the listing is the
  * one above. In `native` the board's repository is read first, with one
  * `gh repo view`, and the listing is asked for the native fields, so an
  * epic's members are its sub-issues and its progress GitHub's own count
- * of them (`readListedEpics`, `src/board/roadmap-epic-rows.ts`, the
+ * of them (`readListedEpics`, `packages/rafa-board/src/board/roadmap-epic-rows.ts`, the
  * count `rafa roadmap` prints).
  *
  * ## Board or epic
@@ -37,7 +37,7 @@
  * (an unlabelled issue titled "Roadmap" or the `roadmap.issue` the
  * project names) is a board. A number the listing does not hold is a
  * board only when it is `roadmap.issue`, as `resolvePlace`
- * (`src/board/place.ts`) lets such a board stand. Anything else is
+ * (`packages/rafa-board/src/board/place.ts`) lets such a board stand. Anything else is
  * refused, and so is a closed board or epic.
  *
  * ## Where it moves
@@ -50,8 +50,8 @@
  *   it, ticked or not: the current board first, then the default board,
  *   then the lowest-numbered open labelled board. An epic that no board
  *   lists moves with the default board. That pick is `boardOfEpic`
- *   (`src/board/epic-board.ts`), which the blocker epic
- *   locator (`src/board/blocker-epic.ts`) reads too.
+ *   (`packages/rafa-board/src/board/epic-board.ts`), which the blocker epic
+ *   locator (`packages/rafa-board/src/board/blocker-epic.ts`) reads too.
  * - `-` moves to the position's `previous` place, as `cd -` does. That
  *   place is checked as a number is: a board or an epic closed or
  *   relabelled since is refused, naming what it lost.
@@ -78,7 +78,7 @@
  * or `board #<b> · no epic` when the board names no `now` epic that is
  * not done. Progress is `readListedEpics` over the listing, in the mode
  * above; the horizon is
- * `horizonOf` (`src/board/roadmap-epic-rows.ts`). In json mode the
+ * `horizonOf` (`packages/rafa-board/src/board/roadmap-epic-rows.ts`). In json mode the
  * terminal result's `data` is a {@link SwitchResult}.
  *
  * ## The drift report
@@ -90,10 +90,10 @@
  * `rafa:claimed`, and a stage label no claim branch names, every line
  * opening `claim drift:`. The report is compared over the listing the
  * move already read, so it costs no second board read rather than the
- * incremental one `src/board/board-cache.ts` would spend; the boards
+ * incremental one `packages/rafa-board/src/board/board-cache.ts` would spend; the boards
  * compared are the listing's `type:roadmap` rows, its epics and
  * `roadmap.issue` when set. The branches are read through
- * `scanClaimBranches` (`src/board/branch-scan.ts`) under `naming.branch`,
+ * `scanClaimBranches` (`packages/rafa-board/src/board/branch-scan.ts`) under `naming.branch`,
  * and only when some issue carries a stage label. The report is report-only: it edits no label,
  * no checklist and no body, and neither what it finds nor a board or
  * git it cannot read changes the exit code. A refused switch reports no
@@ -110,35 +110,43 @@
  *
  * It starts no session, so it declares no `spends`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardView } from '../board/epic-board.js';
-import type { EpicRelations, Epics } from '../board/epics.js';
-import type { ResolvedPlace } from '../board/place.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { Place, Position } from '@open-tomato/rafa/project/position';
+import type {
+  BoardIssue,
+  BoardView,
+  EpicRelations,
+  Epics,
+  GhRunner,
+  ResolvedPlace,
+} from '@open-tomato/rafa-board';
+
+import {
+  ROADMAP_LABEL,
+  boardOfEpic,
+  createGhBoardListing,
+  createGhRunner,
+  defaultBoardOnce,
+  firstNowEpic,
+  horizonOf,
+  issueProject,
+  issueSubjectConfig,
+  lineRefusal,
+  parseRoadmapBody,
+  readConfiguredRelations,
+  readListedEpics,
+  resolvePlace,
+  scanClaimBranches,
+} from '@open-tomato/rafa-board';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { hop, positionFilePath, rehome, writePositionFile } from '@open-tomato/rafa/project/position';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { scanClaimBranches } from '../board/branch-scan.js';
-import { readConfiguredRelations } from '../board/configured-relations.js';
-import { defaultBoardOnce } from '../board/default-board-once.js';
-import { boardOfEpic } from '../board/epic-board.js';
-import { firstNowEpic } from '../board/now-epic.js';
-import { resolvePlace } from '../board/place.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
-import { parseRoadmapBody } from '../board/roadmap.js';
-import { ROADMAP_LABEL } from '../board/setup-roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-
-import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa switch <n | -> [--no-rehome]';

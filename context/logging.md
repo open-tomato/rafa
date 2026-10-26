@@ -230,7 +230,7 @@ them).
 
 ### Moving a module onto the logger
 
-`src/adapters/tracker/resolve.ts` is the first one moved, and the `rafa
+`packages/rafa-board/src/adapters/tracker/resolve.ts` is the first one moved, and the `rafa
 issue` actions reach it (`resolveIssueTracker` names no sink of its own).
 Its default warning sink was a function calling `activeOutput().warn`
 with a `PREFIX`-led string. It is now:

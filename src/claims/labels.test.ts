@@ -10,14 +10,13 @@
  * `written` control beside it through the same runner, so a transition
  * that always warned would fail the control.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { IssueBoard } from '../board/issue-board.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { IssueBoard } from '@open-tomato/rafa-board/board/issue-board';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
-
-import { createGhIssueBoard } from '../board/issue-board.js';
+import { createGhIssueBoard } from '@open-tomato/rafa-board/board/issue-board';
 
 import {
   labelClaimed,

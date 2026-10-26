@@ -1,7 +1,8 @@
 /**
- * The spec issue template (`src/board/templates/spec.md`) is the
- * document `src/board/readiness.ts` checks a body against, and the two
- * are tracked apart: the template is a package asset, copied into
+ * The spec issue template
+ * (`packages/rafa-board/src/board/templates/spec.md`) is the document
+ * `packages/rafa-board/src/board/readiness.ts` checks a body against, and
+ * the two are tracked apart: the template is a package asset, copied into
  * `dist/templates/` by the build (`./package-build.test.ts`) and written
  * into a project's `.github/ISSUE_TEMPLATE/` by `rafa init --board`,
  * while the headings it carries live in code as
@@ -13,7 +14,7 @@
  * So the live claims here are all about the FILE as tracked:
  *
  *  - its front matter labels the issue `type:spec`, which is what
- *    `src/board/issue.ts` refuses an issue for not carrying
+ *    `packages/rafa-board/src/board/issue.ts` refuses an issue for not carrying
  *    ({@link SPEC_LABEL}), read through `Bun.YAML.parse` rather than a
  *    substring search, so `type:spec` appearing anywhere else in the
  *    body cannot satisfy it;
@@ -48,15 +49,15 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { SPEC_LABEL } from '../board/issue.js';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
 import {
   findReadinessGaps, LIST_HEADINGS, OPTIONAL_HEADINGS, TEMPLATE_HEADINGS,
-} from '../board/readiness.js';
+} from '@open-tomato/rafa-board/board/readiness';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Where the template is tracked, from the repository root. */
-const TEMPLATE_PATH = 'src/board/templates/spec.md';
+const TEMPLATE_PATH = 'packages/rafa-board/src/board/templates/spec.md';
 
 const TEMPLATE = readFileSync(join(REPO_ROOT, TEMPLATE_PATH), 'utf8');
 

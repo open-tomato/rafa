@@ -23,13 +23,13 @@
  */
 import type { GatedOwner, OwnerApproval, OwnerApprovalRequest, TeamMembership } from './owner-approval.js';
 import type { PullRequestReview } from './types.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { OwnedBoard } from '../board/board-owns.js';
-import type { OwnerResolution } from '../board/owner-resolve.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { OwnedBoard } from '@open-tomato/rafa-board/board/board-owns';
+import type { OwnerResolution } from '@open-tomato/rafa-board/board/owner-resolve';
 
 import { describe, expect, it } from 'bun:test';
 
-import { parseCodeowners } from '../board/codeowners.js';
+import { parseCodeowners } from '@open-tomato/rafa-board/board/codeowners';
 
 import { httpFailure, notFound } from './gh-fake-shapes.js';
 import { createGhTeamMembership, readOwnerApproval, teamMembershipArgs } from './owner-approval.js';

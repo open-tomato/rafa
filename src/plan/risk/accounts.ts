@@ -26,7 +26,7 @@
  *   never guesses `private`.
  * - **The issue tracker** is the chain the config names,
  *   `tracker.default` then `tracker.fallback`, each kind once at its
- *   first place, the order `src/adapters/tracker/resolve.ts` tries them.
+ *   first place, the order `packages/rafa-board/src/adapters/tracker/resolve.ts` tries them.
  *   When the chain holds `github`, the repository that adapter files on
  *   is named too: it passes no `--repo`, so `gh` resolves the
  *   repository of the directory it runs in, which `gh repo view --json

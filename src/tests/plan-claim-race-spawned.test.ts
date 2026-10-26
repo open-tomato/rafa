@@ -6,7 +6,7 @@
  * only over the fakes `src/claims/plan-claim.test.ts` and
  * `src/commands/plan/claim-route.test.ts` drive.
  *
- * `src/board/roadmap-claims-remote.test.ts` already proves the READING
+ * `src/tests/board-coupled/board/roadmap-claims-remote.test.ts` already proves the READING
  * side of a claim branch over a real bare remote; this file drives the
  * WRITING side end to end, spawned exactly as an operator's shell would
  * run it: two clones, each with its own minted effort store (so each
@@ -24,8 +24,8 @@
  * with the first's rather than land on a branch of its own.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { SpecIssue } from '../board/issue.js';
 import type { GitRunner } from '../pr/index.js';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,13 +35,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { branchName, planStub } from '@open-tomato/rafa/board/naming';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { completeSpecBody } from './spec-bodies.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
@@ -113,7 +113,7 @@ function shellQuoted(payload: unknown): string {
  * (`gh api repos/{owner}/{repo}/collaborators/<login>/permission`, which
  * both clones' resolutions send unchanged, literal placeholders and
  * all): everything else the board route could ask for `--issue` is
- * outside those two calls (`src/board/issue.ts`, `src/board/trust.ts`).
+ * outside those two calls (`packages/rafa-board/src/board/issue.ts`, `packages/rafa-board/src/board/trust.ts`).
  */
 function writeIssueGh(bin: string, issue: SpecIssue): void {
   const lines = [

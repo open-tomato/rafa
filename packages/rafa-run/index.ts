@@ -95,16 +95,12 @@ export type { NextHopStep } from '../../src/next/hop-rows.js';
 
 export type {
   DryEpic,
-  HopTarget,
   NextBoard,
-  NextHopReading,
   NextRoadmapReading,
   NextRoadmapSources,
   NextSources,
   OpenPull,
   PickedLine,
-  TakenBlocker,
-  WaitingLine,
 } from '../../src/next/readings.js';
 export {
   readBranch,

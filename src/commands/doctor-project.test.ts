@@ -20,16 +20,16 @@
  *    retries on: under `board.project.retries: false` the same read is
  *    the unknown scope row. Every other case opens with retrying off.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { FakeProjectField } from '../board/project/project-fake.js';
-import type { ProjectRetryConfig } from '../board/project/project-runner.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { FakeProjectField } from '@open-tomato/rafa-board/board/project/project-fake';
+import type { ProjectRetryConfig } from '@open-tomato/rafa-board/board/project/project-runner';
 
 import { describe, expect, it } from 'bun:test';
 
-import { createGhProjectPort } from '../board/project/gh.js';
-import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS, fakeProjectId } from '../board/project/project-fake.js';
-import { retryLine } from '../board/project/project-runner.js';
-import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
+import { createGhProjectPort } from '@open-tomato/rafa-board/board/project/gh';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS, fakeProjectId } from '@open-tomato/rafa-board/board/project/project-fake';
+import { retryLine } from '@open-tomato/rafa-board/board/project/project-runner';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '@open-tomato/rafa-board/board/project/retry-fake';
 
 import {
   DRIFT_CHECK,

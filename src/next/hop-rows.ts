@@ -85,20 +85,22 @@
  * with no position file, at the walked board with no epic chosen, the
  * place a first `rafa switch` resolves as home.
  */
-import type { HopDecision, HopHalt, HopMove } from './hop-chain.js';
 import type { DryEpic, NextHopReading, NextRoadmapReading, NextRoadmapSources, NextWorld } from './readings.js';
 import type { NextStateId, RowAnswer } from './state.js';
-import type { NextNowEpic } from '../board/epic-walk.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { HopKind, HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { Place } from '@open-tomato/rafa/project/position';
+import type { HopDecision, HopHalt, HopMove, NextNowEpic } from '@open-tomato/rafa-board';
+
+import {
+  SPEC_READY_LABEL,
+  hopDecisionSentence,
+  oneHopAllows,
+  samePlace,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { samePlace } from '../board/place.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-
-import { hopDecisionSentence, oneHopAllows } from './hop-chain.js';
 import { onBase } from './readings.js';
 
 /** What the `hop` action writes as the record's own, less its state, pull request and start time. */

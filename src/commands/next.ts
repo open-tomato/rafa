@@ -214,7 +214,7 @@
  *
  * `--claim-ahead` rides on it and on nothing else: the `plan` action
  * carries it after `--roadmap`, so `plan create` also claims the line
- * after its pick (`src/claims/ahead.ts`), and no other action's words
+ * after its pick (`packages/rafa-board/src/claims/ahead.ts`), and no other action's words
  * change. A line giving it without `--roadmap` is refused with exit code
  * 1 before any source is opened (`readClaimAhead`).
  *

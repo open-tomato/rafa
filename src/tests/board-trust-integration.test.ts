@@ -1,14 +1,14 @@
 /**
  * An integration suite over four of the five call sites
- * `src/board/trust.ts` REFUSES through: `inspectSpecIssue` and
- * `inspectRoadmapIssue` (`src/board/plan-spec.ts`), and
+ * `packages/rafa-board/src/board/trust.ts` REFUSES through: `inspectSpecIssue` and
+ * `inspectRoadmapIssue` (`packages/rafa-board/src/board/plan-spec.ts`), and
  * `readTrustedTriageComment` and `requireTrustedResolveAuthor`
  * (`src/commands/pr/triage-trust.ts`). `./trust.ts`'s own module note
  * numbers them the THIRD, the FOURTH and the TWO already in
  * `triage-trust.ts`. The fifth refusing site is `rafa issue ready`
- * (`src/commands/issue/ready.ts`), which refuses through
+ * (`packages/rafa-board/src/commands/issue/ready.ts`), which refuses through
  * `requireTrustedBoardAuthor` as the two plan sites do; no scenario
- * below drives it, and `src/commands/issue/ready.test.ts` holds its
+ * below drives it, and `src/tests/board-coupled/commands/issue/ready.test.ts` holds its
  * cases. The caller that IGNORES rather than refuses — the
  * `rafa:spec-review` marker filter in `./review-comment.ts` — answers
  * none of the four scenarios below either, so it stays
@@ -53,10 +53,10 @@
  * `gh issue view` and the collaborators permission path from a table
  * planted per case, recording every command it is asked.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { SpecIssue } from '../board/issue.js';
 import type { PullRequestComment } from '../pr/index.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -66,16 +66,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { inspectRoadmapIssue, resolvePlanSpec } from '@open-tomato/rafa-board/board/plan-spec';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { ghBoardTrust } from '@open-tomato/rafa-board/board/trust';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { SPEC_LABEL } from '../board/issue.js';
-import { inspectRoadmapIssue, resolvePlanSpec } from '../board/plan-spec.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { ghBoardTrust } from '../board/trust.js';
 import { requireTrustedResolveAuthor, readTrustedTriageComment } from '../commands/pr/triage-trust.js';
 import { TRIAGE_MARKER } from '../pr/triage/comment.js';
-
-import { sinkOutput } from './output-sinks.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** Where `resolvePlanSpec` writes snapshots; a project's own default. */
 const SPECS_DIR = '.rafa/specs';

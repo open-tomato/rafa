@@ -59,6 +59,7 @@ import {
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 
@@ -68,8 +69,6 @@ import { dispatchTask } from '../start/dispatch.js';
 import { injectionPlace } from '../start/loop-events.js';
 import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';

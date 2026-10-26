@@ -47,11 +47,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { createGitRunner } from '../pr/index.js';
 import { offerRunBranch } from '../start/branch.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** The plan stub every case runs, and the branch it names. */
 const STUB = 'rafa-49-scratch-branch';

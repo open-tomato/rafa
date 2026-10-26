@@ -16,8 +16,8 @@
  */
 import type { BoardStepResult } from './init-board.js';
 import type { InitResult, InitSeams } from './init.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,7 +25,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { EPIC_GUARD_PATH } from '../board/epic-guard.js';
+import { EPIC_GUARD_PATH } from '@open-tomato/rafa-board/board/epic-guard';
+
 import { dispatchCaptured, eventsOf } from '../tests/cli-capture.js';
 
 import {
