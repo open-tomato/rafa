@@ -32,16 +32,16 @@
  * `--max-budget-usd` comes from. Four readings it leaves to this module:
  *
  *   - `pr.provider` and `pr.base` default to NULL, and null here means
- *     "nobody has said", not "off". The spec's default for the provider
- *     is `gh` when `origin` is a GitHub remote and `none` otherwise, and
- *     its default base is whatever the remote calls its default branch;
- *     neither is a value this module can spell, because both are read
- *     off the repository at use (`pr/provider.ts`). Writing either
- *     default as a literal would be the silent choice the config refuses
- *     everywhere else: `prBase: 'main'` would open a pull request into a
- *     branch that may not exist on a repository whose default is
- *     `master`. A file spelling `provider:` or `base:` with no value
- *     says nothing, as every null does, and resolves to the same null.
+ *     "nobody has said", not "off". The spec's default for the provider is `gh`
+ *     when `origin` is a GitHub remote and `none` otherwise, and its default
+ *     base is whatever the remote calls its default branch; neither is a value
+ *     this module can spell, because both are read off the repository at use
+ *     (`packages/rafa/src/pr/provider.ts`). Writing either default as a literal
+ *     would be the silent choice the config refuses everywhere else: `prBase:
+ *     'main'` would open a pull request into a branch that may not exist on a
+ *     repository whose default is `master`. A file spelling `provider:` or
+ *     `base:` with no value says nothing, as every null does, and resolves to
+ *     the same null.
  *   - `pr.mergeMethod` defaults to `squash`, the first method the spec
  *     lists and the one the merge flow is written for: it deletes the
  *     local branch with `-D` because a squash leaves it unmerged in

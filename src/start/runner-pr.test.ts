@@ -1,13 +1,13 @@
 /**
  * Tests for the runner-opened pull request (`runner-pr.ts`).
  *
- * {@link openRunnerPullRequest} is driven through stand-in seams that
- * record each call, so every case reads both the outcome and which
- * steps ran: a blocked step is a control on the opened case, since the
- * same input with one seam failing answers `blocked` at that step and
- * sends nothing after it. The provider is the port's double
- * (`pr/pull-requests-double.ts`), which refuses any member a case did
- * not name, so a create sent where none should be fails the case.
+ * {@link openRunnerPullRequest} is driven through stand-in seams that record
+ * each call, so every case reads both the outcome and which steps ran: a
+ * blocked step is a control on the opened case, since the same input with one
+ * seam failing answers `blocked` at that step and sends nothing after it. The
+ * provider is the port's double
+ * (`packages/rafa/src/pr/pull-requests-double.ts`), which refuses any member a
+ * case did not name, so a create sent where none should be fails the case.
  *
  * The project refresh after the create is a recorded seam too: each
  * blocked case shows it is never asked, the control to the opened case

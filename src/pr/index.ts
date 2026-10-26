@@ -9,7 +9,7 @@
  * adapter over the GitHub CLI, `./checks.js` holds the check-row
  * readers, which are pure and belong to no provider,
  * `./merge.js` holds what `pr merge` refuses on and the clean-up steps
- * it runs afterwards, both as data, `../core/git/index.js` is the runner
+ * it runs afterwards, both as data, `@open-tomato/rafa/core/git` is the runner
  * those steps are spawned through, git being the merge command's own
  * half and no provider's, and
  * `@open-tomato/rafa/pr/provider` (core's `packages/rafa/src/pr/provider.ts`

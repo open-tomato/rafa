@@ -10,10 +10,10 @@
  *
  * The release fragment cases: `prepareReleaseStage` and `finishRelease`
  * (`./release-stage.js`) run over a real scratch repository with a bare
- * `origin`, exactly as `src/tests/release-stage-integration.test.ts`
- * drives them, but the pull request is a `PullRequests` double
- * (`../pr/pull-requests-double.js`) rather than the `gh` fake, since the
- * subject there is what the stage SENDS a provider — the forecast in
+ * `origin`, exactly as `src/tests/release-stage-integration.test.ts` drives
+ * them, but the pull request is a `PullRequests` double
+ * (`packages/rafa/src/pr/pull-requests-double.ts`) rather than the `gh` fake,
+ * since the subject there is what the stage SENDS a provider — the forecast in
  * the body — and not a provider's own read-modify-write.
  *
  * The `pr.base` case (rafa-628, #627): under `pr.base: integration`, the

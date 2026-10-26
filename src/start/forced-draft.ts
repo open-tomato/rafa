@@ -17,18 +17,17 @@
  * json caller) takes a `pr` for a delivered pull request, and a forced
  * wrap-up's is not one until it is a draft.
  *
- * The conversion is sent through the `gh` runner rather than the pull
- * request port (`pr/types.ts`), which has no draft member: widening the
- * port reaches every literal that implements it, and this is the one
- * caller. {@link markForcedDraft} never throws: a refused conversion is
- * one warning line naming what `gh` said, and its answer is false. The
- * caller then emits no `pr` event and ends the run through
- * {@link refuseUndraftedPullRequest}: a `halt` naming the pull request,
- * and exit code 20 (`DECISION_STOP_EXIT`, `./continue-exits.ts`) with a
- * line naming the command to run by hand, so the run's record ends
- * `stopped`, never `done`, over a pull request left ready for review. A
- * body that cannot be written is one warning line and nothing more: the
- * pull request is a draft either way.
+ * The conversion is sent through the `gh` runner rather than the pull request
+ * port (`packages/rafa/src/pr/types.ts`), which has no draft member: widening
+ * the port reaches every literal that implements it, and this is the one
+ * caller. {@link markForcedDraft} never throws: a refused conversion is one
+ * warning line naming what `gh` said, and its answer is false. The caller then
+ * emits no `pr` event and ends the run through {@link
+ * refuseUndraftedPullRequest}: a `halt` naming the pull request, and exit code
+ * 20 (`DECISION_STOP_EXIT`, `./continue-exits.ts`) with a line naming the
+ * command to run by hand, so the run's record ends `stopped`, never `done`,
+ * over a pull request left ready for review. A body that cannot be written is
+ * one warning line and nothing more: the pull request is a draft either way.
  *
  * Every line goes through the active output (`core/output/active.ts`).
  */

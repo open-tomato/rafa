@@ -18,12 +18,12 @@
  * deadline" means, and the same pull request on a head committed a
  * second ago is held to the polls the grace asks for.
  *
- * The cases that dispatch the command run it from a project of its own
- * beside a home of its own under this file's temporary directory
- * (`tests/cli-capture.ts`), so the config read is the one the case
- * planted and no case reads the real home. None of them reaches GitHub
- * or spawns `gh`: the provider is the double (`pr/pull-requests-double.ts`),
- * and the branch and the `origin` probe are seams.
+ * The cases that dispatch the command run it from a project of its own beside a
+ * home of its own under this file's temporary directory
+ * (`tests/cli-capture.ts`), so the config read is the one the case planted and
+ * no case reads the real home. None of them reaches GitHub or spawns `gh`: the
+ * provider is the double (`packages/rafa/src/pr/pull-requests-double.ts`), and
+ * the branch and the `origin` probe are seams.
  *
  * ## The ending is driven, never composed
  *

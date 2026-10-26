@@ -215,10 +215,10 @@ The import pattern is `^Phase 0(?![\w])`.
 | `src/tests/effort-collect-worktrees-integration.test.ts` | `c12-index` | 1 | none |
 | `src/tests/epic-guard-workflow.test.ts` | `c20-epic-guard-workflow.test` | 1 | none |
 | `src/tests/eslint-stand-in.mjs` | `c21-eslint-stand-in` | 1 | none |
-| `src/tests/git-identity-spawn.test.ts` | `c08-cli-capture` | 1 | none |
+| `packages/rafa/src/tests/git-identity-spawn.test.ts` | `c08-cli-capture` | 1 | none |
 | `src/tests/git-identity.sweep.test.ts` | `c22-git-identity.sweep.test` | 3 | none |
-| `src/tests/git-identity.test.ts` | `c08-cli-capture` | 1 | none |
-| `src/tests/git-identity.ts` | `c08-cli-capture` | 1 | none |
+| `packages/rafa/src/tests/git-identity.test.ts` | `c08-cli-capture` | 1 | none |
+| `packages/rafa/src/tests/git-identity.ts` | `c08-cli-capture` | 1 | none |
 | `src/tests/issue-create-spec-integration.test.ts` | `c10-index` | 1 | none |
 | `src/tests/loop-events-file-integration.test.ts` | `c08-cli-capture` | 1 | none |
 | `src/tests/loop-session-fixtures.ts` | `c05-sessions` | 1 | none |
@@ -234,8 +234,8 @@ The import pattern is `^Phase 0(?![\w])`.
 | `src/tests/report-ask-live.test.ts` | `c02-active` | 1 | none |
 | `src/tests/report-ask.test.ts` | `c02-active` | 1 | none |
 | `src/tests/schema-records.test.ts` | `c11-frontmatter` | 1 | none |
-| `src/tests/scratch-home-env.test.ts` | `c08-cli-capture` | 1 | none |
-| `src/tests/scratch-home-env.ts` | `c08-cli-capture` | 1 | none |
+| `packages/rafa/src/tests/scratch-home-env.test.ts` | `c08-cli-capture` | 1 | none |
+| `packages/rafa/src/tests/scratch-home-env.ts` | `c08-cli-capture` | 1 | none |
 | `src/tests/skill-gap-section.test.ts` | `c27-skill-gap-section.test` | 1 | none |
 | `src/tests/source-uses.ts` | `c08-cli-capture` | 1 | none |
 | `src/tests/stage-green-without-live-parity.test.ts` | `c03-config` | 2 | none |

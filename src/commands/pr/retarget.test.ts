@@ -4,12 +4,12 @@
  * alone with exit 0, the refusals of the line, and what the command
  * writes in each mode.
  *
- * Every dispatching case runs the real command from a project of its own
- * beside a home of its own under this file's temporary directory
- * (`tests/cli-capture.ts`), so no case reads the real home. No case
- * reaches GitHub or spawns `gh`: the provider is the adapter over the
- * recorded fake (`pr/gh-fake.ts`) or the port double
- * (`pr/pull-requests-double.ts`).
+ * Every dispatching case runs the real command from a project of its own beside
+ * a home of its own under this file's temporary directory
+ * (`tests/cli-capture.ts`), so no case reads the real home. No case reaches
+ * GitHub or spawns `gh`: the provider is the adapter over the recorded fake
+ * (`pr/gh-fake.ts`) or the port double
+ * (`packages/rafa/src/pr/pull-requests-double.ts`).
  *
  * Controls: the no-op case reads the double's call log beside a
  * retarget whose log shows the `editBase` the no-op skips, and the

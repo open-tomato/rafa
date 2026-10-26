@@ -145,16 +145,20 @@ parser and the plan-file readers; `loop/` the loop's session helpers, its
 session readings and the Claude spawner; `runtime/` the reading of which build
 is running. The ninth, `services/`, moved nothing in: it was written there
 (#1336) and holds the service registry, the functions of run, pr and release
-that board and release call, registered by the root. Pass 4c (rafa-1349)
-added two folders beside the nine: `cli/`, the command registry and the
-describe document, `registry.ts` and `describe.ts` with their tests, which
-board's refs check and doctor read, and
-`tests/`, the output sinks test helper, `output-sinks.ts`, with its test, which
-the tests take; `GLOBAL_FLAGS` went into `command/`, in `global-flags.ts`. A
-file keeps its base name when it moves. A moved file keeps no re-export at its
-old path. The root's build entries are the exception:
-`src/effort/store/index.ts` and `src/ports/index.ts` stand at core's folder
-paths and re-export a package subpath until #808 publishes core.
+that board and release call, registered by the root. Pass 4c (rafa-1349) added
+two folders beside the nine: `cli/`, the command registry and the describe
+document, `registry.ts` and `describe.ts` with their tests, which board's refs
+check and doctor read, and `tests/`, the output sinks test helper,
+`output-sinks.ts`, with its test, which the tests take; `GLOBAL_FLAGS` went into
+`command/`, in `global-flags.ts`. The sixth decouple item (rafa-1362) added
+`pr/` beside them, with the port's types, `types.ts`, its provider,
+`provider.ts`, and its double, `pull-requests-double.ts`, each with its test,
+and `tests/` took the two test helpers, `git-identity.ts` and
+`scratch-home-env.ts`, with their tests, beside `output-sinks.ts`. A file keeps
+its base name when it moves. A moved file keeps no re-export at its old path.
+The root's build entries are the exception: `src/effort/store/index.ts` and
+`src/ports/index.ts` stand at core's folder paths and re-export a package
+subpath until #808 publishes core.
 
 Two edge cases show why a file is core. `src/pr/git.ts` sat under the
 pull-request code, but release code imports the git runner too, so it moved to

@@ -1,15 +1,14 @@
 /**
  * Tests for the five `rafa status` readings (`sections.ts`).
  *
- * Every case but the housekeeping ones runs over scripted seams: a git
- * that answers `rev-parse --abbrev-ref HEAD` and refuses the rest, a
- * `gh` opener that records each command and the time it was given, the
- * pull request double (`../pr/pull-requests-double.ts`), a scripted
- * board and blocked-issue listing, a scripted `origin` and pid probe,
- * and a cleanup whose git refuses. The session records and trackers are
- * the loop's own fixtures (`../tests/loop-session-fixtures.ts`), planted
- * in a project of each case's own, so no case spawns git or `gh` or
- * reaches the network.
+ * Every case but the housekeeping ones runs over scripted seams: a git that
+ * answers `rev-parse --abbrev-ref HEAD` and refuses the rest, a `gh` opener
+ * that records each command and the time it was given, the pull request double
+ * (`packages/rafa/src/pr/pull-requests-double.ts`), a scripted board and
+ * blocked-issue listing, a scripted `origin` and pid probe, and a cleanup whose
+ * git refuses. The session records and trackers are the loop's own fixtures
+ * (`../tests/loop-session-fixtures.ts`), planted in a project of each case's
+ * own, so no case spawns git or `gh` or reaches the network.
  *
  * The housekeeping cases run over the real repository
  * `../cleanup/scratch-repository.ts` builds, with only the disk's
