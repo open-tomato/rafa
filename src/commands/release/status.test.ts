@@ -33,10 +33,10 @@
  */
 import type { StaleDocsReading } from './status-stale-docs.js';
 import type { ReleaseSeams, ReleaseStatusReading, ReleaseStatusResult } from './status.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { ReleaseTag } from '../../release/status-readings.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 import type { PlanChange } from '@open-tomato/rafa/store/changes';
 

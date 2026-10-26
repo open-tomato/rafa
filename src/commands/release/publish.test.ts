@@ -10,8 +10,8 @@
  * reading that could have failed.
  */
 import type { ProcessResult, PublishRunner, PublishStdout, ReleasePublishResult } from './publish.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

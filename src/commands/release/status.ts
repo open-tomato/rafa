@@ -76,10 +76,10 @@
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
 import type { PackagesReading } from './status-packages.js';
 import type { StaleDocsReader, StaleDocsReading, StaleDocsSettings } from './status-stale-docs.js';
-import type { GitRunner } from '../../pr/index.js';
 import type { AuditReading } from '../../release/audit.js';
 import type { TagReading, UntaggedReading } from '../../release/status-readings.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { PlanChange } from '@open-tomato/rafa/store/changes';
@@ -93,9 +93,9 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 
-import { createGitRunner } from '../../pr/index.js';
 import { auditCell, auditLines, readAudit } from '../../release/audit.js';
 import { groupChangeNotes, renderNoteLines } from '../../release/changelog.js';
 import { highestChangeLevel } from '../../release/level.js';

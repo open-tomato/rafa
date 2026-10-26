@@ -63,8 +63,8 @@
  * result's data is {@link ReleaseFragmentResult}: the path, the fragment
  * and the warnings.
  */
-import type { GitRunner } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
@@ -74,10 +74,10 @@ import { dirname, join, posix } from 'node:path';
 import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
-import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readFragmentTree } from '../../release/fragment-tree.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { packageNamed, readWorkspacePackages } from '../../release/workspace-packages.js';

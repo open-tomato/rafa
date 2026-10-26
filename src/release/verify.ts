@@ -84,9 +84,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 import { parseFragment } from '@open-tomato/rafa/release/fragment';
-
-import { gitSaid } from '../pr/index.js';
 
 /** Why a verification refused the session's edit. */
 export type ReleaseRefusalReason =

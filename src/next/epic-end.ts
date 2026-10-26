@@ -44,7 +44,7 @@
  * and the release line is left out rather than guessed.
  */
 import type { DryEpic, NextBoard, NextRoadmapReading, NextSources } from './readings.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { readTags, readUntagged } from '../release/status-readings.js';
 

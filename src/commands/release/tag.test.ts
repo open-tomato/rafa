@@ -51,11 +51,11 @@ import type {
   TagReady,
   TagRefused,
 } from './tag.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { ReleaseTag } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { execFileSync } from 'node:child_process';

@@ -96,12 +96,12 @@ import type { ReleaseMove } from './release-move.js';
 import type { SettleExitCode } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleBuilt, SettleFragment, SettleSettings, SettleUnitFold } from './settle.js';
-import type { GitRunner, PullRequestDetail, PullRequestDraft, PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { PullRequestDetail, PullRequestDraft, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { ReleaseTagMode } from '@open-tomato/rafa/core/config/sections';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { gitSaid } from '../pr/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { TAG_WORKFLOW } from './ladder.js';
 import { releaseCommitSubject } from './release-move.js';

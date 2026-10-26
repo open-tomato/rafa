@@ -62,9 +62,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
-import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { prepareRelease } from './prepare.js';

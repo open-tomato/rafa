@@ -52,10 +52,10 @@
  * refuse the same way: no forecast, and the grouping's sentence under
  * the block.
  */
-import type { GitRunner } from '../../pr/index.js';
 import type { SettleForecast } from '../../release/forecast.js';
 import type { SettleFragment } from '../../release/settle.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 
 import { forecastSettle } from '../../release/forecast.js';

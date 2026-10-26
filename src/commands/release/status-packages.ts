@@ -38,8 +38,8 @@
  * reason is already said under its own row, so it is not repeated here.
  */
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
-import type { GitRunner } from '../../pr/index.js';
 import type { TagReading } from '../../release/status-readings.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

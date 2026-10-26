@@ -88,13 +88,14 @@
  * It starts no Claude session and declares no `spends`.
  */
 import type { SettleProjectRefresh } from './settle-project.js';
-import type { GitRunner, PullRequests } from '../../pr/index.js';
+import type { PullRequests } from '../../pr/index.js';
 import type { SettleLockPlan } from '../../release/settle-lock.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
 import type { SettleBuild, SettleFragment, SettleReading, SettleSettings, SettleUnitFold } from '../../release/settle.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { GhRunner, RefreshItems } from '@open-tomato/rafa-board';
 
@@ -104,8 +105,9 @@ import { commandRetrySeams, createGhRunner } from '@open-tomato/rafa-board';
 
 import { expectNoArgument, readSwitch, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 
-import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
+import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { releaseCommitSubject } from '../../release/release-move.js';
 import { settleByPr } from '../../release/settle-pr.js';
 import { settleByPush } from '../../release/settle-push.js';

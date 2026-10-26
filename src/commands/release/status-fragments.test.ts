@@ -36,9 +36,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
-import { createGitRunner } from '../../pr/index.js';
 import { readSettle } from '../../release/settle.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';

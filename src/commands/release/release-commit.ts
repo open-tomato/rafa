@@ -46,9 +46,10 @@
  * commits it is the number of merges past the release, which is what
  * `git log --first-parent` shows the operator.
  */
-import type { GitRunner } from '../../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
-import { gitSaid } from '../../pr/index.js';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+
 import { readManifestVersion } from '../../release/version.js';
 
 /** Why the release commit could not be named: the version is not committed, or git did not answer. */

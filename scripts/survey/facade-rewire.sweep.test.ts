@@ -102,6 +102,12 @@ interface RewiredRow {
  * `TriageServiceResult`. `packages/rafa-board/src/commands/epic/close-docs.ts`, the last
  * board file among them, left them in the same item: its pr import by
  * path was `addStaleDocLine`, which it reaches through the same registry.
+ * The sixth decouple item took ten back-edge and three load-cycle files
+ * off the row, the release commands, `src/next/epic-end.ts`,
+ * `src/release/branch-forecast.ts`, `prepare.ts` and `verify.ts`: their
+ * one pr import by path was the pr barrel, for core's git names, which
+ * they take from `@open-tomato/rafa/core/git` now, so the row keeps 10
+ * load-cycle and 2 back-edge files.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -157,25 +163,12 @@ const REWIRED: readonly RewiredRow[] = [
       'src/claims/lost.ts': 'loadCycle',
       'src/cleanup/past-head.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
-      'src/commands/release/fragment.ts': 'backEdge',
-      'src/commands/release/list.ts': 'backEdge',
-      'src/commands/release/publish.ts': 'backEdge',
-      'src/commands/release/release-commit.ts': 'backEdge',
       'src/commands/release/settle.ts': 'backEdge',
-      'src/commands/release/status-fragments.ts': 'loadCycle',
-      'src/commands/release/status-packages.ts': 'backEdge',
       'src/commands/release/status-stale-docs.ts': 'backEdge',
-      'src/commands/release/status.ts': 'backEdge',
-      'src/commands/release/tag-units.ts': 'backEdge',
-      'src/commands/release/tag.ts': 'backEdge',
-      'src/next/epic-end.ts': 'loadCycle',
       'src/next/hint.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/readings.ts': 'loadCycle',
-      'src/release/branch-forecast.ts': 'loadCycle',
-      'src/release/prepare.ts': 'backEdge',
       'src/release/settle-pr.ts': 'loadCycle',
-      'src/release/verify.ts': 'backEdge',
       'src/start/pr-lifecycle.ts': 'loadCycle',
       'src/start/pr-retarget.ts': 'loadCycle',
       'src/start/suite-blocker.ts': 'loadCycle',

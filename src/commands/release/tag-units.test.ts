@@ -28,7 +28,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { readNewestRelease, readTagPackages, readUnitInputs, readVersion, unitDecisionOf } from './tag-units.js';
