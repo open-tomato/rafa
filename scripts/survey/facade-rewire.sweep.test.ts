@@ -116,8 +116,11 @@ interface RewiredRow {
  * types it takes from `@open-tomato/rafa/pr/types` now.
  * `src/commands/release/status-stale-docs.ts` left it in the same item:
  * its one pr import by path was `src/docs/open-lines.ts`, which the item
- * placed in release by name. So the row keeps 8 load-cycle files and 1
- * back-edge file.
+ * placed in release by name. `src/commands/release/settle.ts`, the last
+ * release file on the row, left it in the same item: its one pr import
+ * by path was `ghPullRequestsIn`, which it reaches through core's service
+ * registry as `pullRequestsIn`. So the row keeps 8 load-cycle files and
+ * no back-edge file.
  * Run's nine load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -170,7 +173,6 @@ const REWIRED: readonly RewiredRow[] = [
     allowed: {
       'src/claims/lost.ts': 'loadCycle',
       'src/cleanup/worktrees.ts': 'loadCycle',
-      'src/commands/release/settle.ts': 'backEdge',
       'src/next/hint.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/readings.ts': 'loadCycle',
