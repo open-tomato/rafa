@@ -121,12 +121,13 @@
  * `endWithNextStep`, reached through core's service registry
  * (`activeServices().endWithNextStep`, registered by the root
  * `src/service-registry.ts`), since pr may not import run; with nothing
- * registered the call refuses, naming the key and the root. So a pull request the assessment found green ends
- * with the merge, one whose checks are still running ends with the
- * wait, and one still red ends with another assessment — the honest
- * reading, since a triage reports and repairs nothing by itself. A
- * `--resolve` run that gave up ends with its own exit 3 and the
- * follow-up prompt instead, as every refusal does.
+ * registered the call refuses, naming the key and the root. So a pull
+ * request the assessment found green ends with the merge, one whose
+ * checks are still running ends with the wait, and one still red ends
+ * with another assessment — the honest reading, since a triage reports
+ * and repairs nothing by itself. A `--resolve` run that gave up ends
+ * with its own exit 3 and the follow-up prompt instead, as every
+ * refusal does.
  *
  * ## What is allowed to fail
  *
