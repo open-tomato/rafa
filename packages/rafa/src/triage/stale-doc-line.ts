@@ -13,7 +13,7 @@
  *
  * The module is pure: it reads no file, no git and no tracker. The issue
  * itself, its title, body and the calls that add or tick a line, stays in
- * `src/docs/release-issue.ts`, which reads both names from here.
+ * `packages/rafa-release/src/docs/release-issue.ts`, which reads both names from here.
  */
 
 /** A run of white space, the line and paragraph separators included. */

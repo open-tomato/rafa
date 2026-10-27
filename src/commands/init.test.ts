@@ -60,7 +60,7 @@
  * `init` has just written, and the rerun that asks nothing because the
  * config already answers. What the step decides on its own and what the
  * edit does to the text are held in `init-release.test.ts` and
- * `src/release/setting.test.ts`. Every case whose world has no
+ * `src/tests/release-coupled/release/setting.test.ts`. Every case whose world has no
  * `package.json` and no `CHANGELOG.md` is the ordinary one here, since
  * a world is planted empty; the case that plants both is what shows the
  * two lines above the question are absent when nothing is missing.

@@ -43,6 +43,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import releaseSettle from '@open-tomato/rafa-release/commands/release/settle';
 
 import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { settleState } from '../next/settle-step.js';
@@ -50,7 +51,6 @@ import { dispatchInProject } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';
 import prMerge from './pr/merge.js';
-import releaseSettle from './release/settle.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-settle-')));

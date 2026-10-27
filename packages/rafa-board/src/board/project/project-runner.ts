@@ -18,7 +18,7 @@
  * | `packages/rafa-board/src/commands/epic/epic-project.ts` | the `rafa epic` actions, the add of `epic new` included |
  * | `packages/rafa-board/src/commands/epic/close-triage.ts` | the `openGh` the gate of `rafa epic close` hands `./add-filed.ts` for the bugs its failed checks filed |
  * | `src/commands/pr/merge-project.ts` | `rafa pr merge` |
- * | `src/commands/release/settle-project.ts` | `rafa release settle` |
+ * | `packages/rafa-release/src/commands/release/settle-project.ts` | `rafa release settle` |
  * | `./issue-board-refresh.ts` | the refreshing issue board's refresh, and every caller of `refreshIssueItems` |
  * | `src/commands/doctor-project.ts` | the project section of `rafa doctor` |
  * | `src/start/triage.ts` | the `openGh` `loop start`'s triage hands `./add-filed.ts` for the bugs a task's report filed |

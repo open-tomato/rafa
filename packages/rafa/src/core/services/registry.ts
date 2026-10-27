@@ -100,7 +100,7 @@ export interface ServiceReason {
   readonly lower: 'board' | 'release';
   /** The package the function lives in. */
   readonly higher: 'pr' | 'release' | 'run';
-  /** The function's file, repository-relative, as it stood when the key's reach was read; see the module note. */
+  /** The function's file, repository-relative, where it stands now; its reach was read where it stood then; see the module note. */
   readonly home: string;
   /** The files outside `packages/rafa/` the home reaches on the import graph; see the module note. */
   readonly reach: number;
@@ -113,10 +113,10 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
   addStaleDocLine: Object.freeze<ServiceReason>({
     lower: 'board',
     higher: 'release',
-    home: 'src/docs/release-issue.ts',
+    home: 'packages/rafa-release/src/docs/release-issue.ts',
     reach: 6,
     why: 'rafa epic close adds a docs-only criterion to the stale-docs issue, whose module reads the release version'
-      + ' helpers of src/release/.',
+      + ' helpers of packages/rafa-release/src/release/.',
   }),
   endWithNextStep: Object.freeze<ServiceReason>({
     lower: 'board',

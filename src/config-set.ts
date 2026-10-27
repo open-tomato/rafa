@@ -6,7 +6,7 @@
  *
  * The text is edited and never re-serialised, so every comment `rafa
  * init` wrote, and every comment an operator added, survives: the rule
- * `src/release/setting.ts` and `packages/rafa/src/effort/store/move.ts` follow for
+ * `packages/rafa-release/src/release/setting.ts` and `packages/rafa/src/effort/store/move.ts` follow for
  * their one key each. This module is the same edit for any key the
  * schema knows, one or two levels deep.
  *
@@ -26,7 +26,7 @@
  * setting commented at its default (`src/project/scaffold.ts`), and the
  * block a commented `# pr:` opens holds the other `pr` keys too, so
  * uncommenting the section would be uncommenting a section of several
- * settings for one of them; `src/release/setting.ts` explains why that
+ * settings for one of them; `packages/rafa-release/src/release/setting.ts` explains why that
  * is the wrong edit. So the commented block stays as it was, and the
  * setting is appended below it.
  *

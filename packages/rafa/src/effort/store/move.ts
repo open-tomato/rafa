@@ -48,7 +48,7 @@
  *
  * {@link withSqliteStoreSetting} edits the text rather than
  * re-serialising it, so every comment `rafa init` wrote stays, the rule
- * `src/release/setting.ts` spells out for `release.enabled`. An
+ * `packages/rafa-release/src/release/setting.ts` spells out for `release.enabled`. An
  * uncommented top-level `store:` line is replaced, the commented one
  * `rafa init` writes is uncommented as `store: sqlite`, and a file
  * naming no `store` gains the line at its end. A file naming `store`

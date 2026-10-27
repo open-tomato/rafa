@@ -27,7 +27,7 @@
  *
  * {@link StaleDocsTracker}, {@link StaleDocLineResult} and
  * {@link AddStaleDocLineOptions} moved here from
- * `src/docs/release-issue.ts`, which declares `addStaleDocLine` over
+ * `packages/rafa-release/src/docs/release-issue.ts`, which declares `addStaleDocLine` over
  * them and imports them from `@open-tomato/rafa/core/services`. They are
  * the whole shape of that function, so core states it with no copy.
  *
@@ -37,7 +37,7 @@
  * declared in `packages/rafa/src/pr/types.ts`, which moved into core's
  * package before the service entered, so the key is written over the
  * port itself and no shape of it is spelled here. `rafa release settle`
- * (`src/commands/release/settle.ts`) reads the provider through it.
+ * (`packages/rafa-release/src/commands/release/settle.ts`) reads the provider through it.
  *
  * ## The service types
  *

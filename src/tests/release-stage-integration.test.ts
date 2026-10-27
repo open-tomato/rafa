@@ -28,10 +28,10 @@
  */
 import type { CapturedRun } from './cli-capture.js';
 import type { GitRunner, PrProviderReading } from '../pr/index.js';
-import type { ReleaseLevelSource } from '../release/level.js';
-import type { ReleasePreparation } from '../release/prepare.js';
 import type { ReleaseFinish, ReleaseStageSettings } from '../start/release-stage.js';
 import type { ReportChange } from '@open-tomato/rafa/report/parse';
+import type { ReleaseLevelSource } from '@open-tomato/rafa-release/release/level';
+import type { ReleasePreparation } from '@open-tomato/rafa-release/release/prepare';
 
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

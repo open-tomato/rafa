@@ -39,9 +39,9 @@ package once its coupling is gone, or into the module it really tests.
 | `commands/doctor-refs.test.ts` | `src/commands/index.ts` |
 | `commands/epic/cancel-native.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/epic/cancel.test.ts` | `src/tests/cli-capture.ts` |
-| `commands/epic/close-docs.test.ts` | `src/docs/release-issue.ts` |
+| `commands/epic/close-docs.test.ts` | `packages/rafa-release/src/docs/release-issue.ts` |
 | `commands/epic/close-native.test.ts` | `src/tests/cli-capture.ts` |
-| `commands/epic/close.test.ts` | `packages/rafa-effort/src/effort/epic-cost.ts`, `src/docs/release-issue.ts`, `src/tests/cli-capture.ts`, `src/triage/triage.ts` |
+| `commands/epic/close.test.ts` | `packages/rafa-effort/src/effort/epic-cost.ts`, `packages/rafa-release/src/docs/release-issue.ts`, `src/tests/cli-capture.ts`, `src/triage/triage.ts` |
 | `commands/epic/epic-project.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/epic/horizon-change.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/epic/move-native.test.ts` | `src/tests/cli-capture.ts` |

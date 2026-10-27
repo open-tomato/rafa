@@ -18,14 +18,15 @@
  */
 import type { FollowUpReading } from './merge-followups.js';
 import type { SettleWaiting } from '../../pr/settle-waiting.js';
-import type { ReleaseMove } from '../../release/release-move.js';
+import type { ReleaseMove } from '@open-tomato/rafa-release/release/release-move';
 
 import { describe, expect, it } from 'bun:test';
 
-import { moveSpelling } from '../../release/release-move.js';
-import { versionTag } from '../../release/version-tag.js';
+import { createReleaseSettleCommand } from '@open-tomato/rafa-release/commands/release/settle';
+import { moveSpelling } from '@open-tomato/rafa-release/release/release-move';
+import { versionTag } from '@open-tomato/rafa-release/release/version-tag';
+
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
-import { createReleaseSettleCommand } from '../release/settle.js';
 
 import { afterLoopsPhrase, readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND } from './merge-followups.js';
 

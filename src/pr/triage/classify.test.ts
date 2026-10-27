@@ -67,7 +67,7 @@ import type { CheckRow } from '../checks.js';
 import type { TriageClass } from './classes.js';
 import type { ClassifiedPullRequest, ClassifyTriageInput } from './classify.js';
 import type { FailedStep } from './evidence.js';
-import type { GuardVerdict, NamedBaseEntry } from '../../release/guard.js';
+import type { GuardVerdict, NamedBaseEntry } from '@open-tomato/rafa-release/release/guard';
 
 import { describe, expect, it } from 'bun:test';
 

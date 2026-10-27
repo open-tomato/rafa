@@ -11,8 +11,8 @@
  * ## The body's forecast, not a new one
  *
  * The sentence is the one the wrap-up wrote into the body, read back by
- * `readBodyForecast` (`src/release/body-forecast.ts`); it was made by
- * `src/release/forecast.ts` when the body was written, and nothing here
+ * `readBodyForecast` (`packages/rafa-release/src/release/body-forecast.ts`); it was made by
+ * `packages/rafa-release/src/release/forecast.ts` when the body was written, and nothing here
  * folds or calls a strategy. What this module adds is the reading of the
  * base NOW, so a sentence computed against a base that has moved on is
  * marked rather than read as current: the release it names may be taken
@@ -24,7 +24,7 @@
  * The base is `origin/<base branch>` of each pull request — its own
  * `baseRefName`, since pull requests into two branches are forecast
  * against two bases — read by `readWaiting`
- * (`src/commands/release/status-fragments.ts`), the reading `rafa release
+ * (`packages/rafa-release/src/commands/release/status-fragments.ts`), the reading `rafa release
  * status` prints, so the two commands cannot disagree over one tree.
  * Like that one, it fetches nothing: the ref is read as last fetched and
  * named in the line, and each base is read once however many pull

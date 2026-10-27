@@ -8,12 +8,12 @@
  */
 import type { LocalBranch } from './branches.js';
 import type { MergedBy, MergedRow, NotPushedRow, StaleRow } from './groups.js';
-import type { PastHeadCommit } from './past-head.js';
 import type { RemoteOnlyRow } from './remote-only.js';
 import type { RunRow } from './runs.js';
 import type { CleanupFiles, CleanupSelection } from './steps.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { PastHeadCommit } from '@open-tomato/rafa-release/cleanup/past-head';
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

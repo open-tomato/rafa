@@ -80,11 +80,11 @@
  */
 import type { WrapUpLearning } from './wrap-up.js';
 import type { GitRunner } from '../pr/index.js';
-import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { Learning } from '@open-tomato/rafa/ports';
 import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
+import type { ReleasePrepared, ReleaseSkipped } from '@open-tomato/rafa-release/release/prepare';
 
 import { createHash } from 'node:crypto';
 

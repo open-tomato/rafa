@@ -10,7 +10,7 @@
  * reading here is of a guard that could never fail.
  */
 import type { BundleMetafile } from './bundle';
-import type { WorkspacePackage } from '../../src/release/workspace-packages.js';
+import type { WorkspacePackage } from '@open-tomato/rafa-release/release/workspace-packages';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

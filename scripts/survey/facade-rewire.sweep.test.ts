@@ -78,14 +78,14 @@ interface RewiredRow {
  * Release's one board importer, `packages/rafa-board/src/board/project/facts.ts`, left the row
  * in the fourth decouple item: its one release import by path was
  * `directoryPrefix` and `fragmentIdOf`, which it takes from
- * `@open-tomato/rafa/release/fragment` now. `src/docs/release-issue.ts`
+ * `@open-tomato/rafa/release/fragment` now. `packages/rafa-release/src/docs/release-issue.ts`
  * stayed, for `SettleForecast` and `nextVersion`, until the sixth decouple
  * item placed it in release by name, so its imports are inside release
  * and the row is empty.
  * Pr's 13 load-cycle files are claims, cleanup, next, start and release files
  * pr's files reach, three of them release files that are back edges the
  * load-cycle group takes first. `packages/rafa/src/claims/git.ts`,
- * `packages/rafa/src/start/branch-decision.ts` and `src/release/fragment-tree.ts` left the
+ * `packages/rafa/src/start/branch-decision.ts` and `packages/rafa-release/src/release/fragment-tree.ts` left the
  * row in the fourth decouple item: their one pr import by path was the pr
  * barrel, for core's git names and `WorkingTreeStatus`, which they take from
  * `@open-tomato/rafa/core/git` now. Its 12 back-edge files are release
@@ -105,18 +105,18 @@ interface RewiredRow {
  * board file among them, left them in the same item: its pr import by
  * path was `addStaleDocLine`, which it reaches through the same registry.
  * The sixth decouple item took ten back-edge and three load-cycle files
- * off the row, the release commands, `src/next/epic-end.ts`,
- * `src/release/branch-forecast.ts`, `prepare.ts` and `verify.ts`: their
+ * off the row, the release commands, `packages/rafa-release/src/next/epic-end.ts`,
+ * `packages/rafa-release/src/release/branch-forecast.ts`, `prepare.ts` and `verify.ts`: their
  * one pr import by path was the pr barrel, for core's git names, which
- * they take from `@open-tomato/rafa/core/git` now. `src/cleanup/past-head.ts`
+ * they take from `@open-tomato/rafa/core/git` now. `packages/rafa-release/src/cleanup/past-head.ts`
  * left it in the same item: its one pr import by path was
  * `MergedPullRequest` of `packages/rafa/src/pr/types.ts`, which the item's
- * core move list took into core. `src/release/settle-pr.ts` left it in
+ * core move list took into core. `packages/rafa-release/src/release/settle-pr.ts` left it in
  * the same item: its one pr import by path was the pr barrel, for the port
  * types it takes from `@open-tomato/rafa/pr/types` now.
- * `src/commands/release/status-stale-docs.ts` left it in the same item:
- * its one pr import by path was `src/docs/open-lines.ts`, which the item
- * placed in release by name. `src/commands/release/settle.ts`, the last
+ * `packages/rafa-release/src/commands/release/status-stale-docs.ts` left it in the same item:
+ * its one pr import by path was `packages/rafa-release/src/docs/open-lines.ts`, which the item
+ * placed in release by name. `packages/rafa-release/src/commands/release/settle.ts`, the last
  * release file on the row, left it in the same item: its one pr import
  * by path was `ghPullRequestsIn`, which it reaches through core's service
  * registry as `pullRequestsIn`. So the row keeps 8 load-cycle files and

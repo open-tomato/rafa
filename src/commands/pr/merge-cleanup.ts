@@ -65,7 +65,7 @@
  * `readFollowUps` decides from: the version in the project's
  * `package.json`, whether that `package.json` names rafa, whether the
  * version is installed as a runtime under the home, and the settle dry
- * run (`readSettle`, `src/release/settle.ts`) over `origin/<base>`,
+ * run (`readSettle`, `packages/rafa-release/src/release/settle.ts`) over `origin/<base>`,
  * which the pull has just updated. The dry run reads git objects only
  * and runs where the release does (`release.enabled`, read as the
  * wrap-up and the guard read it); only its `folded` answer names

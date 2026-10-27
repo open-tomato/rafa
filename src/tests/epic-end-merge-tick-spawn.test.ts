@@ -7,7 +7,7 @@
  * project with no epic prints `rafa next` and `rafa pr merge` output
  * byte-identical to what they always wrote.
  *
- * ## The end of an epic (`src/next/epic-end.ts`)
+ * ## The end of an epic (`packages/rafa-release/src/next/epic-end.ts`)
  *
  * One fixture, read twice: a roadmap naming one epic whose only member
  * is closed, so the walk descends into it and finds nothing left. The
@@ -55,10 +55,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
 import { tickSentence } from '@open-tomato/rafa-board/board/roadmap-tick';
+import { epicEndLines } from '@open-tomato/rafa-release/next/epic-end';
 
 import { summaryLine } from '../commands/pr/merge.js';
 import { YES_FLAG } from '../next/ceiling.js';
-import { epicEndLines } from '../next/epic-end.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

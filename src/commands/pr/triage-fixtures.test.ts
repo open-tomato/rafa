@@ -52,9 +52,9 @@ import type { TriageSeams } from './triage.js';
 import type { FakePrAuthor, FakePrCheck, FakePullRequestSeed } from '../../pr/gh-fake.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { TriageClass } from '../../pr/triage/classes.js';
-import type { GuardReading } from '../../release/guard.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { GuardReading } from '@open-tomato/rafa-release/release/guard';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -191,7 +191,7 @@ const COLLISION_READING: GuardReading = {
  * A guard reader answering {@link COLLISION_READING} for the heads in
  * `stamped` and `null` — the release not running — for every other,
  * the way `conflictGit` answers the conflicting files per head. The
- * guard's own git reads are `src/release/guard.test.ts`'s territory.
+ * guard's own git reads are `packages/rafa-release/src/release/guard.test.ts`'s territory.
  */
 function stampGuard(stamped: ReadonlySet<string>): TriageGuardReader {
   return (input) => stamped.has(input.pr.headRefOid)

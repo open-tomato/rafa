@@ -174,7 +174,7 @@
  *
  * A chain that ends at `nothing-left` because the walk ran dry inside an
  * epic — every line done or taken, the epic not done — ends with the
- * lines `src/next/epic-end.ts` renders, after its own and after any stop
+ * lines `packages/rafa-release/src/next/epic-end.ts` renders, after its own and after any stop
  * line: `rafa epic close <n>` as the next step, `rafa roadmap` to list
  * the board's epics, and `rafa release tag` where a version the
  * changelog calls released carries no tag. Each is printed, never run.

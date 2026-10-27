@@ -2,9 +2,9 @@
 # pull request, for levels 3 and 4 of the release ladder.
 #
 # Written into a project's `.github/workflows/` by `writeReleaseWorkflow`
-# (`src/release/templates.ts`) at levels 3 and 4 while
-# `.github/dependabot.yml` exists. A bot pull request has no wrap-up to
-# write its fragment, so this workflow writes one with
+# (`packages/rafa-release/src/release/templates.ts`) at levels 3 and 4
+# while `.github/dependabot.yml` exists. A bot pull request has no
+# wrap-up to write its fragment, so this workflow writes one with
 # `rafa release fragment --plan=dependabot-<number>`, at `patch` when
 # `dependabot/fetch-metadata` reads the update as `direct:production` and
 # at `none` otherwise, commits it as `chore: release fragment

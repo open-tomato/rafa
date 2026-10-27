@@ -20,13 +20,13 @@
  * ```
  *
  * Nothing here decides what a release says. The reading modules under
- * `src/release/` own that: `prepare.ts` writes the fragment or says why
- * it wrote none, `verify.ts` reads what the session made of it and
- * restores step 1's text on any refusal, and `branch-forecast.ts` folds
- * the verified fragment over the base and renders the body block. This
- * module is the ORDER those run in, the git the verified fragment is
- * committed and pushed with, and what a finish leaves in the pull
- * request body.
+ * `packages/rafa-release/src/release/` own that: `prepare.ts` writes
+ * the fragment or says why it wrote none, `verify.ts` reads what the
+ * session made of it and restores step 1's text on any refusal, and
+ * `branch-forecast.ts` folds the verified fragment over the base and
+ * renders the body block. This module is the ORDER those run in, the
+ * git the verified fragment is committed and pushed with, and what a
+ * finish leaves in the pull request body.
  *
  * ## Why the finish takes a record rather than reading the files again
  *

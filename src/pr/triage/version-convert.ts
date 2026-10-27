@@ -21,9 +21,9 @@
  *
  *   - **A fragment** under `release.fragments`, whose notes are the
  *     stamped section's lines as the guard reads them (`sectionFor` in
- *     `src/release/guard.ts`: non-blank, trimmed, receipts left out).
+ *     `packages/rafa-release/src/release/guard.ts`: non-blank, trimmed, receipts left out).
  *   - **The version file** with its version set back to the MERGE
- *     BASE's, through `replaceManifestVersion` (`src/release/version.ts`),
+ *     BASE's, through `replaceManifestVersion` (`packages/rafa-release/src/release/version.ts`),
  *     so every other byte the branch wrote in it — a dependency it added
  *     — stays.
  *   - **The changelog** as the merge base's text, whole. The stamped
@@ -50,7 +50,7 @@
  *
  * The base is `origin/<base>` after a `git fetch` of it, which is where
  * the merge base and the guard's reading are taken. A fetch that fails is
- * a problem noted and not a stop, as `src/release/guard-merge.ts` treats
+ * a problem noted and not a stop, as `packages/rafa-release/src/release/guard-merge.ts` treats
  * its own: the conversion then reads what this clone holds.
  *
  * The commit names its three paths, so nothing else staged in a reused
@@ -76,7 +76,7 @@
  *   - notes — the stamped section's lines. A stamp of the version file
  *     alone has no section, and a shipping fragment may not be empty, so
  *     the title becomes its one note and a problem says so, as
- *     `src/release/prepare.ts` does for a plan whose notes all came out
+ *     `packages/rafa-release/src/release/prepare.ts` does for a plan whose notes all came out
  *     empty.
  *
  * The file name is `allocateFragmentName`'s first free name against the

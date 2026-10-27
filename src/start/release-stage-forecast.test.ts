@@ -8,18 +8,18 @@
  * (`src/tests/release-stage-fixtures.ts`).
  *
  * The forecast seam is stubbed: what the fold answers is
- * `src/release/branch-forecast.test.ts`'s question, and what the stage
+ * `packages/rafa-release/src/release/branch-forecast.test.ts`'s question, and what the stage
  * does with the answer is this file's.
  */
 import type { ReleaseStageSeams } from './release-stage.js';
-import type { ReleasePreparation } from '../release/prepare.js';
+import type { ReleasePreparation } from '@open-tomato/rafa-release/release/prepare';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { RELEASE_BLOCK_CLOSE } from '@open-tomato/rafa-release/release/branch-forecast';
 
-import { RELEASE_BLOCK_CLOSE } from '../release/branch-forecast.js';
 import {
   BRANCH,
   COMMITTED,

@@ -111,7 +111,7 @@ function buildProbe(): string {
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
     `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
-    `import { createReleaseSettleCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'release', 'settle.ts'))};`,
+    `import { createReleaseSettleCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-release', 'src', 'commands', 'release', 'settle.ts'))};`,
     `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
     `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     '',

@@ -15,7 +15,7 @@
  * the tip's reading directly, so the module note's reason is a reading
  * and not a claim.
  */
-import type { SettleSettings } from '../../release/settle.js';
+import type { SettleSettings } from '@open-tomato/rafa-release/release/settle';
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,8 +26,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
-
-import { readGuard } from '../../release/guard.js';
+import { readGuard } from '@open-tomato/rafa-release/release/guard';
 
 import {
   conversionCommitSubject,

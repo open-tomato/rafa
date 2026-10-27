@@ -101,8 +101,8 @@ import { EPIC_PROJECT_NUMBER, recordingEpicRefresh, withProjectNumber } from '@o
 import { splitCriteria, VERIFY_PROMPT_PREFIX } from '@open-tomato/rafa-board/epic/verify-plan';
 import { CHECK_PROMPT_PREFIX, verifyWorktreePath } from '@open-tomato/rafa-board/epic/verify-run';
 import { MEMBERSHIP_NOTE, renderEpicCost } from '@open-tomato/rafa-effort/effort/epic-cost';
+import { staleDocsTitle } from '@open-tomato/rafa-release/docs/release-issue';
 
-import { staleDocsTitle } from '../../../../docs/release-issue.js';
 import { triageReport } from '../../../../triage/triage.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 

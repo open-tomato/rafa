@@ -15,12 +15,13 @@ Ten actions read and control pull requests:
   and one the body names by keyword that the provider does not link, are
   marked), each check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
-- `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable,
-  and where the release is on the forecast its body carries, marked
-  `(base moved)` when `origin/<base>` as last fetched holds another version
-  or other waiting fragments than the body's `rafa:release` marker names
-  (`src/commands/pr/list-forecast.ts`, over `src/release/body-forecast.ts`;
-  no fetch, no fold, no extra `gh` command)
+- `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable, and
+  where the release is on the forecast its body carries, marked `(base moved)`
+  when `origin/<base>` as last fetched holds another version or other waiting
+  fragments than the body's `rafa:release` marker names
+  (`src/commands/pr/list-forecast.ts`, over
+  `packages/rafa-release/src/release/body-forecast.ts`; no fetch, no fold, no
+  extra `gh` command)
 - `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
   merge the PR; `--skip-checks` is for a PR that reports no checks at all
 - `pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config]
@@ -113,18 +114,17 @@ learning, output, planner, sync and logger only), so adding a method to it bumps
 no version.
 
 `create` and `editTitle` are rafa-367's, for settle's `pr` delivery
-(`src/release/settle-pr.ts`), which opens or updates the one pending
-release pull request from `rafa/release`. `create` takes a
-`PullRequestDraft` — `head`, `base`, `title`, `body`, the head already
-pushed — and answers the pull request as `gh pr view` reads it back; it
-throws on every failure, a pull request already open from that head into
-that base included. On `gh` it sends `gh pr create` with all four flags,
-so nothing prompts, pushes or forks, and reads the number off the last
-stdout line that is a `/pull/<n>` URL. That output is from
-`gh pr create --help` on 2.100.0, not from a recorded create. `editTitle`
-is `gh pr edit <n> --title`, read by its exit code, as `editBody` is.
-The fake models both, and the unmodelled-flag case on `pr edit` now
-sends `--add-label`.
+(`packages/rafa-release/src/release/settle-pr.ts`), which opens or updates the
+one pending release pull request from `rafa/release`. `create` takes a
+`PullRequestDraft` — `head`, `base`, `title`, `body`, the head already pushed —
+and answers the pull request as `gh pr view` reads it back; it throws on every
+failure, a pull request already open from that head into that base included. On
+`gh` it sends `gh pr create` with all four flags, so nothing prompts, pushes or
+forks, and reads the number off the last stdout line that is a `/pull/<n>` URL.
+That output is from `gh pr create --help` on 2.100.0, not from a recorded
+create. `editTitle` is `gh pr edit <n> --title`, read by its exit code, as
+`editBody` is. The fake models both, and the unmodelled-flag case on `pr edit`
+now sends `--add-label`.
 
 `editBase(number, base)` is rafa-628's, for the wrap-up's retarget of a
 pull request opened against another base than the run's. It is
@@ -231,16 +231,16 @@ sentence replaces nothing.
    forecast; `missing` and `stale` follow `pr.versionCollision` (`allow`,
    `report`, `ask`, `refuse`); `collision` refuses unless
    `dangerous.acceptVersionCollision` is true. Its question comes before the
-   merge question, `--yes` does not answer it, and without a TTY `ask`
-   refuses. Settle's release pull request, a head of `rafa/release`
-   (`RELEASE_PR_BRANCH`) that stamps a version the base has neither
-   released nor passed (`src/release/release-delivery.ts`), is not
-   `stale`: it prints one line on stdout,
+   merge question, `--yes` does not answer it, and without a TTY `ask` refuses.
+   Settle's release pull request, a head of `rafa/release` (`RELEASE_PR_BRANCH`)
+   that stamps a version the base has neither released nor passed
+   (`packages/rafa-release/src/release/release-delivery.ts`), is not `stale`: it
+   prints one line on stdout,
    `Release: #<n> is settle's release pull request; merging it lands <version>`,
-   with no forecast and no `fix:` line, merges whatever
-   `pr.versionCollision` says, and its json `guard` reads answer `release`,
-   reaction `print` (#843). A `rafa/release` head the base has passed or
-   collides with reads as any branch does.
+   with no forecast and no `fix:` line, merges whatever `pr.versionCollision`
+   says, and its json `guard` reads answer `release`, reaction `print` (#843). A
+   `rafa/release` head the base has passed or collides with reads as any branch
+   does.
 3. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
 4. `gh pr merge <n> --<method>`, then in code, each step reported: switch to

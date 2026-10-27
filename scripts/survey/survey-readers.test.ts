@@ -12,20 +12,33 @@ import { testKind, type TestKind } from './test-kinds';
 /** The repository root, two folders above this file. */
 const ROOT = join(import.meta.dir, '..', '..');
 
-/** The eleven test files stream A's stretch 10 added, which the cut table lists nowhere. */
+/**
+ * The eleven test files stream A's stretch 10 added, which the cut table
+ * lists nowhere. Since pass 4d eight sit in release's package and three
+ * are parked under `src/tests/release-coupled/`, which the cut table
+ * reads as core's `src/tests/` folder, `@open-tomato/rafa`; see
+ * {@link PARKED_STRETCH_10_RELEASE_TESTS}.
+ */
 const STRETCH_10_RELEASE_TESTS = [
-  'src/commands/release/list.test.ts',
-  'src/commands/release/settle-workspace.test.ts',
-  'src/commands/release/status-packages.test.ts',
-  'src/commands/release/tag-follow-ups.test.ts',
-  'src/commands/release/tag-units.test.ts',
-  'src/commands/release/tag-workspace.test.ts',
-  'src/release/package-base-version.test.ts',
-  'src/release/release-move.test.ts',
-  'src/release/settle-groups.test.ts',
-  'src/release/status-readings.test.ts',
-  'src/release/workspace-packages.test.ts',
+  'src/tests/release-coupled/commands/release/list.test.ts',
+  'src/tests/release-coupled/commands/release/settle-workspace.test.ts',
+  'packages/rafa-release/src/commands/release/status-packages.test.ts',
+  'packages/rafa-release/src/commands/release/tag-follow-ups.test.ts',
+  'packages/rafa-release/src/commands/release/tag-units.test.ts',
+  'src/tests/release-coupled/commands/release/tag-workspace.test.ts',
+  'packages/rafa-release/src/release/package-base-version.test.ts',
+  'packages/rafa-release/src/release/release-move.test.ts',
+  'packages/rafa-release/src/release/settle-groups.test.ts',
+  'packages/rafa-release/src/release/status-readings.test.ts',
+  'packages/rafa-release/src/release/workspace-packages.test.ts',
 ];
+
+/** The three of {@link STRETCH_10_RELEASE_TESTS} pass 4d parked, placed in core by the `src/tests/` folder. */
+const PARKED_STRETCH_10_RELEASE_TESTS: ReadonlySet<string> = new Set([
+  'src/tests/release-coupled/commands/release/list.test.ts',
+  'src/tests/release-coupled/commands/release/settle-workspace.test.ts',
+  'src/tests/release-coupled/commands/release/tag-workspace.test.ts',
+]);
 
 describe('the survey readers over the live tree', () => {
   const tracked = listTrackedFiles(ROOT);
@@ -42,7 +55,10 @@ describe('the survey readers over the live tree', () => {
     const stray = 'src/nowhere/new-file.test.ts';
 
     for (const path of STRETCH_10_RELEASE_TESTS) {
-      expect(map.unitOf(path)).toBe('rafa-release');
+      const unit = PARKED_STRETCH_10_RELEASE_TESTS.has(path)
+        ? '@open-tomato/rafa'
+        : 'rafa-release';
+      expect(map.unitOf(path)).toBe(unit);
     }
     expect(map.unitOf('packages/rafa-inventory/src/schema/new-file.test.ts')).toBe('rafa-inventory');
     expect(map.unitOf(stray)).toBeUndefined();

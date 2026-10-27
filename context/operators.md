@@ -58,10 +58,10 @@ the watchtower finds it by), `bucket.md`, `loop-<issue>.log`,
 (the analyst's one write) and `report.md`. Its wrap-up writes the next
 stretch's opening message to `.rafa/stretch/engineer-prompt.md`.
 
-The integration branch is `stretch/<n>`, and `pr.base` points at it
-for the stretch. `release settle` folds `origin/<pr.base>`
-(`src/release/settle-worktree.ts`), so the wrap-up points `pr.base`
-back at `main` before it settles: one version per stretch, cut after
+The integration branch is `stretch/<n>`, and `pr.base` points at it for the
+stretch. `release settle` folds `origin/<pr.base>`
+(`packages/rafa-release/src/release/settle-worktree.ts`), so the wrap-up points
+`pr.base` back at `main` before it settles: one version per stretch, cut after
 the integration branch reaches `main`.
 
 ### Starting them

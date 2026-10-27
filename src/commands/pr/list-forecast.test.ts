@@ -22,10 +22,10 @@
  */
 import type { BaseNow, BaseReader, PrListForecast } from './list-forecast.js';
 import type { PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
-import type { BranchForecast } from '../../release/branch-forecast.js';
-import type { FoldFragment } from '../../release/strategy.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { BranchForecast } from '@open-tomato/rafa-release/release/branch-forecast';
+import type { FoldFragment } from '@open-tomato/rafa-release/release/strategy';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -37,11 +37,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { bodyWithRelease, releaseBodyBlock } from '@open-tomato/rafa-release/release/branch-forecast';
+import { forecastRelease } from '@open-tomato/rafa-release/release/forecast';
+import { releaseStrategyFor } from '@open-tomato/rafa-release/release/strategy';
 
 import { createGitRunner } from '../../pr/index.js';
-import { bodyWithRelease, releaseBodyBlock } from '../../release/branch-forecast.js';
-import { forecastRelease } from '../../release/forecast.js';
-import { releaseStrategyFor } from '../../release/strategy.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import {

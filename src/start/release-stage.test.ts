@@ -33,7 +33,7 @@
  */
 import type { ReleaseStageSeams } from './release-stage.js';
 import type { PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/index.js';
-import type { ReleasePreparation, ReleasePrepared } from '../release/prepare.js';
+import type { ReleasePreparation, ReleasePrepared } from '@open-tomato/rafa-release/release/prepare';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -47,8 +47,8 @@ import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { getCurrentBranch } from '@open-tomato/rafa/utils/git';
 import { assumptionsHeading } from '@open-tomato/rafa-board/board/review-stamp';
+import { verifyRelease } from '@open-tomato/rafa-release/release/verify';
 
-import { verifyRelease } from '../release/verify.js';
 import {
   BRANCH,
   COMMITTED,

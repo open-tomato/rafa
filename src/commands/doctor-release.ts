@@ -12,7 +12,7 @@
  * ## Only where the release is on
  *
  * The row is read and printed only when `resolveReleaseEnabled`
- * (`src/release/enabled.ts`) says the release runs here: under `auto`,
+ * (`packages/rafa-release/src/release/enabled.ts`) says the release runs here: under `auto`,
  * both `release.versionFile` and `release.changelog` are files. A
  * project that never opted in gets no row and sends no git command, so
  * the other rows of `doctor` read as they did before this one.
@@ -21,7 +21,7 @@
  *
  * It reads what `rafa release status` reads, through that action's own
  * readers (`./release/status-fragments.ts` and the library half,
- * `src/release/status-readings.ts`), and assembles no `git` argv of its
+ * `packages/rafa-release/src/release/status-readings.ts`), and assembles no `git` argv of its
  * own:
  *
  *   - the base version and the waiting fragments with their forecast

@@ -12,8 +12,8 @@
  */
 import type { FollowUpPlace } from './merge-cleanup.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
-import type { MergeGuardSettings } from '../../release/guard-merge.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
+import type { MergeGuardSettings } from '@open-tomato/rafa-release/release/guard-merge';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

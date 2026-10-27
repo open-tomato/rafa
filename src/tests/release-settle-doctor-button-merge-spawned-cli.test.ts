@@ -1,6 +1,6 @@
 /**
  * `rafa doctor` and `rafa release settle` (`src/commands/doctor-release.ts`,
- * `src/commands/release/settle.ts`), spawned as the real `rafa` binary —
+ * `packages/rafa-release/src/commands/release/settle.ts`), spawned as the real `rafa` binary —
  * `src/tests/cli-capture.ts` — over a bare origin, a hub clone that plays
  * the forge's own checkout, and two SEPARATE caller clones: one device
  * that only ever runs `doctor`, and another that later runs the settle.
