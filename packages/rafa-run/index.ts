@@ -73,7 +73,6 @@ export {
   runAction,
 } from '../../src/next/actions.js';
 
-export type { NextEndingSeams } from '../../src/next/ending.js';
 export {
   actionOutput,
   endWithNextStep,
