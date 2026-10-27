@@ -120,10 +120,14 @@
  * ## The ending, on the green run alone
  *
  * A green wait ends with the one step that follows, which for a pull
- * request whose checks have just passed is the merge
- * (`src/next/ending.ts`, `--no-hint` to turn it off). The other four
- * endings get none: each is a `CommandExit` carrying its own report,
- * and that report already names the rafa command for what it found —
+ * request whose checks have just passed is the merge (`--no-hint` to
+ * turn it off). It is run's `endWithNextStep`, reached through core's
+ * service registry (`activeServices().endWithNextStep`, registered by
+ * the root `src/service-registry.ts`), since pr may not import run;
+ * with nothing registered the call refuses, naming the key and the
+ * root. The other four endings get none: each is a `CommandExit`
+ * carrying its own report, and that report already names the rafa
+ * command for what it found —
  * `rafa pr triage <n>` for a red one, `rafa pr show <n>` for one with
  * no checks, beside `rafa pr wait <n>` unless it conflicts, and
  * `rafa pr wait <n>` again for a deadline that passed. A hint would
@@ -146,14 +150,14 @@
  * reads `pending — 0 check(s)`, the verdict the wait acted on.
  */
 import type { PrSeams } from './pr-context.js';
-import type { NextEndingSeams } from '../../next/ending.js';
 import type { CheckRow, ChecksVerdict, PullRequestDetail } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { EndingSeams } from '@open-tomato/rafa/core/services';
 
 import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
+import { activeServices } from '@open-tomato/rafa/core/services';
 import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 
-import { endWithNextStep } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
 
 import { SEPARATOR } from './current.js';
@@ -192,7 +196,7 @@ export interface PrWaitSeams extends PrSeams {
   /** The wait between polls. A real timer when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
-  readonly ending?: NextEndingSeams;
+  readonly ending?: EndingSeams;
 }
 
 /** The seams the registered action runs with: the system's own, every one. */
@@ -408,7 +412,7 @@ export function createPrWaitCommand(seams: PrWaitSeams = DEFAULT_WAIT_SEAMS): Ra
       if (waited.exitCode !== 0) throw new CommandExit(waited.exitCode, waited.text);
       if (context.outputMode === 'json') context.output.result(waited);
       else context.output.info(waited.text);
-      await endWithNextStep(context, seams.ending);
+      await activeServices().endWithNextStep(context, seams.ending);
     },
   };
   return Object.freeze(command);

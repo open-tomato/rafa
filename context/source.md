@@ -936,7 +936,7 @@ names come from, and the facade entry is no node.
     (rafa-1362) cut the release files off pr too: the ten
     `packages/rafa-release/src/commands/release/` files, `prepare.ts` and
     `verify.ts` take core's names or the registry's provider now, so release has
-    no edge into pr. Run has eight: no board file
+    no edge into pr. Run had eight: no board file
     (`packages/rafa-board/src/commands/board/list.ts` and
     `packages/rafa-board/src/commands/epic/new.ts` left them in the fourth
     decouple item, which moved `defaultBoardOnce` into
@@ -950,13 +950,12 @@ names come from, and the facade entry is no node.
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and `wait.ts`).
     Each sits earlier in the move order than run, so each imports it backwards,
     and the decouple step before pass 4 cuts them. The seventh decouple item
-    cut seven of the eight: `merge-cleanup.ts`, `merge-followups.ts` and
+    cut all eight: `merge-cleanup.ts`, `merge-followups.ts` and
     `triage-resolve.ts` take their constant from core,
     `merge-loop-worktree.ts` and `retarget.ts` import
     `src/cleanup/worktrees.ts` and `src/start/pr-retarget.ts`, which it placed
-    in pr, and `merge.ts` and `triage.ts` call `endWithNextStep` through
-    core's service registry. Run keeps `wait.ts`, for `endWithNextStep` of
-    `src/next/ending.ts`.
+    in pr, and `merge.ts`, `triage.ts` and `wait.ts` call `endWithNextStep`
+    through core's service registry. Run's row is empty.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
     a private package, which pass 4 settles. No package has one now: the dry
