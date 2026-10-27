@@ -286,7 +286,7 @@ import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
 import type { ComparedText, ScoredIssue, SimilarityWeights } from './similarity.js';
 import type { BugRecord, BugRules } from '@open-tomato/rafa/bugs/record';
-import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { TriageSettings } from '@open-tomato/rafa/config-schema-triage';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 import type { BugKind, ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
@@ -472,7 +472,7 @@ export interface TriageOptions {
    * that step is off.
    */
   readonly similarity?: Pick<
-    RafaConfig,
+    TriageSettings,
     | 'triageSimilarityThreshold'
     | 'triageSimilarityCandidates'
     | 'triageSimilarityWeightsCauseLeaf'
