@@ -2,7 +2,8 @@
  * Tests for `rafa pr open` (`open.ts`): a pull request opened over the
  * recorded `gh`, the one already open on the head printed and none
  * opened, the refusals of the line and of the body file, and what the
- * command writes in each mode.
+ * command writes in each mode. The unit cases of the library half,
+ * `open-pull.ts`, are in `open-pull.test.ts`.
  *
  * Every dispatching case runs the real command from a project of its own beside
  * a home of its own under this file's temporary directory
@@ -26,7 +27,7 @@ import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative } from 'node:path';
+import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -36,7 +37,7 @@ import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
-import { createPrOpenCommand, readOpenBody } from './open.js';
+import { createPrOpenCommand } from './open.js';
 import { PR_USAGE } from './pr-context.js';
 
 /** A temporary directory of this file's own. */
@@ -338,14 +339,5 @@ describe('the refusals, each before a provider is made', () => {
     expect(run.exitCode).toBe(2);
     expect(run.stderr).toContain(PR_NEEDS_GH);
     expect(seams.made()).toEqual([]);
-  });
-});
-
-describe('the body file reader', () => {
-  it('reads a relative path from the directory rafa runs in', async () => {
-    const path = relative(process.cwd(), bodyFile());
-
-    expect(isAbsolute(path)).toBe(false);
-    expect(await readOpenBody(path)).toBe(BODY);
   });
 });

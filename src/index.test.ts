@@ -904,7 +904,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX']],
   ]],
   ['./commands/stretch/end.js', [
-    ['@open-tomato/rafa-pr', ['DEFAULT_PR_SEAMS', 'onProvider', 'openPrContext', 'readRemoteHead']],
+    ['@open-tomato/rafa-pr', ['baseWarning', 'DEFAULT_PR_SEAMS', 'onProvider', 'openPrContext', 'openPull', 'readRemoteHead', 'renderOpen']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config', ['configFilePath']],

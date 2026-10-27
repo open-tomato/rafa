@@ -60,6 +60,12 @@ export {
 
 export { PR_SUBJECT } from '../../src/commands/pr/declarations.js';
 
+export {
+  baseWarning,
+  openPull,
+  renderOpen,
+} from '../../src/commands/pr/open-pull.js';
+
 export type { PrSeams } from '../../src/commands/pr/pr-context.js';
 export {
   DEFAULT_PR_SEAMS,
