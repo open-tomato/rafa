@@ -105,7 +105,7 @@ const MEMBERS: readonly Member[] = [
     name: 'checks',
     lines: ['  checks: async (_n: number) => ({ rows: [], verdict: "none" as const }),'],
   },
-  { name: 'changedFiles', lines: ['  changedFiles: async (_n: number) => ["src/pr/gh.ts"],'] },
+  { name: 'changedFiles', lines: ['  changedFiles: async (_n: number) => ["packages/rafa-pr/src/pr/gh.ts"],'] },
   { name: 'reviews', lines: ['  reviews: async (_n: number) => [review],'] },
   { name: 'browse', lines: ['  browse: async (_n: number) => {},'] },
   {

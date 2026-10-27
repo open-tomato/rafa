@@ -8,7 +8,7 @@
  * stage the chain passes through.
  *
  * `src/commands/next.test.ts` drives the chain's own logic over scripted
- * states and fakes, and `src/commands/pr/merge-driven.test.ts` drives
+ * states and fakes, and `src/tests/pr-coupled/commands/pr/merge-driven.test.ts` drives
  * `pr merge`'s clean-up over a real repository the way this file borrows
  * from. Neither runs the THREE actions in sequence: this is the first
  * suite to walk `merge` → `plan` → `start` as one `rafa next` invocation
@@ -160,14 +160,14 @@ function buildProbe(): string {
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
-    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
+    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'commands', 'pr', 'merge.ts'))};`,
     `import planCreateDeclared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
     `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
     `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
     `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
     `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
     `import { offerRunBranch } from ${JSON.stringify(join(SRC_DIR, 'start', 'branch.ts'))};`,
-    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
+    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'pr', 'index.ts'))};`,
     `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'plan', 'plan-stamp.ts'))};`,
     '',

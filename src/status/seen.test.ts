@@ -15,8 +15,8 @@
  */
 import type { SeenInput, SeenSeams, SeenSnapshot } from './seen.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
-import type { WorktreeSeams } from '../cleanup/worktrees.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { WorktreeSeams } from '@open-tomato/rafa-pr/cleanup/worktrees';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

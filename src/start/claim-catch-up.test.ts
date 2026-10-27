@@ -16,7 +16,7 @@
  * the merge commit git itself writes.
  */
 import type { ClaimCatchUpReading } from './claim-catch-up.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -25,7 +25,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { readClaimCatchUp } from './claim-catch-up.js';
 

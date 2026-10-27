@@ -15,12 +15,12 @@
  * them.
  */
 import type { StartKindOptions } from './triage-kinds.js';
-import type { BaseRunAnswer, NamedTest } from '../triage/base-run.js';
-import type { BugTriage } from '../triage/triage.js';
 import type { GitResult } from '@open-tomato/rafa/core/git';
 import type { ReportBug } from '@open-tomato/rafa/report/parse';
 import type { BugRouteEntry } from '@open-tomato/rafa/store/bug-routes';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
+import type { BaseRunAnswer, NamedTest } from '@open-tomato/rafa-pr/triage/base-run';
+import type { BugTriage } from '@open-tomato/rafa-pr/triage/triage';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

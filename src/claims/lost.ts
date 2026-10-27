@@ -75,15 +75,15 @@
  * drives the absent, fast-forward and refused rows over planted clones.
  */
 import type { DeviceStoreIds } from './device.js';
-import type { GitRunner } from '../pr/index.js';
 import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
 import type { PendingHandover } from '@open-tomato/rafa/claims/record';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from '@open-tomato/rafa/claims/git';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, stubOfBranch } from '@open-tomato/rafa/core/config/sections';
 import { localRef, REMOTE } from '@open-tomato/rafa/start/branch-decision';
-
-import { gitSaid } from '../pr/index.js';
 
 import { holdsClaim } from './device.js';
 

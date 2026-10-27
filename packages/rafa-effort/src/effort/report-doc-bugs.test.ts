@@ -60,7 +60,7 @@ function storeBugs(root: string, sessionId: string, bugs: readonly ReportBug[]):
 const STALE_PAGE = bug('context/triage.md:12 still says three channels');
 
 /** A bug about code. */
-const CODE_BUG = bug('src/triage/triage.ts drops the last entry', 'expected 2, received 1');
+const CODE_BUG = bug('packages/rafa-pr/src/triage/triage.ts drops the last entry', 'expected 2, received 1');
 
 /** A machine fault whose only path is a page: `ld:` makes its scope `machine`. */
 const MACHINE_FAULT = bug('README.md build notes do not cover this', 'ld: tapi error: malformed file');
@@ -78,7 +78,7 @@ describe('countDocOnlyBugs', () => {
     const page = 'context/triage.md is stale';
 
     // A source path in the artifact makes the bug one about code.
-    expect(countDocOnlyBugs([{ what: page, artifact: 'src/triage/triage.ts:40' }]).docOnly).toBe(0);
+    expect(countDocOnlyBugs([{ what: page, artifact: 'packages/rafa-pr/src/triage/triage.ts:40' }]).docOnly).toBe(0);
     // An artifact naming no path answers false alone, and nothing here.
     expect(countDocOnlyBugs([{ what: page, artifact: 'the loop files three channels' }]).docOnly).toBe(1);
     // The page may be named by the artifact alone.

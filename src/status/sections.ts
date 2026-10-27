@@ -66,7 +66,7 @@
  * `housekeeping` is not raced: its one `gh` command is the merged
  * listing, which the runner bounds, and `readCleanup` turns a listing
  * that failed or timed out into a note (`readProviderMerges`,
- * `src/cleanup/groups.ts`) rather than failing the counts git read.
+ * `packages/rafa-pr/src/cleanup/groups.ts`) rather than failing the counts git read.
  *
  * ## A provider that is not `gh`
  *
@@ -155,7 +155,7 @@
  *
  * `housekeeping.idleWorktrees` counts the listed worktrees whose
  * `WorktreeRow.blockers` hold no `recent` blocker: nothing touched them
- * within `cleanup.worktreeIdleDays` (`src/cleanup/worktrees.ts`). A
+ * within `cleanup.worktreeIdleDays` (`packages/rafa-pr/src/cleanup/worktrees.ts`). A
  * worktree blocked for being dirty or locked is still idle by that rule.
  */
 import type { BlockedCount, BlockedCountRelations } from './blocked-count.js';

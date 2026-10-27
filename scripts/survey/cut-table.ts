@@ -313,9 +313,16 @@ export const CUT_RULES: CutRules = {
       named: BOARD_NAMED,
     },
     {
+      // #1374: pass 4e moved pr's files into `packages/rafa-pr/`.
+      // `src/commands/pr/`, `src/pr/` and `src/triage/` stay for their
+      // four integration tests, at the root until #913, as `src/tiers/`
+      // stays for inventory's; they also hold `pr-spawn.test.ts`,
+      // `version-collision-incident-spawn.test.ts`,
+      // `plans/validate.test.ts` and `closed-issue-triage.test.ts`, which
+      // stem no listed file and wait on #1360's rule for the move tool.
       folders: ['packages/rafa-pr/', 'src/commands/pr/', 'src/pr/', 'src/triage/'],
       name: 'rafa-pr',
-      named: [...PR_NAMED, 'src/pr/index.ts'],
+      named: [...PR_NAMED, 'packages/rafa-pr/src/pr/index.ts'],
     },
     {
       folders: ['packages/rafa-run/', 'src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],

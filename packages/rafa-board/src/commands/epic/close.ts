@@ -45,7 +45,7 @@
  *    command and what git said; a removal git refuses is a `warn` line.
  * 7. The verdicts. Every check that answered `fail` is filed
  *    (`./close-triage.ts`) as an out-of-scope bug through `triageReport`
- *    (`src/triage/triage.ts`), or,
+ *    (`packages/rafa-pr/src/triage/triage.ts`), or,
  *    when its criterion names only documentation, sent to the `docs`
  *    channel (`./close-docs.ts`), and the close is refused. A check whose session answered nothing is
  *    neither a pass nor a fail, and refuses the close too, filing

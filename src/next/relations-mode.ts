@@ -5,7 +5,7 @@
  * {@link openNextRelations} is asked once, before the first turn, and
  * what it answers is handed to `openNextSources` (`./sources.ts`) as
  * `relations`, so every board the chain opens reads its epics and
- * blockers through the one adapter, as `src/commands/pr/merge-freed.ts`
+ * blockers through the one adapter, as `packages/rafa-pr/src/commands/pr/merge-freed.ts`
  * reads what a merge freed.
  *
  * ## `labels`, the default, reads nothing
@@ -39,11 +39,10 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { EpicRelations, GhRunner } from '@open-tomato/rafa-board';
 
 import { createGhRunner, readBoardRepository, selectBoardRelations } from '@open-tomato/rafa-board';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
-
-import { resolvePrProvider } from '../pr/index.js';
 
 /** The settings the mode is read from, or null where `openNextSources` refuses the config. */
 async function modeConfig(root: string, home: string): Promise<RafaConfig | null> {

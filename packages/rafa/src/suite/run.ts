@@ -584,7 +584,7 @@ export function parseJunitFiles(xml: string): readonly string[] | null {
  * pair {@link parseJunitFailures} answers is here as `failed`. A
  * testcase holding a `<skipped>` element, as Bun writes for `it.skip`
  * and `it.todo`, is `skipped` unless it failed too.
- * `src/triage/base-run.ts` reads it to tell a case that passed from one
+ * `packages/rafa-pr/src/triage/base-run.ts` reads it to tell a case that passed from one
  * the run never held.
  */
 export function parseJunitCases(xml: string): readonly JunitCase[] | null {

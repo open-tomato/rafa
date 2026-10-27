@@ -26,8 +26,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
-
-import { insertLeftoverRepair, leftoverRepairText } from '../triage/leftover-repair.js';
+import { insertLeftoverRepair, leftoverRepairText } from '@open-tomato/rafa-pr/triage/leftover-repair';
 
 import {
   blockerText,

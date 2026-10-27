@@ -15,7 +15,7 @@
  * This module is the reading alone. It calls nothing, reads no tracker and
  * no store, and answers from the two fields a report gives it — the bug's
  * `what` and its `artifact`, which are all a session is required to
- * write. `src/triage/triage.ts` owns what a match then means: a matched
+ * write. `packages/rafa-pr/src/triage/triage.ts` owns what a match then means: a matched
  * bug reaches no tracker at all and is kept as a machine-scoped row
  * instead.
  *

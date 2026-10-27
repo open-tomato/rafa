@@ -32,7 +32,7 @@
  * after this one.
  */
 import type { ReleaseStageSeams } from './release-stage.js';
-import type { PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { PullRequestDetail, PullRequests, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 import type { ReleasePreparation, ReleasePrepared } from '@open-tomato/rafa-release/release/prepare';
 
 import { spawnSync } from 'node:child_process';

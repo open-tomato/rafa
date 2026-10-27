@@ -4,7 +4,7 @@
  * (`./sources.ts`) hands the table, composed over the project's `gh`
  * runner, its pull request provider and its root. The reading itself,
  * its five answers and every `gh` argument it sends are
- * `readOwnerApproval`'s (`src/pr/owner-approval.ts`); this module only
+ * `readOwnerApproval`'s (`packages/rafa-pr/src/pr/owner-approval.ts`); this module only
  * gathers what that function is handed.
  *
  * ## What one reading gathers
@@ -34,9 +34,9 @@
  * holds the merge back and never lets it through.
  */
 import type { NextRoadmapSources } from './readings.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { PullRequests } from '@open-tomato/rafa/pr/types';
 import type { BoardIssue, BoardListing, GhRunner, OwnedBoard } from '@open-tomato/rafa-board';
+import type { OwnerApproval } from '@open-tomato/rafa-pr';
 
 import {
   createGhBoardLister,
@@ -48,10 +48,9 @@ import {
   readCodeowners,
   resolveDefaultBoard,
 } from '@open-tomato/rafa-board';
+import { createGhTeamMembership, readOwnerApproval } from '@open-tomato/rafa-pr';
 
 import { readPositionFile } from '@open-tomato/rafa/project/position';
-
-import { createGhTeamMembership, readOwnerApproval } from '../pr/owner-approval.js';
 
 /** What {@link nextOwnerGate} reads through. */
 export interface NextOwnerGateOptions {

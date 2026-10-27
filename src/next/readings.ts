@@ -3,8 +3,8 @@
  * records, the git seam, the plans directory, the pull request provider
  * and the board, behind one set of readings each made at most once.
  *
- * The split is the `pr` subject's own (`src/pr/merge.ts` beside
- * `src/commands/pr/merge.ts`): this module is the half that READS, and
+ * The split is the `pr` subject's own (`packages/rafa-pr/src/pr/merge.ts` beside
+ * `packages/rafa-pr/src/commands/pr/merge.ts`): this module is the half that READS, and
  * `./state.ts` is the half that decides, so a row of the table is a
  * comparison over data and never a command. Nothing is spawned here
  * either — git arrives through the {@link NextSources.git} seam, the
@@ -101,14 +101,21 @@
  * importer of them changes.
  */
 import type { PlanListing } from '../plan/list.js';
-import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { BaseStanding } from '@open-tomato/rafa/start/branch-decision';
 import type { BlockedLine, NextBoard, NextRoadmapReading, RoadmapLine } from '@open-tomato/rafa-board';
+import type {
+  ChecksVerdict,
+  GitRunner,
+  Mergeability,
+  OwnerApproval,
+  PullRequestSummary,
+  PullRequests,
+} from '@open-tomato/rafa-pr';
 
 import { scanClaimBranches } from '@open-tomato/rafa-board';
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -118,7 +125,6 @@ import { planFileName } from '@open-tomato/rafa/core/plan';
 import { parseBaseStanding, REMOTE, trackedChanges } from '@open-tomato/rafa/start/branch-decision';
 
 import { listPlans } from '../plan/list.js';
-import { gitSaid } from '../pr/index.js';
 
 /** The branch `git rev-parse --abbrev-ref HEAD` answers on a detached HEAD. */
 const DETACHED = 'HEAD';
@@ -169,7 +175,7 @@ export interface NextSources {
 export interface NextRoadmapSources {
   /**
    * The owner gate for one pull request against the home board
-   * (`readOwnerApproval`, `src/pr/owner-approval.ts`). A rejection is
+   * (`readOwnerApproval`, `packages/rafa-pr/src/pr/owner-approval.ts`). A rejection is
    * read as `unknown` by the row that asks, never as approved.
    */
   readonly ownerApproval: (pullRequest: number) => Promise<OwnerApproval>;

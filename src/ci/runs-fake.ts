@@ -3,7 +3,7 @@
  * sends: an in-memory list of workflow runs behind a {@link GhRunner},
  * recording every command it is handed.
  *
- * The discipline `src/pr/gh-fake.ts` holds for pull requests, kept apart
+ * The discipline `packages/rafa-pr/src/pr/gh-fake.ts` holds for pull requests, kept apart
  * from it so that file does not grow. This module is a test helper that
  * is not itself a test file: bun runs nothing in it until a `*.test.ts`
  * calls it.

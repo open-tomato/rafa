@@ -23,11 +23,11 @@ import type {
   TaskStepInput,
 } from './suite-step.js';
 import type { SuiteStepCalls } from './suite-steps-run.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
 import type { SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

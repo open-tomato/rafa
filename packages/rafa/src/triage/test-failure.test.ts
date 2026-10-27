@@ -66,9 +66,9 @@ describe('testFailureOf', () => {
   it('reads a file > case wording: the file on the line, the case after it', () => {
     expect(testFailureOf({
       what: 'a red test',
-      artifact: 'src/triage/triage.test.ts > triageReport > files one bug\nExpected: 1\nReceived: 2',
+      artifact: 'packages/rafa-pr/src/triage/triage.test.ts > triageReport > files one bug\nExpected: 1\nReceived: 2',
     })).toEqual({
-      file: 'src/triage/triage.test.ts',
+      file: 'packages/rafa-pr/src/triage/triage.test.ts',
       name: 'triageReport > files one bug',
       evidence: 'Expected: 1',
     });

@@ -27,7 +27,7 @@
  *     and goes past the rule, to the worktree the refusal never added.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,9 +35,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { resolveWorktreePath } from '@open-tomato/rafa-pr/pr/worktree';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
-import { resolveWorktreePath } from '../pr/worktree.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { plantFakeGh } from './replaying-fake-gh.js';

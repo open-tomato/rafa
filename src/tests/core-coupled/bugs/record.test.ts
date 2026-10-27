@@ -17,9 +17,8 @@ import {
 } from '@open-tomato/rafa/bugs/record';
 import { DEFAULT_BUG_TITLE } from '@open-tomato/rafa/bugs/title';
 import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
-
-import { ISSUE_OPENING } from '../../../triage/issue-text.js';
-import { issueTextOf } from '../../../triage/similarity.js';
+import { ISSUE_OPENING } from '@open-tomato/rafa-pr/triage/issue-text';
+import { issueTextOf } from '@open-tomato/rafa-pr/triage/similarity';
 
 /** The rules of a project that sets nothing. */
 const RULES: BugRules = {

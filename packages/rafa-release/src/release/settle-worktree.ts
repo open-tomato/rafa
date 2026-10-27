@@ -35,7 +35,7 @@
  * ## Why removal forces
  *
  * `git worktree remove` refuses a worktree holding modified or untracked
- * files (`src/pr/worktree.ts` measured it), and the resolve worktree
+ * files (`packages/rafa-pr/src/pr/worktree.ts` measured it), and the resolve worktree
  * honours that refusal because its files are a person's evidence. This
  * worktree holds nothing of anyone's: it was made from a pushed commit a
  * moment ago, and whatever it holds that was not committed and pushed is

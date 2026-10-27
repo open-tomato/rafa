@@ -814,7 +814,7 @@ describe('an out_of_scope_bugs entry\'s bug fields', () => {
     const reading = bugReport(
       '    module: "src/triage"',
       '    action: "filing a bug"',
-      '    reproduce: "bun test src/triage/triage.test.ts"',
+      '    reproduce: "bun test packages/rafa-pr/src/triage/triage.test.ts"',
       '    cause: "io:missing-file"',
     );
 
@@ -825,7 +825,7 @@ describe('an out_of_scope_bugs entry\'s bug fields', () => {
       kind: 'bug',
       module: 'src/triage',
       action: 'filing a bug',
-      reproduce: 'bun test src/triage/triage.test.ts',
+      reproduce: 'bun test packages/rafa-pr/src/triage/triage.test.ts',
       cause: 'io:missing-file',
       extras: [],
     }]);

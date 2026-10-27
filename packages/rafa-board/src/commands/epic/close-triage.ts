@@ -1,7 +1,7 @@
 /**
  * The filing of `rafa epic close` (`./close.ts`), step 7 of its module
  * note: every check that answered `fail` is filed through `triageReport`
- * (`src/triage/triage.ts`) or, when its criterion names only
+ * (`packages/rafa-pr/src/triage/triage.ts`) or, when its criterion names only
  * documentation, sent to the `docs` channel (`./close-docs.ts`).
  * {@link fileFailures} runs it, reading only the part of the close's run
  * it needs, {@link FilingRun}.
@@ -45,7 +45,7 @@
  * name, which keeps the epic's number, so a second close failing the same
  * criterion comments on the first issue rather than filing another, unless
  * that issue was closed as completed, when a new one is filed in its place
- * (`src/triage/triage.ts`). A criterion whose key finds nothing is compared
+ * (`packages/rafa-pr/src/triage/triage.ts`). A criterion whose key finds nothing is compared
  * with the open bugs by its words, as the run's `triage.similarity` settings
  * say, and comments on the nearest at the threshold. No file is read or written at
  * that path: the report carries no blocker, and a blocker is the only

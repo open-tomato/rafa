@@ -26,8 +26,7 @@ import { readHorizonChange } from '@open-tomato/rafa-board/board/epic-horizon';
 import { claimsOf } from '@open-tomato/rafa-board/board/roadmap-epic-rows';
 import { hasText, readLineRows } from '@open-tomato/rafa-board/board/roadmap-rows';
 import { pickRoadmapIssue } from '@open-tomato/rafa-board/board/spec-source-roadmap';
-
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 const TEMPLATE = 'work/{stub}';
 const BRANCH = 'work/rafa-20-x';

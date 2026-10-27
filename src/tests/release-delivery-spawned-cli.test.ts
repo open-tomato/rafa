@@ -14,7 +14,7 @@
  *     since `gh` needs a network).
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,9 +26,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
 import { RELEASE_PR_BRANCH } from '@open-tomato/rafa-release/release/settle-pr';
-
-import { createPrMergeCommand } from '../commands/pr/merge.js';
 
 import { dispatchInProject, eventsOf, expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

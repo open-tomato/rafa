@@ -9,7 +9,7 @@
  *
  * Two places hold fixtures:
  *
- *   - any folder named `testdata`, at any depth (`src/triage/testdata/`,
+ *   - any folder named `testdata`, at any depth (`packages/rafa-pr/src/triage/testdata/`,
  *     `packages/rafa-hub/src/testdata/`), and every file below it;
  *   - `src/tests/fixtures/`, and every file below it.
  *

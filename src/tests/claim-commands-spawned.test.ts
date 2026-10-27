@@ -40,7 +40,7 @@
  * own `mintDeviceStore` does.
  */
 import type { ScratchRepo, CapturedRun } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -56,8 +56,7 @@ import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claim
 import { formatClaimMessage, parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
-
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

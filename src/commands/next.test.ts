@@ -134,8 +134,8 @@ import type { NextChainOptions, NextChainReport } from './next.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextDryRun } from '../next/lines.js';
 import type { NextState } from '../next/state.js';
-import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -146,6 +146,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import prTriage from '@open-tomato/rafa-pr/commands/pr/triage';
 import { epicEndLines } from '@open-tomato/rafa-release/next/epic-end';
 
 import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
@@ -155,7 +156,6 @@ import { CLAIM_AHEAD_FLAG, DRY_RUN_FLAG, MAX_ACTIONS, NEXT_USAGE, ROADMAP_FLAG }
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';
-import prTriage from './pr/triage.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-command-')));

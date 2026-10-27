@@ -4,4 +4,4 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-pr --commands`.
  */
 
-export { PR_FEATURE } from '../../src/commands/pr/index.js';
+export { PR_FEATURE } from './src/commands/pr/index.js';

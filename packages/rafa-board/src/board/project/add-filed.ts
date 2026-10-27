@@ -1,6 +1,6 @@
 /**
  * The bugs rafa files on its own, onto the project: {@link addFiledBugs}
- * takes what `triageReport` (`src/triage/triage.ts`) answered for one
+ * takes what `triageReport` (`packages/rafa-pr/src/triage/triage.ts`) answered for one
  * report, a loop task's out-of-scope bugs or the bugs the gate of
  * `rafa epic close` files, and adds each bug it filed on the public
  * GitHub tracker to the repository's project through

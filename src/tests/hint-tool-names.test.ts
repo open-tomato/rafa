@@ -1,6 +1,6 @@
 /**
  * A sweep over the words the ending hint (`src/next/hint.ts`) and the
- * `pr merge` follow-ups (`src/commands/pr/merge-followups.ts`) print:
+ * `pr merge` follow-ups (`packages/rafa-pr/src/commands/pr/merge-followups.ts`) print:
  * neither may name `git`, `gh` or `bun`, since both are text an
  * operator reads and neither is the tool this session runs.
  *
@@ -31,14 +31,14 @@
  * the check is not vacuous, the way `user-facing-spelling.sweep.test.ts`
  * plants its own hit for the same reason.
  */
-import type { FollowUpReading } from '../commands/pr/merge-followups.js';
 import type { NextState } from '../next/state.js';
+import type { FollowUpReading } from '@open-tomato/rafa-pr/commands/pr/merge-followups';
 
 import { describe, expect, it } from 'bun:test';
 
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { readFollowUps } from '@open-tomato/rafa-pr/commands/pr/merge-followups';
 
-import { readFollowUps } from '../commands/pr/merge-followups.js';
 import { actionInvocation } from '../next/actions.js';
 import { hintLine, nextQuestion } from '../next/hint.js';
 

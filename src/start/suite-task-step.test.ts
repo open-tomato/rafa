@@ -12,10 +12,10 @@
  */
 
 import type { SuiteStepContext, SuiteStepSeams } from './suite-step.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

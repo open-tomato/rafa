@@ -36,9 +36,9 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
 
 import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
 

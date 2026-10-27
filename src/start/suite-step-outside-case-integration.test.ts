@@ -26,9 +26,9 @@
  * it is written and the run goes on, a task step names the file in its
  * blocker, and no record carries `outsideCase` or a tail.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
 import type { SuiteSpawner } from '@open-tomato/rafa/suite/run';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

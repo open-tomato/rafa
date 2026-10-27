@@ -44,9 +44,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { hubUnreachableLine } from '@open-tomato/rafa-effort/effort/sync/contact';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { BASE, NEXT_ISSUE, NEXT_TITLE, ROADMAP_ISSUE, writeStandInGh } from './next-chain-fixtures.js';

@@ -1,11 +1,11 @@
 /**
  * The files the cut table names for each feature package (#808, pass 1):
  * root files that reach a feature package, placed by name whatever their
- * folder. A named file keeps its path until its package moves; the board
- * and release lists follow their files since passes 4c and 4d. Each list
- * is sorted by UTF-16 code unit, and `CUT_RULES` of `cut-table.ts` reads
- * them, so a file named here is placed in its package and is not left to
- * place.
+ * folder. A named file keeps its path until its package moves; the board,
+ * release and pr lists follow their files since passes 4c, 4d and 4e.
+ * Each list is sorted by UTF-16 code unit, and `CUT_RULES` of
+ * `cut-table.ts` reads them, so a file named here is placed in its
+ * package and is not left to place.
  *
  * @module
  */
@@ -63,23 +63,27 @@ export const BOARD_NAMED: readonly string[] = [
  * stale-docs files `packages/rafa-release/src/docs/open-lines.ts` and
  * `packages/rafa-release/src/docs/release-issue.ts` to the release list,
  * since each reaches only release and core. The seventh decouple item
- * (rafa-1368) placed `src/cleanup/worktrees.ts` and
- * `src/start/pr-retarget.ts` here by pass 1's rule, since each reaches
- * only pr and core (`worktrees.ts` `parseWorktrees` of `src/pr/merge.ts`,
- * `pr-retarget.ts` the port types of `src/pr/index.ts`), and moved
+ * (rafa-1368) placed `packages/rafa-pr/src/cleanup/worktrees.ts` and
+ * `packages/rafa-pr/src/start/pr-retarget.ts` here by pass 1's rule,
+ * since each reaches only pr and core (`worktrees.ts` `parseWorktrees`
+ * of `packages/rafa-pr/src/pr/merge.ts`, `pr-retarget.ts` the port types
+ * of `packages/rafa-pr/src/pr/index.ts`), and moved
  * `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
  * `src/next/relations-mode.ts`, `src/next/settle-step.ts` and
- * `src/next/sources.ts` to the run list.
+ * `src/next/sources.ts` to the run list. Since pass 4e the list names
+ * each file at its path in pr's package, `packages/rafa-pr/src/`, where
+ * the `packages/rafa-pr/` folder of `CUT_RULES` would place it too; the
+ * order is the one it had, since the paths share the prefix.
  */
 export const PR_NAMED: readonly string[] = [
-  'src/bugs/filed-values.ts',
-  'src/cleanup/branches.ts',
-  'src/cleanup/groups.ts',
-  'src/cleanup/worktrees.ts',
-  'src/docs/task-reading.ts',
-  'src/plan/risk.ts',
-  'src/plan/risk/accounts.ts',
-  'src/start/pr-retarget.ts',
+  'packages/rafa-pr/src/bugs/filed-values.ts',
+  'packages/rafa-pr/src/cleanup/branches.ts',
+  'packages/rafa-pr/src/cleanup/groups.ts',
+  'packages/rafa-pr/src/cleanup/worktrees.ts',
+  'packages/rafa-pr/src/docs/task-reading.ts',
+  'packages/rafa-pr/src/plan/risk.ts',
+  'packages/rafa-pr/src/plan/risk/accounts.ts',
+  'packages/rafa-pr/src/start/pr-retarget.ts',
 ];
 
 /**
@@ -98,8 +102,8 @@ export const PR_NAMED: readonly string[] = [
  * `src/next/relations-mode.ts`, `src/next/settle-step.ts` and
  * `src/next/sources.ts` here by the same rule read with type edges, since
  * each reads run's types and is imported only by run and the CLI, and
- * moved `src/cleanup/worktrees.ts` to the pr list, since it reaches only
- * pr and core.
+ * moved `packages/rafa-pr/src/cleanup/worktrees.ts` to the pr list,
+ * since it reaches only pr and core.
  */
 export const RUN_NAMED: readonly string[] = [
   'src/cleanup/index.ts',

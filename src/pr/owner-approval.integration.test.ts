@@ -20,8 +20,8 @@
  *  - `#50`, `/approved/`, owned by `@org/web` — bob's `APPROVED` review,
  *    and an active `gh api …/memberships/bob`: `approved`.
  */
-import type { OwnerApprovalRequest, OwnerApprovalSeams } from './owner-approval.js';
 import type { OwnedBoard } from '@open-tomato/rafa-board/board/board-owns';
+import type { OwnerApprovalRequest, OwnerApprovalSeams } from '@open-tomato/rafa-pr/pr/owner-approval';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,11 +33,10 @@ import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { createGhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { readBoardOwnership } from '@open-tomato/rafa-board/board/board-owns';
 import { createOwnerResolver } from '@open-tomato/rafa-board/board/owner-resolve';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/gh';
+import { createGhTeamMembership, readOwnerApproval } from '@open-tomato/rafa-pr/pr/owner-approval';
 
 import { hostToolDirs } from '../tests/stand-in-gh.js';
-
-import { createGhPullRequests } from './gh.js';
-import { createGhTeamMembership, readOwnerApproval } from './owner-approval.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-owner-approval-integration-')));

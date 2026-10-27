@@ -15,9 +15,9 @@
  * beside the plan with one that does.
  */
 import type { ConventionBodyInput, ConventionBodySeams } from './convention-body.js';
-import type { PrProviderReading, PullRequests } from '../pr/index.js';
 import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import type { BugRoute, BugRouteRow } from '@open-tomato/rafa/store/bug-routes';
+import type { PrProviderReading, PullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 

@@ -1,5 +1,7 @@
 # Test timing
 
+Pass 4e (rafa-1374) moved pr's files and tests after this record was written. A path that names one of them is written at its place now, under `packages/rafa-pr/`, or under `src/tests/pr-coupled/` for a parked test. The rest of this record stays as written at its commit and is not regenerated.
+
 Coverage: 925 of 925 tracked files read (test files `bun test` discovers).
 
 Run: green. Exit code 0; 18356 pass, 0 fail, 17 skipped across 925 test files.
@@ -28,10 +30,10 @@ They take 128.82 s, 35.2% of the time in test cases.
 | 14 | `src/release/settle-tag.test.ts` | 5.00 s | 1.4% | 13 | 0 | 0 |
 | 15 | `src/commands/claim/hand.test.ts` | 4.25 s | 1.2% | 21 | 0 | 0 |
 | 16 | `src/claims/git.test.ts` | 4.07 s | 1.1% | 32 | 0 | 0 |
-| 17 | `src/triage/similarity-scoring.test.ts` | 3.94 s | 1.1% | 7 | 0 | 0 |
+| 17 | `packages/rafa-pr/src/triage/similarity-scoring.test.ts` | 3.94 s | 1.1% | 7 | 0 | 0 |
 | 18 | `src/tests/loop-output.test.ts` | 3.93 s | 1.1% | 35 | 0 | 0 |
 | 19 | `src/tests/user-facing-spelling.sweep.test.ts` | 3.92 s | 1.1% | 7 | 0 | 0 |
-| 20 | `src/pr/triage/version-convert.test.ts` | 3.90 s | 1.1% | 18 | 0 | 0 |
+| 20 | `packages/rafa-pr/src/pr/triage/version-convert.test.ts` | 3.90 s | 1.1% | 18 | 0 | 0 |
 
 ## Files whose every case was skipped
 

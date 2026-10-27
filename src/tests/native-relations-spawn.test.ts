@@ -35,9 +35,9 @@ import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-boar
 import { BOARD_LABELS, LABEL_LIST_LIMIT } from '@open-tomato/rafa-board/board/setup';
 import { NATIVE_MODE, nativeParentLine } from '@open-tomato/rafa-board/commands/epic/move-native';
 import { NATIVE_UNBLOCK_LINE } from '@open-tomato/rafa-board/commands/issue/unblock-native';
+import { freedHeaderLine, freedIssueLine } from '@open-tomato/rafa-pr/commands/pr/merge-freed';
 
 import { EPIC_GUARD_NATIVE_REFUSAL } from '../commands/init-board.js';
-import { freedHeaderLine, freedIssueLine } from '../commands/pr/merge-freed.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

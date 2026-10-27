@@ -22,9 +22,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
 import { CLAIMED_LABEL } from '@open-tomato/rafa/claims/stale';
 import { createRoadmapReadings, DEFAULT_REMOTE, scanClaimBranches } from '@open-tomato/rafa-board/board/roadmap';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { findDrift } from '../claims/drift.js';
-import { createGitRunner } from '../pr/index.js';
 
 const TEMPLATE = 'work/{stub}';
 const BRANCH = 'work/rafa-20-x';

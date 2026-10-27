@@ -103,7 +103,6 @@
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
-import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
@@ -111,6 +110,7 @@ import type { ClaudeSettingSource, TierPin } from '@open-tomato/rafa/core/config
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import {
   existsSync,
@@ -141,16 +141,16 @@ import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { createGhIssueBoard } from '@open-tomato/rafa-board/board/issue-board';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 import { serveSession } from '@open-tomato/rafa-inventory/start/serving';
-
-import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,
   ghMissingMessage,
   ghOnPathItem,
   ghUnauthenticatedMessage,
-} from '../pr/preflight-items.js';
+} from '@open-tomato/rafa-pr/pr/preflight-items';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { buildTaskPrompt, dispatchTask } from './dispatch.js';
 import { KNOWN_MISSING_SENTENCE, knownMissingNotice, runStartPreflight } from './preflight.js';

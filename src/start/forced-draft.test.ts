@@ -7,8 +7,8 @@
  * written again, the same body without it being the control.
  */
 import type { PassedOverTask } from './loop-events.js';
-import type { PullRequestDetail } from '../pr/index.js';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { PullRequestDetail } from '@open-tomato/rafa-pr/pr/index';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 

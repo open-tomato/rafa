@@ -125,7 +125,7 @@ describe('the roster in a fresh process', () => {
     expect(reading.loaded.filter((path) => modules.includes(path))).toEqual([]);
     // Controls: the reading sees the declarations and a core command, so an empty answer is no blind one.
     expect(reading.loaded).toContain('src/commands/claim/declarations.ts');
-    expect(reading.loaded).toContain('src/commands/pr/declarations.ts');
+    expect(reading.loaded).toContain('packages/rafa-pr/src/commands/pr/declarations.ts');
     expect(reading.loaded).toContain('src/commands/plan/list.ts');
   }, RUN_TIMEOUT);
 

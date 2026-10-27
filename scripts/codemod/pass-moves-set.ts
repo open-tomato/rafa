@@ -3,8 +3,9 @@
  * and 2, reading which files move where from a move list and the files a
  * commit would hold. A listed file moves to its `to`; its colocated tests
  * and its folder's `testdata/` go with it; a moved test whose imports
- * reach a file outside core, the target package (`pass-target.ts`) and the
- * move is parked under the target's parking folder instead. A
+ * reach a file outside core, the target package (`pass-target.ts`), the
+ * move and the feature packages the target's `package.json` declares
+ * (`declared`) is parked under the target's parking folder instead. A
  * colocated test the project's `tests.integration` globs match is left in
  * place, until #913 places each integration test with the package entry it
  * drives. Every function here is pure over its input; the rewrites of each
@@ -30,9 +31,9 @@ export interface PathMove {
   readonly to: string;
 }
 
-/** One parked test, with the files outside core, the target and the move it reaches. */
+/** One parked test, with the files outside core, the target, its declared packages and the move it reaches. */
 export interface ParkedTest extends PathMove {
-  /** The files outside core, the target and the move its imports reach, sorted. */
+  /** The files outside core, the target, its declared packages and the move its imports reach, sorted. */
   readonly reaches: readonly string[];
 }
 
@@ -57,6 +58,13 @@ export interface PassMovesInput {
   readonly present?: (path: string) => boolean;
   /** The package the list moves into; core unless handed in. */
   readonly target?: PassTarget;
+  /**
+   * The folders, each with its closing `/`, of the feature packages the
+   * target's `package.json` names under `dependencies` (`declaredFolders`
+   * of `pass-target.ts`); a moved test may reach a file under one, by its
+   * facade or a subpath, without parking. None unless handed in.
+   */
+  readonly declared?: readonly string[];
 }
 
 /**
@@ -165,9 +173,11 @@ function testdataMoves(files: readonly string[], moves: readonly FileMove[]): { 
 }
 
 /**
- * Step 2: the files outside core, the target's folder and the move a test's
- * imports reach. For core the target's folder is read as its source folder,
- * as it was before the target.
+ * Step 2: the files outside core, the target's folder, the folders of the
+ * feature packages it declares and the move a test's imports reach. For
+ * core the target's folder is read as its source folder, as it was before
+ * the target. A declared package's facade by name resolves to its
+ * `index.ts`, under its folder, and counts as inside the same way.
  *
  * @param input - The run's input.
  * @param inPackage - The path after the move of each file that moves into the package.
@@ -181,8 +191,8 @@ function reachesOf(input: PassMovesInput, inPackage: ReadonlyMap<string, string>
   }
   const target = targetOf(input);
   const kept = target.core
-    ? [CORE_SOURCE]
-    : [CORE_SOURCE, target.folder];
+    ? [CORE_SOURCE, ...input.declared ?? []]
+    : [CORE_SOURCE, target.folder, ...input.declared ?? []];
   const reached = new Set<string>();
   for (const site of specifierSites(parseSource(file, text))) {
     const landed = input.resolve(site.node.text, file);

@@ -135,14 +135,16 @@
  * DIRECTORIES, so the build script ends with a loop over a table of
  * `<source>:<name under dist>` pairs, each source a path from the package
  * root since pass 4c moved the board tree to
- * `packages/rafa-board/src/board/templates/`, and pass 4d the release
- * tree to `packages/rafa-release/src/release/templates/`. Three readings
- * shape it:
+ * `packages/rafa-board/src/board/templates/`, pass 4d the release tree
+ * to `packages/rafa-release/src/release/templates/`, and pass 4e the
+ * plans tree to `packages/rafa-pr/src/pr/plans/`. Three readings shape
+ * it:
  *
- *   - It copies `*.md` and `*.yml` and nothing else. `src/pr/plans/`
- *     holds `load.ts` and `load.test.ts` beside the four plans, and
- *     copying the directory whole would publish both, since `files`
- *     publishes all of `dist`. A case reads `dist/plans` for a `.ts`
+ *   - It copies `*.md` and `*.yml` and nothing else.
+ *     `packages/rafa-pr/src/pr/plans/` holds `load.ts` and
+ *     `load.test.ts` beside the four plans, and copying the directory
+ *     whole would publish both, since `files` publishes all of
+ *     `dist`. A case reads `dist/plans` for a `.ts`
  *     file and names the two source modules that would land there.
  *     The `*.yml` copy is for the epic guard workflow
  *     `packages/rafa-board/src/board/templates/epic-guard.yml` and the
@@ -150,14 +152,16 @@
  *     and a case resolves each through `readEpicGuard` and
  *     `readReleaseTemplate` pointed at `dist/`.
  *     Each pattern is copied file by file behind an `[ -e ]` guard, so
- *     a tree holding no YAML (`src/pr/plans/`) or no markdown
- *     (`packages/rafa-release/src/release/templates/`) is not a failure.
+ *     a tree holding no YAML (`packages/rafa-pr/src/pr/plans/`) or no
+ *     markdown (`packages/rafa-release/src/release/templates/`) is not a
+ *     failure.
  *   - A tree lands DIRECTLY under `dist/`, as `dist/plans`,
  *     `dist/templates` and `dist/release-templates`, not at its source
  *     path; the release tree takes its own name because `templates` is
  *     the board's. A bundle reading
  *     `import.meta.url` answers its own directory, which is `dist/` for
- *     `cli.js`, so `src/pr/plans/load.ts`'s first candidate is
+ *     `cli.js`, so the first candidate of
+ *     `packages/rafa-pr/src/pr/plans/load.ts` is
  *     `<moduleDir>/plans/<name>.md`; `PINNED_PLANS_DIRNAME` is that
  *     name, and a case resolves every pinned plan through
  *     `readPinnedPlan` pointed at `dist/` rather than only comparing
@@ -499,13 +503,13 @@ import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { EPIC_GUARD_FILE, readEpicGuard } from '@open-tomato/rafa-board/board/epic-guard';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '@open-tomato/rafa-board/epic/verify-plan';
 import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
+import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '@open-tomato/rafa-pr/pr/plans/load';
 import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '@open-tomato/rafa-release/release/templates';
 
 import * as configSource from '../config/index.js';
 import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
-import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
@@ -782,7 +786,7 @@ const TEMPLATES: [string, string][] = [
  * note on the clause.
  */
 const ASSET_TREES: [string, string][] = [
-  ['src/pr/plans', 'plans'],
+  ['packages/rafa-pr/src/pr/plans', 'plans'],
   ['packages/rafa-board/src/board/templates', 'templates'],
   ['packages/rafa-release/src/release/templates', RELEASE_TEMPLATES_DIRNAME],
 ];
@@ -1923,8 +1927,8 @@ describe('the asset trees in the build', () => {
     expect(readFileSync(built, 'utf8')).toBe(PLANTED_BOARD_BODY);
   });
 
-  it('copies no TypeScript out of src/pr/plans, so the reader modules stay unpublished', () => {
-    const source = readdirSync(join(PACKAGE_DIR, 'src/pr/plans')).sort();
+  it('copies no TypeScript out of packages/rafa-pr/src/pr/plans, so the reader modules stay unpublished', () => {
+    const source = readdirSync(join(PACKAGE_DIR, 'packages/rafa-pr/src/pr/plans')).sort();
     const copied = readdirSync(join(DIST, 'plans')).filter((file) => file.endsWith('.ts'));
 
     expect(PLAN_READER_MODULES.filter((module) => !source.includes(module))).toEqual([]);
@@ -1934,7 +1938,7 @@ describe('the asset trees in the build', () => {
   it('lands each pinned plan where readPinnedPlan looks for it from a bundle in dist', () => {
     const differing = PINNED_PLAN_CLASSES.filter(
       (triageClass) => readPinnedPlan(triageClass, { moduleDir: DIST })
-        !== readFileSync(join(PACKAGE_DIR, 'src/pr/plans', pinnedPlanFileName(triageClass)), 'utf8'),
+        !== readFileSync(join(PACKAGE_DIR, 'packages/rafa-pr/src/pr/plans', pinnedPlanFileName(triageClass)), 'utf8'),
     );
 
     expect(PINNED_PLAN_CLASSES.length).toBeGreaterThan(0);

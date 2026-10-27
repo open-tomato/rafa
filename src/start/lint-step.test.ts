@@ -10,7 +10,7 @@
  * thing, runs it or goes red.
  */
 import type { LintRunOptions, LintRunResult, LintStepInput } from './lint-step.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

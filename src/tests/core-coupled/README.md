@@ -6,7 +6,9 @@ Core's unit tests that import a file above core wait here, outside core's packag
 
 A file's text was not rewritten beyond its specifiers. An import of a core file reads that file's subpath,
 `@open-tomato/rafa/<subpath>`, barrel or not, and an import of a root file reads the relative path from here. A
-path built from `import.meta` was pointed by hand at the file or folder it named before the move.
+path built from `import.meta` was pointed by hand at the file or folder it named before the move. An import of a
+pr file reads that file's subpath, `@open-tomato/rafa-pr/<subpath>`, since pr moved into `packages/rafa-pr/` (#808,
+pass 4e), and its row below names the file's path there.
 
 The barrels sweep (`scripts/survey/core-barrels.ts`) treats this folder as core's own, through `CORE_PARKED_TESTS`
 and `isCoreRead` of `scripts/survey/core-moves.ts`: it reads these files as core's and does not hold their imports
@@ -21,8 +23,8 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `adapters/logger/active.test.ts` | `src/tests/logger-harness.ts` |
 | `adapters/logger/console.test.ts` | `src/tests/logger-harness.ts` |
 | `adapters/logger/contract.test.ts` | `src/tests/logger-harness.ts` |
-| `bugs/record-composition.test.ts` | `packages/rafa-board/src/bugs/cause-rule.ts`, `src/bugs/filed-values.ts` |
-| `bugs/record.test.ts` | `src/triage/issue-text.ts`, `src/triage/similarity.ts` |
+| `bugs/record-composition.test.ts` | `packages/rafa-board/src/bugs/cause-rule.ts`, `packages/rafa-pr/src/bugs/filed-values.ts` |
+| `bugs/record.test.ts` | `packages/rafa-pr/src/triage/issue-text.ts`, `packages/rafa-pr/src/triage/similarity.ts` |
 | `bugs/stack-path.test.ts` | `src/tests/package-tree.ts` |
 | `commands/plan/plan-files.test.ts` | `src/config-registry.ts`, `src/tests/cli-capture.ts` |
 | `config-schema-board-project.test.ts` | `src/config-registry.ts` |

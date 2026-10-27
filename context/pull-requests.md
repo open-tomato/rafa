@@ -19,7 +19,7 @@ Ten actions read and control pull requests:
   where the release is on the forecast its body carries, marked `(base moved)`
   when `origin/<base>` as last fetched holds another version or other waiting
   fragments than the body's `rafa:release` marker names
-  (`src/commands/pr/list-forecast.ts`, over
+  (`packages/rafa-pr/src/commands/pr/list-forecast.ts`, over
   `packages/rafa-release/src/release/body-forecast.ts`; no fetch, no fold, no
   extra `gh` command)
 - `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
@@ -53,33 +53,31 @@ and `pr retarget`, which act on the number they are given. Every action
 carries a summary, examples and `outputs: [text, json]`; each one in the
 core roster carries help snapshots too.
 
-`pr wait` composes `waitForChecks` (`src/pr/checks.ts`) over the provider's
-`checks` and is READ-ONLY: no repair session, no comment, no label, no
-merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those, and
-the deadline and the poll interval are that gate's own constants. The same
-`waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop
-agree about what green means and how often a pull request is asked. Green
-exits 0; red exits 1; a pull request with NO checks at all exits 1 too,
-with the head line `no check registered yet`. Zero checks are polled
-again at the poll interval while the head is younger than
-`FIRST_CHECK_GRACE_MS` (120 seconds, `src/pr/checks.ts`), since GitHub
-registers a push's runs some seconds after the push; past that grace the
-ending is `none` at once. The age is the head commit's committed date
-(`headCommittedAt` on the pull request's detail), not the push time, so an
-old commit pushed just now gets no grace, and a head whose date the
-provider does not answer gets none either. Only `pr wait` passes that
-date: the loop's CI gate and `pr triage --resolve` poll as they did. A
-`none` ending says the pull request does not merge cleanly, and that no
-run is scheduled for it, only when one more read of its detail says
-`conflicting`; any other reading gets `rafa pr wait <n>` to ask again and
-`rafa pr show <n>`, and says nothing about merging. The deadline passing
-with checks still running exits 3. A green wait writes its report
-through the output and then names the one step that follows, which for
-checks that have just passed is the merge (`src/next/ending.ts`,
-`--no-hint` to turn it off); every other ending carries the report as the
-message of its exit, because the dispatcher drops a command's payload when
-it ends non-zero, and gets no hint, since that report already names the
-rafa command for what it found. The clock and the wait between polls are
+`pr wait` composes `waitForChecks` (`packages/rafa-pr/src/pr/checks.ts`) over
+the provider's `checks` and is READ-ONLY: no repair session, no comment, no
+label, no merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those,
+and the deadline and the poll interval are that gate's own constants. The same
+`waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop agree
+about what green means and how often a pull request is asked. Green exits 0; red
+exits 1; a pull request with NO checks at all exits 1 too, with the head line
+`no check registered yet`. Zero checks are polled again at the poll interval
+while the head is younger than `FIRST_CHECK_GRACE_MS` (120 seconds,
+`packages/rafa-pr/src/pr/checks.ts`), since GitHub registers a push's runs some
+seconds after the push; past that grace the ending is `none` at once. The age is
+the head commit's committed date (`headCommittedAt` on the pull request's
+detail), not the push time, so an old commit pushed just now gets no grace, and
+a head whose date the provider does not answer gets none either. Only `pr wait`
+passes that date: the loop's CI gate and `pr triage --resolve` poll as they did.
+A `none` ending says the pull request does not merge cleanly, and that no run is
+scheduled for it, only when one more read of its detail says `conflicting`; any
+other reading gets `rafa pr wait <n>` to ask again and `rafa pr show <n>`, and
+says nothing about merging. The deadline passing with checks still running exits
+3. A green wait writes its report through the output and then names the one step
+that follows, which for checks that have just passed is the merge
+(`src/next/ending.ts`, `--no-hint` to turn it off); every other ending carries
+the report as the message of its exit, because the dispatcher drops a command's
+payload when it ends non-zero, and gets no hint, since that report already names
+the rafa command for what it found. The clock and the wait between polls are
 seams, so its tests spend no real second.
 
 ### The provider and preflight
@@ -93,15 +91,14 @@ two automatic preflight items run before any task is paid for:
    login`
 
 `rafa doctor` prints both checks. With `provider: none` the loop pushes the
-branch, prints the compare URL, skips the CI wait, skips the release
-stage's body write — there being no body — and says so each time. A push
-of a claim branch the remote refuses because another store now owns the
-claim halts the run instead, exit 1 with the "claim lost" report, its
-commits kept on `lost/<stub>` and no compare URL printed
-(`src/start/pr-lifecycle.ts` over `src/claims/lost.ts`). No other
-provider is built; the functions in `src/pr/gh.ts` move behind one
-`PullRequests` interface in `src/pr/` so a second provider is an adapter
-later.
+branch, prints the compare URL, skips the CI wait, skips the release stage's
+body write — there being no body — and says so each time. A push of a claim
+branch the remote refuses because another store now owns the claim halts the run
+instead, exit 1 with the "claim lost" report, its commits kept on `lost/<stub>`
+and no compare URL printed (`src/start/pr-lifecycle.ts` over
+`src/claims/lost.ts`). No other provider is built; the functions in
+`packages/rafa-pr/src/pr/gh.ts` move behind one `PullRequests` interface in
+`packages/rafa/src/pr/types.ts` so a second provider is an adapter later.
 
 Every `pr` action without a usable `gh` exits 2 with the same message.
 
@@ -126,36 +123,34 @@ create. `editTitle` is `gh pr edit <n> --title`, read by its exit code, as
 `editBody` is. The fake models both, and the unmodelled-flag case on `pr edit`
 now sends `--add-label`.
 
-`editBase(number, base)` is rafa-628's, for the wrap-up's retarget of a
-pull request opened against another base than the run's. It is
-`gh pr edit <n> --base <base>` (`-B, --base branch` in `gh pr edit
---help` on 2.101.0), a WRITE shaped like `editTitle`: a bad number or an
-empty base is refused before `gh` is sent anything, every failure throws,
-an absent pull request included, and nothing reads back what the edit
-wrote — a caller wanting the new `baseRefName` calls `get`. The fake
-stores the new base, so every later read of that pull request answers
-it as `baseRefName`. Its caller is `retargetPullRequest(pull, base,
-seams)` in `src/start/pr-retarget.ts`: it compares `pull.baseRefName`
-with `base` exactly, sends nothing when they match, prints one
-`↪ Retargeted pull request #<n> from <old> to <new> (pr.base).` line
-after an edit, and turns a refused edit into one warning naming the
-pull request, both bases and what `gh` said, never a throw.
+`editBase(number, base)` is rafa-628's, for the wrap-up's retarget of a pull
+request opened against another base than the run's. It is `gh pr edit <n> --base
+<base>` (`-B, --base branch` in `gh pr edit --help` on 2.101.0), a WRITE shaped
+like `editTitle`: a bad number or an empty base is refused before `gh` is sent
+anything, every failure throws, an absent pull request included, and nothing
+reads back what the edit wrote — a caller wanting the new `baseRefName` calls
+`get`. The fake stores the new base, so every later read of that pull request
+answers it as `baseRefName`. Its caller is `retargetPullRequest(pull, base,
+seams)` in `packages/rafa-pr/src/start/pr-retarget.ts`: it compares
+`pull.baseRefName` with `base` exactly, sends nothing when they match, prints
+one `↪ Retargeted pull request #<n> from <old> to <new> (pr.base).` line after
+an edit, and turns a refused edit into one warning naming the pull request, both
+bases and what `gh` said, never a throw.
 
 `close(number, comment, { deleteBranch })` is `gh pr close <n>
---comment=<comment>`, with `--delete-branch` after it only when
-`deleteBranch` is true. It is built in `src/pr/gh-close.ts`, which
-`src/pr/gh.ts` hands its runner to, a split that keeps `gh.ts` under its
-size cap as `gh-closing-issues.ts` did for its read. A WRITE shaped like
-`editBase`: a bad number, a blank or
-non-string comment and a `deleteBranch` that is not a boolean are refused
-as TypeErrors before `gh` is sent anything, and a failed command throws
-naming `gh pr close <n>` and what it wrote, the comment left out of the
-name. It answers nothing and reads nothing back. Closing a pull request
-closes none of the issues it links. The port does not read the state
-first, so the caller does: `pr close` reads `get(n)` and refuses a pull
-request that is merged, closed or absent before the close is sent. The
-fake refuses a close of a pull request that is not open, and a close with
-no comment, the same way (`src/pr/gh-fake.ts`).
+--comment=<comment>`, with `--delete-branch` after it only when `deleteBranch`
+is true. It is built in `packages/rafa-pr/src/pr/gh-close.ts`, which
+`packages/rafa-pr/src/pr/gh.ts` hands its runner to, a split that keeps `gh.ts`
+under its size cap as `gh-closing-issues.ts` did for its read. A WRITE shaped
+like `editBase`: a bad number, a blank or non-string comment and a
+`deleteBranch` that is not a boolean are refused as TypeErrors before `gh` is
+sent anything, and a failed command throws naming `gh pr close <n>` and what it
+wrote, the comment left out of the name. It answers nothing and reads nothing
+back. Closing a pull request closes none of the issues it links. The port does
+not read the state first, so the caller does: `pr close` reads `get(n)` and
+refuses a pull request that is merged, closed or absent before the close is
+sent. The fake refuses a close of a pull request that is not open, and a close
+with no comment, the same way (`packages/rafa-pr/src/pr/gh-fake.ts`).
 
 `listMerged` is rafa-94's, for `rafa cleanup`: it answers the recent
 merged pull requests as `MergedPullRequest` rows — `number`,
@@ -203,31 +198,31 @@ sentence replaces nothing.
 
 ### The merge flow
 
-1. Refuse on a tracked change in the working tree, or on an untracked
-   path the merge would write a file onto — one the pull request's head
-   commit or `origin/<base>` holds, read with `git ls-tree -r --name-only`
-   over both only when the tree has an untracked path (a folded `?? dir/`
-   counts when either holds a path under it). Any other untracked path,
-   such as `.claude/settings.local.json`, is left in place and named in one
-   line when nothing refuses (`src/pr/merge.ts`, "Which untracked paths
-   refuse"; `src/commands/pr/merge-refuse.ts`). A head commit this clone
-   does not have is refused naming the `git fetch` that brings it. Refuse
-   too on a PR that is not green or not mergeable (the refusal names which; `pending` and `red` point at
-   `pr triage`, and verdict `none` — no checks at all — points at
-   `--skip-checks` instead, since triage has nothing to fix there), and
-   when the branch is checked out in another worktree (names it). Before
-   those refusals, a branch held by a loop worktree one directory below
-   `loop.worktreeDir` is freed when that worktree is clean and no live
-   loop session holds it: `CLOSEOUT-<stub>.md` and `PLAN_TRACKER-<stub>.md`
-   are copied into the main checkout's `plan.dir` (a later-modified file
-   there is kept), `git worktree remove` runs, and one line says so. A
-   dirty one, one a live loop holds, one whose session records cannot be
-   read, and one git will not remove are refused naming the path, before
-   anything is merged (`src/commands/pr/merge-loop-worktree.ts`). Any
-   other holder gets the refusal above.
+1. Refuse on a tracked change in the working tree, or on an untracked path the
+   merge would write a file onto — one the pull request's head commit or
+   `origin/<base>` holds, read with `git ls-tree -r --name-only` over both only
+   when the tree has an untracked path (a folded `?? dir/` counts when either
+   holds a path under it). Any other untracked path, such as
+   `.claude/settings.local.json`, is left in place and named in one line when
+   nothing refuses (`packages/rafa-pr/src/pr/merge.ts`, "Which untracked paths
+   refuse"; `packages/rafa-pr/src/commands/pr/merge-refuse.ts`). A head commit
+   this clone does not have is refused naming the `git fetch` that brings it.
+   Refuse too on a PR that is not green or not mergeable (the refusal names
+   which; `pending` and `red` point at `pr triage`, and verdict `none` — no
+   checks at all — points at `--skip-checks` instead, since triage has nothing
+   to fix there), and when the branch is checked out in another worktree (names
+   it). Before those refusals, a branch held by a loop worktree one directory
+   below `loop.worktreeDir` is freed when that worktree is clean and no live
+   loop session holds it: `CLOSEOUT-<stub>.md` and `PLAN_TRACKER-<stub>.md` are
+   copied into the main checkout's `plan.dir` (a later-modified file there is
+   kept), `git worktree remove` runs, and one line says so. A dirty one, one a
+   live loop holds, one whose session records cannot be read, and one git will
+   not remove are refused naming the path, before anything is merged
+   (`packages/rafa-pr/src/commands/pr/merge-loop-worktree.ts`). Any other holder
+   gets the refusal above.
 2. Where the release runs (`release.enabled`), read the release guard
-   (`src/commands/pr/merge-guard.ts`) over `origin/<head>` against
-   `origin/<base>`, both fetched first: `clean` prints its lines and the
+   (`packages/rafa-pr/src/commands/pr/merge-guard.ts`) over `origin/<head>`
+   against `origin/<base>`, both fetched first: `clean` prints its lines and the
    forecast; `missing` and `stale` follow `pr.versionCollision` (`allow`,
    `report`, `ask`, `refuse`); `collision` refuses unless
    `dangerous.acceptVersionCollision` is true. Its question comes before the
@@ -235,12 +230,11 @@ sentence replaces nothing.
    Settle's release pull request, a head of `rafa/release` (`RELEASE_PR_BRANCH`)
    that stamps a version the base has neither released nor passed
    (`packages/rafa-release/src/release/release-delivery.ts`), is not `stale`: it
-   prints one line on stdout,
-   `Release: #<n> is settle's release pull request; merging it lands <version>`,
-   with no forecast and no `fix:` line, merges whatever `pr.versionCollision`
-   says, and its json `guard` reads answer `release`, reaction `print` (#843). A
-   `rafa/release` head the base has passed or collides with reads as any branch
-   does.
+   prints one line on stdout, `Release: #<n> is settle's release pull request;
+   merging it lands <version>`, with no forecast and no `fix:` line, merges
+   whatever `pr.versionCollision` says, and its json `guard` reads answer
+   `release`, reaction `print` (#843). A `rafa/release` head the base has passed
+   or collides with reads as any branch does.
 3. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
 4. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
@@ -255,33 +249,34 @@ sentence replaces nothing.
    present, so step 1 still refuses it, or frees it when an ended loop
    worktree holds it.
 5. Tick the roadmap and print what is ready.
-6. Run the unblock reading over every open issue labelled
-   `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
-   asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
-   about each one whose blockers have all closed and removing the label on a
-   yes (`packages/rafa-board/src/board/unblock-after-merge.ts`, over `rafa issue unblock`'s own
-   `runUnblock`). `--yes` does not answer that question, and every failure of
-   it is a warning rather than an exit code. Under
-   `board.relationships: native` step 5 ticks no epic checklist and this
-   step prints the open issues the merge freed instead, read through the
-   relationships port's `freedBy` over one native board listing, asking
-   nothing and writing nothing (`src/commands/pr/merge-freed.ts`). Then,
-   in both modes and with `board.project.number` set, refresh on the
+6. Run the unblock reading over every open issue labelled `spec:blocked` whose
+   `Blocked by:` line names an issue this PR closes, asking `#<n> was blocked by
+   #24, all closed. Remove spec:blocked? [y/N]` about each one whose blockers
+   have all closed and removing the label on a yes
+   (`packages/rafa-board/src/board/unblock-after-merge.ts`, over `rafa issue
+   unblock`'s own `runUnblock`). `--yes` does not answer that question, and
+   every failure of it is a warning rather than an exit code. Under
+   `board.relationships: native` step 5 ticks no epic checklist and this step
+   prints the open issues the merge freed instead, read through the
+   relationships port's `freedBy` over one native board listing, asking nothing
+   and writing nothing (`packages/rafa-pr/src/commands/pr/merge-freed.ts`).
+   Then, in both modes and with `board.project.number` set, refresh on the
    project the issues this PR closes and the issues those were blocking
-   (`src/commands/pr/merge-project.ts`); its lines are warnings.
-7. Print the two follow-ups when they apply, under `Follow-ups:`:
-   `rafa self-update`, then `rafa release settle` while the fragments
-   waiting on `origin/<base>` fold into a version, so settle is the
-   merge's last line (`src/commands/pr/merge-followups.ts`). While a loop
-   of the project is live, the update's line ends `run it after the loop
-   on <branch> finishes`, since `rafa self-update` refuses while that loop
-   is live. A tracker in `plan.dir` with an open or blocked task stops the
-   update only then: read while a loop is live, it exits 1 and names each
-   tracker, unless `--force` is on the line. With no loop live the update
-   goes on and warns once, naming each such tracker, so a tracker a parked
-   plan left behind does not hold it (`src/runtime/install.ts`).
-   Both are only printed: `pr merge` never runs settle, and `rafa release
-   tag` is no longer named here, since settle tags or names the tag itself.
+   (`packages/rafa-pr/src/commands/pr/merge-project.ts`); its lines are
+   warnings.
+7. Print the two follow-ups when they apply, under `Follow-ups:`: `rafa
+   self-update`, then `rafa release settle` while the fragments waiting on
+   `origin/<base>` fold into a version, so settle is the merge's last line
+   (`packages/rafa-pr/src/commands/pr/merge-followups.ts`). While a loop of the
+   project is live, the update's line ends `run it after the loop on <branch>
+   finishes`, since `rafa self-update` refuses while that loop is live. A
+   tracker in `plan.dir` with an open or blocked task stops the update only
+   then: read while a loop is live, it exits 1 and names each tracker, unless
+   `--force` is on the line. With no loop live the update goes on and warns
+   once, naming each such tracker, so a tracker a parked plan left behind does
+   not hold it (`src/runtime/install.ts`). Both are only printed: `pr merge`
+   never runs settle, and `rafa release tag` is no longer named here, since
+   settle tags or names the tag itself.
 8. Last, name the one step that follows — with the base pulled and both
    branches gone, the next plan or the loop on a plan already there
    (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
@@ -298,13 +293,13 @@ checks at all. On `pending`, `red` or `green`, the flag is refused, and the
 refusal names each check row and its state. Without the flag, `none` is
 refused as today, naming `--skip-checks` and what it means.
 
-Before asking to merge, the command reads the repository's workflow count
-(`gh api repos/<repo>/actions/workflows`, `total_count`). Where it reads one
-or more, it also reads the workflow files on the PR's base through its own
-`GitRunner`: `git fetch origin <base>`, then the `*.yml` and `*.yaml` blobs
-under `.github/workflows/` on `origin/<base>` (`git ls-tree --full-tree -z`,
-`git cat-file blob`), judged by `src/pr/workflow-triggers.ts`. Three cases
-(`src/pr/unchecked.ts`):
+Before asking to merge, the command reads the repository's workflow count (`gh
+api repos/<repo>/actions/workflows`, `total_count`). Where it reads one or more,
+it also reads the workflow files on the PR's base through its own `GitRunner`:
+`git fetch origin <base>`, then the `*.yml` and `*.yaml` blobs under
+`.github/workflows/` on `origin/<base>` (`git ls-tree --full-tree -z`, `git
+cat-file blob`), judged by `packages/rafa-pr/src/pr/workflow-triggers.ts`. Three
+cases (`packages/rafa-pr/src/pr/unchecked.ts`):
 
 - `no-workflow`: the count read zero.
 - `no-pull-request-workflow`: the count read one or more, and no workflow
@@ -359,7 +354,7 @@ Assessment is CODE, not a session:
   conflict the file list from `git merge-tree --write-tree` with a liveness
   control (the `merge-tree-mergeability-readings` skill's rule), and, where
   the release runs, the release guard over the head against the base with
-  no fetch (`src/commands/pr/triage-guard.ts`).
+  no fetch (`packages/rafa-pr/src/commands/pr/triage-guard.ts`).
 - Classify into one class: `green`, `pending`, `no-checks`,
   `conflict-lockfile`, `conflict-manifest` (`package.json` where both sides
   added or bumped entries), `conflict-other`, `conflict-version`,
@@ -379,14 +374,15 @@ Assessment is CODE, not a session:
 - Output: the class, the evidence (files, step, log excerpt capped at 40
   lines), and a ready FOLLOW-UP PROMPT for another session that carries all
   of it, so that session does not assess again.
-- A class added to `TRIAGE_CLASSES` (`src/pr/triage/classes.ts`) needs, in
-  the same change, its line in `FOLLOW_UP_TASKS` (`src/pr/triage/follow-up.ts`,
-  a `Record` over the class, so `check-types` fails without it), a case in
+- A class added to `TRIAGE_CLASSES`
+  (`packages/rafa-pr/src/pr/triage/classes.ts`) needs, in the same change, its
+  line in `FOLLOW_UP_TASKS` (`packages/rafa-pr/src/pr/triage/follow-up.ts`, a
+  `Record` over the class, so `check-types` fails without it), a case in
   `classify.test.ts` that produces it, and a fixture folder
-  `src/tests/fixtures/pr-triage/<class>/` (`pr.json`, checks, log). Both
-  tests check the closed set from each end, and the pre-commit hook runs no
-  tests, so a missing fixture only shows up in `bun run test`. This bullet
-  is new and replaces no earlier text.
+  `src/tests/fixtures/pr-triage/<class>/` (`pr.json`, checks, log). Both tests
+  check the closed set from each end, and the pre-commit hook runs no tests, so
+  a missing fixture only shows up in `bun run test`. This bullet is new and
+  replaces no earlier text.
 
 The triage comment:
 
@@ -419,7 +415,7 @@ Run again:
   already stored at the same head is shown, and a moved head with a check
   still running shows the old triage as `pending`, conflict or not.
   `unknown` with any other merge state and green checks still says green
-  (`src/pr/triage/rerun.ts`).
+  (`packages/rafa-pr/src/pr/triage/rerun.ts`).
 - `--no-comment` reads an existing comment and writes none.
 
 Which PR, with no `<n>` and no PR on the current branch: list red PRs. One:
@@ -432,30 +428,31 @@ candidate refuses, exit 2, listing the commands.
 ### Triage --resolve
 
 A pinned plan per simple class ships in the package
-(`src/pr/plans/resolve-<class>.md`), filled from the triage block and run by
-the ordinary loop, so commits, reports and effort rows are the usual ones.
+(`packages/rafa-pr/src/pr/plans/resolve-<class>.md`), filled from the triage
+block and run by the ordinary loop, so commits, reports and effort rows are the
+usual ones.
 
 `conflict-version` has no pinned plan and is not run through the loop:
-`resolvePullRequest` dispatches it to `src/commands/pr/triage-convert.ts`
-ahead of the pinned-plan check, after the trust check and the
-cross-repository refusal. In the same worktree it runs
-`convertStampedVersion` (`src/pr/triage/version-convert.ts`), which makes
-ONE commit touching three paths. It writes a fragment of the stamped
-section's lines, named after the branch's last segment (a rafa branch gives
-its plan stub). The fragment's level is how far the stamp moved from the
-merge base's version. The commit also sets the version file's version back
-to the merge base's, keeping the branch's other bytes in it, and restores the
-changelog to the merge base's text. Then it pushes without force and removes
-the worktree. No session, no CI wait, no attempt raised, no comment written:
-the next `rafa pr triage` assesses the moved head. The MERGE base's values
-and not the base tip's, because the guard measures a stamp against the
-merge base: a branch holding the tip's version and sections still reads
-`stale`/`released` and would be classed `conflict-version` again. The merge
-then takes the base's side of both files. Exit 0 when converted and pushed
-or when the guard no longer reads a stamp; exit 3 when the conversion is
-refused (the worktree is not at the pull request's head, no level reads off
-the stamp, the merge base holds no version or changelog) or the push is
-rejected.
+`resolvePullRequest` dispatches it to
+`packages/rafa-pr/src/commands/pr/triage-convert.ts` ahead of the pinned-plan
+check, after the trust check and the cross-repository refusal. In the same
+worktree it runs `convertStampedVersion`
+(`packages/rafa-pr/src/pr/triage/version-convert.ts`), which makes ONE commit
+touching three paths. It writes a fragment of the stamped section's lines, named
+after the branch's last segment (a rafa branch gives its plan stub). The
+fragment's level is how far the stamp moved from the merge base's version. The
+commit also sets the version file's version back to the merge base's, keeping
+the branch's other bytes in it, and restores the changelog to the merge base's
+text. Then it pushes without force and removes the worktree. No session, no CI
+wait, no attempt raised, no comment written: the next `rafa pr triage` assesses
+the moved head. The MERGE base's values and not the base tip's, because the
+guard measures a stamp against the merge base: a branch holding the tip's
+version and sections still reads `stale`/`released` and would be classed
+`conflict-version` again. The merge then takes the base's side of both files.
+Exit 0 when converted and pushed or when the guard no longer reads a stamp; exit
+3 when the conversion is refused (the worktree is not at the pull request's
+head, no level reads off the stamp, the merge base holds no version or
+changelog) or the push is rejected.
 
 - Workspace: `git worktree add ~/.rafa/worktrees/pr-<n> <branch>`, so the
   operator's uncommitted work is never touched; removed on success, on the
@@ -469,47 +466,50 @@ rejected.
   branch against the pull request's head. A cross-repository PR is refused.
   Never a force-push.
 - `resolve-conflict-lockfile`: merge the base, take the base's lockfile,
-  reinstall, run the gates, commit, push. `resolve-conflict-manifest`: keep
-  both sides' entries, the higher version where both bumped one, then as
-  above. `resolve-ci-install` and `resolve-ci-lint`: the `build-error-resolver`
-  agent with the log excerpt in the task. The conflict sentence is the
-  wrap-up prompt's own, from one source (`src/pr/conflict-sentence.ts`),
-  which is why THREE suites read `buildWrapUpPrompt` and a bullet moved in
-  it can redden any of them: `src/start/wrap-up.test.ts`,
-  `src/pr/conflict-sentence.sweep.test.ts` and `src/tests/plan-injection.test.ts`,
-  the last because the prompt's FIRST line is the `wrap-up` classifier key
-  `PROMPT_SHAPES` reads. Run the three together before the full suite.
-- Then the existing CI wait. A fresh assessment of class `green` OR
-  `no-checks` counts as resolved (`endOfAttempt`,
-  `src/commands/pr/triage-resolve.ts`), because a resolved conflict in a
-  repository that schedules no checks reads `no-checks`. Nothing counts as
-  resolved while the PR still conflicts (`stillConflicts`), green checks
-  included: they are what a green, conflicting PR brings into its run.
-  Guard against an unfixable PR: `attempts` in
-  the triage block, raised before each run; at `--max-attempts` (default 2),
-  or when a run ends with the same class and the same failing step as before,
-  stop, update the comment, remove the worktree, print the follow-up prompt,
-  exit 3. Each run carries `--max-budget-usd` from `pr.resolveBudget`.
+  reinstall, run the gates, commit, push. `resolve-conflict-manifest`: keep both
+  sides' entries, the higher version where both bumped one, then as above.
+  `resolve-ci-install` and `resolve-ci-lint`: the `build-error-resolver` agent
+  with the log excerpt in the task. The conflict sentence is the wrap-up
+  prompt's own, from one source
+  (`packages/rafa-pr/src/pr/conflict-sentence.ts`), which is why THREE suites
+  read `buildWrapUpPrompt` and a bullet moved in it can redden any of them:
+  `src/start/wrap-up.test.ts`,
+  `src/tests/pr-coupled/pr/conflict-sentence.sweep.test.ts` and
+  `src/tests/plan-injection.test.ts`, the last because the prompt's FIRST line
+  is the `wrap-up` classifier key `PROMPT_SHAPES` reads. Run the three together
+  before the full suite.
+- Then the existing CI wait. A fresh assessment of class `green` OR `no-checks`
+  counts as resolved (`endOfAttempt`,
+  `packages/rafa-pr/src/commands/pr/triage-resolve.ts`), because a resolved
+  conflict in a repository that schedules no checks reads `no-checks`. Nothing
+  counts as resolved while the PR still conflicts (`stillConflicts`), green
+  checks included: they are what a green, conflicting PR brings into its run.
+  Guard against an unfixable PR: `attempts` in the triage block, raised before
+  each run; at `--max-attempts` (default 2), or when a run ends with the same
+  class and the same failing step as before, stop, update the comment, remove
+  the worktree, print the follow-up prompt, exit 3. Each run carries
+  `--max-budget-usd` from `pr.resolveBudget`.
 - Pushing to a dependabot branch stops dependabot rebasing it; the comment
   says so.
 
 ### Trust
 
-Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. EIGHT routes ask the question. Two are
-`src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
-the pull request's author for `pr triage --resolve`. Four are
-`requireTrustedBoardAuthor`'s — the board entry point in
-`packages/rafa-board/src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list and
-the repo label. Two of those are `plan create`'s: `packages/rafa-board/src/board/plan-spec.ts`'s
-`inspectSpecIssue` calls it ahead of the label check, the leak refusal and
-the completeness refusal, and its `inspectRoadmapIssue` calls it on the
-ROADMAP issue a `--next` walk reads its order off, before a line is parsed
-out of that body and before either taken reading is spent. The third is
-`rafa issue ready <n>` (`packages/rafa-board/src/commands/issue/ready.ts`), which calls it
-before the completeness check and before its own question, so an outsider's
-issue is refused with exit 2 and nobody is asked anything. The login all
-three ask about is `SpecIssue.author`, which `packages/rafa-board/src/board/issue.ts`'s
+Text from the board ends up in an agent's prompt, so its source must be someone
+allowed to change the repo. EIGHT routes ask the question. Two are
+`packages/rafa-pr/src/commands/pr/triage-trust.ts`'s: the triage marker
+comment's author, and the pull request's author for `pr triage --resolve`. Four
+are `requireTrustedBoardAuthor`'s — the board entry point in
+`packages/rafa-board/src/board/trust.ts`, over a `BoardTrust` of the lookup, the
+allow-list and the repo label. Two of those are `plan create`'s:
+`packages/rafa-board/src/board/plan-spec.ts`'s `inspectSpecIssue` calls it ahead
+of the label check, the leak refusal and the completeness refusal, and its
+`inspectRoadmapIssue` calls it on the ROADMAP issue a `--next` walk reads its
+order off, before a line is parsed out of that body and before either taken
+reading is spent. The third is `rafa issue ready <n>`
+(`packages/rafa-board/src/commands/issue/ready.ts`), which calls it before the
+completeness check and before its own question, so an outsider's issue is
+refused with exit 2 and nobody is asked anything. The login all three ask about
+is `SpecIssue.author`, which `packages/rafa-board/src/board/issue.ts`'s
 `ISSUE_VIEW_FIELDS` fetches.
 
 **Every body a `plan create` run reads is checked**: the issue `--issue=<n>`
@@ -571,18 +571,18 @@ spec", exit 2, before the body is read any further or snapshotted. A failed
 permission lookup is a refusal, never a pass. Applied on every repository,
 public or not.
 
-For `pr triage --resolve`, a PR whose author is untrusted is refused unless
-it is `dependabot[bot]` or listed. Its head's config module is trusted
-apart from its author (`src/commands/pr/triage-config-trust.ts`), after the
-cross-repository refusal and before the worktree is added: a
+For `pr triage --resolve`, a PR whose author is untrusted is refused unless it
+is `dependabot[bot]` or listed. Its head's config module is trusted apart from
+its author (`packages/rafa-pr/src/commands/pr/triage-config-trust.ts`), after
+the cross-repository refusal and before the worktree is added: a
 `rafa.config.ts` or `rafa.config.mjs` on the head (the local branch, else
-`origin/<branch>`, as `git worktree add` takes it) whose blob
-`origin/<base>` as last fetched does not hold, by `git rev-parse`, is
-refused with exit 1 naming the file, the base and `--allow-local-config`.
-That flag lets it through with one warning line. A config module is code
-the resolve loop imports when it starts in the worktree. For marker comments, one from an untrusted
-author is ignored and reported, so a planted triage comment cannot supply the
-follow-up prompt.
+`origin/<branch>`, as `git worktree add` takes it) whose blob `origin/<base>` as
+last fetched does not hold, by `git rev-parse`, is refused with exit 1 naming
+the file, the base and `--allow-local-config`. That flag lets it through with
+one warning line. A config module is code the resolve loop imports when it
+starts in the worktree. For marker comments, one from an untrusted author is
+ignored and reported, so a planted triage comment cannot supply the follow-up
+prompt.
 
 ### The readiness gate
 
@@ -809,7 +809,7 @@ Ticking: `pr merge` ticks the PR's `Closes #<n>` line on every open
 no issue carries the label, after the merge (GitHub closes the issue; it does
 not tick a task-list box). Before the boards it ticks the same line on the
 checklist of the open epic the issue's `epic:<slug>` label names, printing one
-sentence per epic (`src/commands/pr/merge-tick.ts`, which runs
+sentence per epic (`packages/rafa-pr/src/commands/pr/merge-tick.ts`, which runs
 `tickEpics` of `packages/rafa-board/src/board/epic-tick.ts`).
 An edit conflict re-reads and retries once — and the only conflict signal
 there is, is the body the PATCH answers with. The issues REST API takes no
@@ -1107,17 +1107,19 @@ then one `gh issue view <n> --json number,state` for each blocker that a full
 listing did not hold. A blocker whose state is not read counts as not cleared,
 so its issue keeps the label and the run names it `#<n> (state not read)`.
 
-In **`native` mode**, the freed reading (`src/commands/pr/merge-freed.ts`) prints
-the open issues the merge freed, read through the port's `freedBy`, and sends no
-write (`packages/rafa-board/src/board/relations/native.ts`'s `afterMerge`). An issue is freed when it
-is open, waits on blockers, and has at least one blocker among the closed issues
-and would not wait on anything once those count as closed. The output is silence
-when the merge freed nothing; otherwise a header line naming the mode, the count,
-the closed issues and that nothing was written, followed by one indented line per
-freed issue — lowest number first — naming its number and title, or number alone
-if the title is empty. `--yes` does not answer anything, since there is no
-question. A read that cannot get the board's repository or the native listing
-sends one warning and prints nothing, as the merge has already happened.
+In **`native` mode**, the freed reading
+(`packages/rafa-pr/src/commands/pr/merge-freed.ts`) prints the open issues the
+merge freed, read through the port's `freedBy`, and sends no write
+(`packages/rafa-board/src/board/relations/native.ts`'s `afterMerge`). An issue
+is freed when it is open, waits on blockers, and has at least one blocker among
+the closed issues and would not wait on anything once those count as closed. The
+output is silence when the merge freed nothing; otherwise a header line naming
+the mode, the count, the closed issues and that nothing was written, followed by
+one indented line per freed issue — lowest number first — naming its number and
+title, or number alone if the title is empty. `--yes` does not answer anything,
+since there is no question. A read that cannot get the board's repository or the
+native listing sends one warning and prints nothing, as the merge has already
+happened.
 
 #### Cache and truncation for freed-issues in native mode
 

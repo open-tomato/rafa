@@ -124,7 +124,7 @@ describe('CUT_RULES', () => {
 const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], length: number, kept: readonly string[]])[] = [
   ['rafa-inventory', INVENTORY_NAMED, 0, []],
   ['rafa-board', BOARD_NAMED, 22, []],
-  ['rafa-pr', PR_NAMED, 8, ['src/pr/index.ts']],
+  ['rafa-pr', PR_NAMED, 8, ['packages/rafa-pr/src/pr/index.ts']],
   ['rafa-run', RUN_NAMED, 22, []],
   ['rafa-release', RELEASE_NAMED, 6, []],
   ['rafa-effort', EFFORT_NAMED, 0, []],
@@ -475,7 +475,7 @@ describe('buildCutTable: files', () => {
         'packages/rafa/src/report/parse.ts',
         'packages/rafa/src/report/parse.test.ts',
         'src/pr/gh-fake.ts',
-        'src/pr/index.ts',
+        'packages/rafa-pr/src/pr/index.ts',
         'packages/rafa-board/src/board/project/rules.ts',
       ],
     ),
@@ -484,10 +484,10 @@ describe('buildCutTable: files', () => {
   it('lists each package\'s files sorted, tests included, counted by kind and by folder', () => {
     expect(rowOf(table, 'rafa-pr')).toMatchObject({
       fileCounts: { source: 2, test: 0, testSupport: 1 },
-      files: ['src/pr/gh-fake.ts', 'src/pr/gh.ts', 'src/pr/index.ts'],
+      files: ['packages/rafa-pr/src/pr/index.ts', 'src/pr/gh-fake.ts', 'src/pr/gh.ts'],
       filesByFolder: { 'packages/rafa-pr/': 0, 'src/commands/pr/': 0, 'src/pr/': 2, 'src/triage/': 0 },
       folders: ['packages/rafa-pr/', 'src/commands/pr/', 'src/pr/', 'src/triage/'],
-      named: [...PR_NAMED, 'src/pr/index.ts'],
+      named: [...PR_NAMED, 'packages/rafa-pr/src/pr/index.ts'],
       rank: 6,
     });
     expect(rowOf(table, CORE_PACKAGE).files).toEqual(['packages/rafa/src/report/parse.test.ts', 'packages/rafa/src/report/parse.ts']);

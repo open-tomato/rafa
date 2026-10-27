@@ -100,11 +100,12 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/init-release.ts', libraryHalf: 'packages/rafa-release/src/release/scaffold.ts' },
   { commandFile: 'src/commands/ci/status.ts', libraryHalf: 'src/ci/status-reading.ts' },
   { commandFile: 'packages/rafa-board/src/commands/issue/unblock.ts', libraryHalf: 'packages/rafa-board/src/board/unblock.ts' },
-  { commandFile: 'src/commands/pr/merge-tick.ts', libraryHalf: 'packages/rafa-board/src/board/epic-tick.ts' },
-  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'packages/rafa-release/src/release/version-tag.ts' },
-  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
-  { commandFile: 'src/commands/pr/merge-cleanup.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-tick.ts', libraryHalf: 'packages/rafa-board/src/board/epic-tick.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-followups.ts', libraryHalf: 'packages/rafa-release/src/release/version-tag.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-followups.ts', libraryHalf: 'packages/rafa-pr/src/pr/settle-waiting.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-cleanup.ts', libraryHalf: 'packages/rafa-pr/src/pr/settle-waiting.ts' },
   { commandFile: 'src/commands/self-update.ts', libraryHalf: 'packages/rafa/src/runtime/live-loops.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/open.ts', libraryHalf: 'packages/rafa-pr/src/commands/pr/open-pull.ts' },
 ];
 
 /**

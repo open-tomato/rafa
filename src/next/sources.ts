@@ -49,7 +49,7 @@
  *
  * That check asks the config and `origin`, and it spawns no `gh`.
  * Whether the CLI is installed and authenticated is the preflight's
- * reading (`src/pr/preflight-items.ts`), and a `gh` that then cannot
+ * reading (`packages/rafa-pr/src/pr/preflight-items.ts`), and a `gh` that then cannot
  * answer is the `pulls-unusable` pre-condition of `./state.ts`, which
  * names `rafa doctor`.
  *
@@ -247,7 +247,6 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { SettleReader } from './settle-step.js';
-import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
@@ -260,6 +259,7 @@ import type {
   SpecIssue,
   SpecIssueReader,
 } from '@open-tomato/rafa-board';
+import type { GitRunner, PullRequests } from '@open-tomato/rafa-pr';
 import type { EpicEndRelease, MergeGuardSettings } from '@open-tomato/rafa-release';
 
 import {
@@ -283,6 +283,12 @@ import {
   walkEpic,
   walkTarget,
 } from '@open-tomato/rafa-board';
+import {
+  createGitRunner,
+  ghPullRequestsIn,
+  requireGhProvider,
+  resolvePrProvider,
+} from '@open-tomato/rafa-pr';
 import { readEpicEndRelease } from '@open-tomato/rafa-release';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -291,8 +297,6 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { readRecords, resolveLoopSeams } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
-
-import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
 import { nextOwnerGate } from './owner-gate.js';
 import { settleReaderFor } from './settle-step.js';

@@ -68,12 +68,12 @@ import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit, HINT_FLAG, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import issueReady from '@open-tomato/rafa-board/commands/issue/ready';
+import prMerge from '@open-tomato/rafa-pr/commands/pr/merge';
+import prTriage from '@open-tomato/rafa-pr/commands/pr/triage';
+import prWait from '@open-tomato/rafa-pr/commands/pr/wait';
 
 import loopStart from '../commands/loop/start.js';
 import planCreate from '../commands/plan/create.js';
-import prMerge from '../commands/pr/merge.js';
-import prTriage from '../commands/pr/triage.js';
-import prWait from '../commands/pr/wait.js';
 
 import { DEFAULT_ENDING_SEAMS, endingWith, endWithNextStep } from './ending.js';
 

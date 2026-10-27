@@ -37,7 +37,7 @@
  *    three of `./state.test.ts` that plant a conflict or the order.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { ChecksVerdict, GitResult, Mergeability, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
+import type { ChecksVerdict, GitResult, Mergeability, PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

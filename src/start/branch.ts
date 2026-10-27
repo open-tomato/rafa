@@ -18,8 +18,8 @@
  *  - spawning each step's argv and handing what git said back to
  *    {@link readStepOutcome}.
  *
- * It is the split `rafa pr merge` already has — `src/pr/merge.ts` beside
- * `src/commands/pr/merge.ts` — and the seams are that command's too: a
+ * It is the split `rafa pr merge` already has — `packages/rafa-pr/src/pr/merge.ts` beside
+ * `packages/rafa-pr/src/commands/pr/merge.ts` — and the seams are that command's too: a
  * `git` factory over the project root, an `isTerminal` reading, and an
  * `openPrompter` called ONLY when there is a question to ask. So
  * `--create-branch` under a cron job opens no prompter at all, and a

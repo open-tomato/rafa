@@ -14,8 +14,8 @@
 import type { LintRunner } from './lint-step.js';
 import type { SuiteStepContext, TaskStepInput } from './suite-step.js';
 import type { TypeRunner } from './type-step.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteResult } from '@open-tomato/rafa/suite/run';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

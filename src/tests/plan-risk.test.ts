@@ -1,5 +1,5 @@
 /**
- * An integration test for `assessPlanRisk` (`src/plan/risk.ts`) over a
+ * An integration test for `assessPlanRisk` (`packages/rafa-pr/src/plan/risk.ts`) over a
  * planted project on real disk: a real agent definition, a real skill's
  * `SKILL.md`, and a real plan file, read through the actual seams
  * (`parsePlan`, `findAgentDefinition`, `resolveSkillTiers`,
@@ -19,9 +19,9 @@
  *   prose mention of the same words, in the SAME fence and file,
  *   neither of which is reported.
  */
-import type { RiskFinding, RiskSeams } from '../plan/risk.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { RiskFinding, RiskSeams } from '@open-tomato/rafa-pr/plan/risk';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,7 +29,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { assessPlanRisk, EVERY_TOOL } from '../plan/risk.js';
+import { assessPlanRisk, EVERY_TOOL } from '@open-tomato/rafa-pr/plan/risk';
 
 /** The fence marker, spelled once so no line below nests one. */
 const FENCE = '```';

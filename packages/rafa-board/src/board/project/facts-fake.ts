@@ -6,7 +6,7 @@
  * GitHub.
  *
  * This module is a test helper that is not itself a test file, as
- * `src/pr/gh-fake.ts` is: bun runs nothing in it until a `*.test.ts`
+ * `packages/rafa-pr/src/pr/gh-fake.ts` is: bun runs nothing in it until a `*.test.ts`
  * calls it, and `check-types` reads it.
  *
  * ## What it answers, and from which reading

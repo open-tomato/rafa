@@ -4,8 +4,8 @@
  * which refusal follows an answer, and which git steps a yes turns into
  * — all of it as data, none of it spawning anything.
  *
- * The split is the `pr` subject's (`src/pr/merge.ts` beside
- * `src/commands/pr/merge.ts`): everything here is the part that can be
+ * The split is the `pr` subject's (`packages/rafa-pr/src/pr/merge.ts` beside
+ * `packages/rafa-pr/src/commands/pr/merge.ts`): everything here is the part that can be
  * decided without a repository, leaving the other half — the one that
  * takes these readings off a `GitRunner` and a `Prompter` and runs the
  * steps — as the only place anything is spawned. Three things follow
@@ -166,7 +166,7 @@ import { gitSaid } from '../core/git/index.js';
 /** The remote a plan's branch is created from and tracked on. */
 export const REMOTE = 'origin';
 
-/** The indent a refusal's listed lines carry, as `src/pr/merge.ts` indents its own. */
+/** The indent a refusal's listed lines carry, as `packages/rafa-pr/src/pr/merge.ts` indents its own. */
 const INDENT = '   ';
 
 /** The two-character prefix `git status --porcelain` gives an untracked path; see the module note. */

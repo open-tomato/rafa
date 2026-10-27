@@ -11,8 +11,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { LONG_RUN_FIX, longRunOf, readLongRuns } from '@open-tomato/rafa-inventory/plan/risk/long-runs';
-
-import { openTasks } from '../../../../plan/risk.js';
+import { openTasks } from '@open-tomato/rafa-pr/plan/risk';
 
 /** The fence marker, spelled once so no line below nests one. */
 const FENCE = '```';
@@ -72,7 +71,7 @@ describe('longRunOf: what is not a whole-suite run', () => {
     'Check `bun test src/plan/` is green',
     'Run `bun test --changed=<base>` and read its summary',
     'Run `bun test --changed` over the diff',
-    'Run `bun test ./src/plan/risk.test.ts --reporter=junit`',
+    'Run `bun test ./packages/rafa-pr/src/plan/risk.test.ts --reporter=junit`',
     'Run `bun test --reporter=junit src/plan/`',
     'Run `bun test src/plan/ > out.txt 2>&1`',
     'Run `bunx tsc --noEmit` and `bunx eslint src/plan/`',

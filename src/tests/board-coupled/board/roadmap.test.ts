@@ -6,7 +6,7 @@
  *
  * Every case plants its own roadmap body and drives its own seams. The
  * open pull request list goes through the strict recorded fake
- * (`src/pr/gh-fake.ts`), which models
+ * (`packages/rafa-pr/src/pr/gh-fake.ts`), which models
  * `gh pr list --state open --json <fields> --limit <n>` and refuses a
  * `--json` field it does not know, so a field list this module got
  * wrong is refused by the fake rather than quietly answered. The
@@ -118,8 +118,7 @@ import {
   severalRoadmapsMessage,
   skipSentence,
 } from '@open-tomato/rafa-board/board/roadmap';
-
-import { createFakePrGh } from '../../../pr/gh-fake.js';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;

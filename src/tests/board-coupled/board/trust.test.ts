@@ -4,7 +4,7 @@
  * refuses rather than passes, and the sentence a refusal carries.
  *
  * The `gh` route is driven through the strict recorded fake
- * (`src/pr/gh-fake.ts`), which models
+ * (`packages/rafa-pr/src/pr/gh-fake.ts`), which models
  * `api repos/<repo>/collaborators/<login>/permission` and answers a 404
  * for a login nobody planted. Everything the fake does not model — a
  * connection failure, a payload with one permission field, a payload
@@ -34,7 +34,7 @@
  * and verified with `shasum -c` after each. 33 pass either side, and
  * each count below is the run's own. The two `trustRefusalClause`
  * cases came later, when the clause was exported for
- * `src/commands/pr/triage-trust.ts` to report an ignored marker
+ * `packages/rafa-pr/src/commands/pr/triage-trust.ts` to report an ignored marker
  * comment with: they were not in the 33 and no count below counts
  * them, which is why this file now holds 35:
  *
@@ -120,8 +120,7 @@ import {
   trustRefusalClause,
   trustRefusalMessage,
 } from '@open-tomato/rafa-board/board/trust';
-
-import { createFakePrGh } from '../../../pr/gh-fake.js';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
 
 /** The path every lookup sends, with the placeholders `gh` expands. */
 const PATH = 'repos/{owner}/{repo}/collaborators/octocat/permission';

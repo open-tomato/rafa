@@ -51,9 +51,9 @@
  *    the second move on a dry hop.
  */
 import type { NextRoadmapReading } from './readings.js';
-import type { GitRunner } from '../pr/index.js';
 import type { Place, Position } from '@open-tomato/rafa/project/position';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

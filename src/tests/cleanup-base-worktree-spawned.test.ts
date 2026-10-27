@@ -23,8 +23,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
-
-import { ADMIN_FILES, GIT_DIR } from '../cleanup/worktrees.js';
+import { ADMIN_FILES, GIT_DIR } from '@open-tomato/rafa-pr/cleanup/worktrees';
 
 import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

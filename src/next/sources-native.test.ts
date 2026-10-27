@@ -23,9 +23,9 @@
  * that read a blocker one issue at a time.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { EpicRelations } from '@open-tomato/rafa-board/board/epics';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

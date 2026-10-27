@@ -121,7 +121,7 @@ interface RewiredRow {
  * by path was `ghPullRequestsIn`, which it reaches through core's service
  * registry as `pullRequestsIn`. So the row kept 8 load-cycle files and
  * no back-edge file. The seventh decouple item (rafa-1368) took
- * `src/cleanup/worktrees.ts` and `src/start/pr-retarget.ts` off the row,
+ * `packages/rafa-pr/src/cleanup/worktrees.ts` and `packages/rafa-pr/src/start/pr-retarget.ts` off the row,
  * since it places them in pr by name, and `src/next/hint.ts`, whose pr
  * imports by path were `src/next/sources.ts` and `relations-mode.ts`,
  * which it places in run. It named the seven run files that import a pr
@@ -133,8 +133,11 @@ interface RewiredRow {
  * the item's rewire task read it. Its dry run read the four `src/next/`
  * files on a load cycle and the other three to rewire, and the codemod
  * took `src/cleanup/index.ts`, `steps.ts` and `src/start/wrap-up-run.ts`
- * onto the facade. So the row keeps 9 load-cycle files and no back-edge
- * file.
+ * onto the facade. So the row kept 9 load-cycle files and no back-edge
+ * file. The nine left the row in pass 4e (rafa-1374): decouple 7 cut the
+ * imports into run their cycles ran through, the codemod read all nine to
+ * rewire and none on a load cycle, and it took them onto the facade. So
+ * the row is empty: no file outside pr imports a pr file by path.
  * Run's five load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -144,10 +147,10 @@ interface RewiredRow {
  * `packages/rafa/src/plan/validate.ts`, `packages/rafa/src/claims/stale.ts`,
  * `packages/rafa/src/claims/git.ts` and
  * `packages/rafa/src/start/branch-decision.ts`, which the item's move list
- * took into core. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
+ * took into core. Pr's `packages/rafa-pr/src/triage/kind-route.ts` and `leftover-repair.ts`
  * left the row in the third decouple item: their one run import by path
  * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Pr's
- * `src/triage/base-run.ts` and `inherited.ts` left the row in the seventh
+ * `packages/rafa-pr/src/triage/base-run.ts` and `inherited.ts` left the row in the seventh
  * decouple item: their run imports by path were the suite runner,
  * `src/suite/run.ts`, which the item moved into core as
  * `packages/rafa/src/suite/run.ts`. Run's
@@ -162,17 +165,17 @@ interface RewiredRow {
  * and `packages/rafa-board/src/commands/epic/close-triage.ts` left them in the fifth decouple
  * item: their run imports by path were `endWithNextStep` and
  * `readStaleDocsVersion`, which they call through core's service
- * registry. Pr's `src/commands/pr/merge-cleanup.ts`, `merge-followups.ts`
+ * registry. Pr's `packages/rafa-pr/src/commands/pr/merge-cleanup.ts`, `merge-followups.ts`
  * and `triage-resolve.ts` left them in the seventh decouple item: their
  * one run import by path each was a constant, `RUNTIME_SUBDIR`,
  * `RAFA_PACKAGE_NAME` and `CI_POLL_INTERVAL_MS`, which the item moved
  * into core. The same item placed `src/cleanup/steps.ts`,
  * `src/next/owner-gate.ts`, `settle-step.ts` and `sources.ts` in run by
  * name, so their run imports are inside run and they left the row, and
- * placed `src/cleanup/worktrees.ts` and `src/start/pr-retarget.ts` in pr,
- * so `src/cleanup/groups.ts`, `src/commands/pr/merge-loop-worktree.ts`
+ * placed `packages/rafa-pr/src/cleanup/worktrees.ts` and `packages/rafa-pr/src/start/pr-retarget.ts` in pr,
+ * so `packages/rafa-pr/src/cleanup/groups.ts`, `packages/rafa-pr/src/commands/pr/merge-loop-worktree.ts`
  * and `retarget.ts`, whose run imports by path were those two files, left
- * it too. `src/commands/pr/merge.ts`, `triage.ts` and `wait.ts` left it
+ * it too. `packages/rafa-pr/src/commands/pr/merge.ts`, `triage.ts` and `wait.ts` left it
  * in the same item: their run import by path was `endWithNextStep`,
  * which they call through core's service registry. So the row is empty:
  * no file outside run imports a run file by path.
@@ -201,17 +204,7 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-release',
   },
   {
-    allowed: {
-      'src/claims/lost.ts': 'loadCycle',
-      'src/next/hop-rows.ts': 'loadCycle',
-      'src/next/owner-gate.ts': 'loadCycle',
-      'src/next/readings.ts': 'loadCycle',
-      'src/next/relations-mode.ts': 'loadCycle',
-      'src/next/settle-step.ts': 'loadCycle',
-      'src/next/sources.ts': 'loadCycle',
-      'src/start/pr-lifecycle.ts': 'loadCycle',
-      'src/start/suite-blocker.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-pr',
   },
   {

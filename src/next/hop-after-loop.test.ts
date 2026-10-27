@@ -21,8 +21,8 @@
  *    counted.
  */
 import type { HopTarget, NextHopReading, NextRoadmapReading, NextSources } from './readings.js';
-import type { PullRequests } from '../pr/index.js';
 import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { PullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import { describe, expect, it } from 'bun:test';
 

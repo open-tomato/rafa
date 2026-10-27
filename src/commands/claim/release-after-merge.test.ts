@@ -23,10 +23,10 @@
  * Every case writes once before the command reads the store id, since a
  * read never mints and a read-only check passes while wrong.
  */
-import type { GitRunner } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
 import type { StoreIdentitySeams } from '@open-tomato/rafa/store/store-meta';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -41,9 +41,9 @@ import { bringForward } from '@open-tomato/rafa/store/bring-forward';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { readHostId } from '@open-tomato/rafa/store/store-identity';
 import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { readDeviceStoreId } from '../../claims/device.js';
-import { createGitRunner } from '../../pr/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 import { createMergeCommand } from '../effort/merge.js';
 

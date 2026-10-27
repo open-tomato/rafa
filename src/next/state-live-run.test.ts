@@ -69,8 +69,8 @@
  *    `./state.test.ts` still passes, since none plants such a record.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { GitResult } from '../pr/index.js';
 import type { SessionRecord, SessionState } from '@open-tomato/rafa/core/loop';
+import type { GitResult } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -109,7 +109,7 @@ const CHECKOUT = '/work/rafa';
 const WORKTREE = '/work/rafa-worktrees/rafa-367';
 
 /** What the loop's task has changed, as `git status --porcelain` writes it. */
-const TASK_EDITS = [' M src/pr/gh.ts', ' M src/pr/index.ts', '?? src/pr/gh-fake.ts'];
+const TASK_EDITS = [' M packages/rafa-pr/src/pr/gh.ts', ' M packages/rafa-pr/src/pr/index.ts', '?? packages/rafa-pr/src/pr/gh-fake.ts'];
 
 /** The argv the tree reading spends, and the one that names its checkout. */
 const STATUS = 'status --porcelain';
@@ -218,7 +218,7 @@ describe('a live run beside the edits its task has made', () => {
     expect(state.proposal).toBe('nothing to start while it runs; `rafa loop status` says where it is');
     expect(both).not.toContain('commit');
     expect(both).not.toContain('set aside');
-    expect(both).not.toContain('src/pr/gh.ts');
+    expect(both).not.toContain('packages/rafa-pr/src/pr/gh.ts');
   });
 
   it('answers a paused run the same way, since its run has not ended', async () => {
@@ -258,7 +258,7 @@ describe('a live run in a worktree of its own, which holds none of the tree that
 
     expect([edited.id, clean.id]).toEqual(['tree-modified', 'loop-running']);
     expect(edited.reading).toBe(
-      `the working tree at \`${CHECKOUT}\` has changes to 2 tracked files: \`src/pr/gh.ts\`, \`src/pr/index.ts\``,
+      `the working tree at \`${CHECKOUT}\` has changes to 2 tracked files: \`packages/rafa-pr/src/pr/gh.ts\`, \`packages/rafa-pr/src/pr/index.ts\``,
     );
     expect(edited.proposal).toBe('commit or set aside your changes; rafa will not touch them');
   });
@@ -297,7 +297,7 @@ describe('a live run in a worktree of its own, which holds none of the tree that
     const state = await readNextState(sourcesFor({ runs: [run('running', { worktree: WORKTREE })], tree: TASK_EDITS, toplevel }).sources);
 
     expect(state.id).toBe('tree-modified');
-    expect(state.reading).toBe('the working tree has changes to 2 tracked files: `src/pr/gh.ts`, `src/pr/index.ts`');
+    expect(state.reading).toBe('the working tree has changes to 2 tracked files: `packages/rafa-pr/src/pr/gh.ts`, `packages/rafa-pr/src/pr/index.ts`');
     expect(state.problems).toHaveLength(1);
   });
 });
@@ -314,7 +314,7 @@ describe('a run that has ended, whose edits are the person\'s again', () => {
     const state = await readNextState(sourcesFor({ runs: [run('stopped')], tree: TASK_EDITS }).sources);
 
     expect(state.reading).toBe(
-      `the working tree at \`${CHECKOUT}\` has changes to 2 tracked files: \`src/pr/gh.ts\`, \`src/pr/index.ts\``,
+      `the working tree at \`${CHECKOUT}\` has changes to 2 tracked files: \`packages/rafa-pr/src/pr/gh.ts\`, \`packages/rafa-pr/src/pr/index.ts\``,
     );
   });
 });

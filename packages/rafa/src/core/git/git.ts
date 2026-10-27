@@ -58,7 +58,7 @@
  * `git status` would say. An untracked entry is also kept as a PATH with
  * git's quoting undone ({@link unquoteGitPath}), because it is compared
  * with the paths `git ls-tree` prints, which quotes differently. Both
- * readers moved here from `src/pr/merge.ts`, which still holds the merge
+ * readers moved here from `packages/rafa-pr/src/pr/merge.ts`, which still holds the merge
  * refusal that reads them.
  */
 import { spawnSync } from 'node:child_process';
@@ -133,7 +133,7 @@ const UNTRACKED_PREFIX = '?? ';
  * each one in exactly one of the two halves: a `?? ` line is untracked
  * and its path is unquoted, every other line is tracked and kept as git
  * wrote it; see the module note. Which half refuses a merge is
- * `readMergeRefusal`'s, in `src/pr/merge.ts`.
+ * `readMergeRefusal`'s, in `packages/rafa-pr/src/pr/merge.ts`.
  */
 export function parseWorkingTree(stdout: string): WorkingTreeStatus {
   const entries = stdout.split('\n')

@@ -20,9 +20,9 @@
  * case, and one that read the repository in labels mode fails the labels
  * case.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

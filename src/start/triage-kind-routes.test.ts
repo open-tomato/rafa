@@ -21,10 +21,10 @@
  */
 import type { StartKindOptions } from './triage-kinds.js';
 import type { StartTriageOptions, TaskTriageInput } from './triage.js';
-import type { BaseRunAnswer, NamedTest } from '../triage/base-run.js';
 import type { GitResult } from '@open-tomato/rafa/core/git';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
+import type { BaseRunAnswer, NamedTest } from '@open-tomato/rafa-pr/triage/base-run';
 
 import {
   existsSync,
@@ -52,10 +52,10 @@ import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { LEFTOVER_MARKER } from '@open-tomato/rafa-pr/triage/leftover-repair';
+import { createPrivateTriageTracker, privateTriageDir } from '@open-tomato/rafa-pr/triage/triage';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { LEFTOVER_MARKER } from '../triage/leftover-repair.js';
-import { createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';
 
 import { createStartTriage } from './triage.js';
 

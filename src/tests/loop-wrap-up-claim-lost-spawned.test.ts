@@ -13,7 +13,7 @@
  * `--no-ci-wait`, which skips `verifyPullRequest` — the gate this file
  * means to reach — altogether (`src/start.ts`); with `pr.provider: none`
  * that gate still costs no network, since it only pushes the branch
- * itself rather than opening a pull request (`src/pr/none.ts`). One
+ * itself rather than opening a pull request (`packages/rafa-pr/src/pr/none.ts`). One
  * stand-in `claude` answers both of the run's real sessions, the task's
  * and the wrap-up's: each writes a tracked marker file, for the loop's
  * own `commitTaskWork` to commit, and — the first time only, an idle
@@ -43,7 +43,7 @@
  *     and on `device-b` because its own push did.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -58,8 +58,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
 import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

@@ -6,7 +6,7 @@
  *
  * The spec gives ONE spec-review comment per issue, marked
  * `<!-- rafa:spec-review v1 -->` and edited on a rerun
- * (`.rafa/specs/rafa-20-pr-commands.md`), the rule `src/pr/triage/comment.ts`
+ * (`.rafa/specs/rafa-20-pr-commands.md`), the rule `packages/rafa-pr/src/pr/triage/comment.ts`
  * keeps for the triage comment on a pull request. The two are separate
  * modules because they mark different things and carry different
  * bodies: a triage comment is also a STORE, whose `rafa:triage` block
@@ -20,7 +20,7 @@
  * own review on every run, so a comment somebody edited in between
  * changes no verdict and supplies no prompt. That is what the other
  * two marker-comment readers spend a trust reading for
- * (`src/commands/pr/triage-trust.ts`), and it is why this module said
+ * (`packages/rafa-pr/src/commands/pr/triage-trust.ts`), and it is why this module said
  * for a while that it needed none.
  *
  * What a planted marker comment CAN take is the EDIT. The gate keeps
@@ -42,7 +42,7 @@
  * where a person will read it.
  *
  * Ignored and never refused, the rule
- * `src/commands/pr/triage-trust.ts` keeps for the triage marker comment
+ * `packages/rafa-pr/src/commands/pr/triage-trust.ts` keeps for the triage marker comment
  * and for the same reason: anyone at all can comment on a public issue,
  * and a gate that exited over one would hand a stranger a way to stop
  * rafa reviewing specs on that repository at all.

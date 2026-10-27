@@ -4,8 +4,8 @@
  * git or `bun test`; the step's own use of both is covered through its
  * seams in `suite-step.test.ts`.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteFailure, SuiteResult } from '@open-tomato/rafa/suite/run';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 

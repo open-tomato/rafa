@@ -42,7 +42,7 @@
  *
  *   - **No merged pull request from `stretch/<n>`.** The body is written
  *     to `.rafa/stretch/<n>/pr-body.md` ({@link bodyPath}) and handed to
- *     the `pr open` logic (`openPull`, `../pr/open.ts`) as the line
+ *     the `pr open` logic (`openPull`, `../pr/open-pull.ts`) as the line
  *     `rafa pr open --head=stretch/<n> --base=<default>
  *     --title="Stretch <n>" --body-file=<pr-body.md>`, which is printed
  *     first. So a pull request already open from `stretch/<n>` is printed
@@ -95,10 +95,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import {
+  baseWarning,
   DEFAULT_PR_SEAMS,
   onProvider,
   openPrContext,
+  openPull,
   readRemoteHead,
+  renderOpen,
 } from '@open-tomato/rafa-pr';
 
 import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
@@ -331,8 +334,6 @@ async function openEnd(context: RafaContext, input: EndInput, body: string, seam
   } catch (error) {
     throw failure(`${path} could not be written: ${messageOf(error)}. No pull request was opened.`);
   }
-  // Imported here, not at the top: `pr open` is the `pr` feature's command module, loaded when it is used.
-  const { baseWarning, openPull, renderOpen } = await import('../pr/open.js');
   const result = await openPull({ ...context, args: [], flags }, seams.pr);
   const warning = baseWarning(result);
   if (warning !== null) context.output.warn(warning);

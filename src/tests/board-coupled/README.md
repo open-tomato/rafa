@@ -12,7 +12,9 @@ file or folder it named before the move: `commands/plan/refs-check.test.ts` read
 folders up.
 
 An import of an effort file reads that file's subpath, `@open-tomato/rafa-effort/<subpath>`, and is listed below
-as the tool printed it, since effort is a package of its own and not board's.
+as the tool printed it, since effort is a package of its own and not board's. An import of a pr file reads that
+file's subpath, `@open-tomato/rafa-pr/<subpath>`, since pr moved into `packages/rafa-pr/` (pass 4e), and its row
+below names the file's path there.
 
 The test-index guard (`scripts/survey/test-index.ts --against`) reads these files as any test: under its own path,
 in the unit the cut table lists it in, and held to the rule of its kind. A later spec sorts each file: back into the
@@ -24,15 +26,15 @@ package once its coupling is gone, or into the module it really tests.
 | --- | --- |
 | `adapters/tracker/github.test.ts` | nothing since `scratch-home-env.ts` moved into core as `packages/rafa/src/tests/scratch-home-env.ts` (#1362) |
 | `adapters/tracker/resolve.test.ts` | `src/adapter-registry.ts` |
-| `board/owner-resolve.test.ts` | `src/pr/gh-fake-shapes.ts` |
-| `board/project/add-filed.test.ts` | `src/triage/triage.ts` |
+| `board/owner-resolve.test.ts` | `packages/rafa-pr/src/pr/gh-fake-shapes.ts` |
+| `board/project/add-filed.test.ts` | `packages/rafa-pr/src/triage/triage.ts` |
 | `board/refs-gate.test.ts` | `src/config-registry.ts` |
-| `board/roadmap-claims-remote.test.ts` | `src/pr/index.ts` |
-| `board/roadmap.test.ts` | `src/pr/gh-fake.ts` |
+| `board/roadmap-claims-remote.test.ts` | `packages/rafa-pr/src/pr/index.ts` |
+| `board/roadmap.test.ts` | `packages/rafa-pr/src/pr/gh-fake.ts` |
 | `board/setup-config.test.ts` | `src/project/scaffold.ts` |
 | `board/setup.test.ts` | `src/project/scaffold.ts` |
 | `board/status.test.ts` | `src/project/scaffold.ts` |
-| `board/trust.test.ts` | `src/pr/gh-fake.ts` |
+| `board/trust.test.ts` | `packages/rafa-pr/src/pr/gh-fake.ts` |
 | `commands/board/list.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/board/sync.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/doctor-refs-roadmap.test.ts` | `src/commands/index.ts` |
@@ -41,7 +43,7 @@ package once its coupling is gone, or into the module it really tests.
 | `commands/epic/cancel.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/epic/close-docs.test.ts` | `packages/rafa-release/src/docs/release-issue.ts` |
 | `commands/epic/close-native.test.ts` | `src/tests/cli-capture.ts` |
-| `commands/epic/close.test.ts` | `packages/rafa-effort/src/effort/epic-cost.ts`, `packages/rafa-release/src/docs/release-issue.ts`, `src/tests/cli-capture.ts`, `src/triage/triage.ts` |
+| `commands/epic/close.test.ts` | `packages/rafa-effort/src/effort/epic-cost.ts`, `packages/rafa-pr/src/triage/triage.ts`, `packages/rafa-release/src/docs/release-issue.ts`, `src/tests/cli-capture.ts` |
 | `commands/epic/epic-project.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/epic/horizon-change.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/epic/move-native.test.ts` | `src/tests/cli-capture.ts` |

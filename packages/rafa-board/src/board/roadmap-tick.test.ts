@@ -27,7 +27,7 @@
  *
  * One mutation of `roadmap-tick.ts` was driven on 2026-09-19 over
  * `env -u CLAUDECODE bun test packages/rafa-board/src/board/roadmap-tick.test.ts
- * src/commands/pr/merge-tick.test.ts`, the module restored from a
+ * packages/rafa-pr/src/commands/pr/merge-tick.test.ts`, the module restored from a
  * scratch copy and verified with `shasum -c`: {@link TICK_ATTEMPTS}
  * dropped from 2 to 1, so nothing retries, left 26 pass and 4 fail
  * against 30 pass either side — the three retry cases here and the

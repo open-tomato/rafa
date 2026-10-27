@@ -39,7 +39,7 @@
  */
 import type { Sleep } from './worktree-upstream.js';
 import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
@@ -51,9 +51,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { parseWorktrees } from '@open-tomato/rafa-pr/pr/index';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { parseWorktrees } from '../pr/index.js';
 
 import { UPSTREAM_PAUSE_MS, UPSTREAM_TRIES } from './worktree-upstream.js';
 import {

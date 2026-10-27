@@ -1,0 +1,1319 @@
+/**
+ * Tests for `rafa pr merge` (`merge.ts`): what it refuses before it
+ * asks anything, the question and the two ways past it, the merge it
+ * sends, each clean-up step it runs, what a failed step leaves, and the
+ * follow-ups, the roadmap tick it writes after the merge, and the
+ * unblock reading that runs after the clean-up.
+ *
+ * Every case dispatches the real command from a project of its own
+ * beside a home of its own under this file's temporary directory
+ * (`tests/cli-capture.ts`), so the config read is the one the case
+ * planted and no case reads the real home. Nothing here reaches GitHub
+ * or git: the provider is a stub recording every member it was sent,
+ * and the git runner is a planted answer per command recording every
+ * argv. The task after this one drives the same command over a real
+ * repository with a bare remote.
+ *
+ * ## The ending is driven, never composed
+ *
+ * A merge that went through ends by naming the step that follows, so
+ * every case either hands the command an {@link endingProbe} — one
+ * state from a literal, the readings counted — or types `--no-hint`.
+ * Left to the system seams that ending would read the real project:
+ * `git` and `gh` spawned in the scratch directory the case planted.
+ * The probe's count is what makes the declined run's silence a
+ * reading: it counts ZERO readings against the merged run's one.
+ *
+ * The ending is reached through core's service registry, which the
+ * test preload fills with the root's set, so the probe cases drive the
+ * real `endWithNextStep`. The cases under "the ending service" replace
+ * that one key with a recording stub, and put the set back after each
+ * case, to read the call itself and the refusal with nothing registered.
+ *
+ * Three controls carry readings that would otherwise pass while wrong:
+ * the provider records whether `merge` was ever sent, so "it refused
+ * and merged nothing" is measured; the git runner records every command,
+ * so "the clean-up stopped at the step that failed" is measured rather
+ * than inferred from the message; and the prompter throws when it is
+ * opened under `--yes`, so "the question was skipped" is measured.
+ */
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
+import type {
+  ChecksReading,
+  GitResult,
+  GitRunner,
+  MergeOutcome,
+  PullRequestDetail,
+  PullRequests,
+} from '@open-tomato/rafa-pr/pr/index';
+
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
+
+import { RAFA_PACKAGE_NAME } from '@open-tomato/rafa/core/runtime';
+import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
+import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+import { createPrMergeCommand, summaryLine } from '@open-tomato/rafa-pr/commands/pr/merge';
+import { noBoardListsLine } from '@open-tomato/rafa-pr/commands/pr/merge-tick';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
+
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
+import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../../ending-probe.js';
+
+/** A temporary directory of this file's own. */
+const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-')));
+
+afterAll(() => {
+  rmSync(tempBase, { recursive: true, force: true });
+});
+
+/** The subject the command routes under. */
+const SUBJECTS = [{ name: 'pr', summary: 'pull requests' }];
+
+/** The usage line every refusal of this action names. */
+const USAGE = PR_USAGE.merge;
+
+/** A config naming the GitHub CLI. */
+const GH_CONFIG = 'pr:\n  provider: gh\n';
+
+/** A config naming no pull request provider at all. */
+const NONE_CONFIG = 'pr:\n  provider: none\n';
+
+/** An `origin` on github.com, in the spelling git writes for an SSH remote. */
+const GITHUB_ORIGIN = 'git@github.com:open-tomato/rafa.git';
+
+/** The head branch of every case's pull request. */
+const BRANCH = 'feat/rafa-20-pr-commands';
+
+/** The base branch of every case's pull request. */
+const BASE = 'main';
+
+/** The version a planted `package.json` carries. */
+const VERSION = '0.4.0';
+
+/** A pull request detail as a stub answers one, filled from `over`. */
+function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
+  return {
+    number: 41,
+    title: 'rafa-20: pull request commands',
+    url: 'https://github.com/open-tomato/rafa/pull/41',
+    state: 'open',
+    headRefName: BRANCH,
+    baseRefName: BASE,
+    author: { login: 'octo', isBot: false },
+    isCrossRepository: false,
+    updatedAt: '2026-09-18T11:00:00Z',
+    body: '',
+    headRefOid: '1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b',
+    headCommittedAt: null,
+    mergeable: 'mergeable',
+    mergeStateStatus: 'CLEAN',
+    labels: [],
+    closes: [],
+    ...over,
+  };
+}
+
+/** What a stub provider answers for the members this action can send. */
+interface StubAnswers {
+  readonly get?: () => Promise<PullRequestDetail | null>;
+  readonly checks?: () => Promise<ChecksReading>;
+  readonly merge?: () => Promise<MergeOutcome>;
+}
+
+/** A provider answering the three members this action sends, refusing every other call and recording each. */
+function stubPulls(answers: StubAnswers = {}): PullRequestsDouble {
+  return createPullRequestsDouble({
+    get: answers.get ?? (() => Promise.resolve(detail())),
+    checks: answers.checks ?? (() => Promise.resolve({ rows: [], verdict: 'green' })),
+    merge: answers.merge ?? (() => Promise.resolve({ merged: true, detail: 'Squashed and merged pull request #41' })),
+  }, { refusal: 'the stub provider models get, checks and merge alone' });
+}
+
+/** A git answer that worked, carrying `stdout`. */
+function ok(stdout = ''): GitResult {
+  return { ok: true, stdout, stderr: '' };
+}
+
+/** A git answer that failed, carrying `stderr`. */
+function failed(stderr: string): GitResult {
+  return { ok: false, stdout: '', stderr };
+}
+
+/** A git runner over planted answers, and the log of every command it was handed. */
+interface FakeGit {
+  readonly git: (root: string) => GitRunner;
+  /** Each command, in order, the words after `git` joined by a space. */
+  readonly ran: () => readonly string[];
+}
+
+/** The answers every case starts from: a clean tree, this checkout alone, and a remote still holding the branch. */
+function defaultAnswers(root: string): Record<string, GitResult> {
+  return {
+    'status --porcelain': ok(''),
+    'worktree list --porcelain': ok(`worktree ${root}\nbranch refs/heads/${BRANCH}\n\n`),
+    'rev-parse --show-toplevel': ok(`${root}\n`),
+    [`ls-remote --heads origin ${BRANCH}`]: ok(`1f0c2b7\trefs/heads/${BRANCH}\n`),
+    [`tag --list v${VERSION}`]: ok(''),
+  };
+}
+
+/** A git runner answering the planted commands, every other command working and writing nothing. */
+function fakeGit(root: string, over: Readonly<Record<string, GitResult>> = {}): FakeGit {
+  const ran: string[] = [];
+  const answers = { ...defaultAnswers(root), ...over };
+  return {
+    git: () => (args) => {
+      const line = args.join(' ');
+      ran.push(line);
+      return answers[line] ?? ok('');
+    },
+    ran: () => [...ran],
+  };
+}
+
+/** The roadmap issue the tick cases plant, and the body it carries. */
+const ROADMAP_ISSUE = 31;
+
+/** The roadmap body the planted issue holds before a tick. */
+const ROADMAP_BODY = '- [ ] #20 plans from the board\n- [ ] #33 the board setup\n';
+
+/** A config naming the GitHub CLI and the roadmap issue. */
+const ROADMAP_CONFIG = `${GH_CONFIG}roadmap:\n  issue: ${ROADMAP_ISSUE}\n`;
+
+/** The blocked-issue listing the unblock reading sends, as the log spells it. */
+const BLOCKED_LISTING = `issue list --state open --label ${SPEC_BLOCKED_LABEL} --limit 100 --json number,body`;
+
+/** The `type:roadmap` listing the tick finds the default board through, as the fake gh records it. */
+const BOARDS_LISTING = BOARDS_LIST_ARGS.join(' ');
+
+/** The board listing the epic tick finds each closed issue's epic through, as the fake gh records it. */
+const EPIC_LISTING = boardListingCommand(BOARD_LISTING_LIMIT).slice('gh '.length);
+
+/** One row of the board listing, as `gh` writes it. */
+interface ListedRow {
+  readonly number: number;
+  readonly title: string;
+  readonly body: string;
+  readonly state: 'OPEN' | 'CLOSED';
+  readonly stateReason: string | null;
+  readonly labels: readonly { readonly name: string }[];
+}
+
+/** What a case's board holds for the unblock reading, beside the roadmap. */
+interface BoardIssues {
+  /** The open issues labelled `spec:blocked`, each number to its body. */
+  readonly blocked?: Readonly<Record<string, string>>;
+  /** Every issue the board holds with its state, each number to it. */
+  readonly states?: Readonly<Record<string, 'OPEN' | 'CLOSED'>>;
+  /** The open `type:roadmap` boards, each number to its body; none when left out. */
+  readonly labelled?: Readonly<Record<string, string>>;
+  /** The rows the epic tick's board listing answers, as `gh` writes them; none when left out. */
+  readonly listing?: readonly ListedRow[];
+}
+
+/** The `type:roadmap` listing's rows for `labelled`, as `gh` writes them. */
+function labelledRows(labelled: Readonly<Record<string, string>>): string {
+  return JSON.stringify(Object.entries(labelled).map(([number, body]) => ({
+    number: Number(number),
+    title: `Board ${number}`,
+    body,
+    state: 'OPEN',
+    stateReason: null,
+    labels: [{ name: 'type:roadmap' }],
+  })));
+}
+
+/** A `gh` runner over one planted roadmap issue, and the log of every command it was handed. */
+interface FakeGh {
+  readonly gh: (root: string) => GhRunner;
+  /** Each command, in order, the arguments joined by a space. */
+  readonly ran: () => readonly string[];
+  /** `#<n> <label>` per label removal the unblock reading wrote. */
+  readonly removed: () => readonly string[];
+}
+
+/**
+ * A runner serving the epic tick's board listing, the roadmap read and
+ * write, the two listings the unblock reading sends and the one removal
+ * it writes, storing what a PATCH sends. `broken` fails every call but
+ * the `type:roadmap` listing and the board listing, which is how a board
+ * that will not take the tick is driven.
+ */
+function fakeGh(broken = false, board: BoardIssues = {}): FakeGh {
+  const ran: string[] = [];
+  const removed: string[] = [];
+  const stored = new Map<number, string>([
+    [ROADMAP_ISSUE, ROADMAP_BODY],
+    ...(board.listing ?? []).map((row): [number, string] => [row.number, row.body]),
+    ...Object.entries(board.labelled ?? {}).map(([number, body]): [number, string] => [Number(number), body]),
+  ]);
+  const ok = (stdout: string): Promise<GhResult> => Promise.resolve({ ok: true, stdout, stderr: '' });
+
+  const gh: GhRunner = (args) => {
+    ran.push(args.join(' '));
+    // Unless a case plants labelled boards no issue carries type:roadmap,
+    // so its listing answers empty, broken board or not, and roadmap.issue
+    // decides, as before; the other --label listing is the unblock reading's.
+    if (args.includes('--label') && args.includes('type:roadmap')) return ok(labelledRows(board.labelled ?? {}));
+    // The epic tick's board listing, told from the unblock reading's
+    // `--state all` listing by its whole argument list, answers as planted.
+    if (args.join(' ') === EPIC_LISTING) return ok(JSON.stringify(board.listing ?? []));
+    if (broken) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Not Found (HTTP 404)' });
+    if (args.slice(0, 2).join(' ') === 'issue edit') {
+      removed.push(`#${args[2] ?? ''} ${args[4] ?? ''}`);
+      return ok('');
+    }
+    if (args.includes('--label')) {
+      const rows = Object.entries(board.blocked ?? {}).map(([number, text]) => ({ number: Number(number), body: text }));
+      return ok(JSON.stringify(rows));
+    }
+    if (args.includes('all')) {
+      const rows = Object.entries(board.states ?? {}).map(([number, state]) => ({ number: Number(number), state }));
+      return ok(JSON.stringify(rows));
+    }
+    const issue = Number(/issues\/(\d+)$/u.exec(args[1] ?? '')?.[1] ?? ROADMAP_ISSUE);
+    const sent = args.find((arg) => arg.startsWith('body='));
+    if (sent !== undefined) stored.set(issue, sent.slice('body='.length));
+    return ok(JSON.stringify({ number: issue, body: stored.get(issue) ?? '' }));
+  };
+  return { gh: () => gh, ran: () => [...ran], removed: () => [...removed] };
+}
+
+/** A prompter answering `answer` once, then nothing, and recording each question. */
+function stubPrompter(answer: string | null): { open: () => Prompter; asked: () => readonly string[] } {
+  const asked: string[] = [];
+  let left: string | null = answer;
+  return {
+    open: () => ({
+      say: () => undefined,
+      ask: (question: string) => {
+        asked.push(question);
+        const next = left;
+        left = null;
+        return Promise.resolve(next);
+      },
+      close: () => undefined,
+    }),
+    asked: () => [...asked],
+  };
+}
+
+/** What a case hands the command. */
+interface CaseSeams {
+  readonly seams: MergeSeams;
+  readonly git: FakeGit;
+  readonly gh: FakeGh;
+  readonly asked: () => readonly string[];
+}
+
+/** How a case is set up beyond the defaults. */
+interface CaseOptions {
+  /** Git answers replacing the defaults, keyed by the words after `git`. */
+  readonly git?: Readonly<Record<string, GitResult>>;
+  /** What the question is answered with. A terminal is assumed unless `terminal` says otherwise. */
+  readonly answer?: string | null;
+  /** False for a machine with no terminal to ask on. */
+  readonly terminal?: boolean;
+  /** True for a board that fails every call the roadmap tick makes. */
+  readonly brokenBoard?: boolean;
+  /** What the board holds for the unblock reading; nothing blocked when it is left out. */
+  readonly board?: BoardIssues;
+}
+
+/** Seams over `pulls` for a project, with the git and prompter controls. */
+function caseSeams(pulls: PullRequests, project: PlantedProject, options: CaseOptions = {}): CaseSeams {
+  const git = fakeGit(project.root, options.git ?? {});
+  const gh = fakeGh(options.brokenBoard ?? false, options.board ?? {});
+  const prompter = stubPrompter(Object.hasOwn(options, 'answer')
+    ? options.answer ?? null
+    : 'y');
+  return {
+    seams: {
+      pullRequests: () => pulls,
+      readBranch: () => BRANCH,
+      readRemote: () => GITHUB_ORIGIN,
+      git: git.git,
+      gh: gh.gh,
+      isTerminal: () => options.terminal ?? true,
+      openPrompter: prompter.open,
+    },
+    git,
+    gh,
+    asked: prompter.asked,
+  };
+}
+
+/** A project of this case's own, holding `config`. */
+function freshProject(config: string = GH_CONFIG): PlantedProject {
+  return plantProject(mkdtempSync(join(tempBase, 'case-')), config);
+}
+
+/** Writes a `package.json` under the project root. */
+function plantPackage(project: PlantedProject, text: string): void {
+  writeFileSync(join(project.root, 'package.json'), text, 'utf8');
+}
+
+/** What one run left: what it wrote, and its events when it wrote NDJSON. */
+interface Ran {
+  readonly run: CapturedRun;
+  readonly events: readonly CliEvent[];
+  readonly lines: readonly string[];
+}
+
+/**
+ * Typed by every case driving no ending of its own, so that no case
+ * composes the real sources and spawns `git` and `gh` in the scratch
+ * project it planted. A case that hands the command `ending` seams
+ * leaves it off and drives the ending through them.
+ */
+const NO_HINT = '--no-hint';
+
+/** Dispatches `rafa pr merge` over `seams` from `project`, with `words` after the action. */
+async function ran(seams: MergeSeams, project: PlantedProject, words: readonly string[] = []): Promise<Ran> {
+  const command: RafaCommand = createPrMergeCommand(seams);
+  const line = seams.ending === undefined
+    ? [...words, NO_HINT]
+    : words;
+  const run = await dispatchInProject(['pr', 'merge', ...line], SUBJECTS, [command], project);
+  return {
+    run,
+    events: words.includes('--output=json')
+      ? eventsOf(run.stdout)
+      : [],
+    lines: run.stdout.split('\n').filter((line) => line !== ''),
+  };
+}
+
+/** The data of the terminal result event. */
+function dataOf(events: readonly CliEvent[]): Record<string, unknown> {
+  return (events.at(-1) as { data?: Record<string, unknown> }).data ?? {};
+}
+
+describe('the summary line', () => {
+  it('names the pull request, both branches and the method', () => {
+    expect(summaryLine(detail(), 'squash')).toBe(`#41 rafa-20: pull request commands — ${BRANCH} → ${BASE} — squash`);
+  });
+
+  it('names the number alone where the title is blank, with no stray space', () => {
+    expect(summaryLine(detail({ title: '  ' }), 'rebase')).toBe(`#41 — ${BRANCH} → ${BASE} — rebase`);
+  });
+});
+
+describe('the line it is given', () => {
+  it('refuses a method that is none of the three, naming them, and merges nothing', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['--method=fast-forward']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('"fast-forward" is no merge method; one of: squash, merge, rebase');
+    expect(run.stderr).toContain(`Usage: ${USAGE}`);
+    expect(stub.sent()).toEqual([]);
+  });
+
+  it('refuses a --yes that swallowed the number, naming the order that works', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['--yes', '41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('type the pull request number before the flags');
+    expect(stub.sent()).toEqual([]);
+  });
+
+  it('refuses a project whose provider is not gh with exit code 2 and the shared message', async () => {
+    const stub = stubPulls();
+    const project = freshProject(NONE_CONFIG);
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(2);
+    expect(run.stderr).toContain(PR_NEEDS_GH);
+    expect(stub.sent()).toEqual([]);
+  });
+
+  it('refuses a number the repository has no pull request for, having read nothing else', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(null) });
+    const project = freshProject();
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['9', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('No pull request #9 at');
+    expect(stub.sent()).toEqual(['get 9']);
+  });
+});
+
+describe('what it refuses before asking anything', () => {
+  it('refuses a dirty working tree, listing what git wrote, and merges nothing', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: {
+        'status --porcelain': ok(' M packages/rafa-pr/src/pr/merge.ts\n?? notes.md\n'),
+        // The head adds notes.md, so the untracked path is weighed in.
+        'ls-tree -r --name-only 1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b': ok('notes.md\nsrc/pr/merge.ts\n'),
+      },
+    });
+    const { run } = await ran(seams.seams, project, ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('rafa pr merge refuses: the working tree has 2 changes.');
+    expect(run.stderr).toContain('?? notes.md');
+    expect(stub.sent()).toEqual(['get 41', 'checks 41']);
+    expect(seams.asked()).toEqual([]);
+  });
+
+  it('refuses a pull request that does not merge, naming what GitHub said and pointing at triage', async () => {
+    const stub = stubPulls({
+      get: () => Promise.resolve(detail({ mergeable: 'conflicting', mergeStateStatus: 'DIRTY' })),
+      checks: () => Promise.resolve({ rows: [], verdict: 'none' }),
+    });
+    const project = freshProject();
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`#41 does not merge into ${BASE} — GitHub says conflicting (DIRTY)`);
+    expect(run.stderr).toContain('Run rafa pr triage 41 to see why.');
+  });
+
+  it('refuses a pull request that is not green, naming the verdict', async () => {
+    const stub = stubPulls({ checks: () => Promise.resolve({ rows: [], verdict: 'red' }) });
+    const project = freshProject();
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('#41 is not green — its checks failed (red)');
+  });
+
+  it('refuses a branch checked out in another worktree, naming it with the command that removes it', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const elsewhere = join(tempBase, 'other worktree');
+    const seams = caseSeams(stub.pulls, project, {
+      git: {
+        'worktree list --porcelain':
+          ok(`worktree ${project.root}\nbranch refs/heads/${BASE}\n\nworktree ${elsewhere}\nbranch refs/heads/${BRANCH}\n\n`),
+      },
+    });
+    const { run } = await ran(seams.seams, project, ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`branch ${BRANCH} is checked out in another worktree`);
+    expect(run.stderr).toContain(`git worktree remove '${elsewhere}'`);
+    expect(seams.asked()).toEqual([]);
+  });
+
+  it('refuses a git reading that failed, naming what was being read and what git said', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { 'status --porcelain': failed('fatal: not a git repository') },
+    });
+    const { run } = await ran(seams.seams, project, ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('Could not read the working tree: fatal: not a git repository');
+    expect(seams.git.ran()).toEqual(['status --porcelain']);
+  });
+});
+
+describe('the question', () => {
+  it('shows the summary, asks Merge? [y/N], and merges on y', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, { answer: 'y' });
+    const { run, lines } = await ran(seams.seams, project, ['41']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.asked()).toEqual(['Merge? [y/N] ']);
+    expect(lines[0]).toBe(summaryLine(detail(), 'squash'));
+    expect(stub.sent()).toContain('merge 41 squash');
+  });
+
+  it('merges nothing on an answer that is not yes, and ends 0 saying so', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, { answer: '' });
+    const { run, lines } = await ran(seams.seams, project, ['41']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(lines.at(-1)).toBe('Nothing was merged.');
+    expect(stub.sent()).toEqual(['get 41', 'checks 41']);
+    expect(seams.git.ran()).not.toContain(`branch -D ${BRANCH}`);
+  });
+
+  it('merges nothing when the input ends before an answer is typed', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const { run } = await ran(caseSeams(stub.pulls, project, { answer: null }).seams, project, ['41']);
+
+    expect(run.exitCode).toBe(0);
+    expect(stub.sent()).toEqual(['get 41', 'checks 41']);
+  });
+
+  it('refuses without a terminal and without --yes, naming the flag, and merges nothing', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, { terminal: false });
+    const { run } = await ran(seams.seams, project, ['41']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('standard input is no terminal');
+    expect(run.stderr).toContain('--yes');
+    expect(run.stderr).toContain(summaryLine(detail(), 'squash'));
+    expect(run.stdout).toBe('');
+    expect(stub.sent()).toEqual(['get 41', 'checks 41']);
+  });
+
+  it('asks nothing under --yes, opening no prompter at all, even with no terminal', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams: MergeSeams = {
+      ...caseSeams(stub.pulls, project, { terminal: false }).seams,
+      openPrompter: () => {
+        throw new Error('--yes must open no prompter');
+      },
+    };
+    const { run } = await ran(seams, project, ['41', '--yes']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(stub.sent()).toContain('merge 41 squash');
+  });
+});
+
+describe('the merge it sends', () => {
+  it('sends pr.mergeMethod where the line names none', async () => {
+    const stub = stubPulls();
+    const project = freshProject('pr:\n  provider: gh\n  mergeMethod: merge\n');
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(stub.sent()).toContain('merge 41 merge');
+  });
+
+  it('sends the method the line names, over the one the config gives', async () => {
+    const stub = stubPulls();
+    const project = freshProject('pr:\n  provider: gh\n  mergeMethod: merge\n');
+    const { run } = await ran(caseSeams(stub.pulls, project).seams, project, ['41', '--yes', '--method=rebase']);
+
+    expect(run.exitCode).toBe(0);
+    expect(stub.sent()).toContain('merge 41 rebase');
+  });
+
+  it('refuses with what the provider said when it would not merge, and cleans up nothing', async () => {
+    const stub = stubPulls({ merge: () => Promise.resolve({ merged: false, detail: 'Pull request is not mergeable' }) });
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project);
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('gh would not merge #41: Pull request is not mergeable');
+    expect(seams.git.ran()).not.toContain(`switch ${BASE}`);
+  });
+});
+
+describe('the clean-up', () => {
+  it('runs the five steps in order and reports each, then says what is ready', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.git.ran()).toEqual([
+      'status --porcelain',
+      'worktree list --porcelain',
+      'rev-parse --show-toplevel',
+      `ls-remote --heads origin ${BRANCH}`,
+      `show-ref --verify --quiet refs/heads/${BRANCH}`,
+      `switch ${BASE}`,
+      'pull --ff-only',
+      `branch -D ${BRANCH}`,
+      `push origin --delete ${BRANCH}`,
+      'fetch --prune',
+    ]);
+    expect(lines).toContain(`Merged #41 into ${BASE} (squash).`);
+    expect(lines).toContain(`switch to ${BASE}: done`);
+    expect(lines).toContain(`delete origin/${BRANCH}: done`);
+    expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled, and ${BRANCH} is gone locally and on origin.`);
+  });
+
+  it('leaves the remote delete out where the remote no longer holds the branch, and says so', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`ls-remote --heads origin ${BRANCH}`]: ok('') },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.git.ran()).not.toContain(`push origin --delete ${BRANCH}`);
+    expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled, and ${BRANCH} is gone locally; origin had already deleted it.`);
+  });
+
+  it('warns about a remote probe that failed, leaves the delete out, and cleans up the rest', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`ls-remote --heads origin ${BRANCH}`]: failed('fatal: could not read from remote repository') },
+    });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('origin could not be asked whether it still holds');
+    expect(seams.git.ran()).not.toContain(`push origin --delete ${BRANCH}`);
+    expect(seams.git.ran()).toContain('fetch --prune');
+  });
+
+  it('skips the local delete where this checkout has no such branch, and runs every step after it', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`show-ref --verify --quiet refs/heads/${BRANCH}`]: failed('') },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.git.ran()).not.toContain(`branch -D ${BRANCH}`);
+    expect(seams.git.ran()).toContain(`push origin --delete ${BRANCH}`);
+    expect(seams.git.ran()).toContain('fetch --prune');
+    expect(lines).toContain(`delete the local branch ${BRANCH}: skipped — no local branch ${BRANCH}; nothing to delete`);
+    expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled, and ${BRANCH} is gone on origin; there was no local branch to delete.`);
+  });
+
+  it('says both were already gone where neither this checkout nor the remote holds the branch', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: {
+        [`show-ref --verify --quiet refs/heads/${BRANCH}`]: failed(''),
+        [`ls-remote --heads origin ${BRANCH}`]: ok(''),
+      },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled; ${BRANCH} had no local branch, and origin had already deleted it.`);
+  });
+
+  it('warns about a local probe that failed and runs the local delete, which reports for itself', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`show-ref --verify --quiet refs/heads/${BRANCH}`]: failed('fatal: bad object HEAD') },
+    });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`could not read whether this checkout holds a local branch ${BRANCH}`);
+    expect(seams.git.ran()).toContain(`branch -D ${BRANCH}`);
+  });
+
+  it('stops at the step that failed, prints the rest as commands, and leaves the merge alone', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { 'pull --ff-only': failed('fatal: Not possible to fast-forward, aborting.') },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`❌ pull ${BASE}, fast-forward only: failed`);
+    expect(run.stderr).toContain('fatal: Not possible to fast-forward, aborting.');
+    expect(run.stderr).toContain('#41 is merged, and the merge is left alone. Run the rest yourself:');
+    expect(run.stderr).toContain('git pull --ff-only');
+    expect(run.stderr).toContain(`git branch -D ${BRANCH}`);
+    expect(run.stderr).toContain('git fetch --prune');
+    expect(seams.git.ran().filter((line) => line.startsWith('branch -D'))).toEqual([]);
+    expect(lines).toContain(`Merged #41 into ${BASE} (squash).`);
+    expect(stub.sent()).toContain('merge 41 squash');
+  });
+
+  it('names no revert, reset or force-push anywhere in what a failed step leaves', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`branch -D ${BRANCH}`]: failed('error: branch not found') },
+    });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).not.toContain('revert');
+    expect(run.stderr).not.toContain('reset');
+    expect(run.stderr).not.toContain('--force');
+    expect(run.stderr).toContain(`git push origin --delete ${BRANCH}`);
+  });
+});
+
+describe('the follow-ups', () => {
+  it('names the update, and no tag, where the version on the base is untagged and not installed', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
+    const { run, lines } = await ran(caseSeams(stub.pulls, project).seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-2)).toBe('Follow-ups:');
+    expect(lines.at(-1)).toContain('rafa self-update');
+    expect(lines.some((line) => line.includes('rafa release tag'))).toBe(false);
+  });
+
+  it('names neither for a version already installed as the runtime, whatever its tag', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
+    mkdirSync(join(project.home, '.rafa', 'runtime', VERSION), { recursive: true });
+    const seams = caseSeams(stub.pulls, project, {
+      git: { [`tag --list v${VERSION}`]: ok(`v${VERSION}\n`) },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines).not.toContain('Follow-ups:');
+  });
+
+  it('names neither, and asks git for no tag, where the project holds no package.json', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines).not.toContain('Follow-ups:');
+    expect(seams.git.ran().filter((line) => line.startsWith('tag '))).toEqual([]);
+  });
+});
+
+/** The pid a case's probe reads as a live loop's; every other pid reads as gone. */
+const LIVE_PID = 4242;
+
+/** The pid of a loop that has ended. */
+const GONE_PID = 4444;
+
+/** Writes a session record under the project's `.rafa/runs/`, as `loop start` would. */
+function plantLoop(project: PlantedProject, sessionId: string, branch: string, pid: number): void {
+  const record: SessionRecord = {
+    sessionId,
+    planStub: `stub-${sessionId}`,
+    plan: `.rafa/plans/PLAN-${sessionId}.md`,
+    branch,
+    pid,
+    startedAt: '2026-09-29T10:00:00.000Z',
+    state: 'running',
+    task: null,
+  };
+  mkdirSync(join(project.root, '.rafa', 'runs'), { recursive: true });
+  writeFileSync(join(project.root, '.rafa', 'runs', `${sessionId}.json`), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+}
+
+/** A rafa checkout on a version nothing has installed, its seams reading only {@link LIVE_PID} as alive. */
+function updateCase(): { readonly project: PlantedProject; readonly seams: MergeSeams } {
+  const project = freshProject();
+  plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
+  const seams = caseSeams(stubPulls().pulls, project, {
+    git: { [`tag --list v${VERSION}`]: ok(`v${VERSION}\n`) },
+  }).seams;
+  return { project, seams: { ...seams, isAlive: (pid) => pid === LIVE_PID } };
+}
+
+describe('the self-update follow-up beside a live loop', () => {
+  it('reads "after the loop on <branch> finishes" while a loop of the project runs', async () => {
+    const { project, seams } = updateCase();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    const { run, lines } = await ran(seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(`${'   '}rafa self-update — ${VERSION} is not installed as this machine's rafa runtime;`
+      + ' run it after the loop on feature/a finishes');
+  });
+
+  it('names the update bare once that loop\'s pid is gone, the control the wait is read against', async () => {
+    const { project, seams } = updateCase();
+    plantLoop(project, 'ended', 'feature/a', GONE_PID);
+    const { run, lines } = await ran(seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(`${'   '}rafa self-update — ${VERSION} is not installed as this machine's rafa runtime`);
+  });
+
+  it('carries the wait into the result event\'s follow-up', async () => {
+    const { project, seams } = updateCase();
+    plantLoop(project, 'running', 'feature/a', LIVE_PID);
+    const { run, events } = await ran(seams, project, ['41', '--yes', '--output=json']);
+    const data = dataOf(events) as unknown as { followUps: { id: string; why: string }[] };
+
+    expect(run.exitCode).toBe(0);
+    expect(data.followUps.map((followUp) => followUp.id)).toEqual(['self-update']);
+    expect(data.followUps[0]?.why).toEndWith('run it after the loop on feature/a finishes');
+  });
+
+  it('says a loop record cannot be read, and still exits 0, where one under .rafa/runs holds no JSON', async () => {
+    const { project, seams } = updateCase();
+    mkdirSync(join(project.root, '.rafa', 'runs'), { recursive: true });
+    writeFileSync(join(project.root, '.rafa', 'runs', 'torn.json'), '{ not json', 'utf8');
+    const { run, lines } = await ran(seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toEndWith('a loop record under .rafa/runs cannot be read, and rafa self-update refuses until it can');
+  });
+});
+
+describe('the roadmap tick', () => {
+  it('spends no board call on a pull request whose body closes no issue', async () => {
+    const stub = stubPulls();
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project);
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([]);
+  });
+
+  it('ticks the line of the issue the merged pull request closes, and says so', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
+      BOARDS_LISTING,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
+      BLOCKED_LISTING,
+    ]);
+    expect(lines).toContain(`Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`);
+    expect(lines.filter((line) => line.includes('epic'))).toEqual([]);
+  });
+
+  it('ticks a member on its epic before the roadmap listing it, one line each, the epic line first', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const epicBody = '## Specs\n\n- [ ] #20 plans from the board\n';
+    const labels = (...names: readonly string[]): readonly { readonly name: string }[] => names.map((name) => ({ name }));
+    const seams = caseSeams(stub.pulls, project, {
+      board: {
+        listing: [
+          { number: 252, title: 'Epic', body: epicBody, state: 'OPEN', stateReason: null, labels: labels('type:epic', 'epic:boards') },
+          { number: 20, title: 'Spec', body: '', state: 'CLOSED', stateReason: null, labels: labels('type:spec', 'epic:boards') },
+        ],
+      },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
+      'api repos/{owner}/{repo}/issues/252',
+      'api repos/{owner}/{repo}/issues/252 -X PATCH -f body=## Specs\n\n- [x] #20 plans from the board\n',
+      'api repos/{owner}/{repo}/issues/252',
+      BOARDS_LISTING,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE} -X PATCH -f body=- [x] #20 plans from the board\n- [ ] #33 the board setup\n`,
+      BLOCKED_LISTING,
+    ]);
+    const epicLine = epicTickSentence({ issue: 252, status: 'edited', attempts: 1, problem: '', members: [20] });
+    const roadmapLine = `Ticked #20 on the roadmap, issue #${ROADMAP_ISSUE}.`;
+    expect(lines).toContain(epicLine);
+    expect(lines.indexOf(epicLine)).toBeLessThan(lines.indexOf(roadmapLine));
+  });
+
+  it('ticks every labelled board whose checklist lists the closed issue, and no other, one line each', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, {
+      board: { labelled: { 44: '- [ ] #20 plans\n', 40: '- [ ] #20 plans\n', 42: '- [ ] #33 setup\n' } },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
+      BOARDS_LISTING,
+      'api repos/{owner}/{repo}/issues/40',
+      'api repos/{owner}/{repo}/issues/40 -X PATCH -f body=- [x] #20 plans\n',
+      'api repos/{owner}/{repo}/issues/44',
+      'api repos/{owner}/{repo}/issues/44 -X PATCH -f body=- [x] #20 plans\n',
+      BLOCKED_LISTING,
+    ]);
+    expect(lines).toContain('Ticked #20 on the roadmap, issue #40.');
+    expect(lines).toContain('Ticked #20 on the roadmap, issue #44.');
+  });
+
+  it('says no board lists the closed issue when labelled boards exist and none does, reading none of them', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, { board: { labelled: { 42: '- [ ] #33 setup\n' } } });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([EPIC_LISTING, BOARDS_LISTING, BLOCKED_LISTING]);
+    expect(lines).toContain(noBoardListsLine([20]));
+  });
+
+  it('ticks before the clean-up, so a clean-up that fails cannot drop the tick', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { git: { [`switch ${BASE}`]: failed('fatal: no such branch') } });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(seams.gh.ran()).toHaveLength(4);
+  });
+
+  it('warns and merges anyway when the board will not take the tick', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { brokenBoard: true });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([
+      EPIC_LISTING,
+      BOARDS_LISTING,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      `api repos/{owner}/{repo}/issues/${ROADMAP_ISSUE}`,
+      BLOCKED_LISTING,
+    ]);
+    expect(lines.some((line) => line.startsWith('warn: ') && line.includes('was not ticked'))).toBe(true);
+    expect(stub.sent()).toContain('merge 41 squash');
+  });
+});
+
+describe('the unblock reading after the clean-up', () => {
+  /** A board where #12 waits on the issue this merge closes, and that issue is closed. */
+  const WAITING: BoardIssues = {
+    blocked: { 12: 'Blocked by: #20\n' },
+    states: { 12: 'OPEN', 20: 'CLOSED' },
+  };
+
+  /** A board where #12 waits on #20 and on a #26 the board still holds open. */
+  const HALF: BoardIssues = {
+    blocked: { 12: 'Blocked by: #20 #26\n' },
+    states: { 12: 'OPEN', 20: 'CLOSED', 26: 'OPEN' },
+  };
+
+  it('spends no board call at all on a pull request whose body closes no issue', async () => {
+    const stub = stubPulls();
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.gh.ran()).toEqual([]);
+    expect(seams.gh.removed()).toEqual([]);
+  });
+
+  it('asks about the issue waiting on what this merge closed, and takes the label off on a yes', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.asked()).toEqual([`#12 was blocked by #20, all closed. Remove ${SPEC_BLOCKED_LABEL}? [y/N] `]);
+    expect(seams.gh.removed()).toEqual([`#12 ${SPEC_BLOCKED_LABEL}`]);
+    expect(lines).toContain(`Removed ${SPEC_BLOCKED_LABEL} from #12`);
+  });
+
+  it('names the blocker still open over the same merge, asking nothing and removing nothing', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: HALF });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect([seams.asked(), seams.gh.removed()]).toEqual([[], []]);
+    expect(lines).toContain(`#12 is blocked by #26 (open), so ${SPEC_BLOCKED_LABEL} stays`);
+  });
+
+  it('runs after the clean-up has reported, and before the follow-ups are named', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    plantPackage(project, `{"name": "${RAFA_PACKAGE_NAME}", "version": "${VERSION}"}`);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING });
+    const { lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    // Each index is asserted present before it is ordered, so no missing line reads as an order.
+    const at = (line: string): number => {
+      const found = lines.indexOf(line);
+      if (found < 0) throw new Error(`the run wrote no "${line}" line: ${lines.join(' | ')}`);
+      return found;
+    };
+
+    expect(at('Follow-ups:')).toBeGreaterThan(at(`Removed ${SPEC_BLOCKED_LABEL} from #12`));
+    expect(at(`Removed ${SPEC_BLOCKED_LABEL} from #12`)).toBeGreaterThan(at('prune deleted remote branches: done'));
+  });
+
+  it('is never reached by a clean-up step that failed, which leaves the label alone', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, {
+      board: WAITING,
+      git: { [`switch ${BASE}`]: failed('fatal: no such branch') },
+    });
+    const { run } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(seams.gh.ran()).not.toContain(BLOCKED_LISTING);
+    expect([seams.asked(), seams.gh.removed()]).toEqual([[], []]);
+  });
+
+  it('asks nothing and removes nothing under --yes where there is no terminal', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING, terminal: false });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect([seams.asked(), seams.gh.removed()]).toEqual([[], []]);
+    expect(lines.some((line) => line.includes('Run rafa issue unblock 12'))).toBe(true);
+  });
+
+  it('warns rather than failing the merge when the board will not take the removal', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, { board: WAITING, brokenBoard: true });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(stub.sent()).toContain('merge 41 squash');
+    expect(lines.some((line) => line.startsWith('warn: the blocked-issue reading'))).toBe(true);
+  });
+});
+
+describe('json mode', () => {
+  it('gives the pull request, the method, each step and the follow-ups as the result', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    plantPackage(project, `{"version": "${VERSION}"}`);
+    const { run, events } = await ran(caseSeams(stub.pulls, project).seams, project, ['41', '--yes', '--output=json']);
+    const data = dataOf(events);
+
+    expect(run.exitCode).toBe(0);
+    expect(data['number']).toBe(41);
+    expect([data['branch'], data['base'], data['method']]).toEqual([BRANCH, BASE, 'squash']);
+    expect([data['merged'], data['declined']]).toEqual([true, false]);
+    expect((data['steps'] as { id: string }[]).map((step) => step.id)).toEqual([
+      'switch-base',
+      'pull-base',
+      'delete-local',
+      'delete-remote',
+      'prune-remotes',
+    ]);
+    // No changelog, so the release does not run and no settle is named; merge-settle.test.ts names one.
+    expect((data['followUps'] as { id: string }[]).map((followUp) => followUp.id)).toEqual([]);
+    expect([data['roadmapTick'], data['roadmapTicks'], data['unblocked']]).toEqual([null, null, null]);
+  });
+
+  it('carries what the unblock reading came to for a pull request that closes an issue', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project, {
+      board: { blocked: { 12: 'Blocked by: #20\n' }, states: { 12: 'OPEN', 20: 'CLOSED' } },
+    });
+    const { events } = await ran(seams.seams, project, ['41', '--yes', '--output=json']);
+    const unblocked = dataOf(events)['unblocked'] as { issues: { issue: number; status: string }[] };
+
+    expect(unblocked.issues.map((issue) => [issue.issue, issue.status])).toEqual([[12, 'removed']]);
+  });
+
+  it('carries what the roadmap tick came to for a pull request that closes an issue', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ body: 'Closes #20' })) });
+    const project = freshProject(ROADMAP_CONFIG);
+    const seams = caseSeams(stub.pulls, project);
+    const { events } = await ran(seams.seams, project, ['41', '--yes', '--output=json']);
+
+    const data = dataOf(events);
+    expect(data['roadmapTick']).toMatchObject({
+      roadmap: ROADMAP_ISSUE,
+      status: 'ticked',
+      ticked: [20],
+      attempts: 1,
+    });
+    expect(data['roadmapTicks']).toEqual([data['roadmapTick']]);
+  });
+
+  it('gives a declined merge as a result carrying no step at all', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project, { answer: 'no' });
+    const { run, events } = await ran(seams.seams, project, ['41', '--output=json']);
+    const data = dataOf(events);
+
+    expect(run.exitCode).toBe(0);
+    expect([data['merged'], data['declined'], data['steps']]).toEqual([false, true, []]);
+  });
+});
+
+describe('the ending it names the next step with', () => {
+  it('ends a merge that went through by printing the step that follows, last of all', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const probe = endingProbe();
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines } = await ran({ ...seams.seams, ending: probe.seams }, project, ['41']);
+
+    expect(run.exitCode).toBe(0);
+    expect(lines.at(-1)).toBe(ENDING_LINE);
+    expect([probe.reads(), probe.asked()]).toEqual([1, []]);
+  });
+
+  it('puts the question where there is a terminal, printing no line', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const probe = endingProbe({ terminal: true });
+    const seams = caseSeams(stub.pulls, project);
+    const { run } = await ran({ ...seams.seams, ending: probe.seams }, project, ['41']);
+
+    expect(probe.asked()).toEqual([ENDING_QUESTION]);
+    expect(run.stdout).not.toContain(ENDING_LINE);
+  });
+
+  it('reads nothing at all when the merge was declined, which the merge that ran does read', async () => {
+    const declinedProbe = endingProbe();
+    const takenProbe = endingProbe();
+    const declinedProject = freshProject();
+    const takenProject = freshProject();
+    const declined = caseSeams(stubPulls().pulls, declinedProject, { answer: '' });
+    const taken = caseSeams(stubPulls().pulls, takenProject);
+
+    const quiet = await ran({ ...declined.seams, ending: declinedProbe.seams }, declinedProject, ['41']);
+    const loud = await ran({ ...taken.seams, ending: takenProbe.seams }, takenProject, ['41']);
+
+    expect([declinedProbe.reads(), quiet.run.stdout.includes('Next:')]).toEqual([0, false]);
+    expect([takenProbe.reads(), loud.run.stdout.includes(ENDING_LINE)]).toEqual([1, true]);
+  });
+
+  it('reads nothing and prints nothing under --no-hint', async () => {
+    const probe = endingProbe();
+    const project = freshProject();
+    const seams = caseSeams(stubPulls().pulls, project);
+    const { run } = await ran({ ...seams.seams, ending: probe.seams }, project, ['41', NO_HINT]);
+
+    expect(run.exitCode).toBe(0);
+    expect([probe.reads(), run.stdout.includes('Next:')]).toEqual([0, false]);
+  });
+});
+
+describe('the ending service', () => {
+  /** The line the stub prints through the context it was handed. */
+  const STUB_LINE = 'the stubbed ending ran';
+
+  /** What the stub was called with, one entry per call. */
+  interface EndingCall {
+    readonly context: RafaContext;
+    readonly seams: EndingSeams | undefined;
+  }
+
+  /** The set the stubbed setup replaced, put back after each case; undefined when none was set up. */
+  let replaced: RafaServices | null | undefined;
+
+  afterEach(() => {
+    if (replaced !== undefined) restoreServices(replaced);
+    replaced = undefined;
+  });
+
+  /** Registers a recording `endWithNextStep` over the active set, as board's `stubEnding` does. */
+  function stubEnding(): readonly EndingCall[] {
+    const calls: EndingCall[] = [];
+    const stub: RafaServices['endWithNextStep'] = (context, seams) => {
+      calls.push({ context, seams });
+      context.output.info(STUB_LINE);
+      return Promise.resolve(null);
+    };
+    replaced = registerServices({ ...activeServices(), endWithNextStep: stub });
+    return calls;
+  }
+
+  it('calls the registered ending once, with the context of the run and the ending seams it was given', async () => {
+    const calls = stubEnding();
+    const project = freshProject();
+    const ending: EndingSeams = { isTerminal: () => false };
+    const seams = caseSeams(stubPulls().pulls, project);
+
+    const { run, lines } = await ran({ ...seams.seams, ending }, project, ['41']);
+
+    expect(run.exitCode).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.seams).toBe(ending);
+    expect(calls[0]?.context.argv).toContain('41');
+    expect(lines.at(-1)).toBe(STUB_LINE);
+  });
+
+  it('never calls the registered ending on a declined merge, which the merge that ran calls', async () => {
+    const calls = stubEnding();
+    const declinedProject = freshProject();
+    const takenProject = freshProject();
+    const declined = caseSeams(stubPulls().pulls, declinedProject, { answer: '' });
+    const taken = caseSeams(stubPulls().pulls, takenProject);
+
+    const quiet = await ran({ ...declined.seams, ending: {} }, declinedProject, ['41']);
+    const quietCalls = calls.length;
+    const loud = await ran({ ...taken.seams, ending: {} }, takenProject, ['41']);
+
+    expect([quietCalls, calls.length]).toEqual([0, 1]);
+    expect([quiet.run.stdout.includes(STUB_LINE), loud.run.stdout.includes(STUB_LINE)]).toEqual([false, true]);
+  });
+
+  it('refuses the ending of a merged run, naming the key and the root, while no service is registered', async () => {
+    const project = freshProject();
+    const seams = caseSeams(stubPulls().pulls, project);
+    const held = registerServices({ ...activeServices() });
+    restoreServices(null);
+    let outcome: Ran;
+    try {
+      outcome = await ran({ ...seams.seams, ending: {} }, project, ['41']);
+    } finally {
+      restoreServices(held);
+    }
+
+    expect(outcome.run.exitCode).toBe(1);
+    expect(outcome.run.stdout).toContain('Merged #41');
+    expect(outcome.run.stderr).toContain('service registry:');
+    expect(outcome.run.stderr).toContain('endWithNextStep');
+    expect(outcome.run.stderr).toContain('src/service-registry.ts');
+  });
+});
+
+describe('the command itself', () => {
+  it('routes as pr merge, declares both renderings, one optional number and its four flags, and is frozen', () => {
+    const command = createPrMergeCommand();
+
+    expect([command.subject, command.action, command.name]).toEqual(['pr', 'merge', 'pr merge']);
+    expect(command.outputs).toEqual(['text', 'json']);
+    expect(command.args.map((arg) => [arg.name, arg.required ?? false])).toEqual([['n', false]]);
+    expect(command.flags.map((flag) => [flag.name, flag.type]))
+      .toEqual([['yes', 'boolean'], ['skip-checks', 'boolean'], ['method', 'string'], ['hint', 'boolean']]);
+    expect(Object.isFrozen(command)).toBe(true);
+  });
+
+  it('declares a summary, a description and examples, as the describe roster needs', () => {
+    const command = createPrMergeCommand();
+
+    expect(command.summary.length > 0).toBe(true);
+    expect(command.description.length > command.summary.length).toBe(true);
+    expect(command.examples.map((example) => example.cmd)).toEqual([
+      'rafa pr merge',
+      'rafa pr merge 41 --yes',
+      'rafa pr merge 41 --skip-checks',
+      'rafa pr merge 41 --method=rebase --output=json',
+    ]);
+  });
+});

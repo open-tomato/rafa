@@ -17,9 +17,9 @@
  * the walk passed every other line first, for the reason each one's
  * claim gives.
  */
-import type { GitRunner } from '../../../pr/index.js';
 import type { ClaimRecord } from '@open-tomato/rafa/claims/record';
 import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,8 +33,7 @@ import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/st
 import {
   createRoadmapReadings, parseRoadmapBody, pickNextRoadmapLine, scanClaimBranches,
 } from '@open-tomato/rafa-board/board/roadmap';
-
-import { createGitRunner } from '../../../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 /** This suite's own temporary directory, removed once every case has run. */
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-roadmap-claims-remote-')));

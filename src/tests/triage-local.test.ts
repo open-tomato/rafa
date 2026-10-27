@@ -1,12 +1,12 @@
 /**
- * Loop-owned triage (`src/triage/triage.ts`) over the real `local`
+ * Loop-owned triage (`packages/rafa-pr/src/triage/triage.ts`) over the real `local`
  * tracker adapter, tying its outward guarantees together in one file: an
  * out-of-scope bug filed once and commented on when it recurs, a security
  * bug kept off the public tracker, a named secret kept off a filed body,
  * and a blocker's text carried through to the prompt of the task's later
  * dispatch.
  *
- * `src/triage/triage.test.ts` already drives `triageReport` through a
+ * `packages/rafa-pr/src/triage/triage.test.ts` already drives `triageReport` through a
  * mutation-testing grid over spied `local` trackers, and
  * `src/start/triage.test.ts` does the same for `createStartTriage`'s
  * wiring into `loop start`. Neither carries a written blocker on to
@@ -59,9 +59,9 @@ import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { createPrivateTriageTracker, privateTriageDir, triageReport } from '@open-tomato/rafa-pr/triage/triage';
 
 import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '../start/dispatch.js';
-import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 
 /** The clock every tracker call in this file stamps with. */
 const CLOCK = (): string => '2026-09-15T10:00:00.000Z';
@@ -294,7 +294,7 @@ describe('a machine-scoped bug over the local adapter', () => {
    * #17's artifact: a linker failure against an Xcode Command Line Tools
    * SDK installed on the machine the session ran on, not against rafa.
    * `packages/rafa/src/effort/store/machine-fault.test.ts` and
-   * `src/triage/triage.test.ts` already exercise the reading and its routing over spied trackers;
+   * `packages/rafa-pr/src/triage/triage.test.ts` already exercise the reading and its routing over spied trackers;
    * this case is the same pairing over the real `local` adapter.
    */
   const TOOLCHAIN_ARTIFACT = 'ld: tapi error: malformed file: '

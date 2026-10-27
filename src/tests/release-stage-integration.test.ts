@@ -27,9 +27,9 @@
  * the base bumped by that level, with the level report beside it.
  */
 import type { CapturedRun } from './cli-capture.js';
-import type { GitRunner, PrProviderReading } from '../pr/index.js';
 import type { ReleaseFinish, ReleaseStageSettings } from '../start/release-stage.js';
 import type { ReportChange } from '@open-tomato/rafa/report/parse';
+import type { GitRunner, PrProviderReading } from '@open-tomato/rafa-pr/pr/index';
 import type { ReleaseLevelSource } from '@open-tomato/rafa-release/release/level';
 import type { ReleasePreparation } from '@open-tomato/rafa-release/release/prepare';
 
@@ -45,9 +45,9 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
-import { createFakePrGh } from '../pr/gh-fake.js';
-import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
 
 import { expectExit } from './cli-capture.js';

@@ -38,9 +38,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { beginSession } from '@open-tomato/rafa/core/loop';
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

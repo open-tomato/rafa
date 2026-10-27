@@ -17,10 +17,10 @@
  */
 import type { ClaimTakeSeams } from './take.js';
 import type { DeviceStoreId } from '../../claims/device.js';
-import type { GitRunner } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,8 +32,8 @@ import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@o
 import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 import { createGhIssueBoard } from '@open-tomato/rafa-board/board/issue-board';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
-import { createGitRunner } from '../../pr/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

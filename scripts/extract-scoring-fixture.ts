@@ -1,13 +1,13 @@
 /**
  * Scoring fixture extract: reads the board's bug issues and their
  * `Reported again` comments with `gh` and writes
- * `src/triage/testdata/scoring.json`, which
- * `src/triage/similarity-scoring.test.ts` replays. The module note of
- * `src/triage/scoring-fixture.ts` says what a filing is, how its cause is
+ * `packages/rafa-pr/src/triage/testdata/scoring.json`, which
+ * `packages/rafa-pr/src/triage/similarity-scoring.test.ts` replays. The module note of
+ * `packages/rafa-pr/src/triage/scoring-fixture.ts` says what a filing is, how its cause is
  * labelled and what is taken out.
  *
  * The cause labels come from the board's closing comments and from
- * `src/triage/testdata/scoring-causes.json`, a reading kept by hand, and
+ * `packages/rafa-pr/src/triage/testdata/scoring-causes.json`, a reading kept by hand, and
  * an issue numbered after that reading's `through` gives no filing.
  *
  * Usage:
@@ -40,7 +40,7 @@ export const TAG = '[scoring-fixture]';
 const ISSUE_LIMIT = '2000';
 
 /** The default file written, relative to the checkout. */
-const DEFAULT_OUT = 'src/triage/testdata/scoring.json';
+const DEFAULT_OUT = 'packages/rafa-pr/src/triage/testdata/scoring.json';
 
 /** The indent `jsonc/indent` asks of every linted `.json` file. */
 export const FIXTURE_INDENT = 2;
@@ -79,7 +79,7 @@ async function readBoard(): Promise<BoardIssue[]> {
 }
 
 /** The judgement file beside the fixture, relative to the checkout. */
-const CAUSES_FILE = 'src/triage/testdata/scoring-causes.json';
+const CAUSES_FILE = 'packages/rafa-pr/src/triage/testdata/scoring-causes.json';
 
 /** Writes the fixture to `out`, answering the exit code. */
 async function main(argv: readonly string[]): Promise<number> {

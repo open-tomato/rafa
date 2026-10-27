@@ -42,7 +42,7 @@ describe('namesOnlyDocs', () => {
   });
 
   it('answers false for a text mixing a source path with a page', () => {
-    expect(namesOnlyDocs('context/triage.md says three channels, src/triage/triage.ts has four')).toBe(false);
+    expect(namesOnlyDocs('context/triage.md says three channels, packages/rafa-pr/src/triage/triage.ts has four')).toBe(false);
     expect(namesOnlyDocs('triage.ts disagrees with README.md')).toBe(false);
     // The page alone, the source path gone, answers true.
     expect(namesOnlyDocs('context/triage.md says three channels, the code has four')).toBe(true);

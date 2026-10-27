@@ -12,7 +12,7 @@
  * `afterAll`.
  */
 import type { CapturedRun } from './cli-capture.js';
-import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
+import type { PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
