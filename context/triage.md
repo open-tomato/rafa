@@ -1,21 +1,21 @@
 ## Triage
 
-`src/triage/` routes each out-of-scope entry of a task report by its kind, and
-each `stale_docs` entry to the `docs` channel. The six kinds are `bug`,
-`own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them only a
-`bug` reaches a tracker as an issue of its own. The loop calls `triageReport`
-from `src/start/triage.ts` and `rafa epic close` from
-`packages/rafa-board/src/commands/epic/close-triage.ts`. The triage writer stores every bug and its
-action in the effort store, keyed by the bug's recurrence key, not the
-artifact the report's findings use, and each routed entry leaves one row in
-the `bug_routes` table (`packages/rafa/src/effort/store/bug-routes.ts`) naming
-the kind the
-session said, the kind the loop routed it under and the route it took.
+`packages/rafa-pr/src/triage/` routes each out-of-scope entry of a task report
+by its kind, and each `stale_docs` entry to the `docs` channel. The six kinds
+are `bug`, `own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them
+only a `bug` reaches a tracker as an issue of its own. The loop calls
+`triageReport` from `src/start/triage.ts` and `rafa epic close` from
+`packages/rafa-board/src/commands/epic/close-triage.ts`. The triage writer
+stores every bug and its action in the effort store, keyed by the bug's
+recurrence key, not the artifact the report's findings use, and each routed
+entry leaves one row in the `bug_routes` table
+(`packages/rafa/src/effort/store/bug-routes.ts`) naming the kind the session
+said, the kind the loop routed it under and the route it took.
 
 ### The kinds and their routes
 
-`packages/rafa-pr/src/triage/kind-route.ts` routes an entry after the security rule and the
-kind check. Read top to bottom:
+`packages/rafa-pr/src/triage/kind-route.ts` routes an entry after the security
+rule and the kind check. Read top to bottom:
 
 | Kind | Route |
 | --- | --- |
@@ -41,10 +41,10 @@ is written for it, so no security entry leaves the private channel.
 
 The session that reports a red test is not the one that turned it red, and it
 cannot see the plan's base, so the loop checks every `own-` claim and every
-`bug` that names a test or a path. `checkKind` (`packages/rafa-pr/src/triage/own-check.ts`)
-reads the entry down a decision table, the first row that holds answering.
-An entry the session said is `convention`, `docs` or `machine` is taken as
-said and nothing is read.
+`bug` that names a test or a path. `checkKind`
+(`packages/rafa-pr/src/triage/own-check.ts`) reads the entry down a decision
+table, the first row that holds answering. An entry the session said is
+`convention`, `docs` or `machine` is taken as said and nothing is read.
 
 | The entry | Answer |
 | --- | --- |
@@ -64,20 +64,20 @@ with any leading `./` taken off; when it is absolute and ends in one; or when
 it is a bare file name and a plan file has that base name.
 
 **What it costs.** The head is read first: the named test file runs once at
-`HEAD` of the run checkout, and only when the case is red there does it run
-once at the plan's base. Each run is one test file, never the suite. It runs
-in a detached temporary worktree of that commit with the run checkout's
-`node_modules` linked in, removed afterwards, and is cached per commit and
-file for the whole run, so two bugs naming two cases of one file cost one
-run (`packages/rafa-pr/src/triage/base-run.ts`). A file missing at the commit, under
-`node_modules` or outside the checkout is not run, and reads as
-`unrunnable`, so its entry is a `bug`. The plan's base is the merge base of
-`HEAD` and `refs/remotes/origin/<pr.base>`, and the plan's files are the
-paths `git diff --name-only -z` names between that base and `HEAD`
-(`packages/rafa-pr/src/triage/plan-commits.ts`). A report with no test named costs those git
-reads, made again for each report. A failed read reads as a base or a file
-list the loop cannot use, so the entry is a `bug`: the cost falls on filing,
-never on hiding.
+`HEAD` of the run checkout, and only when the case is red there does it run once
+at the plan's base. Each run is one test file, never the suite. It runs in a
+detached temporary worktree of that commit with the run checkout's
+`node_modules` linked in, removed afterwards, and is cached per commit and file
+for the whole run, so two bugs naming two cases of one file cost one run
+(`packages/rafa-pr/src/triage/base-run.ts`). A file missing at the commit, under
+`node_modules` or outside the checkout is not run, and reads as `unrunnable`, so
+its entry is a `bug`. The plan's base is the merge base of `HEAD` and
+`refs/remotes/origin/<pr.base>`, and the plan's files are the paths `git diff
+--name-only -z` names between that base and `HEAD`
+(`packages/rafa-pr/src/triage/plan-commits.ts`). A report with no test named
+costs those git reads, made again for each report. A failed read reads as a base
+or a file list the loop cannot use, so the entry is a `bug`: the cost falls on
+filing, never on hiding.
 
 ### The channels
 
@@ -137,20 +137,20 @@ stored as a `sighting` row whose `where` is the first path its `what`, then its
 
 ### The body the loop files
 
-A bug the loop files carries the bug record (`context/bug-record.md`), built
-by `bugFilingOf` (`packages/rafa-pr/src/triage/bug-filing.ts`) from the session's report, the
-dispatch it ran under and the checkout. Its body opens with the sentence
-saying where it came from, then a `Supersedes` section when the bug came
-back, then `What`, `Artifact`, `Refs` when the artifact names a path or a
-symbol, `Recurrence key`, `Plan`, `Task` and `Feedback`.
-The sections above `Feedback` are the ones `./bug-key.ts` and
-`./similarity.ts` read, and the record adds nothing to them. After `Feedback`
-come the record's sections, one per field holding a value, in `BUG_FIELDS`
-order: `Reproduce`, `Rerun`, `Cause`, `Proposed cause`, `Suspected cause`,
-`Module`, `Action`, `Project`, `Environment` and `Versions`. Last are
-`Reported module` and `Reported action`, the session's word for a `Module` or
-`Action` the record holds as `unknown`. A new issue's `Possible duplicates`
-section, when the similarity step filed one, comes after those two.
+A bug the loop files carries the bug record (`context/bug-record.md`), built by
+`bugFilingOf` (`packages/rafa-pr/src/triage/bug-filing.ts`) from the session's
+report, the dispatch it ran under and the checkout. Its body opens with the
+sentence saying where it came from, then a `Supersedes` section when the bug
+came back, then `What`, `Artifact`, `Refs` when the artifact names a path or a
+symbol, `Recurrence key`, `Plan`, `Task` and `Feedback`. The sections above
+`Feedback` are the ones `./bug-key.ts` and `./similarity.ts` read, and the
+record adds nothing to them. After `Feedback` come the record's sections, one
+per field holding a value, in `BUG_FIELDS` order: `Reproduce`, `Rerun`, `Cause`,
+`Proposed cause`, `Suspected cause`, `Module`, `Action`, `Project`,
+`Environment` and `Versions`. Last are `Reported module` and `Reported action`,
+the session's word for a `Module` or `Action` the record holds as `unknown`. A
+new issue's `Possible duplicates` section, when the similarity step filed one,
+comes after those two.
 
 `Reproduce` is the session's word, else `seen while running task <line> of
 plan <stub>`, or ``seen while running `<command>` `` for a dispatch with no
@@ -179,10 +179,10 @@ other record sections.
 
 ### The repair task and its cap
 
-`packages/rafa-pr/src/triage/leftover-repair.ts` writes the repair of an `own-fallout` or
-`own-gap` entry through `insertTrackerTask` (`packages/rafa/src/utils/tracker.ts`),
-directly above the plan's first open task, `[ ]` or `[BLOCKED]`, or after the
-last task when none is open:
+`packages/rafa-pr/src/triage/leftover-repair.ts` writes the repair of an
+`own-fallout` or `own-gap` entry through `insertTrackerTask`
+(`packages/rafa/src/utils/tracker.ts`), directly above the plan's first open
+task, `[ ]` or `[BLOCKED]`, or after the last task when none is open:
 
 ```text
 - [BLOCKED] Repair the own-fallout leftover: <what> <!-- leftover -->  {agent=build-error-resolver}  <!-- blocked: ... -->
@@ -392,23 +392,22 @@ bugs that have none today, which would add a tracker read to private bugs.
 
 When `TriageOptions.inherited` provides the run-start baseline's failures, a
 public bug that `./inherited.ts` reads as one of those is a red test the run
-started with, not one its task made: its action is `inherited`. The bug
-matches a failure when it names a test file and case whose base name and
-case name equal the failure's, and, when the failure has a message, its
-evidence line holds that message. A failure with no message, or a blank one,
-is matched on test file and case alone: Bun 1.3.14 writes a failing `toBe`'s
-`<failure>` with no `message` attribute where 1.4.2 writes one, so under the
-pinned Bun a baseline failure often carries none. Nothing is
-filed for it. Its key is looked up as steps 1 and 2 above look one up, and
-the issue they find has its state read; an open one is commented on unless
-it already was this run. The key goes into the option's `commented` set once
-the comment is made, so one red test reported by every task of a run comments
-once. A closed issue, or none, is left alone, and create is never called.
-Closed as completed, the run still files nothing, since it inherited the
-failure before its own work. Security and machine-scoped bugs are never read
-against the failures. The check's red-on-both answer
-(`packages/rafa-pr/src/triage/own-check.ts`) is unfiled in the same way, with its route row
-`inherited`.
+started with, not one its task made: its action is `inherited`. The bug matches
+a failure when it names a test file and case whose base name and case name equal
+the failure's, and, when the failure has a message, its evidence line holds that
+message. A failure with no message, or a blank one, is matched on test file and
+case alone: Bun 1.3.14 writes a failing `toBe`'s `<failure>` with no `message`
+attribute where 1.4.2 writes one, so under the pinned Bun a baseline failure
+often carries none. Nothing is filed for it. Its key is looked up as steps 1 and
+2 above look one up, and the issue they find has its state read; an open one is
+commented on unless it already was this run. The key goes into the option's
+`commented` set once the comment is made, so one red test reported by every task
+of a run comments once. A closed issue, or none, is left alone, and create is
+never called. Closed as completed, the run still files nothing, since it
+inherited the failure before its own work. Security and machine-scoped bugs are
+never read against the failures. The check's red-on-both answer
+(`packages/rafa-pr/src/triage/own-check.ts`) is unfiled in the same way, with
+its route row `inherited`.
 
 ### State read on a repeat
 
@@ -428,26 +427,26 @@ its place: a security bug is commented on as found without a state read.
 
 Five keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 
-- `triage.similarity.threshold`: `false` to turn the step off, or a number
-  from 0 to 1 naming the minimum score. Default is `0.3`, which on the
-  1,013 filings of `packages/rafa-pr/src/triage/testdata/scoring.json` gave 84% of repeats
-  right (696 of 827) and 3% of new causes wrong (6 of 186); `0.2` gave 86%
-  and 20%. `packages/rafa-pr/src/triage/similarity-scoring.test.ts` holds the default to at
-  least 84% and at most 4%. Lower matches more repeats and puts more new
-  causes on the wrong issue.
+- `triage.similarity.threshold`: `false` to turn the step off, or a number from
+  0 to 1 naming the minimum score. Default is `0.3`, which on the 1,013 filings
+  of `packages/rafa-pr/src/triage/testdata/scoring.json` gave 84% of repeats
+  right (696 of 827) and 3% of new causes wrong (6 of 186); `0.2` gave 86% and
+  20%. `packages/rafa-pr/src/triage/similarity-scoring.test.ts` holds the
+  default to at least 84% and at most 4%. Lower matches more repeats and puts
+  more new causes on the wrong issue.
 
 - `triage.similarity.candidates`: the count of open bugs, highest rank first,
   that the `Possible duplicates` section lists when the step files a bug with
   no match at the threshold. Default is `3`.
 
-- `triage.similarity.weights.causeLeaf`, `.causeFamily` and `.boundary`:
-  the bonuses `rankedCandidates` (`packages/rafa-pr/src/triage/similarity.ts`) adds to an
-  open bug's word score for the same cause code, the same cause family with
-  another leaf, and the same module and action, capped at 1 (see "Similarity
-  and duplicates"). Each is a number from 0 to 1, and `0` turns its signal
-  off. Defaults are `0.15`, `0.05` and `0.10`. They order the list of
-  `Possible duplicates` only; the same-bug decision stays on the word score
-  and the threshold. A number outside 0 to 1, `true` and `false` are refused.
+- `triage.similarity.weights.causeLeaf`, `.causeFamily` and `.boundary`: the
+  bonuses `rankedCandidates` (`packages/rafa-pr/src/triage/similarity.ts`) adds
+  to an open bug's word score for the same cause code, the same cause family
+  with another leaf, and the same module and action, capped at 1 (see
+  "Similarity and duplicates"). Each is a number from 0 to 1, and `0` turns its
+  signal off. Defaults are `0.15`, `0.05` and `0.10`. They order the list of
+  `Possible duplicates` only; the same-bug decision stays on the word score and
+  the threshold. A number outside 0 to 1, `true` and `false` are refused.
 
 With an empty config the three weights take their defaults. Setting one to
 `0` turns its signal off and leaves the other two as they are:
