@@ -323,6 +323,12 @@ export const CUT_RULES: CutRules = {
       named: RUN_NAMED,
     },
     {
+      // #1366: pass 4d moved release's files into
+      // `packages/rafa-release/`. `src/commands/release/` stays for its
+      // three integration tests, at the root until #913, as `src/tiers/`
+      // stays for inventory's; `src/release/` stays for
+      // `fold-spawned.test.ts`, which stems no listed file and waits on
+      // #1360's rule for the move tool.
       folders: ['packages/rafa-release/', 'src/commands/release/', 'src/release/'],
       name: 'rafa-release',
       named: RELEASE_NAMED,
