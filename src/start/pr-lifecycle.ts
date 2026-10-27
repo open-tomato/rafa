@@ -132,6 +132,7 @@ import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runClaude, spawnClaude } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 import { readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 
 import { readDeviceStoreId } from '../claims/device.js';
@@ -150,8 +151,7 @@ import {
 
 import { withStamp } from './stamp.js';
 
-/** Seconds between polls. CI here settles in 2-5 minutes. */
-export const CI_POLL_INTERVAL_MS = 20_000;
+export { CI_POLL_INTERVAL_MS };
 
 /** Repair sessions spent on a red or conflicting PR before escalating. */
 export const DEFAULT_CI_ATTEMPTS = 2;

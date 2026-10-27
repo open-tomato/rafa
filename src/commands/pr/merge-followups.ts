@@ -8,8 +8,9 @@
  *     runtime under the home. Both halves keep the line out of a place
  *     where the command it names would refuse: `self-update` installs
  *     the checkout it runs in, and `installRuntime` refuses a
- *     `package.json` naming anything but {@link RAFA_PACKAGE_NAME}
- *     (`this is no rafa checkout`) and refuses again, at the
+ *     `package.json` naming anything but {@link RAFA_PACKAGE_NAME},
+ *     which both read from core's runtime barrel
+ *     (`@open-tomato/rafa/core/runtime`), (`this is no rafa checkout`) and refuses again, at the
  *     `runtime-exists` reason, while `~/.rafa/runtime/<version>/` is
  *     already there (`src/runtime/install.ts`). Naming it in another
  *     project, or for an installed version, would send the operator at
@@ -63,9 +64,10 @@
  * either command: the follow-ups are text an operator reads, and both
  * settling and updating are the operator's call — or, for settle,
  * `rafa next`'s workflow action. {@link RAFA_PACKAGE_NAME} is imported
- * from `src/runtime/install.ts`, the module `self-update` installs
- * through, so the name this reading tests and the name that install
- * refuses over are one string.
+ * from core's runtime barrel, `@open-tomato/rafa/core/runtime`, the
+ * same binding `src/runtime/install.ts`, the module `self-update`
+ * installs through, imports, so the name this reading tests and the
+ * name that install refuses over are one string.
  *
  * ## Why the reading is separate from what reads it
  *
@@ -89,7 +91,7 @@
  */
 import type { SettleWaiting } from '../../pr/settle-waiting.js';
 
-import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
+import { RAFA_PACKAGE_NAME } from '@open-tomato/rafa/core/runtime';
 
 /** Which follow-up a line names. */
 export type FollowUpId = 'self-update' | 'release-settle';

@@ -194,6 +194,7 @@ import type { SettleSettings } from '@open-tomato/rafa-release';
 
 import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 
 import { waitForChecks } from '../../pr/index.js';
 import { withTaskBudget } from '../../pr/plans/budget.js';
@@ -209,7 +210,6 @@ import {
   resolveWorktreePath,
   worktreeAt,
 } from '../../pr/worktree.js';
-import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 
 import { runResolveLoop, writeResolvePlan } from './resolve-loop.js';
 import { requireTrustedConfig } from './triage-config-trust.js';

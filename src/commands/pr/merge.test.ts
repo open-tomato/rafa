@@ -53,6 +53,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { RAFA_PACKAGE_NAME } from '@open-tomato/rafa/core/runtime';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
@@ -60,7 +61,6 @@ import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { PR_NEEDS_GH } from '../../pr/index.js';
-import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 

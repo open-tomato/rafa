@@ -87,6 +87,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { RUNTIME_SUBDIR } from '@open-tomato/rafa/core/runtime';
 
 import { argValue } from './run-config.js';
 import { NOTHING_DISPATCHED } from './session.js';
@@ -94,8 +95,7 @@ import { NOTHING_DISPATCHED } from './session.js';
 /** The flag naming the runtime. */
 const RUNTIME_FLAG = '--runtime';
 
-/** Where versions sit under the home: `~/.rafa/runtime/<version>/`. */
-export const RUNTIME_SUBDIR: string = join('.rafa', 'runtime');
+export { RUNTIME_SUBDIR };
 
 /** A runtime's entry, in a version's directory and in a directory a path names. */
 export const RUNTIME_ENTRY = 'cli.js';

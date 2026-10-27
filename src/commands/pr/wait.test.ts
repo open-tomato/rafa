@@ -73,10 +73,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
+import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { FIRST_CHECK_GRACE_MS, PR_NEEDS_GH } from '../../pr/index.js';
-import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 

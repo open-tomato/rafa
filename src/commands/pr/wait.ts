@@ -11,8 +11,9 @@
  * the deadline and the interval are that gate's own: the default
  * deadline is core's `DEFAULT_CI_TIMEOUT_MIN`, which the loop's
  * `--ci-timeout` defaults to, and the interval the gate's
- * `CI_POLL_INTERVAL_MS`, so one wait and the other agree about what green means and about how often a
- * pull request is asked.
+ * `CI_POLL_INTERVAL_MS`, which both read from core's
+ * `packages/rafa/src/pr/ci-poll.ts`, so one wait and the other agree
+ * about what green means and about how often a pull request is asked.
  *
  * What it does NOT do is the rest of that gate: no repair session, no
  * comment, no label, no merge. `verifyPullRequest` keeps those, and this
@@ -150,10 +151,10 @@ import type { CheckRow, ChecksVerdict, PullRequestDetail } from '../../pr/index.
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
+import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 
 import { endWithNextStep } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
-import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 
 import { SEPARATOR } from './current.js';
 import { PR_WAIT_DECLARATION, WAIT_TIMEOUT_FLAG } from './declarations.js';

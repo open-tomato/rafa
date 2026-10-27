@@ -133,7 +133,7 @@ interface RewiredRow {
  * took into core. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
  * left the row in the third decouple item: their one run import by path
  * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
- * eight back-edge files are pr files, every one earlier in the move
+ * five back-edge files are pr files, every one earlier in the move
  * order. `packages/rafa-board/src/board/spec-source.ts` and `packages/rafa-board/src/commands/epic/close.ts`
  * left them in the fourth decouple item: their one run import by path was
  * `packages/rafa-board/src/claims/ahead.ts` and `packages/rafa-board/src/epic/verify-run.ts`, which it places in
@@ -144,7 +144,11 @@ interface RewiredRow {
  * and `packages/rafa-board/src/commands/epic/close-triage.ts` left them in the fifth decouple
  * item: their run imports by path were `endWithNextStep` and
  * `readStaleDocsVersion`, which they call through core's service
- * registry.
+ * registry. Pr's `src/commands/pr/merge-cleanup.ts`, `merge-followups.ts`
+ * and `triage-resolve.ts` left them in the seventh decouple item: their
+ * one run import by path each was a constant, `RUNTIME_SUBDIR`,
+ * `RAFA_PACKAGE_NAME` and `CI_POLL_INTERVAL_MS`, which the item moved
+ * into core.
  * No row keeps a file for the library build any more. Board, release, pr
  * and run each take their feature object through a commands entry,
  * `@open-tomato/rafa-<name>/commands`, which the roster alone imports, so a
@@ -186,12 +190,9 @@ const REWIRED: readonly RewiredRow[] = [
     allowed: {
       'src/cleanup/groups.ts': 'loadCycle',
       'src/cleanup/steps.ts': 'loadCycle',
-      'src/commands/pr/merge-cleanup.ts': 'backEdge',
-      'src/commands/pr/merge-followups.ts': 'backEdge',
       'src/commands/pr/merge-loop-worktree.ts': 'backEdge',
       'src/commands/pr/merge.ts': 'backEdge',
       'src/commands/pr/retarget.ts': 'backEdge',
-      'src/commands/pr/triage-resolve.ts': 'backEdge',
       'src/commands/pr/triage.ts': 'backEdge',
       'src/commands/pr/wait.ts': 'backEdge',
       'src/next/owner-gate.ts': 'loadCycle',

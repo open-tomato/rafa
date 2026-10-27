@@ -228,7 +228,6 @@ export type {
 export {
   EXIT_COULD_NOT_RUN,
   FORCE_FLAG,
-  RAFA_PACKAGE_NAME,
   exitCodeFor,
   installRuntime,
   outcomeProblem,
@@ -291,10 +290,7 @@ export {
   resolvePlanPath,
 } from '../../src/start/plan-path.js';
 
-export {
-  CI_POLL_INTERVAL_MS,
-  DEFAULT_CI_ATTEMPTS,
-} from '../../src/start/pr-lifecycle.js';
+export { DEFAULT_CI_ATTEMPTS } from '../../src/start/pr-lifecycle.js';
 
 export { retargetedLine } from '../../src/start/pr-retarget.js';
 
@@ -330,7 +326,6 @@ export {
 } from '../../src/start/run-setup.js';
 
 export {
-  RUNTIME_SUBDIR,
   refuseMisplacedRuntime,
   runFromSelectedRuntime,
 } from '../../src/start/runtime.js';

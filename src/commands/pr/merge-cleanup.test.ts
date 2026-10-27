@@ -23,10 +23,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { RUNTIME_SUBDIR } from '@open-tomato/rafa/core/runtime';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { createGitRunner } from '../../pr/index.js';
-import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 
 import {
   cleanUpAfterMerge,
