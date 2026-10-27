@@ -27,9 +27,9 @@
  *
  * A barrel that groups a file with a file outside `packages/rafa/src/core/` that
  * imports the barrel back by value is a runtime cycle. `identity.ts`
- * imports `node:fs`, `node:path` and the root `package.json`, and no
- * file under `src/`, so no file behind this barrel reaches a file that
- * imports it back.
+ * imports only `node:fs` and `node:path`, no file under `src/`, and
+ * spells rafa's package name as a literal, so no file behind this barrel
+ * reaches a file that imports it back.
  *
  * ## The old path
  *

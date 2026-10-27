@@ -903,7 +903,7 @@ names come from, and the facade entry is no node.
     `packages/rafa-board/src/next/relation-readings.ts`,
     `src/next/settle-step.ts`, `src/next/sources.ts`, `src/triage/base-run.ts`
     and `src/triage/inherited.ts`. The sixth decouple item cut `epic-end.ts` off
-    run, since `watchDryEpic` reads only its board field, so run has eight. All
+    run, since `watchDryEpic` reads only its board field, so run had eight. All
     eight are files of packages earlier in `MOVE_ORDER` of
     `scripts/survey/coupling.ts`, by the cut table's unit, and they sit in this
     group because the load-cycle group comes first. Their edges to run are back
@@ -976,8 +976,8 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's none, inventory's none, board's 19, release's none, pr's 29
-  and run's 19, and a planted control reds on one relative import.
+  files, effort's none, inventory's none, board's none, release's none, pr's
+  nine and run's none, and a planted control reds on one relative import.
   No row keeps a file for the library build. Board's, release's, pr's and
   run's rows once held a fourth group, `libraryChunks`: 68 files a library
   entry reaches statically (board 21, release eight, pr 33 and run six), kept

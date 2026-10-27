@@ -65,7 +65,7 @@ Every source file has a module note in: `c01-github`, `c03-config`, `c04-sqlite`
 | `src/commands/plan/risk.test.ts` | `c03-config` | `runRafa` | 1 | `src/tests/cli-capture.ts` | `c08-cli-capture` |
 | `src/commands/pr/merge-cleanup.test.ts` | `c09-version` | `GitRunner` | 1 | `src/pr/index.ts` | `c07-index` |
 | `src/commands/pr/merge-cleanup.ts` | `c09-version` | `GitRunner` | 1 | `src/pr/index.ts` | `c07-index` |
-| `src/commands/pr/merge-followups.ts` | `c06-command` | `RAFA_PACKAGE_NAME` | 2 | `src/runtime/install.ts` | `c05-sessions` |
+| `src/commands/pr/merge-followups.ts` | `c06-command` | `RAFA_PACKAGE_NAME` | 2 | `packages/rafa/src/core/runtime/identity.ts` | `c04-sqlite` |
 | `src/commands/pr/merge.test.ts` | `c01-github` | `endingProbe` | 1 | `src/tests/ending-probe.ts` | `c06-command` |
 | `src/commands/pr/merge.ts` | `c06-command` | `Prompter` | 1 | `src/cli/prompt/confirm.ts` | `c01-github` |
 | `src/commands/pr/pr-context.ts` | `c06-command` | `ghPullRequestsIn` | 1 | `src/pr/index.ts` | `c07-index` |

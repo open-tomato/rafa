@@ -55,7 +55,7 @@ Non-test imports leaving the cluster (170 edges, 70 distinct files; 128 value ed
 | `c03-config` | 38 | 7 | `src/config.ts`, `src/config-load.ts`, `src/config-schema.ts`, `packages/rafa/src/config-schema-release.ts`, `src/config-sections.ts`, `src/effort/collect.ts`, `src/effort/sync/contact.ts` |
 | `c06-command` | 24 | 9 | `src/cli/{command,dispatch,registry,route}.ts`, `src/cli/prompt/{multi-select,terminal}.ts`, `src/adapters/output/events.ts`, `src/next/{epic-end,settle-step}.ts` |
 | `c07-index` | 20 | 9 | `src/board/roadmap-claims.ts`, `src/claims/record.ts`, `src/pr/{checks,index,merge,preflight-items,worktree}.ts`, `src/start/branch-decision.ts`, `src/status/claims.ts` |
-| `c02-active` | 19 | 8 | `src/adapters/output/active.ts`, `src/effort/classify.ts`, `src/plan/index.ts`, `src/start/runtime.ts`, `src/suite/run.ts`, `src/utils/{declaration,plan-stamp,tracker}.ts` |
+| `c02-active` | 19 | 8 | `src/adapters/output/active.ts`, `src/effort/classify.ts`, `src/plan/index.ts`, `src/start/runtime.ts`, `packages/rafa/src/suite/run.ts`, `src/utils/{declaration,plan-stamp,tracker}.ts` |
 | `c04-sqlite` | 10 | 6 | `src/effort/{report,report-format,report-skills,report-trend-read,session-log}.ts`, `src/effort/store/task-finishes.ts` |
 | `c09-version` | 3 | 3 | `src/release/{fragment-tree,guard-merge,receipt}.ts` |
 | `c08-cli-capture` | 3 | 3 | `src/project/worktree-root.ts`, `src/tests/cli-capture.ts`, `packages/rafa/src/tests/git-identity.ts` |
