@@ -881,9 +881,12 @@ names come from, and the facade entry is no node.
     path once the placement is made, `src/cleanup/index.ts`,
     `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
     `src/next/relations-mode.ts`, `src/next/settle-step.ts`,
-    `src/next/sources.ts` and `src/start/wrap-up-run.ts`, sit on the guard's pr
-    row in this group until the item's rewire task reads them, twelve with the
-    five left. Run had nine:
+    `src/next/sources.ts` and `src/start/wrap-up-run.ts`, sat on the guard's pr
+    row in this group until the item's rewire task read them, twelve with the
+    five left. Its dry run read the four `src/next/` files on a load cycle and
+    the other three to rewire, and the codemod took `src/cleanup/index.ts`,
+    `src/cleanup/steps.ts` and `src/start/wrap-up-run.ts` onto the pr facade,
+    so pr reads nine. Run had nine:
     `src/cleanup/groups.ts`, `src/cleanup/steps.ts`,
     `packages/rafa-release/src/next/epic-end.ts`, `src/next/owner-gate.ts`,
     `packages/rafa-board/src/next/relation-readings.ts`,

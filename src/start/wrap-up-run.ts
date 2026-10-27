@@ -118,7 +118,12 @@ import type { ClaudeSettingSource, PrProvider } from '@open-tomato/rafa/core/con
 import type { SessionServing } from '@open-tomato/rafa-inventory';
 import type { PullRequestSummary } from '@open-tomato/rafa-pr';
 
-import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '@open-tomato/rafa-pr';
+import {
+  createGitRunner,
+  ghPullRequestsIn,
+  resolvePrProvider,
+  retargetPullRequest,
+} from '@open-tomato/rafa-pr';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -134,7 +139,6 @@ import { fileFollowUps } from './follow-ups.js';
 import { forcedDraftSeamsIn, markForcedDraft, refuseUndraftedPullRequest } from './forced-draft.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
-import { retargetPullRequest } from './pr-retarget.js';
 import { carryReleaseIntoPullRequest } from './release-body.js';
 import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
 import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';

@@ -52,21 +52,27 @@
  */
 import type { RemoteOnlyRow, RemoteOnlySettings } from './remote-only.js';
 import type { RunRow, RunSeams } from './runs.js';
-import type { WorktreeRow, WorktreeSeams } from './worktrees.js';
-import type { BranchGroups, PullRequests, ReleasePaths } from '@open-tomato/rafa-pr';
+import type {
+  BranchGroups,
+  PullRequests,
+  ReleasePaths,
+  WorktreeRow,
+  WorktreeSeams,
+} from '@open-tomato/rafa-pr';
 
 import {
   classifyBranches,
+  defaultWorktreeSeams,
   holdBranchRows,
   readBranches,
   readProviderMerges,
+  readWorktrees,
 } from '@open-tomato/rafa-pr';
 
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
 import { readRemoteOnly } from './remote-only.js';
 import { readRunRecords } from './runs.js';
-import { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
 export type {
   BranchGroup,
@@ -123,7 +129,8 @@ export type {
   WorktreesRead,
   WorktreesReading,
   WorktreesUnread,
-} from './worktrees.js';
+} from '@open-tomato/rafa-pr';
+export { defaultWorktreeSeams, readWorktrees } from '@open-tomato/rafa-pr';
 
 export { readRemoteOnly, remoteOnlyReason } from './remote-only.js';
 export { readRunRecords } from './runs.js';
@@ -136,7 +143,6 @@ export {
   removeRunStep,
   runCleanupSteps,
 } from './steps.js';
-export { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
 /** The argv the remote-tracking branches are refreshed with. Never forced. */
 export const FETCH_PRUNE: readonly string[] = Object.freeze(['fetch', '--prune']);

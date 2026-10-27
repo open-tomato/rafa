@@ -130,8 +130,11 @@ interface RewiredRow {
  * `src/start/wrap-up-run.ts` (`./pr-retarget.js`) and
  * `src/next/owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and
  * `sources.ts` (files of `src/pr/`), each in the load-cycle group until
- * the item's rewire task reads it. So the row keeps 12 load-cycle files
- * and no back-edge file.
+ * the item's rewire task read it. Its dry run read the four `src/next/`
+ * files on a load cycle and the other three to rewire, and the codemod
+ * took `src/cleanup/index.ts`, `steps.ts` and `src/start/wrap-up-run.ts`
+ * onto the facade. So the row keeps 9 load-cycle files and no back-edge
+ * file.
  * Run's five load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -199,8 +202,6 @@ const REWIRED: readonly RewiredRow[] = [
   {
     allowed: {
       'src/claims/lost.ts': 'loadCycle',
-      'src/cleanup/index.ts': 'loadCycle',
-      'src/cleanup/steps.ts': 'loadCycle',
       'src/next/hop-rows.ts': 'loadCycle',
       'src/next/owner-gate.ts': 'loadCycle',
       'src/next/readings.ts': 'loadCycle',
@@ -209,7 +210,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/next/sources.ts': 'loadCycle',
       'src/start/pr-lifecycle.ts': 'loadCycle',
       'src/start/suite-blocker.ts': 'loadCycle',
-      'src/start/wrap-up-run.ts': 'loadCycle',
     },
     packageName: 'rafa-pr',
   },
