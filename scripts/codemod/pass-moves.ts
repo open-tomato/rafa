@@ -38,9 +38,13 @@
  *     until #913 places each integration test with the package entry it
  *     drives.
  *  2. Parks each moved test file whose imports, resolved, reach a file of
- *     the repository outside core, outside the package's folder and
- *     outside the move (a root file, a `src/tests/` helper, the root
- *     `package.json`) at the target's parking folder
+ *     the repository outside core, outside the package's folder, outside
+ *     the move and outside the folders of the feature packages the
+ *     package's `package.json` names under `dependencies`
+ *     (`declaredFolders` of `pass-target.ts`, printed after the first
+ *     line as `declared dependencies (n)`, a facade by name counting as
+ *     its folder's `index.ts`), such as a root file, a `src/tests/`
+ *     helper or the root `package.json`, at the target's parking folder
  *     (`src/tests/core-coupled/` for core, `src/tests/<name>-coupled/`
  *     for `rafa-<name>`) under its path below `src/`, and prints what
  *     each reaches as a row of that folder's README.
@@ -133,6 +137,7 @@ import { buildNotes, CLUSTER_MAP_FILE, CODEMOD_FOLDER, isBuildScope, isProseScop
 import {
   checkWorkspaceMember,
   CORE_TARGET,
+  declaredFolders,
   PACKAGE_PREFIX,
   packageSubpath,
   PassTargetError,
@@ -189,6 +194,8 @@ export {
 export interface PassMovesPlan {
   /** The package the list moves into. */
   readonly target: PassTarget;
+  /** Step 2: the folders of the feature packages the target declares, read as inside. */
+  readonly declared: readonly string[];
   /** Step 1: the listed files, sorted by `from`. */
   readonly moves: readonly PathMove[];
   /** Step 1: the colocated tests that move into the package, sorted. */
@@ -522,6 +529,7 @@ export function planPassMoves(input: PassMovesInput): PassMovesPlan {
     buildReads: buildReads.sort(byFileAndLine),
     clusterKeys,
     colocated: set.colocated,
+    declared: input.declared ?? [],
     escapes: escapes.sort(byFileAndLine),
     importers: new Set(specifiers.filter((item) => !parkedFrom.has(item.file)).map((item) => item.file)).size,
     left: set.left,
@@ -574,8 +582,11 @@ function indexFiles(root: string): ReadonlySet<string> {
  * @param moves - The move list.
  * @param integrationGlobs - The project's `tests.integration` patterns.
  * @param target - The package the list moves into; core unless handed in.
+ *   Its `package.json`'s declared feature packages ({@link declaredFolders})
+ *   are handed in as `declared`.
  * @returns The plan.
  * @throws {TreeError} When `git ls-files` fails.
+ * @throws {PassTargetError} When the target's `package.json` cannot be read.
  */
 export function readPassMoves(root: string, moves: readonly FileMove[], integrationGlobs: readonly string[], target: PassTarget = CORE_TARGET): PassMovesPlan {
   const files = committableFiles(root);
@@ -586,6 +597,7 @@ export function readPassMoves(root: string, moves: readonly FileMove[], integrat
     }
   }
   return planPassMoves({
+    declared: declaredFolders(root, target),
     files,
     integrationGlobs,
     moves,
@@ -645,6 +657,7 @@ export function reportLines(plan: PassMovesPlan, dryRun: boolean): readonly stri
   const note = (item: SiteNote): string => `${item.file}:${item.line} ${item.text}`;
   return [
     `the package: ${plan.target.source}, imported as ${plan.target.prefix}`,
+    ...section('declared dependencies', plan.declared),
     ...section('1. moved into the package', plan.moves.map(move)),
     ...section('1. colocated tests moved with them', plan.colocated.map(move)),
     ...section('1. integration tests left at the root, imports rewritten', plan.left),

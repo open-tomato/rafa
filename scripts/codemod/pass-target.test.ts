@@ -1,7 +1,8 @@
 /**
  * The target of the pass-moves codemod: the reader of a `--package=` name,
- * the workspace-member check over a planted folder, and the three path
- * functions for core and for a feature package.
+ * the workspace-member check and the declared feature packages over a
+ * planted folder, and the three path functions for core and for a feature
+ * package.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,6 +13,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import {
   checkWorkspaceMember,
   CORE_TARGET,
+  declaredFolders,
   packageSubpath,
   parkedPath,
   PassTargetError,
@@ -85,6 +87,31 @@ describe('checkWorkspaceMember', () => {
     expect(() => {
       checkWorkspaceMember(root, CORE_TARGET);
     }).not.toThrow();
+  });
+});
+
+describe('declaredFolders', () => {
+  const root = mkdtempSync(join(tmpdir(), 'pass-target-declared-'));
+  roots.push(root);
+  mkdirSync(join(root, 'packages/rafa-pr'), { recursive: true });
+  writeFileSync(join(root, 'packages/rafa-pr/package.json'), `${JSON.stringify({
+    dependencies: { '@open-tomato/rafa-board': 'workspace:*', '@open-tomato/rafa-core': 'workspace:*' },
+    devDependencies: { '@open-tomato/rafa-eslint-config': 'workspace:*' },
+    name: '@open-tomato/rafa-pr',
+  })}\n`);
+  mkdirSync(join(root, 'packages/rafa-inventory'), { recursive: true });
+  writeFileSync(join(root, 'packages/rafa-inventory/package.json'), '{"name":"@open-tomato/rafa-inventory"}\n');
+
+  it('reads none for core', () => {
+    expect(declaredFolders(root, CORE_TARGET)).toEqual([]);
+  });
+
+  it('reads a target naming core and board as board\'s folder alone, devDependencies unread', () => {
+    expect(declaredFolders(root, readPassTarget('rafa-pr'))).toEqual(['packages/rafa-board/']);
+  });
+
+  it('reads none for a manifest with no dependencies', () => {
+    expect(declaredFolders(root, INVENTORY)).toEqual([]);
   });
 });
 

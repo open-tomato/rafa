@@ -4,9 +4,11 @@
  * feature package such as `rafa-inventory` is named by `--package=` (#808,
  * pass 4). The target spells the paths every step reads: the package's
  * folder and source folder, where a coupled test parks, and the name a file
- * outside the package imports a moved file by.
+ * outside the package imports a moved file by; its `package.json` names the
+ * feature packages it declares, whose files a moved test may reach without
+ * parking ({@link declaredFolders}).
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CORE_PACKAGE, CORE_PARKED_TESTS, CORE_SOURCE } from '../survey/core-moves';
@@ -30,6 +32,9 @@ const SCOPE = '@open-tomato/';
 
 /** The name of a feature package, as `scripts/codemod/rewire-facade.ts` spells it. */
 const FEATURE_NAME = /^rafa-[a-z][a-z0-9-]*$/;
+
+/** The name core's `package.json` gives it, which a feature package declares and which is not a feature package. */
+const CORE_MANIFEST_NAME = `${SCOPE}rafa-core`;
 
 /** The package a move list moves into. */
 export interface PassTarget {
@@ -107,6 +112,43 @@ export function checkWorkspaceMember(root: string, target: PassTarget): void {
   if (!target.core && !existsSync(join(root, target.folder, 'package.json'))) {
     throw new PassTargetError(`--package=${target.name} names no workspace member: ${target.folder}package.json is absent`);
   }
+}
+
+/**
+ * The folders of the feature packages a target's `package.json` names under
+ * `dependencies`: each `@open-tomato/rafa-<name>` key other than core's
+ * `@open-tomato/rafa-core`, as `packages/rafa-<name>/`, sorted. Core
+ * declares none, and a manifest with no `dependencies` reads none.
+ *
+ * @param root - The repository root.
+ * @param target - The target, a workspace member ({@link checkWorkspaceMember}).
+ * @returns The folders, each with its closing `/`.
+ * @throws {PassTargetError} When the target's `package.json` is not a JSON object.
+ */
+export function declaredFolders(root: string, target: PassTarget): readonly string[] {
+  if (target.core) {
+    return [];
+  }
+  const path = join(root, target.folder, 'package.json');
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new PassTargetError(`cannot read ${target.folder}package.json: ${error instanceof Error
+      ? error.message
+      : String(error)}`);
+  }
+  if (typeof manifest !== 'object' || manifest === null) {
+    throw new PassTargetError(`${target.folder}package.json is not a JSON object`);
+  }
+  const dependencies = (manifest as { dependencies?: unknown }).dependencies;
+  if (typeof dependencies !== 'object' || dependencies === null) {
+    return [];
+  }
+  return Object.keys(dependencies)
+    .filter((name) => name !== CORE_MANIFEST_NAME && name.startsWith(SCOPE) && FEATURE_NAME.test(name.slice(SCOPE.length)))
+    .map((name) => `packages/${name.slice(SCOPE.length)}/`)
+    .sort();
 }
 
 /**
