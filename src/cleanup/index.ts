@@ -79,12 +79,6 @@ export type {
   BranchesRead,
   BranchesReading,
   BranchesUnread,
-  CleanupFiles,
-  CleanupOutcome,
-  CleanupPlan,
-  CleanupSelection,
-  CleanupStep,
-  CleanupStepKind,
   GroupSettings,
   LocalBranch,
   MergedBy,
@@ -93,22 +87,14 @@ export type {
   ProviderMerges,
   ReleasePaths,
   StaleRow,
-  WithheldRemoval,
 } from '@open-tomato/rafa-pr';
 export {
   MERGED_STATE_UNKNOWN,
   classifyBranches,
-  cleanupCommandLine,
-  cleanupSteps,
-  deletedNotPushed,
-  dryRunLines,
-  forcedFlagRefusal,
   isKept,
   readBranches,
   readProviderMerges,
-  removeRunStep,
   resolveBaseBranch,
-  runCleanupSteps,
 } from '@open-tomato/rafa-pr';
 export type { PastHeadCommit, PastHeadRead } from '@open-tomato/rafa-release';
 export type {
@@ -119,6 +105,15 @@ export type {
   RemoteOnlyUnread,
 } from './remote-only.js';
 export type { RunRow, RunSeams, RunsReading } from './runs.js';
+export type {
+  CleanupFiles,
+  CleanupOutcome,
+  CleanupPlan,
+  CleanupSelection,
+  CleanupStep,
+  CleanupStepKind,
+  WithheldRemoval,
+} from './steps.js';
 export type {
   WorktreeBlocker,
   WorktreeBlockKind,
@@ -132,6 +127,15 @@ export type {
 
 export { readRemoteOnly, remoteOnlyReason } from './remote-only.js';
 export { readRunRecords } from './runs.js';
+export {
+  cleanupCommandLine,
+  cleanupSteps,
+  deletedNotPushed,
+  dryRunLines,
+  forcedFlagRefusal,
+  removeRunStep,
+  runCleanupSteps,
+} from './steps.js';
 export { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
 /** The argv the remote-tracking branches are refreshed with. Never forced. */

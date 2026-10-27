@@ -62,20 +62,24 @@ export const BOARD_NAMED: readonly string[] = [
  * same folder places them. The sixth decouple item (rafa-1362) moved the
  * stale-docs files `packages/rafa-release/src/docs/open-lines.ts` and
  * `packages/rafa-release/src/docs/release-issue.ts` to the release list,
- * since each reaches only release and core.
+ * since each reaches only release and core. The seventh decouple item
+ * (rafa-1368) placed `src/cleanup/worktrees.ts` and
+ * `src/start/pr-retarget.ts` here by pass 1's rule, since each reaches
+ * only pr and core (`worktrees.ts` `parseWorktrees` of `src/pr/merge.ts`,
+ * `pr-retarget.ts` the port types of `src/pr/index.ts`), and moved
+ * `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
+ * `src/next/relations-mode.ts`, `src/next/settle-step.ts` and
+ * `src/next/sources.ts` to the run list.
  */
 export const PR_NAMED: readonly string[] = [
   'src/bugs/filed-values.ts',
   'src/cleanup/branches.ts',
   'src/cleanup/groups.ts',
-  'src/cleanup/steps.ts',
+  'src/cleanup/worktrees.ts',
   'src/docs/task-reading.ts',
-  'src/next/owner-gate.ts',
-  'src/next/relations-mode.ts',
-  'src/next/settle-step.ts',
-  'src/next/sources.ts',
   'src/plan/risk.ts',
   'src/plan/risk/accounts.ts',
+  'src/start/pr-retarget.ts',
 ];
 
 /**
@@ -89,13 +93,19 @@ export const PR_NAMED: readonly string[] = [
  * item (rafa-1333) moved `packages/rafa/src/plan/validate.ts` into core's
  * package too, and the same folder places it, and placed
  * `packages/rafa-board/src/epic/verify-run.ts` in board by name, since it
- * reaches only board and core.
+ * reaches only board and core. The seventh decouple item (rafa-1368)
+ * placed `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
+ * `src/next/relations-mode.ts`, `src/next/settle-step.ts` and
+ * `src/next/sources.ts` here by the same rule read with type edges, since
+ * each reads run's types and is imported only by run and the CLI, and
+ * moved `src/cleanup/worktrees.ts` to the pr list, since it reaches only
+ * pr and core.
  */
 export const RUN_NAMED: readonly string[] = [
   'src/cleanup/index.ts',
   'src/cleanup/remote-only.ts',
   'src/cleanup/runs.ts',
-  'src/cleanup/worktrees.ts',
+  'src/cleanup/steps.ts',
   'src/commands/switch.ts',
   'src/loop/events-file.ts',
   'src/next/actions.ts',
@@ -103,8 +113,12 @@ export const RUN_NAMED: readonly string[] = [
   'src/next/hint.ts',
   'src/next/hop-action.ts',
   'src/next/hop-rows.ts',
+  'src/next/owner-gate.ts',
   'src/next/preconditions.ts',
   'src/next/readings.ts',
+  'src/next/relations-mode.ts',
+  'src/next/settle-step.ts',
+  'src/next/sources.ts',
   'src/next/state.ts',
   'src/plan/index.ts',
   'src/plan/list.ts',

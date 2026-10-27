@@ -36,28 +36,27 @@ export type {
 export {
   MERGED_STATE_UNKNOWN,
   classifyBranches,
+  heldReason,
   holdBranchRows,
   readProviderMerges,
 } from '../../src/cleanup/groups.js';
 
 export type {
-  CleanupFiles,
-  CleanupOutcome,
-  CleanupPlan,
-  CleanupSelection,
-  CleanupStep,
-  CleanupStepKind,
-  WithheldRemoval,
-} from '../../src/cleanup/steps.js';
+  WorktreeBlockKind,
+  WorktreeBlocker,
+  WorktreeRead,
+  WorktreeRow,
+  WorktreeSeams,
+  WorktreesRead,
+  WorktreesReading,
+  WorktreesUnread,
+} from '../../src/cleanup/worktrees.js';
 export {
-  cleanupCommandLine,
-  cleanupSteps,
-  deletedNotPushed,
-  dryRunLines,
-  forcedFlagRefusal,
-  removeRunStep,
-  runCleanupSteps,
-} from '../../src/cleanup/steps.js';
+  ADMIN_FILES,
+  GIT_DIR,
+  defaultWorktreeSeams,
+  readWorktrees,
+} from '../../src/cleanup/worktrees.js';
 
 export { PR_SUBJECT } from '../../src/commands/pr/declarations.js';
 
@@ -73,26 +72,6 @@ export {
   readDocTaskInput,
   renderDocTaskSection,
 } from '../../src/docs/task-reading.js';
-
-export type { NextOwnerGateOptions } from '../../src/next/owner-gate.js';
-export { nextOwnerGate } from '../../src/next/owner-gate.js';
-
-export { openNextRelations } from '../../src/next/relations-mode.js';
-
-export {
-  followsMerge,
-  readSettleAfterMerge,
-} from '../../src/next/settle-step.js';
-
-export type {
-  NextBoardOptions,
-  NextSourceSeams,
-  OpenedNextSources,
-} from '../../src/next/sources.js';
-export {
-  ghNextBoard,
-  openNextSources,
-} from '../../src/next/sources.js';
 
 export type {
   RiskFinding,
@@ -137,18 +116,28 @@ export {
   gitSaid,
   parseWorktrees,
   pushBranch,
+  requireGhProvider,
   resolvePrProvider,
   waitForChecks,
 } from '../../src/pr/index.js';
 
 export type { OwnerApproval } from '../../src/pr/owner-approval.js';
+export {
+  createGhTeamMembership,
+  readOwnerApproval,
+} from '../../src/pr/owner-approval.js';
 
 export {
   ghMissingMessage,
   ghUnauthenticatedMessage,
 } from '../../src/pr/preflight-items.js';
 
+export type { SettleWaiting } from '../../src/pr/settle-waiting.js';
+export { settleWaitingOn } from '../../src/pr/settle-waiting.js';
+
 export { parseFailedLogLine } from '../../src/pr/triage/evidence.js';
+
+export { retargetPullRequest } from '../../src/start/pr-retarget.js';
 
 export type {
   BaseRunAnswer,

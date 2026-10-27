@@ -18,27 +18,21 @@ export { claimPlanIssue } from '../../src/claims/plan-claim.js';
 export type {
   BranchRow,
   CleanupCounts,
-  CleanupOutcome,
-  CleanupPlan,
   CleanupRead,
   CleanupReading,
   CleanupSeams,
-  CleanupSelection,
   CleanupSettings,
-  CleanupStepKind,
   MergedBy,
   MergedRow,
   NotPushedRow,
   StaleRow,
+  WorktreeBlockKind,
+  WorktreeRow,
 } from '../../src/cleanup/index.js';
 export {
   cleanupCounts,
-  cleanupSteps,
   defaultCleanupSeams,
-  deletedNotPushed,
-  dryRunLines,
   readCleanup,
-  runCleanupSteps,
 } from '../../src/cleanup/index.js';
 
 export type { RemoteOnlyRow } from '../../src/cleanup/remote-only.js';
@@ -46,17 +40,17 @@ export type { RemoteOnlyRow } from '../../src/cleanup/remote-only.js';
 export type { RunRow } from '../../src/cleanup/runs.js';
 
 export type {
-  WorktreeBlockKind,
-  WorktreeRow,
-  WorktreeSeams,
-} from '../../src/cleanup/worktrees.js';
+  CleanupOutcome,
+  CleanupPlan,
+  CleanupSelection,
+  CleanupStepKind,
+} from '../../src/cleanup/steps.js';
 export {
-  ADMIN_FILES,
-  GIT_DIR,
-  WORKTREE_STATUS,
-  countChanges,
-  defaultWorktreeSeams,
-} from '../../src/cleanup/worktrees.js';
+  cleanupSteps,
+  deletedNotPushed,
+  dryRunLines,
+  runCleanupSteps,
+} from '../../src/cleanup/steps.js';
 
 export { CLAIM_SUBJECT } from '../../src/commands/claim/declarations.js';
 
@@ -93,11 +87,13 @@ export {
 
 export type { NextHopStep } from '../../src/next/hop-rows.js';
 
+export type { NextOwnerGateOptions } from '../../src/next/owner-gate.js';
+export { nextOwnerGate } from '../../src/next/owner-gate.js';
+
 export type {
   DryEpic,
   NextBoard,
   NextRoadmapReading,
-  NextRoadmapSources,
   NextSources,
   OpenPull,
   PickedLine,
@@ -109,11 +105,27 @@ export {
   readPlans,
 } from '../../src/next/readings.js';
 
+export { openNextRelations } from '../../src/next/relations-mode.js';
+
+export {
+  followsMerge,
+  readSettleAfterMerge,
+} from '../../src/next/settle-step.js';
+
+export type {
+  NextBoardOptions,
+  NextSourceSeams,
+  OpenedNextSources,
+} from '../../src/next/sources.js';
+export {
+  ghNextBoard,
+  openNextSources,
+} from '../../src/next/sources.js';
+
 export type {
   NextActionId,
   NextAnswerId,
   NextState,
-  NextStateId,
 } from '../../src/next/state.js';
 export {
   readHomeAfterLoop,
@@ -291,8 +303,6 @@ export {
 } from '../../src/start/plan-path.js';
 
 export { DEFAULT_CI_ATTEMPTS } from '../../src/start/pr-lifecycle.js';
-
-export { retargetedLine } from '../../src/start/pr-retarget.js';
 
 export { createStartPreflightClaim } from '../../src/start/preflight-claim.js';
 

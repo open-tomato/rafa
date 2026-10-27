@@ -176,8 +176,6 @@ import type {
 } from '@open-tomato/rafa-board';
 import type {
   GitRunner,
-  NextBoardOptions,
-  NextOwnerGateOptions,
   OwnerApproval,
   PrProviderReading,
   PullRequests,
@@ -186,6 +184,8 @@ import type {
   CleanupCounts,
   CleanupSeams,
   NextBoard,
+  NextBoardOptions,
+  NextOwnerGateOptions,
   NextRoadmapReading,
   NextSources,
   OpenPull,
@@ -208,13 +208,13 @@ import {
 import {
   createGhPullRequests,
   createGitRunner,
-  ghNextBoard,
-  nextOwnerGate,
   resolvePrProvider,
 } from '@open-tomato/rafa-pr';
 import {
   cleanupCounts,
   defaultCleanupSeams,
+  ghNextBoard,
+  nextOwnerGate,
   readBranch,
   readBranchPlan,
   readCleanup,

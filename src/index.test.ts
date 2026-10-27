@@ -961,9 +961,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/next.js', [
     ['@open-tomato/rafa-effort', ['pullBeforeRead']],
-    ['@open-tomato/rafa-pr', ['followsMerge', 'openNextRelations', 'openNextSources', 'readSettleAfterMerge']],
     ['@open-tomato/rafa-release', ['epicEndLines', 'watchDryEpic']],
-    ['@open-tomato/rafa-run', ['actionInvocation', 'actionOutput', 'commandWords', 'nextQuestion', 'readHomeAfterLoop', 'readNextState', 'runAction']],
+    ['@open-tomato/rafa-run', ['actionInvocation', 'actionOutput', 'commandWords', 'followsMerge', 'nextQuestion', 'openNextRelations', 'openNextSources', 'readHomeAfterLoop', 'readNextState', 'readSettleAfterMerge', 'runAction']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'createLinePrompter', 'lazyPrompter']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
