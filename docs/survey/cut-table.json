@@ -3604,8 +3604,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 201,
-        "test": 144,
+        "source": 205,
+        "test": 148,
         "testSupport": 9
       },
       "files": [
@@ -3906,6 +3906,8 @@
         "packages/rafa/src/ports/spec-review.ts",
         "packages/rafa/src/ports/unresolved-tracker.test.ts",
         "packages/rafa/src/ports/unresolved-tracker.ts",
+        "packages/rafa/src/pr/ci-poll.test.ts",
+        "packages/rafa/src/pr/ci-poll.ts",
         "packages/rafa/src/pr/provider.test.ts",
         "packages/rafa/src/pr/provider.ts",
         "packages/rafa/src/pr/pull-requests-double.test.ts",
@@ -3936,6 +3938,12 @@
         "packages/rafa/src/start/branch-decision.test.ts",
         "packages/rafa/src/start/branch-decision.ts",
         "packages/rafa/src/start/worktree-dir.ts",
+        "packages/rafa/src/suite/failure-lines.test.ts",
+        "packages/rafa/src/suite/failure-lines.ts",
+        "packages/rafa/src/suite/run.test.ts",
+        "packages/rafa/src/suite/run.ts",
+        "packages/rafa/src/suite/unhandled.test.ts",
+        "packages/rafa/src/suite/unhandled.ts",
         "packages/rafa/src/tests/git-identity-spawn.test.ts",
         "packages/rafa/src/tests/git-identity.test.ts",
         "packages/rafa/src/tests/git-identity.ts",
@@ -3965,7 +3973,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 354
+        "packages/rafa/": 362
       },
       "folders": [
         "packages/rafa/"
@@ -4491,41 +4499,6 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/cleanup/groups.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/cleanup/worktrees.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/cleanup/steps.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "packages/rafa-release/src/cleanup/past-head.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/cleanup/steps.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/cleanup/remote-only.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/cleanup/steps.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/cleanup/runs.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/cleanup/steps.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/cleanup/worktrees.ts",
-          "toPackage": "rafa-run"
-        },
-        {
           "from": "src/commands/pr/list-forecast.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
@@ -4561,20 +4534,6 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/commands/pr/merge-cleanup.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/start/runtime.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/pr/merge-followups.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/runtime/install.ts",
-          "toPackage": "rafa-run"
-        },
-        {
           "from": "src/commands/pr/merge-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
@@ -4603,32 +4562,11 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/commands/pr/merge-loop-worktree.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/cleanup/worktrees.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/pr/merge.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/next/ending.ts",
-          "toPackage": "rafa-run"
-        },
-        {
           "from": "src/commands/pr/pr-context.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
           "to": "packages/rafa-release/src/release/guard-merge.ts",
           "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/commands/pr/retarget.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/start/pr-retarget.ts",
-          "toPackage": "rafa-run"
         },
         {
           "from": "src/commands/pr/triage-convert.ts",
@@ -4671,76 +4609,6 @@
           "kind": "type",
           "to": "packages/rafa-release/src/release/settle.ts",
           "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/commands/pr/triage-resolve.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/start/pr-lifecycle.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/pr/triage.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/next/ending.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/pr/wait.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/next/ending.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/commands/pr/wait.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/start/pr-lifecycle.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/next/owner-gate.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/next/readings.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/next/settle-step.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "packages/rafa-release/src/release/guard-merge.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/next/settle-step.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/next/state.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/next/sources.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "packages/rafa-release/src/next/epic-end.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/next/sources.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "packages/rafa-release/src/release/guard-merge.ts",
-          "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/next/sources.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/next/readings.ts",
-          "toPackage": "rafa-run"
         },
         {
           "from": "src/pr/settle-waiting.ts",
@@ -4804,25 +4672,11 @@
           "kind": "value",
           "to": "packages/rafa-release/src/release/version.ts",
           "toPackage": "rafa-release"
-        },
-        {
-          "from": "src/triage/base-run.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/suite/run.ts",
-          "toPackage": "rafa-run"
-        },
-        {
-          "from": "src/triage/inherited.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/suite/run.ts",
-          "toPackage": "rafa-run"
         }
       ],
       "fileCounts": {
-        "source": 82,
-        "test": 110,
+        "source": 79,
+        "test": 107,
         "testSupport": 2
       },
       "files": [
@@ -4832,8 +4686,8 @@
         "src/cleanup/branches.ts",
         "src/cleanup/groups.test.ts",
         "src/cleanup/groups.ts",
-        "src/cleanup/steps.test.ts",
-        "src/cleanup/steps.ts",
+        "src/cleanup/worktrees.test.ts",
+        "src/cleanup/worktrees.ts",
         "src/commands/pr/close.test.ts",
         "src/commands/pr/close.ts",
         "src/commands/pr/current.test.ts",
@@ -4915,14 +4769,6 @@
         "src/commands/pr/wait.ts",
         "src/docs/task-reading.test.ts",
         "src/docs/task-reading.ts",
-        "src/next/owner-gate.test.ts",
-        "src/next/owner-gate.ts",
-        "src/next/relations-mode.test.ts",
-        "src/next/relations-mode.ts",
-        "src/next/settle-step.test.ts",
-        "src/next/settle-step.ts",
-        "src/next/sources.test.ts",
-        "src/next/sources.ts",
         "src/plan/risk.test.ts",
         "src/plan/risk.ts",
         "src/plan/risk/accounts.test.ts",
@@ -4988,6 +4834,8 @@
         "src/pr/workflow-triggers.ts",
         "src/pr/worktree.test.ts",
         "src/pr/worktree.ts",
+        "src/start/pr-retarget.test.ts",
+        "src/start/pr-retarget.ts",
         "src/triage/base-run.test.ts",
         "src/triage/base-run.ts",
         "src/triage/bug-filing.test.ts",
@@ -5038,19 +4886,16 @@
         "src/bugs/filed-values.ts",
         "src/cleanup/branches.ts",
         "src/cleanup/groups.ts",
-        "src/cleanup/steps.ts",
+        "src/cleanup/worktrees.ts",
         "src/docs/task-reading.ts",
-        "src/next/owner-gate.ts",
-        "src/next/relations-mode.ts",
-        "src/next/settle-step.ts",
-        "src/next/sources.ts",
         "src/plan/risk.ts",
         "src/plan/risk/accounts.ts",
+        "src/start/pr-retarget.ts",
         "src/pr/index.ts"
       ],
       "rank": 6,
-      "remaining": 48,
-      "upwardEdges": 48
+      "remaining": 26,
+      "upwardEdges": 26
     },
     {
       "clearedByIssue118": 0,
@@ -5063,11 +4908,39 @@
           "toPackage": "rafa-release"
         },
         {
+          "from": "src/cleanup/steps.ts",
+          "fromPackage": "rafa-run",
+          "kind": "type",
+          "to": "packages/rafa-release/src/cleanup/past-head.ts",
+          "toPackage": "rafa-release"
+        },
+        {
           "from": "src/next/actions.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
           "to": "src/cli/core/parseArgs.ts",
           "toPackage": "@open-tomato/rafa"
+        },
+        {
+          "from": "src/next/settle-step.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/next/sources.ts",
+          "fromPackage": "rafa-run",
+          "kind": "value",
+          "to": "packages/rafa-release/src/next/epic-end.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/next/sources.ts",
+          "fromPackage": "rafa-run",
+          "kind": "type",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
+          "toPackage": "rafa-release"
         },
         {
           "from": "src/start/preflight-sync.ts",
@@ -5212,8 +5085,8 @@
         "src/cleanup/remote-only.ts",
         "src/cleanup/runs.test.ts",
         "src/cleanup/runs.ts",
-        "src/cleanup/worktrees.test.ts",
-        "src/cleanup/worktrees.ts",
+        "src/cleanup/steps.test.ts",
+        "src/cleanup/steps.ts",
         "src/commands/claim/accept.test.ts",
         "src/commands/claim/accept.ts",
         "src/commands/claim/declarations-integration.test.ts",
@@ -5243,9 +5116,17 @@
         "src/next/hop-action.ts",
         "src/next/hop-rows.test.ts",
         "src/next/hop-rows.ts",
+        "src/next/owner-gate.test.ts",
+        "src/next/owner-gate.ts",
         "src/next/preconditions.ts",
         "src/next/readings.test.ts",
         "src/next/readings.ts",
+        "src/next/relations-mode.test.ts",
+        "src/next/relations-mode.ts",
+        "src/next/settle-step.test.ts",
+        "src/next/settle-step.ts",
+        "src/next/sources.test.ts",
+        "src/next/sources.ts",
         "src/next/state.test.ts",
         "src/next/state.ts",
         "src/plan/index.test.ts",
@@ -5331,8 +5212,6 @@
         "src/start/plan-path.ts",
         "src/start/pr-lifecycle.test.ts",
         "src/start/pr-lifecycle.ts",
-        "src/start/pr-retarget.test.ts",
-        "src/start/pr-retarget.ts",
         "src/start/preflight-claim.test.ts",
         "src/start/preflight-claim.ts",
         "src/start/preflight-drift.test.ts",
@@ -5448,26 +5327,20 @@
         "src/suite/checks.ts",
         "src/suite/deadline-spawn.test.ts",
         "src/suite/deadline-spawn.ts",
-        "src/suite/failure-lines.test.ts",
-        "src/suite/failure-lines.ts",
         "src/suite/owns.test.ts",
         "src/suite/owns.ts",
         "src/suite/run-baseline-integration.test.ts",
         "src/suite/run-recheck-integration.test.ts",
-        "src/suite/run.test.ts",
-        "src/suite/run.ts",
         "src/suite/scope.test.ts",
-        "src/suite/scope.ts",
-        "src/suite/unhandled.test.ts",
-        "src/suite/unhandled.ts"
+        "src/suite/scope.ts"
       ],
       "filesByFolder": {
         "packages/rafa-run/": 0,
         "src/claims/": 11,
         "src/commands/claim/": 15,
         "src/preflight/": 10,
-        "src/start/": 177,
-        "src/suite/": 18
+        "src/start/": 175,
+        "src/suite/": 12
       },
       "folders": [
         "packages/rafa-run/",
@@ -5482,7 +5355,7 @@
         "src/cleanup/index.ts",
         "src/cleanup/remote-only.ts",
         "src/cleanup/runs.ts",
-        "src/cleanup/worktrees.ts",
+        "src/cleanup/steps.ts",
         "src/commands/switch.ts",
         "src/loop/events-file.ts",
         "src/next/actions.ts",
@@ -5490,8 +5363,12 @@
         "src/next/hint.ts",
         "src/next/hop-action.ts",
         "src/next/hop-rows.ts",
+        "src/next/owner-gate.ts",
         "src/next/preconditions.ts",
         "src/next/readings.ts",
+        "src/next/relations-mode.ts",
+        "src/next/settle-step.ts",
+        "src/next/sources.ts",
         "src/next/state.ts",
         "src/plan/index.ts",
         "src/plan/list.ts",
@@ -5499,8 +5376,8 @@
         "src/runtime/install.ts"
       ],
       "rank": 7,
-      "remaining": 19,
-      "upwardEdges": 19
+      "remaining": 23,
+      "upwardEdges": 23
     },
     {
       "clearedByIssue118": 0,
@@ -6586,12 +6463,12 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2193,
+    "files": 2195,
     "leftToPlace": 708,
-    "nonTestEdges": 4867,
+    "nonTestEdges": 4868,
     "unassignedFiles": 28,
     "unrankedEdges": 75,
-    "upwardEdges": 70
+    "upwardEdges": 52
   },
   "unassigned": [
     {
