@@ -1,5 +1,5 @@
 /**
- * `rafa release settle` (`src/commands/release/settle.ts`), spawned as
+ * `rafa release settle` (`packages/rafa-release/src/commands/release/settle.ts`), spawned as
  * the real `rafa` binary — `src/tests/cli-capture.ts` — over a fragment a
  * SQUASH merge carries to `main`: `git merge --squash <branch>` stages the
  * branch's changes with no merge commit and no parent but `main`'s own

@@ -23,8 +23,8 @@ import type { TriageReading } from './triage-report.js';
 import type { ResolveRun } from './triage-resolve.js';
 import type { PullRequestDetail, PullRequests } from '../../pr/index.js';
 import type { TriageClass } from '../../pr/triage/classes.js';
-import type { SettleSettings } from '../../release/settle.js';
 import type { Output } from '@open-tomato/rafa/ports';
+import type { SettleSettings } from '@open-tomato/rafa-release/release/settle';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,11 +35,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { parseFragment } from '@open-tomato/rafa/release/fragment';
+import { readGuard } from '@open-tomato/rafa-release/release/guard';
 
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';
-import { readGuard } from '../../release/guard.js';
 
 import { RESOLVE_STOP_EXIT, resolvePullRequest } from './triage-resolve.js';
 

@@ -10,7 +10,7 @@
  * the plan goes, and `tracker.default` and `tracker.fallback` for the
  * chain (`adapters/tracker/resolve.ts`), which lands on the first kind
  * whose preflight passes, each kind passed over warned about. Then the
- * open lines, through `readOpenStaleDocLines` (`src/docs/open-lines.ts`):
+ * open lines, through `readOpenStaleDocLines` (`packages/rafa-release/src/docs/open-lines.ts`):
  * every unticked checklist item of every open `chore` issue whose body
  * holds the stale-docs marker, issue by issue in listing order, so a
  * forecast that shifted between two runs, and opened a second issue,

@@ -19,7 +19,7 @@ Ten actions read and control pull requests:
   and where the release is on the forecast its body carries, marked
   `(base moved)` when `origin/<base>` as last fetched holds another version
   or other waiting fragments than the body's `rafa:release` marker names
-  (`src/commands/pr/list-forecast.ts`, over `src/release/body-forecast.ts`;
+  (`src/commands/pr/list-forecast.ts`, over `packages/rafa-release/src/release/body-forecast.ts`;
   no fetch, no fold, no extra `gh` command)
 - `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
   merge the PR; `--skip-checks` is for a PR that reports no checks at all
@@ -113,7 +113,7 @@ learning, output, planner, sync and logger only), so adding a method to it bumps
 no version.
 
 `create` and `editTitle` are rafa-367's, for settle's `pr` delivery
-(`src/release/settle-pr.ts`), which opens or updates the one pending
+(`packages/rafa-release/src/release/settle-pr.ts`), which opens or updates the one pending
 release pull request from `rafa/release`. `create` takes a
 `PullRequestDraft` — `head`, `base`, `title`, `body`, the head already
 pushed — and answers the pull request as `gh pr view` reads it back; it
@@ -234,7 +234,7 @@ sentence replaces nothing.
    merge question, `--yes` does not answer it, and without a TTY `ask`
    refuses. Settle's release pull request, a head of `rafa/release`
    (`RELEASE_PR_BRANCH`) that stamps a version the base has neither
-   released nor passed (`src/release/release-delivery.ts`), is not
+   released nor passed (`packages/rafa-release/src/release/release-delivery.ts`), is not
    `stale`: it prints one line on stdout,
    `Release: #<n> is settle's release pull request; merging it lands <version>`,
    with no forecast and no `fix:` line, merges whatever

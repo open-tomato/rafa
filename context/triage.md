@@ -254,7 +254,7 @@ The `stale_docs` table holds one row per entry per session and kind. Its
   doc task's own `stale_docs` field names. `src/start/stale-docs.ts` writes
   these only for a task declared `docs=repair` that ended `done`, and adds
   each as one line to the release's stale-docs issue (see
-  `src/docs/release-issue.ts`). A blocked, failed or interrupted doc task
+  `packages/rafa-release/src/docs/release-issue.ts`). A blocked, failed or interrupted doc task
   stores nothing: its next attempt reports again.
 
 The unique index covers the session, the kind, the place and the text, so a

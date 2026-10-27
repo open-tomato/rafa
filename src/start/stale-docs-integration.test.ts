@@ -38,8 +38,7 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
-
-import { STALE_DOCS_MARKER, staleDocsTitle } from '../docs/release-issue.js';
+import { STALE_DOCS_MARKER, staleDocsTitle } from '@open-tomato/rafa-release/docs/release-issue';
 
 import { createStartStaleDocs } from './stale-docs.js';
 

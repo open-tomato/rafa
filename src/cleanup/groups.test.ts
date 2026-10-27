@@ -6,10 +6,10 @@
  */
 import type { BranchesRead, LocalBranch } from './branches.js';
 import type { BranchGroups, BranchGroupsReading, MergedRow, ProviderMerges } from './groups.js';
-import type { PastHeadRead } from './past-head.js';
 import type { WorktreeBlocker, WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { MergedPullRequest } from '@open-tomato/rafa/pr/types';
+import type { PastHeadRead } from '@open-tomato/rafa-release/cleanup/past-head';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

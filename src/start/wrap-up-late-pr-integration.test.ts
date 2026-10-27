@@ -29,8 +29,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { RELEASE_BLOCK_OPEN } from '@open-tomato/rafa-release/release/branch-forecast';
 
-import { RELEASE_BLOCK_OPEN } from '../release/branch-forecast.js';
 import { expectExit } from '../tests/cli-capture.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
 

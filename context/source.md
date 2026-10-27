@@ -17,17 +17,17 @@ spells out, and the shapes the lint config forces.
   Shared refusals and readers live in the subject that first needed them
   rather than in a neutral module: command modules take the plan readers
   from the plan barrel, `@open-tomato/rafa/core/plan`, and
-  `src/commands/release/tag.ts` takes `versionTag` from
+  `packages/rafa-release/src/commands/release/tag.ts` takes `versionTag` from
   `../../release/version-tag.js` so two writers cannot spell one tag
   differently. Reach for the existing helper — a second spelling of a
   refusal is the real smell, as `release status`'s hand-rolled
   `Expected no arguments` is beside `packages/rafa/src/commands/plan/plan-files.ts`'s
   shared `expectNoArgument`, which says `Expected no argument`.
-  `src/commands/release/workflows.ts` takes `readLadderFiles` from
-  `src/commands/doctor-ladder.ts`, the ladder's readings the doctor row
-  takes too, and `LADDER_WORKFLOWS` from `src/release/ladder.ts` and
+  `packages/rafa-release/src/commands/release/workflows.ts` takes `readLadderFiles` from
+  `packages/rafa-release/src/commands/doctor-ladder.ts`, the ladder's readings the doctor row
+  takes too, and `LADDER_WORKFLOWS` from `packages/rafa-release/src/release/ladder.ts` and
   `readReleaseTemplate` and `writeReleaseWorkflow` from
-  `src/release/templates.ts`, so the command and the doctor row read one
+  `packages/rafa-release/src/release/templates.ts`, so the command and the doctor row read one
   set of files.
 - **Every `import type` line forms one `import/order` group**
   (`packages/eslint-config/sharedRules.mjs`), and no short rule predicts its order: neither plain
@@ -449,12 +449,13 @@ on the import graph that the function cannot move there. A function that is
 pure, or that reaches nothing past core, moves into core instead. The five
 entries are calls of a lower package, board or release, each into a higher one:
 
-- `addStaleDocLine`, release's, in `src/docs/release-issue.ts`, a file release
-  holds by name since the sixth decouple item (reach 6 at aec5e4a, the figure
-  the registry records; a second method read 95, so the figure is unsettled and
+- `addStaleDocLine`, release's, in
+  `packages/rafa-release/src/docs/release-issue.ts`, a file release holds by
+  name since the sixth decouple item (reach 6 at aec5e4a, the figure the
+  registry records; a second method read 95, so the figure is unsettled and
   was not re-measured), for `rafa epic close`, which adds a line to the
   release's stale-docs issue, whose module reads the release version helpers of
-  `src/release/`.
+  `packages/rafa-release/src/release/`.
 - `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for
   `rafa issue ready`, which ends naming the next step and runs its action
   through run's dispatch.
@@ -821,21 +822,21 @@ names come from, and the facade entry is no node.
     `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an
     effort file, sat among them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
-    Release had one, `src/docs/release-issue.ts`; the sixth decouple item placed
+    Release had one, `packages/rafa-release/src/docs/release-issue.ts`; the sixth decouple item placed
     that file in release by name, so release has none now.
     `packages/rafa-board/src/board/project/facts.ts` left the group in the
     fourth decouple item: its one release import by path,
     of `directoryPrefix` and `fragmentIdOf`, now comes from core's
     `@open-tomato/rafa/release/fragment`. Pr had thirteen:
-    `src/claims/lost.ts`, `src/cleanup/past-head.ts`,
-    `src/cleanup/worktrees.ts`, `src/commands/release/status-fragments.ts`,
-    `src/next/epic-end.ts`, `src/next/hint.ts`, `src/next/hop-rows.ts`,
-    `src/next/readings.ts`, `src/release/branch-forecast.ts`,
-    `src/release/settle-pr.ts`, `src/start/pr-lifecycle.ts`,
+    `src/claims/lost.ts`, `packages/rafa-release/src/cleanup/past-head.ts`,
+    `src/cleanup/worktrees.ts`, `packages/rafa-release/src/commands/release/status-fragments.ts`,
+    `packages/rafa-release/src/next/epic-end.ts`, `src/next/hint.ts`, `src/next/hop-rows.ts`,
+    `src/next/readings.ts`, `packages/rafa-release/src/release/branch-forecast.ts`,
+    `packages/rafa-release/src/release/settle-pr.ts`, `src/start/pr-lifecycle.ts`,
     `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. Five of them,
-    `src/cleanup/past-head.ts`, `src/commands/release/status-fragments.ts`,
-    `src/next/epic-end.ts`, `src/release/branch-forecast.ts` and
-    `src/release/settle-pr.ts`, are release files by the cut table's unit that
+    `packages/rafa-release/src/cleanup/past-head.ts`, `packages/rafa-release/src/commands/release/status-fragments.ts`,
+    `packages/rafa-release/src/next/epic-end.ts`, `packages/rafa-release/src/release/branch-forecast.ts` and
+    `packages/rafa-release/src/release/settle-pr.ts`, are release files by the cut table's unit that
     import pr from a package earlier in the move order; their edges are back
     edges the decouple step before pass 4 cuts, and they sat in this group
     because the load-cycle group comes first. The sixth decouple item
@@ -844,7 +845,7 @@ names come from, and the facade entry is no node.
     `src/claims/lost.ts`, `src/cleanup/worktrees.ts`, `src/next/hint.ts`,
     `src/next/hop-rows.ts`, `src/next/readings.ts`, `src/start/pr-lifecycle.ts`,
     `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. Run had nine:
-    `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/next/epic-end.ts`,
+    `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `packages/rafa-release/src/next/epic-end.ts`,
     `src/next/owner-gate.ts`, `packages/rafa-board/src/next/relation-readings.ts`,
     `src/next/settle-step.ts`, `src/next/sources.ts`, `src/triage/base-run.ts`
     and `src/triage/inherited.ts`. The sixth decouple item cut `epic-end.ts` off
@@ -866,8 +867,8 @@ names come from, and the facade entry is no node.
     effort file imports it. Release has none in the codemod's grouping, since
     `packages/rafa-board/src/board/project/facts.ts`, its one board importer, now takes
     `directoryPrefix` and `fragmentIdOf` from core. Pr had twelve: the ten
-    `src/commands/release/` files, `src/release/prepare.ts` and
-    `src/release/verify.ts`; `packages/rafa-board/src/commands/issue/create.ts` and
+    `src/commands/release/` files, `packages/rafa-release/src/release/prepare.ts` and
+    `packages/rafa-release/src/release/verify.ts`; `packages/rafa-board/src/commands/issue/create.ts` and
     `create-bug.ts` left it in the same item, when their pr imports moved
     into core;
     `packages/rafa-board/src/board/project/add-filed.ts`, `packages/rafa-board/src/commands/epic/close-triage.ts`,
@@ -955,7 +956,7 @@ names come from, and the facade entry is no node.
 - **What publishes is what the manifests say.** A workspace member publishes
   when its `package.json` holds no `"private": true`, and no config key names
   the packages that publish. The build (`publishableOf` in
-  `src/release/workspace-packages.ts`) and the release read that one field;
+  `packages/rafa-release/src/release/workspace-packages.ts`) and the release read that one field;
   the graph check reads it through `isPublishable` in
   `scripts/workspace/publish-rules.ts`. Every member is `private` today, so the
   build passes no external and no fragment can name a package for settle.

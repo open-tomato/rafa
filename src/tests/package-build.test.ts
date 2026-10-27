@@ -135,7 +135,9 @@
  * DIRECTORIES, so the build script ends with a loop over a table of
  * `<source>:<name under dist>` pairs, each source a path from the package
  * root since pass 4c moved the board tree to
- * `packages/rafa-board/src/board/templates/`. Three readings shape it:
+ * `packages/rafa-board/src/board/templates/`, and pass 4d the release
+ * tree to `packages/rafa-release/src/release/templates/`. Three readings
+ * shape it:
  *
  *   - It copies `*.md` and `*.yml` and nothing else. `src/pr/plans/`
  *     holds `load.ts` and `load.test.ts` beside the four plans, and
@@ -144,12 +146,12 @@
  *     file and names the two source modules that would land there.
  *     The `*.yml` copy is for the epic guard workflow
  *     `packages/rafa-board/src/board/templates/epic-guard.yml` and the
- *     release ladder's `src/release/templates/*.yml`, and a case resolves
- *     each through `readEpicGuard` and `readReleaseTemplate` pointed at
- *     `dist/`.
+ *     release ladder's `packages/rafa-release/src/release/templates/*.yml`,
+ *     and a case resolves each through `readEpicGuard` and
+ *     `readReleaseTemplate` pointed at `dist/`.
  *     Each pattern is copied file by file behind an `[ -e ]` guard, so
  *     a tree holding no YAML (`src/pr/plans/`) or no markdown
- *     (`src/release/templates/`) is not a failure.
+ *     (`packages/rafa-release/src/release/templates/`) is not a failure.
  *   - A tree lands DIRECTLY under `dist/`, as `dist/plans`,
  *     `dist/templates` and `dist/release-templates`, not at its source
  *     path; the release tree takes its own name because `templates` is
@@ -497,13 +499,13 @@ import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { EPIC_GUARD_FILE, readEpicGuard } from '@open-tomato/rafa-board/board/epic-guard';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '@open-tomato/rafa-board/epic/verify-plan';
 import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
+import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '@open-tomato/rafa-release/release/templates';
 
 import * as configSource from '../config/index.js';
 import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
-import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '../release/templates.js';
 import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
@@ -782,7 +784,7 @@ const TEMPLATES: [string, string][] = [
 const ASSET_TREES: [string, string][] = [
   ['src/pr/plans', 'plans'],
   ['packages/rafa-board/src/board/templates', 'templates'],
-  ['src/release/templates', RELEASE_TEMPLATES_DIRNAME],
+  ['packages/rafa-release/src/release/templates', RELEASE_TEMPLATES_DIRNAME],
 ];
 
 /**
@@ -1946,7 +1948,7 @@ describe('the asset trees in the build', () => {
   });
 
   it('lands the release publish workflow where readReleaseTemplate looks for it from a bundle in dist', () => {
-    const source = readFileSync(join(PACKAGE_DIR, 'src/release/templates', RELEASE_PUBLISH_FILE), 'utf8');
+    const source = readFileSync(join(PACKAGE_DIR, 'packages/rafa-release/src/release/templates', RELEASE_PUBLISH_FILE), 'utf8');
 
     expect(readReleaseTemplate(RELEASE_PUBLISH_FILE, DIST)).toBe(source);
   });

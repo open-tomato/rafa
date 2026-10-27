@@ -42,15 +42,15 @@ import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
-
-import { renderDocUpdatePlan } from '../commands/docs/plan.js';
 import {
   addStaleDocLine,
   NEXT_VERSION,
   NO_EDITABLE_TRACKER,
   STALE_DOCS_MARKER,
   staleDocsTitle,
-} from '../docs/release-issue.js';
+} from '@open-tomato/rafa-release/docs/release-issue';
+
+import { renderDocUpdatePlan } from '../commands/docs/plan.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { createStartStaleDocs, readStaleDocsVersion } from './stale-docs.js';

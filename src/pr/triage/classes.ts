@@ -77,7 +77,7 @@ import type { PullRequestSummary } from '@open-tomato/rafa/pr/types';
  * still commented, it is simply never resolved automatically.
  * `conflict-version` is the release guard's reading, not git's: the
  * branch stamped a version (`stale` or `collision` in
- * `src/release/guard.ts`) where the base expects a fragment.
+ * `packages/rafa-release/src/release/guard.ts`) where the base expects a fragment.
  */
 export type TriageClass
   = | 'green'

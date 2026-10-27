@@ -2,9 +2,10 @@
  * The files the cut table names for each feature package (#808, pass 1):
  * root files that reach a feature package, placed by name whatever their
  * folder. A named file keeps its path until its package moves; the board
- * list follows its files since pass 4c. Each list is sorted by UTF-16
- * code unit, and `CUT_RULES` of `cut-table.ts` reads them, so a file
- * named here is placed in its package and is not left to place.
+ * and release lists follow their files since passes 4c and 4d. Each list
+ * is sorted by UTF-16 code unit, and `CUT_RULES` of `cut-table.ts` reads
+ * them, so a file named here is placed in its package and is not left to
+ * place.
  *
  * @module
  */
@@ -59,8 +60,9 @@ export const BOARD_NAMED: readonly string[] = [
  * item (rafa-1333) moved `packages/rafa/src/bugs/fill.ts` and
  * `packages/rafa/src/bugs/versions.ts` into core's package too, and the
  * same folder places them. The sixth decouple item (rafa-1362) moved the
- * stale-docs files `src/docs/open-lines.ts` and `src/docs/release-issue.ts`
- * to the release list, since each reaches only release and core.
+ * stale-docs files `packages/rafa-release/src/docs/open-lines.ts` and
+ * `packages/rafa-release/src/docs/release-issue.ts` to the release list,
+ * since each reaches only release and core.
  */
 export const PR_NAMED: readonly string[] = [
   'src/bugs/filed-values.ts',
@@ -119,15 +121,18 @@ export const RUN_NAMED: readonly string[] = [
  * here by pass 1's rule: each reaches only release and core
  * (`release-issue.ts` the release forecast and version helpers,
  * `open-lines.ts` only `release-issue.ts`), and a file goes with the
- * latest package it reaches.
+ * latest package it reaches. Since pass 4d the list names each file at its
+ * path in release's package, `packages/rafa-release/src/`, where the
+ * `packages/rafa-release/` folder of `CUT_RULES` would place it too; the
+ * order is the one it had, since the paths share the prefix.
  */
 export const RELEASE_NAMED: readonly string[] = [
-  'src/cleanup/past-head.ts',
-  'src/commands/doctor-ladder.ts',
-  'src/docs/open-lines.ts',
-  'src/docs/release-issue.ts',
-  'src/next/epic-end.ts',
-  'src/project/lock.ts',
+  'packages/rafa-release/src/cleanup/past-head.ts',
+  'packages/rafa-release/src/commands/doctor-ladder.ts',
+  'packages/rafa-release/src/docs/open-lines.ts',
+  'packages/rafa-release/src/docs/release-issue.ts',
+  'packages/rafa-release/src/next/epic-end.ts',
+  'packages/rafa-release/src/project/lock.ts',
 ];
 
 /**

@@ -16,7 +16,7 @@
  * frozen facade whose members refuse, naming the root
  * `src/service-registry.ts`, while nothing is registered. `shapes.ts`:
  * the types the five service types are written over, the three
- * stale-docs line types `src/docs/release-issue.ts` declared before
+ * stale-docs line types `packages/rafa-release/src/docs/release-issue.ts` declared before
  * among them, and the five service types themselves.
  *
  * ## Why one barrel can hold both

@@ -36,9 +36,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
+import { readSettle } from '@open-tomato/rafa-release/release/settle';
 
 import { createGitRunner } from '../pr/index.js';
-import { readSettle } from '../release/settle.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../tests/cli-capture.js';
 
 import {

@@ -38,8 +38,7 @@ import { activeServices, registerServices, restoreServices } from '@open-tomato/
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 import { createLocalTracker } from '@open-tomato/rafa-board/adapters/tracker/local';
 import { docsOnlyWhat, isDocsOnlyCriterion, routeDocsOnlyFailure } from '@open-tomato/rafa-board/commands/epic/close-docs';
-
-import { staleDocsTitle } from '../../../../docs/release-issue.js';
+import { staleDocsTitle } from '@open-tomato/rafa-release/docs/release-issue';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-close-docs-')));
 

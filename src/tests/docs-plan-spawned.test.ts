@@ -21,8 +21,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
-
-import { STALE_DOCS_MARKER } from '../docs/release-issue.js';
+import { STALE_DOCS_MARKER } from '@open-tomato/rafa-release/docs/release-issue';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

@@ -1067,7 +1067,8 @@ const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, command
     'pr current', 'pr show', 'pr view', 'pr open', 'pr retarget', 'pr close', 'pr list', 'pr wait', 'pr merge', 'pr triage',
   ]],
   ['./commands/claim/index.js', 'RUN_FEATURE', ['claim release', 'claim hand', 'claim accept', 'claim take']],
-  ['./commands/release/index.js', 'RELEASE_FEATURE', ['release status', 'release settle', 'release tag', 'release publish', 'release workflows', 'release fragment', 'release list']],
+  // The release entry moved with release into its package in pass 4d (#808).
+  ['../packages/rafa-release/src/commands/release/index.js', 'RELEASE_FEATURE', ['release status', 'release settle', 'release tag', 'release publish', 'release workflows', 'release fragment', 'release list']],
 ];
 
 /**

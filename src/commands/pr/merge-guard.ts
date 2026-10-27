@@ -3,9 +3,9 @@
  * `readMergeRefusal` answers and before the merge question, so a branch
  * the guard stops is refused before anything is asked about the merge.
  *
- * What the guard answers and how it reads is `src/release/guard.ts`'s;
+ * What the guard answers and how it reads is `packages/rafa-release/src/release/guard.ts`'s;
  * the fetches ahead of it and the reaction the two settings choose are
- * `src/release/guard-merge.ts`'s. This module is the half that acts on
+ * `packages/rafa-release/src/release/guard-merge.ts`'s. This module is the half that acts on
  * that reaction:
  *
  *   - `silent` — prints nothing (`pr.versionCollision: allow`).
@@ -34,7 +34,7 @@
  * lines after, so a `stale` or `collision` refusal still ENDS with
  * `rafa pr triage <n> --resolve`, the line the reader acts on.
  *
- * Settle's release pull request (`src/release/release-delivery.ts`) is
+ * Settle's release pull request (`packages/rafa-release/src/release/release-delivery.ts`) is
  * met before any of these: a head of `RELEASE_PR_BRANCH` the guard
  * reads as the delivery prints its one line,
  * `Release: #<n> is settle's release pull request; merging it lands
@@ -43,7 +43,7 @@
  * the answer `release` and the reaction `print` (#843).
  *
  * The guard runs only where the release does: `release.enabled` read as
- * the wrap-up reads it (`src/release/enabled.ts`), so a project with no
+ * the wrap-up reads it (`packages/rafa-release/src/release/enabled.ts`), so a project with no
  * version file or no changelog under `auto` gets no step, no fetch and
  * no line, and its `pr merge` is what it was before the guard.
  */

@@ -89,18 +89,18 @@
  * merge and triage one repository's pull requests through the
  * PullRequests port and share `pr/pr-context.ts`, nor `release status`, `release tag` and `release list`, which
  * read the version file, the changelog and the repository's tags
- * through `src/release/` and share `release/status.ts`'s seams, nor
+ * through `packages/rafa-release/src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
- * worktree of the base through `src/release/settle*.ts`, nor
+ * worktree of the base through `packages/rafa-release/src/release/settle*.ts`, nor
  * `release publish`, which runs `release.publishCommand` in each tagged
- * unit's directory through `./release/tag-units.ts`,
- * `./release/tag-follow-ups.ts` and `src/release/version-tag.ts`, nor
+ * unit's directory through `packages/rafa-release/src/commands/release/tag-units.ts`,
+ * `tag-follow-ups.ts` beside it and `packages/rafa-release/src/release/version-tag.ts`, nor
  * `release workflows`, which reads the ladder's files through
- * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
- * the shipped templates through `src/release/templates.ts`, nor
+ * `packages/rafa-release/src/release/ladder.ts` and `packages/rafa-release/src/commands/doctor-ladder.ts` and writes
+ * the shipped templates through `packages/rafa-release/src/release/templates.ts`, nor
  * `release fragment`, which writes one change fragment through
  * `packages/rafa/src/release/fragment.ts` and reads the waiting ones through
- * `src/release/fragment-tree.ts`, nor
+ * `packages/rafa-release/src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
@@ -136,7 +136,7 @@
  * `bug recheck`, which reads each bug's `Rerun` through
  * `src/bugs/test-reference.ts` and reruns it through `src/suite/run.ts`
  * in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
- * stale-docs issues through `src/docs/open-lines.ts`.
+ * stale-docs issues through `packages/rafa-release/src/docs/open-lines.ts`.
  *
  * ## What is registered
  *

@@ -75,13 +75,13 @@ import { resolveScope } from '@open-tomato/rafa/project/scope';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import issueReady from '@open-tomato/rafa-board/commands/issue/ready';
 import issueUnblock from '@open-tomato/rafa-board/commands/issue/unblock';
+import releaseSettle from '@open-tomato/rafa-release/commands/release/settle';
 
 import loopStart from '../commands/loop/start.js';
 import planCreate from '../commands/plan/create.js';
 import prMerge from '../commands/pr/merge.js';
 import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
-import releaseSettle from '../commands/release/settle.js';
 
 import {
   actionInvocation,

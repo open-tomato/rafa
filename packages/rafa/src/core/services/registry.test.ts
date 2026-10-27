@@ -235,11 +235,13 @@ describe('SERVICE_REASONS', () => {
     expect(Object.keys(SERVICE_REASONS)).toEqual(KEYS);
   });
 
-  it('names board or release as lower, run, pr or release as higher, a home under src/ and a reach above zero for every key', () => {
+  it('names board or release as lower, run, pr or release as higher, a home under src/ or the higher package\'s src/ and a reach above zero for every key', () => {
     for (const [key, reason] of Object.entries(SERVICE_REASONS)) {
       expect([key, ['board', 'release'].includes(reason.lower)]).toEqual([key, true]);
       expect([key, ['run', 'pr', 'release'].includes(reason.higher)]).toEqual([key, true]);
-      expect([key, reason.home.startsWith('src/')]).toEqual([key, true]);
+      // A home moves with its higher package (release's in pass 4d, #808).
+      const homeRoots = ['src/', `packages/rafa-${reason.higher}/src/`];
+      expect([key, homeRoots.some((root) => reason.home.startsWith(root))]).toEqual([key, true]);
       expect([key, existsSync(resolve(ROOT, reason.home))]).toEqual([key, true]);
       expect([key, reason.reach > 0]).toEqual([key, true]);
       expect([key, reason.why.length > 0]).toEqual([key, true]);

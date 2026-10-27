@@ -159,7 +159,7 @@ session. Verify step 3 checks that the fragment is the only file the release
 step changed (git status over the version file, changelog and fragments folder),
 and the commit is `chore: release fragment <plan id>`. The wrap-up never edits
 the version file or the changelog. `packages/rafa/src/release/fragment.ts` holds the format,
-parser, and the name allocation logic (`src/release/fragment-tree.ts` reads
+parser, and the name allocation logic (`packages/rafa-release/src/release/fragment-tree.ts` reads
 the base branch's fragments after a `git fetch` to pick the right name).
 
 `rafa release fragment --plan=<id> --level=<level> --title=<text>
@@ -209,7 +209,7 @@ line; each workspace package a fragment names folds from the `version` of its
 own `<dir>/package.json` over that package's fragments. Every batch keeps the
 same first-parent order. A package no fragment names is never folded, and it
 keeps its version through a release. The pull request body's forecast
-(`src/release/branch-forecast.ts`) applies the same split: it folds only the
+(`packages/rafa-release/src/release/branch-forecast.ts`) applies the same split: it folds only the
 waiting fragments whose `package` equals the branch fragment's (null with null),
 so a package fragment waiting on the base does not move the root's forecast.
 A package slot folds from the member's own manifest version at the base commit,
@@ -253,7 +253,7 @@ the base branch (the root's, and each workspace package a fragment names),
 deletes the fragments it folded, commits them all at once as
 `chore: release <version>`, `chore: release <version>, <name>@<version>` or
 `chore: release <name>@<version>` (`releaseCommitSubject`,
-`src/release/release-move.ts`) and pushes. If the push is refused, settle
+`packages/rafa-release/src/release/release-move.ts`) and pushes. If the push is refused, settle
 fetches again. If the fragments it folded are gone (another machine settled
 them), it stops with exit 0. If new fragments
 arrived, it recomputes and retries once, then stops with exit 1 if that retry
@@ -283,7 +283,7 @@ that would settle, and writes nothing to the tree or remote.
 
 A base with no `release.changelog` doesn't stop a settle (#842): the release
 commit creates the file holding `# Changelog` and the settled section
-(`buildSettle`, `src/release/settle.ts`), and settle prints
+(`buildSettle`, `packages/rafa-release/src/release/settle.ts`), and settle prints
 `Changelog: <path> is missing, so the release commit creates it under "# Changelog".`
 above its delivery line. A delivery that refused prints no such line. The dry
 run reads the base's tree, not the checkout, and prints the same line. Only an
@@ -301,7 +301,7 @@ changelog, since a tag names a version a section already holds.
 
 **The lock** (`release.moveLock: true`): the release commit also writes
 `rafa.lock` at the repository root, the record of which rafa the project was
-last brought to (`src/project/lock.ts`), to the version settle folds to. It
+last brought to (`packages/rafa-release/src/project/lock.ts`), to the version settle folds to. It
 goes in the same commit as the version file and the changelog, and the commit
 creates it when the base holds none. The lock step reads git objects only, as
 the rest of the reading does: the manifest and `rafa.lock` at the base commit
@@ -326,7 +326,7 @@ reads or writes the lock.
 landed (or that another settle beat to the same fragments) is followed by a
 refresh of the repository's project: the issues closed by the pull requests
 whose commits added the folded fragments, so their Stage moves from In review to
-Done (`src/commands/release/settle-project.ts`). A dry run and a PR delivery
+Done (`packages/rafa-release/src/commands/release/settle-project.ts`). A dry run and a PR delivery
 send no call, since the fragments are still on the base; `rafa board sync`
 catches up the issues a release pull request ships. Its lines are warnings and
 never change settle's exit code.
@@ -353,8 +353,8 @@ versions at or below the boundary are accepted as "released before settle
 existed"; versions above it must carry a receipt. This keeps old releases from
 needing retrofitted fragments and makes every pre-settle section acceptable.
 
-`src/release/receipt.ts` computes the boundary by reading the changelog;
-`src/release/audit.ts` in `rafa release status` audits the changelog and names
+`packages/rafa-release/src/release/receipt.ts` computes the boundary by reading the changelog;
+`packages/rafa-release/src/release/audit.ts` in `rafa release status` audits the changelog and names
 any heading with no root tag above the adoption boundary.
 
 The `{title}` in `release.heading` renders the batch's plan titles in fold order
@@ -368,7 +368,7 @@ settle deterministic across machines and retries.
 branch that set that unit's version: `v<version>` for the root, read off
 `release.versionFile` and `release.changelog`, and `<name>@<version>` for each
 publishable workspace package, read off `<dir>/package.json` and
-`<dir>/CHANGELOG.md` (`src/commands/release/tag-units.ts`). The branch is
+`<dir>/CHANGELOG.md` (`packages/rafa-release/src/commands/release/tag-units.ts`). The branch is
 checked once for the run, and every unit is decided before the first tag is
 written: a unit whose version a tag already names is skipped, the run refuses
 `tagged` only when every unit is skipped, and any other refusal of any unit
@@ -381,14 +381,14 @@ publishes <name>@<version> to <registry> through
 RAFA_RELEASE_PUBLISH is ci (release.publish: ci).`, for the units
 that would have had a publish line (a unit with no name, or a private one,
 gets neither), and json mode carries `publish: "ci"` on that unit
-(`src/commands/release/tag-follow-ups.ts`). The sentence names the switch: with
+(`packages/rafa-release/src/commands/release/tag-follow-ups.ts`). The sentence names the switch: with
 the variable unset the tag still goes out, and the publish job it names is
 skipped, not failed. Without `--push` it
 reaches no network and each push is a line to copy, naming the remote `--push`
 would reach (#857).
 
 With `--push` (#736) it pushes each tag itself once every tag is written, in
-unit order (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote
+unit order (`pushTag`, `packages/rafa-release/src/release/tag-push.ts`), never forced, to the remote
 the release branch tracks (`branch.<pr.base>.remote`), or `origin` when the
 branch tracks none or tracks a local branch. A push that went prints
 `✅ Pushed <tag> to <remote>.` under its `Tagged` line and drops that push line
@@ -455,9 +455,9 @@ changelog section into a fragment and restore the version file to the base
 branch's value, in one commit on the branch.
 
 Settle's own release pull request is not a failure (#843). A head of
-`rafa/release` (`RELEASE_PR_BRANCH`, `src/release/settle-pr.ts`) whose stamp
+`rafa/release` (`RELEASE_PR_BRANCH`, `packages/rafa-release/src/release/settle-pr.ts`) whose stamp
 the base has neither released nor passed is the delivery
-(`src/release/release-delivery.ts`): `rafa pr merge` prints one line,
+(`packages/rafa-release/src/release/release-delivery.ts`): `rafa pr merge` prints one line,
 `Release: #<n> is settle's release pull request; merging it lands <version>`,
 in place of the `stale` line, the forecast's no-fragment line and the `fix:`
 line, and merges whatever `pr.versionCollision` says; `rafa pr triage` gives it
@@ -487,23 +487,23 @@ last fetched) and prints:
   `<n> publishable` otherwise, with one line per package under it, its
   name, the version its manifest declares, how many waiting fragments name
   it and its newest tag (`latestTagOf`) or `untagged`; read in
-  `src/commands/release/status-packages.ts` (`readPackages`)
+  `packages/rafa-release/src/commands/release/status-packages.ts` (`readPackages`)
 - An audit of released history: versions two headings name, gaps (a version not
   the next patch/minor/major bump from the one below it), dates out of order,
   and headings with no tag above the adoption boundary
 - The `stale docs` row: how many unticked lines the open stale-docs issues hold
   on the tracker the chain lands on (`readOpenStaleDocLines`, read in
-  `src/commands/release/status-stale-docs.ts`), `none` at zero, and `?` with
+  `packages/rafa-release/src/commands/release/status-stale-docs.ts`), `none` at zero, and `?` with
   the reason under the block when the chain lands nowhere or the listing
   fails. It is the one reading that can reach the network, and no count
-  changes the exit code. Its two files, `src/docs/open-lines.ts` and
-  `src/docs/release-issue.ts`, are release's by name since the sixth decouple
+  changes the exit code. Its two files, `packages/rafa-release/src/docs/open-lines.ts` and
+  `packages/rafa-release/src/docs/release-issue.ts`, are release's by name since the sixth decouple
   item.
 
-Exits 0. Never writes. Implemented in `src/commands/release/status.ts`; the
+Exits 0. Never writes. Implemented in `packages/rafa-release/src/commands/release/status.ts`; the
 readers other folders import (`compareVersions`, `changelogVersions`,
 `readTags`, `readUntagged`, `rootTags`) are its library half,
-`src/release/status-readings.ts`.
+`packages/rafa-release/src/release/status-readings.ts`.
 
 **`rafa release list`** prints one row per unit that releases on its own,
 the root first (`@open-tomato/rafa  0.45.0  2 waiting  v0.45.0`), then each
@@ -513,7 +513,7 @@ the version file's manifest `name`, for display only; its version comes from
 `release.versionFile`, its waiting count from the base's fragments with no
 `package` line, its tag from the latest root tag. A column it could not read
 is `?`, with the reason under the rows, and it still exits 0. Never writes.
-Implemented in `src/commands/release/list.ts`, over `status`'s readers.
+Implemented in `packages/rafa-release/src/commands/release/list.ts`, over `status`'s readers.
 
 **`rafa pr list`** shows each open pull request's forecast (the version and
 section that settle would produce if the branch merged now), marked as forecast,
@@ -568,7 +568,7 @@ request's body then names as tagging and publishing on the merge.
 publish, default `npm publish`. Free text: `rafa release tag` prints it as
 written and never runs it, and `rafa release publish` runs it through the shell
 in each unit's folder for the release tags on HEAD, skipping a version the
-registry holds (`src/commands/release/publish.ts`). So a project that publishes
+registry holds (`packages/rafa-release/src/commands/release/publish.ts`). So a project that publishes
 with another tool or a flag (`pnpm publish --tag next`) spells it here. When HEAD is past the tagged commit the line becomes
 `git switch --detach <tag> && <publishCommand> && git switch <branch>`, so the
 tagged tree is the one published. A workspace package's line runs it in the

@@ -11,8 +11,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { BOARD_LABELS } from '@open-tomato/rafa-board/board/setup';
+import { LOCK_FILE, projectLockText, writeProjectLock } from '@open-tomato/rafa-release/project/lock';
 
-import { LOCK_FILE, projectLockText, writeProjectLock } from '../../project/lock.js';
 import { PROJECT_TREE } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

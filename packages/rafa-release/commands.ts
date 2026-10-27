@@ -4,4 +4,4 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-release --commands`.
  */
 
-export { RELEASE_FEATURE } from '../../src/commands/release/index.js';
+export { RELEASE_FEATURE } from './src/commands/release/index.js';

@@ -14,14 +14,14 @@
  * `afterEach` puts it back to null.
  */
 import type { ReleaseFinish } from './release-stage.js';
-import type { ReleasePreparation } from '../release/prepare.js';
 import type { Script } from '../tests/release-stage-fixtures.js';
+import type { ReleasePreparation } from '@open-tomato/rafa-release/release/prepare';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { RELEASE_BLOCK_CLOSE } from '@open-tomato/rafa-release/release/branch-forecast';
 
-import { RELEASE_BLOCK_CLOSE } from '../release/branch-forecast.js';
 import {
   BRANCH,
   COMMITTED,

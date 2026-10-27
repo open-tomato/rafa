@@ -11,7 +11,7 @@
  * `git merge-tree --write-tree` (`./conflict.ts`), the repository's
  * workflow count through `PullRequests.workflowCount` (`../types.ts`),
  * and the release guard's verdict through `readGuard`
- * (`src/release/guard.ts`) — so nothing here spawns a process, reads a
+ * (`packages/rafa-release/src/release/guard.ts`) — so nothing here spawns a process, reads a
  * file or awaits. It is a pure function over those six, which is what lets one case per class
  * drive it from literals and what keeps the class set measurable from
  * both ends.

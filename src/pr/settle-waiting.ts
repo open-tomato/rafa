@@ -9,7 +9,7 @@
  * next`'s settle step (`src/next/settle-step.ts`), which turns it into
  * a state of its chain. {@link settleWaitingOn} is the reading both are
  * decided by, so the two cannot disagree about where settle is named:
- * the settle dry run (`readSettle`, `src/release/settle.ts`) over
+ * the settle dry run (`readSettle`, `packages/rafa-release/src/release/settle.ts`) over
  * `origin/<base>`, read only where the release runs (`release.enabled`,
  * as the wrap-up and the guard read it), and answered only for a
  * `folded` outcome. The dry run reads git objects alone and writes
@@ -18,7 +18,7 @@
  * This is the library half of two command files, and neither holds a
  * re-export of what left it. `src/commands/pr/merge-followups.ts` keeps
  * the follow-ups rule and imports the type; its other symbol that left
- * is `versionTag`, in `src/release/version-tag.ts`.
+ * is `versionTag`, in `packages/rafa-release/src/release/version-tag.ts`.
  * `src/commands/pr/merge-cleanup.ts` keeps the clean-up after a merge
  * and the gathering of the follow-ups, imports {@link settleWaitingOn},
  * and widens {@link SettleWaitingPlace} into its own follow-up place.

@@ -26,9 +26,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { RELEASE_PR_BRANCH } from '@open-tomato/rafa-release/release/settle-pr';
 
 import { createPrMergeCommand } from '../commands/pr/merge.js';
-import { RELEASE_PR_BRANCH } from '../release/settle-pr.js';
 
 import { dispatchInProject, eventsOf, expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

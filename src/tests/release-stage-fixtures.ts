@@ -24,12 +24,12 @@
  * using it resets it to null in an `afterEach`.
  */
 import type { GitResult, PrProviderReading, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
-import type { BranchForecast, BranchForecastInput } from '../release/branch-forecast.js';
-import type { ChangelogNote } from '../release/changelog.js';
-import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
-import type { ReleaseRefused, ReleaseVerified } from '../release/verify.js';
 import type { ReleaseStageInput, ReleaseStageSeams, ReleaseStageSettings } from '../start/release-stage.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
+import type { BranchForecast, BranchForecastInput } from '@open-tomato/rafa-release/release/branch-forecast';
+import type { ChangelogNote } from '@open-tomato/rafa-release/release/changelog';
+import type { ReleasePrepared, ReleaseSkipped } from '@open-tomato/rafa-release/release/prepare';
+import type { ReleaseRefused, ReleaseVerified } from '@open-tomato/rafa-release/release/verify';
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';

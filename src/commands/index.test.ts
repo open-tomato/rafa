@@ -85,13 +85,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
 import { BOARD_FEATURE } from '@open-tomato/rafa-board/commands/board/index';
+import { RELEASE_FEATURE } from '@open-tomato/rafa-release/commands/release/index';
 
 import { dispatch } from '../cli/dispatch.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { RUN_FEATURE } from './claim/index.js';
 import { PR_FEATURE } from './pr/index.js';
-import { RELEASE_FEATURE } from './release/index.js';
 
 import { BUNDLED_FEATURES, CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS, createRosterRegistry, ROSTER_SUBJECTS } from './index.js';
 

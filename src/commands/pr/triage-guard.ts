@@ -3,17 +3,17 @@
  * `classifyTriage` turns into `conflict-version` when the branch
  * stamped a version (`src/pr/triage/classify.ts`).
  *
- * What the guard answers and how it reads is `src/release/guard.ts`'s.
+ * What the guard answers and how it reads is `packages/rafa-release/src/release/guard.ts`'s.
  * This module only chooses the refs and the moment, the way
  * `./triage-read.ts` does for the conflict:
  *
  *   - It runs only where the release does — `release.enabled` read as
- *     `rafa pr merge`'s guard step reads it (`src/release/enabled.ts`) —
+ *     `rafa pr merge`'s guard step reads it (`packages/rafa-release/src/release/enabled.ts`) —
  *     and answers `null` everywhere else, so a project with no version
  *     file or no changelog under `auto` spends no git call on it and is
  *     classed as it was before the guard.
  *   - It FETCHES NOTHING. `rafa pr merge` fetches both branches before
- *     its guard (`src/release/guard-merge.ts`) because it is about to
+ *     its guard (`packages/rafa-release/src/release/guard-merge.ts`) because it is about to
  *     write the base; a triage is a read, and `./triage-read.ts`'s note
  *     gives the reason it never writes the operator's object database.
  *   - The refs are the conflict reading's candidates
@@ -23,7 +23,7 @@
  *     nothing answers a {@link GuardUnread} naming what was tried,
  *     which `classifyTriage` reads as no stamp.
  *   - Settle's release pull request — a head of `RELEASE_PR_BRANCH`
- *     whose reading `releaseDeliveryOf` (`src/release/release-delivery.ts`)
+ *     whose reading `releaseDeliveryOf` (`packages/rafa-release/src/release/release-delivery.ts`)
  *     calls the delivery — answers that {@link ReleaseDelivery} in place
  *     of its `stale` reading, and {@link triageVerdict} gives
  *     `classifyTriage` no verdict for it. So the release is never classed

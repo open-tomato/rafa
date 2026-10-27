@@ -1,9 +1,9 @@
 /**
- * `rafa release settle` (`src/commands/release/settle.ts`), spawned as
+ * `rafa release settle` (`packages/rafa-release/src/commands/release/settle.ts`), spawned as
  * the real `rafa` binary — `src/tests/cli-capture.ts` — racing for the
  * same push over one bare origin.
  *
- * `src/release/settle-push.test.ts` already proves the refused-push rule
+ * `packages/rafa-release/src/release/settle-push.test.ts` already proves the refused-push rule
  * in-process: it wraps `SettleWorktree.git` so a chosen push is preceded
  * by a commit the test lands itself, SIMULATING a race inside one call.
  * This file's own question is narrower and disjoint from that one —

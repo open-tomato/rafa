@@ -817,7 +817,7 @@ restores its own text on any failure, commits `chore: release fragment
 <plan id>` over the fragment alone, pushes, and writes the release forecast
 — or the failure sentence — into the PR body, with a level report when the
 plan's declared level is below its notes. Details at `context/release.md`; config in
-`src/release/setting.ts`.
+`packages/rafa-release/src/release/setting.ts`.
 
 ### The wrap-up and pull request
 

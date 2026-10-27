@@ -32,13 +32,13 @@
  * `pr merge` used to name `rafa release tag` for a version on the base
  * no `v<version>` tag named: the branch that stamped the version was the
  * release. No branch stamps a version any more; settle writes it on the
- * base and tags it as `release.tag` says (`src/release/settle-tag.ts`),
+ * base and tags it as `release.tag` says (`packages/rafa-release/src/release/settle-tag.ts`),
  * naming `rafa release tag` itself where it leaves the tag to the
  * operator. So the tag line is settle's to print, not the merge's.
  *
  * The tag's spelling left with it: `versionTag` is
- * `src/release/version-tag.ts`'s, where `src/commands/release/tag.ts`
- * and `src/release/settle-tag.ts` both build the tag they write from it.
+ * `packages/rafa-release/src/release/version-tag.ts`'s, where `packages/rafa-release/src/commands/release/tag.ts`
+ * and `packages/rafa-release/src/release/settle-tag.ts` both build the tag they write from it.
  *
  * ## The update waits for a live loop
  *
@@ -82,7 +82,7 @@
  *
  * This file is the command half of a split and re-exports neither
  * symbol that left it: `versionTag` is in
- * `src/release/version-tag.ts`, and {@link SettleWaiting}, the shape of
+ * `packages/rafa-release/src/release/version-tag.ts`, and {@link SettleWaiting}, the shape of
  * what the settle dry run folded, is in `src/pr/settle-waiting.ts`,
  * since `src/next/settle-step.ts` reads it too and library code imports
  * nothing under `src/commands/`.

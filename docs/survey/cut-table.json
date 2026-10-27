@@ -424,11 +424,6 @@
     },
     {
       "kind": "test",
-      "path": "src/commands/doctor-ladder.command.test.ts",
-      "upwardEdgesIn": 0
-    },
-    {
-      "kind": "test",
       "path": "src/commands/doctor-marks.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3094,6 +3089,116 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/release-coupled/commands/doctor-ladder.command.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/fragment.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/list.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/publish-repo.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/publish.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/settle-lock.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/settle-project.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/settle-workspace.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/settle.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/status-fragments.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/status-stale-docs.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/status.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/tag-workspace.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/tag.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/workflows.levels.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/commands/release/workflows.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/docs/release-issue.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/next/epic-end.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/release/changelog.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/release/scaffold.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/release/setting.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
+      "path": "src/tests/release-coupled/release/templates-shape.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/release-delivery-spawned-cli.test.ts",
       "upwardEdgesIn": 0
     },
@@ -4382,7 +4487,7 @@
           "from": "src/cleanup/groups.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/cleanup/past-head.ts",
+          "to": "packages/rafa-release/src/cleanup/past-head.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4396,7 +4501,7 @@
           "from": "src/cleanup/steps.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/cleanup/past-head.ts",
+          "to": "packages/rafa-release/src/cleanup/past-head.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4424,35 +4529,35 @@
           "from": "src/commands/pr/list-forecast.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/commands/release/status-fragments.ts",
+          "to": "packages/rafa-release/src/commands/release/status-fragments.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/list-forecast.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/body-forecast.ts",
+          "to": "packages/rafa-release/src/release/body-forecast.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/list-forecast.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/release/forecast.ts",
+          "to": "packages/rafa-release/src/release/forecast.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/list-forecast.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/version.ts",
+          "to": "packages/rafa-release/src/release/version.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/list.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/enabled.ts",
+          "to": "packages/rafa-release/src/release/enabled.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4473,28 +4578,28 @@
           "from": "src/commands/pr/merge-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/enabled.ts",
+          "to": "packages/rafa-release/src/release/enabled.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/merge-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/guard-merge.ts",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/merge-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/guard.ts",
+          "to": "packages/rafa-release/src/release/guard.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/merge-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/release-delivery.ts",
+          "to": "packages/rafa-release/src/release/release-delivery.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4515,7 +4620,7 @@
           "from": "src/commands/pr/pr-context.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/guard-merge.ts",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4529,42 +4634,42 @@
           "from": "src/commands/pr/triage-convert.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/release/settle.ts",
+          "to": "packages/rafa-release/src/release/settle.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/triage-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/enabled.ts",
+          "to": "packages/rafa-release/src/release/enabled.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/triage-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/release/guard-merge.ts",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/triage-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/guard.ts",
+          "to": "packages/rafa-release/src/release/guard.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/triage-guard.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/release-delivery.ts",
+          "to": "packages/rafa-release/src/release/release-delivery.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/commands/pr/triage-resolve.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/release/settle.ts",
+          "to": "packages/rafa-release/src/release/settle.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4605,22 +4710,29 @@
         {
           "from": "src/next/settle-step.ts",
           "fromPackage": "rafa-pr",
+          "kind": "value",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
+          "toPackage": "rafa-release"
+        },
+        {
+          "from": "src/next/settle-step.ts",
+          "fromPackage": "rafa-pr",
           "kind": "type",
           "to": "src/next/state.ts",
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/next/settle-step.ts",
+          "from": "src/next/sources.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/guard-merge.ts",
+          "to": "packages/rafa-release/src/next/epic-end.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/next/sources.ts",
           "fromPackage": "rafa-pr",
-          "kind": "value",
-          "to": "src/next/epic-end.ts",
+          "kind": "type",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4631,73 +4743,66 @@
           "toPackage": "rafa-run"
         },
         {
-          "from": "src/next/sources.ts",
-          "fromPackage": "rafa-pr",
-          "kind": "type",
-          "to": "src/release/guard-merge.ts",
-          "toPackage": "rafa-release"
-        },
-        {
           "from": "src/pr/settle-waiting.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/enabled.ts",
+          "to": "packages/rafa-release/src/release/enabled.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/settle-waiting.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/release/guard-merge.ts",
+          "to": "packages/rafa-release/src/release/guard-merge.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/settle-waiting.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/release-move.ts",
+          "to": "packages/rafa-release/src/release/release-move.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/settle-waiting.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/settle.ts",
+          "to": "packages/rafa-release/src/release/settle.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/triage/classify.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/release/guard.ts",
+          "to": "packages/rafa-release/src/release/guard.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/triage/version-convert.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/guard.ts",
+          "to": "packages/rafa-release/src/release/guard.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/triage/version-convert.ts",
           "fromPackage": "rafa-pr",
           "kind": "type",
-          "to": "src/release/settle.ts",
+          "to": "packages/rafa-release/src/release/settle.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/triage/version-convert.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/status-readings.ts",
+          "to": "packages/rafa-release/src/release/status-readings.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/pr/triage/version-convert.ts",
           "fromPackage": "rafa-pr",
           "kind": "value",
-          "to": "src/release/version.ts",
+          "to": "packages/rafa-release/src/release/version.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4954,7 +5059,7 @@
           "from": "src/cleanup/index.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
-          "to": "src/cleanup/past-head.ts",
+          "to": "packages/rafa-release/src/cleanup/past-head.ts",
           "toPackage": "rafa-release"
         },
         {
@@ -4975,112 +5080,112 @@
           "from": "src/start/release-body.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/branch-forecast.ts",
+          "to": "packages/rafa-release/src/release/branch-forecast.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/release-stage.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/branch-forecast.ts",
+          "to": "packages/rafa-release/src/release/branch-forecast.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/release-stage.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
-          "to": "src/release/changelog.ts",
+          "to": "packages/rafa-release/src/release/changelog.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/release-stage.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/level.ts",
+          "to": "packages/rafa-release/src/release/level.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/release-stage.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/prepare.ts",
+          "to": "packages/rafa-release/src/release/prepare.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/release-stage.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/verify.ts",
+          "to": "packages/rafa-release/src/release/verify.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/release-stage.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/version.ts",
+          "to": "packages/rafa-release/src/release/version.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/docs/release-issue.ts",
+          "to": "packages/rafa-release/src/docs/release-issue.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/enabled.ts",
+          "to": "packages/rafa-release/src/release/enabled.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/forecast.ts",
+          "to": "packages/rafa-release/src/release/forecast.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/fragment-tree.ts",
+          "to": "packages/rafa-release/src/release/fragment-tree.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/settle.ts",
+          "to": "packages/rafa-release/src/release/settle.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/strategy.ts",
+          "to": "packages/rafa-release/src/release/strategy.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/stale-docs.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
-          "to": "src/release/version.ts",
+          "to": "packages/rafa-release/src/release/version.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/wrap-up-retry.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
-          "to": "src/release/prepare.ts",
+          "to": "packages/rafa-release/src/release/prepare.ts",
           "toPackage": "rafa-release"
         },
         {
           "from": "src/start/wrap-up.ts",
           "fromPackage": "rafa-run",
           "kind": "type",
-          "to": "src/release/prepare.ts",
+          "to": "packages/rafa-release/src/release/prepare.ts",
           "toPackage": "rafa-release"
         }
       ],
@@ -5401,7 +5506,7 @@
       "clearedByIssue118": 0,
       "edges": [
         {
-          "from": "src/commands/release/status.ts",
+          "from": "packages/rafa-release/src/commands/release/status.ts",
           "fromPackage": "rafa-release",
           "kind": "value",
           "to": "packages/rafa-effort/src/effort/attribution.ts",
@@ -5410,142 +5515,121 @@
       ],
       "fileCounts": {
         "source": 56,
-        "test": 71,
+        "test": 50,
         "testSupport": 0
       },
       "files": [
-        "src/cleanup/past-head.test.ts",
-        "src/cleanup/past-head.ts",
-        "src/commands/doctor-ladder.test.ts",
-        "src/commands/doctor-ladder.ts",
+        "packages/rafa-release/src/cleanup/past-head.test.ts",
+        "packages/rafa-release/src/cleanup/past-head.ts",
+        "packages/rafa-release/src/commands/doctor-ladder.test.ts",
+        "packages/rafa-release/src/commands/doctor-ladder.ts",
+        "packages/rafa-release/src/commands/release/declarations.test.ts",
+        "packages/rafa-release/src/commands/release/declarations.ts",
+        "packages/rafa-release/src/commands/release/fragment.ts",
+        "packages/rafa-release/src/commands/release/index.test.ts",
+        "packages/rafa-release/src/commands/release/index.ts",
+        "packages/rafa-release/src/commands/release/list.ts",
+        "packages/rafa-release/src/commands/release/publish.ts",
+        "packages/rafa-release/src/commands/release/release-commit.test.ts",
+        "packages/rafa-release/src/commands/release/release-commit.ts",
+        "packages/rafa-release/src/commands/release/settle-project.ts",
+        "packages/rafa-release/src/commands/release/settle.ts",
+        "packages/rafa-release/src/commands/release/status-audit.test.ts",
+        "packages/rafa-release/src/commands/release/status-fragments.ts",
+        "packages/rafa-release/src/commands/release/status-packages.test.ts",
+        "packages/rafa-release/src/commands/release/status-packages.ts",
+        "packages/rafa-release/src/commands/release/status-stale-docs.ts",
+        "packages/rafa-release/src/commands/release/status.ts",
+        "packages/rafa-release/src/commands/release/tag-follow-ups.test.ts",
+        "packages/rafa-release/src/commands/release/tag-follow-ups.ts",
+        "packages/rafa-release/src/commands/release/tag-receipt.test.ts",
+        "packages/rafa-release/src/commands/release/tag-units.test.ts",
+        "packages/rafa-release/src/commands/release/tag-units.ts",
+        "packages/rafa-release/src/commands/release/tag.ts",
+        "packages/rafa-release/src/commands/release/workflows.ts",
+        "packages/rafa-release/src/docs/open-lines.test.ts",
+        "packages/rafa-release/src/docs/open-lines.ts",
+        "packages/rafa-release/src/docs/release-issue.ts",
+        "packages/rafa-release/src/next/epic-end.ts",
+        "packages/rafa-release/src/project/lock.test.ts",
+        "packages/rafa-release/src/project/lock.ts",
+        "packages/rafa-release/src/release/audit.test.ts",
+        "packages/rafa-release/src/release/audit.ts",
+        "packages/rafa-release/src/release/body-forecast.test.ts",
+        "packages/rafa-release/src/release/body-forecast.ts",
+        "packages/rafa-release/src/release/branch-forecast.test.ts",
+        "packages/rafa-release/src/release/branch-forecast.ts",
+        "packages/rafa-release/src/release/changelog.ts",
+        "packages/rafa-release/src/release/enabled.test.ts",
+        "packages/rafa-release/src/release/enabled.ts",
+        "packages/rafa-release/src/release/forecast.test.ts",
+        "packages/rafa-release/src/release/forecast.ts",
+        "packages/rafa-release/src/release/fragment-tree.test.ts",
+        "packages/rafa-release/src/release/fragment-tree.ts",
+        "packages/rafa-release/src/release/guard-merge.test.ts",
+        "packages/rafa-release/src/release/guard-merge.ts",
+        "packages/rafa-release/src/release/guard.test.ts",
+        "packages/rafa-release/src/release/guard.ts",
+        "packages/rafa-release/src/release/ladder.test.ts",
+        "packages/rafa-release/src/release/ladder.ts",
+        "packages/rafa-release/src/release/level.test.ts",
+        "packages/rafa-release/src/release/level.ts",
+        "packages/rafa-release/src/release/package-base-version.test.ts",
+        "packages/rafa-release/src/release/package-base-version.ts",
+        "packages/rafa-release/src/release/prepare.test.ts",
+        "packages/rafa-release/src/release/prepare.ts",
+        "packages/rafa-release/src/release/receipt.test.ts",
+        "packages/rafa-release/src/release/receipt.ts",
+        "packages/rafa-release/src/release/release-delivery.test.ts",
+        "packages/rafa-release/src/release/release-delivery.ts",
+        "packages/rafa-release/src/release/release-move.test.ts",
+        "packages/rafa-release/src/release/release-move.ts",
+        "packages/rafa-release/src/release/scaffold.ts",
+        "packages/rafa-release/src/release/setting.ts",
+        "packages/rafa-release/src/release/settle-groups.test.ts",
+        "packages/rafa-release/src/release/settle-groups.ts",
+        "packages/rafa-release/src/release/settle-lock.test.ts",
+        "packages/rafa-release/src/release/settle-lock.ts",
+        "packages/rafa-release/src/release/settle-pr.test.ts",
+        "packages/rafa-release/src/release/settle-pr.ts",
+        "packages/rafa-release/src/release/settle-push.test.ts",
+        "packages/rafa-release/src/release/settle-push.ts",
+        "packages/rafa-release/src/release/settle-tag.test.ts",
+        "packages/rafa-release/src/release/settle-tag.ts",
+        "packages/rafa-release/src/release/settle-worktree.test.ts",
+        "packages/rafa-release/src/release/settle-worktree.ts",
+        "packages/rafa-release/src/release/settle.test.ts",
+        "packages/rafa-release/src/release/settle.ts",
+        "packages/rafa-release/src/release/status-readings.test.ts",
+        "packages/rafa-release/src/release/status-readings.ts",
+        "packages/rafa-release/src/release/strategies/semver-by-level.test.ts",
+        "packages/rafa-release/src/release/strategies/semver-by-level.ts",
+        "packages/rafa-release/src/release/strategy.test.ts",
+        "packages/rafa-release/src/release/strategy.ts",
+        "packages/rafa-release/src/release/tag-push.test.ts",
+        "packages/rafa-release/src/release/tag-push.ts",
+        "packages/rafa-release/src/release/templates-bot-fragment.test.ts",
+        "packages/rafa-release/src/release/templates-settle.test.ts",
+        "packages/rafa-release/src/release/templates-tag.test.ts",
+        "packages/rafa-release/src/release/templates.test.ts",
+        "packages/rafa-release/src/release/templates.ts",
+        "packages/rafa-release/src/release/verify.test.ts",
+        "packages/rafa-release/src/release/verify.ts",
+        "packages/rafa-release/src/release/version-tag.test.ts",
+        "packages/rafa-release/src/release/version-tag.ts",
+        "packages/rafa-release/src/release/version.test.ts",
+        "packages/rafa-release/src/release/version.ts",
+        "packages/rafa-release/src/release/workspace-packages.test.ts",
+        "packages/rafa-release/src/release/workspace-packages.ts",
         "src/commands/release/declarations-integration.test.ts",
-        "src/commands/release/declarations.test.ts",
-        "src/commands/release/declarations.ts",
-        "src/commands/release/fragment.test.ts",
-        "src/commands/release/fragment.ts",
         "src/commands/release/index-integration.test.ts",
-        "src/commands/release/index.test.ts",
-        "src/commands/release/index.ts",
-        "src/commands/release/list.test.ts",
-        "src/commands/release/list.ts",
-        "src/commands/release/publish-repo.test.ts",
-        "src/commands/release/publish.test.ts",
-        "src/commands/release/publish.ts",
-        "src/commands/release/release-commit.test.ts",
-        "src/commands/release/release-commit.ts",
-        "src/commands/release/settle-lock.test.ts",
-        "src/commands/release/settle-project.test.ts",
-        "src/commands/release/settle-project.ts",
-        "src/commands/release/settle-workspace.test.ts",
-        "src/commands/release/settle.test.ts",
-        "src/commands/release/settle.ts",
-        "src/commands/release/status-audit.test.ts",
-        "src/commands/release/status-fragments.test.ts",
-        "src/commands/release/status-fragments.ts",
-        "src/commands/release/status-packages.test.ts",
-        "src/commands/release/status-packages.ts",
-        "src/commands/release/status-stale-docs.test.ts",
-        "src/commands/release/status-stale-docs.ts",
         "src/commands/release/status-worktree-spawned.test.ts",
-        "src/commands/release/status.test.ts",
-        "src/commands/release/status.ts",
-        "src/commands/release/tag-follow-ups.test.ts",
-        "src/commands/release/tag-follow-ups.ts",
-        "src/commands/release/tag-receipt.test.ts",
-        "src/commands/release/tag-units.test.ts",
-        "src/commands/release/tag-units.ts",
-        "src/commands/release/tag-workspace.test.ts",
-        "src/commands/release/tag.test.ts",
-        "src/commands/release/tag.ts",
-        "src/commands/release/workflows.levels.test.ts",
-        "src/commands/release/workflows.test.ts",
-        "src/commands/release/workflows.ts",
-        "src/docs/open-lines.test.ts",
-        "src/docs/open-lines.ts",
-        "src/docs/release-issue.test.ts",
-        "src/docs/release-issue.ts",
-        "src/next/epic-end.test.ts",
-        "src/next/epic-end.ts",
-        "src/project/lock.test.ts",
-        "src/project/lock.ts",
-        "src/release/audit.test.ts",
-        "src/release/audit.ts",
-        "src/release/body-forecast.test.ts",
-        "src/release/body-forecast.ts",
-        "src/release/branch-forecast.test.ts",
-        "src/release/branch-forecast.ts",
-        "src/release/changelog.test.ts",
-        "src/release/changelog.ts",
-        "src/release/enabled.test.ts",
-        "src/release/enabled.ts",
-        "src/release/fold-spawned.test.ts",
-        "src/release/forecast.test.ts",
-        "src/release/forecast.ts",
-        "src/release/fragment-tree.test.ts",
-        "src/release/fragment-tree.ts",
-        "src/release/guard-merge.test.ts",
-        "src/release/guard-merge.ts",
-        "src/release/guard.test.ts",
-        "src/release/guard.ts",
-        "src/release/ladder.test.ts",
-        "src/release/ladder.ts",
-        "src/release/level.test.ts",
-        "src/release/level.ts",
-        "src/release/package-base-version.test.ts",
-        "src/release/package-base-version.ts",
-        "src/release/prepare.test.ts",
-        "src/release/prepare.ts",
-        "src/release/receipt.test.ts",
-        "src/release/receipt.ts",
-        "src/release/release-delivery.test.ts",
-        "src/release/release-delivery.ts",
-        "src/release/release-move.test.ts",
-        "src/release/release-move.ts",
-        "src/release/scaffold.test.ts",
-        "src/release/scaffold.ts",
-        "src/release/setting.test.ts",
-        "src/release/setting.ts",
-        "src/release/settle-groups.test.ts",
-        "src/release/settle-groups.ts",
-        "src/release/settle-lock.test.ts",
-        "src/release/settle-lock.ts",
-        "src/release/settle-pr.test.ts",
-        "src/release/settle-pr.ts",
-        "src/release/settle-push.test.ts",
-        "src/release/settle-push.ts",
-        "src/release/settle-tag.test.ts",
-        "src/release/settle-tag.ts",
-        "src/release/settle-worktree.test.ts",
-        "src/release/settle-worktree.ts",
-        "src/release/settle.test.ts",
-        "src/release/settle.ts",
-        "src/release/status-readings.test.ts",
-        "src/release/status-readings.ts",
-        "src/release/strategies/semver-by-level.test.ts",
-        "src/release/strategies/semver-by-level.ts",
-        "src/release/strategy.test.ts",
-        "src/release/strategy.ts",
-        "src/release/tag-push.test.ts",
-        "src/release/tag-push.ts",
-        "src/release/templates-bot-fragment.test.ts",
-        "src/release/templates-settle.test.ts",
-        "src/release/templates-shape.test.ts",
-        "src/release/templates-tag.test.ts",
-        "src/release/templates.test.ts",
-        "src/release/templates.ts",
-        "src/release/verify.test.ts",
-        "src/release/verify.ts",
-        "src/release/version-tag.test.ts",
-        "src/release/version-tag.ts",
-        "src/release/version.test.ts",
-        "src/release/version.ts",
-        "src/release/workspace-packages.test.ts",
-        "src/release/workspace-packages.ts"
+        "src/release/fold-spawned.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-release/": 0,
-        "src/commands/release/": 42,
-        "src/release/": 73
+        "packages/rafa-release/": 92,
+        "src/commands/release/": 3,
+        "src/release/": 1
       },
       "folders": [
         "packages/rafa-release/",
@@ -5554,12 +5638,12 @@
       ],
       "name": "rafa-release",
       "named": [
-        "src/cleanup/past-head.ts",
-        "src/commands/doctor-ladder.ts",
-        "src/docs/open-lines.ts",
-        "src/docs/release-issue.ts",
-        "src/next/epic-end.ts",
-        "src/project/lock.ts"
+        "packages/rafa-release/src/cleanup/past-head.ts",
+        "packages/rafa-release/src/commands/doctor-ladder.ts",
+        "packages/rafa-release/src/docs/open-lines.ts",
+        "packages/rafa-release/src/docs/release-issue.ts",
+        "packages/rafa-release/src/next/epic-end.ts",
+        "packages/rafa-release/src/project/lock.ts"
       ],
       "rank": 8,
       "remaining": 1,
@@ -5728,7 +5812,7 @@
       "edges": [],
       "fileCounts": {
         "source": 176,
-        "test": 529,
+        "test": 550,
         "testSupport": 22
       },
       "files": [
@@ -5848,7 +5932,6 @@
         "src/commands/doctor-epics.ts",
         "src/commands/doctor-install.test.ts",
         "src/commands/doctor-install.ts",
-        "src/commands/doctor-ladder.command.test.ts",
         "src/commands/doctor-marks.test.ts",
         "src/commands/doctor-marks.ts",
         "src/commands/doctor-previous.test.ts",
@@ -6390,6 +6473,28 @@
         "src/tests/relations-move-round-trip.test.ts",
         "src/tests/relations-native-cli.test.ts",
         "src/tests/release-bot-fragment-workflow.test.ts",
+        "src/tests/release-coupled/commands/doctor-ladder.command.test.ts",
+        "src/tests/release-coupled/commands/release/fragment.test.ts",
+        "src/tests/release-coupled/commands/release/list.test.ts",
+        "src/tests/release-coupled/commands/release/publish-repo.test.ts",
+        "src/tests/release-coupled/commands/release/publish.test.ts",
+        "src/tests/release-coupled/commands/release/settle-lock.test.ts",
+        "src/tests/release-coupled/commands/release/settle-project.test.ts",
+        "src/tests/release-coupled/commands/release/settle-workspace.test.ts",
+        "src/tests/release-coupled/commands/release/settle.test.ts",
+        "src/tests/release-coupled/commands/release/status-fragments.test.ts",
+        "src/tests/release-coupled/commands/release/status-stale-docs.test.ts",
+        "src/tests/release-coupled/commands/release/status.test.ts",
+        "src/tests/release-coupled/commands/release/tag-workspace.test.ts",
+        "src/tests/release-coupled/commands/release/tag.test.ts",
+        "src/tests/release-coupled/commands/release/workflows.levels.test.ts",
+        "src/tests/release-coupled/commands/release/workflows.test.ts",
+        "src/tests/release-coupled/docs/release-issue.test.ts",
+        "src/tests/release-coupled/next/epic-end.test.ts",
+        "src/tests/release-coupled/release/changelog.test.ts",
+        "src/tests/release-coupled/release/scaffold.test.ts",
+        "src/tests/release-coupled/release/setting.test.ts",
+        "src/tests/release-coupled/release/templates-shape.test.ts",
         "src/tests/release-delivery-spawned-cli.test.ts",
         "src/tests/release-fragment-ci-config-spawned.test.ts",
         "src/tests/release-mechanics.test.ts",
@@ -6482,7 +6587,7 @@
   "totals": {
     "clearedByIssue118": 0,
     "files": 2193,
-    "leftToPlace": 687,
+    "leftToPlace": 708,
     "nonTestEdges": 4867,
     "unassignedFiles": 28,
     "unrankedEdges": 75,

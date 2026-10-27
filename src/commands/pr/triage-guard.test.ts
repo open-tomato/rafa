@@ -1,7 +1,7 @@
 /**
  * Tests for the triage's guard reading (`./triage-guard.ts`).
  *
- * The guard's own judgement is `src/release/guard.test.ts`'s; this
+ * The guard's own judgement is `packages/rafa-release/src/release/guard.test.ts`'s; this
  * file holds what the triage adds around it — that it reads nothing
  * where the release does not run, that it fetches nothing and answers
  * an unread reading for refs that do not resolve, and that over a real
@@ -11,8 +11,8 @@
  */
 import type { TriageGuardInput, TriageGuardReading } from './triage-guard.js';
 import type { GitRunner } from '../../pr/index.js';
-import type { MergeGuardSettings } from '../../release/guard-merge.js';
-import type { GuardRead } from '../../release/guard.js';
+import type { GuardRead } from '@open-tomato/rafa-release/release/guard';
+import type { MergeGuardSettings } from '@open-tomato/rafa-release/release/guard-merge';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,9 +22,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { RELEASE_PR_BRANCH } from '@open-tomato/rafa-release/release/settle-pr';
 
 import { createGitRunner } from '../../pr/index.js';
-import { RELEASE_PR_BRANCH } from '../../release/settle-pr.js';
 
 import { readTriageGuard, triageVerdict } from './triage-guard.js';
 

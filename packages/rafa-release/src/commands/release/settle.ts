@@ -1,0 +1,432 @@
+/**
+ * `rafa release settle [--dry-run]`: the fragments waiting on the base
+ * branch folded into one version and one changelog section per unit —
+ * the root, and each workspace package a fragment names — committed at
+ * once under `releaseCommitSubject` (`packages/rafa-release/src/release/release-move.ts`:
+ * `chore: release 0.46.0, @scope/plugin@0.2.0`) and delivered by
+ * `release.settle`. The command reads its line and the config, hands
+ * the work to `src/release/`, and prints what came back; it assembles
+ * no `git` or `gh` argv of its own.
+ *
+ * ```text
+ * rafa release settle            → fold, commit, deliver, maybe tag
+ * rafa release settle --dry-run  → fold only; writes nothing
+ * ```
+ *
+ * ## The steps
+ *
+ * Both forms run inside the scratch worktree of `origin/<pr.base>` that
+ * `withSettleWorktree` (`packages/rafa-release/src/release/settle-worktree.ts`) fetches, adds
+ * and removes on every path out, so the caller's checkout and index are
+ * never touched, whatever branch it is on.
+ *
+ *   - `--dry-run` reads the settle at the worktree's `HEAD`
+ *     (`readSettle`, `packages/rafa-release/src/release/settle.ts`) and stops: no file, no
+ *     commit, no push. The worktree is scratch, so `git status` in the
+ *     caller's checkout reads as it did before.
+ *   - Without it, the delivery `release.settle` names runs:
+ *     `settleByPush` (`packages/rafa-release/src/release/settle-push.ts`) for `push`, the
+ *     default, and `settleByPr` (`packages/rafa-release/src/release/settle-pr.ts`) for `pr`,
+ *     which first resolves the `gh` provider as every `pr` action does
+ *     and is refused with exit code 2 without one; the provider comes
+ *     through core's service registry (`pullRequestsIn`), registered by
+ *     the root, `src/service-registry.ts`. Then `tagSettle`
+ *     (`packages/rafa-release/src/release/settle-tag.ts`) applies `release.tag`.
+ *
+ * ## What it prints
+ *
+ * Every run names the strategy that answered, the base commit and the
+ * version it declares, and the fragments in fold order — the order the
+ * base received them, first-parent add commit first — each with its
+ * level, its title, the package it names after the title when it names
+ * one (`"a hook" for @scope/plugin`), and the commit and date that
+ * added it. A fold that answered adds one `Version:` line per unit it
+ * moves, the root's first, a package's naming the package before its
+ * versions; a delivery adds one line for what it did, and a tag one
+ * more, naming every tag the step wrote (one per unit,
+ * `packages/rafa-release/src/release/settle-tag.ts`). A settle whose base lacks
+ * `release.changelog`, or a package's
+ * `<dir>/CHANGELOG.md`, creates it holding `# Changelog` and the section
+ * (`buildSettle`, #842), and says so in a `Changelog:` line above the
+ * delivery's — the dry run in the same words, before its own last line;
+ * a delivery that refused prints no such line, since nothing landed.
+ * Under `release.moveLock` a `Lock:` line follows it the same way: the
+ * dry run says `rafa.lock` would move from the base's version to the
+ * new one, or that the release commit creates it when the base holds
+ * none, and a landed delivery says it moved; with the key off, or
+ * after a refused delivery, no `Lock:` line is printed.
+ * After a push that was retried, the
+ * reading printed is the REBUILT one, the batch the base now holds.
+ *
+ * ## Exit codes
+ *
+ * 0 when the settle is done or there was nothing to do: a dry run that
+ * folded or found nothing, a push or pull request delivered, a push
+ * whose fragments another settle released first. 1 for everything
+ * else — a base that could not be fetched or read, a fragment that
+ * does not parse or names a package the workspace lacks or a private
+ * one, a strategy that threw, a commit that could not be
+ * built, a push refused twice, by branch protection or by a repository
+ * rule, a pull request step that failed, and a tag that could not be
+ * written or pushed after a push that landed. The failure's sentence is
+ * the refusal; the reading above it is printed first either way, and no
+ * success line follows it: a refused push's sentence carries none of
+ * the `Done` git's `--porcelain` prints after a refusal
+ * (`packages/rafa-release/src/release/settle-push.ts`, #765). In json mode a
+ * run exiting 0 gives {@link ReleaseSettleResult} as the terminal
+ * result's data.
+ *
+ * ## The project refresh
+ *
+ * After a delivery that left the base without the folded fragments — a
+ * push, or a push another settle beat to the same fragments — and with
+ * `board.project.number` set, `./settle-project.ts` refreshes on the
+ * repository's project the issues closed by the pull requests whose
+ * fragments were folded, so their Stage moves from In review to Done.
+ * Its lines are printed as warnings after the reading and never change
+ * the exit code; the result carries what it read as `project`, null
+ * where it sent nothing.
+ *
+ * It starts no Claude session and declares no `spends`.
+ */
+import type { SettleProjectRefresh } from './settle-project.js';
+import type { SettleLockPlan } from '../../release/settle-lock.js';
+import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
+import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
+import type { SettleBuild, SettleFragment, SettleReading, SettleSettings, SettleUnitFold } from '../../release/settle.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { PullRequests } from '@open-tomato/rafa/pr/types';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { GhRunner, RefreshItems } from '@open-tomato/rafa-board';
+
+import { relative } from 'node:path';
+
+import { expectNoArgument, readSwitch, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { activeServices } from '@open-tomato/rafa/core/services';
+import { requireGhProvider, resolvePrProvider } from '@open-tomato/rafa/pr/provider';
+import { commandRetrySeams, createGhRunner } from '@open-tomato/rafa-board';
+
+import { releaseCommitSubject } from '../../release/release-move.js';
+import { settleByPr } from '../../release/settle-pr.js';
+import { settleByPush } from '../../release/settle-push.js';
+import { tagSettle } from '../../release/settle-tag.js';
+import { withSettleWorktree } from '../../release/settle-worktree.js';
+import { CHANGELOG_TITLE, readSettle, settleMoves } from '../../release/settle.js';
+import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
+
+import { RELEASE_SETTLE_DECLARATION, RELEASE_SETTLE_DRY_RUN_FLAG } from './declarations.js';
+import { refreshProjectAfterSettle } from './settle-project.js';
+
+/** The usage line this action's refusals name. */
+export const RELEASE_SETTLE_USAGE = 'rafa release settle [--dry-run]';
+
+/** The command's name, as a config refusal opens. */
+const COMMAND_NAME = 'rafa release settle';
+
+/** What every line under a heading is indented by. */
+const INDENT = '  ';
+
+/** How many characters of a hash a line names. */
+const SHORT_HASH = 12;
+
+/** How the action reaches git, the scratch directory and the provider; each left out is the system's own. */
+export interface ReleaseSettleSeams {
+  /** Makes the git runner of the caller's repository. `createGitRunner` when left out. */
+  readonly git?: (root: string) => GitRunner;
+  /** Where the scratch worktree's directory is made. The system temporary directory when left out. */
+  readonly scratchRoot?: string;
+  /** The provider a `pr` delivery opens its pull request through. `activeServices().pullRequestsIn`, the service registry's, when left out. */
+  readonly pullRequests?: (root: string) => PullRequests;
+  /** The `origin` probe `resolvePrProvider` takes. `gitRemoteUrl` when left out. */
+  readonly readRemote?: (dir: string) => string | null;
+  /** Makes the `gh` runner the project refresh reads and writes through. `createGhRunner` in the root when left out. */
+  readonly gh?: (root: string) => GhRunner;
+  /** The project refresh. `refreshProjectItems` when left out. */
+  readonly refresh?: RefreshItems;
+}
+
+/** The seams the registered action runs with: the system's own, every one. */
+export const DEFAULT_RELEASE_SETTLE_SEAMS: ReleaseSettleSeams = Object.freeze({});
+
+/** What a run answers: its lines, its exit code, and the sentence an exit 1 refuses with. */
+export interface ReleaseSettleResult {
+  /** True for `--dry-run`. */
+  readonly dryRun: boolean;
+  /** `release.settle`, or null for a dry run, which delivers nothing. */
+  readonly delivery: RafaConfig['releaseSettle'] | null;
+  /** The reading or the build the lines were rendered from. */
+  readonly reading: SettleReading | SettleBuild;
+  /** What the delivery answered, or null for a dry run. */
+  readonly delivered: SettleDelivered | null;
+  /** What `release.tag` did, or null for a dry run. */
+  readonly tag: SettleTagOutcome | null;
+  /** 0 or 1; see the module note. */
+  readonly exitCode: 0 | 1;
+  /** The refusal an exit 1 carries, or null for exit 0. */
+  readonly problem: string | null;
+  /** The text-mode lines, the refusal left out. */
+  readonly lines: readonly string[];
+  /** What the project refresh read and warned of, or null where it sent nothing; see the module note. */
+  readonly project: SettleProjectRefresh | null;
+}
+
+/** The project the dispatcher resolved, which it resolves for this action. */
+function projectOf(context: RafaContext): ProjectFound {
+  if (context.project === null) throw new Error(`${COMMAND_NAME} runs inside a project, and was handed none`);
+  return context.project;
+}
+
+/** The settings a settle reads, off the resolved config. */
+function settleSettings(config: RafaConfig): SettleSettings {
+  return {
+    releaseVersionFile: config.releaseVersionFile,
+    releaseChangelog: config.releaseChangelog,
+    releaseFragments: config.releaseFragments,
+    releaseStrategy: config.releaseStrategy,
+    releaseHeading: config.releaseHeading,
+    releaseMoveLock: config.releaseMoveLock,
+  };
+}
+
+/** A hash as a line names it. */
+function short(hash: string): string {
+  return hash.slice(0, SHORT_HASH);
+}
+
+/**
+ * The lines every reading prints: the strategy, then — for one that got
+ * as far as the fold — the base, the fragments in fold order and the
+ * version each unit moves to. `ref` names the base as the worktree was made.
+ */
+export function readingLines(reading: SettleReading | SettleBuild, ref: string): readonly string[] {
+  const lines = [`Strategy: ${reading.strategy}`];
+  if (reading.outcome === 'unread') return lines;
+  if (reading.outcome === 'malformed') {
+    return [...lines, `Base: ${ref} at ${short(reading.commit)}`];
+  }
+  lines.push(`Base: ${ref} at ${short(reading.commit)}, version ${reading.baseVersion}`);
+  if (reading.fragments.length === 0) {
+    lines.push('Fragments: none waiting');
+  } else {
+    lines.push('Fragments, in the order the base received them:');
+    reading.fragments.forEach((each, index) => {
+      lines.push(`${INDENT}${String(index + 1)}. ${fragmentLine(each)}`);
+    });
+  }
+  if (reading.outcome === 'folded' || reading.outcome === 'built' || reading.outcome === 'unbuilt') {
+    for (const unit of reading.units) lines.push(versionLine(unit));
+  }
+  return lines;
+}
+
+/** One fragment as the list names it: path, level, title, the package after the title when set, and where it was added. */
+function fragmentLine(each: SettleFragment): string {
+  const { level, title } = each.fragment;
+  const named = each.fragment.package === null
+    ? ''
+    : ` for ${each.fragment.package}`;
+  return `${each.path} — ${level}, "${title}"${named}, added ${each.addedOn} in ${short(each.commit)}`;
+}
+
+/** One unit's `Version:` line: the root's bare, a package's naming the package first. */
+function versionLine(unit: SettleUnitFold): string {
+  const named = unit.package === null
+    ? ''
+    : `${unit.package} `;
+  return `Version: ${named}${unit.baseVersion} → ${unit.version}`;
+}
+
+/** The sentence a reading that folded nothing and wrote nothing ends on, and whether it refuses. */
+function unwrittenEnding(reading: Exclude<SettleReading, { outcome: 'folded' }>): { readonly line: string; readonly refuses: boolean } {
+  switch (reading.outcome) {
+    case 'unread':
+      return { line: `❌ Nothing was folded: ${reading.problem}`, refuses: true };
+    case 'malformed':
+      return { line: `❌ No fragment was folded, since ${reading.problems.join('; ')}`, refuses: true };
+    case 'failed':
+      return { line: `❌ Nothing was written: ${reading.line}`, refuses: true };
+    case 'nothing':
+      return { line: 'Nothing to settle: no fragment waits that ships a release.', refuses: false };
+  }
+}
+
+/** A result from its parts: an ending that refuses is the problem, any other is the last line. */
+function resultOf(
+  base: Pick<ReleaseSettleResult, 'dryRun' | 'delivery' | 'reading' | 'delivered' | 'tag'>,
+  lines: readonly string[],
+  problem: string | null,
+): ReleaseSettleResult {
+  const exitCode = problem === null
+    ? 0
+    : 1;
+  return { ...base, lines, problem, exitCode, project: null };
+}
+
+/** The line naming a changelog the release commit creates rather than inserts into. */
+function createdChangelogLine(changelog: string): string {
+  return `Changelog: ${changelog} is missing, so the release commit creates it under "${CHANGELOG_TITLE}".`;
+}
+
+/** The dry run's line naming how the release commit would move `rafa.lock`. */
+function plannedLockLine(lock: SettleLockPlan): string {
+  return lock.from === null
+    ? `Lock: ${lock.path} is missing, so the release commit creates it at ${lock.to}.`
+    : `Lock: ${lock.path} would move from ${lock.from} to ${lock.to}.`;
+}
+
+/**
+ * The dry run's answer: the reading, and what a settle would commit.
+ * Each unit's changelog the base lacks, and the settle would create, is
+ * named in a line of its own; a reading whose `lock` is set, under
+ * `release.moveLock`, adds how `rafa.lock` would move.
+ */
+export function dryRunResult(reading: SettleReading, ref: string, branch: string): ReleaseSettleResult {
+  const base = { dryRun: true, delivery: null, reading, delivered: null, tag: null };
+  const lines = [...readingLines(reading, ref)];
+  if (reading.outcome === 'folded') {
+    for (const unit of reading.units.filter((each) => each.changelogMissing)) lines.push(createdChangelogLine(unit.changelog));
+    if (reading.lock !== null) lines.push(plannedLockLine(reading.lock));
+    lines.push(`Dry run: settle would commit "${releaseCommitSubject(settleMoves(reading))}" on ${branch}; nothing was written.`);
+    return resultOf(base, lines, null);
+  }
+  const ending = unwrittenEnding(reading);
+  return ending.refuses
+    ? resultOf(base, lines, ending.line)
+    : resultOf(base, [...lines, ending.line], null);
+}
+
+/** The delivery's line, and whether it refuses. */
+function deliveryEnding(delivered: SettleDelivered, branch: string): { readonly line: string; readonly refuses: boolean } {
+  const { outcome } = delivered;
+  if (outcome.outcome === 'unsettled') {
+    const { build } = outcome;
+    if (build.outcome === 'unbuilt') return { line: `❌ The release commit could not be built: ${build.problem}`, refuses: true };
+    return unwrittenEnding(build);
+  }
+  const subject = releaseCommitSubject(settleMoves(outcome.build));
+  switch (outcome.outcome) {
+    case 'pushed': {
+      const retried = outcome.attempts === 2
+        ? ', after one rebuild over a base that moved'
+        : '';
+      return { line: `✅ Pushed "${subject}" (${short(outcome.build.release)}) to ${branch}${retried}.`, refuses: false };
+    }
+    case 'superseded':
+      return { line: `✅ ${outcome.sentence}`, refuses: false };
+    case 'delivered': {
+      const held = outcome.pushed
+        ? ''
+        : '; the branch already held this release';
+      return { line: `✅ Release pull request #${String(outcome.pull.number)} ${outcome.action}, "${outcome.pull.title}" into ${branch}${held}: ${outcome.pull.url}`, refuses: false };
+    }
+    default:
+      return { line: `❌ ${outcome.sentence}`, refuses: true };
+  }
+}
+
+/** A settle's answer: the reading its delivery ended on, the delivery's line and the tag's. */
+export function settledResult(
+  delivered: SettleDelivered,
+  tag: SettleTagOutcome,
+  ref: string,
+  branch: string,
+): ReleaseSettleResult {
+  const reading = delivered.outcome.build;
+  const base = { dryRun: false, delivery: delivered.delivery, reading, delivered, tag };
+  const lines = [...readingLines(reading, ref)];
+  const ending = deliveryEnding(delivered, branch);
+  if (ending.refuses) return resultOf(base, lines, ending.line);
+  const landed = delivered.outcome.outcome === 'pushed' || delivered.outcome.outcome === 'delivered';
+  if (landed && reading.outcome === 'built') {
+    for (const changelog of reading.createdChangelog) lines.push(createdChangelogLine(changelog));
+  }
+  if (landed && reading.outcome === 'built' && reading.lock !== null) {
+    lines.push(`Lock: ${reading.lock.path} moved to ${reading.lock.to}.`);
+  }
+  lines.push(ending.line);
+  if (tag.outcome === 'failed') return resultOf(base, lines, `❌ ${tag.sentence}`);
+  if (tag.outcome === 'tagged') lines.push(`✅ ${tag.sentence}`);
+  if (tag.outcome === 'skipped' && tag.sentence !== null) lines.push(`Tag: ${tag.sentence}`);
+  return resultOf(base, lines, null);
+}
+
+/** The provider a `pr` delivery needs, refused with exit code 2 when it is not `gh`. */
+function providerFor(project: ProjectFound, config: RafaConfig, seams: ReleaseSettleSeams): PullRequests {
+  requireGhProvider(resolvePrProvider({ configured: config.prProvider, dir: project.root, readRemote: seams.readRemote }));
+  return (seams.pullRequests ?? activeServices().pullRequestsIn)(project.root);
+}
+
+/** One whole run: the line, the config, the worktree and what ran in it; see the module note. */
+export async function runSettle(
+  context: RafaContext,
+  seams: ReleaseSettleSeams = DEFAULT_RELEASE_SETTLE_SEAMS,
+): Promise<ReleaseSettleResult> {
+  expectNoArgument(context.args, RELEASE_SETTLE_USAGE);
+  const dryRun = readSwitch(RELEASE_SETTLE_DRY_RUN_FLAG, context.flags[RELEASE_SETTLE_DRY_RUN_FLAG], `Usage: ${RELEASE_SETTLE_USAGE}`);
+  const project = projectOf(context);
+  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
+    context.output.warn(message);
+  });
+  const settings = settleSettings(config);
+  const configFile = relative(project.root, project.project.configFile);
+  const branch = config.prBase ?? RELEASE_BASE_BRANCH;
+  const pulls = !dryRun && config.releaseSettle === 'pr'
+    ? providerFor(project, config, seams)
+    : null;
+  const options: SettleWorktreeOptions = {
+    git: (seams.git ?? createGitRunner)(project.root),
+    base: { remote: RELEASE_REMOTE, branch },
+    scratchRoot: seams.scratchRoot,
+  };
+
+  const ran = await withSettleWorktree(options, async (worktree) => {
+    if (dryRun) return dryRunResult(readSettle(worktree.git, 'HEAD', settings), worktree.ref, branch);
+    const delivered: SettleDelivered = pulls === null
+      ? { delivery: 'push', outcome: settleByPush(worktree, settings, configFile) }
+      : { delivery: 'pr', outcome: await settleByPr(worktree, settings, pulls, config.releaseTag) };
+    const tag = tagSettle(worktree, config.releaseTag, delivered);
+    return settledResult(delivered, tag, worktree.ref, branch);
+  });
+  if (ran.leftover !== null) context.output.warn(`The settle worktree was not fully removed: ${ran.leftover}`);
+  if (!ran.ok) throw new CommandExit(1, `❌ ${ran.problem}`);
+  if (ran.value.delivered === null) return ran.value;
+  const refreshed = await refreshProjectAfterSettle({
+    delivered: ran.value.delivered,
+    branch,
+    config,
+    openGh: () => (seams.gh ?? ((cwd: string) => createGhRunner({ cwd })))(project.root),
+    refresh: seams.refresh,
+    retry: commandRetrySeams(context.output, context.outputMode),
+  });
+  return { ...ran.value, project: refreshed };
+}
+
+/** The command, reaching git and the provider through `seams`; see the module note. */
+export function createReleaseSettleCommand(seams: ReleaseSettleSeams = DEFAULT_RELEASE_SETTLE_SEAMS): RafaCommand {
+  const command: RafaCommand = {
+    ...RELEASE_SETTLE_DECLARATION,
+    run: async (context) => {
+      const result = await runSettle(context, seams);
+      const warnProject = (): void => {
+        for (const line of result.project?.warnings ?? []) context.output.warn(line);
+      };
+      if (context.outputMode === 'json') {
+        warnProject();
+        if (result.problem !== null) throw new CommandExit(1, result.problem);
+        context.output.result(result);
+        return;
+      }
+      for (const line of result.lines) context.output.info(line);
+      warnProject();
+      if (result.problem !== null) throw new CommandExit(1, result.problem);
+    },
+  };
+  return Object.freeze(command);
+}
+
+const command: RafaCommand = createReleaseSettleCommand();
+export default command;

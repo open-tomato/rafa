@@ -1,5 +1,5 @@
 /**
- * The 0.25.0 incident (`src/release/guard.ts`'s own module note), replayed
+ * The 0.25.0 incident (`packages/rafa-release/src/release/guard.ts`'s own module note), replayed
  * end to end over two REAL spawns of `bun src/rafa.ts`: two clones of one
  * bare origin, a stand-in `gh` on the operator clone's `PATH`, and the
  * three commands an operator would actually type, in order.

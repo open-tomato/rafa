@@ -15,8 +15,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
-
-import { readReleaseTemplate } from '../release/templates.js';
+import { readReleaseTemplate } from '@open-tomato/rafa-release/release/templates';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 

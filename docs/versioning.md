@@ -52,7 +52,7 @@ A release fragment names one level: `patch`, `minor`, `major` or `none`.
 wait for the same unit's release, the highest level wins and that unit's
 version moves once: two `minor` fragments make one minor bump, not two.
 The strategy is `semver-by-level`, the default of `release.strategy`
-(`src/release/strategies/semver-by-level.ts`).
+(`packages/rafa-release/src/release/strategies/semver-by-level.ts`).
 
 Below 1.0.0 the same levels follow npm's rules, as `nextVersion` applies
 them:
