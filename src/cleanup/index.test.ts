@@ -28,14 +28,14 @@ import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { BRANCH_FORMAT } from '@open-tomato/rafa-pr/cleanup/branches';
+import { unreachableNote } from '@open-tomato/rafa-pr/cleanup/groups';
+import { GIT_DIR, WORKTREE_LIST, WORKTREE_STATUS } from '@open-tomato/rafa-pr/cleanup/worktrees';
 
 import { EVENTS_EXTENSION, eventsFilePath } from '../start/loop-events.js';
 
-import { BRANCH_FORMAT } from './branches.js';
-import { unreachableNote } from './groups.js';
 import { openUnknownNote, openUnreadNote, REMOTE_BRANCH_FORMAT, remoteOnlyReason } from './remote-only.js';
 import { createScratchRepository, REMOTE_ONLY_BRANCHES, REMOTE_ONLY_COMMITS, SCRATCH_NOW } from './scratch-repository.js';
-import { GIT_DIR, WORKTREE_LIST, WORKTREE_STATUS } from './worktrees.js';
 
 import {
   cleanupCounts,

@@ -22,9 +22,9 @@
  *     assessed is measured to assess nothing, so the row it still
  *     stores is shown to come from the checks read, not the assessment.
  */
-import type { TriageSeams } from './triage.js';
-import type { FakePullRequestSeed } from '../../pr/gh-fake.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
+import type { TriageSeams } from '@open-tomato/rafa-pr/commands/pr/triage';
+import type { FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,12 +35,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
+import { createPrTriageCommand } from '@open-tomato/rafa-pr/commands/pr/triage';
+import { createFakePrGh, logFailedText } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
 
-import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
-import { createGhPullRequests } from '../../pr/index.js';
-import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
-
-import { createPrTriageCommand } from './triage.js';
+import { dispatchInProject, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-triage-plan-ci-')));

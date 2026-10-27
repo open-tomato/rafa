@@ -11,7 +11,7 @@
  * The log cases drive a stub answering `failedLog` and nothing else, so
  * what is measured is which runs were ASKED FOR and which reading became
  * the evidence, not what `readFailedLog` makes of a capture — that is
- * `src/pr/triage/evidence.test.ts`.
+ * `packages/rafa-pr/src/pr/triage/evidence.test.ts`.
  *
  * The conflict cases are in two halves:
  *
@@ -21,7 +21,7 @@
  *     it, every "no conflict" reading here could be a command that
  *     silently answered nothing, since `git merge-tree` exits 1 both for
  *     a real conflict and for a ref it cannot resolve
- *     (`src/pr/triage/conflict.ts`). The clean merge in the same
+ *     (`packages/rafa-pr/src/pr/triage/conflict.ts`). The clean merge in the same
  *     repository is its pair.
  *   - A recording stub, for the readings a repository cannot easily be
  *     put into: which argv were sent, and that a pair of refs that does

@@ -1,5 +1,5 @@
 /**
- * Tests for the kind routing (`src/triage/kind-route.ts`), driven
+ * Tests for the kind routing (`packages/rafa-pr/src/triage/kind-route.ts`), driven
  * through its one call in `triageReport` so the routing and the bug
  * channel it hands back to are read together.
  *
@@ -27,11 +27,10 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { ABSENT } from '@open-tomato/rafa-board/refs/stamp';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { docsWhereOf } from './kind-route.js';
 import { LEFTOVER_MARKER } from './leftover-repair.js';

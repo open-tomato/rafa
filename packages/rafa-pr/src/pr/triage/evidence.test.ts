@@ -1,5 +1,5 @@
 /**
- * Tests for the failing-log evidence (`src/pr/triage/evidence.ts`).
+ * Tests for the failing-log evidence (`packages/rafa-pr/src/pr/triage/evidence.ts`).
  *
  * The module is pure over one string, so nothing here spawns `gh`,
  * reaches a network or reads a file. What the cases are built on

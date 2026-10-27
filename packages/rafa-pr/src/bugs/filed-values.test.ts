@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test';
 
 import { DEFAULT_BUG_TITLE, renderTitle, titleRoundTrips } from '@open-tomato/rafa/bugs/title';
 import { GITHUB_LABEL_MAX_LENGTH, GITHUB_LABELS } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { describe, expect, test } from 'bun:test';
 
 import { boundaryValueOf, summaryOf } from './filed-values.js';
 

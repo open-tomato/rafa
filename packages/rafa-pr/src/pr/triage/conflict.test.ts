@@ -1,5 +1,5 @@
 /**
- * Tests for the conflicting file list (`src/pr/triage/conflict.ts`).
+ * Tests for the conflicting file list (`packages/rafa-pr/src/pr/triage/conflict.ts`).
  *
  * These cases spawn the REAL git, in repositories of their own under
  * this file's temporary directory, for the same reason
@@ -41,9 +41,8 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { hasConflictMessage, mergeTreeArgs, parseMergeTree, readConflict } from './conflict.js';
 
@@ -319,7 +318,7 @@ describe('reading captured output', () => {
 describe('where the cases run', () => {
   it('plants every repository under its own temporary directory', () => {
     const root = plantRepo('under-temp', { 'kept.txt': 'kept\n' });
-    const projectRoot = realpathSync(join(import.meta.dir, '..', '..', '..'));
+    const projectRoot = realpathSync(join(import.meta.dir, '..', '..', '..', '..', '..'));
 
     expect(realpathSync(root).startsWith(`${tempBase}/`)).toBe(true);
     expect(tempBase.startsWith(realpathSync(tmpdir()))).toBe(true);

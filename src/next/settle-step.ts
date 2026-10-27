@@ -22,7 +22,7 @@
  *
  * What the step turns on is {@link SettleWaiting}, the settle dry run
  * over `origin/<base>` that `pr merge`'s own follow-up is decided by
- * (`settleWaitingOn`, `src/pr/settle-waiting.ts`), composed for
+ * (`settleWaitingOn`, `packages/rafa-pr/src/pr/settle-waiting.ts`), composed for
  * the project by `openNextSources` (`./sources.ts`). So `rafa next`
  * proposes settle exactly where the merge it just ran named
  * `rafa release settle` as its last line, and names nothing where the

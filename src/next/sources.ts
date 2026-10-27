@@ -49,7 +49,7 @@
  *
  * That check asks the config and `origin`, and it spawns no `gh`.
  * Whether the CLI is installed and authenticated is the preflight's
- * reading (`src/pr/preflight-items.ts`), and a `gh` that then cannot
+ * reading (`packages/rafa-pr/src/pr/preflight-items.ts`), and a `gh` that then cannot
  * answer is the `pulls-unusable` pre-condition of `./state.ts`, which
  * names `rafa doctor`.
  *

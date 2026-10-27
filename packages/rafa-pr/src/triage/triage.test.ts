@@ -1,5 +1,5 @@
 /**
- * Tests for loop-owned triage (`src/triage/triage.ts`).
+ * Tests for loop-owned triage (`packages/rafa-pr/src/triage/triage.ts`).
  *
  * Every repo root, tracker file, store and issue directory is made under
  * one temporary directory this file creates and removes; no case writes
@@ -84,9 +84,6 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Database } from 'bun:sqlite';
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 import { writeFindings } from '@open-tomato/rafa/store/findings';
@@ -96,6 +93,8 @@ import { bugKeyOf, legacyBugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { createLocalTracker, localIssuesDir, parseLocalIssue } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { Database } from 'bun:sqlite';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { DEFAULT_BUG_RULES } from './bug-filing.js';
 import { ISSUE_OPENING, supersedesSection } from './issue-text.js';

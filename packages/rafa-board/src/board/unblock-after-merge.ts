@@ -17,7 +17,7 @@
  *
  * This file came whole out of `src/commands/pr/merge-unblock.ts`, which
  * read no argv and no flag and so left no command half behind. Its two
- * callers are the command, `src/commands/pr/merge.ts`, which hands it
+ * callers are the command, `packages/rafa-pr/src/commands/pr/merge.ts`, which hands it
  * the merged body and the question, and the `labels` adapter's
  * `afterMerge` (`./relations/labels.ts`). It imports nothing under
  * `src/commands/`.
@@ -56,7 +56,7 @@
  * ## Why every failure is a warning
  *
  * The merge has already happened by the time this runs, as
- * `src/commands/pr/merge-tick.ts` records for the roadmap tick. A board
+ * `packages/rafa-pr/src/commands/pr/merge-tick.ts` records for the roadmap tick. A board
  * that will
  * not answer the listing, an issue whose line cannot be read and a
  * `removeLabel` GitHub refused none of them un-merge anything, and

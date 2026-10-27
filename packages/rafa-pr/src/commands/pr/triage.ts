@@ -160,7 +160,7 @@
  * pull request for, and a provider call that rejected. Under
  * `--resolve`, three more from elsewhere: exit 2 for more than one red
  * candidate (`select.ts`), for a cross-repository pull request
- * (`src/pr/worktree.ts`) and for a pull request whose author is
+ * (`packages/rafa-pr/src/pr/worktree.ts`) and for a pull request whose author is
  * trusted with nothing (`packages/rafa-board/src/board/trust.ts`), exit 1 for a head whose
  * config module `origin/<base>` does not hold, unless
  * `--allow-local-config` (`./triage-config-trust.ts`), and exit 3 when

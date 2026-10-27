@@ -11,7 +11,7 @@
  *
  * ## Why the console lines are not the comment's lines
  *
- * `src/pr/triage/comment.ts` renders the same assessment for GitHub:
+ * `packages/rafa-pr/src/pr/triage/comment.ts` renders the same assessment for GitHub:
  * backticked paths, a `<details>` fold, a fenced excerpt. That is
  * markdown for a web page. These are lines for a terminal, and they
  * differ in what markdown would cost rather than in what they say: a
@@ -23,7 +23,7 @@
  *
  * ## The four re-run readings are one line each
  *
- * `readTriageRerun` (`src/pr/triage/rerun.ts`) already answers a
+ * `readTriageRerun` (`packages/rafa-pr/src/pr/triage/rerun.ts`) already answers a
  * headline for every reading it makes, so this module prints that
  * sentence and never re-words it: "already assessed at <time>", the
  * moved head with a run still going, the head that is assessed again,
@@ -53,14 +53,14 @@
  *
  * `no-checks` has nothing to fix, so what a reader needs under it is
  * the decision `rafa pr merge --skip-checks` would ask for, in the
- * words that command prints before its question (`src/pr/unchecked.ts`):
+ * words that command prints before its question (`packages/rafa-pr/src/pr/unchecked.ts`):
  * the workflow count read, the warning of its case, and the command
  * itself — {@link skipChecksCommand} — with whether `--yes` may answer
  * it. The count is {@link TriageReading.workflows}, which
  * `readWorkflowCount` (`./triage-read.ts`) asked for on this reading;
  * where it was not handed one, the count reads as unread, the riskier
  * case, and never as "no workflow". The lines follow the verdict, in
- * the same place in `src/pr/triage/comment.ts`.
+ * the same place in `packages/rafa-pr/src/pr/triage/comment.ts`.
  *
  * ## The prompt is printed whole, unindented
  *

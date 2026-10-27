@@ -1,5 +1,5 @@
 /**
- * Tests for the recorded answer shapes (`src/pr/gh-fake-shapes.ts`).
+ * Tests for the recorded answer shapes (`packages/rafa-pr/src/pr/gh-fake-shapes.ts`).
  *
  * The fake proves what a `src/pr/` case claims only as far as it answers
  * as `gh` does, so every reading the module note lists is held here as it

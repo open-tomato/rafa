@@ -47,13 +47,13 @@
  * The release guard's verdict `conflict-version` needs is supplied the
  * same way, by a `readGuard` seam keyed on the head commit.
  */
-import type { TriageGuardReader } from './triage-guard.js';
-import type { TriageSeams } from './triage.js';
-import type { FakePrAuthor, FakePrCheck, FakePullRequestSeed } from '../../pr/gh-fake.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
-import type { TriageClass } from '../../pr/triage/classes.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { TriageSeams } from '@open-tomato/rafa-pr/commands/pr/triage';
+import type { TriageGuardReader } from '@open-tomato/rafa-pr/commands/pr/triage-guard';
+import type { FakePrAuthor, FakePrCheck, FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
+import type { TriageClass } from '@open-tomato/rafa-pr/pr/triage/classes';
 import type { GuardReading } from '@open-tomato/rafa-release/release/guard';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
@@ -63,14 +63,13 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
+import { createPrTriageCommand } from '@open-tomato/rafa-pr/commands/pr/triage';
+import { runIdOf } from '@open-tomato/rafa-pr/commands/pr/triage-read';
+import { createFakePrGh, logFailedText } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
+import { TRIAGE_CLASSES } from '@open-tomato/rafa-pr/pr/triage/classes';
 
-import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
-import { createGhPullRequests } from '../../pr/index.js';
-import { TRIAGE_CLASSES } from '../../pr/triage/classes.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
-import { runIdOf } from './triage-read.js';
-import { createPrTriageCommand } from './triage.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-triage-fixtures-')));
@@ -211,7 +210,7 @@ interface CapturedFixture {
 
 /** Where one class's fixture lives under `src/tests/fixtures/pr-triage/`. */
 function fixturePath(triageClass: TriageClass, file: string): URL {
-  return new URL(`../../tests/fixtures/pr-triage/${triageClass}/${file}`, import.meta.url);
+  return new URL(`../../../fixtures/pr-triage/${triageClass}/${file}`, import.meta.url);
 }
 
 /** Reads one class's fixture directory. */
@@ -403,7 +402,7 @@ describe('the bare line, over more than one candidate, including the 72-hour ski
     const runId = '9101';
     const log = logFailedText('gates', [
       '##[group]Run bunx eslint .',
-      'src/pr/triage/select.ts',
+      'packages/rafa-pr/src/pr/triage/select.ts',
       '##[endgroup]',
       '##[error]Process completed with exit code 1.',
     ]);

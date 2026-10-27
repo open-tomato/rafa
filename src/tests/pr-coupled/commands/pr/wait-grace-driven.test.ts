@@ -1,7 +1,7 @@
 /**
- * `rafa pr wait` driven over the `gh` fake (`src/pr/gh-fake.ts`) through
+ * `rafa pr wait` driven over the `gh` fake (`packages/rafa-pr/src/pr/gh-fake.ts`) through
  * the registered command, for the grace a young head gets before its first
- * check registers (`FIRST_CHECK_GRACE_MS` in `src/pr/checks.ts`).
+ * check registers (`FIRST_CHECK_GRACE_MS` in `packages/rafa-pr/src/pr/checks.ts`).
  *
  * `wait.test.ts` proves the wording over a stub provider; this file proves
  * the real provider, reading the fake's `gh pr view --json commits` and
@@ -15,9 +15,9 @@
  * check ever (exit 1, `no check registered yet`, no `merge cleanly` line);
  * and a conflicting pull request with no check (exit 1, the line present).
  */
-import type { PrWaitSeams } from './wait.js';
-import type { FakePullRequestSeed } from '../../pr/gh-fake.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
+import type { PrWaitSeams } from '@open-tomato/rafa-pr/commands/pr/wait';
+import type { FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,11 +25,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests } from '../../pr/index.js';
-import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
+import { createPrWaitCommand } from '@open-tomato/rafa-pr/commands/pr/wait';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
 
-import { createPrWaitCommand } from './wait.js';
+import { dispatchInProject, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-wait-grace-')));

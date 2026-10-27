@@ -24,7 +24,7 @@
  *
  * One fixture was recorded the same way under bun 1.3.14, the version
  * `package.json` pins, and stays at the root's `src/suite/testdata/` for
- * the inherited-failure test, `src/triage/inherited.test.ts`, the one
+ * the inherited-failure test, `packages/rafa-pr/src/triage/inherited.test.ts`, the one
  * that reads it:
  *
  *   - `no-message`: one failing `toBe` in `src/parse/parse.test.ts`,

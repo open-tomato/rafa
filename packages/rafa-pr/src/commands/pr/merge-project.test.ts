@@ -31,12 +31,11 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import type { ProjectRefresh, RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
 import type { UnblockOutcome, UnblockReport } from '@open-tomato/rafa-board/board/unblock';
 
-import { describe, expect, it } from 'bun:test';
-
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { retryLine } from '@open-tomato/rafa-board/board/project/project-runner';
 import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '@open-tomato/rafa-board/board/project/retry-fake';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+import { describe, expect, it } from 'bun:test';
 
 import { blockingProblemLine, refreshProblemLine, refreshProjectAfterMerge } from './merge-project.js';
 

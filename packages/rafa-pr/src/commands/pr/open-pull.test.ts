@@ -18,9 +18,8 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { baseWarning, readOpenBody, readOpenLine, renderOpen } from './open-pull.js';
 import { PR_USAGE } from './pr-context.js';

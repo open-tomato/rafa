@@ -22,8 +22,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { DOC_TASK_HEADING, NO_SIGHTINGS_LINE } from '../docs/task-reading.js';
+import { DOC_TASK_HEADING, NO_SIGHTINGS_LINE } from '@open-tomato/rafa-pr/docs/task-reading';
 
 import { dispatchTask } from './dispatch.js';
 import { docTaskBaseRef, docTaskPrompt } from './doc-task.js';
@@ -58,7 +57,7 @@ function fakeGit(calls: string[][], remote = true): GitRunner {
     if (args[0] === 'symbolic-ref') return result(true, 'origin/main\n');
     if (args[0] === 'rev-parse') return result(remote);
     if (args[0] === 'merge-base') return result(true, 'abc123\n');
-    if (args[0] === 'diff') return result(true, 'src/triage/triage.ts\0context/triage.md\0');
+    if (args[0] === 'diff') return result(true, 'packages/rafa-pr/src/triage/triage.ts\0context/triage.md\0');
     return result(false);
   };
 }
@@ -110,7 +109,7 @@ describe('docTaskPrompt', () => {
     expect(prompt.endsWith(`\n\n${PROMPT_MD}`)).toBe(true);
     expect(prompt).toContain('- context/triage.md:12: names three channels');
     expect(prompt).toContain('- the README lists seven fields');
-    expect(prompt).toContain('- `src/triage/triage.ts`');
+    expect(prompt).toContain('- `packages/rafa-pr/src/triage/triage.ts`');
     expect(prompt).toContain('- `context/triage.md`');
     expect(prompt).toContain('since it left `origin/integration`');
   });
@@ -147,7 +146,7 @@ describe('docTaskPrompt', () => {
 
     expect(rowsRead).toBe(0);
     expect(prompt).toContain(NO_SIGHTINGS_LINE);
-    expect(prompt).toContain('- `src/triage/triage.ts`');
+    expect(prompt).toContain('- `packages/rafa-pr/src/triage/triage.ts`');
   });
 
   it('reads the files by git in the checkout and redacts paths under it', () => {

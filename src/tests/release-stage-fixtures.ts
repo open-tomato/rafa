@@ -23,9 +23,9 @@
  * {@link stub} sets the active output, which is module state: a file
  * using it resets it to null in an `afterEach`.
  */
-import type { GitResult, PrProviderReading, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
 import type { ReleaseStageInput, ReleaseStageSeams, ReleaseStageSettings } from '../start/release-stage.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
+import type { GitResult, PrProviderReading, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '@open-tomato/rafa-pr/pr/index';
 import type { BranchForecast, BranchForecastInput } from '@open-tomato/rafa-release/release/branch-forecast';
 import type { ChangelogNote } from '@open-tomato/rafa-release/release/changelog';
 import type { ReleasePrepared, ReleaseSkipped } from '@open-tomato/rafa-release/release/prepare';

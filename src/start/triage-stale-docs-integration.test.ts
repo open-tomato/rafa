@@ -30,9 +30,9 @@ import { recordTaskReport } from '@open-tomato/rafa/report/record';
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { createPrivateTriageTracker } from '@open-tomato/rafa-pr/triage/triage';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { createPrivateTriageTracker } from '../triage/triage.js';
 
 import { createStartTriage } from './triage.js';
 

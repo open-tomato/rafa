@@ -7,9 +7,9 @@
  * ## Where each answer comes from
  *
  * - **The push remote** is `origin`, because that is the remote the
- *   loop itself pushes to: `pushBranch` in `src/pr/none.ts` runs
- *   `git push --set-upstream origin <branch>`, and `src/pr/worktree.ts`
- *   and `src/pr/merge.ts` default their remote to `origin` too. Its URL
+ *   loop itself pushes to: `pushBranch` in `packages/rafa-pr/src/pr/none.ts` runs
+ *   `git push --set-upstream origin <branch>`, and `packages/rafa-pr/src/pr/worktree.ts`
+ *   and `packages/rafa-pr/src/pr/merge.ts` default their remote to `origin` too. Its URL
  *   is read with `git remote get-url --push origin`, which honours a
  *   `pushurl` where the plain form would print the fetch URL. With no
  *   `origin`, git exits 2 with `error: No such remote '<name>'`

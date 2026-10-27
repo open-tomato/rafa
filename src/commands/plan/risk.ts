@@ -1,6 +1,6 @@
 /**
  * `rafa plan risk [<plan>] [--strict]`: the risk reading of one plan
- * (`src/plan/risk.ts`), printed. What a run of the plan may do on this
+ * (`packages/rafa-pr/src/plan/risk.ts`), printed. What a run of the plan may do on this
  * machine and under the person's accounts, read in code: the command
  * starts no Claude session and so declares no `spends`.
  *

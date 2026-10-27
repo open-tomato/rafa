@@ -1,5 +1,5 @@
 /**
- * Tests for the scoring fixture's reading (`src/triage/scoring-fixture.ts`):
+ * Tests for the scoring fixture's reading (`packages/rafa-pr/src/triage/scoring-fixture.ts`):
  * how a board's issues become labelled filings, in what order, and what
  * the leak check refuses. Issue bodies are written by `./issue-text.ts`.
  */

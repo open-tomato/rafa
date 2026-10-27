@@ -62,8 +62,8 @@ import { resolveConfig } from '@open-tomato/rafa/core/config';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '@open-tomato/rafa-pr/pr/preflight-items';
 
-import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { forkWorktree } from '../preflight/fork.js';
 import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js';
 

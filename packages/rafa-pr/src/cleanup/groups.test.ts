@@ -16,11 +16,10 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readBranches } from './branches.js';
 import {

@@ -4,7 +4,7 @@
  *
  * `packages/rafa-board/src/board/issue.ts`, `packages/rafa-board/src/board/roadmap.ts`, `packages/rafa-board/src/board/spec-source.ts`,
  * `packages/rafa-board/src/board/spec-source-roadmap.ts`, `packages/rafa-board/src/board/plan-spec.ts`,
- * `packages/rafa-board/src/board/roadmap-tick.ts` and `src/commands/pr/merge-tick.ts` each
+ * `packages/rafa-board/src/board/roadmap-tick.ts` and `packages/rafa-pr/src/commands/pr/merge-tick.ts` each
  * drive their own module, or a pair of them, over planted fakes; this
  * file drives none of that again. It exists for the SEAM across all of
  * them, which `src/plan.test.ts` names in its own module note and does
@@ -22,7 +22,7 @@
  *    reading, a closed reading, a branch taken and a pull request taken,
  *    to the line it picks.
  *  - `rafa pr merge` ticks a roadmap line after a merge
- *    (`src/commands/pr/merge-tick.test.ts`, `packages/rafa-board/src/board/roadmap-tick.test.ts`),
+ *    (`packages/rafa-pr/src/commands/pr/merge-tick.test.ts`, `packages/rafa-board/src/board/roadmap-tick.test.ts`),
  *    and `plan create --next` reads a ticked line as done
  *    (`src/tests/board-coupled/board/roadmap.test.ts`). Nothing anywhere plays the two in
  *    sequence over the SAME board: a tick written by one, read as done
@@ -118,8 +118,7 @@ import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-boar
 import { describeIssue, dryRunLine } from '@open-tomato/rafa-board/board/spec-source';
 import { pickLine, roadmapHeaderLine, skipLine } from '@open-tomato/rafa-board/board/spec-source-roadmap';
 import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
-
-import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
+import { tickRoadmapAfterMerge } from '@open-tomato/rafa-pr/commands/pr/merge-tick';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

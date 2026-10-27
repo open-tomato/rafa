@@ -19,9 +19,8 @@
 import type { PullRequestComment } from '../../pr/index.js';
 import type { PermissionReading, Permissions } from '@open-tomato/rafa-board/board/trust';
 
-import { describe, expect, it } from 'bun:test';
-
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { describe, expect, it } from 'bun:test';
 
 import { TRIAGE_MARKER } from '../../pr/triage/comment.js';
 

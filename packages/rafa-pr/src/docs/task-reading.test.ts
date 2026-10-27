@@ -19,10 +19,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
   DOC_TASK_FILE_CAP,

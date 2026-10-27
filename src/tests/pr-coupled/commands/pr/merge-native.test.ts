@@ -28,12 +28,12 @@
  * calls follow the board reading. Every case above sets no number and
  * holds the call list to end at that reading, which is the control.
  */
-import type { MergeSeams } from './merge.js';
-import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
+import type { GitResult, GitRunner, PullRequestDetail } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -45,12 +45,11 @@ import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-dou
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
+import { INDENT } from '@open-tomato/rafa-pr/commands/pr/merge-cleanup';
+import { freedHeaderLine } from '@open-tomato/rafa-pr/commands/pr/merge-freed';
 
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
-import { INDENT } from './merge-cleanup.js';
-import { freedHeaderLine } from './merge-freed.js';
-import { createPrMergeCommand } from './merge.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-native-')));

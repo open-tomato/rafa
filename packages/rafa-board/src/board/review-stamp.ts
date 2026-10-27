@@ -62,7 +62,7 @@
  * ## Written bare, and what it reads back as
  *
  * The value is written as the spec spells it, `review: skipped`, and
- * not through `JSON.stringify` as `src/pr/triage/comment.ts` writes
+ * not through `JSON.stringify` as `packages/rafa-pr/src/pr/triage/comment.ts` writes
  * every value of its block. That module quotes because a sha, a date
  * and a path each come back retyped or cut short by the YAML core
  * schema; this value is one lower-case word, and it was measured on bun

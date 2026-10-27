@@ -79,11 +79,11 @@
  * 1.3.14, 2026-10-13).
  */
 import type { WrapUpLearning } from './wrap-up.js';
-import type { GitRunner } from '../pr/index.js';
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
 import type { Learning } from '@open-tomato/rafa/ports';
 import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 import type { ReleasePrepared, ReleaseSkipped } from '@open-tomato/rafa-release/release/prepare';
 
 import { createHash } from 'node:crypto';
@@ -96,9 +96,9 @@ import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { createGhPullRequests } from '../pr/index.js';
 import { PLAN_DONE, scratchPlanter, STUB } from '../tests/loop-scratch.js';
 
 import { NO_PROVIDER_REASON } from './promoted-check.js';

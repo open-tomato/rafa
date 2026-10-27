@@ -94,7 +94,7 @@ export interface EndingSeams {
 /**
  * What the `triageReport` service is handed for one report: the fields
  * `rafa epic close` passes (`packages/rafa-board/src/commands/epic/close-triage.ts`), each
- * one pr's `TriageOptions` (`src/triage/triage.ts`) takes.
+ * one pr's `TriageOptions` (`packages/rafa-pr/src/triage/triage.ts`) takes.
  */
 export interface TriageServiceOptions {
   /** The repo root the store lives under. */

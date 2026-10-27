@@ -20,12 +20,11 @@ import type { FollowUpReading } from './merge-followups.js';
 import type { SettleWaiting } from '../../pr/settle-waiting.js';
 import type { ReleaseMove } from '@open-tomato/rafa-release/release/release-move';
 
-import { describe, expect, it } from 'bun:test';
-
 import { RAFA_PACKAGE_NAME } from '@open-tomato/rafa/core/runtime';
 import { createReleaseSettleCommand } from '@open-tomato/rafa-release/commands/release/settle';
 import { moveSpelling } from '@open-tomato/rafa-release/release/release-move';
 import { versionTag } from '@open-tomato/rafa-release/release/version-tag';
+import { describe, expect, it } from 'bun:test';
 
 import { afterLoopsPhrase, readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND } from './merge-followups.js';
 

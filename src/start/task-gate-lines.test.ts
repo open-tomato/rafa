@@ -11,8 +11,8 @@
  * a real tsc, in `type-step.test.ts`.
  */
 
-import type { GitRunner } from '../pr/index.js';
 import type { Output } from '@open-tomato/rafa/ports';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
@@ -59,7 +59,7 @@ describe('baseLines, handing the task its base commit', () => {
 const TRACKED = [
   'src/tests/repo-hygiene.sweep.test.ts',
   'src/start/task-gate-lines.ts',
-  'src/pr/conflict-sentence.sweep.test.ts',
+  'src/tests/pr-coupled/pr/conflict-sentence.sweep.test.ts',
   'packages/hub/x.sweep.test.ts',
   'src/start/task-gate-lines.test.ts',
 ];
@@ -91,9 +91,9 @@ describe('the always-run line, over the tests.alwaysRun files', () => {
   it('names the default glob\'s tracked sweeps under src/, sorted, each prefixed ./', () => {
     const files = readAlwaysRunFiles(lsFiles(TRACKED), TESTS_DEFAULTS.testsAlwaysRun);
 
-    expect(files).toEqual(['src/pr/conflict-sentence.sweep.test.ts', 'src/tests/repo-hygiene.sweep.test.ts']);
+    expect(files).toEqual(['src/tests/pr-coupled/pr/conflict-sentence.sweep.test.ts', 'src/tests/repo-hygiene.sweep.test.ts']);
     expect(alwaysRunLines(files)).toEqual([
-      'Also run `bun test ./src/pr/conflict-sentence.sweep.test.ts ./src/tests/repo-hygiene.sweep.test.ts`: '
+      'Also run `bun test ./src/tests/pr-coupled/pr/conflict-sentence.sweep.test.ts ./src/tests/repo-hygiene.sweep.test.ts`: '
       + 'these are the `tests.alwaysRun` files, content sweeps no changed file selects.',
     ]);
   });
@@ -120,7 +120,7 @@ describe('the always-run line, over the tests.alwaysRun files', () => {
 
   it('names a file two globs match once', () => {
     expect(alwaysRunFiles(['src/**/*.sweep.test.ts', 'src/tests/*.ts'], TRACKED)).toEqual([
-      'src/pr/conflict-sentence.sweep.test.ts',
+      'src/tests/pr-coupled/pr/conflict-sentence.sweep.test.ts',
       'src/tests/repo-hygiene.sweep.test.ts',
     ]);
   });

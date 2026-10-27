@@ -20,9 +20,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
   agentTools,

@@ -7,7 +7,7 @@
  * (`worktreePathFor`, `src/start/worktree.ts`) on `feat/<stub>`, and it
  * leaves that worktree behind when it ends. Its pull request is then
  * merged from the main checkout, where `readMergeRefusal`
- * (`src/pr/merge.ts`) refuses, because the clean-up deletes a branch
+ * (`packages/rafa-pr/src/pr/merge.ts`) refuses, because the clean-up deletes a branch
  * another worktree holds. Removing the worktree by hand also deletes
  * the plan files the loop wrote inside it, since `.rafa/` is ignored
  * and `git worktree remove` takes ignored files with it. This module
@@ -23,7 +23,7 @@
  * (`packages/rafa/src/start/worktree-dir.ts`), and that directory's name is the
  * stub. Git prints each path resolved, so the directory is compared in
  * both spellings through {@link LoopWorktreeSeams.realPath}, as
- * `src/cleanup/worktrees.ts` compares its roots. A holder anywhere
+ * `packages/rafa-pr/src/cleanup/worktrees.ts` compares its roots. A holder anywhere
  * else, more than one holder, or none answers `none`, and the existing
  * refusal stays the answer for it: somebody's own checkout is never
  * removed here.
@@ -38,7 +38,7 @@
  *     whose recorded `worktree` is the holder. The record names the
  *     session and its pid.
  *   - a dirty tree: `git --no-optional-locks status` in the holder
- *     (`WORKTREE_STATUS`, `src/cleanup/worktrees.ts`) lists an
+ *     (`WORKTREE_STATUS`, `packages/rafa-pr/src/cleanup/worktrees.ts`) lists an
  *     uncommitted change or an untracked file. Ignored files do not
  *     count, which is also what `git worktree remove` without `--force`
  *     refuses on.
@@ -96,7 +96,7 @@ import { shellQuote } from '@open-tomato/rafa/utils/shell';
 import { countChanges, WORKTREE_STATUS } from '../../cleanup/worktrees.js';
 import { createGitRunner, gitSaid, worktreesHolding } from '../../pr/index.js';
 
-/** How every refusal here opens, as `src/pr/merge.ts`'s refusals open. */
+/** How every refusal here opens, as `packages/rafa-pr/src/pr/merge.ts`'s refusals open. */
 const REFUSAL_PREFIX = 'rafa pr merge refuses';
 
 /** The indent a refusal's listed lines carry. */

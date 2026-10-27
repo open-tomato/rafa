@@ -73,6 +73,7 @@ import type {
   UnblockReport,
 } from '@open-tomato/rafa-board';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import {
   BOARD_SYNC_FIX,
   closedIssuesIn,
@@ -82,8 +83,6 @@ import {
   refreshIssueItems,
   selectBoardRelations,
 } from '@open-tomato/rafa-board';
-
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** What {@link refreshProjectAfterMerge} is made with. */
 export interface MergeProjectOptions {

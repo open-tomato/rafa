@@ -3,7 +3,7 @@
  * it closes on the checklist of that issue's epic, and the sentences
  * that say what each tick came to.
  *
- * This is the library half of `src/commands/pr/merge-tick.ts`. The
+ * This is the library half of `packages/rafa-pr/src/commands/pr/merge-tick.ts`. The
  * command half holds what `rafa pr merge` decides about the roadmap
  * boards — which issues the merged pull request closes, which boards
  * list them, and the one tick per board — and runs {@link tickEpics}

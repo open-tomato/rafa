@@ -53,7 +53,7 @@
  *     Sessions of this plan reported these documentation lines as stale:
  *     - context/triage.md:12: names three channels
  *     The plan's commits touched these files since it left `origin/main`:
- *     - `src/triage/triage.ts`
+ *     - `packages/rafa-pr/src/triage/triage.ts`
  *
  * A row is `- <where>: <what>`, and `- <what>` for one that named no
  * place. A file is `` - `<path>` ``. At most {@link DOC_TASK_FILE_CAP}

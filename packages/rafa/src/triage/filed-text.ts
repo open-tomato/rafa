@@ -5,7 +5,7 @@
  * {@link TRIAGE_MODULE}, `unassigned`, is the module a draft is filed
  * under when its record names none or `unknown`: the module the GitHub
  * adapter's `get` answers for an issue with no module label. Triage
- * (`src/triage/triage.ts`), `rafa issue create`, the bug record's fill
+ * (`packages/rafa-pr/src/triage/triage.ts`), `rafa issue create`, the bug record's fill
  * and the release and follow-up issues all file under it.
  *
  * {@link namedSecrets} answers the value of every `env` item under
@@ -13,7 +13,7 @@
  * that is set. {@link redactSecrets} replaces each value with
  * `[redacted: <NAME>]`. Every value a session or the plan supplied goes
  * through it before it reaches a title, a body, a comment or a `find`
- * query; the note of `src/triage/triage.ts` holds why the key is built
+ * query; the note of `packages/rafa-pr/src/triage/triage.ts` holds why the key is built
  * from the redacted artifact and the title cut after redaction.
  */
 import type { RafaConfig } from '../core/config/index.js';

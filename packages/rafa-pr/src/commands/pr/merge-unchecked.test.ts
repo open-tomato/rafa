@@ -1,6 +1,6 @@
 /**
  * Tests for the unchecked half of `rafa pr merge --skip-checks`
- * (`src/commands/pr/merge-unchecked.ts`): the workflow count read, the
+ * (`packages/rafa-pr/src/commands/pr/merge-unchecked.ts`): the workflow count read, the
  * two refusals it decides, the warning and the question, and the comment
  * posted after the merge.
  *
@@ -24,10 +24,9 @@ import type { UncheckedMerge, UncheckedMergeOptions } from './merge-unchecked.js
 import type { GitResult, GitRunner, PullRequestComment } from '../../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 
-import { describe, expect, it } from 'bun:test';
-
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { describe, expect, it } from 'bun:test';
 
 import {
   NO_WORKFLOW_WARNING,

@@ -34,7 +34,7 @@
  *
  * The head is the revision the worktree will hold. `git worktree add
  * <path> <branch>` takes the local branch when there is one and DWIMs
- * `origin/<branch>` otherwise (`src/pr/worktree.ts`), so the head is
+ * `origin/<branch>` otherwise (`packages/rafa-pr/src/pr/worktree.ts`), so the head is
  * read in the same order, {@link headRevision}. A branch neither ref
  * names answers no head and nothing to compare: the add that follows
  * fails on the same missing branch, and no config is loaded.

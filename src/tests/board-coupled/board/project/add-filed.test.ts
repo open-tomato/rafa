@@ -23,11 +23,11 @@
  * is on the project with its Stage set. The same bug settled `commented`
  * sits beside it, after which the project holds no item for it.
  */
-import type { BugTriage } from '../../../../triage/triage.js';
 import type { IssueRef } from '@open-tomato/rafa/ports';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { AddIssueOptions } from '@open-tomato/rafa-board/board/project/add-issue';
 import type { ProjectRefresh, RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
+import type { BugTriage } from '@open-tomato/rafa-pr/triage/triage';
 
 import { describe, expect, it } from 'bun:test';
 

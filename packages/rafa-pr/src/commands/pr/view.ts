@@ -4,7 +4,7 @@
  * ## One provider call, or two, and never a read it does not use
  *
  * The action's whole work is `PullRequests.browse`, which the `gh`
- * adapter spells `gh pr view <n> --web` (`src/pr/gh.ts`). It asks the
+ * adapter spells `gh pr view <n> --web` (`packages/rafa-pr/src/pr/gh.ts`). It asks the
  * provider for nothing else:
  *
  *   - With `<n>` on the line, `pickPullRequest` sends no call at all, so

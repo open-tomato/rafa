@@ -5,7 +5,7 @@
  *
  * `./merge.ts` decides WHEN each of these runs and holds the rest of the
  * command; what the clean-up IS, as data, is `cleanUpSteps` in
- * `src/pr/merge.ts`, and which follow-ups apply is `./merge-followups.ts`'s
+ * `packages/rafa-pr/src/pr/merge.ts`, and which follow-ups apply is `./merge-followups.ts`'s
  * pure rule. Nothing here asks a question or reaches the provider: every
  * function reads git through the {@link GitRunner} it is handed and
  * reports through the `info` and `warn` it is handed, so each is
@@ -74,7 +74,7 @@
  * ## The library half
  *
  * That dry run's reading, `settleWaitingOn`, is in
- * `src/pr/settle-waiting.ts`, the library half of this file, since
+ * `packages/rafa-pr/src/pr/settle-waiting.ts`, the library half of this file, since
  * `rafa next`'s settle step (`src/next/settle-step.ts`) is decided by
  * the same reading. This file imports it and holds no re-export of it;
  * {@link FollowUpPlace} widens that file's `SettleWaitingPlace` with

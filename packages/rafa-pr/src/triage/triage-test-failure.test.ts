@@ -1,5 +1,5 @@
 /**
- * Triage of one red test met by several plans (`src/triage/triage.ts`).
+ * Triage of one red test met by several plans (`packages/rafa-pr/src/triage/triage.ts`).
  *
  * A recording tracker over a temporary directory and the real SQLite store
  * under it: the same test failure worded two ways by two plans files one bug
@@ -16,9 +16,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { triageReport } from './triage.js';
 

@@ -1,14 +1,14 @@
 /**
  * The git half of `rafa pr merge`'s refusals: {@link refuseFromGit}
  * gathers at the project root everything `readMergeRefusal`
- * (`src/pr/merge.ts`) decides from and refuses with exit code 1 on what
+ * (`packages/rafa-pr/src/pr/merge.ts`) decides from and refuses with exit code 1 on what
  * it answers.
  *
  * It reads `git status --porcelain` for the working tree,
  * `git ls-tree -r --name-only` over the pull request's head commit
  * (`headRefOid`) and over `origin/<base>` for the paths the merge
  * brings in — only when the tree has an untracked path, since only an
- * untracked path is weighed against them (`src/pr/merge.ts`, "Which
+ * untracked path is weighed against them (`packages/rafa-pr/src/pr/merge.ts`, "Which
  * untracked paths refuse") —
  * `git worktree list --porcelain` for the worktrees (once, and again
  * after the loop worktree step freed one), and
@@ -17,7 +17,7 @@
  * which frees a clean, ended loop worktree holding the head branch and
  * prints one line, or refuses on one that is not. The pull request, its
  * mergeability and its checks come in from `./merge.ts`, which read
- * them; what to refuse on, and in which order, stays `src/pr/merge.ts`'s.
+ * them; what to refuse on, and in which order, stays `packages/rafa-pr/src/pr/merge.ts`'s.
  * A git reading that fails is refused naming what was being read; a
  * head commit this clone does not have is one, and fetching the head
  * branch is the way past it. When nothing is refused, the untracked

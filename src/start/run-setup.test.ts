@@ -48,7 +48,7 @@
  */
 
 import type { BranchSeams } from './branch.js';
-import type { GitResult } from '../pr/index.js';
+import type { GitResult } from '@open-tomato/rafa-pr/pr/index';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 

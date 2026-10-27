@@ -23,7 +23,7 @@
  * ## Why the comment is where the check bites
  *
  * The triage comment is a STORE and not only a report
- * (`src/pr/triage/comment.ts`): its `head` decides whether the pull
+ * (`packages/rafa-pr/src/pr/triage/comment.ts`): its `head` decides whether the pull
  * request is assessed again, its `attempts` is the resolve counter, and
  * the `<details>` under it carries a follow-up prompt a session is
  * handed as it stands. All three are text off the board, and on a public
@@ -50,7 +50,7 @@
  *
  * `gh` resolves the repository from the directory it runs in, so
  * nothing here is told which repository it is working on — the same rule
- * `src/pr/gh.ts` keeps for every path it builds. The name in a sentence
+ * `packages/rafa-pr/src/pr/gh.ts` keeps for every path it builds. The name in a sentence
  * is therefore a LABEL and not an input to the lookup:
  * {@link repoLabel} takes `owner/name` out of the pull request's own
  * URL, falls back to the normalised `origin` remote, and says
@@ -67,6 +67,7 @@
 import type { PullRequestComment, PullRequestDetail } from '../../pr/index.js';
 import type { Permissions, TrustReading } from '@open-tomato/rafa-board';
 
+import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
 import {
   createGhPermissions,
   createGhRunner,
@@ -74,8 +75,6 @@ import {
   requireTrustedAuthor,
   trustRefusalClause,
 } from '@open-tomato/rafa-board';
-
-import { normalizeRemote } from '@open-tomato/rafa/schema/project-id';
 
 import { DEPENDENCY_BUMP_AUTHORS } from '../../pr/triage/classes.js';
 import { triageComments } from '../../pr/triage/comment.js';

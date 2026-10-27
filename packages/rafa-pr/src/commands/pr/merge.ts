@@ -3,7 +3,7 @@
  * the pull request merged through the provider, and the five git steps
  * after it run here, each one reported.
  *
- * `src/pr/merge.ts` holds what this refuses on and what the clean-up
+ * `packages/rafa-pr/src/pr/merge.ts` holds what this refuses on and what the clean-up
  * is, both as data and neither of them spawning anything. This module
  * is the half that acts: it gathers what that reading decides from,
  * asks the one question, sends the merge, and walks the steps.
@@ -22,7 +22,7 @@
  *
  *   - Nothing is asked and nothing is merged while any refusal stands,
  *     which is the spec's "refuse before it asks anything".
- *   - The refusal ORDER is `src/pr/merge.ts`'s alone. Gathering the
+ *   - The refusal ORDER is `packages/rafa-pr/src/pr/merge.ts`'s alone. Gathering the
  *     working tree first and refusing on it before the provider is
  *     asked anything would save two `gh` calls on a dirty tree and put
  *     a second copy of that order here, where the two could drift. The
@@ -217,6 +217,9 @@ import type {
   UnblockReport,
 } from '@open-tomato/rafa-board';
 
+import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { activeServices } from '@open-tomato/rafa/core/services';
+import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
 import {
   closedIssuesIn,
   commandRetrySeams,
@@ -225,10 +228,6 @@ import {
   tickSentence,
   unblockAfterMerge,
 } from '@open-tomato/rafa-board';
-
-import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
-import { activeServices } from '@open-tomato/rafa/core/services';
-import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
 
 import {
   createGitRunner,

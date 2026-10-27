@@ -315,7 +315,7 @@ export const CUT_RULES: CutRules = {
     {
       folders: ['packages/rafa-pr/', 'src/commands/pr/', 'src/pr/', 'src/triage/'],
       name: 'rafa-pr',
-      named: [...PR_NAMED, 'src/pr/index.ts'],
+      named: [...PR_NAMED, 'packages/rafa-pr/src/pr/index.ts'],
     },
     {
       folders: ['packages/rafa-run/', 'src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],

@@ -1,5 +1,5 @@
 /**
- * Tests for the pull request's check-row readers (`src/pr/checks.ts`).
+ * Tests for the pull request's check-row readers (`packages/rafa-pr/src/pr/checks.ts`).
  *
  * Everything here is driven through injected probes and an injected
  * clock, so no `gh`, no network and no real timers are involved. The

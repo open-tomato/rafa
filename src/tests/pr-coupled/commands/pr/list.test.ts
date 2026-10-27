@@ -26,12 +26,12 @@
  * counts how many probes are in flight at once, so the bound is a
  * reading rather than a claim in a comment.
  */
-import type { PrListRow, PrListResult } from './list.js';
-import type { PrSeams } from './pr-context.js';
-import type { ChecksReading, PullRequestDetail, PullRequests, PullRequestSummary } from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PrListRow, PrListResult } from '@open-tomato/rafa-pr/commands/pr/list';
+import type { PrSeams } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import type { ChecksReading, PullRequestDetail, PullRequests, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,12 +40,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
-
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
-import { SEPARATOR } from './current.js';
+import { SEPARATOR } from '@open-tomato/rafa-pr/commands/pr/current';
 import {
   ageCell,
   createPrListCommand,
@@ -55,8 +50,12 @@ import {
   titleCell,
   TITLE_WIDTH,
   UNREADABLE,
-} from './list.js';
-import { PR_USAGE } from './pr-context.js';
+} from '@open-tomato/rafa-pr/commands/pr/list';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
+
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-list-')));

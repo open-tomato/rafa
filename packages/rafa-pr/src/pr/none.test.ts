@@ -1,5 +1,5 @@
 /**
- * Tests for what a `none` provider gets (`src/pr/none.ts`).
+ * Tests for what a `none` provider gets (`packages/rafa-pr/src/pr/none.ts`).
  *
  * {@link compareUrl} is pure, so its cases are a table of remotes in
  * every spelling git writes one — https, scp-style, `ssh://` with a
@@ -41,9 +41,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
-
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { describe, expect, it } from 'bun:test';
 
 import { compareUrl, pushBranch } from './none.js';
 

@@ -136,11 +136,10 @@ import type { PastHeadRead, PastHeadReading, PastHeadSettings } from '@open-toma
 
 import { basename } from 'node:path';
 
-import { readPastHead } from '@open-tomato/rafa-release';
-
 import { RELEASE_DEFAULTS } from '@open-tomato/rafa/config-schema-release';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
+import { readPastHead } from '@open-tomato/rafa-release';
 
 /** The wording every Stale and Not-pushed row carries when no provider is configured. */
 export const MERGED_STATE_UNKNOWN = 'merged state unknown';

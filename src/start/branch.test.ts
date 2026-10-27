@@ -33,8 +33,8 @@
  * process, so each case sets a sink and the last one sets it back.
  */
 import type { BranchOutcome, BranchRequest, BranchSeams } from './branch.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 

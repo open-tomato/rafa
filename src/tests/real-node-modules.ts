@@ -12,7 +12,8 @@
 
 import { join } from 'node:path';
 
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+
 import { findNodeModules } from '../start/type-step.js';
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');

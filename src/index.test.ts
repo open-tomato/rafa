@@ -1062,7 +1062,8 @@ const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, command
     'board list', 'board sync',
     'epic show', 'epic new', 'epic defer', 'epic promote', 'epic move', 'epic close', 'epic cancel',
   ]],
-  ['./commands/pr/index.js', 'PR_FEATURE', [
+  // The pr entry moved with pr into its package in pass 4e (#808).
+  ['../packages/rafa-pr/src/commands/pr/index.js', 'PR_FEATURE', [
     'pr current', 'pr show', 'pr view', 'pr open', 'pr retarget', 'pr close', 'pr list', 'pr wait', 'pr merge', 'pr triage',
   ]],
   ['./commands/claim/index.js', 'RUN_FEATURE', ['claim release', 'claim hand', 'claim accept', 'claim take']],

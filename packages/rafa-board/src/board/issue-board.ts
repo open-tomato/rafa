@@ -12,7 +12,7 @@
  * {@link IssueBoard} is the interface the gate is written against, and
  * {@link createGhIssueBoard} is the one implementation, over the
  * {@link GhRunner} declared in `packages/rafa-board/src/adapters/tracker/github.ts` and
- * taken by the pull request provider (`src/pr/gh.ts`) and the trust
+ * taken by the pull request provider (`packages/rafa-pr/src/pr/gh.ts`) and the trust
  * reading (`./trust.ts`) already.
  * Where a board is built for label writes, it is usually built wrapped
  * (`./project/issue-board-refresh.ts`): the same commands, each label

@@ -169,15 +169,15 @@ import { ROADMAP_ROW_NAME } from '@open-tomato/rafa-board/board/status';
 import { issueCheckCommand } from '@open-tomato/rafa-board/refs/check-command';
 import { ABSENT, PRESENT, writeRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
 import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
-
-import { version } from '../../package.json';
-import { dispatch } from '../cli/dispatch.js';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,
   ghMissingMessage,
   ghOnPathItem,
-} from '../pr/preflight-items.js';
+} from '@open-tomato/rafa-pr/pr/preflight-items';
+
+import { version } from '../../package.json';
+import { dispatch } from '../cli/dispatch.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 

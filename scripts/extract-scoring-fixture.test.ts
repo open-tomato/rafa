@@ -1,5 +1,5 @@
 import type { ScrubContext } from '../src/fixtures/scrub.js';
-import type { BoardIssue, CauseJudgement } from '../src/triage/scoring-fixture.js';
+import type { BoardIssue, CauseJudgement } from '@open-tomato/rafa-pr/triage/scoring-fixture';
 
 import { resolve } from 'node:path';
 
@@ -7,9 +7,9 @@ import { describe, expect, it } from 'bun:test';
 import { ESLint } from 'eslint';
 
 import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
+import { ISSUE_OPENING, issueText } from '@open-tomato/rafa-pr/triage/issue-text';
 
 import { EMAIL_MARKER, HOST_MARKER, ScrubRefusal, findLeaks } from '../src/fixtures/scrub.js';
-import { ISSUE_OPENING, issueText } from '../src/triage/issue-text.js';
 
 import { FIXTURE_INDENT, scrubbedFilings, serializeFixture } from './extract-scoring-fixture.js';
 
@@ -18,7 +18,7 @@ import { FIXTURE_INDENT, scrubbedFilings, serializeFixture } from './extract-sco
  * board: the filings it reads, each value through the fixture scrub of
  * `src/fixtures/scrub.ts`, and the fixture serializer, whose text passes
  * the `jsonc/indent` rule `packages/eslint-config/base.mjs` applies to
- * `.json` files and holds both fixture files under `src/triage/testdata/`.
+ * `.json` files and holds both fixture files under `packages/rafa-pr/src/triage/testdata/`.
  * No case runs the extract itself, which reads the live board with `gh`.
  */
 
@@ -27,8 +27,8 @@ const eslint = new ESLint({ cwd: ROOT });
 
 /** The fixture files kept in the serializer's form. */
 const FIXTURE_FILES = [
-  'src/triage/testdata/scoring.json',
-  'src/triage/testdata/scoring-causes.json',
+  'packages/rafa-pr/src/triage/testdata/scoring.json',
+  'packages/rafa-pr/src/triage/testdata/scoring-causes.json',
 ];
 
 /** A small value with nesting on every level the fixtures use. */
@@ -123,7 +123,7 @@ describe('serializeFixture', () => {
   });
 });
 
-describe('the fixture files under src/triage/testdata/', () => {
+describe('the fixture files under packages/rafa-pr/src/triage/testdata/', () => {
   for (const path of FIXTURE_FILES) {
     it(`holds ${path} in the serializer's text`, async () => {
       const text = await Bun.file(resolve(ROOT, path)).text();

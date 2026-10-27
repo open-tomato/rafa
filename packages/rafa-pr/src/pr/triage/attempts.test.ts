@@ -1,5 +1,5 @@
 /**
- * Tests for the attempt guard (`src/pr/triage/attempts.ts`): the
+ * Tests for the attempt guard (`packages/rafa-pr/src/pr/triage/attempts.ts`): the
  * counter raised before each `--resolve` run, and the two readings that
  * stop the loop.
  *

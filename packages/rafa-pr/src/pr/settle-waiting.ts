@@ -16,10 +16,10 @@
  * nothing.
  *
  * This is the library half of two command files, and neither holds a
- * re-export of what left it. `src/commands/pr/merge-followups.ts` keeps
+ * re-export of what left it. `packages/rafa-pr/src/commands/pr/merge-followups.ts` keeps
  * the follow-ups rule and imports the type; its other symbol that left
  * is `versionTag`, in `packages/rafa-release/src/release/version-tag.ts`.
- * `src/commands/pr/merge-cleanup.ts` keeps the clean-up after a merge
+ * `packages/rafa-pr/src/commands/pr/merge-cleanup.ts` keeps the clean-up after a merge
  * and the gathering of the follow-ups, imports {@link settleWaitingOn},
  * and widens {@link SettleWaitingPlace} into its own follow-up place.
  * Nothing here imports from `src/commands/`.

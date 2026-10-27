@@ -4,7 +4,7 @@
  * into, in which order, with which delete flag, and the one runner that
  * carries them out.
  *
- * `src/pr/worktree.ts` draws the line this module copies: a step is an
+ * `packages/rafa-pr/src/pr/worktree.ts` draws the line this module copies: a step is an
  * argv that can be read in a test without a repository, printed as the
  * line a person would paste (`--dry-run` prints exactly those lines),
  * and run by a thin runner that answers each step's outcome rather than

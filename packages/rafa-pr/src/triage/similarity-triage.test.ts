@@ -1,5 +1,5 @@
 /**
- * The nearest-open-bug step of loop-owned triage (`src/triage/triage.ts`,
+ * The nearest-open-bug step of loop-owned triage (`packages/rafa-pr/src/triage/triage.ts`,
  * step 3 of a public bug's lookup), one case per branch, over a real
  * `local` tracker and the real SQLite store under a temporary root.
  *
@@ -26,9 +26,8 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { createLocalTracker } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { triageReport } from './triage.js';
 

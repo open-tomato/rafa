@@ -7,19 +7,19 @@
  * pieces it acts through were each built and tested on their own, and
  * nothing here re-decides what they decided:
  *
- *   - `src/pr/worktree.ts` — where the worktree goes, the
+ *   - `packages/rafa-pr/src/pr/worktree.ts` — where the worktree goes, the
  *     cross-repository refusal, and the removal that is never forced.
- *   - `src/pr/plans/load.ts` — the pinned plan for the class, filled
+ *   - `packages/rafa-pr/src/pr/plans/load.ts` — the pinned plan for the class, filled
  *     from the triage block, the shared conflict sentence and the
  *     failing job's log excerpt.
- *   - `src/pr/plans/budget.ts` — `pr.resolveBudget` written into that
+ *   - `packages/rafa-pr/src/pr/plans/budget.ts` — `pr.resolveBudget` written into that
  *     plan's task lines, which is how a session is handed
  *     `--max-budget-usd`.
  *   - `./resolve-loop.ts` — the plan written outside the worktree and
  *     `rafa loop start` spawned inside it.
- *   - `src/pr/checks.ts`'s `waitForChecks` — the CI wait, the same one
+ *   - `packages/rafa-pr/src/pr/checks.ts`'s `waitForChecks` — the CI wait, the same one
  *     the loop's own gate polls with.
- *   - `src/pr/triage/attempts.ts` — the counter and the two stops.
+ *   - `packages/rafa-pr/src/pr/triage/attempts.ts` — the counter and the two stops.
  *
  * ## The order of one attempt, and why it is that order
  *
@@ -45,7 +45,7 @@
  *
  * When the loop makes no commit, the head does not move, and the
  * re-assessment reads `already-assessed` and classifies nothing
- * (`src/pr/triage/rerun.ts`). There is then no fresh pair to compare,
+ * (`packages/rafa-pr/src/pr/triage/rerun.ts`). There is then no fresh pair to compare,
  * and {@link ATTEMPT_OUTCOME_UNCHANGED} is the reading taken: the
  * attempt is treated as having ended exactly as it began, which makes
  * the second such attempt a repeat and stops the loop. The other
@@ -62,11 +62,11 @@
  *
  * The two CI plans carry a `{FAILING_LOG}` slot, and the triage block
  * they are otherwise filled from does not hold a log: it records the
- * class, the files and the attempts only (`src/pr/plans/load.ts`). The
+ * class, the files and the attempts only (`packages/rafa-pr/src/pr/plans/load.ts`). The
  * log is in the ASSESSMENT's evidence, which this module has in hand:
  * the run reads it off the reading with `evidenceOf`
  * (`./triage-report.ts`), and {@link planFor} caps it with
- * `excerptLines` (`src/pr/triage/follow-up.ts`) — the reader the
+ * `excerptLines` (`packages/rafa-pr/src/pr/triage/follow-up.ts`) — the reader the
  * FOLLOW-UP PROMPT is capped by, deliberately, so the plan a session
  * runs and the prompt a person pastes quote the same lines of the same
  * log rather than two different tails of it. A fill carrying no excerpt still answers the
@@ -108,13 +108,13 @@
  * ordinary one. The other is a fresh assessment whose class is `green`
  * or `no-checks`, the second being what a resolved conflict answers in
  * a repository that schedules no run for the merge ref at all
- * (`src/pr/checks.ts`: `none` is a verdict, not a wait). Whether to
+ * (`packages/rafa-pr/src/pr/checks.ts`: `none` is a verdict, not a wait). Whether to
  * merge with no checks is `rafa pr merge --skip-checks`'s question, not
  * this one's.
  *
  * Neither reading is taken while the pull request still conflicts
  * ({@link stillConflicts}). Passing rows on a head that does not merge
- * are rows from before the base moved (`src/pr/triage/rerun.ts`), and
+ * are rows from before the base moved (`packages/rafa-pr/src/pr/triage/rerun.ts`), and
  * they are exactly what a green, conflicting pull request carries into
  * its resolve run: the assessment hands it the plan for its
  * `conflict-*` class like any other conflict, and the CI wait after an
@@ -139,7 +139,7 @@
  *
  * ## `conflict-version` is converted in code, ahead of the loop path
  *
- * A class in `CONVERSION_TRIAGE_CLASSES` (`src/pr/triage/classes.ts`)
+ * A class in `CONVERSION_TRIAGE_CLASSES` (`packages/rafa-pr/src/pr/triage/classes.ts`)
  * has no pinned plan, so it is dispatched before the pinned-plan check
  * rather than read as "not simple", and after the trust check and the
  * cross-repository refusal, since it pushes to the branch as a plan

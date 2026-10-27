@@ -3,7 +3,7 @@
  * `own-fallout` or `own-gap` entry, the count of such lines a tracker
  * holds, and the cap that stops one more.
  */
-import type { LeftoverEntry } from './leftover-repair.js';
+import type { LeftoverEntry } from '@open-tomato/rafa-pr/triage/leftover-repair';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,9 +13,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { parsePlan , parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { findNextTask, listTrackerTasks } from '@open-tomato/rafa/utils/tracker';
-
-import { isRepairTask, REPAIR_AGENT } from '../start/suite-blocker.js';
-
 import {
   countLeftoverRepairs,
   insertLeftoverRepair,
@@ -24,7 +21,9 @@ import {
   LEFTOVER_MARKER,
   leftoverCap,
   leftoverRepairText,
-} from './leftover-repair.js';
+} from '@open-tomato/rafa-pr/triage/leftover-repair';
+
+import { isRepairTask, REPAIR_AGENT } from '../../../start/suite-blocker.js';
 
 /** An `own-fallout` entry with plain text. */
 const FALLOUT: LeftoverEntry = { kind: 'own-fallout', what: 'src/a.test.ts went red', artifact: 'expect(received).toBe(expected)' };

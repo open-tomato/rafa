@@ -9,13 +9,14 @@
  * the exact failure the extraction exists to prevent.
  *
  * So the drift guard reads the READER SOURCES: the sentence must appear
- * in `conflict-sentence.ts` and nowhere else under `src/`. Its control
- * is the same scan finding the one copy, so a scan that matched nothing
- * anywhere cannot pass it. The scan UNESCAPES each file first: the
- * sentence holds apostrophes, and the lint config's single quotes with
- * no `avoidEscape` mean a copy of it in TypeScript is written
- * `base\'s`, which a raw substring search would miss — that miss is
- * precisely how a second copy would slip past this guard.
+ * in `conflict-sentence.ts` and nowhere else under the root's `src/` or
+ * `packages/rafa-pr/src/`, where the module and its readers live since
+ * pass 4e. Its control is the same scan finding the one copy, so a scan
+ * that matched nothing anywhere cannot pass it. The scan UNESCAPES each
+ * file first: the sentence holds apostrophes, and the lint config's
+ * single quotes with no `avoidEscape` mean a copy of it in TypeScript is
+ * written `base\'s`, which a raw substring search would miss — that miss
+ * is precisely how a second copy would slip past this guard.
  *
  * The other quiet failure is the fill DEFAULT. `pinnedPlanValues` takes
  * an optional override, and a case that passed no override and asserted
@@ -31,16 +32,16 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, setDefaultTimeout, test } from 'bun:test';
 
 import { PROMPT_SHAPES } from '@open-tomato/rafa-effort/effort/classify';
+import { MECHANICAL_CONFLICT_SENTENCE, mechanicalConflictBullet } from '@open-tomato/rafa-pr/pr/conflict-sentence';
+import { loadPinnedPlan, pinnedPlanValues } from '@open-tomato/rafa-pr/pr/plans/load';
 
-import { buildWrapUpPrompt } from '../start/wrap-up.js';
-import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
-
-import { MECHANICAL_CONFLICT_SENTENCE, mechanicalConflictBullet } from './conflict-sentence.js';
-import { loadPinnedPlan, pinnedPlanValues } from './plans/load.js';
+import { buildWrapUpPrompt } from '../../../start/wrap-up.js';
+import { SWEEP_TIMEOUT } from '../../sweep-timeout.js';
 
 setDefaultTimeout(SWEEP_TIMEOUT);
 
@@ -54,18 +55,21 @@ const EMPTY_BLOCK = Object.freeze({
   files: null,
 });
 
-/** `src/`, which the drift guard walks. */
-const SRC_DIR = join(import.meta.dir, '..');
+/** The root's `src/`, which the drift guard walks. */
+const SRC_DIR = join(import.meta.dir, '..', '..', '..');
+
+/** Pr's `src/`, which the drift guard walks beside the root's since pass 4e. */
+const PR_SRC_DIR = join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src');
 
 /** Where the one copy of the sentence is allowed to be. */
-const SOURCE_FILE = join(import.meta.dir, 'conflict-sentence.ts');
+const SOURCE_FILE = fileURLToPath(import.meta.resolve('@open-tomato/rafa-pr/pr/conflict-sentence'));
 
 /** A file's text with its escaped apostrophes read back; see the note. */
 function unescaped(path: string): string {
   return readFileSync(path, 'utf8').replaceAll('\\\'', '\'');
 }
 
-/** Every file under `src/`, this test file excluded. */
+/** Every file under `dir`, this test file excluded. */
 function sourceFiles(dir: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -137,11 +141,12 @@ describe('the pinned plans as readers', () => {
   });
 });
 
-describe('the drift guard over src/', () => {
-  const holders = sourceFiles(SRC_DIR)
+describe('the drift guard over src/ and packages/rafa-pr/src/', () => {
+  const holders = [SRC_DIR, PR_SRC_DIR]
+    .flatMap((dir) => sourceFiles(dir))
     .filter((path) => unescaped(path).includes(MECHANICAL_CONFLICT_SENTENCE));
 
-  test('exactly one file under src/ holds the sentence', () => {
+  test('exactly one file under src/ and packages/rafa-pr/src/ holds the sentence', () => {
     expect(holders).toEqual([SOURCE_FILE]);
   });
 

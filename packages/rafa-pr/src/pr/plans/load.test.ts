@@ -1,5 +1,5 @@
 /**
- * Tests for the pinned resolve-plan loader (`src/pr/plans/load.ts`).
+ * Tests for the pinned resolve-plan loader (`packages/rafa-pr/src/pr/plans/load.ts`).
  *
  * Two halves, and they are tested against different things on purpose:
  *
@@ -60,9 +60,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, describe, expect, test } from 'bun:test';
-
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { afterAll, describe, expect, test } from 'bun:test';
 
 import { DEPENDENCY_BUMP_SIMPLE_CLASSES, SIMPLE_TRIAGE_CLASSES } from '../triage/classes.js';
 

@@ -24,10 +24,10 @@
  * control for the reason, which is absent there.
  */
 import type { PromotedCheck } from './promoted-check.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { Learning, SyncPayload } from '@open-tomato/rafa/ports';
 import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
 import type { Instinct } from '@open-tomato/rafa-inventory/schema/instinct';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,9 +40,8 @@ import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 import { parseInstinct, writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
-
-import { createFakePrGh } from '../pr/gh-fake.js';
-import { createGhPullRequests } from '../pr/index.js';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import {
   changedSince,

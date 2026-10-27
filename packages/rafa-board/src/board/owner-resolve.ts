@@ -27,7 +27,7 @@
  * - `resolved` — `gh` exited 0. The body is not read: GitHub answered
  *   the path, so the account or team exists.
  * - `unresolved` — `gh` failed with `(HTTP 404)` on stderr, the shape
- *   `src/pr/gh-fake-shapes.ts` records off `gh` 2.100.0. GitHub also
+ *   `packages/rafa-pr/src/pr/gh-fake-shapes.ts` records off `gh` 2.100.0. GitHub also
  *   answers a secret team the token cannot see with a 404, so
  *   `unresolved` means "no one this token can see", which is the reading
  *   CODEOWNERS itself gets.

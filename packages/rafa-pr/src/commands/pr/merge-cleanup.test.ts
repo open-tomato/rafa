@@ -20,11 +20,10 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'bun:test';
-
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { RUNTIME_SUBDIR } from '@open-tomato/rafa/core/runtime';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '../../pr/index.js';
 

@@ -22,11 +22,10 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { parseFragment, serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { readGuard } from '@open-tomato/rafa-release/release/guard';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
   conversionCommitSubject,

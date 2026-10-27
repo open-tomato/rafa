@@ -63,10 +63,10 @@
  */
 import type { RunClaim, StartPreflightClaim } from './preflight-claim.js';
 import type { DeviceStoreId } from '../claims/device.js';
-import type { GitRunner } from '../pr/index.js';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -82,9 +82,9 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createGhIssueBoard } from '@open-tomato/rafa-board/board/issue-board';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { readDeviceStoreId } from '../claims/device.js';
-import { createGitRunner } from '../pr/index.js';
 
 import { createStartPreflightClaim, markInDevelopment, readRunClaim, refuseUnownedClaim } from './preflight-claim.js';
 

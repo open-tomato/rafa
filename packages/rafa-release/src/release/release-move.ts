@@ -18,7 +18,7 @@
  * ```
  *
  * {@link moveSpelling} is how one move reads there, which the settle
- * follow-up (`src/pr/settle-waiting.ts`) prints too.
+ * follow-up (`packages/rafa-pr/src/pr/settle-waiting.ts`) prints too.
  *
  * The root's move comes first wherever it sits in the list; the packages
  * follow in the order handed, which the caller keeps as workspace order.

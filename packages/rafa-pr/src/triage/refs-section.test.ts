@@ -1,5 +1,5 @@
 /**
- * Tests for a filed bug's `## Refs` section (`src/triage/refs-section.ts`).
+ * Tests for a filed bug's `## Refs` section (`packages/rafa-pr/src/triage/refs-section.ts`).
  *
  * What is read and how it is shown are driven through a fake verifier
  * that records what it was asked, so a case can say the verifier was

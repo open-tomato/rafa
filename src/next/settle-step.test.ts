@@ -23,8 +23,8 @@
  */
 import type { SettlePlace } from './settle-step.js';
 import type { NextActionId } from './state.js';
-import type { SettleWaiting } from '../pr/settle-waiting.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
+import type { SettleWaiting } from '@open-tomato/rafa-pr/pr/settle-waiting';
 import type { MergeGuardSettings } from '@open-tomato/rafa-release/release/guard-merge';
 import type { ReleaseMove } from '@open-tomato/rafa-release/release/release-move';
 
@@ -36,9 +36,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 import { moveSpelling } from '@open-tomato/rafa-release/release/release-move';
-
-import { createGitRunner } from '../pr/index.js';
 
 import { actionInvocation, NEXT_COMMAND_ACTIONS } from './actions.js';
 import { allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from './ceiling.js';

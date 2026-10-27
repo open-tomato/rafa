@@ -30,9 +30,9 @@
 import type { NextChainOptions, NextChainReport } from './next.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextState } from '../next/state.js';
-import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
+import type { PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -43,6 +43,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import prMerge from '@open-tomato/rafa-pr/commands/pr/merge';
 import releaseSettle from '@open-tomato/rafa-release/commands/release/settle';
 
 import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
@@ -50,7 +51,6 @@ import { settleState } from '../next/settle-step.js';
 import { dispatchInProject } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';
-import prMerge from './pr/merge.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-settle-')));

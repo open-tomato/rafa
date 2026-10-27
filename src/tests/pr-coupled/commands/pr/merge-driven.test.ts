@@ -19,7 +19,7 @@
  * beside it under a HOME of this file's own. `git`'s global and system
  * config are pointed at that HOME (`GIT_CONFIG_GLOBAL`,
  * `GIT_CONFIG_NOSYSTEM`), so no case here reads the operator's real
- * `~/.gitconfig` — the same isolation `src/pr/none.test.ts` uses for
+ * `~/.gitconfig` — the same isolation `packages/rafa-pr/src/pr/none.test.ts` uses for
  * `pushBranch`. The base branch (`main`) and the head branch
  * (`feat/merge-driven`) each carry one commit, both pushed to the bare
  * remote, and the work tree is left checked out on the head branch: the
@@ -37,7 +37,9 @@
  * which is what "the merge is left alone" means in git rather than in a
  * message.
  */
-import type { MergeSeams } from './merge.js';
+import type { PlantedProject } from '../../../cli-capture.js';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
 import type {
   ChecksReading,
   GitResult,
@@ -45,9 +47,7 @@ import type {
   MergeOutcome,
   PullRequestDetail,
   PullRequests,
-} from '../../pr/index.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
-import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+} from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -58,10 +58,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { createPrMergeCommand, summaryLine } from '@open-tomato/rafa-pr/commands/pr/merge';
 
-import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-
-import { createPrMergeCommand, summaryLine } from './merge.js';
+import { dispatchInProject, plantProjectConfig } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-driven-')));
@@ -244,7 +243,7 @@ describe('what it refuses, read off a real repository', () => {
   it('refuses a dirty working tree, listing what git wrote, and merges nothing', async () => {
     const repo = plantMergeRepo();
     // A modified tracked file: an untracked one neither incoming tree
-    // holds no longer refuses (`src/pr/merge.ts`, "Which untracked paths
+    // holds no longer refuses (`packages/rafa-pr/src/pr/merge.ts`, "Which untracked paths
     // refuse").
     writeFileSync(join(repo.work, 'README.md'), 'edited\n', 'utf8');
     const stub = stubPulls();

@@ -18,9 +18,8 @@
  */
 import type { MergeRefusalReading } from './merge.js';
 
-import { describe, expect, test } from 'bun:test';
-
 import { parseWorkingTree } from '@open-tomato/rafa/core/git';
+import { describe, expect, test } from 'bun:test';
 
 import { readMergeRefusal } from './merge.js';
 import { readUnchecked } from './unchecked.js';

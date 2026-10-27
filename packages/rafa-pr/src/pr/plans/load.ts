@@ -5,12 +5,12 @@
  * `rafa pr triage --resolve` does not ask a model how to clear a
  * mechanical failure; it runs a plan that already says how
  * (`.rafa/specs/rafa-20-pr-commands.md`). One plan ships per SIMPLE triage
- * class, beside this module in `src/pr/plans/`, and the ORDINARY loop
- * runs it, so its commits, its reports and its effort rows are the
- * usual ones. This module is the seam between the two: it answers the
- * plan's text for a class, with the pull-request-specific values
- * already substituted, and it knows nothing about worktrees, budgets or
- * attempts.
+ * class, beside this module in `packages/rafa-pr/src/pr/plans/`, and the
+ * ORDINARY loop runs it, so its commits, its reports and its effort rows
+ * are the usual ones. This module is the seam between the two: it
+ * answers the plan's text for a class, with the pull-request-specific
+ * values already substituted, and it knows nothing about worktrees,
+ * budgets or attempts.
  *
  * ## Where a plan is looked for, and why in that order
  *
@@ -31,9 +31,9 @@
  *      source that reads them.
  *
  * Neither candidate is reachable from the other layout: a checkout has
- * no `src/pr/plans/plans/`, and a build has no markdown loose in
- * `dist/`, so the order costs one `existsSync` and never picks the
- * wrong copy. {@link readPinnedPlan} names BOTH paths when it finds
+ * no `packages/rafa-pr/src/pr/plans/plans/`, and a build has no markdown
+ * loose in `dist/`, so the order costs one `existsSync` and never picks
+ * the wrong copy. {@link readPinnedPlan} names BOTH paths when it finds
  * neither, because the way this fails in the field is a build that
  * dropped the copy step, and a message naming only the checkout path
  * sends the reader to a file that is there.
@@ -76,13 +76,13 @@
  * lockfile, take the base's `bun.lock`. Both spell that ref as
  * `origin/{BASE}`, and {@link PinnedPlanFill.base} fills it with the
  * branch the pull request targets — `baseRefName`, which
- * `src/commands/pr/triage-resolve.ts` reads off the pull request it is
- * resolving. A plan that named `origin/main` outright would merge the
- * wrong branch into every pull request opened against an integration
- * or stretch branch, and a conflict cleared against `main` is not the
- * conflict GitHub reported (#636). The field is REQUIRED rather than
- * defaulting to `main` for that reason: a caller that forgot it would
- * otherwise get the old bug back with no error to say so.
+ * `packages/rafa-pr/src/commands/pr/triage-resolve.ts` reads off the
+ * pull request it is resolving. A plan that named `origin/main` outright
+ * would merge the wrong branch into every pull request opened against an
+ * integration or stretch branch, and a conflict cleared against `main` is
+ * not the conflict GitHub reported (#636). The field is REQUIRED rather
+ * than defaulting to `main` for that reason: a caller that forgot it
+ * would otherwise get the old bug back with no error to say so.
  *
  * ## Filled from the triage block, and from ONE conflict sentence
  *

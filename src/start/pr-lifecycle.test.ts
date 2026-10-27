@@ -9,7 +9,7 @@
  * the case rather than passing on an unread call. A poll, merge read or
  * repair session the script did not plan throws the same way. The check
  * rows go in as the `gh pr checks --json name,state,link` stdout
- * `src/pr/checks.test.ts` parses, read through `parseChecks` as the `gh`
+ * `packages/rafa-pr/src/pr/checks.test.ts` parses, read through `parseChecks` as the `gh`
  * adapter reads them.
  *
  * There is one case per verdict branch, and each pins the whole sequence
@@ -99,6 +99,7 @@
 import type { PrLifecyclePhases, PrLifecycleSeams } from './pr-lifecycle.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type {
   ChecksReading,
   PrProviderReading,
@@ -106,8 +107,7 @@ import type {
   PullRequestSummary,
   GitRunner,
   PushOutcome,
-} from '../pr/index.js';
-import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+} from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -126,9 +126,9 @@ import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { getCurrentBranch, readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
+import { createGitRunner, parseChecks, verdictOf } from '@open-tomato/rafa-pr/pr/index';
 
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 
 import {
   CI_POLL_INTERVAL_MS,

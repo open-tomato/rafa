@@ -18,9 +18,9 @@
  * three find no claim, and the release refuses with no branch found,
  * pushing nothing; so are the three claim commands.
  */
-import type { GitRunner } from '../pr/index.js';
 import type { StatusSeams } from '../status/sections.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,12 +32,12 @@ import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '@o
 import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { createClaimAcceptCommand } from '../commands/claim/accept.js';
 import { createClaimHandCommand } from '../commands/claim/hand.js';
 import { createClaimReleaseCommand } from '../commands/claim/release.js';
 import { createClaimTakeCommand } from '../commands/claim/take.js';
-import { createGitRunner } from '../pr/index.js';
 import { readRunClaim } from '../start/preflight-claim.js';
 import { readStatusSections } from '../status/sections.js';
 

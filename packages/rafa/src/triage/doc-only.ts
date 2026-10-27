@@ -19,7 +19,7 @@
  * ends its sentence and a `:12` or `:12:3` position. What is left is a
  * path when it is one of:
  *
- *   - a piece holding a `/` and a letter (`src/triage/triage.ts`,
+ *   - a piece holding a `/` and a letter (`packages/rafa-pr/src/triage/triage.ts`,
  *     `context/`, `./docs/a.md`);
  *   - a bare file name ending in one of {@link FILE_EXTENSIONS}
  *     (`triage.ts`, `package.json`, `notes.md`);

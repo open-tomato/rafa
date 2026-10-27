@@ -1,5 +1,5 @@
 /**
- * Tests for the pull request barrel (`src/pr/index.ts`).
+ * Tests for the pull request barrel (`packages/rafa-pr/src/pr/index.ts`).
  *
  * A barrel has no behaviour of its own, so what is held here is that
  * every name it answers is the SAME binding its owning module exports,
@@ -16,10 +16,10 @@
  * `undefined` rather than as an error — and `tsc --noEmit` reported it
  * at the import in `src/start/pr-lifecycle.ts` (TS2724).
  */
-import { describe, expect, it } from 'bun:test';
 
 import * as provider from '@open-tomato/rafa/pr/provider';
 import * as types from '@open-tomato/rafa/pr/types';
+import { describe, expect, it } from 'bun:test';
 
 import * as checks from './checks.js';
 import * as gh from './gh.js';

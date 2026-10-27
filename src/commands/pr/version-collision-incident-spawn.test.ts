@@ -34,7 +34,7 @@
  * reading `merge-guard.test.ts`'s own collision case takes. The checks
  * read empty (verdict `none`), which keeps `rafa pr triage`'s re-run
  * reading from short-circuiting to "green, nothing to triage" before the
- * release guard is ever asked (`src/pr/triage/rerun.ts`: a verdict of
+ * release guard is ever asked (`packages/rafa-pr/src/pr/triage/rerun.ts`: a verdict of
  * `green` answers that regardless of what the guard would say), and `rafa
  * pr merge` is run with `--skip-checks` so the ordinary "no checks"
  * refusal never masks the guard's own. `--no-hint` is on every line so the

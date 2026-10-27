@@ -1,5 +1,5 @@
 /**
- * Tests for the triage selection (`src/pr/triage/select.ts`): which pull
+ * Tests for the triage selection (`packages/rafa-pr/src/pr/triage/select.ts`): which pull
  * request a bare `rafa pr triage` assesses, the 72-hour rule over two or
  * three candidates, the listing above three, and the `--resolve`
  * refusal above one.

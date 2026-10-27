@@ -20,10 +20,10 @@
  *   - the provider double's call log is asserted, so the column is known
  *     to cost no `gh` command beyond the list's own `1 + 2n`.
  */
-import type { BaseNow, BaseReader, PrListForecast } from './list-forecast.js';
-import type { PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { BaseNow, BaseReader, PrListForecast } from '@open-tomato/rafa-pr/commands/pr/list-forecast';
+import type { PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 import type { BranchForecast } from '@open-tomato/rafa-release/release/branch-forecast';
 import type { FoldFragment } from '@open-tomato/rafa-release/release/strategy';
 
@@ -37,13 +37,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
-import { bodyWithRelease, releaseBodyBlock } from '@open-tomato/rafa-release/release/branch-forecast';
-import { forecastRelease } from '@open-tomato/rafa-release/release/forecast';
-import { releaseStrategyFor } from '@open-tomato/rafa-release/release/strategy';
-
-import { createGitRunner } from '../../pr/index.js';
-import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-
+import { createPrListCommand, UNREADABLE } from '@open-tomato/rafa-pr/commands/pr/list';
 import {
   createBaseReader,
   forecastCell,
@@ -52,8 +46,13 @@ import {
   MOVED_MARK,
   NO_FORECAST,
   UNCHECKED_MARK,
-} from './list-forecast.js';
-import { createPrListCommand, UNREADABLE } from './list.js';
+} from '@open-tomato/rafa-pr/commands/pr/list-forecast';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { bodyWithRelease, releaseBodyBlock } from '@open-tomato/rafa-release/release/branch-forecast';
+import { forecastRelease } from '@open-tomato/rafa-release/release/forecast';
+import { releaseStrategyFor } from '@open-tomato/rafa-release/release/strategy';
+
+import { dispatchInProject, plantProjectConfig } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-list-forecast-')));

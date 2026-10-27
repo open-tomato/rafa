@@ -34,9 +34,9 @@
  * Restoring the bug — `readNextState(sources)` in place of
  * `readNextState(sources.answer())` — reddens both.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

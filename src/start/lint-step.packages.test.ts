@@ -16,7 +16,7 @@
  * `@open-tomato/rafa-typescript-config`, the base the copied
  * `tsconfig.packages.json` extends.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

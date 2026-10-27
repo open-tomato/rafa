@@ -1,6 +1,6 @@
 /**
  * Tests for which untracked paths `rafa pr merge` refuses on
- * (`./merge-refuse.ts`; the rule is `src/pr/merge.ts`'s, "Which
+ * (`./merge-refuse.ts`; the rule is `packages/rafa-pr/src/pr/merge.ts`'s, "Which
  * untracked paths refuse"), driven over real git: a scratch clone of a
  * local bare origin holding `main` and a pull request branch that adds
  * `added.txt`, and a scripted provider that answers get, checks and merge.
@@ -12,8 +12,8 @@
  *  - A modified tracked file refuses too, so the untracked rule did not
  *    loosen the tracked one.
  */
-import type { MergeSeams } from './merge.js';
-import type { PullRequestDetail } from '../../pr/index.js';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
+import type { PullRequestDetail } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,10 +22,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
 
-import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-
-import { createPrMergeCommand } from './merge.js';
+import { dispatchInProject, plantProjectConfig } from '../../../cli-capture.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-untracked-')));
 

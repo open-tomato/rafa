@@ -5,7 +5,7 @@
  *
  * ## It composes, and it writes nothing
  *
- * The poll is `src/pr/checks.ts`'s `waitForChecks` over
+ * The poll is `packages/rafa-pr/src/pr/checks.ts`'s `waitForChecks` over
  * `PullRequests.checks`, the same pair the loop's own CI gate
  * (`src/start/pr-lifecycle.ts`) and `pr triage --resolve` poll with, and
  * the deadline and the interval are that gate's own: the default

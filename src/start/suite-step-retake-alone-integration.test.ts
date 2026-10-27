@@ -36,9 +36,9 @@
  * tracker file.
  */
 import type { StepOutcome, SuiteStepContext } from './suite-step.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

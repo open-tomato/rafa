@@ -6,7 +6,7 @@
  * Every case drives {@link stubGh}, a runner answering recorded results
  * and keeping the argument lists it was handed, so no case spawns a
  * process or reaches GitHub. The failures are the envelopes
- * `src/pr/gh-fake-shapes.ts` records off `gh` 2.100.0.
+ * `packages/rafa-pr/src/pr/gh-fake-shapes.ts` records off `gh` 2.100.0.
  *
  * ## The controls
  *
@@ -23,8 +23,7 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import { describe, expect, it } from 'bun:test';
 
 import { createOwnerResolver, ownerLookupArgs } from '@open-tomato/rafa-board/board/owner-resolve';
-
-import { httpFailure, notFound } from '../../../pr/gh-fake-shapes.js';
+import { httpFailure, notFound } from '@open-tomato/rafa-pr/pr/gh-fake-shapes';
 
 const USERS_DOCS = 'https://docs.github.com/rest/users/users#get-a-user';
 const TEAMS_DOCS = 'https://docs.github.com/rest/teams/teams#get-a-team-by-name';

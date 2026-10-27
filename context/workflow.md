@@ -120,7 +120,7 @@ which never refuses a plan, so a plan written before the rule still runs
 (`packages/rafa/src/plan/doc-task.ts`).
 
 **What the doc task is handed.** Its prompt gets a section headed
-`## Documentation to repair` (`src/docs/task-reading.ts`, placed by
+`## Documentation to repair` (`packages/rafa-pr/src/docs/task-reading.ts`, placed by
 `src/start/dispatch.ts`) with two parts. The first is the plan's `sighting`
 rows, one `<where>: <what>` line each, as its sessions reported them under
 `stale_docs`. The second is every file the plan's commits touched since the
@@ -469,7 +469,7 @@ root, and you run the loop where you already are.
 **The base is read one way, by the start and by the wrap-up.** It is
 `pr.base` when the config sets it (`rafa config set pr.base=<branch>`), else
 the branch `origin/HEAD` names, else `main`. `resolveBaseBranch`
-(`src/cleanup/branches.ts`) reads it: the start reads it in the project root
+(`packages/rafa-pr/src/cleanup/branches.ts`) reads it: the start reads it in the project root
 for the branch it cuts and the worktree it adds, the wrap-up reads it in the
 run's own checkout (`src/start/wrap-up-run.ts`) for the pull request. A
 repository with no `origin/HEAD` and no `pr.base` gets `main`. To name another

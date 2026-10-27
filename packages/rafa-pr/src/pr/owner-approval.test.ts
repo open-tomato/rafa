@@ -1,5 +1,5 @@
 /**
- * Tests for the owner gate reading (`src/pr/owner-approval.ts`): which
+ * Tests for the owner gate reading (`packages/rafa-pr/src/pr/owner-approval.ts`): which
  * paths are gated, the five answers, the latest-review rule, and the
  * team membership lookup over `gh`.
  *
@@ -27,10 +27,9 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import type { OwnedBoard } from '@open-tomato/rafa-board/board/board-owns';
 import type { OwnerResolution } from '@open-tomato/rafa-board/board/owner-resolve';
 
-import { describe, expect, it } from 'bun:test';
-
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { parseCodeowners } from '@open-tomato/rafa-board/board/codeowners';
+import { describe, expect, it } from 'bun:test';
 
 import { httpFailure, notFound } from './gh-fake-shapes.js';
 import { createGhTeamMembership, readOwnerApproval, teamMembershipArgs } from './owner-approval.js';

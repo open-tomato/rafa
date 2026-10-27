@@ -59,7 +59,7 @@
  *      those are is `src/cleanup/steps.ts`'s to say, through
  *      `deletedNotPushed`: a row a ticked worktree holds (#978), or a
  *      listed worktree that cannot be ticked holds (its `heldBy`,
- *      `src/cleanup/groups.ts`, #860), is never deleted, so it gets no
+ *      `packages/rafa-pr/src/cleanup/groups.ts`, #860), is never deleted, so it gets no
  *      question and is handed on unasked for step 3 to withhold.
  *      `--dry-run` asks the same questions as a real run.
  *   3. The ticked rows become `src/cleanup/steps.ts`'s steps, a
@@ -90,7 +90,7 @@
  * by that module's `delete-remote-branch` step; a Stale row's line still
  * only names the `git push origin --delete <b>` the person may run. The
  * current branch, the base branch and every `cleanup.keep` match are
- * never listed (`src/cleanup/branches.ts`), and neither is a branch on
+ * never listed (`packages/rafa-pr/src/cleanup/branches.ts`), and neither is a branch on
  * `origin` that is the base, a `cleanup.keep` match, under `stretch/`,
  * the head of an open pull request or a claim another store holds
  * (`src/cleanup/remote-only.ts`).

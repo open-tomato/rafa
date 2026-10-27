@@ -80,7 +80,6 @@ import type {
   StartTriageOptions,
   TaskTriageInput,
 } from './triage.js';
-import type { TriageOptions, TriageResult } from '../triage/triage.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { CliEventLog, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
@@ -88,6 +87,7 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 import type { RefreshAddedItems } from '@open-tomato/rafa-board/board/project/add-issue';
 import type { ProjectRefresh } from '@open-tomato/rafa-board/board/project/refresh';
+import type { TriageOptions, TriageResult } from '@open-tomato/rafa-pr/triage/triage';
 
 import {
   existsSync,
@@ -124,9 +124,9 @@ import { createFakeFactsGh } from '@open-tomato/rafa-board/board/project/facts-f
 import { createGhProjectPort } from '@open-tomato/rafa-board/board/project/gh';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '@open-tomato/rafa-board/board/project/project-fake';
 import { scopeWarning } from '@open-tomato/rafa-board/board/project/refresh-warnings';
+import { createPrivateTriageTracker, privateTriageDir, triageReport } from '@open-tomato/rafa-pr/triage/triage';
 
 import { createJsonOutput } from '../adapters/output/json.js';
-import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 
 import {
   createStartTriage,

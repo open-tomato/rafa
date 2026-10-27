@@ -1,5 +1,5 @@
 /**
- * Tests for the triage vocabulary (`src/pr/triage/classes.ts`).
+ * Tests for the triage vocabulary (`packages/rafa-pr/src/pr/triage/classes.ts`).
  *
  * Everything in that module is pure and takes literals, so nothing here
  * plants a repository, spawns `gh` or reads a fixture. The two jobs the

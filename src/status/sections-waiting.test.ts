@@ -16,7 +16,6 @@
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { PullRequestDetail, PullRequestState } from '@open-tomato/rafa/pr/types';
@@ -24,6 +23,7 @@ import type { Position } from '@open-tomato/rafa/project/position';
 import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
 import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
+import type { OwnerApproval } from '@open-tomato/rafa-pr/pr/owner-approval';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

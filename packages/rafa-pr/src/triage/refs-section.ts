@@ -49,15 +49,14 @@
 import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { LiveReading, Ref, RefVerifier } from '@open-tomato/rafa-board';
 
+import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION } from '@open-tomato/rafa/cli/describe';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 import {
   createRefVerifier,
   extractRefs,
   fingerprintText,
   tsSymbolsOutliner,
 } from '@open-tomato/rafa-board';
-
-import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION } from '@open-tomato/rafa/cli/describe';
-import { createGitRunner } from '@open-tomato/rafa/core/git';
 
 /** The heading the section is written under. */
 export const REFS_HEADING = 'Refs';

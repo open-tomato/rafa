@@ -30,10 +30,9 @@
  */
 import type { TitleValues } from '@open-tomato/rafa/bugs/title';
 
-import { GITHUB_LABELS, GITHUB_LABEL_MAX_LENGTH } from '@open-tomato/rafa-board';
-
 import { ACTION_SHAPE, MODULE_SHAPE, titleRoundTrips, UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { oneLine } from '@open-tomato/rafa/triage/bug-key';
+import { GITHUB_LABELS, GITHUB_LABEL_MAX_LENGTH } from '@open-tomato/rafa-board';
 
 /** The two fields the boundary rule reads. */
 export type BoundaryField = 'module' | 'action';

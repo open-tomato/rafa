@@ -13,11 +13,11 @@
  * (`./settle-tag.ts`) both build the tag they write from it. Two copies
  * of the template would drift with nothing to notice.
  *
- * This is a library half of `src/commands/pr/merge-followups.ts`, where
+ * This is a library half of `packages/rafa-pr/src/commands/pr/merge-followups.ts`, where
  * {@link versionTag} was first spelled while `rafa pr merge` still named
  * `rafa release tag` as a follow-up. That file keeps the follow-ups rule
  * and holds no re-export of this one; the other symbol that left it is
- * `SettleWaiting`, in `src/pr/settle-waiting.ts`. Nothing here imports
+ * `SettleWaiting`, in `packages/rafa-pr/src/pr/settle-waiting.ts`. Nothing here imports
  * from `src/commands/`; the imports are the type of a move, from
  * `./release-move.ts`, and the version shape {@link parseReleaseTag}
  * holds a tag's version to, `parseSemanticVersion` from `./version.ts`.

@@ -60,18 +60,18 @@
  * that does not conflict and a second that does, so the line is shown
  * to come from the read at the ending.
  */
-import type { PrWaitReading, PrWaitSeams } from './wait.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PrWaitReading, PrWaitSeams } from '@open-tomato/rafa-pr/commands/pr/wait';
 import type {
   CheckRow,
   ChecksReading,
   PullRequestDetail,
   PullRequests,
   PullRequestSummary,
-} from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
-import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
-import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
-import type { CliEvent } from '@open-tomato/rafa/ports';
+} from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -83,18 +83,17 @@ import { DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
 import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
-
-import { FIRST_CHECK_GRACE_MS, PR_NEEDS_GH } from '../../pr/index.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
-
-import { PR_USAGE } from './pr-context.js';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
 import {
   createPrWaitCommand,
   readTimeoutMinutes,
   renderWait,
   WAIT_EXIT_CODES,
-} from './wait.js';
+} from '@open-tomato/rafa-pr/commands/pr/wait';
+import { FIRST_CHECK_GRACE_MS, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
+
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
+import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../../ending-probe.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-wait-')));

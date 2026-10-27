@@ -1,5 +1,5 @@
 /**
- * Scoring test of the nearest-open-bug step (`src/triage/similarity.ts`)
+ * Scoring test of the nearest-open-bug step (`packages/rafa-pr/src/triage/similarity.ts`)
  * at the default threshold, over the board's own reports
  * (`./testdata/scoring.json`, built by `scripts/extract-scoring-fixture.ts`;
  * `./scoring-fixture.ts` says how each is labelled with its cause).
@@ -28,9 +28,8 @@
 import type { Filing, ScoringFixture } from './scoring-fixture.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 
-import { describe, expect, it } from 'bun:test';
-
 import { bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
+import { describe, expect, it } from 'bun:test';
 
 import { ISSUE_OPENING, issueText } from './issue-text.js';
 import { firstLeakIn } from './scoring-fixture.js';

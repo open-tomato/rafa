@@ -73,14 +73,14 @@
  * failed lookup rather than `read`, and `board.trustedAuthors` is read
  * off the project config this file plants — not handed over as a
  * literal — so that case measures the config wiring
- * (`src/commands/pr/pr-context.ts`) reaching this command, and not only
+ * (`packages/rafa-pr/src/commands/pr/pr-context.ts`) reaching this command, and not only
  * `board/trust.ts` or `triage-trust.ts` in isolation.
  */
-import type { TriageSeams } from './triage.js';
-import type { FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { TriageSeams } from '@open-tomato/rafa-pr/commands/pr/triage';
+import type { FakePrGh, FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -89,15 +89,14 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
+import { resolveRunDir } from '@open-tomato/rafa-pr/commands/pr/resolve-loop';
+import { createPrTriageCommand } from '@open-tomato/rafa-pr/commands/pr/triage';
+import { DEPENDABOT_REBASE_NOTE } from '@open-tomato/rafa-pr/commands/pr/triage-resolve';
+import { createFakePrGh, logFailedText } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
+import { resolveWorktreePath } from '@open-tomato/rafa-pr/pr/worktree';
 
-import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
-import { createGhPullRequests } from '../../pr/index.js';
-import { resolveWorktreePath } from '../../pr/worktree.js';
-import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
-
-import { resolveRunDir } from './resolve-loop.js';
-import { DEPENDABOT_REBASE_NOTE } from './triage-resolve.js';
-import { createPrTriageCommand } from './triage.js';
+import { dispatchInProject, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-resolve-')));

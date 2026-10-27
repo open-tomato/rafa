@@ -24,8 +24,8 @@
  * with the first's rather than land on a branch of its own.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
 import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,8 +38,7 @@ import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite
 import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
 import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
 import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
-
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

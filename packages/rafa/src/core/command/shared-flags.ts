@@ -5,7 +5,7 @@
  * that end by naming the step that follows (`src/next/ending.ts`):
  * `pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready` and
  * `loop start`. They belong to four features, and three of them are
- * declared in a declarations file (`src/commands/pr/declarations.ts`,
+ * declared in a declarations file (`packages/rafa-pr/src/commands/pr/declarations.ts`,
  * `packages/rafa-board/src/commands/issue/declarations.ts`), which imports core's entries
  * alone and no module under `src/`. So the flag lives here, where every
  * one of the six can reach it, and each declares this value itself
@@ -14,7 +14,7 @@
  * {@link DEFAULT_CI_TIMEOUT_MIN} is here for the same reason: the
  * loop's `--ci-timeout` (`src/commands/loop/start.ts`,
  * `src/start/run-setup.ts`) and `pr wait`'s `--timeout`
- * (`src/commands/pr/declarations.ts`, `src/commands/pr/wait.ts`) both
+ * (`packages/rafa-pr/src/commands/pr/declarations.ts`, `packages/rafa-pr/src/commands/pr/wait.ts`) both
  * default to it, and the second is spelled in a declarations file.
  *
  * The file imports nothing by value: it names `command.ts` with

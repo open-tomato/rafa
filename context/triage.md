@@ -14,7 +14,7 @@ session said, the kind the loop routed it under and the route it took.
 
 ### The kinds and their routes
 
-`src/triage/kind-route.ts` routes an entry after the security rule and the
+`packages/rafa-pr/src/triage/kind-route.ts` routes an entry after the security rule and the
 kind check. Read top to bottom:
 
 | Kind | Route |
@@ -41,7 +41,7 @@ is written for it, so no security entry leaves the private channel.
 
 The session that reports a red test is not the one that turned it red, and it
 cannot see the plan's base, so the loop checks every `own-` claim and every
-`bug` that names a test or a path. `checkKind` (`src/triage/own-check.ts`)
+`bug` that names a test or a path. `checkKind` (`packages/rafa-pr/src/triage/own-check.ts`)
 reads the entry down a decision table, the first row that holds answering.
 An entry the session said is `convention`, `docs` or `machine` is taken as
 said and nothing is read.
@@ -69,12 +69,12 @@ once at the plan's base. Each run is one test file, never the suite. It runs
 in a detached temporary worktree of that commit with the run checkout's
 `node_modules` linked in, removed afterwards, and is cached per commit and
 file for the whole run, so two bugs naming two cases of one file cost one
-run (`src/triage/base-run.ts`). A file missing at the commit, under
+run (`packages/rafa-pr/src/triage/base-run.ts`). A file missing at the commit, under
 `node_modules` or outside the checkout is not run, and reads as
 `unrunnable`, so its entry is a `bug`. The plan's base is the merge base of
 `HEAD` and `refs/remotes/origin/<pr.base>`, and the plan's files are the
 paths `git diff --name-only -z` names between that base and `HEAD`
-(`src/triage/plan-commits.ts`). A report with no test named costs those git
+(`packages/rafa-pr/src/triage/plan-commits.ts`). A report with no test named costs those git
 reads, made again for each report. A failed read reads as a base or a file
 list the loop cannot use, so the entry is a `bug`: the cost falls on filing,
 never on hiding.
@@ -138,7 +138,7 @@ stored as a `sighting` row whose `where` is the first path its `what`, then its
 ### The body the loop files
 
 A bug the loop files carries the bug record (`context/bug-record.md`), built
-by `bugFilingOf` (`src/triage/bug-filing.ts`) from the session's report, the
+by `bugFilingOf` (`packages/rafa-pr/src/triage/bug-filing.ts`) from the session's report, the
 dispatch it ran under and the checkout. Its body opens with the sentence
 saying where it came from, then a `Supersedes` section when the bug came
 back, then `What`, `Artifact`, `Refs` when the artifact names a path or a
@@ -179,7 +179,7 @@ other record sections.
 
 ### The repair task and its cap
 
-`src/triage/leftover-repair.ts` writes the repair of an `own-fallout` or
+`packages/rafa-pr/src/triage/leftover-repair.ts` writes the repair of an `own-fallout` or
 `own-gap` entry through `insertTrackerTask` (`packages/rafa/src/utils/tracker.ts`),
 directly above the plan's first open task, `[ ]` or `[BLOCKED]`, or after the
 last task when none is open:
@@ -407,7 +407,7 @@ once. A closed issue, or none, is left alone, and create is never called.
 Closed as completed, the run still files nothing, since it inherited the
 failure before its own work. Security and machine-scoped bugs are never read
 against the failures. The check's red-on-both answer
-(`src/triage/own-check.ts`) is unfiled in the same way, with its route row
+(`packages/rafa-pr/src/triage/own-check.ts`) is unfiled in the same way, with its route row
 `inherited`.
 
 ### State read on a repeat
@@ -430,9 +430,9 @@ Five keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 
 - `triage.similarity.threshold`: `false` to turn the step off, or a number
   from 0 to 1 naming the minimum score. Default is `0.3`, which on the
-  1,013 filings of `src/triage/testdata/scoring.json` gave 84% of repeats
+  1,013 filings of `packages/rafa-pr/src/triage/testdata/scoring.json` gave 84% of repeats
   right (696 of 827) and 3% of new causes wrong (6 of 186); `0.2` gave 86%
-  and 20%. `src/triage/similarity-scoring.test.ts` holds the default to at
+  and 20%. `packages/rafa-pr/src/triage/similarity-scoring.test.ts` holds the default to at
   least 84% and at most 4%. Lower matches more repeats and puts more new
   causes on the wrong issue.
 
@@ -441,7 +441,7 @@ Five keys in `.rafa/config.yaml` tune the nearest-open-bug step:
   no match at the threshold. Default is `3`.
 
 - `triage.similarity.weights.causeLeaf`, `.causeFamily` and `.boundary`:
-  the bonuses `rankedCandidates` (`src/triage/similarity.ts`) adds to an
+  the bonuses `rankedCandidates` (`packages/rafa-pr/src/triage/similarity.ts`) adds to an
   open bug's word score for the same cause code, the same cause family with
   another leaf, and the same module and action, capped at 1 (see "Similarity
   and duplicates"). Each is a number from 0 to 1, and `0` turns its signal

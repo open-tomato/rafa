@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { rerunOf } from '../triage/bug-filing.js';
+import { rerunOf } from '@open-tomato/rafa-pr/triage/bug-filing';
 
 import { NO_RERUN_REASON, readTestReference, resolveTestReference } from './test-reference.js';
 

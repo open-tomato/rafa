@@ -37,7 +37,14 @@
  * than inferred from the message; and the prompter throws when it is
  * opened under `--yes`, so "the question was skipped" is measured.
  */
-import type { MergeSeams } from './merge.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
+import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
 import type {
   ChecksReading,
   GitResult,
@@ -45,14 +52,7 @@ import type {
   MergeOutcome,
   PullRequestDetail,
   PullRequests,
-} from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
-import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
-import type { SessionRecord } from '@open-tomato/rafa/core/loop';
-import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
-import type { CliEvent } from '@open-tomato/rafa/ports';
-import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
-import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+} from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -67,14 +67,13 @@ import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
 import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+import { createPrMergeCommand, summaryLine } from '@open-tomato/rafa-pr/commands/pr/merge';
+import { noBoardListsLine } from '@open-tomato/rafa-pr/commands/pr/merge-tick';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
 
-import { PR_NEEDS_GH } from '../../pr/index.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
-
-import { noBoardListsLine } from './merge-tick.js';
-import { createPrMergeCommand, summaryLine } from './merge.js';
-import { PR_USAGE } from './pr-context.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
+import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../../ending-probe.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-')));
@@ -465,7 +464,7 @@ describe('what it refuses before asking anything', () => {
     const project = freshProject();
     const seams = caseSeams(stub.pulls, project, {
       git: {
-        'status --porcelain': ok(' M src/pr/merge.ts\n?? notes.md\n'),
+        'status --porcelain': ok(' M packages/rafa-pr/src/pr/merge.ts\n?? notes.md\n'),
         // The head adds notes.md, so the untracked path is weighed in.
         'ls-tree -r --name-only 1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b': ok('notes.md\nsrc/pr/merge.ts\n'),
       },

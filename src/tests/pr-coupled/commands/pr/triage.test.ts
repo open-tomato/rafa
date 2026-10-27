@@ -12,7 +12,7 @@
  * clock are seams. No case spawns git either — every conflict reading
  * here goes through a stub runner, since what `git merge-tree` says is
  * measured against the real git in `triage-read.test.ts` and in
- * `src/pr/triage/conflict.test.ts`.
+ * `packages/rafa-pr/src/pr/triage/conflict.test.ts`.
  *
  * The permission lookup behind the trust check is a seam too, made over
  * the same recorded fake, so the account a marker comment was written by
@@ -55,16 +55,16 @@
  * lookup rather than `read`, and `board.trustedAuthors` is read off the
  * project config this file plants, not handed over as a literal, so the
  * allow-list case measures the actual config wiring
- * (`src/commands/pr/pr-context.ts`) and not only `board/trust.ts`
+ * (`packages/rafa-pr/src/commands/pr/pr-context.ts`) and not only `board/trust.ts`
  * itself.
  */
-import type { TriageSeams } from './triage.js';
-import type { FakePrComment, FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';
-import type { GitResult, GitRunner, PullRequests } from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { TriageSeams } from '@open-tomato/rafa-pr/commands/pr/triage';
+import type { FakePrComment, FakePrGh, FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { GitResult, GitRunner, PullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,16 +74,15 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
+import { DEFAULT_MAX_ATTEMPTS } from '@open-tomato/rafa-pr/commands/pr/declarations';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { createPrTriageCommand, readMaxAttempts } from '@open-tomato/rafa-pr/commands/pr/triage';
+import { createFakePrGh, logFailedText } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
+import { TRIAGE_MARKER } from '@open-tomato/rafa-pr/pr/triage/comment';
 
-import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
-import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { TRIAGE_MARKER } from '../../pr/triage/comment.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
-
-import { DEFAULT_MAX_ATTEMPTS } from './declarations.js';
-import { PR_USAGE } from './pr-context.js';
-import { createPrTriageCommand, readMaxAttempts } from './triage.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
+import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../../ending-probe.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-triage-')));
@@ -136,7 +135,7 @@ const PASSING_GATES = {
 /** The `--log-failed` capture of a lint failure, in the recorded TAB shape. */
 const LINT_LOG = logFailedText('gates', [
   '##[group]Run bunx eslint .',
-  'src/pr/triage/select.ts',
+  'packages/rafa-pr/src/pr/triage/select.ts',
   '  42:7  error  unused is assigned a value but never used  no-unused-vars',
   '##[endgroup]',
   '##[error]Process completed with exit code 1.',

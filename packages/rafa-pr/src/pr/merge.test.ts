@@ -1,6 +1,6 @@
 /**
  * Tests for the merge refusals and the clean-up steps
- * (`src/pr/merge.ts`).
+ * (`packages/rafa-pr/src/pr/merge.ts`).
  *
  * Everything in that module is pure, so nothing here plants a
  * repository, spawns git or reaches a network: a case builds the
@@ -48,9 +48,8 @@
 import type { CheckRow } from './checks.js';
 import type { MergeRefusalReading } from './merge.js';
 
-import { describe, expect, it } from 'bun:test';
-
 import { parseWorkingTree } from '@open-tomato/rafa/core/git';
+import { describe, expect, it } from 'bun:test';
 
 import { classifyState } from './checks.js';
 import {

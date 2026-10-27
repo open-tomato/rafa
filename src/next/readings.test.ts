@@ -81,9 +81,9 @@
  *    9's has-a-branch case, whose fake log answers nothing.
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
-import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { RoadmapLine } from '@open-tomato/rafa-board/board/roadmap';
+import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

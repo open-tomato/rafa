@@ -1,5 +1,5 @@
 /**
- * Tests for the nearest open bugs (`src/triage/similarity.ts`).
+ * Tests for the nearest open bugs (`packages/rafa-pr/src/triage/similarity.ts`).
  *
  * Every open bug's body is written by `./issue-text.ts`'s own
  * {@link issueText}, so a change to the sections it writes that this
@@ -9,9 +9,8 @@ import type { SimilarityWeights } from './similarity.js';
 import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 
-import { describe, expect, it } from 'bun:test';
-
 import { EMPTY_BUG_RECORD, parseBugRecord } from '@open-tomato/rafa/bugs/record';
+import { describe, expect, it } from 'bun:test';
 
 import { COMMENT_OPENING, ISSUE_OPENING, issueText } from './issue-text.js';
 import {

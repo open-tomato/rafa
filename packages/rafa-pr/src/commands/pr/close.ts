@@ -49,7 +49,7 @@
  * It stays where it is unless the line carries `--delete-branch`, which
  * is passed to the provider as it is. On `gh` that switch deletes the
  * LOCAL branch as well as the remote one, by the words of
- * `gh pr close --help` that `src/pr/gh-close.ts` quotes, and `gh` runs at
+ * `gh pr close --help` that `packages/rafa-pr/src/pr/gh-close.ts` quotes, and `gh` runs at
  * the project root. What `gh` does when that branch is the one checked
  * out there was not measured, and nothing here guards it.
  *
@@ -68,9 +68,8 @@ import type { LineFlags, PrSeams } from './pr-context.js';
 import type { ClosingIssue, PullRequestDetail } from '../../pr/index.js';
 import type { Prompter, RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { readRequiredFlag } from '@open-tomato/rafa-board';
-
 import { CommandExit, createLinePrompter } from '@open-tomato/rafa/core/command';
+import { readRequiredFlag } from '@open-tomato/rafa-board';
 
 import { PR_CLOSE_DECLARATION } from './declarations.js';
 import {

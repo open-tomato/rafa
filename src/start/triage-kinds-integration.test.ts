@@ -59,11 +59,11 @@ import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { createBaseRunCache, runNamedTestAt } from '@open-tomato/rafa-pr/triage/base-run';
+import { LEFTOVER_MARKER } from '@open-tomato/rafa-pr/triage/leftover-repair';
+import { createPrivateTriageTracker } from '@open-tomato/rafa-pr/triage/triage';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { createBaseRunCache, runNamedTestAt } from '../triage/base-run.js';
-import { LEFTOVER_MARKER } from '../triage/leftover-repair.js';
-import { createPrivateTriageTracker } from '../triage/triage.js';
 
 import { createStartTriage } from './triage.js';
 

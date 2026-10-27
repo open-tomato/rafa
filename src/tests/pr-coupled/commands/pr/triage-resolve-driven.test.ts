@@ -56,10 +56,10 @@
  * `ok: true` for `worktree remove` could not fail even if the command
  * never called it.
  */
-import type { TriageSeams } from './triage.js';
-import type { FakePullRequestSeed } from '../../pr/gh-fake.js';
-import type { GitRunner } from '../../pr/index.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
+import type { TriageSeams } from '@open-tomato/rafa-pr/commands/pr/triage';
+import type { FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -68,14 +68,13 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
+import { createPrTriageCommand } from '@open-tomato/rafa-pr/commands/pr/triage';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { hasConflictMessage, readConflict } from '@open-tomato/rafa-pr/pr/triage/conflict';
+import { resolveWorktreePath } from '@open-tomato/rafa-pr/pr/worktree';
 
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, createGitRunner } from '../../pr/index.js';
-import { hasConflictMessage, readConflict } from '../../pr/triage/conflict.js';
-import { resolveWorktreePath } from '../../pr/worktree.js';
-import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-
-import { createPrTriageCommand } from './triage.js';
+import { dispatchInProject, plantProjectConfig } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-resolve-driven-')));

@@ -1,5 +1,5 @@
 /**
- * Tests for the classifier (`src/pr/triage/classify.ts`).
+ * Tests for the classifier (`packages/rafa-pr/src/pr/triage/classify.ts`).
  *
  * The module is a pure function over four already-captured readings, so
  * nothing here plants a repository, spawns `gh` or `git`, or reads a

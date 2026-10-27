@@ -28,10 +28,10 @@
  *     row they store is shown to come from the checks read and not from
  *     a merge that went through.
  */
-import type { MergeSeams } from './merge.js';
-import type { FakePullRequestSeed } from '../../pr/gh-fake.js';
-import type { GitResult } from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
+import type { FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { GitResult } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -41,12 +41,11 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
 
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests } from '../../pr/index.js';
-import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
-
-import { createPrMergeCommand } from './merge.js';
+import { dispatchInProject, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-plan-ci-')));

@@ -17,7 +17,7 @@
  * answers nothing (`packages/rafa/src/pr/types.ts`), so the comparison needs the read
  * first. A pull request the repository does not hold is refused naming
  * its number. One already on `base` (compared exactly, as
- * `retargetPullRequest` in `src/start/pr-retarget.ts` compares) sends no
+ * `retargetPullRequest` in `packages/rafa-pr/src/start/pr-retarget.ts` compares) sends no
  * edit, prints that it is already there and exits 0, so running the line
  * twice edits once.
  *

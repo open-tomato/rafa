@@ -1,5 +1,5 @@
 /**
- * Tests for the follow-up prompt (`src/pr/triage/follow-up.ts`).
+ * Tests for the follow-up prompt (`packages/rafa-pr/src/pr/triage/follow-up.ts`).
  *
  * The module is a pure function from one reading to one string, so
  * nothing here plants a repository, spawns `gh` or `git`, or reads a

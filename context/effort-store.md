@@ -1103,7 +1103,7 @@ no row. `readPlanCi` reads every row, or one plan's, in append order.
 **Verdict, PR, head commit.** A `pending` verdict (a check still running)
 stores no row, and the table's CHECK admits only `green`, `red` and `none`.
 `verdictOf` (`store/check-rows.ts`, with `CheckRow` and `failingRows`, all
-re-exported by `src/pr/checks.ts`) answers the settled verdict over every
+re-exported by `packages/rafa-pr/src/pr/checks.ts`) answers the settled verdict over every
 check, and the `failing` list is the failing checks' names; a CHECK keeps
 `failing` non-empty exactly when the verdict is `red`. The key is
 `(pr, head_sha, read_at)`: the same head read twice at two times is two

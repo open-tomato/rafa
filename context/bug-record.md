@@ -5,7 +5,7 @@ rendered from them (#951). Two writers build the record. `rafa issue
 create --type=bug` reads its flags into one (`src/bugs/`, and
 `packages/rafa-board/src/commands/issue/create-bug.ts`) and refuses a record missing a
 required field, naming it. Triage builds the same record for a bug the
-loop files, from a session's report, in `src/triage/bug-filing.ts`
+loop files, from a session's report, in `packages/rafa-pr/src/triage/bug-filing.ts`
 (#991), and never refuses one over its fields: a value it cannot use is
 filed as `unknown` or `unknown:new-context`, and the session's own word
 is kept in the body. `context/error-codes.md` is the authority for the

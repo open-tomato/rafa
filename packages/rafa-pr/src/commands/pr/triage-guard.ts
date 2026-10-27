@@ -1,7 +1,7 @@
 /**
  * The release guard as `rafa pr triage` reads it: the verdict
  * `classifyTriage` turns into `conflict-version` when the branch
- * stamped a version (`src/pr/triage/classify.ts`).
+ * stamped a version (`packages/rafa-pr/src/pr/triage/classify.ts`).
  *
  * What the guard answers and how it reads is `packages/rafa-release/src/release/guard.ts`'s.
  * This module only chooses the refs and the moment, the way

@@ -5,7 +5,7 @@
  * {@link openNextRelations} is asked once, before the first turn, and
  * what it answers is handed to `openNextSources` (`./sources.ts`) as
  * `relations`, so every board the chain opens reads its epics and
- * blockers through the one adapter, as `src/commands/pr/merge-freed.ts`
+ * blockers through the one adapter, as `packages/rafa-pr/src/commands/pr/merge-freed.ts`
  * reads what a merge freed.
  *
  * ## `labels`, the default, reads nothing

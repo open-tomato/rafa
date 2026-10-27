@@ -32,7 +32,7 @@
  *
  * Read after rows 5 and 6, so what reaches it is a pull request green
  * or with no check at all that merges: exactly what rows 7 and 8 would
- * merge. The gate (`src/pr/owner-approval.ts`) lets it through only as
+ * merge. The gate (`packages/rafa-pr/src/pr/owner-approval.ts`) lets it through only as
  * `not-gated` or `approved`; `waiting`, `unresolved` and `unknown` answer
  * `none`, reading `waiting on #C (owner review)`, and a gate reading that
  * REJECTS is read as `unknown`, so a failed reading never lets a merge

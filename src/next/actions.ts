@@ -50,7 +50,7 @@
  *    the spec names — a dirty tree, a pull request that is not green,
  *    one that does not merge, a head branch checked out elsewhere — are
  *    all read before the question, and the unblock question it ends
- *    with is one `--yes` does not answer either (`src/commands/pr/merge.ts`).
+ *    with is one `--yes` does not answer either (`packages/rafa-pr/src/commands/pr/merge.ts`).
  *  - `merge-unchecked` passes `--skip-checks` and NOT `--yes`. The
  *    question `Merge #<n> with no checks? [y/N]` is `pr merge`'s own,
  *    asked after it has read the workflow count and printed the warning

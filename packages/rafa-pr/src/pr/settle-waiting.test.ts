@@ -8,7 +8,7 @@
  * release turned off against the same place with it on, a base no ref
  * names against `main`, and a `level: none` fragment against a `patch`
  * one. So a null is shown to come from the rule and not from a base the
- * dry run could never have folded. `src/commands/pr/merge-cleanup.test.ts`
+ * dry run could never have folded. `packages/rafa-pr/src/commands/pr/merge-cleanup.test.ts`
  * drives the same function through the follow-ups it decides.
  */
 import type { SettleWaitingPlace } from './settle-waiting.js';
@@ -22,11 +22,10 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'bun:test';
-
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import { moveSpelling } from '@open-tomato/rafa-release/release/release-move';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { SETTLE_REMOTE, settleWaitingOn } from './settle-waiting.js';
 

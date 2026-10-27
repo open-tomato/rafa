@@ -45,9 +45,9 @@
  * question is answered by a scripted prompter recording what it was
  * asked.
  */
-import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -59,8 +59,7 @@ import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-dou
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { KNOWN_LIST_LIMIT } from '@open-tomato/rafa-board/board/blocked-issues';
 import { createIssueUnblockCommand } from '@open-tomato/rafa-board/commands/issue/unblock';
-
-import { createPrMergeCommand } from '../commands/pr/merge.js';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
 

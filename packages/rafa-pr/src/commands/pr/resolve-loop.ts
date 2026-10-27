@@ -9,7 +9,7 @@
  * the loop is this same rafa, spawned as `rafa loop start --plan=<file>`
  * with the worktree as its working directory. Nothing about the sessions it
  * spawns is special-cased — the budget rides in on the plan's own `budget=`
- * declarations (`src/pr/plans/budget.ts`), and the agent routing is the
+ * declarations (`packages/rafa-pr/src/pr/plans/budget.ts`), and the agent routing is the
  * plan's own.
  *
  * ## Why the plan is written OUTSIDE the worktree

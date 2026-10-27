@@ -73,9 +73,8 @@ import type { PrSeams } from './pr-context.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { resolveReleaseEnabled } from '@open-tomato/rafa-release';
-
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { resolveReleaseEnabled } from '@open-tomato/rafa-release';
 
 import { createGitRunner } from '../../pr/index.js';
 

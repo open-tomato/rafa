@@ -6,13 +6,13 @@
  * remote-only row, is read the same three ways, its real run over a
  * clone of a bare remote that holds a branch named `-f`.
  */
-import type { LocalBranch } from './branches.js';
-import type { MergedBy, MergedRow, NotPushedRow, StaleRow } from './groups.js';
 import type { RemoteOnlyRow } from './remote-only.js';
 import type { RunRow } from './runs.js';
 import type { CleanupFiles, CleanupSelection } from './steps.js';
-import type { WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { LocalBranch } from '@open-tomato/rafa-pr/cleanup/branches';
+import type { MergedBy, MergedRow, NotPushedRow, StaleRow } from '@open-tomato/rafa-pr/cleanup/groups';
+import type { WorktreeRow } from '@open-tomato/rafa-pr/cleanup/worktrees';
 import type { PastHeadCommit } from '@open-tomato/rafa-release/cleanup/past-head';
 
 import { spawnSync } from 'node:child_process';

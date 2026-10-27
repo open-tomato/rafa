@@ -1,6 +1,6 @@
 /**
  * Tests for the resolve budget written into a pinned plan
- * (`src/pr/plans/budget.ts`).
+ * (`packages/rafa-pr/src/pr/plans/budget.ts`).
  *
  * Every case is a pure call over literals: the module reads no file,
  * spawns nothing and takes no clock.
@@ -31,9 +31,8 @@
  */
 import type { TriageBlock } from '../triage/comment.js';
 
-import { describe, expect, test } from 'bun:test';
-
 import { parsePlan , parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
+import { describe, expect, test } from 'bun:test';
 
 import { budgetEntry, BUDGET_KEY, withTaskBudget } from './budget.js';
 import { loadPinnedPlan } from './load.js';

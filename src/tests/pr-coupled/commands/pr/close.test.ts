@@ -18,12 +18,12 @@
  * `--yes` case opens a prompter that throws, beside a case whose
  * prompter records the question it was asked.
  */
-import type { CloseSeams, PrCloseResult } from './close.js';
-import type { FakePrGh } from '../../pr/gh-fake.js';
-import type { PullRequestDetail, PullRequests } from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { CloseSeams, PrCloseResult } from '@open-tomato/rafa-pr/commands/pr/close';
+import type { FakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { PullRequestDetail, PullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,13 +33,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { closeQuestion, createPrCloseCommand, readCloseLine, summaryLines } from '@open-tomato/rafa-pr/commands/pr/close';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
 
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
-import { closeQuestion, createPrCloseCommand, readCloseLine, summaryLines } from './close.js';
-import { PR_USAGE } from './pr-context.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-close-')));

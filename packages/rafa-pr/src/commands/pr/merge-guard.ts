@@ -52,6 +52,7 @@ import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { GuardAnswer, GuardReaction, GuardReading } from '@open-tomato/rafa-release';
 
+import { CommandExit } from '@open-tomato/rafa/core/command';
 import {
   guardLines,
   guardReaction,
@@ -61,8 +62,6 @@ import {
   releaseDeliveryOf,
   resolveReleaseEnabled,
 } from '@open-tomato/rafa-release';
-
-import { CommandExit } from '@open-tomato/rafa/core/command';
 
 /** The answers that mean yes to a question spelled `[y/N]`. */
 const YES_ANSWERS: readonly string[] = ['y', 'yes'];

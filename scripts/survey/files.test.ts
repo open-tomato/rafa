@@ -132,7 +132,7 @@ describe('scope and kinds', () => {
   });
 
   it('reads a fake by its stem and not by a word that only contains it', () => {
-    expect(classifyFile('src/pr/gh-fake-shapes.ts')).toBe('test-support');
+    expect(classifyFile('packages/rafa-pr/src/pr/gh-fake-shapes.ts')).toBe('test-support');
     expect(classifyFile('packages/rafa-board/src/adapters/tracker/github-fake.ts')).toBe('test-support');
     expect(classifyFile('src/pr/fakery.ts')).toBe('source');
   });

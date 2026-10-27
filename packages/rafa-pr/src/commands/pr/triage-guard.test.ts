@@ -19,10 +19,9 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { RELEASE_PR_BRANCH } from '@open-tomato/rafa-release/release/settle-pr';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '../../pr/index.js';
 

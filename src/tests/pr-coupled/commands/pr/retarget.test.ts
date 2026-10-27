@@ -16,10 +16,10 @@
  * refusals read the provider factory's log beside a valid line that does
  * make a provider.
  */
-import type { PrSeams } from './pr-context.js';
-import type { PullRequestDetail, PullRequests } from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PrSeams } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import type { PullRequestDetail, PullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,14 +28,13 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { createPrRetargetCommand } from '@open-tomato/rafa-pr/commands/pr/retarget';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
+import { retargetedLine } from '@open-tomato/rafa-pr/start/pr-retarget';
 
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { retargetedLine } from '../../start/pr-retarget.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
-import { PR_USAGE } from './pr-context.js';
-import { createPrRetargetCommand } from './retarget.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-retarget-')));

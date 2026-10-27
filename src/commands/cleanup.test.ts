@@ -200,7 +200,7 @@ const UNHELD_NOT_PUSHED: NotPushedRow = {
   reason: 'no upstream; 3 commits not on any remote',
 };
 
-/** The same row as `src/cleanup/groups.ts` reads it held by {@link WT_DIRTY}. */
+/** The same row as `packages/rafa-pr/src/cleanup/groups.ts` reads it held by {@link WT_DIRTY}. */
 const HELD_NOT_PUSHED: NotPushedRow = {
   ...UNHELD_NOT_PUSHED,
   heldBy: { path: WT_DIRTY.path, name: 'wt-dirty', blockers: ['dirty'] },

@@ -1,6 +1,6 @@
 /**
  * Tests for the record's sections in a filed body and a recurrence's
- * comment (`src/triage/issue-text.ts`, #991): where they go, how each is
+ * comment (`packages/rafa-pr/src/triage/issue-text.ts`, #991): where they go, how each is
  * written, and that the sections above them, `What`, `Artifact` and
  * `Recurrence key` among them, keep their text byte for byte, so
  * `issueTextOf` (`./similarity.ts`) reads a new body as it reads an old one.
@@ -12,9 +12,8 @@ import type { MatchedSignal, RankedIssue } from './similarity.js';
 import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 
-import { describe, expect, it } from 'bun:test';
-
 import { EMPTY_BUG_RECORD, parseBugRecord } from '@open-tomato/rafa/bugs/record';
+import { describe, expect, it } from 'bun:test';
 
 import {
   COMMENT_OPENING,

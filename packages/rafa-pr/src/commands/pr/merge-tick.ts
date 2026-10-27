@@ -99,6 +99,7 @@ import type {
   RoadmapTickResult,
 } from '@open-tomato/rafa-board';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import {
   ROADMAP_LABEL,
   closedIssuesIn,
@@ -110,8 +111,6 @@ import {
   tickEpics,
   tickRoadmapIssue,
 } from '@open-tomato/rafa-board';
-
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** What {@link tickRoadmapAfterMerge} is asked: what the epic tick reads, and what the boards add. */
 export interface MergeTickOptions extends EpicTickOptions {

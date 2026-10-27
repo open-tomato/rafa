@@ -25,7 +25,7 @@
  *
  * What it does NOT check is whether `gh` is installed and authenticated.
  * That is the two REQUIRED preflight items a `gh` provider contributes
- * (`src/pr/preflight-items.ts`), checked ahead of any session and
+ * (`packages/rafa-pr/src/pr/preflight-items.ts`), checked ahead of any session and
  * printed by `rafa doctor`; probing again here would spawn `gh` twice
  * for every action. An action that then runs a `gh` which is absent
  * meets {@link onProvider}, which names what was being done and what
@@ -99,12 +99,11 @@ import type { MergeGuardSettings } from '@open-tomato/rafa-release';
 
 import { execFileSync } from 'node:child_process';
 
-import { mergeGuardSettings } from '@open-tomato/rafa-release';
-
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { mergeGuardSettings } from '@open-tomato/rafa-release';
 
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 

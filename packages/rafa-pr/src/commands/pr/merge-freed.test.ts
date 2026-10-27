@@ -26,9 +26,8 @@
  */
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
-import { describe, expect, it } from 'bun:test';
-
 import { boardListingCommand, BOARD_LISTING_LIMIT } from '@open-tomato/rafa-board/board/roadmap-board';
+import { describe, expect, it } from 'bun:test';
 
 import { INDENT } from './merge-cleanup.js';
 import { freedAfterMerge, freedHeaderLine, freedIssueLine, freedProblemLine } from './merge-freed.js';

@@ -1,6 +1,6 @@
 /**
  * Tests for `changedFiles` and `reviews` on the `gh` pull request
- * provider (`src/pr/gh.ts`).
+ * provider (`packages/rafa-pr/src/pr/gh.ts`).
  *
  * Their own file because `./gh.test.ts` sits at the 800-line cap. Every
  * case drives the adapter through a stand-in runner that records the

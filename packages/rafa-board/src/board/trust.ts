@@ -27,7 +27,7 @@
  *
  * ## The callers
  *
- * TWO are in `src/commands/pr/triage-trust.ts`, both on
+ * TWO are in `packages/rafa-pr/src/commands/pr/triage-trust.ts`, both on
  * {@link readAuthorTrust} directly and carrying their own
  * `TriageTrust`: the `rafa:pr-triage` marker-comment reader, and
  * `pr triage --resolve` on the pull request's own author.
@@ -101,7 +101,7 @@
  *
  * `gh api repos/{owner}/{repo}/collaborators/<login>/permission`, which
  * answers `permission`, `role_name` and `user`; the readings taken are
- * recorded in `src/pr/gh-fake-shapes.ts`, and they cover `admin` for a
+ * recorded in `packages/rafa-pr/src/pr/gh-fake-shapes.ts`, and they cover `admin` for a
  * write-holder and `read` for an outsider on a public repository.
  *
  * BOTH permission fields are read, and either one naming `admin`,
@@ -119,7 +119,7 @@
  * The path carries the `{owner}/{repo}` placeholders rather than a
  * repository this module was told about, because `gh` resolves the
  * repository of the directory its runner runs in — the rule
- * `src/pr/gh.ts` keeps for every path it builds, and for the same
+ * `packages/rafa-pr/src/pr/gh.ts` keeps for every path it builds, and for the same
  * reason: a second source of truth for the repository is a way for the
  * two halves to disagree.
  *
@@ -315,7 +315,7 @@ export interface GhPermissionsOptions {
  * for, and one holding both without the label could not name the
  * repository its refusal is about.
  *
- * `src/commands/pr/triage-trust.ts` declares its own `TriageTrust` of
+ * `packages/rafa-pr/src/commands/pr/triage-trust.ts` declares its own `TriageTrust` of
  * the same three fields; the shapes are not shared because the triage
  * one is what the PR command passes around, and this one is what a
  * board reader is handed.
@@ -521,7 +521,7 @@ export async function requireTrustedBoardAuthor(
  *
  * Exported because the refusal is not the only place the claim is made.
  * A marker comment from an untrusted author is IGNORED rather than
- * refused (`src/commands/pr/triage-trust.ts`), and the sentence
+ * refused (`packages/rafa-pr/src/commands/pr/triage-trust.ts`), and the sentence
  * reporting that says the same thing about access as
  * {@link trustRefusalMessage} does — which it can only keep saying if
  * there is one spelling of it.

@@ -16,10 +16,10 @@
  * `merge.test.ts` is past 800 lines, so these cases live here, beside
  * the module they cover.
  */
-import type { MergeSeams, PrMergeResult } from './merge.js';
-import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
 import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import type { MergeSeams, PrMergeResult } from '@open-tomato/rafa-pr/commands/pr/merge';
+import type { GitResult, GitRunner, PullRequestDetail } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,11 +30,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
 import { RELEASE_PR_BRANCH } from '@open-tomato/rafa-release/release/settle-pr';
 
-import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
-
-import { createPrMergeCommand } from './merge.js';
+import { dispatchInProject, eventsOf, plantProjectConfig } from '../../../cli-capture.js';
 
 /**
  * The words the step's own line, `#<n> merges anyway:

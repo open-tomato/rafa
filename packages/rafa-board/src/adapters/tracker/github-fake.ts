@@ -25,7 +25,7 @@
  *     `name`, `description` and `color`. An open issue's `stateReason` is
  *     an empty string; a closed one's is `COMPLETED` or `NOT_PLANNED`.
  *   - An issue's `author` is `{"id","is_bot","login","name"}` for a
- *     person, the shape `src/pr/gh-fake-shapes.ts` records for a pull
+ *     person, the shape `packages/rafa-pr/src/pr/gh-fake-shapes.ts` records for a pull
  *     request's: `gh issue view 1 --repo cli/cli --json author`,
  *     read on 2026-09-21 with the same `gh` 2.100.0, answered
  *     `{"id":"MDQ6VXNlcjk4NDgy","is_bot":false,"login":"vilmibm","name":"Nate Smith"}`.

@@ -85,7 +85,7 @@
  * This file is the command half of a split and re-exports neither
  * symbol that left it: `versionTag` is in
  * `packages/rafa-release/src/release/version-tag.ts`, and {@link SettleWaiting}, the shape of
- * what the settle dry run folded, is in `src/pr/settle-waiting.ts`,
+ * what the settle dry run folded, is in `packages/rafa-pr/src/pr/settle-waiting.ts`,
  * since `src/next/settle-step.ts` reads it too and library code imports
  * nothing under `src/commands/`.
  */

@@ -4,7 +4,7 @@
  * (`./sources.ts`) hands the table, composed over the project's `gh`
  * runner, its pull request provider and its root. The reading itself,
  * its five answers and every `gh` argument it sends are
- * `readOwnerApproval`'s (`src/pr/owner-approval.ts`); this module only
+ * `readOwnerApproval`'s (`packages/rafa-pr/src/pr/owner-approval.ts`); this module only
  * gathers what that function is handed.
  *
  * ## What one reading gathers

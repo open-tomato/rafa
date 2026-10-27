@@ -11,9 +11,8 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { readPlanBase, readPlanFiles } from './plan-commits.js';
 

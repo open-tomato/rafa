@@ -20,7 +20,7 @@
  * ```
  * ````
  *
- * The FORMAT is not this module's. `src/pr/triage/comment.ts` writes
+ * The FORMAT is not this module's. `packages/rafa-pr/src/pr/triage/comment.ts` writes
  * that comment, edits it on the next assessment and reads its block
  * back, and this module is the `pr show` end of it: the marker comment
  * picked out of a list through `findTriageComment`, its block through
@@ -35,7 +35,7 @@
  * checked here, and this reading is a DISPLAY: `pr show` prints the
  * stored class and the login that wrote it, and hands nothing on. The
  * check lives where the comment is read as a STORE —
- * `src/commands/pr/triage-trust.ts`, which `rafa pr triage` finds its
+ * `packages/rafa-pr/src/commands/pr/triage-trust.ts`, which `rafa pr triage` finds its
  * marker comment through, dropping an untrusted one and reporting it, so
  * that neither the stored head, the attempt count nor the follow-up
  * prompt can come from a planted comment. So a triage `pr show` displays

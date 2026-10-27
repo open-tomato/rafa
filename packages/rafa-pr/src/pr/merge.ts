@@ -73,7 +73,7 @@
  * named in one line ({@link untrackedLeftLine}); it does not refuse
  * (`open-tomato/rafa#772`). Which paths the trees hold is the caller's
  * reading, {@link MergeRefusalReading.incoming}, handed in as data like
- * every other input here; `src/commands/pr/merge-refuse.ts` reads it
+ * every other input here; `packages/rafa-pr/src/commands/pr/merge-refuse.ts` reads it
  * with `git ls-tree -r --name-only`. A folded untracked directory
  * (`?? dir/`, which `git status --porcelain` writes for a directory
  * holding no tracked file) is held when any incoming path lies under it.

@@ -1,5 +1,5 @@
 /**
- * Tests for the re-run readings (`src/pr/triage/rerun.ts`): what a
+ * Tests for the re-run readings (`packages/rafa-pr/src/pr/triage/rerun.ts`): what a
  * second `rafa pr triage` over the same pull request decides from the
  * comment already on it and the head and checks as they stand now.
  *

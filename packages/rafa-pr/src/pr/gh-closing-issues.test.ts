@@ -1,5 +1,5 @@
 /**
- * Tests for the closing-references reader (`src/pr/gh-closing-issues.ts`).
+ * Tests for the closing-references reader (`packages/rafa-pr/src/pr/gh-closing-issues.ts`).
  *
  * The references below are the ones recorded on 2026-10-05 off `gh`
  * 2.102.0, copied verbatim, so a reader that drifts from what `gh`

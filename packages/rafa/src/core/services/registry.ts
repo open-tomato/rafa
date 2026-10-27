@@ -133,7 +133,7 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
   pullRequestsIn: Object.freeze<ServiceReason>({
     lower: Object.freeze(['release']),
     higher: 'pr',
-    home: 'src/pr/gh.ts',
+    home: 'packages/rafa-pr/src/pr/gh.ts',
     reach: 9,
     why: 'rafa release settle opens its release pull request through the gh provider, which reaches board\'s gh runner'
       + ' and pr\'s check readers.',
@@ -149,7 +149,7 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
   triageReport: Object.freeze<ServiceReason>({
     lower: Object.freeze(['board']),
     higher: 'pr',
-    home: 'src/triage/triage.ts',
+    home: 'packages/rafa-pr/src/triage/triage.ts',
     reach: 66,
     why: 'rafa epic close files each failed criterion as a bug, which pr\'s triage files, comments on or skips over'
       + ' its trackers and store.',

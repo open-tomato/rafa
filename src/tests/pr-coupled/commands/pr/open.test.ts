@@ -19,11 +19,11 @@
  * the "none opened" cases read the fake's or the double's own call log,
  * beside a first run whose log shows the create the second one skips.
  */
-import type { PrSeams } from './pr-context.js';
-import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PrSeams } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import type { PullRequests, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,13 +32,12 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { createPrOpenCommand } from '@open-tomato/rafa-pr/commands/pr/open';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
 
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
-import { createPrOpenCommand } from './open.js';
-import { PR_USAGE } from './pr-context.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-open-')));

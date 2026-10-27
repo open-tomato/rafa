@@ -1,5 +1,5 @@
 /**
- * Tests for the `gh` pull request provider (`src/pr/gh.ts`).
+ * Tests for the `gh` pull request provider (`packages/rafa-pr/src/pr/gh.ts`).
  *
  * Every case drives the adapter through the strict recorded fake in
  * `./gh-fake.ts`, so each command the adapter sends is checked against a
@@ -23,7 +23,7 @@
  *     models, it being no part of the port, so its two cases record the
  *     args through a stub runner of their own.
  *
- * Twelve mutations of `src/pr/gh.ts` were driven on 2026-09-18, one run
+ * Twelve mutations of `packages/rafa-pr/src/pr/gh.ts` were driven on 2026-09-18, one run
  * each over this file, with 48 pass before and after and the module
  * restored byte-identical (sha256) after every one. Each reddened at
  * least one case, and the failure lists are written from the runs rather

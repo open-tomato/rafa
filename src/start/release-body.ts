@@ -30,7 +30,7 @@
  * resolves to `none` spawns no `gh` at all rather than spawning one and
  * reporting what it said. A run under `pr.provider: none` has no pull
  * request to carry anything: the loop pushes the branch and prints a
- * compare URL (`src/pr/none.ts`), and asking the GitHub CLI for a body
+ * compare URL (`packages/rafa-pr/src/pr/none.ts`), and asking the GitHub CLI for a body
  * there is a call that can only fail, slowly, on a machine that may not
  * have `gh` installed.
  *

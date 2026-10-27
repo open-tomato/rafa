@@ -12,7 +12,7 @@
  *
  * `rafa pr triage --resolve` dispatches a pull request classed
  * `conflict-version` here ahead of the loop path
- * (`src/commands/pr/triage-resolve.ts`): the fix needs nothing from what
+ * (`packages/rafa-pr/src/commands/pr/triage-resolve.ts`): the fix needs nothing from what
  * the pull request was FOR, so no pinned plan and no session is spent on
  * it. The caller adds the worktree, pushes the commit and removes the
  * worktree; this module reads, writes the three files and commits.
@@ -113,6 +113,9 @@ import type { GuardAnswer, GuardStamp, SettleSettings } from '@open-tomato/rafa-
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { gitSaid } from '@open-tomato/rafa/core/git';
+import { FRAGMENT_PLAN_ID_PATTERN, allocateFragmentName, directoryPrefix, serializeFragment } from '@open-tomato/rafa/release/fragment';
 import {
   RELEASE_REMOTE,
   compareVersions,
@@ -122,10 +125,6 @@ import {
   readManifestVersion,
   replaceManifestVersion,
 } from '@open-tomato/rafa-release';
-
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-import { gitSaid } from '@open-tomato/rafa/core/git';
-import { FRAGMENT_PLAN_ID_PATTERN, allocateFragmentName, directoryPrefix, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 /** What one conversion reads. */
 export interface VersionConvertInput {

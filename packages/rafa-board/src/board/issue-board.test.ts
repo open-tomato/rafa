@@ -7,7 +7,7 @@
  * and keeping the argument lists it was handed, so no case spawns a
  * process, reaches GitHub or reads the configuration `gh` keeps under
  * the home. The payloads are the REST shapes
- * `src/pr/gh-fake-shapes.ts` records for the comment endpoints, cut to
+ * `packages/rafa-pr/src/pr/gh-fake-shapes.ts` records for the comment endpoints, cut to
  * the three fields this board reads.
  *
  * A seam like this passes while wrong most easily by sending a command

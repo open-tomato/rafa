@@ -22,11 +22,11 @@
  * they were reached, so "the line is read first" and "an argument reads
  * no branch" are measured rather than assumed.
  */
-import type { PrSeams } from './pr-context.js';
-import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PrSeams } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import type { PullRequests, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,11 +37,6 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
-
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
 import {
   expectNoArguments,
   openPrContext,
@@ -49,7 +44,11 @@ import {
   PR_USAGE,
   readBooleanFlag,
   readPullArgument,
-} from './pr-context.js';
+} from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
+
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-context-')));

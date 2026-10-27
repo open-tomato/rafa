@@ -1,5 +1,5 @@
 /**
- * A `gh` a spawned run can call: `src/pr/gh-fake.ts`'s in-memory fake
+ * A `gh` a spawned run can call: `packages/rafa-pr/src/pr/gh-fake.ts`'s in-memory fake
  * behind a process, for the case that spawns `rafa pr triage` and has to
  * answer each `gh` command it sends.
  *
@@ -19,13 +19,13 @@
  * Run as `bun <this file> <gh arguments>`; {@link plantFakeGh} writes
  * the `gh` script in a scratch `bin/` that does so.
  */
-import type { FakePullRequestSeed } from '../pr/gh-fake-shapes.js';
+import type { FakePullRequestSeed } from '@open-tomato/rafa-pr/pr/gh-fake-shapes';
 
 import { appendFileSync, chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createFakePrGh } from '../pr/gh-fake.js';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
 
 /** The variable naming the directory holding the seed and the call log. */
 export const FAKE_GH_STATE = 'FAKE_GH_STATE';

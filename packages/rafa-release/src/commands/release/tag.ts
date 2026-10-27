@@ -14,7 +14,7 @@
  * base branch by `rafa release settle`. This action is the operator
  * step the changelog and release spec puts after the merge (its step
  * 4). `rafa pr merge` names `rafa release settle` as its follow-up,
- * not this action (`src/commands/pr/merge-followups.ts`), and the tag
+ * not this action (`packages/rafa-pr/src/commands/pr/merge-followups.ts`), and the tag
  * settle does not write itself is this action's
  * (`packages/rafa-release/src/release/settle-tag.ts`).
  *

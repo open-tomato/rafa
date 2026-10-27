@@ -74,7 +74,7 @@
  *    answers `unknown`. Rows 7 and 8 need `mergeable` and row 6 needs
  *    `conflicting`, so `unknown` is none of them, and it is what `pr merge`
  *    refuses with "GitHub may still be computing the merge"
- *    (`src/pr/merge.ts`) — which is a wait.
+ *    (`packages/rafa-pr/src/pr/merge.ts`) — which is a wait.
  *  - Row 10 also requires the line NOT to be blocked. `spec:ready` and
  *    `spec:blocked` are independent facts (`packages/rafa-board/src/board/blocked.ts`), so
  *    an issue can carry both; without the conjunct the first-match rule
@@ -100,7 +100,7 @@
  * ## Row 7: no check at all
  *
  * A pull request reporting no check at all (verdict `none`, zero check
- * rows, `verdictOf` in `src/pr/checks.ts`) has nothing for `pr triage`
+ * rows, `verdictOf` in `packages/rafa-pr/src/pr/checks.ts`) has nothing for `pr triage`
  * to fix, so it is its own row rather than a clause of row 6. Its action
  * is `merge-unchecked`, which `pr merge --skip-checks` does, and which
  * asks its own question. Row 6 still takes such a pull request when it

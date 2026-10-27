@@ -87,7 +87,7 @@
  * Nothing here throws for a board that would not take the tick: the
  * caller gets a {@link RoadmapTickResult} saying what happened, because
  * a merge that went through is not a failed command
- * (`src/commands/pr/merge.ts`).
+ * (`packages/rafa-pr/src/commands/pr/merge.ts`).
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 

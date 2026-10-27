@@ -15,7 +15,7 @@
  * total, and `current.test.ts` drives it over every subset.
  *
  * Which parts a `gh` provider can actually leave out, measured against
- * the adapter's readers in `src/pr/gh.ts`:
+ * the adapter's readers in `packages/rafa-pr/src/pr/gh.ts`:
  *
  *   - The NUMBER and the STATE cannot. `readSummary` refuses a `number`
  *     that is not a positive whole number and a `state` that is not one

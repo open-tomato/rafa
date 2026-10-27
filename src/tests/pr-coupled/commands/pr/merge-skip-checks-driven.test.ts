@@ -1,6 +1,6 @@
 /**
  * `rafa pr merge --skip-checks` driven over the `gh` fake
- * (`src/pr/gh-fake.ts`) and a real scratch git repository with a bare
+ * (`packages/rafa-pr/src/pr/gh-fake.ts`) and a real scratch git repository with a bare
  * remote standing in for GitHub — the same shape
  * `triage-resolve-driven.test.ts` uses for `pr triage --resolve` and
  * `merge-driven.test.ts` uses for `pr merge`.
@@ -36,10 +36,10 @@
  * pull request into `stretch/x` merges under `--yes`, and one into `main`
  * is refused with the workflows-exist warning.
  */
-import type { MergeSeams } from './merge.js';
-import type { FakePrCheck, FakePullRequestSeed, FakeWorkflow } from '../../pr/gh-fake.js';
-import type { GitResult, GitRunner } from '../../pr/index.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
+import type { FakePrCheck, FakePullRequestSeed, FakeWorkflow } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -49,19 +49,18 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
-
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests } from '../../pr/index.js';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
 import {
   NO_WORKFLOW_WARNING,
   noPullRequestWorkflowLine,
   UNCHECKED_MERGE_SENTENCE,
   WORKFLOWS_EXIST_WARNING,
   workflowCountLine,
-} from '../../pr/unchecked.js';
-import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
+} from '@open-tomato/rafa-pr/pr/unchecked';
 
-import { createPrMergeCommand } from './merge.js';
+import { dispatchInProject, plantProjectConfig } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-skip-driven-')));

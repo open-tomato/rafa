@@ -25,17 +25,17 @@
  * call log holds NO `pr list`, so "the number on the line is used
  * instead of the branch" is a reading rather than an assumption.
  */
-import type { PrSeams } from './pr-context.js';
-import type { PrShowReading } from './show.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
+import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PrSeams } from '@open-tomato/rafa-pr/commands/pr/pr-context';
+import type { PrShowReading } from '@open-tomato/rafa-pr/commands/pr/show';
 import type {
   ChecksReading,
   PullRequestComment,
   PullRequestDetail,
   PullRequests,
-} from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
-import type { RafaCommand } from '@open-tomato/rafa/core/command';
-import type { CliEvent } from '@open-tomato/rafa/ports';
+} from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,21 +44,20 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
-
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, PR_NEEDS_GH } from '../../pr/index.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
-import { PR_SHOW_JSON_FIELDS } from './declarations.js';
-import { TRIAGE_MARKER } from './last-triage.js';
-import { PR_USAGE } from './pr-context.js';
+import { PR_SHOW_JSON_FIELDS } from '@open-tomato/rafa-pr/commands/pr/declarations';
+import { TRIAGE_MARKER } from '@open-tomato/rafa-pr/commands/pr/last-triage';
+import { PR_USAGE } from '@open-tomato/rafa-pr/commands/pr/pr-context';
 import {
   createPrShowCommand,
   KEYWORD_ONLY,
   NOT_IN_BODY,
   OTHER_REPOSITORY,
   renderShow,
-} from './show.js';
+} from '@open-tomato/rafa-pr/commands/pr/show';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, PR_NEEDS_GH } from '@open-tomato/rafa-pr/pr/index';
+
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-show-')));

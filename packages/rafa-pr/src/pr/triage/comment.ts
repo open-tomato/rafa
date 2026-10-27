@@ -13,7 +13,7 @@
  * field written in a shape the reader refuses is a store that silently
  * forgets, and one file is what holds the two spellings together.
  *
- * `src/commands/pr/last-triage.ts` is the reader's other caller: `pr
+ * `packages/rafa-pr/src/commands/pr/last-triage.ts` is the reader's other caller: `pr
  * show` ends with the last triage, and it reads the same comment through
  * {@link findTriageComment} and {@link readTriageBlock} rather than
  * through a fence reader of its own.
@@ -105,7 +105,7 @@
  * `--yes` may answer it. The count is
  * {@link TriageCommentInput.workflowCount}; left out, it reads as a
  * count that could not be read — the riskier case — and never as "no
- * workflow". `src/commands/pr/triage-report.ts` prints the same three
+ * workflow". `packages/rafa-pr/src/commands/pr/triage-report.ts` prints the same three
  * lines in the same place for a terminal. Every other class carries
  * none of them.
  *
@@ -116,11 +116,11 @@
  * whoever wrote it, because nothing here may spawn and the trust
  * reading is a `gh api` call (`packages/rafa-board/src/board/trust.ts`).
  *
- * `src/commands/pr/triage-trust.ts` is where that check lives, and
+ * `packages/rafa-pr/src/commands/pr/triage-trust.ts` is where that check lives, and
  * `rafa pr triage` reads its marker comment through it: a comment from
  * an account without write access is dropped from the list and reported,
  * so a planted one supplies neither the stored head, the attempt count
- * nor the follow-up prompt. `src/commands/pr/last-triage.ts`, which
+ * nor the follow-up prompt. `packages/rafa-pr/src/commands/pr/last-triage.ts`, which
  * `pr show` reads through, still takes the newest marker comment
  * whoever wrote it, and prints the author beside it.
  */
@@ -249,7 +249,7 @@ export interface WriteTriageCommentOptions {
  *
  * The order is the one {@link findTriageComment} answers from, and it is
  * also what a reader dropping an untrusted marker comment walks
- * (`src/commands/pr/triage-trust.ts`): with the newest first, the triage
+ * (`packages/rafa-pr/src/commands/pr/triage-trust.ts`): with the newest first, the triage
  * that stands is the first trusted comment in this list, and a planted
  * one is passed over rather than allowed to hide the comment under it.
  */

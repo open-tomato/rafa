@@ -1,5 +1,5 @@
 /**
- * Tests for the resolve worktree (`src/pr/worktree.ts`).
+ * Tests for the resolve worktree (`packages/rafa-pr/src/pr/worktree.ts`).
  *
  * The cases split the way the module does. The path, the
  * cross-repository refusal and the push guard are pure readings over
@@ -48,10 +48,9 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { WORKTREES_SUBDIR } from '@open-tomato/rafa/start/worktree-dir';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
   addResolveWorktree,

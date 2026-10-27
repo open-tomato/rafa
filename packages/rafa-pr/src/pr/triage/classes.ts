@@ -142,7 +142,7 @@ export const SIMPLE_TRIAGE_CLASSES: readonly TriageClass[] = Object.freeze([
  * The classes `--resolve` converts in code, with no pinned plan and no
  * session: simple on any pull request, like
  * {@link SIMPLE_TRIAGE_CLASSES}, but kept apart from it because
- * `src/pr/plans/load.ts` claims a pinned plan for every member of that
+ * `packages/rafa-pr/src/pr/plans/load.ts` claims a pinned plan for every member of that
  * list and none ships for these.
  *
  * `conflict-version` alone: its fix — the stamped section's lines
@@ -165,7 +165,7 @@ export const DEPENDENCY_BUMP_SIMPLE_CLASSES: readonly TriageClass[] = Object.fre
 /**
  * The logins whose pull requests are dependency bumps by authorship
  * alone. Two, because dependabot answers under two spellings and only
- * one of them is what `gh` writes: `src/pr/gh-fake-shapes.ts` records,
+ * one of them is what `gh` writes: `packages/rafa-pr/src/pr/gh-fake-shapes.ts` records,
  * off `cli/cli`'s own dependabot pull requests, that a bot author is
  * `{"is_bot","login"}` whose login is the app path `app/dependabot`,
  * NOT `dependabot[bot]`. The bracketed spelling is what the REST and

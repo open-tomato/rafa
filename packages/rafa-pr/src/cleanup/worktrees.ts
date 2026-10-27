@@ -30,7 +30,7 @@
  * other checkout is somebody's own and is not listed.
  *
  * Git writes each path resolved — `/private/var/...` for a macOS
- * temporary directory spelled `/var/...` (`src/pr/merge.ts`'s note) —
+ * temporary directory spelled `/var/...` (`packages/rafa-pr/src/pr/merge.ts`'s note) —
  * so the home and the working directory are compared through
  * {@link WorktreeSeams.realPath}, in both spellings.
  *

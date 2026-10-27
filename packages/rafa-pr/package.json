@@ -1,7 +1,7 @@
 {
   "name": "@open-tomato/rafa-pr",
   "version": "0.46.0",
-  "description": "Facade of the pr package (#808, pass 2): re-exports today's files from src/ under the package's final name, and becomes its own index at its move.",
+  "description": "The pr package (#808): its files live under its own src/ since pass 4e, index.ts and commands.ts re-export the names the files outside it import, and every file is a subpath through ./*.",
   "private": true,
   "license": "Apache-2.0",
   "openTomato": {
@@ -10,7 +10,8 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./commands": "./commands.ts"
+    "./commands": "./commands.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "lint": "eslint .",

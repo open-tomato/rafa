@@ -4,10 +4,10 @@
  * the refusals they decide, the warning, the question, and the one
  * comment posted after the merge.
  *
- * What each of those SAYS is `src/pr/unchecked.ts`'s, a pure reading
+ * What each of those SAYS is `packages/rafa-pr/src/pr/unchecked.ts`'s, a pure reading
  * over the workflow count and what the base's workflow files said.
  * Whether `--skip-checks` is allowed at all — verdict `none` alone — is
- * `readMergeRefusal`'s in `src/pr/merge.ts`, read before anything here.
+ * `readMergeRefusal`'s in `packages/rafa-pr/src/pr/merge.ts`, read before anything here.
  * This module is the half that acts: it asks the provider for the count,
  * reads the base's workflow files through git, refuses, prints, asks the
  * terminal and posts. The merge itself and the clean-up after it stay
@@ -67,7 +67,7 @@
  * `git ls-tree --full-tree -z` (the top of the tree, whichever directory
  * the project root is), keeps the `*.yml` and `*.yaml` blobs, reads each
  * with `git cat-file blob`, and hands the texts to
- * `src/pr/workflow-triggers.ts`. Where none has a `pull_request`
+ * `packages/rafa-pr/src/pr/workflow-triggers.ts`. Where none has a `pull_request`
  * trigger naming the base, the case is `no-pull-request-workflow` and
  * `--yes` may answer.
  *
@@ -85,7 +85,7 @@
  *
  * A count of zero or one that could not be read never reaches git: zero
  * already lets `--yes` answer, and an unreadable count keeps refusing it
- * whatever the files say (see `src/pr/unchecked.ts`).
+ * whatever the files say (see `packages/rafa-pr/src/pr/unchecked.ts`).
  *
  * ## The comment, and why its failure is a warning
  *
@@ -146,7 +146,7 @@ export interface UncheckedMerge {
   readonly workflowCount: number | null;
   /** What the base's workflow files said, or null where they were not read; see the module note. */
   readonly baseWorkflows: BaseWorkflowReading | null;
-  /** Everything `src/pr/unchecked.ts` reads from that count. */
+  /** Everything `packages/rafa-pr/src/pr/unchecked.ts` reads from that count. */
   readonly reading: UncheckedReading;
   /** Whether `--yes` was given, and so answers the question; see the module note. */
   readonly yes: boolean;

@@ -5,7 +5,7 @@
  *
  * The same discipline `packages/rafa-board/src/adapters/tracker/github-fake.ts` holds for
  * issues, and behind the same seam: `GhRunner` and `GhResult` are
- * declared once, in `packages/rafa-board/src/adapters/tracker/github.ts`, and `src/pr/gh.ts`
+ * declared once, in `packages/rafa-board/src/adapters/tracker/github.ts`, and `packages/rafa-pr/src/pr/gh.ts`
  * takes one as the tracker adapter does. So no case in `src/pr/` spawns
  * a process, reaches GitHub, or reads the configuration `gh` keeps under
  * the home.

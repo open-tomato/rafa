@@ -1,5 +1,5 @@
 /**
- * Tests for the `docs` channel (`src/triage/stale-docs.ts`): the row each
+ * Tests for the `docs` channel (`packages/rafa-pr/src/triage/stale-docs.ts`): the row each
  * `stale_docs` entry is answered with, its one redacted line, and that
  * `triageReport` reaches no tracker for one.
  *
@@ -45,10 +45,9 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { parseReport } from '@open-tomato/rafa/report/parse';
 import { HOME_MARKER } from '@open-tomato/rafa/triage/local-paths';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { staleDocSentence, triageStaleDocs } from './stale-docs.js';
 import { triageReport } from './triage.js';

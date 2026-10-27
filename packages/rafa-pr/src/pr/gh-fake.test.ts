@@ -1,5 +1,5 @@
 /**
- * Tests for the strict recorded `gh` fake (`src/pr/gh-fake.ts`).
+ * Tests for the strict recorded `gh` fake (`packages/rafa-pr/src/pr/gh-fake.ts`).
  *
  * Every rule the fake enforces sits here beside a command it accepts, so
  * a refusal case cannot pass on a fake that refuses everything. The

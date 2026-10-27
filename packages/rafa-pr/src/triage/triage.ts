@@ -303,8 +303,6 @@ import type { LocalTrackerOptions, RefVerifier } from '@open-tomato/rafa-board';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { createLocalTracker } from '@open-tomato/rafa-board';
-
 import { bugTitle } from '@open-tomato/rafa/bugs/record';
 import { UNKNOWN_VALUE } from '@open-tomato/rafa/bugs/title';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -314,6 +312,7 @@ import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from '@open-tomato/rafa
 import { redactSecrets, TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 import { writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
+import { createLocalTracker } from '@open-tomato/rafa-board';
 
 import { bugFilingOf, DEFAULT_BUG_RULES } from './bug-filing.js';
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';

@@ -1,6 +1,6 @@
 /**
  * Tests for what `rafa pr merge` decides about the roadmap tick
- * (`src/commands/pr/merge-tick.ts`): whether there is anything to tick,
+ * (`packages/rafa-pr/src/commands/pr/merge-tick.ts`): whether there is anything to tick,
  * which boards list a closed issue, the default board while none is
  * labelled, and that nothing on the way out throws.
  *
@@ -22,11 +22,10 @@
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { EpicTickResult } from '@open-tomato/rafa-board/board/epic-tick';
 
-import { describe, expect, it } from 'bun:test';
-
 import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND } from '@open-tomato/rafa-board/board/boards';
 import { epicTickProblemLine, epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+import { describe, expect, it } from 'bun:test';
 
 import { noBoardListsLine, tickProblemLine, tickRoadmapAfterMerge } from './merge-tick.js';
 

@@ -88,10 +88,10 @@
  */
 import type { ReleaseFinish } from './release-stage.js';
 import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } from './wrap-up-run.js';
-import type { FakePrGh } from '../pr/gh-fake.js';
-import type { PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 import type { Instinct } from '@open-tomato/rafa-inventory/schema/instinct';
+import type { FakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import type { PullRequests, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -110,14 +110,14 @@ import { assumptionsHeading } from '@open-tomato/rafa-board/board/review-stamp';
 import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/gh';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { retargetPullRequest } from '@open-tomato/rafa-pr/start/pr-retarget';
 
-import { createFakePrGh } from '../pr/gh-fake.js';
-import { createGhPullRequests } from '../pr/gh.js';
 import { plantProjectConfig, plantScratchRepo } from '../tests/cli-capture.js';
 import { COMMITTED, FORECAST_LINE, prepared, PROVIDER_GH, SETTINGS, stub, VERIFIED } from '../tests/release-stage-fixtures.js';
 
 import { bindEventsFile, unbindEventsFile } from './loop-events.js';
-import { retargetPullRequest } from './pr-retarget.js';
 import { NO_PROVIDER_REASON } from './promoted-check.js';
 import { carryReleaseIntoPullRequest } from './release-body.js';
 import { finishRelease } from './release-stage.js';

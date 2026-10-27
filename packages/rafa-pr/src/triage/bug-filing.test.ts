@@ -6,13 +6,12 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { bugTitle } from '@open-tomato/rafa/bugs/record';
 import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
 import { redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { bugFilingOf, DEFAULT_BUG_RULES, reproduceOf, rerunOf } from './bug-filing.js';
 

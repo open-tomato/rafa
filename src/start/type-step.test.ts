@@ -12,7 +12,7 @@
  * case where the same input, changed in one thing, goes red or runs.
  */
 import type { TypeDiagnostic, TypeRunOptions, TypeRunResult, TypeStepInput } from './type-step.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -24,8 +24,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
-import { createGitRunner } from '../pr/index.js';
 import { realNodeModules } from '../tests/real-node-modules.js';
 
 import { TYPE_CHECK_FILE, TYPE_CHECK_SCRATCH, typeCheckLines } from './task-gate-lines.js';

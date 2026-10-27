@@ -8,7 +8,7 @@
  * do, and each declares `HINT_FLAG_SPEC` so `--no-hint` turns it off.
  * The flag lives in core (`packages/rafa/src/core/command/shared-flags.ts`,
  * through the command barrel), not here: three of the six are declared
- * in a declarations file (`src/commands/pr/declarations.ts`,
+ * in a declarations file (`packages/rafa-pr/src/commands/pr/declarations.ts`,
  * `packages/rafa-board/src/commands/issue/declarations.ts`), which imports core's entries
  * alone, so core is the one place all six reach the same value from, and
  * the help of all six reads the same.

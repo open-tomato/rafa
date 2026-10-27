@@ -23,7 +23,11 @@
  * workflow tests read the argv the command sent (`fetch origin <base>`)
  * as well as what it printed and posted.
  */
-import type { MergeSeams } from './merge.js';
+import type { CapturedRun, PlantedProject } from '../../../cli-capture.js';
+import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
+import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
 import type {
   CheckRow,
   ChecksReading,
@@ -31,11 +35,7 @@ import type {
   GitRunner,
   PullRequestComment,
   PullRequestDetail,
-} from '../../pr/index.js';
-import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
-import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
-import type { CliEvent } from '@open-tomato/rafa/ports';
-import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+} from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,17 +44,16 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
-
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
 import {
   NO_WORKFLOW_WARNING,
   noPullRequestWorkflowLine,
   UNCHECKED_MERGE_SENTENCE,
   WORKFLOWS_EXIST_WARNING,
   workflowCountLine,
-} from '../../pr/unchecked.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+} from '@open-tomato/rafa-pr/pr/unchecked';
 
-import { createPrMergeCommand } from './merge.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-skip-')));

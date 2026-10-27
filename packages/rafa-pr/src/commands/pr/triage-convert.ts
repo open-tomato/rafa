@@ -3,10 +3,10 @@
  * worktree, one conversion, one push, and the worktree removed.
  *
  * `./triage-resolve.ts` dispatches a pull request whose class is in
- * `CONVERSION_TRIAGE_CLASSES` (`src/pr/triage/classes.ts`) here, ahead
+ * `CONVERSION_TRIAGE_CLASSES` (`packages/rafa-pr/src/pr/triage/classes.ts`) here, ahead
  * of the pinned-plan check that would otherwise read it as "not simple"
  * and ahead of the loop path. What the conversion writes and commits is
- * `src/pr/triage/version-convert.ts`'s; the worktree's add and removal
+ * `packages/rafa-pr/src/pr/triage/version-convert.ts`'s; the worktree's add and removal
  * are the resolve run's own, handed in, so both paths add and remove a
  * worktree one way.
  *
@@ -22,7 +22,7 @@
  *     then, naming whatever the stamp was hiding: a conflict on another
  *     file, a red check.
  *
- * The push is `pushResolved` (`src/pr/worktree.ts`), never forced. A
+ * The push is `pushResolved` (`packages/rafa-pr/src/pr/worktree.ts`), never forced. A
  * converted and pushed branch, and a branch the guard no longer reads as
  * stamped, are not failures; a refused conversion or a refused push is,
  * and the caller ends it as a run that did not fix what it was asked

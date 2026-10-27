@@ -20,7 +20,9 @@ import {
   workflowsRunOnPullRequestsInto,
 } from './workflow-triggers.js';
 
-const VERIFY_YML = await Bun.file(join(import.meta.dir, '..', '..', '.github', 'workflows', 'verify.yml')).text();
+const VERIFY_YML = await Bun.file(
+  join(import.meta.dir, '..', '..', '..', '..', '.github', 'workflows', 'verify.yml'),
+).text();
 
 /** A workflow whose `on:` block is `onBlock`, indented as written. */
 function workflowWith(onBlock: string): string {

@@ -23,8 +23,8 @@
  *    and that no remove was sent, so its refusal is the step's and not a
  *    later one.
  */
-import type { MergeSeams } from './merge.js';
-import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
+import type { MergeSeams } from '@open-tomato/rafa-pr/commands/pr/merge';
+import type { GitResult, GitRunner, PullRequestDetail } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,11 +33,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { WORKTREE_STATUS } from '@open-tomato/rafa-pr/cleanup/worktrees';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
 
-import { WORKTREE_STATUS } from '../../cleanup/worktrees.js';
-import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
-
-import { createPrMergeCommand } from './merge.js';
+import { dispatchInProject, plantProject } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-merge-loop-holder-')));

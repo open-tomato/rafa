@@ -14,9 +14,9 @@
  * site: refused before the worktree is added, and let through with one
  * warning line under `--allow-local-config`.
  */
-import type { TriageSeams } from './triage.js';
-import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { PlantedProject } from '../../../cli-capture.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { TriageSeams } from '@open-tomato/rafa-pr/commands/pr/triage';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,20 +26,19 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
-
-import { createFakePrGh } from '../../pr/gh-fake.js';
-import { createGhPullRequests, createGitRunner } from '../../pr/index.js';
-import { resolveWorktreePath } from '../../pr/worktree.js';
-import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
-
-import { ALLOW_LOCAL_CONFIG_FLAG } from './declarations.js';
+import { ALLOW_LOCAL_CONFIG_FLAG } from '@open-tomato/rafa-pr/commands/pr/declarations';
+import { createPrTriageCommand } from '@open-tomato/rafa-pr/commands/pr/triage';
 import {
   CONFIG_TRUST_REFUSE_EXIT,
   headRevision,
   readConfigDrift,
   requireTrustedConfig,
-} from './triage-config-trust.js';
-import { createPrTriageCommand } from './triage.js';
+} from '@open-tomato/rafa-pr/commands/pr/triage-config-trust';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { resolveWorktreePath } from '@open-tomato/rafa-pr/pr/worktree';
+
+import { dispatchInProject, plantProjectConfig } from '../../../cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-config-trust-')));

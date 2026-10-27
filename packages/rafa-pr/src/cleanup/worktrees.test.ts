@@ -13,9 +13,8 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, wri
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
   countChanges,

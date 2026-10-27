@@ -32,7 +32,7 @@
  * the verdict: `checks none` is a pull request GitHub ran nothing for,
  * and `checks could not be read` is a question that could not be asked.
  * Rendering both as an absence would make a conflicting pull request —
- * which schedules no run at all, `src/pr/checks.ts` — look like an
+ * which schedules no run at all, `packages/rafa-pr/src/pr/checks.ts` — look like an
  * outage.
  *
  * ## The rendering is one pure function
@@ -47,7 +47,7 @@
  * The parts of a line are joined the way `pr current` joins them
  * ({@link SEPARATOR}, imported from it), one subject's two readings
  * being read by one person. Check rows are `formatRows`
- * (`src/pr/checks.ts`), the one row format the wrap-up gate and a repair
+ * (`packages/rafa-pr/src/pr/checks.ts`), the one row format the wrap-up gate and a repair
  * prompt already print, so a check reads the same wherever it is shown.
  *
  * ## What it closes, read twice
@@ -89,9 +89,8 @@ import type { PrSeams } from './pr-context.js';
 import type { ChecksReading, ClosingIssue, PullRequestDetail } from '../../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
-import { closedIssuesIn } from '@open-tomato/rafa-board';
-
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { closedIssuesIn } from '@open-tomato/rafa-board';
 
 import { formatRows } from '../../pr/index.js';
 

@@ -51,6 +51,8 @@
  */
 import type { BoardIssue, GhRunner } from '@open-tomato/rafa-board';
 
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { plural } from '@open-tomato/rafa/core/plan';
 import {
   NATIVE_MODE,
   closedIssuesIn,
@@ -58,9 +60,6 @@ import {
   readBoardRepository,
   selectBoardRelations,
 } from '@open-tomato/rafa-board';
-
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-import { plural } from '@open-tomato/rafa/core/plan';
 
 import { INDENT } from './merge-cleanup.js';
 

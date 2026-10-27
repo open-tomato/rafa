@@ -52,7 +52,7 @@
  * for every other verdict, which spends no `gh api` call on a pull
  * request whose checks did report. Asked, the reading's `count` is the
  * port's answer, where null is a count that could not be read: the
- * riskier reading `src/pr/unchecked.ts` files beside "workflows exist",
+ * riskier reading `packages/rafa-pr/src/pr/unchecked.ts` files beside "workflows exist",
  * never "no workflow". The port answers null on any failure rather than
  * throwing; a rejection is caught all the same and read as that null,
  * because a triage that crashed on it would leave the pull request
@@ -61,7 +61,7 @@
  *
  * ## The conflict is read only when GitHub says it might be one
  *
- * `readsAsConflicting` (`src/pr/triage/classify.ts`) answers `false`
+ * `readsAsConflicting` (`packages/rafa-pr/src/pr/triage/classify.ts`) answers `false`
  * outright for `mergeable: 'mergeable'`, so a pull request GitHub has
  * already merged in its head is never merged again here: the git read
  * is skipped and the file list is empty. It runs for `conflicting` and
@@ -298,7 +298,7 @@ function firstResolved(git: GitRunner, candidates: readonly string[]): string | 
  *
  * The refs are resolved before anything is merged, so an exit 1 from
  * `merge-tree` is never read as a conflict it was not; see the module
- * note and `src/pr/triage/conflict.ts`.
+ * note and `packages/rafa-pr/src/pr/triage/conflict.ts`.
  */
 export function readConflictFiles(git: GitRunner, refs: ConflictRefs): ConflictFilesReading {
   const bases = baseCandidates(refs);

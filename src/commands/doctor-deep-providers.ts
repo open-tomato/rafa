@@ -8,7 +8,7 @@
  * {@link readDeepProviders} reads into data; {@link providersSection}
  * turns that data into the rows `./doctor-deep-row.ts` renders. No row
  * is a `PreflightCheck`: the REQUIRED `gh` items stay
- * `src/pr/preflight-items.ts`'s, checked by plain `doctor` under the
+ * `packages/rafa-pr/src/pr/preflight-items.ts`'s, checked by plain `doctor` under the
  * rafa process's own environment, and this reading moves no exit code.
  *
  * ## Which environment

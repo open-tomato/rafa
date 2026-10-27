@@ -1,5 +1,5 @@
 /**
- * Tests for the triage comment (`src/pr/triage/comment.ts`): the body
+ * Tests for the triage comment (`packages/rafa-pr/src/pr/triage/comment.ts`): the body
  * one assessment is written into, the block read back out of it, and the
  * post-or-edit that keeps one triage comment per pull request.
  *
@@ -26,7 +26,7 @@
  *     same body, which is what a spilt fence would break.
  *
  * Six mutations of `comment.ts` were driven on 2026-09-18, one at a
- * time, over this file and `src/commands/pr/last-triage.test.ts`, which
+ * time, over this file and `packages/rafa-pr/src/commands/pr/last-triage.test.ts`, which
  * reads the same block through this module. 41 pass either side, and the
  * module restored from a scratch copy and verified with `shasum -c`
  * after each. The failure lists are written from the runs:

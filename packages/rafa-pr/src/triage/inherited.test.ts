@@ -1,14 +1,15 @@
 /**
- * Inherited red (`src/triage/inherited.ts`) and how `triageReport`
- * answers it (`src/triage/triage.ts`).
+ * Inherited red (`packages/rafa-pr/src/triage/inherited.ts`) and how
+ * `triageReport` answers it (`packages/rafa-pr/src/triage/triage.ts`).
  *
  * The match is read on its own, then through a recording tracker over a
  * temporary directory and the real SQLite store under it: an inherited
  * bug files nothing and comments on its open issue once per run, while a
  * bug whose message differs is filed as before. A run-start failure with
  * no message is matched on test file and case alone, read both as built
- * here and through `runSuite` over `../suite/testdata/no-message.junit.xml`,
- * recorded from bun 1.3.14, whose `<failure>` carries no `message`.
+ * here and through `runSuite` over the root's
+ * `src/suite/testdata/no-message.junit.xml`, recorded from bun 1.3.14,
+ * whose `<failure>` carries no `message`.
  */
 import type { InheritedTriage } from './inherited.js';
 import type { TriageResult } from './triage.js';
@@ -20,15 +21,18 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
-
 import { runSuite } from '@open-tomato/rafa/suite/run';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import { triageReport } from './triage.js';
 
-const TESTDATA = join(import.meta.dir, '..', 'suite', 'testdata');
+/**
+ * The root's `src/suite/testdata/`, which stayed at the root when this
+ * test moved into the package in pass 4e.
+ */
+const TESTDATA = join(import.meta.dir, '..', '..', '..', '..', 'src', 'suite', 'testdata');
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-triage-inherited-'));
 let rootCount = 0;

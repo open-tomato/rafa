@@ -1,5 +1,5 @@
-import type { BoardIssue, CauseJudgement } from '../src/triage/scoring-fixture.js';
 import type { BugRecord } from '@open-tomato/rafa/bugs/record';
+import type { BoardIssue, CauseJudgement } from '@open-tomato/rafa-pr/triage/scoring-fixture';
 
 import { describe, expect, it } from 'bun:test';
 
