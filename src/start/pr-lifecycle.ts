@@ -114,6 +114,8 @@
 import type { RunSession } from './session.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
 import type {
   CheckRow,
   PrProviderReading,
@@ -122,9 +124,19 @@ import type {
   PushOutcome,
   WaitOptions,
   WaitResult,
-} from '../pr/index.js';
-import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
-import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
+} from '@open-tomato/rafa-pr';
+
+import {
+  compareUrl,
+  createGitRunner,
+  failingRows,
+  formatRows,
+  ghAuthOkIn,
+  ghPullRequestsIn,
+  pushBranch,
+  resolvePrProvider,
+  waitForChecks,
+} from '@open-tomato/rafa-pr';
 
 import { claimBranchIssue } from '@open-tomato/rafa/claims/git';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -137,17 +149,6 @@ import { readCheckedOutBranch } from '@open-tomato/rafa/utils/git';
 
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
-import {
-  compareUrl,
-  createGitRunner,
-  failingRows,
-  formatRows,
-  ghAuthOkIn,
-  ghPullRequestsIn,
-  pushBranch,
-  resolvePrProvider,
-  waitForChecks,
-} from '../pr/index.js';
 
 import { withStamp } from './stamp.js';
 

@@ -46,16 +46,14 @@
  * `warn` it is handed.
  */
 import type { NextActionId, NextState, NextStateId } from './state.js';
-import type { GitRunner } from '../pr/index.js';
-import type { SettleWaiting } from '../pr/settle-waiting.js';
+import type { GitRunner, SettleWaiting } from '@open-tomato/rafa-pr';
 import type { MergeGuardSettings } from '@open-tomato/rafa-release';
 
+import { settleWaitingOn } from '@open-tomato/rafa-pr';
 import { mergeGuardSettings } from '@open-tomato/rafa-release';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { settleWaitingOn } from '../pr/settle-waiting.js';
 
 /** The id the settle step's state carries; no row of the table answers it. */
 export const SETTLE_STATE_ID: NextStateId = 'fragments-waiting';

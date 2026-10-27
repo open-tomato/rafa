@@ -87,10 +87,10 @@
  */
 import type { DryEpic, NextHopReading, NextRoadmapReading, NextRoadmapSources, NextWorld } from './readings.js';
 import type { NextStateId, RowAnswer } from './state.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { HopKind, HopRecord } from '@open-tomato/rafa/next/hop-record';
 import type { Place } from '@open-tomato/rafa/project/position';
 import type { HopDecision, HopHalt, HopMove, NextNowEpic } from '@open-tomato/rafa-board';
+import type { OwnerApproval } from '@open-tomato/rafa-pr';
 
 import {
   SPEC_READY_LABEL,

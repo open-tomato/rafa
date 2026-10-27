@@ -101,14 +101,21 @@
  * importer of them changes.
  */
 import type { PlanListing } from '../plan/list.js';
-import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { BaseStanding } from '@open-tomato/rafa/start/branch-decision';
 import type { BlockedLine, NextBoard, NextRoadmapReading, RoadmapLine } from '@open-tomato/rafa-board';
+import type {
+  ChecksVerdict,
+  GitRunner,
+  Mergeability,
+  OwnerApproval,
+  PullRequestSummary,
+  PullRequests,
+} from '@open-tomato/rafa-pr';
 
 import { scanClaimBranches } from '@open-tomato/rafa-board';
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -118,7 +125,6 @@ import { planFileName } from '@open-tomato/rafa/core/plan';
 import { parseBaseStanding, REMOTE, trackedChanges } from '@open-tomato/rafa/start/branch-decision';
 
 import { listPlans } from '../plan/list.js';
-import { gitSaid } from '../pr/index.js';
 
 /** The branch `git rev-parse --abbrev-ref HEAD` answers on a detached HEAD. */
 const DETACHED = 'HEAD';

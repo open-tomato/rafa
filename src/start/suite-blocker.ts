@@ -121,10 +121,10 @@ import type { InsertedTask } from '@open-tomato/rafa/utils/tracker';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { isLeftoverRepairTask } from '@open-tomato/rafa-pr';
+
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { insertTrackerTask, writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
-
-import { isLeftoverRepairTask } from '../triage/leftover-repair.js';
 
 import { outsideCaseText } from './suite-outside-case.js';
 

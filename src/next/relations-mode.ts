@@ -39,11 +39,10 @@ import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { EpicRelations, GhRunner } from '@open-tomato/rafa-board';
 
 import { createGhRunner, readBoardRepository, selectBoardRelations } from '@open-tomato/rafa-board';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
-
-import { resolvePrProvider } from '../pr/index.js';
 
 /** The settings the mode is read from, or null where `openNextSources` refuses the config. */
 async function modeConfig(root: string, home: string): Promise<RafaConfig | null> {

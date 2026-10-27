@@ -133,8 +133,11 @@ interface RewiredRow {
  * the item's rewire task read it. Its dry run read the four `src/next/`
  * files on a load cycle and the other three to rewire, and the codemod
  * took `src/cleanup/index.ts`, `steps.ts` and `src/start/wrap-up-run.ts`
- * onto the facade. So the row keeps 9 load-cycle files and no back-edge
- * file.
+ * onto the facade. So the row kept 9 load-cycle files and no back-edge
+ * file. The nine left the row in pass 4e (rafa-1374): decouple 7 cut the
+ * imports into run their cycles ran through, the codemod read all nine to
+ * rewire and none on a load cycle, and it took them onto the facade. So
+ * the row is empty: no file outside pr imports a pr file by path.
  * Run's five load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
@@ -201,17 +204,7 @@ const REWIRED: readonly RewiredRow[] = [
     packageName: 'rafa-release',
   },
   {
-    allowed: {
-      'src/claims/lost.ts': 'loadCycle',
-      'src/next/hop-rows.ts': 'loadCycle',
-      'src/next/owner-gate.ts': 'loadCycle',
-      'src/next/readings.ts': 'loadCycle',
-      'src/next/relations-mode.ts': 'loadCycle',
-      'src/next/settle-step.ts': 'loadCycle',
-      'src/next/sources.ts': 'loadCycle',
-      'src/start/pr-lifecycle.ts': 'loadCycle',
-      'src/start/suite-blocker.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-pr',
   },
   {
