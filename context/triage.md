@@ -250,12 +250,12 @@ The `stale_docs` table holds one row per entry per session and kind. Its
 - `sighting`: an entry a task reported as a stale line, written by
   `storeTaskReport` for every task, the doc task included. It is the reading
   a plan's doc task is handed.
-- `unsettled`: an entry the doc task could not settle, which is what the
-  doc task's own `stale_docs` field names. `src/start/stale-docs.ts` writes
-  these only for a task declared `docs=repair` that ended `done`, and adds
-  each as one line to the release's stale-docs issue (see
-  `packages/rafa-release/src/docs/release-issue.ts`). A blocked, failed or interrupted doc task
-  stores nothing: its next attempt reports again.
+- `unsettled`: an entry the doc task could not settle, which is what the doc
+  task's own `stale_docs` field names. `src/start/stale-docs.ts` writes these
+  only for a task declared `docs=repair` that ended `done`, and adds each as one
+  line to the release's stale-docs issue (see
+  `packages/rafa-release/src/docs/release-issue.ts`). A blocked, failed or
+  interrupted doc task stores nothing: its next attempt reports again.
 
 The unique index covers the session, the kind, the place and the text, so a
 report written twice writes its rows once. `kind` is in the index, so an

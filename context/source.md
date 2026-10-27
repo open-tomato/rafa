@@ -13,22 +13,22 @@ spells out, and the shapes the lint config forces.
 - **A library module never imports `src/rafa.ts`.** It dispatches on
   `process.argv` when imported; `src/index.ts` explains the rule and
   `index.test.ts` measures it.
-- **A cross-subject helper import is the convention, not a smell.**
-  Shared refusals and readers live in the subject that first needed them
-  rather than in a neutral module: command modules take the plan readers
-  from the plan barrel, `@open-tomato/rafa/core/plan`, and
+- **A cross-subject helper import is the convention, not a smell.** Shared
+  refusals and readers live in the subject that first needed them rather than in
+  a neutral module: command modules take the plan readers from the plan barrel,
+  `@open-tomato/rafa/core/plan`, and
   `packages/rafa-release/src/commands/release/tag.ts` takes `versionTag` from
   `../../release/version-tag.js` so two writers cannot spell one tag
-  differently. Reach for the existing helper — a second spelling of a
-  refusal is the real smell, as `release status`'s hand-rolled
-  `Expected no arguments` is beside `packages/rafa/src/commands/plan/plan-files.ts`'s
-  shared `expectNoArgument`, which says `Expected no argument`.
-  `packages/rafa-release/src/commands/release/workflows.ts` takes `readLadderFiles` from
-  `packages/rafa-release/src/commands/doctor-ladder.ts`, the ladder's readings the doctor row
-  takes too, and `LADDER_WORKFLOWS` from `packages/rafa-release/src/release/ladder.ts` and
-  `readReleaseTemplate` and `writeReleaseWorkflow` from
-  `packages/rafa-release/src/release/templates.ts`, so the command and the doctor row read one
-  set of files.
+  differently. Reach for the existing helper — a second spelling of a refusal is
+  the real smell, as `release status`'s hand-rolled `Expected no arguments` is
+  beside `packages/rafa/src/commands/plan/plan-files.ts`'s shared
+  `expectNoArgument`, which says `Expected no argument`.
+  `packages/rafa-release/src/commands/release/workflows.ts` takes
+  `readLadderFiles` from `packages/rafa-release/src/commands/doctor-ladder.ts`,
+  the ladder's readings the doctor row takes too, and `LADDER_WORKFLOWS` from
+  `packages/rafa-release/src/release/ladder.ts` and `readReleaseTemplate` and
+  `writeReleaseWorkflow` from `packages/rafa-release/src/release/templates.ts`,
+  so the command and the doctor row read one set of files.
 - **Every `import type` line forms one `import/order` group**
   (`packages/eslint-config/sharedRules.mjs`), and no short rule predicts its order: neither plain
   name order, "every sibling before every parent", nor path depth first,
@@ -363,7 +363,8 @@ naming what it reaches above core. A feature package's parked tests wait in
 `src/tests/<name>-coupled/` the same way, inventory's seven first, under
 `src/tests/inventory-coupled/`, and effort's twelve after them, under
 `src/tests/effort-coupled/`, and board's forty-seven after those, under
-`src/tests/board-coupled/`. A file that joins the folder takes its row in the
+`src/tests/board-coupled/`, and release's twenty-two after them, under
+`src/tests/release-coupled/`. A file that joins the folder takes its row in the
 same commit. The folder held 63 test files before rafa-1333 and holds 63 after
 it, since none of the nine files' tests reaches the root: each reaches only
 core, its own file and the other moved files, so the move parked nothing. The
@@ -583,21 +584,27 @@ rewritten the list with them; the rule's folders are `packages/rafa-board/` and
 the four it keeps for #913, `src/board/`, `src/commands/board/`,
 `src/commands/epic/` and `src/commands/issue/`, and it dropped
 `src/adapters/tracker/`, `src/board/project/` and `src/refs/`, the three folders
-the move emptied. `CUT_RULES` reads them and adds a package's own file beside
-its list where one belongs: `src/pr/index.ts` to `PR_NAMED`. The run rule added
+the move emptied. Release's move (pass 4d) moved its named files the same way,
+and `RELEASE_NAMED` holds six files on their `packages/rafa-release/src/` paths
+since then. Its rule keeps two root folders beside `packages/rafa-release/`:
+`src/commands/release/`, for its three integration tests, at the root
+until #913, and `src/release/`, for `fold-spawned.test.ts`, which stems no
+listed file and waits on #1360's rule for the move tool. `CUT_RULES` reads them
+and adds a package's own file beside its list where one belongs:
+`src/pr/index.ts` to `PR_NAMED`. The run rule added
 `packages/rafa/src/start/branch-decision.ts` beside `RUN_NAMED` until the fourth
 decouple item (rafa-1333) moved it into core, so `CUT_RULES` now adds
 `src/pr/index.ts` beside `PR_NAMED` alone. `INVENTORY_NAMED` is empty since pass
 4a moved its six files into `packages/rafa-inventory/src/`, where the package's
 folder rule places them. The CLI's named files are five, `CLI_NAMED`: the
 roster, the bin entry and the agent schema, which were the CLI rule's three
-inline names, and `src/inventory/browse.ts`, the view behind `rafa skill list
--i`, which sits under `src/inventory/` but is a CLI file by name: the CLI's
-prompt files it uses, `src/cli/prompt/page.ts`, `select.ts` and `terminal.ts`,
-are CLI-internal, so it counts no edge out of inventory and does not move. The
-store entry, `src/effort/store/index.ts`, is the fifth, since pass 4b: the
-published `./store` build entry, a CLI file by name as `src/rafa.ts` is, and it
-stays at the root. The first decouple item (#808) took `naming.ts` off
+inline names, and `src/inventory/browse.ts`, the view behind
+`rafa skill list -i`, which sits under `src/inventory/` but is a CLI file by
+name: the CLI's prompt files it uses, `src/cli/prompt/page.ts`, `select.ts` and
+`terminal.ts`, are CLI-internal, so it counts no edge out of inventory and does
+not move. The store entry, `src/effort/store/index.ts`, is the fifth, since pass
+4b: the published `./store` build entry, a CLI file by name as `src/rafa.ts` is,
+and it stays at the root. The first decouple item (#808) took `naming.ts` off
 `BOARD_NAMED` and `agent-definition.ts` off `EFFORT_NAMED` as they moved into
 core, now `packages/rafa/src/board/naming.ts` and
 `packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
@@ -713,16 +720,17 @@ names come from, and the facade entry is no node.
   today's files from their `src/` paths, with `.js` specifiers:
   `'../../src/effort/collect.js'`, never `'.ts'`, since a `.ts` ending fails
   `tsc` with TS5097. The entry exports exactly the names that non-test files
-  outside the package import from it, value and type alike, as `export type { …
-  }` and `export { … }` lines and nothing else. `scripts/survey/facade-names.ts
-  --package=rafa-<name>` reads that set with the checker, and `--entry` prints
-  the entry it is written from. Board, release, pr and run hold a second entry,
-  `commands.ts`, mapped as `"./commands"` beside `"."` and imported as
-  `@open-tomato/rafa-<name>/commands`: it re-exports the feature object
-  (`BOARD_FEATURE`, `RELEASE_FEATURE`, `PR_FEATURE`, `RUN_FEATURE`) alone, which
-  the facade's `index.ts` does not, since a feature's index holds the loaders of
-  its lazy command modules and every library entry reaching the facade would
-  reach them. The roster, `src/commands/index.ts`, is its one importer, which
+  outside the package import from it, value and type alike, as
+  `export type { … }` and `export { … }` lines and nothing else.
+  `scripts/survey/facade-names.ts --package=rafa-<name>` reads that set with the
+  checker, and `--entry` prints the entry it is written from. Board, release, pr
+  and run hold a second entry, `commands.ts`, mapped as `"./commands"` beside
+  `"."` and imported as `@open-tomato/rafa-<name>/commands`: it re-exports the
+  feature object (`BOARD_FEATURE`, `RELEASE_FEATURE`, `PR_FEATURE`,
+  `RUN_FEATURE`) alone, which the facade's `index.ts` does not, since a
+  feature's index holds the loaders of its lazy command modules and every
+  library entry reaching the facade would reach them. The roster,
+  `src/commands/index.ts`, is its one importer, which
   `src/tests/commands-entry.sweep.test.ts` holds, and `--commands` prints it.
   Each of the four facades' `index.test.ts` holds both entries, the index
   against its names and the commands entry against the names taken through it,
@@ -731,24 +739,24 @@ names come from, and the facade entry is no node.
   importer (pass 3) moves its line there. Pass 2 added the package's folder to
   `CUT_RULES` with its facade, and at its move (pass 4) the facade becomes the
   package's own `index`. Pass 2 moved no file under `src/` and changed no
-  importer. Inventory's move (pass 4a), effort's (pass 4b) and board's (pass 4c)
-  have run: those three packages now hold their own files and a `tsconfig.json`,
-  and their `index.ts` re-exports from `./src/…`, so the sentences above that
-  say 'until its move' describe the three facades still waiting, for release, pr
-  and run, and the `'../../src/effort/collect.js'` example is the form effort's
-  facade took before pass 4b.
+  importer. Inventory's move (pass 4a), effort's (pass 4b), board's (pass 4c)
+  and release's (pass 4d) have run: those four packages now hold their own files
+  and a `tsconfig.json`, and their `index.ts` re-exports from `./src/…`, so the
+  sentences above that say 'until its move' describe the two facades still
+  waiting, for pr and run, and the `'../../src/effort/collect.js'` example is
+  the form effort's facade took before pass 4b.
 - **The first feature move is inventory's (pass 4a), effort's the second (pass
-  4b), board's the third (pass 4c), and each later move repeats its shape.** A
-  feature package holds its own files under `packages/rafa-<name>/src/`, at
-  their paths below `src/`, once its move has run, as `packages/rafa-inventory/`
-  does since pass 4a. The move tool, `scripts/codemod/pass-moves.ts`, takes
-  `--package=<name>` and moves a list into a feature package as it moves into
-  core, with four differences: the parked tests go to
-  `src/tests/<name>-coupled/`, with a README; an outside importer takes the
-  package by `@open-tomato/rafa-<name>/<path below src>`; a moved file keeps its
-  bare core specifiers; and the facade's re-exports point at `./src/…`. The
-  package's `exports` maps `"./*"` to `./src/*.ts`, for the tests outside it
-  that take names the facade does not export, and
+  4b), board's the third (pass 4c) and release's the fourth (pass 4d), and each
+  later move repeats its shape.** A feature package holds its own files under
+  `packages/rafa-<name>/src/`, at their paths below `src/`, once its move has
+  run, as `packages/rafa-inventory/` does since pass 4a. The move tool,
+  `scripts/codemod/pass-moves.ts`, takes `--package=<name>` and moves a list
+  into a feature package as it moves into core, with four differences: the
+  parked tests go to `src/tests/<name>-coupled/`, with a README; an outside
+  importer takes the package by `@open-tomato/rafa-<name>/<path below src>`; a
+  moved file keeps its bare core specifiers; and the facade's re-exports point
+  at `./src/…`. The package's `exports` maps `"./*"` to `./src/*.ts`, for the
+  tests outside it that take names the facade does not export, and
   `src/tests/facade-subpaths.sweep.test.ts` holds that no non-test file takes a
   subpath. Its `tsconfig.json` is composite, references core and each feature
   package it depends on, and `check-types` runs `tsc --build`. Its `bunfig.toml`
@@ -766,6 +774,15 @@ names come from, and the facade entry is no node.
   includes it in its `tsconfig.json`; and a test red for a core service parks as
   root-coupled, as the adapter registry's `resolve.test.ts` did, under
   `src/tests/board-coupled/`. The integration test stays at the root until #913.
+  Release's move (pass 4d) differed in four ways: a package whose files reached
+  only lower packages and whose importers already took the facade moved with no
+  core move and no rewire first; a package that carries workflow templates moves
+  them beside their reader and the build's asset row follows; a test that
+  imports a dependency package's facade by name parks under the tool's rule, as
+  one that imports a file of that package by path does; and a test that stems no
+  listed file, `src/release/fold-spawned.test.ts`, stays where it is, with its
+  spawned-module paths pointed at the package (#1360). Its three integration
+  tests stay at the root until #913.
 - **The rewire moves effort's, inventory's, board's, release's, pr's and run's
   importers onto their facades and keeps the files each one's groups name on
   their paths.**
@@ -813,7 +830,8 @@ names come from, and the facade entry is no node.
     group, so its row is unchanged. Pass 4c (rafa-1349) rewired the nineteen
     onto the facade at commit 4bf699f3, before the move, and the rewire's dry
     run reads `to rewire (0)` after it.
-    `packages/rafa-board/src/claims/ahead.ts` and `packages/rafa-board/src/epic/verify-run.ts` left them in the fourth
+    `packages/rafa-board/src/claims/ahead.ts` and
+    `packages/rafa-board/src/epic/verify-run.ts` left them in the fourth
     decouple item (rafa-1333), which places both in board by name, and
     `src/claims/plan-claim.ts`, which took them by path, took the facade. The
     second decouple item took the importers it freed onto the facades:
@@ -822,31 +840,37 @@ names come from, and the facade entry is no node.
     `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an
     effort file, sat among them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
-    Release had one, `packages/rafa-release/src/docs/release-issue.ts`; the sixth decouple item placed
-    that file in release by name, so release has none now.
-    `packages/rafa-board/src/board/project/facts.ts` left the group in the
-    fourth decouple item: its one release import by path,
-    of `directoryPrefix` and `fragmentIdOf`, now comes from core's
-    `@open-tomato/rafa/release/fragment`. Pr had thirteen:
-    `src/claims/lost.ts`, `packages/rafa-release/src/cleanup/past-head.ts`,
-    `src/cleanup/worktrees.ts`, `packages/rafa-release/src/commands/release/status-fragments.ts`,
-    `packages/rafa-release/src/next/epic-end.ts`, `src/next/hint.ts`, `src/next/hop-rows.ts`,
-    `src/next/readings.ts`, `packages/rafa-release/src/release/branch-forecast.ts`,
-    `packages/rafa-release/src/release/settle-pr.ts`, `src/start/pr-lifecycle.ts`,
-    `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. Five of them,
-    `packages/rafa-release/src/cleanup/past-head.ts`, `packages/rafa-release/src/commands/release/status-fragments.ts`,
-    `packages/rafa-release/src/next/epic-end.ts`, `packages/rafa-release/src/release/branch-forecast.ts` and
-    `packages/rafa-release/src/release/settle-pr.ts`, are release files by the cut table's unit that
-    import pr from a package earlier in the move order; their edges are back
-    edges the decouple step before pass 4 cuts, and they sat in this group
-    because the load-cycle group comes first. The sixth decouple item
-    (rafa-1362) cut all five off pr: each takes core's git names,
+    Release had one, `packages/rafa-release/src/docs/release-issue.ts`; the
+    sixth decouple item placed that file in release by name, so release has none
+    now. `packages/rafa-board/src/board/project/facts.ts` left the group in the
+    fourth decouple item: its one release import by path, of `directoryPrefix`
+    and `fragmentIdOf`, now comes from core's
+    `@open-tomato/rafa/release/fragment`. Pr had thirteen: `src/claims/lost.ts`,
+    `packages/rafa-release/src/cleanup/past-head.ts`,
+    `src/cleanup/worktrees.ts`,
+    `packages/rafa-release/src/commands/release/status-fragments.ts`,
+    `packages/rafa-release/src/next/epic-end.ts`, `src/next/hint.ts`,
+    `src/next/hop-rows.ts`, `src/next/readings.ts`,
+    `packages/rafa-release/src/release/branch-forecast.ts`,
+    `packages/rafa-release/src/release/settle-pr.ts`,
+    `src/start/pr-lifecycle.ts`, `src/start/pr-retarget.ts` and
+    `src/start/suite-blocker.ts`. Five of them,
+    `packages/rafa-release/src/cleanup/past-head.ts`,
+    `packages/rafa-release/src/commands/release/status-fragments.ts`,
+    `packages/rafa-release/src/next/epic-end.ts`,
+    `packages/rafa-release/src/release/branch-forecast.ts` and
+    `packages/rafa-release/src/release/settle-pr.ts`, are release files by the
+    cut table's unit that import pr from a package earlier in the move order;
+    their edges are back edges the decouple step before pass 4 cuts, and they
+    sat in this group because the load-cycle group comes first. The sixth
+    decouple item (rafa-1362) cut all five off pr: each takes core's git names,
     `MergedPullRequest` or the port from core now, so pr reads the eight left,
     `src/claims/lost.ts`, `src/cleanup/worktrees.ts`, `src/next/hint.ts`,
     `src/next/hop-rows.ts`, `src/next/readings.ts`, `src/start/pr-lifecycle.ts`,
     `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. Run had nine:
-    `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `packages/rafa-release/src/next/epic-end.ts`,
-    `src/next/owner-gate.ts`, `packages/rafa-board/src/next/relation-readings.ts`,
+    `src/cleanup/groups.ts`, `src/cleanup/steps.ts`,
+    `packages/rafa-release/src/next/epic-end.ts`, `src/next/owner-gate.ts`,
+    `packages/rafa-board/src/next/relation-readings.ts`,
     `src/next/settle-step.ts`, `src/next/sources.ts`, `src/triage/base-run.ts`
     and `src/triage/inherited.ts`. The sixth decouple item cut `epic-end.ts` off
     run, since `watchDryEpic` reads only its board field, so run has eight. All
@@ -858,44 +882,47 @@ names come from, and the facade entry is no node.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
-    Inventory has none since the 23 October 2026 swap put it first: its
-    three effort importers,
-    `packages/rafa-effort/src/effort/report-skills-read.ts`,
+    Inventory has none since the 23 October 2026 swap put it first: its three
+    effort importers, `packages/rafa-effort/src/effort/report-skills-read.ts`,
     `packages/rafa-effort/src/effort/report-skills.ts` and
     `packages/rafa-effort/src/effort/skill-facts.ts`, import it forward and take
     it by name since the second decouple item's rewire. Board has none: no
     effort file imports it. Release has none in the codemod's grouping, since
-    `packages/rafa-board/src/board/project/facts.ts`, its one board importer, now takes
-    `directoryPrefix` and `fragmentIdOf` from core. Pr had twelve: the ten
-    `src/commands/release/` files, `packages/rafa-release/src/release/prepare.ts` and
-    `packages/rafa-release/src/release/verify.ts`; `packages/rafa-board/src/commands/issue/create.ts` and
-    `create-bug.ts` left it in the same item, when their pr imports moved
-    into core;
-    `packages/rafa-board/src/board/project/add-filed.ts`, `packages/rafa-board/src/commands/epic/close-triage.ts`,
-    `packages/rafa-board/src/commands/epic/close.ts` and `packages/rafa-board/src/commands/epic/close-docs.ts` left it
-    in the fifth decouple item: the first three type what they read on core's
-    declarations, and `close-triage.ts` and `close-docs.ts` reach `triageReport`
-    and `addStaleDocLine` through core's service registry;
+    `packages/rafa-board/src/board/project/facts.ts`, its one board importer,
+    now takes `directoryPrefix` and `fragmentIdOf` from core. Pr had twelve: the
+    ten `packages/rafa-release/src/commands/release/` files,
+    `packages/rafa-release/src/release/prepare.ts` and
+    `packages/rafa-release/src/release/verify.ts`;
+    `packages/rafa-board/src/commands/issue/create.ts` and `create-bug.ts` left
+    it in the same item, when their pr imports moved into core;
+    `packages/rafa-board/src/board/project/add-filed.ts`,
+    `packages/rafa-board/src/commands/epic/close-triage.ts`,
+    `packages/rafa-board/src/commands/epic/close.ts` and
+    `packages/rafa-board/src/commands/epic/close-docs.ts` left it in the fifth
+    decouple item: the first three type what they read on core's declarations,
+    and `close-triage.ts` and `close-docs.ts` reach `triageReport` and
+    `addStaleDocLine` through core's service registry;
     `packages/rafa-effort/src/effort/report-doc-bugs.ts` left it when the first
     decouple item moved `packages/rafa/src/triage/doc-only.ts` into core. Each
     sits earlier in the move order than pr, so each imports it backwards, and
     the decouple step before pass 4 cuts them. The sixth decouple item
     (rafa-1362) cut the release files off pr too: the ten
-    `src/commands/release/` files, `prepare.ts` and `verify.ts` take core's
-    names or the registry's provider now, so release has no edge into pr.
-    Run has eight: no board file (`packages/rafa-board/src/commands/board/list.ts` and
-    `packages/rafa-board/src/commands/epic/new.ts` left them in the fourth decouple item,
-    which moved `defaultBoardOnce` into `packages/rafa-board/src/board/default-board-once.ts`,
-    and `packages/rafa-board/src/commands/issue/ready.ts` and
-    `packages/rafa-board/src/commands/epic/close-triage.ts` in the fifth decouple item, each
-    calling one run function through core's service registry (`ready.ts`
-    calls `endWithNextStep`, `close-triage.ts` calls `readStaleDocsVersion`),
-    and the eight `src/commands/pr/` files
+    `packages/rafa-release/src/commands/release/` files, `prepare.ts` and
+    `verify.ts` take core's names or the registry's provider now, so release has
+    no edge into pr. Run has eight: no board file
+    (`packages/rafa-board/src/commands/board/list.ts` and
+    `packages/rafa-board/src/commands/epic/new.ts` left them in the fourth
+    decouple item, which moved `defaultBoardOnce` into
+    `packages/rafa-board/src/board/default-board-once.ts`, and
+    `packages/rafa-board/src/commands/issue/ready.ts` and
+    `packages/rafa-board/src/commands/epic/close-triage.ts` in the fifth
+    decouple item, each calling one run function through core's service registry
+    (`ready.ts` calls `endWithNextStep`, `close-triage.ts` calls
+    `readStaleDocsVersion`), and the eight `src/commands/pr/` files
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
-    `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and
-    `wait.ts`). Each sits earlier in the move order than
-    run, so each imports it backwards, and the decouple step before pass 4 cuts
-    them.
+    `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and `wait.ts`).
+    Each sits earlier in the move order than run, so each imports it backwards,
+    and the decouple step before pass 4 cuts them.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
     a private package, which pass 4 settles. No package has one now: the dry
@@ -908,7 +935,7 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's none, inventory's none, board's 19, release's one, pr's 29
+  files, effort's none, inventory's none, board's 19, release's none, pr's 29
   and run's 19, and a planted control reds on one relative import.
   No row keeps a file for the library build. Board's, release's, pr's and
   run's rows once held a fourth group, `libraryChunks`: 68 files a library
@@ -956,8 +983,8 @@ names come from, and the facade entry is no node.
 - **What publishes is what the manifests say.** A workspace member publishes
   when its `package.json` holds no `"private": true`, and no config key names
   the packages that publish. The build (`publishableOf` in
-  `packages/rafa-release/src/release/workspace-packages.ts`) and the release read that one field;
-  the graph check reads it through `isPublishable` in
+  `packages/rafa-release/src/release/workspace-packages.ts`) and the release
+  read that one field; the graph check reads it through `isPublishable` in
   `scripts/workspace/publish-rules.ts`. Every member is `private` today, so the
   build passes no external and no fragment can name a package for settle.
 - **The root `build` script keeps every publishable member out of the CLI.**
