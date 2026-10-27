@@ -1,5 +1,7 @@
 # Doc inventory
 
+Pass 4e (rafa-1374) moved pr's files and tests after this record was written. A path that names one of them is written at its place now, under `packages/rafa-pr/`, or under `src/tests/pr-coupled/` for a parked test. The rest of this record stays as written at its commit and is not regenerated.
+
 Coverage: 1577 of 1577 tracked files read (src/ and packages/*/src/).
 
 Module notes: 631 of 633 source files, 890 of 908 test files and 34 of 36 test-support files open with one. `{@link}`s read: 5626; 5344 inside one cluster, 195 across clusters, 1 to a URL or a file outside the graph, 86 bound to no import or declaration of their file. 67 concept placements are named by no module note in their cluster.
@@ -45,13 +47,13 @@ Every source file has a module note in: `c01-github`, `c03-config`, `c04-sqlite`
 | `src/check/references.ts` | `c03-config` | `AGNOSTIC_STACK` | 1 | `src/schema/stack.ts` | `c11-frontmatter` |
 | `src/check/run.test.ts` | `c03-config` | `CHECK_STAGES` | 1 | `src/check/run.ts` | `c11-frontmatter` |
 | `src/claims/drift.ts` | `c01-github` | `STAGE_LABELS` | 3 | `src/claims/labels.ts` | `c07-index` |
-| `src/cleanup/branches.ts` | `c05-sessions` | `GitRunner` | 2 | `src/pr/git.ts` | `c01-github` |
-| `src/cleanup/groups.ts` | `c05-sessions` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
+| `packages/rafa-pr/src/cleanup/branches.ts` | `c05-sessions` | `GitRunner` | 2 | `src/pr/git.ts` | `c01-github` |
+| `packages/rafa-pr/src/cleanup/groups.ts` | `c05-sessions` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
 | `src/cleanup/past-head.ts` | `c05-sessions` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
 | `src/cleanup/steps.ts` | `c05-sessions` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
 | `src/commands/check-report.ts` | `c11-frontmatter` | `CommandExit` | 1 | `src/cli/command.ts` | `c06-command` |
 | `src/commands/cleanup.ts` | `c05-sessions` | `Prompter` | 1 | `src/cli/prompt/confirm.ts` | `c01-github` |
-| `src/commands/cleanup.ts` | `c05-sessions` | `ghPullRequestsIn` | 2 | `src/pr/index.ts` | `c07-index` |
+| `src/commands/cleanup.ts` | `c05-sessions` | `ghPullRequestsIn` | 2 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
 | `src/commands/doctor.test.ts` | `c01-github` | `SERVE_CLI_VERSION` | 1 | `src/tiers/delivery.ts` | `c03-config` |
 | `src/commands/init-release.ts` | `c08-cli-capture` | `Prompter` | 1 | `src/cli/prompt/confirm.ts` | `c01-github` |
 | `src/commands/instinct/flag.ts` | `c06-command` | `CORE_ADAPTER_REGISTRY` | 2 | `src/adapters/registry.ts` | `c03-config` |
@@ -63,16 +65,16 @@ Every source file has a module note in: `c01-github`, `c03-config`, `c04-sqlite`
 | `src/commands/issue/ready.ts` | `c01-github` | `answeredYes` | 1 | `src/start/branch-decision.ts` | `c07-index` |
 | `src/commands/issue/unblock.ts` | `c01-github` | `IssueBoard` | 1 | `src/board/issue-board.ts` | `c07-index` |
 | `src/commands/plan/risk.test.ts` | `c03-config` | `runRafa` | 1 | `src/tests/cli-capture.ts` | `c08-cli-capture` |
-| `src/commands/pr/merge-cleanup.test.ts` | `c09-version` | `GitRunner` | 1 | `src/pr/index.ts` | `c07-index` |
-| `src/commands/pr/merge-cleanup.ts` | `c09-version` | `GitRunner` | 1 | `src/pr/index.ts` | `c07-index` |
-| `src/commands/pr/merge-followups.ts` | `c06-command` | `RAFA_PACKAGE_NAME` | 2 | `packages/rafa/src/core/runtime/identity.ts` | `c04-sqlite` |
-| `src/commands/pr/merge.test.ts` | `c01-github` | `endingProbe` | 1 | `src/tests/ending-probe.ts` | `c06-command` |
-| `src/commands/pr/merge.ts` | `c06-command` | `Prompter` | 1 | `src/cli/prompt/confirm.ts` | `c01-github` |
-| `src/commands/pr/pr-context.ts` | `c06-command` | `ghPullRequestsIn` | 1 | `src/pr/index.ts` | `c07-index` |
-| `src/commands/pr/show.ts` | `c07-index` | `SEPARATOR` | 1 | `src/commands/pr/current.ts` | `c06-command` |
-| `src/commands/pr/triage-report.ts` | `c07-index` | `skipChecksCommand` | 1 | `src/pr/unchecked.ts` | `c06-command` |
-| `src/commands/pr/triage.test.ts` | `c07-index` | `endingProbe` | 1 | `src/tests/ending-probe.ts` | `c06-command` |
-| `src/commands/pr/wait.ts` | `c06-command` | `waitForChecks` | 1 | `src/pr/index.ts` | `c07-index` |
+| `packages/rafa-pr/src/commands/pr/merge-cleanup.test.ts` | `c09-version` | `GitRunner` | 1 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
+| `packages/rafa-pr/src/commands/pr/merge-cleanup.ts` | `c09-version` | `GitRunner` | 1 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
+| `packages/rafa-pr/src/commands/pr/merge-followups.ts` | `c06-command` | `RAFA_PACKAGE_NAME` | 2 | `packages/rafa/src/core/runtime/identity.ts` | `c04-sqlite` |
+| `src/tests/pr-coupled/commands/pr/merge.test.ts` | `c01-github` | `endingProbe` | 1 | `src/tests/ending-probe.ts` | `c06-command` |
+| `packages/rafa-pr/src/commands/pr/merge.ts` | `c06-command` | `Prompter` | 1 | `src/cli/prompt/confirm.ts` | `c01-github` |
+| `packages/rafa-pr/src/commands/pr/pr-context.ts` | `c06-command` | `ghPullRequestsIn` | 1 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
+| `packages/rafa-pr/src/commands/pr/show.ts` | `c07-index` | `SEPARATOR` | 1 | `packages/rafa-pr/src/commands/pr/current.ts` | `c06-command` |
+| `packages/rafa-pr/src/commands/pr/triage-report.ts` | `c07-index` | `skipChecksCommand` | 1 | `packages/rafa-pr/src/pr/unchecked.ts` | `c06-command` |
+| `src/tests/pr-coupled/commands/pr/triage.test.ts` | `c07-index` | `endingProbe` | 1 | `src/tests/ending-probe.ts` | `c06-command` |
+| `packages/rafa-pr/src/commands/pr/wait.ts` | `c06-command` | `waitForChecks` | 1 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
 | `src/commands/release/tag.ts` | `c09-version` | `CommandExit` | 1 | `src/cli/command.ts` | `c06-command` |
 | `src/config-sections.ts` | `c03-config` | `CONFIDENCE_MAX` | 2 | `src/learning/identity.ts` | `c02-active` |
 | `src/config-sections.ts` | `c03-config` | `CONFIDENCE_MIN` | 2 | `src/learning/identity.ts` | `c02-active` |
@@ -128,23 +130,23 @@ Every source file has a module note in: `c01-github`, `c03-config`, `c04-sqlite`
 | `src/ports/index.ts` | `c10-index` | `MergeRule` | 2 | `src/learning/types.ts` | `c02-active` |
 | `src/ports/index.ts` | `c10-index` | `Store` | 2 | `src/effort/store/types.ts` | `c04-sqlite` |
 | `src/ports/index.ts` | `c10-index` | `SyncPayload` | 1 | `src/learning/types.ts` | `c02-active` |
-| `src/pr/gh-closing-issues.ts` | `c07-index` | `ClosingIssue` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/gh-fake.ts` | `c07-index` | `GhRunner` | 1 | `src/adapters/tracker/github.ts` | `c01-github` |
-| `src/pr/gh.ts` | `c07-index` | `GhRunner` | 1 | `src/adapters/tracker/github.ts` | `c01-github` |
-| `src/pr/gh.ts` | `c07-index` | `MERGE_METHODS` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/gh.ts` | `c07-index` | `PullRequestAuthor` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/gh.ts` | `c07-index` | `PullRequests` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/gh.ts` | `c07-index` | `PullRequests.checks` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/gh.ts` | `c07-index` | `PullRequests.get` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/plans/budget.ts` | `c07-index` | `parseBudgetUsd` | 1 | `src/utils/declaration.ts` | `c02-active` |
-| `src/pr/plans/load.ts` | `c07-index` | `MECHANICAL_CONFLICT_SENTENCE` | 1 | `src/pr/conflict-sentence.ts` | `c02-active` |
-| `src/pr/triage/classes.ts` | `c07-index` | `PullRequestSummary` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/triage/classify.ts` | `c07-index` | `PullRequestDetail` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/triage/classify.ts` | `c07-index` | `PullRequestDetail.mergeable` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/triage/comment.ts` | `c07-index` | `PullRequests` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
-| `src/pr/triage/conflict.ts` | `c07-index` | `gitSaid` | 1 | `src/pr/git.ts` | `c01-github` |
-| `packages/rafa/src/pr/types.ts` | `c05-sessions` | `CheckRow` | 1 | `src/pr/checks.ts` | `c07-index` |
-| `src/pr/worktree.ts` | `c07-index` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
+| `packages/rafa-pr/src/pr/gh-closing-issues.ts` | `c07-index` | `ClosingIssue` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/gh-fake.ts` | `c07-index` | `GhRunner` | 1 | `src/adapters/tracker/github.ts` | `c01-github` |
+| `packages/rafa-pr/src/pr/gh.ts` | `c07-index` | `GhRunner` | 1 | `src/adapters/tracker/github.ts` | `c01-github` |
+| `packages/rafa-pr/src/pr/gh.ts` | `c07-index` | `MERGE_METHODS` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/gh.ts` | `c07-index` | `PullRequestAuthor` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/gh.ts` | `c07-index` | `PullRequests` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/gh.ts` | `c07-index` | `PullRequests.checks` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/gh.ts` | `c07-index` | `PullRequests.get` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/plans/budget.ts` | `c07-index` | `parseBudgetUsd` | 1 | `src/utils/declaration.ts` | `c02-active` |
+| `packages/rafa-pr/src/pr/plans/load.ts` | `c07-index` | `MECHANICAL_CONFLICT_SENTENCE` | 1 | `packages/rafa-pr/src/pr/conflict-sentence.ts` | `c02-active` |
+| `packages/rafa-pr/src/pr/triage/classes.ts` | `c07-index` | `PullRequestSummary` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/triage/classify.ts` | `c07-index` | `PullRequestDetail` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/triage/classify.ts` | `c07-index` | `PullRequestDetail.mergeable` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/triage/comment.ts` | `c07-index` | `PullRequests` | 1 | `packages/rafa/src/pr/types.ts` | `c05-sessions` |
+| `packages/rafa-pr/src/pr/triage/conflict.ts` | `c07-index` | `gitSaid` | 1 | `src/pr/git.ts` | `c01-github` |
+| `packages/rafa/src/pr/types.ts` | `c05-sessions` | `CheckRow` | 1 | `packages/rafa-pr/src/pr/checks.ts` | `c07-index` |
+| `packages/rafa-pr/src/pr/worktree.ts` | `c07-index` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
 | `src/project/gitignore.ts` | `c08-cli-capture` | `RafaConfig` | 1 | `src/config.ts` | `c03-config` |
 | `src/project/root-choice.ts` | `c08-cli-capture` | `Prompter` | 1 | `src/cli/prompt/confirm.ts` | `c01-github` |
 | `src/project/scaffold.ts` | `c08-cli-capture` | `CONFIG_DEFAULTS` | 1 | `src/config.ts` | `c03-config` |
@@ -154,7 +156,7 @@ Every source file has a module note in: `c01-github`, `c03-config`, `c04-sqlite`
 | `src/release/enabled.ts` | `c09-version` | `ReleaseEnabled` | 1 | `src/config-sections.ts` | `c03-config` |
 | `src/release/level.ts` | `c09-version` | `ChangeLevel` | 1 | `src/report/parse.ts` | `c04-sqlite` |
 | `src/release/level.ts` | `c09-version` | `PlanReleaseLevel` | 2 | `src/plan/parse.ts` | `c02-active` |
-| `src/release/settle-pr.ts` | `c09-version` | `PullRequests` | 1 | `src/pr/index.ts` | `c07-index` |
+| `src/release/settle-pr.ts` | `c09-version` | `PullRequests` | 1 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
 | `src/release/settle-push.ts` | `c09-version` | `gitSaid` | 1 | `src/pr/git.ts` | `c01-github` |
 | `src/release/settle-worktree.ts` | `c09-version` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
 | `src/release/version.test.ts` | `c09-version` | `GitRunner` | 1 | `src/pr/git.ts` | `c01-github` |
@@ -167,9 +169,9 @@ Every source file has a module note in: `c01-github`, `c03-config`, `c04-sqlite`
 | `src/start/checkout.ts` | `c02-active` | `CommandExit` | 1 | `src/cli/command.ts` | `c06-command` |
 | `src/start/pr-lifecycle.test.ts` | `c07-index` | `createPullRequestsDouble` | 1 | `packages/rafa/src/pr/pull-requests-double.ts` | `c05-sessions` |
 | `src/start/pr-lifecycle.ts` | `c07-index` | `spawnClaude` | 1 | `src/utils/claude.ts` | `c02-active` |
-| `src/start/promoted-check.test.ts` | `c02-active` | `GitRunner` | 1 | `src/pr/index.ts` | `c07-index` |
+| `src/start/promoted-check.test.ts` | `c02-active` | `GitRunner` | 1 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
 | `src/start/release-stage.ts` | `c09-version` | `ASSUMPTIONS_HEADING` | 1 | `src/board/review-stamp.ts` | `c02-active` |
-| `src/start/release-stage.ts` | `c09-version` | `GitResult` | 1 | `src/pr/index.ts` | `c07-index` |
+| `src/start/release-stage.ts` | `c09-version` | `GitResult` | 1 | `packages/rafa-pr/src/pr/index.ts` | `c07-index` |
 | `src/start/run-setup.ts` | `c02-active` | `DEFAULT_CI_ATTEMPTS` | 1 | `src/start/pr-lifecycle.ts` | `c07-index` |
 | `src/start/run-setup.ts` | `c02-active` | `DEFAULT_CI_TIMEOUT_MIN` | 1 | `src/start/pr-lifecycle.ts` | `c07-index` |
 | `src/start/runner-pr.test.ts` | `c07-index` | `gitIdentityEnv` | 1 | `packages/rafa/src/tests/git-identity.ts` | `c08-cli-capture` |
@@ -192,7 +194,7 @@ Every source file has a module note in: `c01-github`, `c03-config`, `c04-sqlite`
 | `src/tests/parity-differential.test.ts` | `c03-config` | `SessionEffortRow.sizeBytes` | 1 | `src/effort/store/types.ts` | `c04-sqlite` |
 | `src/tests/parity-lineage.test.ts` | `c03-config` | `readStoreRows` | 1 | `src/effort/store.ts` | `c04-sqlite` |
 | `src/tests/worktree-shared-store-integration.test.ts` | `c08-cli-capture` | `withSqliteStore` | 1 | `src/effort/store/sqlite.ts` | `c04-sqlite` |
-| `src/triage/triage.ts` | `c10-index` | `machineFaultSentence` | 1 | `src/triage/machine-fault.ts` | `c04-sqlite` |
+| `packages/rafa-pr/src/triage/triage.ts` | `c10-index` | `machineFaultSentence` | 1 | `src/triage/machine-fault.ts` | `c04-sqlite` |
 | `src/utils/agent-definition.ts` | `c03-config` | `readFrontmatter` | 1 | `src/schema/frontmatter.ts` | `c11-frontmatter` |
 
 ## Concepts no note in their cluster names

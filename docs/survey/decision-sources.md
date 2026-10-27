@@ -1,5 +1,7 @@
 # Decision sources
 
+Pass 4e (rafa-1374) moved pr's files and tests after this record was written. A path that names one of them is written at its place now, under `packages/rafa-pr/`, or under `src/tests/pr-coupled/` for a parked test. The rest of this record stays as written at its commit and is not regenerated.
+
 Coverage: 14 of 14 tracked files read (context/).
 
 Issues: 147 `type:spec` bodies read. Tenets from #598 and #754.
@@ -331,7 +333,7 @@ Decisions: 9 tenets, 152 Rejected lines, 361 context rules. A line read in more 
 - A signal is checked in order, defined once, and never claims a cause. (`context/effort-store.md:886`)
 - A row whose `invoked` is `'unknown'` never reads as invoking nothing, so a skill no known row invoked and some `unknown` row offered has no signal (cannot tell `ignored`). (`context/effort-store.md:892`)
 - **`buildSkillsReport` (`src/effort/report-skills.ts`) answers the report as a pure structure and as JSON.** (`context/effort-store.md:909`)
-- Every other column of these tables holds what a report wrote; `scope` holds what `src/triage/machine-fault.ts` reads off the bug's `what` and `artifact`, which `store/triage.ts` calls for each bug it stores: `machine` for a fault of the machine the session ran on, `rafa` otherwise, and never NULL. (`context/effort-store.md:956`)
+- Every other column of these tables holds what a report wrote; `scope` holds what `packages/rafa/src/effort/store/machine-fault.ts` reads off the bug's `what` and `artifact`, which `store/triage.ts` calls for each bug it stores: `machine` for a fault of the machine the session ran on, `rafa` otherwise, and never NULL. (`context/effort-store.md:956`)
 - **`dispatches` is written for every stored session, ahead of its report.** (`context/effort-store.md:978`)
 - `storeTaskReport` (`start/dispatch.ts`) writes one row keyed by the session id, holding what the task line's declaration asked for and the flags the session was spawned with, one row per session: a second write for the same session id is skipped, never merged into the first. (`context/effort-store.md:978`)
 - **`skill_invocations` is written by `effort collect`, not by a task report.** (`context/effort-store.md:1002`)
@@ -403,7 +405,7 @@ Decisions: 9 tenets, 152 Rejected lines, 361 context rules. A line read in more 
 
 ### `context/pull-requests.md` (38)
 
-- Its caller is `retargetPullRequest(pull, base, seams)` in `src/start/pr-retarget.ts`: it compares `pull.baseRefName` with `base` exactly, sends nothing when they match, prints one `↪ Retargeted pull request #<n> from <old> to <new> (pr.base).` line after an edit, and turns a refused edit into one warning naming the pull request, both bases and what `gh` said, never a throw. (`context/pull-requests.md:97`)
+- Its caller is `retargetPullRequest(pull, base, seams)` in `packages/rafa-pr/src/start/pr-retarget.ts`: it compares `pull.baseRefName` with `base` exactly, sends nothing when they match, prints one `↪ Retargeted pull request #<n> from <old> to <new> (pr.base).` line after an edit, and turns a refused edit into one warning naming the pull request, both bases and what `gh` said, never a throw. (`context/pull-requests.md:97`)
 - The rows come in `gh`'s order, newest CREATED first and not newest merged. 100 is the most one GraphQL request answers (`GH_DEBUG=api` showed one request at 100, two at 101), so a merge older than the newest hundred is not answered, and a head missing from the list is "not among the recent merges", never "never merged". (`context/pull-requests.md:112`)
 - **For a test whose subject is the CALLER, build the provider with `createPullRequestsDouble()`** — imported from `@open-tomato/rafa/pr/pull-requests-double`, never from the barrel, which keeps a test helper out of the loop's import graph as `./gh-fake.js` is kept out. (`context/pull-requests.md:127`)
 - `createFakePrGh()` — imported from `../pr/gh-fake.js`, never from the barrel — plus `createGhPullRequests({ gh: fake.run })` gives a genuine `PullRequests` implementation backed by an in-memory `gh`, so a read-modify-write such as the release stage's body edit runs unmocked. (`context/pull-requests.md:144`)

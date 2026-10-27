@@ -1,5 +1,7 @@
 # Provenance
 
+Pass 4e (rafa-1374) moved pr's files and tests after this record was written. A path that names one of them is written at its place now, under `packages/rafa-pr/`, or under `src/tests/pr-coupled/` for a parked test. The rest of this record stays as written at its commit and is not regenerated.
+
 Coverage: 1577 of 1577 tracked files read (src/ and packages/*/src/).
 
 1577 files read over 106 commits, linking 45 issues: 1149 spec, 86 imported, 0 proof of concept, 147 bug-sweep patch, 195 unclassified. 179 files took their class from a commit after the one that added them; 195 of the 195 unclassified files have a history that names no issue.
@@ -120,9 +122,9 @@ The import pattern is `^Phase 0(?![\w])`.
 | `src/commands/loop/wait.ts` | `c05-sessions` | 1 | none |
 | `src/commands/module/exec.test.ts` | `c06-command` | 1 | none |
 | `src/commands/module/list.test.ts` | `c06-command` | 1 | none |
-| `src/commands/pr/merge-loop-holder.test.ts` | `c05-sessions` | 2 | none |
-| `src/commands/pr/merge-loop-worktree.test.ts` | `c05-sessions` | 1 | none |
-| `src/commands/pr/merge-loop-worktree.ts` | `c05-sessions` | 1 | none |
+| `src/tests/pr-coupled/commands/pr/merge-loop-holder.test.ts` | `c05-sessions` | 2 | none |
+| `packages/rafa-pr/src/commands/pr/merge-loop-worktree.test.ts` | `c05-sessions` | 1 | none |
+| `packages/rafa-pr/src/commands/pr/merge-loop-worktree.ts` | `c05-sessions` | 1 | none |
 | `src/commands/skill/backfill.test.ts` | `c11-frontmatter` | 1 | none |
 | `src/commands/skill/demote.test.ts` | `c11-frontmatter` | 1 | none |
 | `src/commands/skill/demote.ts` | `c11-frontmatter` | 1 | none |
@@ -164,10 +166,10 @@ The import pattern is `^Phase 0(?![\w])`.
 | `src/loop/wait-reasons.test.ts` | `c05-sessions` | 1 | none |
 | `src/loop/wait-reasons.ts` | `c05-sessions` | 1 | none |
 | `src/modules/testdata/seam-fixture/commands.ts` | `c06-command` | 1 | none |
-| `src/pr/gh-closing-issues.test.ts` | `c07-index` | 1 | none |
-| `src/pr/gh-closing-issues.ts` | `c07-index` | 1 | none |
-| `src/pr/workflow-triggers.test.ts` | `c06-command` | 1 | none |
-| `src/pr/workflow-triggers.ts` | `c06-command` | 1 | none |
+| `packages/rafa-pr/src/pr/gh-closing-issues.test.ts` | `c07-index` | 1 | none |
+| `packages/rafa-pr/src/pr/gh-closing-issues.ts` | `c07-index` | 1 | none |
+| `packages/rafa-pr/src/pr/workflow-triggers.test.ts` | `c06-command` | 1 | none |
+| `packages/rafa-pr/src/pr/workflow-triggers.ts` | `c06-command` | 1 | none |
 | `src/preflight/fork.test.ts` | `c02-active` | 3 | none |
 | `src/preflight/run.test.ts` | `c02-active` | 3 | none |
 | `src/preflight/run.ts` | `c02-active` | 1 | none |
@@ -192,8 +194,8 @@ The import pattern is `^Phase 0(?![\w])`.
 | `src/start/lint-step.ts` | `c02-active` | 1 | none |
 | `src/start/pause.test.ts` | `c02-active` | 1 | none |
 | `src/start/pause.ts` | `c02-active` | 1 | none |
-| `src/start/pr-retarget.test.ts` | `c07-index` | 1 | none |
-| `src/start/pr-retarget.ts` | `c02-active` | 1 | none |
+| `packages/rafa-pr/src/start/pr-retarget.test.ts` | `c07-index` | 1 | none |
+| `packages/rafa-pr/src/start/pr-retarget.ts` | `c02-active` | 1 | none |
 | `src/start/stamp.test.ts` | `c02-active` | 1 | none |
 | `src/start/stamp.ts` | `c02-active` | 1 | none |
 | `src/start/suite-blocker.test.ts` | `c02-active` | 1 | none |
@@ -243,15 +245,15 @@ The import pattern is `^Phase 0(?![\w])`.
 | `src/tests/verify-workflow.test.ts` | `c30-verify-workflow.test` | 1 | none |
 | `src/triage/bug-key.test.ts` | `c10-index` | 1 | none |
 | `src/triage/bug-key.ts` | `c10-index` | 1 | none |
-| `src/triage/inherited.test.ts` | `c10-index` | 1 | none |
-| `src/triage/inherited.ts` | `c10-index` | 1 | none |
-| `src/triage/issue-text.ts` | `c10-index` | 1 | none |
-| `src/triage/scoring-fixture.test.ts` | `c10-index` | 2 | none |
-| `src/triage/scoring-fixture.ts` | `c10-index` | 2 | none |
-| `src/triage/similarity-scoring.test.ts` | `c10-index` | 2 | none |
-| `src/triage/similarity-triage.test.ts` | `c10-index` | 1 | none |
-| `src/triage/similarity.test.ts` | `c10-index` | 1 | none |
-| `src/triage/similarity.ts` | `c10-index` | 1 | none |
+| `packages/rafa-pr/src/triage/inherited.test.ts` | `c10-index` | 1 | none |
+| `packages/rafa-pr/src/triage/inherited.ts` | `c10-index` | 1 | none |
+| `packages/rafa-pr/src/triage/issue-text.ts` | `c10-index` | 1 | none |
+| `packages/rafa-pr/src/triage/scoring-fixture.test.ts` | `c10-index` | 2 | none |
+| `packages/rafa-pr/src/triage/scoring-fixture.ts` | `c10-index` | 2 | none |
+| `packages/rafa-pr/src/triage/similarity-scoring.test.ts` | `c10-index` | 2 | none |
+| `packages/rafa-pr/src/triage/similarity-triage.test.ts` | `c10-index` | 1 | none |
+| `packages/rafa-pr/src/triage/similarity.test.ts` | `c10-index` | 1 | none |
+| `packages/rafa-pr/src/triage/similarity.ts` | `c10-index` | 1 | none |
 | `src/triage/test-failure-triage.test.ts` | `c10-index` | 1 | none |
 | `src/triage/test-failure.test.ts` | `c10-index` | 1 | none |
 | `src/triage/test-failure.ts` | `c10-index` | 1 | none |
