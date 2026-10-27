@@ -129,6 +129,7 @@
       "devDependencies": {
         "@open-tomato/rafa-eslint-config": "workspace:*",
         "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
       },
     },
     "packages/rafa-release": {

@@ -2,7 +2,11 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.packages.json",
   // Composite, so `tsc --build` builds core, inventory, board and release
-  // first and reads their declarations from each package's .tsbuild.
+  // first and reads their declarations from each package's .tsbuild
+  // through the references below. A reference to ../rafa-effort is added
+  // only when `tsc --build` asks for it (a TS6307 or an unresolved
+  // subpath naming effort); board's and release's own references to
+  // effort bring its declarations in.
   "compilerOptions": {
     "composite": true,
     "noEmit": false,
@@ -12,11 +16,13 @@
     "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
   },
   "include": ["index.ts", "commands.ts", "src"],
+  // *.test.ts stays out of check-types, as at the root, until the test
+  // type-checking work lands (.rafa/specs/test-type-checking.md).
   "exclude": ["**/*.test.ts"],
   "references": [
     { "path": "../rafa" },
-    { "path": "../rafa-inventory" },
     { "path": "../rafa-board" },
+    { "path": "../rafa-inventory" },
     { "path": "../rafa-release" }
   ]
 }
