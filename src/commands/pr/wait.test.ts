@@ -36,6 +36,12 @@
  * the red and no-checks endings, and the `--no-hint` run, each count
  * ZERO readings against the green run's one.
  *
+ * The ending is reached through core's service registry, which the
+ * test preload fills with the root's set, so the probe cases drive the
+ * real `endWithNextStep`. The cases under "the ending service" replace
+ * that one key with a recording stub, and put the set back after each
+ * case, to read the call itself and the refusal with nothing registered.
+ *
  * Three controls carry readings that would otherwise pass while wrong:
  * the provider factory records whether it was reached, so "a refused
  * line makes no provider" is measured; the double's call log is asserted
@@ -63,20 +69,22 @@ import type {
   PullRequestSummary,
 } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
-import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/command';
+import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
+import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
 import { FIRST_CHECK_GRACE_MS, PR_NEEDS_GH } from '../../pr/index.js';
-import { CI_POLL_INTERVAL_MS } from '../../start/pr-lifecycle.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
@@ -767,6 +775,88 @@ describe('the ending it names the next step with', () => {
 
     expect([off.reads(), quiet.run.stdout.includes('Next:')]).toEqual([0, false]);
     expect([on.reads(), loud.run.stdout.includes(ENDING_LINE)]).toEqual([1, true]);
+  });
+});
+
+describe('the ending service', () => {
+  /** The line the stub prints through the context it was handed. */
+  const STUB_LINE = 'the stubbed ending ran';
+
+  /** What the stub was called with, one entry per call. */
+  interface EndingCall {
+    readonly context: RafaContext;
+    readonly seams: EndingSeams | undefined;
+  }
+
+  /** The set the stubbed setup replaced, put back after each case; undefined when none was set up. */
+  let replaced: RafaServices | null | undefined;
+
+  afterEach(() => {
+    if (replaced !== undefined) restoreServices(replaced);
+    replaced = undefined;
+  });
+
+  /** Registers a recording `endWithNextStep` over the active set, as board's `stubEnding` does. */
+  function stubEnding(): readonly EndingCall[] {
+    const calls: EndingCall[] = [];
+    const stub: RafaServices['endWithNextStep'] = (context, seams) => {
+      calls.push({ context, seams });
+      context.output.info(STUB_LINE);
+      return Promise.resolve(null);
+    };
+    replaced = registerServices({ ...activeServices(), endWithNextStep: stub });
+    return calls;
+  }
+
+  /** Dispatches a wait over one poll reading `verdict`, handing it `ending`. */
+  function waited(verdict: 'green' | 'red', ending: EndingSeams): Promise<Ran> {
+    const rows = verdict === 'green'
+      ? [row()]
+      : [row({ state: 'FAILURE', outcome: 'fail' })];
+    const provider = pollingPulls([checksOf(rows, verdict)]);
+    return ran({ ...caseSeams(provider.pulls, fakeClock()).seams, ending }, freshProject(), ['41']);
+  }
+
+  it('calls the registered ending once on a green wait, with the context of the run and the ending seams it was given', async () => {
+    const stubCalls = stubEnding();
+    const ending: EndingSeams = { isTerminal: () => false };
+
+    const { run } = await waited('green', ending);
+
+    expect(run.exitCode).toBe(0);
+    expect(stubCalls).toHaveLength(1);
+    expect(stubCalls[0]?.seams).toBe(ending);
+    expect(stubCalls[0]?.context.argv).toContain('41');
+    expect(linesOf(run.stdout.trimEnd()).at(-1)).toBe(STUB_LINE);
+  });
+
+  it('never calls the registered ending on a red wait, which a green one calls', async () => {
+    const stubCalls = stubEnding();
+
+    const red = await waited('red', {});
+    const redCalls = stubCalls.length;
+    const green = await waited('green', {});
+
+    expect([red.run.exitCode, green.run.exitCode]).toEqual([1, 0]);
+    expect([redCalls, stubCalls.length]).toEqual([0, 1]);
+    expect([red.run.stdout.includes(STUB_LINE), green.run.stdout.includes(STUB_LINE)]).toEqual([false, true]);
+  });
+
+  it('refuses the ending of a green wait, naming the key and the root, while no service is registered', async () => {
+    const held = registerServices({ ...activeServices() });
+    restoreServices(null);
+    let outcome: Ran;
+    try {
+      outcome = await waited('green', {});
+    } finally {
+      restoreServices(held);
+    }
+
+    expect(outcome.run.exitCode).toBe(1);
+    expect(outcome.run.stdout).toContain('green');
+    expect(outcome.run.stderr).toContain('service registry:');
+    expect(outcome.run.stderr).toContain('endWithNextStep');
+    expect(outcome.run.stderr).toContain('src/service-registry.ts');
   });
 });
 

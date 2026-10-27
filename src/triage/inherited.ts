@@ -37,9 +37,9 @@
  * baseline holds them, since stripping takes out folder prefixes on both
  * sides.
  */
-import type { SuiteFailure } from '../suite/run.js';
 import type { IssueState } from '@open-tomato/rafa/ports';
 import type { ReportBug } from '@open-tomato/rafa/report/parse';
+import type { SuiteFailure } from '@open-tomato/rafa/suite/run';
 import type { TestFailure } from '@open-tomato/rafa/triage/test-failure';
 
 import { basename } from 'node:path';

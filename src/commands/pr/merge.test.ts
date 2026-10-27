@@ -24,6 +24,12 @@
  * The probe's count is what makes the declined run's silence a
  * reading: it counts ZERO readings against the merged run's one.
  *
+ * The ending is reached through core's service registry, which the
+ * test preload fills with the root's set, so the probe cases drive the
+ * real `endWithNextStep`. The cases under "the ending service" replace
+ * that one key with a recording stub, and put the set back after each
+ * case, to read the call itself and the refusal with nothing registered.
+ *
  * Three controls carry readings that would otherwise pass while wrong:
  * the provider records whether `merge` was ever sent, so "it refused
  * and merged nothing" is measured; the git runner records every command,
@@ -41,8 +47,9 @@ import type {
   PullRequests,
 } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
-import type { RafaCommand , Prompter } from '@open-tomato/rafa/core/command';
+import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
+import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 import type { PullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
@@ -51,8 +58,10 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { RAFA_PACKAGE_NAME } from '@open-tomato/rafa/core/runtime';
+import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
 import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
@@ -60,7 +69,6 @@ import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { PR_NEEDS_GH } from '../../pr/index.js';
-import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
@@ -1202,6 +1210,86 @@ describe('the ending it names the next step with', () => {
 
     expect(run.exitCode).toBe(0);
     expect([probe.reads(), run.stdout.includes('Next:')]).toEqual([0, false]);
+  });
+});
+
+describe('the ending service', () => {
+  /** The line the stub prints through the context it was handed. */
+  const STUB_LINE = 'the stubbed ending ran';
+
+  /** What the stub was called with, one entry per call. */
+  interface EndingCall {
+    readonly context: RafaContext;
+    readonly seams: EndingSeams | undefined;
+  }
+
+  /** The set the stubbed setup replaced, put back after each case; undefined when none was set up. */
+  let replaced: RafaServices | null | undefined;
+
+  afterEach(() => {
+    if (replaced !== undefined) restoreServices(replaced);
+    replaced = undefined;
+  });
+
+  /** Registers a recording `endWithNextStep` over the active set, as board's `stubEnding` does. */
+  function stubEnding(): readonly EndingCall[] {
+    const calls: EndingCall[] = [];
+    const stub: RafaServices['endWithNextStep'] = (context, seams) => {
+      calls.push({ context, seams });
+      context.output.info(STUB_LINE);
+      return Promise.resolve(null);
+    };
+    replaced = registerServices({ ...activeServices(), endWithNextStep: stub });
+    return calls;
+  }
+
+  it('calls the registered ending once, with the context of the run and the ending seams it was given', async () => {
+    const calls = stubEnding();
+    const project = freshProject();
+    const ending: EndingSeams = { isTerminal: () => false };
+    const seams = caseSeams(stubPulls().pulls, project);
+
+    const { run, lines } = await ran({ ...seams.seams, ending }, project, ['41']);
+
+    expect(run.exitCode).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.seams).toBe(ending);
+    expect(calls[0]?.context.argv).toContain('41');
+    expect(lines.at(-1)).toBe(STUB_LINE);
+  });
+
+  it('never calls the registered ending on a declined merge, which the merge that ran calls', async () => {
+    const calls = stubEnding();
+    const declinedProject = freshProject();
+    const takenProject = freshProject();
+    const declined = caseSeams(stubPulls().pulls, declinedProject, { answer: '' });
+    const taken = caseSeams(stubPulls().pulls, takenProject);
+
+    const quiet = await ran({ ...declined.seams, ending: {} }, declinedProject, ['41']);
+    const quietCalls = calls.length;
+    const loud = await ran({ ...taken.seams, ending: {} }, takenProject, ['41']);
+
+    expect([quietCalls, calls.length]).toEqual([0, 1]);
+    expect([quiet.run.stdout.includes(STUB_LINE), loud.run.stdout.includes(STUB_LINE)]).toEqual([false, true]);
+  });
+
+  it('refuses the ending of a merged run, naming the key and the root, while no service is registered', async () => {
+    const project = freshProject();
+    const seams = caseSeams(stubPulls().pulls, project);
+    const held = registerServices({ ...activeServices() });
+    restoreServices(null);
+    let outcome: Ran;
+    try {
+      outcome = await ran({ ...seams.seams, ending: {} }, project, ['41']);
+    } finally {
+      restoreServices(held);
+    }
+
+    expect(outcome.run.exitCode).toBe(1);
+    expect(outcome.run.stdout).toContain('Merged #41');
+    expect(outcome.run.stderr).toContain('service registry:');
+    expect(outcome.run.stderr).toContain('endWithNextStep');
+    expect(outcome.run.stderr).toContain('src/service-registry.ts');
   });
 });
 

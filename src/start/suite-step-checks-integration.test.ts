@@ -33,8 +33,8 @@
  *      with `--changed=` in its command and prints no no-check line.
  */
 import type { StepOutcome, SuiteStepContext } from './suite-step.js';
-import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
 import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { execFileSync } from 'node:child_process';

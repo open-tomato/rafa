@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2193 files, 2165 of them in 12 packages (708 left to place) and 28 in 3 unassigned folders. Of the 4867 edges between two files neither of which is a test, value and type alike, 70 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2195 files, 2167 of them in 12 packages (708 left to place) and 28 in 3 unassigned folders. Of the 4868 edges between two files neither of which is a test, value and type alike, 52 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -12,11 +12,11 @@ An upward edge leaves a package for one further down this table. A file left to 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `rafa-eslint-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2 | `rafa-typescript-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 3 | `@open-tomato/rafa-core` | 354 | 201 | 144 | 9 | 0 | 0 | 0 |
+| 3 | `@open-tomato/rafa-core` | 362 | 205 | 148 | 9 | 0 | 0 | 0 |
 | 4 | `rafa-inventory` | 105 | 56 | 49 | 0 | 0 | 0 | 0 |
 | 5 | `rafa-board` | 301 | 156 | 137 | 8 | 2 | 0 | 2 |
-| 6 | `rafa-pr` | 194 | 82 | 110 | 2 | 48 | 0 | 48 |
-| 7 | `rafa-run` | 265 | 111 | 154 | 0 | 19 | 0 | 19 |
+| 6 | `rafa-pr` | 188 | 79 | 107 | 2 | 26 | 0 | 26 |
+| 7 | `rafa-run` | 265 | 111 | 154 | 0 | 23 | 0 | 23 |
 | 8 | `rafa-release` | 106 | 56 | 50 | 0 | 1 | 0 | 1 |
 | 9 | `rafa-effort` | 51 | 32 | 19 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
@@ -31,11 +31,11 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | --- | --- | --- |
 | `rafa-eslint-config` | `packages/eslint-config/` (0) | - |
 | `rafa-typescript-config` | `packages/typescript-config/` (0) | - |
-| `@open-tomato/rafa-core` | `packages/rafa/` (354) | - |
+| `@open-tomato/rafa-core` | `packages/rafa/` (362) | - |
 | `rafa-inventory` | `packages/rafa-inventory/` (104), `src/tiers/` (1), `src/bundled/` (0), `src/inventory/` (0), `src/schema/` (0) | - |
 | `rafa-board` | `packages/rafa-board/` (252), `src/board/` (6), `src/commands/board/` (1), `src/commands/epic/` (1), `src/commands/issue/` (1) | `packages/rafa-board/src/board/flags.ts`, `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/issue.ts`, `packages/rafa-board/src/board/leak.ts`, `packages/rafa-board/src/board/plan-field.ts`, `packages/rafa-board/src/board/plan-spec.ts`, `packages/rafa-board/src/board/previous-copy.ts`, `packages/rafa-board/src/board/readiness.ts`, `packages/rafa-board/src/board/review-comment.ts`, `packages/rafa-board/src/board/review-stamp.ts`, `packages/rafa-board/src/board/snapshot-settle.ts`, `packages/rafa-board/src/board/spec-review.ts`, `packages/rafa-board/src/board/spec-source.ts`, `packages/rafa-board/src/board/trust.ts`, `packages/rafa-board/src/bugs/cause-rule.ts`, `packages/rafa-board/src/claims/ahead.ts`, `packages/rafa-board/src/commands/doctor-refs.ts`, `packages/rafa-board/src/commands/plan/refs-check.ts`, `packages/rafa-board/src/epic/verify-plan.ts`, `packages/rafa-board/src/epic/verify-run.ts`, `packages/rafa-board/src/next/hop-chain.ts`, `packages/rafa-board/src/next/relation-readings.ts` |
-| `rafa-pr` | `src/commands/pr/` (79), `src/pr/` (59), `src/triage/` (32), `packages/rafa-pr/` (0) | `src/bugs/filed-values.ts`, `src/cleanup/branches.ts`, `src/cleanup/groups.ts`, `src/cleanup/steps.ts`, `src/docs/task-reading.ts`, `src/next/owner-gate.ts`, `src/next/relations-mode.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`, `src/plan/risk.ts`, `src/plan/risk/accounts.ts`, `src/pr/index.ts` |
-| `rafa-run` | `src/start/` (177), `src/suite/` (18), `src/commands/claim/` (15), `src/claims/` (11), `src/preflight/` (10), `packages/rafa-run/` (0) | `src/cleanup/index.ts`, `src/cleanup/remote-only.ts`, `src/cleanup/runs.ts`, `src/cleanup/worktrees.ts`, `src/commands/switch.ts`, `src/loop/events-file.ts`, `src/next/actions.ts`, `src/next/ending.ts`, `src/next/hint.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/preconditions.ts`, `src/next/readings.ts`, `src/next/state.ts`, `src/plan/index.ts`, `src/plan/list.ts`, `src/plan/store-rules.ts`, `src/runtime/install.ts` |
+| `rafa-pr` | `src/commands/pr/` (79), `src/pr/` (59), `src/triage/` (32), `packages/rafa-pr/` (0) | `src/bugs/filed-values.ts`, `src/cleanup/branches.ts`, `src/cleanup/groups.ts`, `src/cleanup/worktrees.ts`, `src/docs/task-reading.ts`, `src/plan/risk.ts`, `src/plan/risk/accounts.ts`, `src/start/pr-retarget.ts`, `src/pr/index.ts` |
+| `rafa-run` | `src/start/` (175), `src/commands/claim/` (15), `src/suite/` (12), `src/claims/` (11), `src/preflight/` (10), `packages/rafa-run/` (0) | `src/cleanup/index.ts`, `src/cleanup/remote-only.ts`, `src/cleanup/runs.ts`, `src/cleanup/steps.ts`, `src/commands/switch.ts`, `src/loop/events-file.ts`, `src/next/actions.ts`, `src/next/ending.ts`, `src/next/hint.ts`, `src/next/hop-action.ts`, `src/next/hop-rows.ts`, `src/next/owner-gate.ts`, `src/next/preconditions.ts`, `src/next/readings.ts`, `src/next/relations-mode.ts`, `src/next/settle-step.ts`, `src/next/sources.ts`, `src/next/state.ts`, `src/plan/index.ts`, `src/plan/list.ts`, `src/plan/store-rules.ts`, `src/runtime/install.ts` |
 | `rafa-release` | `packages/rafa-release/` (92), `src/commands/release/` (3), `src/release/` (1) | `packages/rafa-release/src/cleanup/past-head.ts`, `packages/rafa-release/src/commands/doctor-ladder.ts`, `packages/rafa-release/src/docs/open-lines.ts`, `packages/rafa-release/src/docs/release-issue.ts`, `packages/rafa-release/src/next/epic-end.ts`, `packages/rafa-release/src/project/lock.ts` |
 | `rafa-effort` | `packages/rafa-effort/` (51) | - |
 | `rafa-hub` | `packages/rafa-hub/` (31) | - |
@@ -47,9 +47,8 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | From | Into | Edges |
 | --- | --- | --- |
 | `rafa-board` | `rafa-effort` | 2 |
-| `rafa-pr` | `rafa-run` | 18 |
-| `rafa-pr` | `rafa-release` | 30 |
-| `rafa-run` | `rafa-release` | 17 |
+| `rafa-pr` | `rafa-release` | 26 |
+| `rafa-run` | `rafa-release` | 21 |
 | `rafa-run` | `rafa-effort` | 1 |
 | `rafa-run` | `@open-tomato/rafa` | 1 |
 | `rafa-release` | `rafa-effort` | 1 |
@@ -65,19 +64,19 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `packages/rafa-release/src/release/version.ts` | 4 | `rafa-release` | by rule |
 | `packages/rafa-release/src/cleanup/past-head.ts` | 3 | `rafa-release` | by rule |
 | `packages/rafa-release/src/release/prepare.ts` | 3 | `rafa-release` | by rule |
-| `src/cleanup/worktrees.ts` | 3 | `rafa-run` | by rule |
-| `src/next/ending.ts` | 3 | `rafa-run` | by rule |
 | `packages/rafa-release/src/release/branch-forecast.ts` | 2 | `rafa-release` | by rule |
 | `packages/rafa-release/src/release/forecast.ts` | 2 | `rafa-release` | by rule |
 | `packages/rafa-release/src/release/release-delivery.ts` | 2 | `rafa-release` | by rule |
-| `src/next/readings.ts` | 2 | `rafa-run` | by rule |
-| `src/start/pr-lifecycle.ts` | 2 | `rafa-run` | by rule |
-| `src/suite/run.ts` | 2 | `rafa-run` | by rule |
 | `packages/rafa-effort/src/effort/attribution.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-effort/src/effort/epic-cost.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-effort/src/effort/file-stamp.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-effort/src/effort/sync/doctor-reading.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-release/src/commands/release/status-fragments.ts` | 1 | `rafa-release` | by rule |
+| `packages/rafa-release/src/docs/release-issue.ts` | 1 | `rafa-release` | by rule |
+| `packages/rafa-release/src/next/epic-end.ts` | 1 | `rafa-release` | by rule |
+| `packages/rafa-release/src/release/body-forecast.ts` | 1 | `rafa-release` | by rule |
+| `packages/rafa-release/src/release/changelog.ts` | 1 | `rafa-release` | by rule |
+| `packages/rafa-release/src/release/fragment-tree.ts` | 1 | `rafa-release` | by rule |
 
 ## Edges #118 clears
 

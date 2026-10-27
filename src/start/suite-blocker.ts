@@ -114,9 +114,9 @@
  * writes its blocker on that line, as it does after a step's repair.
  */
 import type { AfterTouched, AloneReading } from './suite-retake-alone.js';
-import type { SuiteFailure, SuiteResult } from '../suite/run.js';
-import type { UnhandledError } from '../suite/unhandled.js';
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
+import type { SuiteFailure, SuiteResult } from '@open-tomato/rafa/suite/run';
+import type { UnhandledError } from '@open-tomato/rafa/suite/unhandled';
 import type { InsertedTask } from '@open-tomato/rafa/utils/tracker';
 
 import { readFileSync, writeFileSync } from 'node:fs';

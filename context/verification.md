@@ -357,7 +357,7 @@ the recorded step carries `outsideCase: true` and that tail whole as
 **A run Bun found no test file for is green alone and neutral folded.**
 A project holding no test file makes Bun print `error: 0 test files
 matching` or `No tests found!` and exit 1, and `runSuite`
-(`src/suite/run.ts`) marks that run `noTestFiles`.
+(`packages/rafa/src/suite/run.ts`) marks that run `noTestFiles`.
 `failedOutsideAnyCase` leaves a marked run as it is, and `verdictOf`
 (`src/start/suite-step.ts`) reads it as no failure and no unreported
 exit, so a step holding only that run reads green, and its record
@@ -430,8 +430,9 @@ error and failed assertion to the JUnit file as
 `<failure type="AssertionError" />` and a timeout as
 `<failure type="TimeoutError" />`, with no message, so the report says
 which case failed and not why. Bun prints the error above the case's
-`(fail)` line on stderr, and `src/suite/failure-lines.ts` reads it from
-there: the lines under the code frame, up to the stack, at most five
+`(fail)` line on stderr, and
+`packages/rafa/src/suite/failure-lines.ts` reads it from there: the
+lines under the code frame, up to the stack, at most five
 (`MAX_ERROR_LINES`), each cut at 300 characters. They are kept in three
 places. Each of the step's `newFailures` in the run record carries them
 as `errorLines`. The step's

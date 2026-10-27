@@ -88,14 +88,13 @@
  * answer, {@link readTaskAlwaysRun} warns and answers no file: the step
  * then runs what it ran before the setting existed.
  */
-import type { JunitReading, SuiteFailure, SuiteResult } from '../suite/run.js';
+import type { JunitReading, SuiteFailure, SuiteResult } from '@open-tomato/rafa/suite/run';
 import type { GitRunner } from '@open-tomato/rafa-pr';
 
 import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { suitePathArgument } from '../suite/run.js';
+import { suitePathArgument } from '@open-tomato/rafa/suite/run';
 
 import { alwaysRunFiles } from './task-gate-lines.js';
 

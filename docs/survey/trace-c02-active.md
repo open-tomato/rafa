@@ -116,7 +116,7 @@ The members with the most non-test importers outside the cluster:
 | `src/utils/plan-stamp.ts` | 4 | 1 |
 | `src/effort/attribution.ts` | 4 | 0 |
 | `src/effort/classify.ts` | 4 | 4 |
-| `src/suite/run.ts` | 4 | 2 |
+| `packages/rafa/src/suite/run.ts` | 4 | 2 |
 
 `active.ts` (the active output), `plan/parse.ts` and `plan/blocks.ts` (the plan reading every plan command uses), `utils/claude.ts` (the `claude` spawn), `utils/declaration.ts` (the `{agent=… }` routing token), `utils/tracker.ts` and `utils/plan-stamp.ts` are shared infrastructure that sits here by import weight, as `github.ts` does in `c01-github`; the rest are the loop's own parts.
 

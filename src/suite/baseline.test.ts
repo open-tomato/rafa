@@ -4,7 +4,7 @@
  * or malformed file, and the split of failures into new and known.
  * Files go under a fresh directory in `tmpdir`, removed after each case.
  */
-import type { SuiteResult } from './run.js';
+import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

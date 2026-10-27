@@ -6,7 +6,7 @@
  * empty list leaving the prompt as it was.
  */
 import type { TaskSessionRunner } from './dispatch.js';
-import type { SuiteFailure } from '../suite/run.js';
+import type { SuiteFailure } from '@open-tomato/rafa/suite/run';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 

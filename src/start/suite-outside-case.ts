@@ -114,7 +114,7 @@
  * cannot drift apart unseen.
  */
 import type { StepVerdict } from './suite-blocker.js';
-import type { SuiteResult } from '../suite/run.js';
+import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { constants } from 'node:os';
 

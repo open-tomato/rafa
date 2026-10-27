@@ -190,13 +190,13 @@
  */
 import type { TaskDispatch } from './dispatch.js';
 import type { KindReader, StartKindOptions } from './triage-kinds.js';
-import type { SuiteFailure } from '../suite/run.js';
 import type { IssuesConfigSettings } from '@open-tomato/rafa/config-schema-issues';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingOutcome, FindingsWriterSeams } from '@open-tomato/rafa/store/findings';
+import type { SuiteFailure } from '@open-tomato/rafa/suite/run';
 import type { SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 import type {
   GhRunner,

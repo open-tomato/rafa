@@ -155,20 +155,25 @@
  *   - With `+plus` and `plus` both on the remote,
  *     `git push origin --delete +plus` deletes `+plus` and leaves `plus`.
  */
-import type { BranchHolder, MergedRow, NotPushedRow, StaleRow } from './groups.js';
 import type { RemoteOnlyRow } from './remote-only.js';
 import type { RunRow } from './runs.js';
-import type { WorktreeRow } from './worktrees.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type {
+  BranchHolder,
+  MergedRow,
+  NotPushedRow,
+  StaleRow,
+  WorktreeRow,
+} from '@open-tomato/rafa-pr';
 import type { PastHeadRead } from '@open-tomato/rafa-release';
 
 import { rmSync } from 'node:fs';
 
+import { heldReason as checkedOutReason } from '@open-tomato/rafa-pr';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { gitSaid } from '@open-tomato/rafa/core/git';
 import { shellQuote } from '@open-tomato/rafa/utils/shell';
-
-import { heldReason as checkedOutReason } from './groups.js';
 
 /** How many characters of a commit hash a withheld reason shows. */
 const SHORT_HASH_LENGTH = 7;

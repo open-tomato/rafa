@@ -1,6 +1,6 @@
 /**
  * Tests for the reader of Bun's unhandled-error blocks
- * (`src/suite/unhandled.ts`).
+ * (`packages/rafa/src/suite/unhandled.ts`).
  *
  * The three `unhandled-*` fixtures under `testdata/` were recorded from
  * real runs of bun 1.4.2 over scratch projects, each run as

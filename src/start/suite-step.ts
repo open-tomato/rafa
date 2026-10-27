@@ -293,11 +293,11 @@ import type { RepairSite, RepairStepKind, StepVerdict } from './suite-blocker.js
 import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
-import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { PreloadReading } from '../suite/scope.js';
 import type { CheckName, ChecksSettings } from '@open-tomato/rafa/config-schema-checks';
 import type { TestsSettings } from '@open-tomato/rafa/config-schema-tests';
 import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '@open-tomato/rafa/core/loop';
+import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
 import type { GhRunner } from '@open-tomato/rafa-board';
 import type { GitRunner } from '@open-tomato/rafa-pr';
 
@@ -311,6 +311,7 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runsDir, updateSession } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { runSuite } from '@open-tomato/rafa/suite/run';
 
 import {
   baselineOf,
@@ -320,7 +321,6 @@ import {
   writeBaseline,
 } from '../suite/baseline.js';
 import { readPlanOwns } from '../suite/owns.js';
-import { runSuite } from '../suite/run.js';
 import { listTestFiles, readPreloadFiles } from '../suite/scope.js';
 
 import { runEslint } from './lint-step.js';

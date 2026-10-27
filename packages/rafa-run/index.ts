@@ -18,27 +18,21 @@ export { claimPlanIssue } from '../../src/claims/plan-claim.js';
 export type {
   BranchRow,
   CleanupCounts,
-  CleanupOutcome,
-  CleanupPlan,
   CleanupRead,
   CleanupReading,
   CleanupSeams,
-  CleanupSelection,
   CleanupSettings,
-  CleanupStepKind,
   MergedBy,
   MergedRow,
   NotPushedRow,
   StaleRow,
+  WorktreeBlockKind,
+  WorktreeRow,
 } from '../../src/cleanup/index.js';
 export {
   cleanupCounts,
-  cleanupSteps,
   defaultCleanupSeams,
-  deletedNotPushed,
-  dryRunLines,
   readCleanup,
-  runCleanupSteps,
 } from '../../src/cleanup/index.js';
 
 export type { RemoteOnlyRow } from '../../src/cleanup/remote-only.js';
@@ -46,17 +40,17 @@ export type { RemoteOnlyRow } from '../../src/cleanup/remote-only.js';
 export type { RunRow } from '../../src/cleanup/runs.js';
 
 export type {
-  WorktreeBlockKind,
-  WorktreeRow,
-  WorktreeSeams,
-} from '../../src/cleanup/worktrees.js';
+  CleanupOutcome,
+  CleanupPlan,
+  CleanupSelection,
+  CleanupStepKind,
+} from '../../src/cleanup/steps.js';
 export {
-  ADMIN_FILES,
-  GIT_DIR,
-  WORKTREE_STATUS,
-  countChanges,
-  defaultWorktreeSeams,
-} from '../../src/cleanup/worktrees.js';
+  cleanupSteps,
+  deletedNotPushed,
+  dryRunLines,
+  runCleanupSteps,
+} from '../../src/cleanup/steps.js';
 
 export { CLAIM_SUBJECT } from '../../src/commands/claim/declarations.js';
 
@@ -79,7 +73,6 @@ export {
   runAction,
 } from '../../src/next/actions.js';
 
-export type { NextEndingSeams } from '../../src/next/ending.js';
 export {
   actionOutput,
   endWithNextStep,
@@ -93,11 +86,13 @@ export {
 
 export type { NextHopStep } from '../../src/next/hop-rows.js';
 
+export type { NextOwnerGateOptions } from '../../src/next/owner-gate.js';
+export { nextOwnerGate } from '../../src/next/owner-gate.js';
+
 export type {
   DryEpic,
   NextBoard,
   NextRoadmapReading,
-  NextRoadmapSources,
   NextSources,
   OpenPull,
   PickedLine,
@@ -109,11 +104,27 @@ export {
   readPlans,
 } from '../../src/next/readings.js';
 
+export { openNextRelations } from '../../src/next/relations-mode.js';
+
+export {
+  followsMerge,
+  readSettleAfterMerge,
+} from '../../src/next/settle-step.js';
+
+export type {
+  NextBoardOptions,
+  NextSourceSeams,
+  OpenedNextSources,
+} from '../../src/next/sources.js';
+export {
+  ghNextBoard,
+  openNextSources,
+} from '../../src/next/sources.js';
+
 export type {
   NextActionId,
   NextAnswerId,
   NextState,
-  NextStateId,
 } from '../../src/next/state.js';
 export {
   readHomeAfterLoop,
@@ -228,7 +239,6 @@ export type {
 export {
   EXIT_COULD_NOT_RUN,
   FORCE_FLAG,
-  RAFA_PACKAGE_NAME,
   exitCodeFor,
   installRuntime,
   outcomeProblem,
@@ -291,12 +301,7 @@ export {
   resolvePlanPath,
 } from '../../src/start/plan-path.js';
 
-export {
-  CI_POLL_INTERVAL_MS,
-  DEFAULT_CI_ATTEMPTS,
-} from '../../src/start/pr-lifecycle.js';
-
-export { retargetedLine } from '../../src/start/pr-retarget.js';
+export { DEFAULT_CI_ATTEMPTS } from '../../src/start/pr-lifecycle.js';
 
 export { createStartPreflightClaim } from '../../src/start/preflight-claim.js';
 
@@ -330,7 +335,6 @@ export {
 } from '../../src/start/run-setup.js';
 
 export {
-  RUNTIME_SUBDIR,
   refuseMisplacedRuntime,
   runFromSelectedRuntime,
 } from '../../src/start/runtime.js';
@@ -371,16 +375,3 @@ export { runWrapUp } from '../../src/start/wrap-up-run.js';
 export type { WrapUpLearning } from '../../src/start/wrap-up.js';
 
 export { createDeadlineSpawner } from '../../src/suite/deadline-spawn.js';
-
-export type {
-  JunitCase,
-  SuiteFailure,
-  SuiteResult,
-  SuiteRunOptions,
-  SuiteSpawner,
-} from '../../src/suite/run.js';
-export {
-  parseJunitCases,
-  runSuite,
-  suiteEnv,
-} from '../../src/suite/run.js';

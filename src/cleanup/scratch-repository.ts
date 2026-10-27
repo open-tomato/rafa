@@ -123,7 +123,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ADMIN_FILES, GIT_DIR } from '@open-tomato/rafa-run';
+import { ADMIN_FILES, GIT_DIR } from '@open-tomato/rafa-pr';
 
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 

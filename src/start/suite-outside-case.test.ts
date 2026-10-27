@@ -14,7 +14,7 @@
  * `readOutputTail` (`suite/run.ts`) takes them: the run exited 1 and
  * wrote no JUnit file.
  */
-import type { SuiteFailure, SuiteResult } from '../suite/run.js';
+import type { SuiteFailure, SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { describe, expect, it } from 'bun:test';
 

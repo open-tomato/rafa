@@ -35,7 +35,7 @@
  * `planStubFromPrompt` reads among them. The message is never shown: the
  * session matches on file and case, as the section says.
  */
-import type { SuiteFailure } from '../suite/run.js';
+import type { SuiteFailure } from '@open-tomato/rafa/suite/run';
 
 /** The heading of the inherited section. */
 export const INHERITED_HEADING = '## Failures this run inherited';

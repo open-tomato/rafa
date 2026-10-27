@@ -207,8 +207,8 @@ The import pattern is `^Phase 0(?![\w])`.
 | `src/start/task-gate-lines.test.ts` | `c10-index` | 1 | none |
 | `src/start/task-gate-lines.ts` | `c02-active` | 1 | none |
 | `src/start/triage-inherited.test.ts` | `c10-index` | 1 | none |
-| `src/suite/unhandled.test.ts` | `c02-active` | 1 | none |
-| `src/suite/unhandled.ts` | `c02-active` | 1 | none |
+| `packages/rafa/src/suite/unhandled.test.ts` | `c02-active` | 1 | none |
+| `packages/rafa/src/suite/unhandled.ts` | `c02-active` | 1 | none |
 | `src/tests/backfill-pipeline.test.ts` | `c11-frontmatter` | 1 | none |
 | `src/tests/cleanup-base-worktree-spawned.test.ts` | `c08-cli-capture` | 2 | none |
 | `src/tests/demotion-pass.test.ts` | `c11-frontmatter` | 1 | none |

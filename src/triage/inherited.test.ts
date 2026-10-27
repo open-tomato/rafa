@@ -12,9 +12,9 @@
  */
 import type { InheritedTriage } from './inherited.js';
 import type { TriageResult } from './triage.js';
-import type { SuiteFailure, SuiteSpawner } from '../suite/run.js';
 import type { IssueDraft, IssueRef, Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { SuiteFailure, SuiteSpawner } from '@open-tomato/rafa/suite/run';
 
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,9 +22,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { runSuite } from '@open-tomato/rafa/suite/run';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
-
-import { runSuite } from '../suite/run.js';
 
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import { triageReport } from './triage.js';

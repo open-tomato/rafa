@@ -16,8 +16,9 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { runSuite } from '@open-tomato/rafa/suite/run';
+
 import { createDeadlineSpawner } from './deadline-spawn.js';
-import { runSuite } from './run.js';
 
 /** A deadline short enough to keep the test quick, long enough that a sleeping test is still running. */
 const DEADLINE_MS = 3000;

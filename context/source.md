@@ -154,8 +154,15 @@ check and doctor read, and `tests/`, the output sinks test helper,
 `pr/` beside them, with the port's types, `types.ts`, its provider,
 `provider.ts`, and its double, `pull-requests-double.ts`, each with its test,
 and `tests/` took the two test helpers, `git-identity.ts` and
-`scratch-home-env.ts`, with their tests, beside `output-sinks.ts`. A file keeps
-its base name when it moves. A moved file keeps no re-export at its old path.
+`scratch-home-env.ts`, with their tests, beside `output-sinks.ts`. The seventh
+decouple item (rafa-1368) added `suite/`, the suite runner, `run.ts`,
+`failure-lines.ts` and `unhandled.ts` with their tests and fixtures, which reach
+only core, and `pr/ci-poll.ts`, the poll interval, beside `pr/`'s files. It also
+put `RUNTIME_SUBDIR` and `RAFA_PACKAGE_NAME` into `runtime/`'s barrel,
+`@open-tomato/rafa/core/runtime`, beside `identity.ts`; the root's
+`src/start/runtime.ts` and `src/commands/pr/merge-followups.ts` now read them
+from there. A file keeps its base name when it moves. A moved file keeps no
+re-export at its old path.
 The root's build entries are the exception: `src/effort/store/index.ts` and
 `src/ports/index.ts` stand at core's folder paths and re-export a package
 subpath until #808 publishes core.
@@ -448,7 +455,9 @@ names the lower and higher package, the function's file and its reach on the
 import graph, and why the function cannot move into core, and it needs a check
 on the import graph that the function cannot move there. A function that is
 pure, or that reaches nothing past core, moves into core instead. The five
-entries are calls of a lower package, board or release, each into a higher one:
+entries are calls of a lower package, board, pr or release, each into a higher
+one, and a key may serve more than one lower package, each named in its
+reason's `lower`, a sorted list:
 
 - `addStaleDocLine`, release's, in
   `packages/rafa-release/src/docs/release-issue.ts`, a file release holds by
@@ -457,9 +466,10 @@ entries are calls of a lower package, board or release, each into a higher one:
   was not re-measured), for `rafa epic close`, which adds a line to the
   release's stale-docs issue, whose module reads the release version helpers of
   `packages/rafa-release/src/release/`.
-- `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for
-  `rafa issue ready`, which ends naming the next step and runs its action
-  through run's dispatch.
+- `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for board's
+  `rafa issue ready` and, since the seventh decouple item, pr's
+  `rafa pr merge`, `triage` and `wait`, which end naming the next step and run
+  its action through run's dispatch.
 - `readStaleDocsVersion`, run's, in `src/start/stale-docs.ts` (reach 165), for
   `rafa epic close`, which titles the stale-docs issue by the release forecast.
 - `triageReport`, pr's, in `src/triage/triage.ts` (reach 66), for
@@ -573,12 +583,18 @@ unit. At the base `BOARD_NAMED`, `PR_NAMED` and `RUN_NAMED` held 20, 15 and 20
 files. Since rafa-1333 (the fourth decouple item) `BOARD_NAMED` holds 22, having
 taken `packages/rafa-board/src/claims/ahead.ts` and
 `packages/rafa-board/src/epic/verify-run.ts` by pass 1's rule (verify-run from
-`RUN_NAMED`); `PR_NAMED` holds 13, with `packages/rafa/src/bugs/fill.ts` and
-`packages/rafa/src/bugs/versions.ts` gone for core; and `RUN_NAMED` holds 18,
+`RUN_NAMED`); `PR_NAMED` held 13, with `packages/rafa/src/bugs/fill.ts` and
+`packages/rafa/src/bugs/versions.ts` gone for core; and `RUN_NAMED` held 18,
 with `packages/rafa/src/plan/validate.ts` gone for core and verify-run for
-board. A file a list names is placed in that package whatever its folder, and
-keeps its path: no named file moves in the cut itself; the packages' moves move
-them. Board's move (pass 4c) moved its named files, and `BOARD_NAMED` holds 22
+board. The sixth decouple item (rafa-1362) took the two stale-docs files off
+`PR_NAMED` for `RELEASE_NAMED`, and the seventh (rafa-1368) placed
+`src/cleanup/worktrees.ts` and `src/start/pr-retarget.ts` in pr and
+`src/cleanup/steps.ts`, `src/next/owner-gate.ts`, `relations-mode.ts`,
+`settle-step.ts` and `sources.ts` in run, each by the latest package it
+reaches, so `PR_NAMED` holds 8 and `RUN_NAMED` 22. A file a list names is
+placed in that package whatever its folder, and keeps its path: no named file
+moves in the cut itself; the packages' moves move them. Board's move (pass 4c)
+moved its named files, and `BOARD_NAMED` holds 22
 files on their `packages/rafa-board/src/` paths since then, the move tool having
 rewritten the list with them; the rule's folders are `packages/rafa-board/` and
 the four it keeps for #913, `src/board/`, `src/commands/board/`,
@@ -867,18 +883,37 @@ names come from, and the facade entry is no node.
     `MergedPullRequest` or the port from core now, so pr reads the eight left,
     `src/claims/lost.ts`, `src/cleanup/worktrees.ts`, `src/next/hint.ts`,
     `src/next/hop-rows.ts`, `src/next/readings.ts`, `src/start/pr-lifecycle.ts`,
-    `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. Run had nine:
+    `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. The seventh
+    decouple item (rafa-1368) placed `src/cleanup/worktrees.ts` and
+    `src/start/pr-retarget.ts` in pr by name, so those two are pr's own files
+    and left the group, and `src/next/sources.ts` and `relations-mode.ts`,
+    the pr files `src/next/hint.ts` imported by path, in run, so those two left
+    pr for run. The run files that import a pr file by path once the placement
+    is made, `src/cleanup/index.ts`,
+    `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
+    `src/next/relations-mode.ts`, `src/next/settle-step.ts`,
+    `src/next/sources.ts` and `src/start/wrap-up-run.ts`, sat on the guard's pr
+    row in this group until the item's rewire task read them, twelve with the
+    five left. Its dry run read the four `src/next/` files on a load cycle and
+    the other three to rewire, and the codemod took `src/cleanup/index.ts`,
+    `src/cleanup/steps.ts` and `src/start/wrap-up-run.ts` onto the pr facade,
+    so pr reads nine. Run had nine:
     `src/cleanup/groups.ts`, `src/cleanup/steps.ts`,
     `packages/rafa-release/src/next/epic-end.ts`, `src/next/owner-gate.ts`,
     `packages/rafa-board/src/next/relation-readings.ts`,
     `src/next/settle-step.ts`, `src/next/sources.ts`, `src/triage/base-run.ts`
     and `src/triage/inherited.ts`. The sixth decouple item cut `epic-end.ts` off
-    run, since `watchDryEpic` reads only its board field, so run has eight. All
+    run, since `watchDryEpic` reads only its board field, so run had eight. All
     eight are files of packages earlier in `MOVE_ORDER` of
     `scripts/survey/coupling.ts`, by the cut table's unit, and they sit in this
     group because the load-cycle group comes first. Their edges to run are back
     edges the decouple step before pass 4 cuts, since run moves last and no
-    package imports it forward.
+    package imports it forward. The seventh decouple item left run none: it
+    moved the suite runner, which `src/triage/base-run.ts` and `inherited.ts`
+    imported, into core, placed `src/cleanup/steps.ts`, `owner-gate.ts`,
+    `relations-mode.ts`, `settle-step.ts` and `sources.ts` in run by name, and
+    placed `src/cleanup/worktrees.ts`, which `src/cleanup/groups.ts` imported,
+    in pr, so the guard's run row names no load-cycle file.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
@@ -909,7 +944,7 @@ names come from, and the facade entry is no node.
     (rafa-1362) cut the release files off pr too: the ten
     `packages/rafa-release/src/commands/release/` files, `prepare.ts` and
     `verify.ts` take core's names or the registry's provider now, so release has
-    no edge into pr. Run has eight: no board file
+    no edge into pr. Run had eight: no board file
     (`packages/rafa-board/src/commands/board/list.ts` and
     `packages/rafa-board/src/commands/epic/new.ts` left them in the fourth
     decouple item, which moved `defaultBoardOnce` into
@@ -922,7 +957,13 @@ names come from, and the facade entry is no node.
     (`merge-cleanup.ts`, `merge-followups.ts`, `merge-loop-worktree.ts`,
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and `wait.ts`).
     Each sits earlier in the move order than run, so each imports it backwards,
-    and the decouple step before pass 4 cuts them.
+    and the decouple step before pass 4 cuts them. The seventh decouple item
+    cut all eight: `merge-cleanup.ts`, `merge-followups.ts` and
+    `triage-resolve.ts` take their constant from core,
+    `merge-loop-worktree.ts` and `retarget.ts` import
+    `src/cleanup/worktrees.ts` and `src/start/pr-retarget.ts`, which it placed
+    in pr, and `merge.ts`, `triage.ts` and `wait.ts` call `endWithNextStep`
+    through core's service registry. Run's row is empty.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
     a private package, which pass 4 settles. No package has one now: the dry
@@ -935,8 +976,8 @@ names come from, and the facade entry is no node.
   rewired package to its row of `REWIRED`: no non-test file outside the
   package imports one of its files by relative path unless the row names it
   with its group, and each named file still does. Each row names its kept
-  files, effort's none, inventory's none, board's 19, release's none, pr's 29
-  and run's 19, and a planted control reds on one relative import.
+  files, effort's none, inventory's none, board's none, release's none, pr's
+  nine and run's none, and a planted control reds on one relative import.
   No row keeps a file for the library build. Board's, release's, pr's and
   run's rows once held a fourth group, `libraryChunks`: 68 files a library
   entry reaches statically (board 21, release eight, pr 33 and run six), kept

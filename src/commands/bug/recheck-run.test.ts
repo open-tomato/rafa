@@ -1,6 +1,6 @@
 import type { RecheckBugOptions, RecheckSuiteRunner } from './recheck-run.js';
 import type { RunOutcome } from '../../bugs/recheck-verdict.js';
-import type { SuiteResult, SuiteRunOptions } from '../../suite/run.js';
+import type { SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
 
 import { describe, expect, test } from 'bun:test';
 

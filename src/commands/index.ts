@@ -134,8 +134,8 @@
  * through `src/config-set.ts`, nor `bug codes`, which lists the cause
  * codes of `src/errors/` beside the project's `errors.codes`, nor
  * `bug recheck`, which reads each bug's `Rerun` through
- * `src/bugs/test-reference.ts` and reruns it through `src/suite/run.ts`
- * in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
+ * `src/bugs/test-reference.ts` and reruns it through
+ * `packages/rafa/src/suite/run.ts` in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
  * stale-docs issues through `packages/rafa-release/src/docs/open-lines.ts`.
  *
  * ## What is registered

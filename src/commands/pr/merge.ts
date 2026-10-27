@@ -175,10 +175,14 @@
  * Last of all, after the follow-ups, the command names the one
  * step that follows — with the base pulled and both branches gone, that
  * is the next plan or the loop on a plan already there
- * (`src/next/ending.ts`, `--no-hint` to turn it off). A DECLINED merge
- * ends without one: nothing moved, so the state still reads as a green
- * pull request waiting to be merged, and the hint would put the very
- * question that was just answered no.
+ * (`--no-hint` to turn it off). The ending is run's `endWithNextStep`,
+ * reached through core's service registry
+ * (`activeServices().endWithNextStep`, registered by the root
+ * `src/service-registry.ts`), since pr may not import run; with
+ * nothing registered the call refuses, naming the key and the root. A
+ * DECLINED merge ends without one: nothing moved, so the state still
+ * reads as a green pull request waiting to be merged, and the hint would
+ * put the very question that was just answered no.
  *
  * ## Refusals
  *
@@ -202,10 +206,10 @@ import type { FreedReport } from './merge-freed.js';
 import type { MergeGuardReport } from './merge-guard.js';
 import type { UncheckedMerge, UncheckedMergeReport } from './merge-unchecked.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
-import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { PidProbe } from '@open-tomato/rafa/core/loop';
+import type { EndingSeams } from '@open-tomato/rafa/core/services';
 import type {
   GhRunner,
   RoadmapTickResult,
@@ -223,9 +227,9 @@ import {
 } from '@open-tomato/rafa-board';
 
 import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
+import { activeServices } from '@open-tomato/rafa/core/services';
 import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
 
-import { endWithNextStep } from '../../next/ending.js';
 import {
   createGitRunner,
   isMergeMethod,
@@ -273,7 +277,7 @@ export interface MergeSeams extends PrSeams {
   /** Opens the prompter the question is asked through. Called only to ask. */
   readonly openPrompter?: () => Prompter;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
-  readonly ending?: NextEndingSeams;
+  readonly ending?: EndingSeams;
   /** The clock the release guard's forecast is dated by. The system's own when left out. */
   readonly now?: () => Date;
   /** Whether a loop record's pid is alive, for the update follow-up. `isPidAlive` when left out. */
@@ -666,7 +670,7 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       const merged = await runMerge(context, seams);
       if (context.outputMode === 'json') context.output.result(merged);
       // A declined merge left the project where it was; see the module note.
-      if (merged.merged) await endWithNextStep(context, seams.ending);
+      if (merged.merged) await activeServices().endWithNextStep(context, seams.ending);
     },
   };
   return Object.freeze(command);

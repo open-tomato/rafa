@@ -18,10 +18,10 @@
 import type { Settling, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams } from './suite-step.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { CheckRun } from '../suite/checks.js';
-import type { SuiteResult } from '../suite/run.js';
 import type { CheckName } from '@open-tomato/rafa/config-schema-checks';
 import type { SessionStep, SessionStepReason } from '@open-tomato/rafa/core/loop';
 import type { TestScope } from '@open-tomato/rafa/core/plan';
+import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { activeOutput } from '@open-tomato/rafa/core/output';
 

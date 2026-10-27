@@ -13,9 +13,9 @@
 
 import type { SuiteStepContext, SuiteStepSeams, TaskStepInput } from './suite-step.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
-import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { CheckName } from '@open-tomato/rafa/config-schema-checks';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

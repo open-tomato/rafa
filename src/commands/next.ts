@@ -260,7 +260,6 @@ import type { NextCeiling } from '../next/ceiling.js';
 import type { NextDryRun, NextStop } from '../next/lines.js';
 import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { PullBeforeReadInput } from '@open-tomato/rafa-effort';
-import type { NextSourceSeams, OpenedNextSources } from '@open-tomato/rafa-pr';
 import type {
   DryEpic,
   NextActionId,
@@ -268,25 +267,25 @@ import type {
   NextAnswerId,
   NextHopStep,
   NextInvocation,
+  NextSourceSeams,
   NextSources,
   NextState,
+  OpenedNextSources,
 } from '@open-tomato/rafa-run';
 
 import { pullBeforeRead } from '@open-tomato/rafa-effort';
-import {
-  followsMerge,
-  openNextRelations,
-  openNextSources,
-  readSettleAfterMerge,
-} from '@open-tomato/rafa-pr';
 import { epicEndLines, watchDryEpic } from '@open-tomato/rafa-release';
 import {
   actionInvocation,
   actionOutput,
   commandWords,
+  followsMerge,
   nextQuestion,
+  openNextRelations,
+  openNextSources,
   readHomeAfterLoop,
   readNextState,
+  readSettleAfterMerge,
   runAction,
 } from '@open-tomato/rafa-run';
 

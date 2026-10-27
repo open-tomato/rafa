@@ -1,5 +1,5 @@
 /**
- * Tests for the suite runner (`src/suite/run.ts`).
+ * Tests for the suite runner (`packages/rafa/src/suite/run.ts`).
  *
  * The fixtures under `testdata/` but one were recorded from real runs of
  * bun 1.4.2 over scratch projects, each run as `env -u CLAUDECODE bun test
@@ -23,7 +23,9 @@
  *   - `no-match`: `./nope`. Exit 1, stderr only: Bun wrote no JUnit file.
  *
  * One fixture was recorded the same way under bun 1.3.14, the version
- * `package.json` pins, and is read by `src/triage/inherited.test.ts`:
+ * `package.json` pins, and stays at the root's `src/suite/testdata/` for
+ * the inherited-failure test, `src/triage/inherited.test.ts`, the one
+ * that reads it:
  *
  *   - `no-message`: one failing `toBe` in `src/parse/parse.test.ts`,
  *     whose `<failure>` carries no `message` attribute (1.4.2 wrote one

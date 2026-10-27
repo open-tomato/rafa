@@ -5,7 +5,7 @@
  * seams in `suite-step.test.ts`.
  */
 import type { GitResult, GitRunner } from '../pr/index.js';
-import type { SuiteFailure, SuiteResult } from '../suite/run.js';
+import type { SuiteFailure, SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
