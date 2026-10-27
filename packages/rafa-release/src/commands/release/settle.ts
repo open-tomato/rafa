@@ -5,8 +5,8 @@
  * once under `releaseCommitSubject` (`packages/rafa-release/src/release/release-move.ts`:
  * `chore: release 0.46.0, @scope/plugin@0.2.0`) and delivered by
  * `release.settle`. The command reads its line and the config, hands
- * the work to `src/release/`, and prints what came back; it assembles
- * no `git` or `gh` argv of its own.
+ * the work to `packages/rafa-release/src/release/`, and prints what
+ * came back; it assembles no `git` or `gh` argv of its own.
  *
  * ```text
  * rafa release settle            → fold, commit, deliver, maybe tag

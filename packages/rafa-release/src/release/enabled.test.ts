@@ -16,9 +16,10 @@
  * answer stands against the files and that the files were read anyway.
  *
  * Three mutations of `enabled.ts` were driven on 2026-09-20, one at a
- * time over `env -u CLAUDECODE bun test src/release/`, the module
- * restored from a scratch copy and verified with `shasum -c` after
- * each. 10 pass either side, and each count is that run's own:
+ * time over
+ * `env -u CLAUDECODE bun test packages/rafa-release/src/release/`, the
+ * module restored from a scratch copy and verified with `shasum -c`
+ * after each. 10 pass either side, and each count is that run's own:
  *
  *  - `auto` on when EITHER file is there: 4 fail, every off case under
  *    `auto` that plants one of the two — the missing changelog, the

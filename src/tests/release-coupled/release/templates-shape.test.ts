@@ -1,10 +1,11 @@
 /**
  * The shape every shipped workflow template under
- * `src/release/templates/*.yml` keeps: parsed with `Bun.YAML.parse`, its
- * triggers and `permissions` block as {@link SHAPES} names them for that
- * file, its publish job's `if` as the table names it and no other job's
- * `if` naming the publishing switch, and each `rafa <subject> <action>`
- * inside a `run:` naming an action of the command registry.
+ * `packages/rafa-release/src/release/templates/*.yml` keeps: parsed with
+ * `Bun.YAML.parse`, its triggers and `permissions` block as
+ * {@link SHAPES} names them for that file, its publish job's `if` as the
+ * table names it and no other job's `if` naming the publishing switch,
+ * and each `rafa <subject> <action>` inside a `run:` naming an action of
+ * the command registry.
  */
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

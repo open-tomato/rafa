@@ -1,12 +1,13 @@
 # The rafa release tag workflow: level 3 of the release ladder.
 #
 # Written into a project's `.github/workflows/` by `writeReleaseWorkflow`
-# (`src/release/templates.ts`) for `release.settle: pr` with
-# `release.tag: settle` and `release.publish: ci`. Settle never tags a
-# `pr` delivery: it pushes the release commit to `rafa/release` and opens
-# one release pull request. When that pull request merges, by any merge
-# button, this workflow checks the base branch out at the merge commit,
-# runs `rafa release tag --push`, and then publishes.
+# (`packages/rafa-release/src/release/templates.ts`) for
+# `release.settle: pr` with `release.tag: settle` and
+# `release.publish: ci`. Settle never tags a `pr` delivery: it pushes the
+# release commit to `rafa/release` and opens one release pull request.
+# When that pull request merges, by any merge button, this workflow
+# checks the base branch out at the merge commit, runs
+# `rafa release tag --push`, and then publishes.
 #
 # It runs only on the release pull request's merge: a closed pull
 # request that did not merge, or one from another head or from a fork,

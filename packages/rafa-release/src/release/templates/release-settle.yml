@@ -1,12 +1,13 @@
 # The rafa release settle workflow: level 4 of the release ladder.
 #
 # Written into a project's `.github/workflows/` by `writeReleaseWorkflow`
-# (`src/release/templates.ts`) for `release.settle: push` with
-# `release.tag: settle` and `release.publish: ci`. Every push to the base
-# branch checks it out with full history, sets a git identity for the
-# release commit, and runs `rafa release settle`, which folds the waiting
-# fragments into a release commit, pushes it to the base and tags it.
-# A push with no fragment waiting settles nothing and exits 0.
+# (`packages/rafa-release/src/release/templates.ts`) for
+# `release.settle: push` with `release.tag: settle` and
+# `release.publish: ci`. Every push to the base branch checks it out with
+# full history, sets a git identity for the release commit, and runs
+# `rafa release settle`, which folds the waiting fragments into a release
+# commit, pushes it to the base and tags it. A push with no fragment
+# waiting settles nothing and exits 0.
 #
 # The settle job runs on a push to the repository's default branch. When
 # `pr.base` names another branch, write that branch's name in place of
