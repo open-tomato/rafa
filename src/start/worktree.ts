@@ -29,10 +29,12 @@
  * ## The upstream step
  *
  * A branch's upstream is written to the one `.git/config` the main
- * checkout and every linked worktree share, and git refuses a second
- * writer at once rather than making it wait. An add that carried the
- * write (`--track`) therefore lost to another run's add started in the
- * same instant, and was left with a local `feat/<stub>` holding no
+ * checkout and every linked worktree share, and git 2.55 and earlier
+ * refuses a second writer at once rather than making it wait (git 2.56
+ * retries the lock for about a second first; its reading is in
+ * `./worktree-upstream.ts`). An add that carried the write (`--track`)
+ * therefore lost to another run's add started in the same instant, and
+ * was left with a local `feat/<stub>` holding no
  * upstream and no worktree (issue #960; measured below). So the add of
  * `switch-remote` writes nothing to that file, and the upstream is the
  * `set-upstream` step after it, run through `setUpstream`
