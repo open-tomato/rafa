@@ -120,6 +120,12 @@
     "packages/rafa-pr": {
       "name": "@open-tomato/rafa-pr",
       "version": "0.46.0",
+      "dependencies": {
+        "@open-tomato/rafa-board": "workspace:*",
+        "@open-tomato/rafa-core": "workspace:*",
+        "@open-tomato/rafa-inventory": "workspace:*",
+        "@open-tomato/rafa-release": "workspace:*",
+      },
       "devDependencies": {
         "@open-tomato/rafa-eslint-config": "workspace:*",
         "eslint": "^9.39.4",
