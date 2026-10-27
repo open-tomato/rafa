@@ -95,7 +95,7 @@ describe('the shipped tag workflow', () => {
   });
 
   it('checks the base branch out with full history, and sets up bun from package.json', () => {
-    expect(at(stepNamed('Checkout'), ['uses'])).toBe('actions/checkout@v4');
+    expect(at(stepNamed('Checkout'), ['uses'])).toBe('actions/checkout@v7');
     expect(at(stepNamed('Checkout'), ['with'])).toEqual({
       'ref': '${{ github.event.pull_request.base.ref }}',
       'fetch-depth': 0,
