@@ -6,12 +6,14 @@
  * A branch's upstream is two keys, `branch.<name>.remote` and
  * `branch.<name>.merge`, in the ONE `.git/config` the main checkout and
  * every linked worktree share. Git writes that file under
- * `.git/config.lock`, and a second writer that finds the lock held does
- * not wait: it is refused at once. Two loops that each start in a
- * worktree of their own on an existing branch write it within the same
- * instant, so one of the two loses (issue #960). The write is therefore
- * its own step here, apart from the `git worktree add` that would
- * otherwise carry it, and the step is the one thing tried again.
+ * `.git/config.lock`. On git 2.55 and earlier a second writer that finds
+ * the lock held does not wait: it is refused at once. From git 2.56 git
+ * retries the lock for about a second before refusing (see the reading
+ * below). Two loops that each start in a worktree of their own on an
+ * existing branch write it within the same instant, so one of the two
+ * can lose (issue #960). The write is therefore its own step here, apart
+ * from the `git worktree add` that would otherwise carry it, and the step
+ * is the one thing tried again.
  *
  * ## What is tried again, and what is not
  *
@@ -71,6 +73,40 @@
  * Issue #960 quotes git 2.50.1 writing the same first line from `git
  * worktree add --track`, its second line without the `error:` prefix.
  * That version was not run here. Only the first line is matched.
+ *
+ * Read from git 2.56.0's documentation and release notes, not run here,
+ * since this machine runs git 2.53.0: 2.56.0 added the key
+ * `core.configLockTimeout`, documented as "The length of time, in
+ * milliseconds, to retry when trying to lock a configuration file for
+ * writing. Value 0 means not to retry at all; -1 means to try
+ * indefinitely. Default is 1000 (i.e., retry for 1 second). This is read
+ * from the configuration that is already on disk before the lock is
+ * taken." Its release notes say: "Configuration file locking has been
+ * updated to retry for a short period, avoiding failures when multiple
+ * processes attempt to update the configuration simultaneously."
+ *
+ * For this step, on git 2.56 each try that finds the lock held waits
+ * about 1 s inside git before the refusal above. A lock held for good
+ * therefore costs about 5 s inside git over {@link UPSTREAM_TRIES} tries,
+ * plus {@link UPSTREAM_PAUSE_MS} times `UPSTREAM_TRIES - 1` (0.8 s) of
+ * rafa's own pauses, before the same refusal; on git 2.55 and earlier it
+ * cost the 0.8 s alone. On git 2.56 git's own retry clears the collision
+ * of issue #960 in most cases, and on 2.55 and earlier rafa's retry is
+ * the only one.
+ *
+ * The step keeps its retry unchanged, since rafa's retry is still the one
+ * that covers git 2.55 and earlier, and a lock held for good is rare and
+ * ends in the same refusal. Nor does it hand git a
+ * `-c core.configLockTimeout=0` of its own: that would undo the retry
+ * git added for the very collision this step exists for.
+ *
+ * The two test files of this step, `./worktree-upstream.test.ts` and
+ * `./worktree-upstream-integration.test.ts`, set the key to `0` in the
+ * project they plant, so their cases that hold the lock measure rafa's
+ * pauses alone on every version. Without it (issue #1371), verify run
+ * 40505518174 on runner image ubuntu24 20261025.353, git 2.56.0, timed
+ * the two cases that hold the lock for every try out at about 5541 ms,
+ * against bun's 5 s test timeout.
  */
 import type { GitResult, GitRunner } from '@open-tomato/rafa-pr';
 

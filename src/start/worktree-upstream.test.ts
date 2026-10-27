@@ -20,6 +20,9 @@
  * created by hand, so the lines the predicate matches are proven to be
  * the lines this machine's git writes and the argv is proven to be argv
  * git accepts. Nothing here waits: the pause is the stub in every case.
+ * The planted project turns git's wait off (`core.configLockTimeout` 0, read
+ * back by the first case of that block), since git 2.56 retries a held
+ * config lock for a second per try on its own, past bun's test timeout.
  */
 import type { Sleep } from './worktree-upstream.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
@@ -306,6 +309,12 @@ describe('setUpstream against a real repository', () => {
     lock = join(project, '.git', 'config.lock');
     run(scratch, ['init', '-q', '--bare', remote]);
     run(scratch, ['init', '-q', '-b', 'main', project]);
+    // git 2.56.0 added core.configLockTimeout (default 1000 ms, read from the
+    // configuration on disk before the lock is taken), so git itself retries a
+    // held .git/config.lock for about a second per try (#1371). Earlier git
+    // ignores the key, so the cases read the same on every version and the
+    // pauses they count are rafa's alone.
+    run(project, ['config', 'core.configLockTimeout', '0']);
     run(project, ['commit', '-q', '--allow-empty', '-m', 'one']);
     run(project, ['remote', 'add', 'origin', remote]);
     run(project, ['push', '-q', 'origin', 'main']);
@@ -317,6 +326,10 @@ describe('setUpstream against a real repository', () => {
 
   afterAll(() => {
     rmSync(scratch, { recursive: true, force: true });
+  });
+
+  it('plants the project with git\'s config lock wait turned off', () => {
+    expect(run(project, ['config', 'core.configLockTimeout'])).toBe('0');
   });
 
   it('sets the upstream at the first try with no lock held', () => {

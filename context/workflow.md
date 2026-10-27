@@ -527,20 +527,20 @@ waives which branch the run is on, not that it is on one. Under
 from the same base, and the detached checkout is left as it was.
 
 **`--as-worktree` adds a plan's worktree in two steps, and retries only the
-upstream.** For a plan whose branch already exists on `origin`, the add is
-`git worktree add --no-track`, and the upstream is a second step:
-`git branch --set-upstream-to=origin/<branch> <branch>`. Git keeps one
-`.git/config` for every worktree of a clone and refuses a second writer while
-its lock is held rather than waiting, so two plans started at once in one
-clone could lose one upstream (issue #960). The second step is tried up to
-`UPSTREAM_TRIES` (5) times, with `UPSTREAM_PAUSE_MS` (200) between tries, and
-only while git reports the config as locked (`src/start/worktree-upstream.ts`).
-A run that gives up removes the worktree it added, keeps the local branch, and
-names the branch and that line. A run started again finds the branch and
-leaves its upstream as it was found, so the line is run by hand first. Any
-other failure leaves the worktree in place and says so. A rafa lock file
-around each add was rejected: git already locks the file, and a lock of
-rafa's own would outlive a run killed while holding it.
+upstream.** For a plan whose branch already exists on `origin`, the add is `git
+worktree add --no-track`, and the upstream is a second step: `git branch
+--set-upstream-to=origin/<branch> <branch>`. Git keeps one `.git/config` for
+every worktree of a clone and refuses a second writer while its lock is held
+rather than waiting on git 2.55 and earlier (git 2.56 and later wait about a
+second first), so two plans started at once in one clone could lose one upstream
+(issue #960). The second step is tried up to `UPSTREAM_TRIES` (5) times, with
+`UPSTREAM_PAUSE_MS` (200) between tries, and only while git reports the config
+as locked (`src/start/worktree-upstream.ts`). A run that gives up removes the
+worktree it added, keeps the local branch, and names the branch and that line. A
+run started again finds the branch and leaves its upstream as it was found, so
+the line is run by hand first. Any other failure leaves the worktree in place
+and says so. A rafa lock file around each add was rejected: git already locks
+the file, and a lock of rafa's own would outlive a run killed while holding it.
 
 **A run started from a scratch branch still compares its plan with the
 base.** Started from a session worktree on `scratch/notes`, `--as-worktree`
