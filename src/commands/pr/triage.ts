@@ -116,9 +116,12 @@
  * ## The ending
  *
  * A run that ended 0 finishes by naming the one step that follows
- * (`src/next/ending.ts`, `--no-hint` to turn it off), which is the
- * reading `rafa next` makes of the same project and is worded by the
- * same function. So a pull request the assessment found green ends
+ * (`--no-hint` to turn it off), which is the reading `rafa next` makes
+ * of the same project and is worded by the same function: run's
+ * `endWithNextStep`, reached through core's service registry
+ * (`activeServices().endWithNextStep`, registered by the root
+ * `src/service-registry.ts`), since pr may not import run; with nothing
+ * registered the call refuses, naming the key and the root. So a pull request the assessment found green ends
  * with the merge, one whose checks are still running ends with the
  * wait, and one still red ends with another assessment — the honest
  * reading, since a triage reports and repairs nothing by itself. A
@@ -168,17 +171,17 @@ import type { TriageGuardReader } from './triage-guard.js';
 import type { TriageReading } from './triage-report.js';
 import type { ResolveResult } from './triage-resolve.js';
 import type { IgnoredTriageComment, TriageTrust, TrustedTriageComment } from './triage-trust.js';
-import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, PullRequestComment, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { TriageSelection } from '../../pr/triage/select.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { EndingSeams } from '@open-tomato/rafa/core/services';
 import type { Permissions } from '@open-tomato/rafa-board';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeServices } from '@open-tomato/rafa/core/services';
 import { recordPlanCi } from '@open-tomato/rafa/store/plan-ci';
 
-import { endWithNextStep } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { triageCommentBody, writeTriageComment } from '../../pr/triage/comment.js';
@@ -240,7 +243,7 @@ export interface TriageSeams extends PrSeams {
    */
   readonly permissions?: (root: string) => Permissions;
   /** How the ending hint reaches the state and the terminal. The system's own when left out. */
-  readonly ending?: NextEndingSeams;
+  readonly ending?: EndingSeams;
   /** How the release guard is read for one pull request. `readTriageGuard` when left out. */
   readonly readGuard?: TriageGuardReader;
 }
@@ -632,7 +635,7 @@ export function createPrTriageCommand(seams: TriageSeams = DEFAULT_TRIAGE_SEAMS)
       if (triaged.exitCode !== 0) {
         throw new CommandExit(triaged.exitCode, triaged.resolve?.headline ?? '');
       }
-      await endWithNextStep(context, seams.ending);
+      await activeServices().endWithNextStep(context, seams.ending);
     },
   };
   return Object.freeze(command);

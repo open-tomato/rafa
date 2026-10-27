@@ -172,10 +172,10 @@ interface RewiredRow {
  * placed `src/cleanup/worktrees.ts` and `src/start/pr-retarget.ts` in pr,
  * so `src/cleanup/groups.ts`, `src/commands/pr/merge-loop-worktree.ts`
  * and `retarget.ts`, whose run imports by path were those two files, left
- * it too. `src/commands/pr/merge.ts` left it in the same item: its run
- * import by path was `endWithNextStep`, which it calls through core's
- * service registry. So the row keeps no load-cycle file and two
- * back-edge files, `src/commands/pr/triage.ts` and `wait.ts`, for
+ * it too. `src/commands/pr/merge.ts` and `triage.ts` left it in the same
+ * item: their run import by path was `endWithNextStep`, which they call
+ * through core's service registry. So the row keeps no load-cycle file
+ * and one back-edge file, `src/commands/pr/wait.ts`, for
  * `endWithNextStep` of `src/next/ending.ts`.
  * No row keeps a file for the library build any more. Board, release, pr
  * and run each take their feature object through a commands entry,
@@ -217,7 +217,6 @@ const REWIRED: readonly RewiredRow[] = [
   },
   {
     allowed: {
-      'src/commands/pr/triage.ts': 'backEdge',
       'src/commands/pr/wait.ts': 'backEdge',
     },
     packageName: 'rafa-run',

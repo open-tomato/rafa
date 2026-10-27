@@ -25,6 +25,12 @@
  * read the real project: `git` and `gh` spawned in the scratch
  * directory the case planted.
  *
+ * The ending is reached through core's service registry, which the
+ * test preload fills with the root's set, so the probe cases drive the
+ * real `endWithNextStep`. The cases under "the ending service" replace
+ * that one key with a recording stub, and put the set back after each
+ * case, to read the call itself and the refusal with nothing registered.
+ *
  * Five controls carry readings that would otherwise pass while wrong:
  *
  *   - The provider factory records whether it was reached, so "a refused
@@ -53,19 +59,20 @@
  * itself.
  */
 import type { TriageSeams } from './triage.js';
-import type { NextEndingSeams } from '../../next/ending.js';
 import type { FakePrComment, FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';
 import type { GitResult, GitRunner, PullRequests } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
-import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { EndingSeams, RafaServices } from '@open-tomato/rafa/core/services';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
 import { createGhPermissions } from '@open-tomato/rafa-board/board/trust';
 
 import { createFakePrGh, logFailedText } from '../../pr/gh-fake.js';
@@ -259,7 +266,7 @@ async function overFake(
   seeds: readonly FakePullRequestSeed[],
   words: readonly string[] = [],
   options: SeamOptions = {},
-  ending?: NextEndingSeams,
+  ending?: EndingSeams,
 ): Promise<Ran & { readonly fake: ReturnType<typeof createFakePrGh> }> {
   const fake = plantedFake(seeds);
   const seams = caseSeams(fake, options);
@@ -698,5 +705,79 @@ describe('the ending it names the next step with', () => {
 
     expect([off.reads(), quiet.run.stdout.includes('Next:')]).toEqual([0, false]);
     expect([on.reads(), loud.run.stdout.includes(ENDING_LINE)]).toEqual([1, true]);
+  });
+});
+
+describe('the ending service', () => {
+  /** The line the stub prints through the context it was handed. */
+  const STUB_LINE = 'the stubbed ending ran';
+
+  /** What the stub was called with, one entry per call. */
+  interface EndingCall {
+    readonly context: RafaContext;
+    readonly seams: EndingSeams | undefined;
+  }
+
+  /** The set the stubbed setup replaced, put back after each case; undefined when none was set up. */
+  let replaced: RafaServices | null | undefined;
+
+  afterEach(() => {
+    if (replaced !== undefined) restoreServices(replaced);
+    replaced = undefined;
+  });
+
+  /** Registers a recording `endWithNextStep` over the active set, as board's `stubEnding` does. */
+  function stubEnding(): readonly EndingCall[] {
+    const calls: EndingCall[] = [];
+    const stub: RafaServices['endWithNextStep'] = (context, seams) => {
+      calls.push({ context, seams });
+      context.output.info(STUB_LINE);
+      return Promise.resolve(null);
+    };
+    replaced = registerServices({ ...activeServices(), endWithNextStep: stub });
+    return calls;
+  }
+
+  it('calls the registered ending once, with the context of the run and the ending seams it was given', async () => {
+    const stubCalls = stubEnding();
+    const ending: EndingSeams = { isTerminal: () => false };
+
+    const outcome = await overFake([RED_41], ['41'], {}, ending);
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(stubCalls).toHaveLength(1);
+    expect(stubCalls[0]?.seams).toBe(ending);
+    expect(stubCalls[0]?.context.argv).toContain('41');
+    expect(outcome.run.stdout.trimEnd().split('\n')
+      .at(-1)).toBe(STUB_LINE);
+  });
+
+  it('never calls the registered ending on an assessment that ended otherwise, which one that ended 0 calls', async () => {
+    const stubCalls = stubEnding();
+
+    const quiet = await overFake([RED_41], ['99'], {}, {});
+    const quietCalls = stubCalls.length;
+    const loud = await overFake([RED_41], ['41'], {}, {});
+
+    expect([quiet.run.exitCode, loud.run.exitCode]).toEqual([1, 0]);
+    expect([quietCalls, stubCalls.length]).toEqual([0, 1]);
+    expect([quiet.run.stdout.includes(STUB_LINE), loud.run.stdout.includes(STUB_LINE)]).toEqual([false, true]);
+  });
+
+  it('refuses the ending of an assessment that ended 0, naming the key and the root, while no service is registered', async () => {
+    const held = registerServices({ ...activeServices() });
+    restoreServices(null);
+    let outcome: Ran;
+    try {
+      outcome = await overFake([RED_41], ['41'], {}, {});
+    } finally {
+      restoreServices(held);
+    }
+
+    expect(outcome.run.exitCode).toBe(1);
+    expect(outcome.run.stdout).toContain('ci-lint');
+    expect(outcome.run.stderr).toContain('service registry:');
+    expect(outcome.run.stderr).toContain('endWithNextStep');
+    expect(outcome.run.stderr).toContain('src/service-registry.ts');
   });
 });

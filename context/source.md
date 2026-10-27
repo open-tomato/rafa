@@ -950,12 +950,12 @@ names come from, and the facade entry is no node.
     `merge.ts`, `retarget.ts`, `triage-resolve.ts`, `triage.ts` and `wait.ts`).
     Each sits earlier in the move order than run, so each imports it backwards,
     and the decouple step before pass 4 cuts them. The seventh decouple item
-    cut six of the eight: `merge-cleanup.ts`, `merge-followups.ts` and
-    `triage-resolve.ts` take their constant from core, and
+    cut seven of the eight: `merge-cleanup.ts`, `merge-followups.ts` and
+    `triage-resolve.ts` take their constant from core,
     `merge-loop-worktree.ts` and `retarget.ts` import
     `src/cleanup/worktrees.ts` and `src/start/pr-retarget.ts`, which it placed
-    in pr, and `merge.ts` calls `endWithNextStep` through core's service
-    registry. Run keeps `triage.ts` and `wait.ts`, for `endWithNextStep` of
+    in pr, and `merge.ts` and `triage.ts` call `endWithNextStep` through
+    core's service registry. Run keeps `wait.ts`, for `endWithNextStep` of
     `src/next/ending.ts`.
   - `declarationGraph`: the importer is reached from the `include` of a
     declaration build whose `.d.ts` files ship, so a published type would name
