@@ -154,8 +154,15 @@ check and doctor read, and `tests/`, the output sinks test helper,
 `pr/` beside them, with the port's types, `types.ts`, its provider,
 `provider.ts`, and its double, `pull-requests-double.ts`, each with its test,
 and `tests/` took the two test helpers, `git-identity.ts` and
-`scratch-home-env.ts`, with their tests, beside `output-sinks.ts`. A file keeps
-its base name when it moves. A moved file keeps no re-export at its old path.
+`scratch-home-env.ts`, with their tests, beside `output-sinks.ts`. The seventh
+decouple item (rafa-1368) added `suite/`, the suite runner, `run.ts`,
+`failure-lines.ts` and `unhandled.ts` with their tests and fixtures, which reach
+only core, and `pr/ci-poll.ts`, the poll interval, beside `pr/`'s files. It also
+put `RUNTIME_SUBDIR` and `RAFA_PACKAGE_NAME` into `runtime/`'s barrel,
+`@open-tomato/rafa/core/runtime`, beside `identity.ts`; the root's
+`src/start/runtime.ts` and `src/commands/pr/merge-followups.ts` now read them
+from there. A file keeps its base name when it moves. A moved file keeps no
+re-export at its old path.
 The root's build entries are the exception: `src/effort/store/index.ts` and
 `src/ports/index.ts` stand at core's folder paths and re-export a package
 subpath until #808 publishes core.
@@ -878,10 +885,11 @@ names come from, and the facade entry is no node.
     `src/next/hop-rows.ts`, `src/next/readings.ts`, `src/start/pr-lifecycle.ts`,
     `src/start/pr-retarget.ts` and `src/start/suite-blocker.ts`. The seventh
     decouple item (rafa-1368) placed `src/cleanup/worktrees.ts` and
-    `src/start/pr-retarget.ts` in pr by name, and `src/next/sources.ts` and
-    `relations-mode.ts`, the pr files `src/next/hint.ts` imported by path, in
-    run, so those three left the group. The run files that import a pr file by
-    path once the placement is made, `src/cleanup/index.ts`,
+    `src/start/pr-retarget.ts` in pr by name, so those two are pr's own files
+    and left the group, and `src/next/sources.ts` and `relations-mode.ts`,
+    the pr files `src/next/hint.ts` imported by path, in run, so those two left
+    pr for run. The run files that import a pr file by path once the placement
+    is made, `src/cleanup/index.ts`,
     `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
     `src/next/relations-mode.ts`, `src/next/settle-step.ts`,
     `src/next/sources.ts` and `src/start/wrap-up-run.ts`, sat on the guard's pr
@@ -903,9 +911,9 @@ names come from, and the facade entry is no node.
     package imports it forward. The seventh decouple item left run none: it
     moved the suite runner, which `src/triage/base-run.ts` and `inherited.ts`
     imported, into core, placed `src/cleanup/steps.ts`, `owner-gate.ts`,
-    `settle-step.ts` and `sources.ts` in run by name, and placed
-    `src/cleanup/worktrees.ts`, which `src/cleanup/groups.ts` imported, in pr,
-    so the guard's run row names no load-cycle file.
+    `relations-mode.ts`, `settle-step.ts` and `sources.ts` in run by name, and
+    placed `src/cleanup/worktrees.ts`, which `src/cleanup/groups.ts` imported,
+    in pr, so the guard's run row names no load-cycle file.
   - `backEdge`: the importer sits in a package earlier in the move order than
     the one it imports, so taking the package by name would make that earlier
     package import a later one, which the decouple step before pass 4 cuts.
