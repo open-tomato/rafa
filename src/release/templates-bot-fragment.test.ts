@@ -162,7 +162,7 @@ describe('the shipped bot fragment workflow', () => {
   });
 
   it('reads the dependency type off dependabot/fetch-metadata into the write', () => {
-    expect(stepNamed('Fetch metadata')).toEqual({ name: 'Fetch metadata', id: 'metadata', uses: 'dependabot/fetch-metadata@v2' });
+    expect(stepNamed('Fetch metadata')).toEqual({ name: 'Fetch metadata', id: 'metadata', uses: 'dependabot/fetch-metadata@v3' });
     expect(at(stepNamed('Write the fragment'), ['env', 'DEPENDENCY_TYPE'])).toBe('${{ steps.metadata.outputs.dependency-type }}');
   });
 
