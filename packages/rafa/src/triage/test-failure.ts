@@ -47,7 +47,8 @@
  * The line is trimmed and a leading `error: ` is taken off, so it reads as
  * the first line of the JUnit failure message bun writes for the same
  * failure (`expect(received).toBe(expected)`, `boom 42`), which is what
- * `src/suite/run.ts` records as a run-start failure's message.
+ * `packages/rafa/src/suite/run.ts` records as a run-start failure's
+ * message.
  */
 import type { ReportBug } from '../report/parse.js';
 

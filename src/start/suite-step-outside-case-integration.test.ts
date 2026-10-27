@@ -27,8 +27,8 @@
  * blocker, and no record carries `outsideCase` or a tail.
  */
 import type { GitResult, GitRunner } from '../pr/index.js';
-import type { SuiteSpawner } from '../suite/run.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { SuiteSpawner } from '@open-tomato/rafa/suite/run';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,11 +37,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { runSuite } from '@open-tomato/rafa/suite/run';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
-import { runSuite } from '../suite/run.js';
 
 import { OUTSIDE_CASE_REASON, storedOutsideCaseLine } from './suite-outside-case.js';
 import { addToLedger } from './suite-step.js';

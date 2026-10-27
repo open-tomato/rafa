@@ -1,6 +1,6 @@
 /**
  * Tests for the reader of the error Bun prints for each failed case
- * (`src/suite/failure-lines.ts`).
+ * (`packages/rafa/src/suite/failure-lines.ts`).
  *
  * The two `failed-*` fixtures under `testdata/` were recorded from real
  * runs of bun 1.3.14, the version `package.json` pins, over scratch

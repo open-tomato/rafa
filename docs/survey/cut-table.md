@@ -72,7 +72,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `packages/rafa-release/src/release/release-delivery.ts` | 2 | `rafa-release` | by rule |
 | `src/next/readings.ts` | 2 | `rafa-run` | by rule |
 | `src/start/pr-lifecycle.ts` | 2 | `rafa-run` | by rule |
-| `src/suite/run.ts` | 2 | `rafa-run` | by rule |
+| `packages/rafa/src/suite/run.ts` | 2 | `rafa-run` | by rule |
 | `packages/rafa-effort/src/effort/attribution.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-effort/src/effort/epic-cost.ts` | 1 | `rafa-effort` | by rule |
 | `packages/rafa-effort/src/effort/file-stamp.ts` | 1 | `rafa-effort` | by rule |

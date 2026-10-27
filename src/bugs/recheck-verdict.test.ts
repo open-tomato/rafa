@@ -1,5 +1,5 @@
 import type { JudgedReference, RunOutcome } from './recheck-verdict.js';
-import type { JunitCase, SuiteResult } from '../suite/run.js';
+import type { JunitCase, SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { describe, expect, it } from 'bun:test';
 

@@ -3,7 +3,8 @@
  * one {@link UnhandledError} per `# Unhandled error between tests` block,
  * and a capped text holding those blocks and the summary lines only.
  *
- * Bun's JUnit file holds nothing for such an error (`src/suite/run.ts`,
+ * Bun's JUnit file holds nothing for such an error
+ * (`packages/rafa/src/suite/run.ts`,
  * "What the JUnit file does NOT hold"), so its stderr is the only place
  * that names the file that threw and what it threw.
  *

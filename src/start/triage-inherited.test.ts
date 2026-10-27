@@ -17,8 +17,8 @@
  * inherited at all.
  */
 import type { StartTriage, TaskTriageInput } from './triage.js';
-import type { JunitReading, SuiteFailure } from '../suite/run.js';
 import type { CliEvent, Tracker } from '@open-tomato/rafa/ports';
+import type { JunitReading, SuiteFailure } from '@open-tomato/rafa/suite/run';
 
 import {
   existsSync,

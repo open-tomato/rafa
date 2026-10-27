@@ -132,18 +132,18 @@
 import type { StepVerdict } from './suite-blocker.js';
 import type { Settling, SuiteStepContext, SuiteStepSeams } from './suite-step.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
-import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import type { SessionStepKind, SessionStepOnly } from '@open-tomato/rafa/core/loop';
+import type { SuiteFailure, SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { join, relative } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { runsDir } from '@open-tomato/rafa/core/loop';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { failingFilesOf } from '@open-tomato/rafa/suite/failure-lines';
+import { outputFileFor } from '@open-tomato/rafa/suite/run';
 
 import { splitFailures } from '../suite/baseline.js';
-import { failingFilesOf } from '../suite/failure-lines.js';
-import { outputFileFor } from '../suite/run.js';
 
 import { alwaysRunJunitFileFor, isCheckInterrupted, isStepInterrupted, junitFileFor, retakeOnErrors, verdictOf } from './suite-step.js';
 

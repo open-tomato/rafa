@@ -121,7 +121,7 @@ interface RewiredRow {
  * by path was `ghPullRequestsIn`, which it reaches through core's service
  * registry as `pullRequestsIn`. So the row keeps 8 load-cycle files and
  * no back-edge file.
- * Run's nine load-cycle files are board, pr and release files run's files
+ * Run's five load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
  * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
  * `packages/rafa-board/src/board/roadmap-claims.ts` and `packages/rafa-board/src/board/setup.ts` left them, and
@@ -132,7 +132,11 @@ interface RewiredRow {
  * `packages/rafa/src/start/branch-decision.ts`, which the item's move list
  * took into core. Pr's `src/triage/kind-route.ts` and `leftover-repair.ts`
  * left the row in the third decouple item: their one run import by path
- * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Run's
+ * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Pr's
+ * `src/triage/base-run.ts` and `inherited.ts` left the row in the seventh
+ * decouple item: their run imports by path were the suite runner,
+ * `src/suite/run.ts`, which the item moved into core as
+ * `packages/rafa/src/suite/run.ts`. Run's
  * five back-edge files are pr files, every one earlier in the move
  * order. `packages/rafa-board/src/board/spec-source.ts` and `packages/rafa-board/src/commands/epic/close.ts`
  * left them in the fourth decouple item: their one run import by path was
@@ -198,8 +202,6 @@ const REWIRED: readonly RewiredRow[] = [
       'src/next/owner-gate.ts': 'loadCycle',
       'src/next/settle-step.ts': 'loadCycle',
       'src/next/sources.ts': 'loadCycle',
-      'src/triage/base-run.ts': 'loadCycle',
-      'src/triage/inherited.ts': 'loadCycle',
     },
     packageName: 'rafa-run',
   },

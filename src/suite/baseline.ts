@@ -65,7 +65,7 @@
  * baseline written before messages were kept still reads as `read`. A
  * `message` that is present but not a string makes the file `unreadable`.
  */
-import type { JunitReading, SuiteFailure, SuiteResult } from './run.js';
+import type { JunitReading, SuiteFailure, SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';

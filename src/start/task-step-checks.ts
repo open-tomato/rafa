@@ -20,7 +20,7 @@
 import type { LintOutcome } from './lint-step.js';
 import type { Settling, SuiteStepContext, SuiteStepSeams, TaskStepInput } from './suite-step.js';
 import type { TypeOutcome } from './type-step.js';
-import type { SuiteResult } from '../suite/run.js';
+import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { runLintStep } from './lint-step.js';
 import { isStepInterrupted, SIGINT_EXIT_CODE } from './suite-step.js';

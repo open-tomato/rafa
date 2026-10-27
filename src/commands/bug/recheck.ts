@@ -103,7 +103,6 @@ import {
   resolveIssueTracker,
   trustRefusalClause,
 } from '@open-tomato/rafa-board';
-import { suiteEnv } from '@open-tomato/rafa-run';
 
 import { checkoutOf } from '@open-tomato/rafa/bugs/fill';
 import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
@@ -112,6 +111,7 @@ import { readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/r
 import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { suiteEnv } from '@open-tomato/rafa/suite/run';
 import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 

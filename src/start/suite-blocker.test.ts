@@ -16,7 +16,7 @@
  * step, and the same name on a repair blocked again.
  */
 import type { StepVerdict } from './suite-blocker.js';
-import type { SuiteFailure } from '../suite/run.js';
+import type { SuiteFailure } from '@open-tomato/rafa/suite/run';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

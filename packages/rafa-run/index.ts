@@ -366,16 +366,3 @@ export { runWrapUp } from '../../src/start/wrap-up-run.js';
 export type { WrapUpLearning } from '../../src/start/wrap-up.js';
 
 export { createDeadlineSpawner } from '../../src/suite/deadline-spawn.js';
-
-export type {
-  JunitCase,
-  SuiteFailure,
-  SuiteResult,
-  SuiteRunOptions,
-  SuiteSpawner,
-} from '../../src/suite/run.js';
-export {
-  parseJunitCases,
-  runSuite,
-  suiteEnv,
-} from '../../src/suite/run.js';

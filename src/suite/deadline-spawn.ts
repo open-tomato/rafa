@@ -20,7 +20,7 @@
  * steps use it. This one is for a caller that runs a test it did not
  * choose, such as `rafa bug recheck`.
  */
-import type { SuiteSpawner, SuiteSpawnOptions, SuiteSpawnResult } from './run.js';
+import type { SuiteSpawner, SuiteSpawnOptions, SuiteSpawnResult } from '@open-tomato/rafa/suite/run';
 
 /** Spawns `argv` as the leader of a new process group; see the module note. */
 function spawnGroup(argv: readonly string[], options: SuiteSpawnOptions) {

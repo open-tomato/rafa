@@ -184,7 +184,7 @@
  * `skipped`, so a caller tells a case that ran from one that did not.
  */
 import type { UnhandledError } from './unhandled.js';
-import type { SuiteFailure , SpawnEnv } from '@open-tomato/rafa/core/loop';
+import type { SuiteFailure , SpawnEnv } from '../core/loop/index.js';
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, isAbsolute, join } from 'node:path';

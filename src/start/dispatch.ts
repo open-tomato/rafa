@@ -97,7 +97,6 @@ import type { DocTaskPlace } from './doc-task.js';
 import type { TaskHandout } from './handout.js';
 import type { TypeCheckRecipe } from './type-step.js';
 import type { InjectionRequest, PlanInjection } from '../plan/index.js';
-import type { SuiteFailure } from '../suite/run.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
@@ -105,6 +104,7 @@ import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
 import type { Learning } from '@open-tomato/rafa/ports';
 import type { TaskReportRecord } from '@open-tomato/rafa/report/record';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
+import type { SuiteFailure } from '@open-tomato/rafa/suite/run';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 import type {
   InstinctRecord,

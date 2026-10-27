@@ -930,7 +930,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/bug/recheck.js', [
     ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'boardRepoLabel', 'createGhRunner', 'ghBoardTrust', 'issueName', 'issueRef', 'lineRefusal', 'onTracker', 'readBoardTrust', 'resolveIssueTracker', 'trustRefusalClause']],
-    ['@open-tomato/rafa-run', ['suiteEnv']],
     ['@open-tomato/rafa/bugs/fill', ['checkoutOf']],
     ['@open-tomato/rafa/bugs/record', ['parseBugRecord']],
     ['@open-tomato/rafa/bugs/versions', ['DIRTY_MARK', 'NO_COMMIT', 'codeVersionOf']],
@@ -938,6 +937,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/command', ['CommandExit', 'RAFA_VERSION']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
+    ['@open-tomato/rafa/suite/run', ['suiteEnv']],
     ['@open-tomato/rafa/triage/filed-text', ['namedSecrets', 'redactSecrets']],
     ['@open-tomato/rafa/triage/local-paths', ['localPathRedactor']],
     ['../../bugs/test-reference.js', ['readTestReference', 'resolveTestReference']],
