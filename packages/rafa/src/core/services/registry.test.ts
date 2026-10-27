@@ -235,9 +235,11 @@ describe('SERVICE_REASONS', () => {
     expect(Object.keys(SERVICE_REASONS)).toEqual(KEYS);
   });
 
-  it('names board or release as lower, run, pr or release as higher, a home under src/ or the higher package\'s src/ and a reach above zero for every key', () => {
+  it('names a sorted non-empty list of board, pr or release as lower, run, pr or release as higher, a home under src/ or the higher package\'s src/ and a reach above zero for every key', () => {
     for (const [key, reason] of Object.entries(SERVICE_REASONS)) {
-      expect([key, ['board', 'release'].includes(reason.lower)]).toEqual([key, true]);
+      expect([key, reason.lower.length > 0]).toEqual([key, true]);
+      expect([key, reason.lower.every((lower) => ['board', 'pr', 'release'].includes(lower))]).toEqual([key, true]);
+      expect([key, [...reason.lower]]).toEqual([key, [...new Set(reason.lower)].sort()]);
       expect([key, ['run', 'pr', 'release'].includes(reason.higher)]).toEqual([key, true]);
       // A home moves with its higher package (release's in pass 4d, #808).
       const homeRoots = ['src/', `packages/rafa-${reason.higher}/src/`];
@@ -248,8 +250,15 @@ describe('SERVICE_REASONS', () => {
     }
   });
 
-  it('is frozen, each reason with it', () => {
+  it('names board and pr as the lower packages of endWithNextStep, whose three pr commands joined board\'s in the seventh decouple item', () => {
+    expect([...SERVICE_REASONS.endWithNextStep.lower]).toEqual(['board', 'pr']);
+  });
+
+  it('is frozen, each reason and its lower list with it', () => {
     expect(Object.isFrozen(SERVICE_REASONS)).toBe(true);
-    for (const reason of Object.values(SERVICE_REASONS)) expect(Object.isFrozen(reason)).toBe(true);
+    for (const reason of Object.values(SERVICE_REASONS)) {
+      expect(Object.isFrozen(reason)).toBe(true);
+      expect(Object.isFrozen(reason.lower)).toBe(true);
+    }
   });
 });

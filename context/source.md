@@ -448,7 +448,9 @@ names the lower and higher package, the function's file and its reach on the
 import graph, and why the function cannot move into core, and it needs a check
 on the import graph that the function cannot move there. A function that is
 pure, or that reaches nothing past core, moves into core instead. The five
-entries are calls of a lower package, board or release, each into a higher one:
+entries are calls of a lower package, board, pr or release, each into a higher
+one, and a key may serve more than one lower package, each named in its
+reason's `lower`, a sorted list:
 
 - `addStaleDocLine`, release's, in
   `packages/rafa-release/src/docs/release-issue.ts`, a file release holds by
@@ -457,9 +459,10 @@ entries are calls of a lower package, board or release, each into a higher one:
   was not re-measured), for `rafa epic close`, which adds a line to the
   release's stale-docs issue, whose module reads the release version helpers of
   `packages/rafa-release/src/release/`.
-- `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for
-  `rafa issue ready`, which ends naming the next step and runs its action
-  through run's dispatch.
+- `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for board's
+  `rafa issue ready` and, since the seventh decouple item, pr's
+  `rafa pr merge`, `triage` and `wait`, which end naming the next step and run
+  its action through run's dispatch.
 - `readStaleDocsVersion`, run's, in `src/start/stale-docs.ts` (reach 165), for
   `rafa epic close`, which titles the stale-docs issue by the release forecast.
 - `triageReport`, pr's, in `src/triage/triage.ts` (reach 66), for

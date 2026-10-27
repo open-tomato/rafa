@@ -6,10 +6,11 @@
  * ## Why it exists
  *
  * A package may not import a package that moves after it. Board moves
- * before run, pr and release, and release before pr and run, and a
- * command of a lower package, board or release, calls a function of a
- * higher one that reaches too far into its package to move into core:
- * four of board's commands and release's `rafa release settle`. Each
+ * before run, pr and release, release before pr and run, and pr before
+ * run, and a command of a lower package, board, pr or release, calls a
+ * function of a higher one that reaches too far into its package to
+ * move into core: four of board's commands, release's `rafa release
+ * settle` and pr's `rafa pr merge`, `triage` and `wait`. Each
  * such function is a key of {@link RafaServices}; the lower package
  * calls it through {@link activeServices}, and the composition root
  * `src/service-registry.ts`, outside `packages/rafa/src/core/`, imports
@@ -22,13 +23,16 @@
  *
  * A key enters only when a lower package needs a higher package's
  * function that cannot move into core, and each key carries its reason
- * in {@link SERVICE_REASONS}: the lower package, the higher one, the
+ * in {@link SERVICE_REASONS}: the lower packages, the higher one, the
  * function's file and its reach, the count of files outside
  * `packages/rafa/` that file reaches on `docs/survey/import-graph.json`
  * over value and type edges, tests excluded, the home itself not
  * counted, read at aec5e4a for board's four keys and on the graph the
  * base of decouple 6 held, last written at 76ebfc2, for release's
- * `pullRequestsIn`. The
+ * `pullRequestsIn`. A key may serve more than one lower package, each
+ * named in its reason's `lower`, a sorted list: pr's three commands,
+ * `rafa pr merge`, `triage` and `wait`, joined board's `rafa issue
+ * ready` on `endWithNextStep` in the seventh decouple item. The
  * mapped type of {@link SERVICE_REASONS} makes a key with no reason a
  * `tsc` failure. A function that is pure, or reaches nothing past core,
  * moves into core instead and is no key here.
@@ -84,7 +88,7 @@ const COMPOSITION_ROOT = 'src/service-registry.ts';
 export interface RafaServices {
   /** release's `addStaleDocLine`, for `rafa epic close`. */
   readonly addStaleDocLine: AddStaleDocLineService;
-  /** run's `endWithNextStep`, for `rafa issue ready`. */
+  /** run's `endWithNextStep`, for `rafa issue ready` and `rafa pr merge`, `triage` and `wait`. */
   readonly endWithNextStep: EndWithNextStepService;
   /** pr's `ghPullRequestsIn`, for `rafa release settle`. */
   readonly pullRequestsIn: PullRequestsInService;
@@ -96,8 +100,8 @@ export interface RafaServices {
 
 /** Why one key is a service and not a move into core; see the module note. */
 export interface ServiceReason {
-  /** The lower package whose command calls the service, board or release. */
-  readonly lower: 'board' | 'release';
+  /** The lower packages whose commands call the service, of board, pr and release: sorted, never empty. */
+  readonly lower: readonly ('board' | 'pr' | 'release')[];
   /** The package the function lives in. */
   readonly higher: 'pr' | 'release' | 'run';
   /** The function's file, repository-relative, where it stands now; its reach was read where it stood then; see the module note. */
@@ -111,7 +115,7 @@ export interface ServiceReason {
 /** The reason of each key, frozen, keys sorted. */
 export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReason } = Object.freeze({
   addStaleDocLine: Object.freeze<ServiceReason>({
-    lower: 'board',
+    lower: Object.freeze(['board']),
     higher: 'release',
     home: 'packages/rafa-release/src/docs/release-issue.ts',
     reach: 6,
@@ -119,15 +123,15 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
       + ' helpers of packages/rafa-release/src/release/.',
   }),
   endWithNextStep: Object.freeze<ServiceReason>({
-    lower: 'board',
+    lower: Object.freeze(['board', 'pr']),
     higher: 'run',
     home: 'src/next/ending.ts',
     reach: 119,
-    why: 'rafa issue ready ends naming the next step, which reads the whole next-step state and runs its action'
-      + ' through run\'s dispatch.',
+    why: 'rafa issue ready, and rafa pr merge, triage and wait after a merge, a triage that ended 0 and a green wait,'
+      + ' end naming the next step, which reads the whole next-step state and runs its action through run\'s dispatch.',
   }),
   pullRequestsIn: Object.freeze<ServiceReason>({
-    lower: 'release',
+    lower: Object.freeze(['release']),
     higher: 'pr',
     home: 'src/pr/gh.ts',
     reach: 9,
@@ -135,7 +139,7 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
       + ' and pr\'s check readers.',
   }),
   readStaleDocsVersion: Object.freeze<ServiceReason>({
-    lower: 'board',
+    lower: Object.freeze(['board']),
     higher: 'run',
     home: 'src/start/stale-docs.ts',
     reach: 165,
@@ -143,7 +147,7 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
       + ' chain and the release fold.',
   }),
   triageReport: Object.freeze<ServiceReason>({
-    lower: 'board',
+    lower: Object.freeze(['board']),
     higher: 'pr',
     home: 'src/triage/triage.ts',
     reach: 66,
