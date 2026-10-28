@@ -57,8 +57,7 @@ import { SKILL_RESOLVER_BY_NAME, selectLessons } from '@open-tomato/rafa-invento
 
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { parsePlan } from '../plan/index.js';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
 
 /** The run's two `task.*` keys and where its lessons are pulled from. See "The two keys". */
 export interface TaskHandout {

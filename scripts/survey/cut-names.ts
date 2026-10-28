@@ -103,7 +103,8 @@ export const PR_NAMED: readonly string[] = [
  * `src/next/sources.ts` here by the same rule read with type edges, since
  * each reads run's types and is imported only by run and the CLI, and
  * moved `packages/rafa-pr/src/cleanup/worktrees.ts` to the pr list,
- * since it reaches only pr and core.
+ * since it reaches only pr and core. Pass 4f moved `src/plan/index.ts`,
+ * the published `./plan` entry, to the CLI's list.
  */
 export const RUN_NAMED: readonly string[] = [
   'src/cleanup/index.ts',
@@ -124,7 +125,6 @@ export const RUN_NAMED: readonly string[] = [
   'src/next/settle-step.ts',
   'src/next/sources.ts',
   'src/next/state.ts',
-  'src/plan/index.ts',
   'src/plan/list.ts',
   'src/plan/store-rules.ts',
   'src/runtime/install.ts',
@@ -185,12 +185,16 @@ export const INVENTORY_NAMED: readonly string[] = [];
  * `src/effort/store/index.ts` is the published `./store` entry, a build
  * entry of the CLI as `src/rafa.ts` is (`LIBRARY_ENTRIES` of
  * `scripts/build/bundle.ts`), holding one line of core; it does not move
- * in pass 4b, so the build is untouched.
+ * in pass 4b, so the build is untouched. `src/plan/index.ts` is the
+ * published `./plan` entry, a build entry of the CLI in the same way; it
+ * left run's list in pass 4f, stays at the root when run's files move,
+ * and takes run's preflight names from the facade, `@open-tomato/rafa-run`.
  */
 export const CLI_NAMED: readonly string[] = [
   'src/commands/index.ts',
   'src/effort/store/index.ts',
   'src/inventory/browse.ts',
+  'src/plan/index.ts',
   'src/rafa.ts',
   'src/schema/agent.ts',
 ];

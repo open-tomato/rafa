@@ -540,10 +540,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/plan', ['formatCounts', 'plural']],
   ]],
   ['./commands/plan/show.js', [
-    ['@open-tomato/rafa-run', ['parsePlan']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'requireProject', 'resolvePlansDir']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/plan', ['checkbox', 'countTasks', 'formatCounts', 'isFile', 'issueLine', 'isStampableStub', 'planFileName']],
+    ['@open-tomato/rafa/core/plan', ['checkbox', 'countTasks', 'formatCounts', 'isFile', 'issueLine', 'isStampableStub', 'parsePlan', 'planFileName']],
   ]],
   ['./commands/plan/validate.js', [
     ['@open-tomato/rafa-inventory', ['collidingPlanSkills', 'missingAgentLine', 'missingPlanAgents', 'resolveAgentRoster', 'skillCollisionLine', 'unresolvedPlanSkills', 'unresolvedSkillLine']],

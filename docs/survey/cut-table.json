@@ -5180,8 +5180,8 @@
         }
       ],
       "fileCounts": {
-        "source": 111,
-        "test": 154,
+        "source": 110,
+        "test": 153,
         "testSupport": 0
       },
       "files": [
@@ -5246,8 +5246,6 @@
         "src/next/sources.ts",
         "src/next/state.test.ts",
         "src/next/state.ts",
-        "src/plan/index.test.ts",
-        "src/plan/index.ts",
         "src/plan/list.ts",
         "src/plan/store-rules.test.ts",
         "src/plan/store-rules.ts",
@@ -5487,7 +5485,6 @@
         "src/next/settle-step.ts",
         "src/next/sources.ts",
         "src/next/state.ts",
-        "src/plan/index.ts",
         "src/plan/list.ts",
         "src/plan/store-rules.ts",
         "src/runtime/install.ts"
@@ -5805,8 +5802,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 175,
-        "test": 579,
+        "source": 176,
+        "test": 580,
         "testSupport": 22
       },
       "files": [
@@ -6133,6 +6130,8 @@
         "src/notices/run.ts",
         "src/plan.test.ts",
         "src/plan.ts",
+        "src/plan/index.test.ts",
+        "src/plan/index.ts",
         "src/plan/needs.test.ts",
         "src/plan/needs.ts",
         "src/ports/index.ts",
@@ -6598,6 +6597,7 @@
         "src/commands/index.ts",
         "src/effort/store/index.ts",
         "src/inventory/browse.ts",
+        "src/plan/index.ts",
         "src/rafa.ts",
         "src/schema/agent.ts"
       ],
@@ -6610,7 +6610,7 @@
     "clearedByIssue118": 0,
     "files": 2197,
     "leftToPlace": 738,
-    "nonTestEdges": 4871,
+    "nonTestEdges": 4868,
     "unassignedFiles": 28,
     "unrankedEdges": 75,
     "upwardEdges": 51

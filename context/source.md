@@ -598,12 +598,13 @@ board. The sixth decouple item (rafa-1362) took the two stale-docs files off
 `packages/rafa-pr/src/start/pr-retarget.ts` in pr and `src/cleanup/steps.ts`,
 `src/next/owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and `sources.ts`
 in run, each by the latest package it reaches, so `PR_NAMED` holds 8 and
-`RUN_NAMED` 22. A file a list names is placed in that package whatever its
-folder, and keeps its path: no named file moves in the cut itself; the packages'
-moves move them. Board's move (pass 4c) moved its named files, and `BOARD_NAMED`
-holds 22 files on their `packages/rafa-board/src/` paths since then, the move
-tool having rewritten the list with them; the rule's folders are
-`packages/rafa-board/` and the four it keeps for #913, `src/board/`,
+`RUN_NAMED` 22; pass 4f took `src/plan/index.ts` off `RUN_NAMED` for
+`CLI_NAMED`, so `RUN_NAMED` holds 21. A file a list names is placed in that
+package whatever its folder, and keeps its path: no named file moves in the cut
+itself; the packages' moves move them. Board's move (pass 4c) moved its named
+files, and `BOARD_NAMED` holds 22 files on their `packages/rafa-board/src/`
+paths since then, the move tool having rewritten the list with them; the rule's
+folders are `packages/rafa-board/` and the four it keeps for #913, `src/board/`,
 `src/commands/board/`, `src/commands/epic/` and `src/commands/issue/`, and it
 dropped `src/adapters/tracker/`, `src/board/project/` and `src/refs/`, the three
 folders the move emptied. Release's move (pass 4d) moved its named files the
@@ -626,7 +627,7 @@ beside `RUN_NAMED` until the fourth decouple item (rafa-1333) moved it into
 core, so `CUT_RULES` now adds `packages/rafa-pr/src/pr/index.ts` beside
 `PR_NAMED` alone. `INVENTORY_NAMED` is empty since pass 4a moved its six files
 into `packages/rafa-inventory/src/`, where the package's folder rule places
-them. The CLI's named files are five, `CLI_NAMED`: the roster, the bin entry and
+them. The CLI's named files are six, `CLI_NAMED`: the roster, the bin entry and
 the agent schema, which were the CLI rule's three inline names, and
 `src/inventory/browse.ts`, the view behind `rafa skill list -i`, which sits
 under `src/inventory/` but is a CLI file by name: the CLI's prompt files it
@@ -634,9 +635,11 @@ uses, `src/cli/prompt/page.ts`, `select.ts` and `terminal.ts`, are CLI-internal,
 so it counts no edge out of inventory and does not move. The store entry,
 `src/effort/store/index.ts`, is the fifth, since pass 4b: the published
 `./store` build entry, a CLI file by name as `src/rafa.ts` is, and it stays at
-the root. The first decouple item (#808) took `naming.ts` off `BOARD_NAMED` and
-`agent-definition.ts` off `EFFORT_NAMED` as they moved into core, now
-`packages/rafa/src/board/naming.ts` and
+the root. The plan entry, `src/plan/index.ts`, is the sixth, since pass 4f: the
+published `./plan` build entry, a CLI file by name in the same way, which stays
+at the root when run's files move. The first decouple item (#808) took
+`naming.ts` off `BOARD_NAMED` and `agent-definition.ts` off `EFFORT_NAMED` as
+they moved into core, now `packages/rafa/src/board/naming.ts` and
 `packages/rafa/src/utils/agent-definition.ts`, and `frontmatter.ts` left the
 effort rule of `CUT_RULES` for `packages/rafa/src/schema/frontmatter.ts`. The
 placement, in the same item, added `serving.ts` under `src/start/` to

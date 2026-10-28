@@ -128,10 +128,10 @@ import {
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
 
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { parsePlan } from '../plan/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
 import { writeConventionLines } from './convention-body.js';

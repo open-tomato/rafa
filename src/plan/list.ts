@@ -32,9 +32,7 @@ import type { PlansDir, TaskCounts } from '@open-tomato/rafa/core/plan';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { countTasks, isFile, planFileName, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
-
-import { parsePlan } from './index.js';
+import { countTasks, isFile, parsePlan, planFileName, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
 
 /** One plan the list holds. */
 export interface PlanListing {

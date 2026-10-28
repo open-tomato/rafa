@@ -96,11 +96,11 @@ import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.j
 import type { DocTaskPlace } from './doc-task.js';
 import type { TaskHandout } from './handout.js';
 import type { TypeCheckRecipe } from './type-step.js';
-import type { InjectionRequest, PlanInjection } from '../plan/index.js';
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { TaskDeclaration } from '@open-tomato/rafa/core/plan';
+import type { InjectionRequest, PlanInjection } from '@open-tomato/rafa/plan/inject';
 import type { Learning } from '@open-tomato/rafa/ports';
 import type { TaskReportRecord } from '@open-tomato/rafa/report/record';
 import type { FindingOutcome } from '@open-tomato/rafa/store/findings';
@@ -126,12 +126,11 @@ import {
 import { runClaudeCaptured, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration, resolveDeclarationFlags , escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { renderInjection } from '@open-tomato/rafa/plan/inject';
 import { describeTaskReportRecord, recordTaskReport } from '@open-tomato/rafa/report/record';
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
 import { agentEffortLookup } from '@open-tomato/rafa/utils/agent-definition';
 import { PROGRESS_CAP_BYTES, writeProgress } from '@open-tomato/rafa/utils/progress';
-
-import { renderInjection } from '../plan/index.js';
 
 import { haltIfCheckoutMoved } from './checkout-watch.js';
 import { docTaskPrompt } from './doc-task.js';

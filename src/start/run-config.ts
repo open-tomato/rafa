@@ -25,17 +25,16 @@
  * Every line either writes goes through the active output
  * (`core/output/active.ts`), at warn level.
  */
-import type { PlanIssue } from '../plan/index.js';
 import type { ConfigSource, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+import type { PlanIssue } from '@open-tomato/rafa/core/plan';
 import type { StoreEnvironment } from '@open-tomato/rafa/store/location';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { EFFORT_DIR_VARIABLE } from '@open-tomato/rafa/store/location';
-
-import { parsePlan } from '../plan/index.js';
 
 import { NOTHING_DISPATCHED } from './session.js';
 

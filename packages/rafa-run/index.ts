@@ -132,57 +132,6 @@ export {
 } from '../../src/next/state.js';
 
 export type {
-  CheckOutcome,
-  FindingKind,
-  FindingSignal,
-  InjectionFallback,
-  InjectionFallbackReason,
-  InjectionRequest,
-  InjectionTask,
-  LineSpan,
-  PlanBlockKind,
-  PlanHeader,
-  PlanHeaderExtra,
-  PlanHeaderField,
-  PlanInjection,
-  PlanIssue,
-  PlanIssueReason,
-  PlanModel,
-  PlanStage,
-  PlanTask,
-  PlanTaskStatus,
-  PreflightCheck,
-  PreflightTier,
-  RafaBlock,
-  RafaBlockKind,
-  ReportAbsenceReason,
-  ReportAbsent,
-  ReportBlocker,
-  ReportBug,
-  ReportExtra,
-  ReportFinding,
-  ReportIssue,
-  ReportIssueReason,
-  ReportPresent,
-  ReportReading,
-  ReportStatus,
-  TaskReport,
-} from '../../src/plan/index.js';
-export {
-  FINDING_KINDS,
-  FINDING_SIGNALS,
-  PLAN_BLOCK_KINDS,
-  PLAN_HEADER_FIELDS,
-  RAFA_BLOCK_KINDS,
-  REPORT_STATUSES,
-  isRafaBlockKind,
-  parsePlan,
-  parseReport,
-  readRafaBlocks,
-  renderInjection,
-} from '../../src/plan/index.js';
-
-export type {
   PlanList,
   PlanListing,
 } from '../../src/plan/list.js';
@@ -215,9 +164,12 @@ export {
 } from '../../src/preflight/prerequisites-md.js';
 
 export type {
+  CheckOutcome,
+  PreflightCheck,
   PreflightEnv,
   PreflightOptions,
   PreflightReport,
+  PreflightTier,
   PreflightTiers,
   ProbeOptions,
   ProbeRun,
