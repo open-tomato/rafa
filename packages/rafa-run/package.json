@@ -16,6 +16,14 @@
     "lint": "eslint .",
     "test": "bun test"
   },
+  "dependencies": {
+    "@open-tomato/rafa-board": "workspace:*",
+    "@open-tomato/rafa-core": "workspace:*",
+    "@open-tomato/rafa-effort": "workspace:*",
+    "@open-tomato/rafa-inventory": "workspace:*",
+    "@open-tomato/rafa-pr": "workspace:*",
+    "@open-tomato/rafa-release": "workspace:*"
+  },
   "devDependencies": {
     "@open-tomato/rafa-eslint-config": "workspace:*",
     "eslint": "^9.39.4"
