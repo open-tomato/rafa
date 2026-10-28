@@ -321,7 +321,8 @@ not drifted from the current repository.
   indent, keys `unit`, `map`, `commit`, `binReach` (the bin's reach, eleven units), `tests` keyed by path, `unsorted`,
   `unindexed`.
 
-  The index counts the units a test reaches, doubled when it spawns, so the cut moves it three ways. Lightest first:
+  The index counts the units a test reaches, except through a type-only import of core, doubled when it spawns, so the
+  cut moves it three ways. Lightest first:
   1. A test whose index falls because three folders became one package: say it reached three folders of `src/`, which
      now make one package, so it reaches one unit. A fall fails nothing in the guard.
   2. A test whose index rises because one folder split in two: a folder of `src/` is cut across two packages, so a test

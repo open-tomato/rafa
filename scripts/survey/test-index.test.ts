@@ -1,13 +1,14 @@
 import type { ImportEdge, ImportGraph } from './import-graph';
 import type { IndexRules, TestIndex, TestIndexEntry, TestIndexInput } from './test-index';
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { parseCutMap } from './cut-map';
+import { CORE_PACKAGE } from './cut-table';
 import {
   BASELINE_PATH,
   BIN_ENTRY,
@@ -19,6 +20,19 @@ import {
   renderTestIndexJson,
 } from './test-index';
 import { renderTestIndexMarkdown } from './test-index-markdown';
+import { meetsRule } from './test-index-record';
+import {
+  git,
+  IDENTITY,
+  plant,
+  plantScratch,
+  RECORD_MODE,
+  runGuard,
+  runScript,
+  SCRATCH_FILES,
+  SCRATCH_MAP,
+  SCRATCH_TABLE,
+} from './test-index-scratch';
 
 /** A graph over `files` with `value` edges `[from, to]`, every file read but `unread`. */
 function plantedGraph(files: readonly string[], links: readonly (readonly [string, string])[], unread: readonly string[] = []): ImportGraph {
@@ -290,22 +304,70 @@ describe('the index in projected packages', () => {
   });
 });
 
-/** Runs git in a scratch repository, fails the test on a non-zero exit, and returns what it printed. */
-function git(root: string, args: readonly string[]): string {
-  const result = Bun.spawnSync(['git', ...args], { cwd: root, stderr: 'pipe', stdout: 'pipe' });
-  if (result.exitCode !== 0) {
-    throw new Error(`git ${args.join(' ')} exited ${result.exitCode}: ${result.stderr.toString()}`);
-  }
-  return result.stdout.toString();
-}
+describe('the core type-only rule in projected packages', () => {
+  const CORE = 'packages/rafa/src/schema/core.ts';
+  const OWN = 'src/feature/own.ts';
+  const OTHER = 'src/other/other.ts';
+  const TYPED_CORE = 'src/feature/typed-core.test.ts';
+  const VALUED_CORE = 'src/feature/valued-core.test.ts';
+  const TYPED_OTHER = 'src/feature/typed-other.test.ts';
+  const map = parseCutMap(JSON.stringify({
+    packages: [
+      { files: [CORE], name: CORE_PACKAGE },
+      { files: [BIN_ENTRY, OWN, TYPED_CORE, VALUED_CORE, TYPED_OTHER], name: 'rafa-feature' },
+      { files: [OTHER], name: 'rafa-other' },
+    ],
+    unassigned: [],
+  }), 'cut-table.json');
+  const linked = plantedGraph(
+    [BIN_ENTRY, CORE, OWN, OTHER, TYPED_CORE, VALUED_CORE, TYPED_OTHER],
+    [[BIN_ENTRY, OWN], [TYPED_CORE, OWN], [VALUED_CORE, OWN], [VALUED_CORE, CORE], [TYPED_OTHER, OWN]],
+  );
+  const typed = [[BIN_ENTRY, CORE], [TYPED_CORE, CORE], [TYPED_OTHER, OTHER]] as const;
+  const graph = { ...linked, edges: [...linked.edges, ...typed.map(([from, to]) => ({ from, kind: 'type' as const, to }))] };
+  const input: TestIndexInput = { graph, sources: new Map() };
+  const rules = packageRules(map, graph);
+  const ruled = computeTestIndex(input, rules);
+  // The control: the same graph read with the rule removed.
+  const unruled = computeTestIndex(input, { ...rules, follows: undefined });
+  const meetsUnitRule = (entry: TestIndexEntry): boolean => meetsRule({
+    deep: [],
+    kind: 'unit',
+    package: entry.folder ?? '',
+    packages: entry.folders,
+    spawns: entry.spawns,
+    spawnsVia: entry.spawnsVia,
+  });
 
-function plant(root: string, path: string, text: string): void {
-  mkdirSync(dirname(join(root, path)), { recursive: true });
-  writeFileSync(join(root, path), text);
-}
+  it('does not follow a type edge into core: the test reaches its own unit alone and meets the unit rule', () => {
+    expect(entryOf(ruled, TYPED_CORE)).toMatchObject({ folder: 'rafa-feature', folders: ['rafa-feature'], index: 1, sourceFiles: 1 });
+    expect(meetsUnitRule(entryOf(ruled, TYPED_CORE))).toBe(true);
+    expect(ruled.sources.find((source) => source.source === CORE)?.tests).toEqual([VALUED_CORE]);
+  });
 
-/** The git options a scratch commit is made under, whatever the machine's own configuration. */
-const IDENTITY = ['-c', 'user.name=survey', '-c', 'user.email=survey@example.invalid', '-c', 'commit.gpgsign=false'];
+  it('counts core for the type edge once the rule is removed, the control', () => {
+    expect(entryOf(unruled, TYPED_CORE)).toMatchObject({ folders: [CORE_PACKAGE, 'rafa-feature'], index: 2, sourceFiles: 2 });
+    expect(meetsUnitRule(entryOf(unruled, TYPED_CORE))).toBe(false);
+    expect(unruled.sources.find((source) => source.source === CORE)?.tests).toEqual([TYPED_CORE, VALUED_CORE]);
+  });
+
+  it('follows a value edge into core, with the rule and without it', () => {
+    expect(entryOf(ruled, VALUED_CORE)).toMatchObject({ folders: [CORE_PACKAGE, 'rafa-feature'], index: 2 });
+    expect(entryOf(unruled, VALUED_CORE)).toEqual(entryOf(ruled, VALUED_CORE));
+  });
+
+  it('follows a type edge into another package, with the rule and without it', () => {
+    expect(entryOf(ruled, TYPED_OTHER)).toMatchObject({ folders: ['rafa-feature', 'rafa-other'], index: 2 });
+    expect(entryOf(unruled, TYPED_OTHER)).toEqual(entryOf(ruled, TYPED_OTHER));
+  });
+
+  it('keys on the edge\'s kind and its target\'s unit, and leaves the bin\'s type edge into core in the spawned reach', () => {
+    expect(rules.follows?.({ from: TYPED_CORE, kind: 'type', to: CORE })).toBe(false);
+    expect(rules.follows?.({ from: TYPED_CORE, kind: 'value', to: CORE })).toBe(true);
+    expect(rules.follows?.({ from: TYPED_OTHER, kind: 'type', to: OTHER })).toBe(true);
+    expect(rules.spawnedReach).toEqual([CORE_PACKAGE, 'rafa-feature']);
+  });
+});
 
 describe('a real bun build over a scratch repository', () => {
   let root = '';
@@ -355,63 +417,6 @@ describe('a real bun build over a scratch repository', () => {
     expect(readFileSync(join(root, 'docs/survey/test-index.md'), 'utf8')).toBe(markdown);
   });
 });
-
-/** The map a scratch repository of the record and the guard is read by. */
-const SCRATCH_MAP = 'docs/survey/cut-table.json';
-
-/**
- * A scratch repository's files in scope: the bin, a test of its own unit,
- * and a second unit no test reaches yet.
- */
-const SCRATCH_FILES: Readonly<Record<string, string>> = {
-  'src/a/one.test.ts': 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
-    + 'it(\'x\', () => expect(x).toBe(1));\n',
-  'src/deep/x.ts': 'export const x = 1;\n',
-  'src/far/y.ts': 'export const y = 2;\n',
-  'src/rafa.ts': 'import { x } from \'./deep/x.js\';\nexport const bin = x;\n',
-};
-
-/**
- * The cut table the scratch repositories plant: the bin, its test and
- * `fresh.test.ts`, listed before it is written, in `@scratch/cli`, and
- * `y.ts` alone in `@scratch/far`. `untracked.test.ts`, `stray.test.ts`
- * and `stray/z.ts` are listed nowhere; the two under `src/stray/` stay
- * unplaced, since no listed file sits beside them and no row names a
- * folder.
- */
-const SCRATCH_TABLE = `${JSON.stringify({
-  packages: [
-    { files: ['src/a/fresh.test.ts', 'src/a/one.test.ts', 'src/deep/x.ts', 'src/rafa.ts'], name: '@scratch/cli' },
-    { files: ['src/far/y.ts'], name: '@scratch/far' },
-  ],
-  unassigned: [],
-}, null, 2)}\n`;
-
-/**
- * Plants a scratch repository of the record and the guard: the files in
- * scope, the cut table, a root manifest with no workspace member, and a
- * file out of scope, all staged and none committed.
- *
- * @param prefix - The temp folder's prefix.
- * @param files - The files in scope, by path; the unit test and its sources unless handed.
- * @param table - The cut table's text; {@link SCRATCH_TABLE} unless handed.
- * @returns The repository's root.
- */
-function plantScratch(prefix: string, files: Readonly<Record<string, string>> = SCRATCH_FILES, table: string = SCRATCH_TABLE): string {
-  const root = mkdtempSync(join(tmpdir(), prefix));
-  git(root, ['init', '--quiet']);
-  for (const [path, text] of Object.entries(files)) {
-    plant(root, path, text);
-  }
-  plant(root, SCRATCH_MAP, table);
-  plant(root, 'package.json', '{ "name": "scratch", "private": true, "workspaces": [] }\n');
-  plant(root, 'README.md', 'A file out of scope.\n');
-  git(root, ['add', '-A']);
-  return root;
-}
-
-/** The record mode of a scratch repository, its map passed relative to the root. */
-const RECORD_MODE = { baseline: true, map: SCRATCH_MAP } as const;
 
 describe('the record mode over a scratch repository', () => {
   let root = '';
@@ -495,21 +500,6 @@ describe('the record mode over a scratch repository', () => {
     expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
   });
 });
-
-/** Runs the script itself in `root` with `args`, and returns its exit code and what it printed. */
-function runScript(root: string, args: readonly string[]): { exitCode: number; stderr: string; stdout: string } {
-  const result = Bun.spawnSync([process.execPath, join(import.meta.dir, 'test-index.ts'), ...args], {
-    cwd: root,
-    stderr: 'pipe',
-    stdout: 'pipe',
-  });
-  return { exitCode: result.exitCode, stderr: result.stderr.toString(), stdout: result.stdout.toString() };
-}
-
-/** Runs the guard in `root` against `record`, the map passed beside it. */
-function runGuard(root: string, record: string): { exitCode: number; stderr: string; stdout: string } {
-  return runScript(root, [`--against=${record}`, `--map=${SCRATCH_MAP}`]);
-}
 
 describe('the guard over a scratch repository', () => {
   let root = '';
