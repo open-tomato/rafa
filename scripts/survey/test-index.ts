@@ -57,8 +57,14 @@
  *     other file as the folder it lies in (`packages/rafa/src/effort/store`). Only files
  *     of kind `source` (see `files.ts`) count their folder.
  *   - The imports are the edges of the survey's import graph
- *     (`import-graph.ts`), of either kind: a type-only import ties a test
- *     to a package as much as a value one does. A re-export
+ *     (`import-graph.ts`), of either kind under the survey's rules. Under
+ *     `packageRules` (below) one edge is not followed: a type-only import
+ *     (`kind: 'type'`) whose target the map places in core's unit,
+ *     `@open-tomato/rafa-core` (`CORE_PACKAGE` of `cut-table.ts`), adds no
+ *     unit, no source file and no reaching test, since a type-only import
+ *     of core ties a test to no unit. A value import of core, and a
+ *     type-only import of any other unit, is followed. The rules carry
+ *     this as `follows`, which the test walk consults per edge. A re-export
  *     (`export … from`) is an edge like any other import, so a test that
  *     reaches a file through a barrel reaches the file's folder. An import
  *     of a facade (`packages/rafa-<name>/index.ts`), or of its commands
@@ -93,7 +99,8 @@
  * `packageRules(map, graph)`, which the record and the guard read the tree
  * by, reads it by the cut map instead: a file's folder is its unit, so
  * three folders in one package count once and one folder cut across two
- * packages counts twice. The spawned rule: the rules carry the spawned
+ * packages counts twice, and a test's walk leaves a type-only import of
+ * core unfollowed (above). The spawned rule: the rules carry the spawned
  * reach, the sorted units of every source file reachable from the bin
  * entry `src/rafa.ts` along the graph (edges of either kind), and a
  * spawning test then counts the union of its own units and that reach
@@ -116,7 +123,7 @@
 
 import type { CutMap } from './cut-map';
 import type { FileKind, TrackedFiles } from './files';
-import type { ImportGraph } from './import-graph';
+import type { ImportEdge, ImportGraph } from './import-graph';
 import type { AgainstMode, WritingMode } from './test-index-args';
 import type { RecordComparison } from './test-index-guard';
 import type { RecordInput, TestRecord } from './test-index-record';
@@ -126,6 +133,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
 
 import { readCutMap } from './cut-map';
+import { CORE_PACKAGE } from './cut-table';
 import { readFacadeTables } from './facade-tables';
 import { classifyFile, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
 import {
@@ -219,6 +227,11 @@ export interface IndexRules {
   readonly spawnedReach?: readonly string[];
   /** The source files a spawned process loads that the rules place nowhere, sorted. */
   readonly spawnedUnplaced?: readonly string[];
+  /**
+   * Whether a test's walk follows an import edge; every edge is followed
+   * when absent. The spawned reach is read without it.
+   */
+  readonly follows?: (edge: ImportEdge) => boolean;
 }
 
 /** The bin's entry, the file a spawned `rafa` process starts from. */
@@ -245,14 +258,15 @@ export const SURVEY_RULES: IndexRules = { folderOf: indexFolder, setsAside: () =
 
 /**
  * The rules of the index in projected packages: a file counts as its
- * unit in the cut map, none is set aside, and a spawning test counts the
- * units of every source file reachable from `BIN_ENTRY` along the graph
- * instead of doubling (see "The index in projected packages" in the
- * module note).
+ * unit in the cut map, none is set aside, a test's walk does not follow a
+ * `type` edge into `CORE_PACKAGE`, and a spawning test counts the units
+ * of every source file reachable from `BIN_ENTRY` along the graph, edges
+ * of either kind, instead of doubling (see "The index in projected
+ * packages" in the module note).
  *
  * @param map - The cut map; its `unitOf` is the rules' `folderOf`.
  * @param graph - The import graph the bin's reach is walked along.
- * @returns The rules, with the bin's units under `spawnedReach` and its unplaced source files under `spawnedUnplaced`.
+ * @returns The rules, with the bin's units under `spawnedReach`, its unplaced source files under `spawnedUnplaced`, and the core type-only rule under `follows`.
  * @throws When `BIN_ENTRY` is not a file of the graph, so no reach could be read.
  */
 export function packageRules(map: CutMap, graph: ImportGraph): IndexRules {
@@ -274,6 +288,7 @@ export function packageRules(map: CutMap, graph: ImportGraph): IndexRules {
   }
   return {
     folderOf: (path) => map.unitOf(path),
+    follows: (edge) => edge.kind !== 'type' || map.unitOf(edge.to) !== CORE_PACKAGE,
     setsAside: () => false,
     spawnedReach: [...units].sort(),
     spawnedUnplaced: unplaced.sort(),
@@ -397,7 +412,10 @@ export function computeTestIndex(input: TestIndexInput, rules: IndexRules = SURV
       : kind;
   };
   const reading: FileReading = { folderOf: rules.folderOf, kindOf, spawnedReach: rules.spawnedReach };
-  const next = importTargets(graph);
+  const { follows } = rules;
+  const next = importTargets(follows === undefined
+    ? graph
+    : { ...graph, edges: graph.edges.filter(follows) });
   // By its own kind, not the rules': a file set aside is a source file still, and its spawning is the code under test's.
   const spawning = new Set(
     graph.nodes.filter((path) => classifyFile(path) !== 'source' && spawnApis(path, input.sources.get(path) ?? '').length > 0),

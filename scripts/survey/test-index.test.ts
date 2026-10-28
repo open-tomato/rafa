@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { parseCutMap } from './cut-map';
+import { CORE_PACKAGE } from './cut-table';
 import {
   BASELINE_PATH,
   BIN_ENTRY,
@@ -19,6 +20,7 @@ import {
   renderTestIndexJson,
 } from './test-index';
 import { renderTestIndexMarkdown } from './test-index-markdown';
+import { meetsRule } from './test-index-record';
 
 /** A graph over `files` with `value` edges `[from, to]`, every file read but `unread`. */
 function plantedGraph(files: readonly string[], links: readonly (readonly [string, string])[], unread: readonly string[] = []): ImportGraph {
@@ -287,6 +289,71 @@ describe('the index in projected packages', () => {
     // With no test spawning, nothing loads the bin, so its unplaced file is not reached.
     expect(computeTestIndex({ graph, sources: new Map() }, rules).unplaced).toEqual([STRAY_TEST, STRAY]);
     expect(surveyed.unplaced).toEqual([]);
+  });
+});
+
+describe('the core type-only rule in projected packages', () => {
+  const CORE = 'packages/rafa/src/schema/core.ts';
+  const OWN = 'src/feature/own.ts';
+  const OTHER = 'src/other/other.ts';
+  const TYPED_CORE = 'src/feature/typed-core.test.ts';
+  const VALUED_CORE = 'src/feature/valued-core.test.ts';
+  const TYPED_OTHER = 'src/feature/typed-other.test.ts';
+  const map = parseCutMap(JSON.stringify({
+    packages: [
+      { files: [CORE], name: CORE_PACKAGE },
+      { files: [BIN_ENTRY, OWN, TYPED_CORE, VALUED_CORE, TYPED_OTHER], name: 'rafa-feature' },
+      { files: [OTHER], name: 'rafa-other' },
+    ],
+    unassigned: [],
+  }), 'cut-table.json');
+  const linked = plantedGraph(
+    [BIN_ENTRY, CORE, OWN, OTHER, TYPED_CORE, VALUED_CORE, TYPED_OTHER],
+    [[BIN_ENTRY, OWN], [TYPED_CORE, OWN], [VALUED_CORE, OWN], [VALUED_CORE, CORE], [TYPED_OTHER, OWN]],
+  );
+  const typed = [[BIN_ENTRY, CORE], [TYPED_CORE, CORE], [TYPED_OTHER, OTHER]] as const;
+  const graph = { ...linked, edges: [...linked.edges, ...typed.map(([from, to]) => ({ from, kind: 'type' as const, to }))] };
+  const input: TestIndexInput = { graph, sources: new Map() };
+  const rules = packageRules(map, graph);
+  const ruled = computeTestIndex(input, rules);
+  // The control: the same graph read with the rule removed.
+  const unruled = computeTestIndex(input, { ...rules, follows: undefined });
+  const meetsUnitRule = (entry: TestIndexEntry): boolean => meetsRule({
+    deep: [],
+    kind: 'unit',
+    package: entry.folder ?? '',
+    packages: entry.folders,
+    spawns: entry.spawns,
+    spawnsVia: entry.spawnsVia,
+  });
+
+  it('does not follow a type edge into core: the test reaches its own unit alone and meets the unit rule', () => {
+    expect(entryOf(ruled, TYPED_CORE)).toMatchObject({ folder: 'rafa-feature', folders: ['rafa-feature'], index: 1, sourceFiles: 1 });
+    expect(meetsUnitRule(entryOf(ruled, TYPED_CORE))).toBe(true);
+    expect(ruled.sources.find((source) => source.source === CORE)?.tests).toEqual([VALUED_CORE]);
+  });
+
+  it('counts core for the type edge once the rule is removed, the control', () => {
+    expect(entryOf(unruled, TYPED_CORE)).toMatchObject({ folders: [CORE_PACKAGE, 'rafa-feature'], index: 2, sourceFiles: 2 });
+    expect(meetsUnitRule(entryOf(unruled, TYPED_CORE))).toBe(false);
+    expect(unruled.sources.find((source) => source.source === CORE)?.tests).toEqual([TYPED_CORE, VALUED_CORE]);
+  });
+
+  it('follows a value edge into core, with the rule and without it', () => {
+    expect(entryOf(ruled, VALUED_CORE)).toMatchObject({ folders: [CORE_PACKAGE, 'rafa-feature'], index: 2 });
+    expect(entryOf(unruled, VALUED_CORE)).toEqual(entryOf(ruled, VALUED_CORE));
+  });
+
+  it('follows a type edge into another package, with the rule and without it', () => {
+    expect(entryOf(ruled, TYPED_OTHER)).toMatchObject({ folders: ['rafa-feature', 'rafa-other'], index: 2 });
+    expect(entryOf(unruled, TYPED_OTHER)).toEqual(entryOf(ruled, TYPED_OTHER));
+  });
+
+  it('keys on the edge\'s kind and its target\'s unit, and leaves the bin\'s type edge into core in the spawned reach', () => {
+    expect(rules.follows?.({ from: TYPED_CORE, kind: 'type', to: CORE })).toBe(false);
+    expect(rules.follows?.({ from: TYPED_CORE, kind: 'value', to: CORE })).toBe(true);
+    expect(rules.follows?.({ from: TYPED_OTHER, kind: 'type', to: OTHER })).toBe(true);
+    expect(rules.spawnedReach).toEqual([CORE_PACKAGE, 'rafa-feature']);
   });
 });
 
