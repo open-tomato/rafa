@@ -97,8 +97,8 @@
  * A suppressed hint reads nothing at all: the flag is asked before the
  * sources are composed, so it costs no `gh` call. The flag is `hint`
  * rather than `next` because `plan create` declares `next` already and
- * `src/cli/core/parseArgs.ts` reads `--no-<name>` as false for a
- * declared flag, so `--no-next` means something else there.
+ * `packages/rafa/src/core/command/parseArgs.ts` reads `--no-<name>` as
+ * false for a declared flag, so `--no-next` means something else there.
  */
 import type { NextInvocation } from './actions.js';
 import type { NextSourceSeams } from './sources.js';

@@ -287,7 +287,7 @@ function probeSource(...lines: string[]): string {
   return [
     `import type * as C from ${JSON.stringify(join(SRC_DIR, 'core', 'command', 'command.js'))};`,
     `import type * as T from ${JSON.stringify(join(SRC_DIR, 'core', 'command', 'types.js'))};`,
-    `import type { ParseArgsSpec } from ${JSON.stringify(join(REPO_ROOT, 'src', 'cli', 'core', 'parseArgs.js'))};`,
+    `import type { ParseArgsSpec } from ${JSON.stringify(join(SRC_DIR, 'core', 'command', 'parseArgs.js'))};`,
     'export const base = {',
     '  name: "loop start", description: "Starts.", subject: "loop", action: "start", summary: "starts",',
     '  args: [], flags: [], examples: [{ cmd: "rafa loop start", note: "starts" }],',

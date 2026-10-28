@@ -3754,8 +3754,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 205,
-        "test": 148,
+        "source": 206,
+        "test": 149,
         "testSupport": 9
       },
       "files": [
@@ -3824,6 +3824,8 @@
         "packages/rafa/src/core/command/index.ts",
         "packages/rafa/src/core/command/lazy.test.ts",
         "packages/rafa/src/core/command/lazy.ts",
+        "packages/rafa/src/core/command/parseArgs.test.ts",
+        "packages/rafa/src/core/command/parseArgs.ts",
         "packages/rafa/src/core/command/registry-types.test.ts",
         "packages/rafa/src/core/command/registry-types.ts",
         "packages/rafa/src/core/command/running.test.ts",
@@ -4123,7 +4125,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 362
+        "packages/rafa/": 364
       },
       "folders": [
         "packages/rafa/"
@@ -5037,13 +5039,6 @@
           "toPackage": "rafa-release"
         },
         {
-          "from": "src/next/actions.ts",
-          "fromPackage": "rafa-run",
-          "kind": "value",
-          "to": "src/cli/core/parseArgs.ts",
-          "toPackage": "@open-tomato/rafa"
-        },
-        {
           "from": "src/next/settle-step.ts",
           "fromPackage": "rafa-run",
           "kind": "value",
@@ -5498,8 +5493,8 @@
         "src/runtime/install.ts"
       ],
       "rank": 7,
-      "remaining": 23,
-      "upwardEdges": 23
+      "remaining": 22,
+      "upwardEdges": 22
     },
     {
       "clearedByIssue118": 0,
@@ -5810,8 +5805,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 176,
-        "test": 580,
+        "source": 175,
+        "test": 579,
         "testSupport": 22
       },
       "files": [
@@ -5833,8 +5828,6 @@
         "src/cleanup/settings.ts",
         "src/cli/core/assembleContext.test.ts",
         "src/cli/core/assembleContext.ts",
-        "src/cli/core/parseArgs.test.ts",
-        "src/cli/core/parseArgs.ts",
         "src/cli/describe.test.ts",
         "src/cli/dispatch-hook.test.ts",
         "src/cli/dispatch-logger-scope.test.ts",
@@ -6595,7 +6588,7 @@
         "src/utils/schedule.ts"
       ],
       "filesByFolder": {
-        "src/cli/": 32
+        "src/cli/": 30
       },
       "folders": [
         "src/cli/"
@@ -6620,7 +6613,7 @@
     "nonTestEdges": 4871,
     "unassignedFiles": 28,
     "unrankedEdges": 75,
-    "upwardEdges": 52
+    "upwardEdges": 51
   },
   "unassigned": [
     {

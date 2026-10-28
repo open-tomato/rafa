@@ -258,13 +258,14 @@ already publishes, so the store barrel is `@open-tomato/rafa/store`, and the
 ports barrel is `@open-tomato/rafa/ports`. The `core/` prefix is not optional:
 `@open-tomato/rafa/plan` and `@open-tomato/rafa/config` are the root's own
 `./plan` and `./config` exports, and core's subpaths must not collide with
-them. So the fourteen barrels of `CORE_BARRELS` read
-`@open-tomato/rafa/core/adapters`, `core/command`, `core/config`,
-`core/config/load`, `core/config/sections`, `core/git`, `core/loop`,
-`core/loop/hops`, `core/loop/readings`, `core/output`, `core/plan`,
-`core/plan/block-reader`, `core/runtime` and `core/services`; the named files
-read `report/parse`, `report/record`, `schema/tiers` and `schema/project-id`;
-the augmentation target reads `core/config/config-schema`. A store file is
+them. So the fifteen barrels of `CORE_BARRELS` read
+`@open-tomato/rafa/core/adapters`, `core/command`, `core/command/parseArgs`,
+`core/config`, `core/config/load`, `core/config/sections`, `core/git`,
+`core/loop`, `core/loop/hops`, `core/loop/readings`, `core/output`,
+`core/plan`, `core/plan/block-reader`, `core/runtime` and `core/services`;
+the named files read `report/parse`, `report/record`, `schema/tiers` and
+`schema/project-id`; the augmentation target reads
+`core/config/config-schema`. A store file is
 `store/<file>` and a ports file `ports/<file>`. A file moved outside `core/`
 takes the same spelling: `packages/rafa/src/bugs/record.ts` is `bugs/record`,
 which the package's `exports` names with `./bugs/*`, so a file outside the
@@ -281,12 +282,15 @@ manifests spell it in four places: core's own `package.json` and the three
 for core's files.
 
 **A subject's barrel is the only file under `packages/rafa/src/core/` that a
-file outside it may import.** There are fourteen, all listed in `CORE_BARRELS`
+file outside it may import.** There are fifteen, all listed in `CORE_BARRELS`
 of `scripts/survey/core-moves.ts`: an `index.ts` in each subject folder, and
-five more, `config/sections.ts`, `config/load.ts`, `loop/readings.ts`,
-`loop/hops.ts` and `plan/block-reader.ts`. A barrel re-exports the names of the
-files behind it and no more. The barrels are the declared exports until the cut
-names real subpaths (#808).
+six more, `command/parseArgs.ts`, `config/sections.ts`, `config/load.ts`,
+`loop/readings.ts`, `loop/hops.ts` and `plan/block-reader.ts`. A barrel
+re-exports the names of the files behind it and no more, but for
+`command/parseArgs.ts`: the CLI's argument parser, moved from `src/cli/core/`
+so run reaches no root file, it is a module of its own on its own subpath, and
+`command/index.ts` gains no line for it. The barrels are the declared exports
+until the cut names real subpaths (#808).
 
 **Outside `packages/rafa/src/core/`, a file imports a barrel by its subpath
 and nothing deeper.** In a file outside `packages/rafa/src/core/`, no static
@@ -528,8 +532,9 @@ naming `src/config-registry.ts`.
 **A barrel is split, never widened, when it closes a runtime cycle.** A barrel
 that groups a file with one outside `packages/rafa/src/core/` that imports the
 barrel back by value closes a cycle. The cycle fails with a `ReferenceError` at
-load, in one import order only, so a green `tsc` proves nothing about it. The
-five barrels beyond the subject indexes are the splits made so far.
+load, in one import order only, so a green `tsc` proves nothing about it. Of
+the six barrels beyond the subject indexes, all but `command/parseArgs.ts` are
+the splits made so far.
 `config/sections.ts` holds the leaf pair `config-sections.ts` and
 `config-readers.ts`, with `branch-template.ts` and `merge-method.ts` as leaves
 beside them, split while `config-merged.ts` imported section files that

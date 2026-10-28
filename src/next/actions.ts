@@ -168,8 +168,7 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 
 import { CommandExit, commandSpelling, HINT_FLAG } from '@open-tomato/rafa/core/command';
-
-import { parseArgs } from '../cli/core/parseArgs.js';
+import { parseArgs } from '@open-tomato/rafa/core/command/parseArgs';
 
 import { runHome, runHop } from './hop-action.js';
 

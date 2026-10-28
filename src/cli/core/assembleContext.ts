@@ -50,19 +50,18 @@
  * `output`. Only `-v` and `--verbose` are counted as bare tokens, whatever
  * the spec declares.
  */
-import type { ParseArgsSpec } from './parseArgs.js';
 import type { CliContext, FlagSpec } from '@open-tomato/rafa/core/command';
+import type { ParseArgsSpec } from '@open-tomato/rafa/core/command/parseArgs';
 import type { OutputMode } from '@open-tomato/rafa/core/config/sections';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { createEventsOutput } from '@open-tomato/rafa/adapters/output/events';
+import { parseArgs } from '@open-tomato/rafa/core/command/parseArgs';
 import { OUTPUT_MODES } from '@open-tomato/rafa/core/config/sections';
 import { createTextOutput } from '@open-tomato/rafa/core/output';
 
 import { createJsonOutput } from '../../adapters/output/json.js';
-
-import { parseArgs } from './parseArgs.js';
 
 /** The environment variable naming the output mode: `json`, or `events` for a command that declares it. */
 const OUTPUT_ENV = 'RAFA_OUTPUT';

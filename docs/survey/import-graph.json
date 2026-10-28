@@ -798,15 +798,17 @@
     "packages/rafa/src/core/adapters/registry.test.ts": 0,
     "packages/rafa/src/core/adapters/registry.ts": 3272.341286,
     "packages/rafa/src/core/command/command.test.ts": 0,
-    "packages/rafa/src/core/command/command.ts": 3847.254274,
+    "packages/rafa/src/core/command/command.ts": 3810.159036,
     "packages/rafa/src/core/command/confirm.test.ts": 0,
     "packages/rafa/src/core/command/confirm.ts": 0,
     "packages/rafa/src/core/command/global-flags.test.ts": 0,
     "packages/rafa/src/core/command/global-flags.ts": 0,
     "packages/rafa/src/core/command/index.test.ts": 0,
-    "packages/rafa/src/core/command/index.ts": 26028.011691,
+    "packages/rafa/src/core/command/index.ts": 25866.930739,
     "packages/rafa/src/core/command/lazy.test.ts": 0,
-    "packages/rafa/src/core/command/lazy.ts": 177.440633,
+    "packages/rafa/src/core/command/lazy.ts": 175.345395,
+    "packages/rafa/src/core/command/parseArgs.test.ts": 0,
+    "packages/rafa/src/core/command/parseArgs.ts": 17.438095,
     "packages/rafa/src/core/command/registry-types.test.ts": 0,
     "packages/rafa/src/core/command/registry-types.ts": 0,
     "packages/rafa/src/core/command/running.test.ts": 0,
@@ -814,38 +816,38 @@
     "packages/rafa/src/core/command/shared-flags.test.ts": 0,
     "packages/rafa/src/core/command/shared-flags.ts": 81,
     "packages/rafa/src/core/command/spends.test.ts": 0,
-    "packages/rafa/src/core/command/spends.ts": 179.440633,
+    "packages/rafa/src/core/command/spends.ts": 177.345395,
     "packages/rafa/src/core/command/types.test.ts": 0,
-    "packages/rafa/src/core/command/types.ts": 7318.541085,
+    "packages/rafa/src/core/command/types.ts": 7380.183942,
     "packages/rafa/src/core/command/version.ts": 0,
     "packages/rafa/src/core/config/branch-template.test.ts": 0,
     "packages/rafa/src/core/config/branch-template.ts": 5,
     "packages/rafa/src/core/config/config-items.test.ts": 0,
     "packages/rafa/src/core/config/config-items.ts": 48.52921,
     "packages/rafa/src/core/config/config-load-module.ts": 0,
-    "packages/rafa/src/core/config/config-load.ts": 12145.523709,
+    "packages/rafa/src/core/config/config-load.ts": 12136.023709,
     "packages/rafa/src/core/config/config-origins.test.ts": 0,
     "packages/rafa/src/core/config/config-origins.ts": 0,
     "packages/rafa/src/core/config/config-readers.test.ts": 0,
     "packages/rafa/src/core/config/config-readers.ts": 8,
-    "packages/rafa/src/core/config/config-schema.ts": 190.696058,
+    "packages/rafa/src/core/config/config-schema.ts": 190.196058,
     "packages/rafa/src/core/config/config-sections.test.ts": 0,
     "packages/rafa/src/core/config/config-sections.ts": 3699.094937,
-    "packages/rafa/src/core/config/config.ts": 1123.836007,
+    "packages/rafa/src/core/config/config.ts": 1122.836007,
     "packages/rafa/src/core/config/core-section.test.ts": 0,
-    "packages/rafa/src/core/config/core-section.ts": 582.093321,
-    "packages/rafa/src/core/config/dangerous.ts": 567.984266,
+    "packages/rafa/src/core/config/core-section.ts": 577.593321,
+    "packages/rafa/src/core/config/dangerous.ts": 560.984266,
     "packages/rafa/src/core/config/default-routing.ts": 49.862543,
     "packages/rafa/src/core/config/index.test.ts": 0,
-    "packages/rafa/src/core/config/index.ts": 22528.228327,
+    "packages/rafa/src/core/config/index.ts": 22552.228327,
     "packages/rafa/src/core/config/load.test.ts": 0,
     "packages/rafa/src/core/config/load.ts": 1723.982089,
     "packages/rafa/src/core/config/merge-method.test.ts": 0,
     "packages/rafa/src/core/config/merge-method.ts": 0,
-    "packages/rafa/src/core/config/scope.ts": 12977.198181,
-    "packages/rafa/src/core/config/section.ts": 821.720742,
+    "packages/rafa/src/core/config/scope.ts": 12959.198181,
+    "packages/rafa/src/core/config/section.ts": 822.220742,
     "packages/rafa/src/core/config/sections.test.ts": 0,
-    "packages/rafa/src/core/config/sections.ts": 9148.084555,
+    "packages/rafa/src/core/config/sections.ts": 9149.989317,
     "packages/rafa/src/core/config/standard-schema.test.ts": 0,
     "packages/rafa/src/core/config/standard-schema.ts": 2.944444,
     "packages/rafa/src/core/git/commit.test.ts": 0,
@@ -855,13 +857,13 @@
     "packages/rafa/src/core/git/git.ts": 212.158487,
     "packages/rafa/src/core/git/index.test.ts": 0,
     "packages/rafa/src/core/git/index.ts": 5425.520697,
-    "packages/rafa/src/core/loop/claude.ts": 5374.821762,
+    "packages/rafa/src/core/loop/claude.ts": 5380.821762,
     "packages/rafa/src/core/loop/hop-record.test.ts": 0,
     "packages/rafa/src/core/loop/hop-record.ts": 0,
     "packages/rafa/src/core/loop/hops.test.ts": 0,
     "packages/rafa/src/core/loop/hops.ts": 223.908049,
     "packages/rafa/src/core/loop/index.test.ts": 0,
-    "packages/rafa/src/core/loop/index.ts": 17767.271249,
+    "packages/rafa/src/core/loop/index.ts": 17773.271249,
     "packages/rafa/src/core/loop/readings.test.ts": 0,
     "packages/rafa/src/core/loop/readings.ts": 664.50467,
     "packages/rafa/src/core/loop/session-env.test.ts": 0,
@@ -877,8 +879,8 @@
     "packages/rafa/src/core/loop/sessions.test.ts": 0,
     "packages/rafa/src/core/loop/sessions.ts": 6699.339815,
     "packages/rafa/src/core/loop/suite-failure.ts": 0,
-    "packages/rafa/src/core/output/active.ts": 11537.672646,
-    "packages/rafa/src/core/output/index.ts": 4104.65047,
+    "packages/rafa/src/core/output/active.ts": 11537.577408,
+    "packages/rafa/src/core/output/index.ts": 4104.555232,
     "packages/rafa/src/core/output/stream.ts": 0,
     "packages/rafa/src/core/output/text.test.ts": 0,
     "packages/rafa/src/core/output/text.ts": 1547.154185,
@@ -913,7 +915,7 @@
     "packages/rafa/src/effort/store/absences.test.ts": 0,
     "packages/rafa/src/effort/store/absences.ts": 35.65,
     "packages/rafa/src/effort/store/bring-forward.test.ts": 0,
-    "packages/rafa/src/effort/store/bring-forward.ts": 6183.878632,
+    "packages/rafa/src/effort/store/bring-forward.ts": 6193.878632,
     "packages/rafa/src/effort/store/bug-routes-migration.test.ts": 0,
     "packages/rafa/src/effort/store/bug-routes.test.ts": 0,
     "packages/rafa/src/effort/store/bug-routes.ts": 162.92583,
@@ -924,9 +926,9 @@
     "packages/rafa/src/effort/store/contract.test.ts": 0,
     "packages/rafa/src/effort/store/copy-origins.test.ts": 0,
     "packages/rafa/src/effort/store/copy.test.ts": 0,
-    "packages/rafa/src/effort/store/copy.ts": 4039.822015,
+    "packages/rafa/src/effort/store/copy.ts": 4041.822015,
     "packages/rafa/src/effort/store/development-build.test.ts": 0,
-    "packages/rafa/src/effort/store/development-build.ts": 10117.734374,
+    "packages/rafa/src/effort/store/development-build.ts": 10155.734374,
     "packages/rafa/src/effort/store/dispatches.test.ts": 0,
     "packages/rafa/src/effort/store/dispatches.ts": 233.553339,
     "packages/rafa/src/effort/store/effort-levels.test.ts": 0,
@@ -948,10 +950,10 @@
     "packages/rafa/src/effort/store/merge-rules.ts": 0,
     "packages/rafa/src/effort/store/merge-scenarios.test.ts": 0,
     "packages/rafa/src/effort/store/merge-store.test.ts": 0,
-    "packages/rafa/src/effort/store/merge-store.ts": 51534.511653,
+    "packages/rafa/src/effort/store/merge-store.ts": 51589.511653,
     "packages/rafa/src/effort/store/merge-union.test.ts": 0,
     "packages/rafa/src/effort/store/merge-union.ts": 1042.944906,
-    "packages/rafa/src/effort/store/migrate.ts": 3837.395726,
+    "packages/rafa/src/effort/store/migrate.ts": 3840.395726,
     "packages/rafa/src/effort/store/migration-shapes.ts": 0,
     "packages/rafa/src/effort/store/migrations.ts": 0,
     "packages/rafa/src/effort/store/move.ts": 23.452381,
@@ -978,7 +980,7 @@
     "packages/rafa/src/effort/store/schema-report.ts": 97.810409,
     "packages/rafa/src/effort/store/session-row-types.ts": 0,
     "packages/rafa/src/effort/store/session-worktree.test.ts": 0,
-    "packages/rafa/src/effort/store/settings.ts": 1908.745729,
+    "packages/rafa/src/effort/store/settings.ts": 1907.745729,
     "packages/rafa/src/effort/store/skill-invocations.test.ts": 0,
     "packages/rafa/src/effort/store/skill-invocations.ts": 322.187692,
     "packages/rafa/src/effort/store/sqlite.test.ts": 0,
@@ -1033,10 +1035,10 @@
     "packages/rafa/src/plan/risk/secrets.test.ts": 0,
     "packages/rafa/src/plan/risk/secrets.ts": 9.583333,
     "packages/rafa/src/plan/validate.ts": 801.666667,
-    "packages/rafa/src/ports/index.ts": 63344.517873,
+    "packages/rafa/src/ports/index.ts": 63399.684539,
     "packages/rafa/src/ports/learning.ts": 0,
     "packages/rafa/src/ports/log-level.ts": 0,
-    "packages/rafa/src/ports/spec-review.ts": 2014.383673,
+    "packages/rafa/src/ports/spec-review.ts": 2014.55034,
     "packages/rafa/src/ports/unresolved-tracker.test.ts": 0,
     "packages/rafa/src/ports/unresolved-tracker.ts": 82,
     "packages/rafa/src/pr/ci-poll.test.ts": 0,
@@ -1153,9 +1155,7 @@
     "src/cleanup/steps.test.ts": 0,
     "src/cleanup/steps.ts": 99.44159,
     "src/cli/core/assembleContext.test.ts": 0,
-    "src/cli/core/assembleContext.ts": 1045.649629,
-    "src/cli/core/parseArgs.test.ts": 0,
-    "src/cli/core/parseArgs.ts": 0,
+    "src/cli/core/assembleContext.ts": 1045.554391,
     "src/cli/describe.test.ts": 0,
     "src/cli/dispatch-hook.test.ts": 0,
     "src/cli/dispatch-logger-scope.test.ts": 0,
@@ -1478,13 +1478,13 @@
     "src/modules/activate-integration.test.ts": 0,
     "src/modules/testdata/pull-merge-sync/sync.ts": 0,
     "src/next/actions.test.ts": 0,
-    "src/next/actions.ts": 365.23625,
+    "src/next/actions.ts": 365.552917,
     "src/next/ceiling.test.ts": 0,
-    "src/next/ceiling.ts": 145.817979,
+    "src/next/ceiling.ts": 145.767979,
     "src/next/ending.test.ts": 0,
     "src/next/ending.ts": 658.590255,
     "src/next/hint.test.ts": 0,
-    "src/next/hint.ts": 1250.385778,
+    "src/next/hint.ts": 1250.169111,
     "src/next/hop-action.test.ts": 0,
     "src/next/hop-action.ts": 240.489424,
     "src/next/hop-after-loop.test.ts": 0,
@@ -1492,13 +1492,13 @@
     "src/next/hop-rows.test.ts": 0,
     "src/next/hop-rows.ts": 773.926322,
     "src/next/lines.test.ts": 0,
-    "src/next/lines.ts": 407.255372,
+    "src/next/lines.ts": 407.205372,
     "src/next/loop-worktree-tree-driven.test.ts": 0,
     "src/next/owner-gate.test.ts": 0,
     "src/next/owner-gate.ts": 273.197558,
     "src/next/preconditions.ts": 2.033333,
     "src/next/readings.test.ts": 0,
-    "src/next/readings.ts": 2112.931792,
+    "src/next/readings.ts": 2112.765125,
     "src/next/relations-mode.test.ts": 0,
     "src/next/relations-mode.ts": 284.207112,
     "src/next/settle-step.test.ts": 0,
@@ -1513,7 +1513,7 @@
     "src/next/state-native.test.ts": 0,
     "src/next/state-no-checks.test.ts": 0,
     "src/next/state.test.ts": 0,
-    "src/next/state.ts": 1981.302342,
+    "src/next/state.ts": 1981.135675,
     "src/next/sync.test.ts": 0,
     "src/next/sync.ts": 17.223626,
     "src/notices/notices.test.ts": 0,
@@ -1522,8 +1522,8 @@
     "src/plan.test.ts": 0,
     "src/plan.ts": 1975.970804,
     "src/plan/index.test.ts": 0,
-    "src/plan/index.ts": 1683.48953,
-    "src/plan/list.ts": 577.037734,
+    "src/plan/index.ts": 1683.322863,
+    "src/plan/list.ts": 576.871068,
     "src/plan/needs.test.ts": 0,
     "src/plan/needs.ts": 316.983766,
     "src/plan/store-rules.test.ts": 0,
@@ -3523,7 +3523,7 @@
         "packages/rafa/src/plan": 3,
         "src/adapters/output": 2,
         "src/cli": 12,
-        "src/cli/core": 4,
+        "src/cli/core": 1,
         "src/commands": 12,
         "src/commands/agent": 1,
         "src/commands/board": 1,
@@ -3578,10 +3578,7 @@
         "packages/rafa/src/plan/validate.ts",
         "src/adapters/output/json.test.ts",
         "src/adapters/output/json.ts",
-        "src/cli/core/assembleContext.test.ts",
         "src/cli/core/assembleContext.ts",
-        "src/cli/core/parseArgs.test.ts",
-        "src/cli/core/parseArgs.ts",
         "src/cli/describe.test.ts",
         "src/cli/dispatch-hook.test.ts",
         "src/cli/dispatch-scope.test.ts",
@@ -3702,7 +3699,7 @@
         "src/tests/tracker-declarations.test.ts"
       ],
       "name": "c06-index",
-      "size": 153
+      "size": 150
     },
     {
       "folders": {
@@ -4383,12 +4380,13 @@
     },
     {
       "folders": {
-        "packages/rafa/src/core/command": 18,
+        "packages/rafa/src/core/command": 20,
         "packages/rafa/src/core/config": 26,
         "packages/rafa/src/core/loop": 20,
         "packages/rafa/src/core/output": 1,
         "packages/rafa/src/core/plan": 10,
         "packages/rafa/src/effort/store": 2,
+        "src/cli/core": 1,
         "src/tests/core-coupled/core/command": 1,
         "src/tests/core-coupled/core/config": 5,
         "src/tests/core-coupled/core/loop": 1
@@ -4404,6 +4402,8 @@
         "packages/rafa/src/core/command/index.test.ts",
         "packages/rafa/src/core/command/lazy.test.ts",
         "packages/rafa/src/core/command/lazy.ts",
+        "packages/rafa/src/core/command/parseArgs.test.ts",
+        "packages/rafa/src/core/command/parseArgs.ts",
         "packages/rafa/src/core/command/registry-types.ts",
         "packages/rafa/src/core/command/running.test.ts",
         "packages/rafa/src/core/command/running.ts",
@@ -4472,6 +4472,7 @@
         "packages/rafa/src/core/plan/tracker-path.ts",
         "packages/rafa/src/effort/store/effort-levels.test.ts",
         "packages/rafa/src/effort/store/effort-levels.ts",
+        "src/cli/core/assembleContext.test.ts",
         "src/tests/core-coupled/core/command/version.test.ts",
         "src/tests/core-coupled/core/config/config-load-templates.test.ts",
         "src/tests/core-coupled/core/config/config-load.test.ts",
@@ -4481,7 +4482,7 @@
         "src/tests/core-coupled/core/loop/claude.test.ts"
       ],
       "name": "c11-config-sections",
-      "size": 84
+      "size": 87
     },
     {
       "folders": {
@@ -23522,6 +23523,21 @@
       "to": "packages/rafa/src/core/config/config-sections.ts"
     },
     {
+      "from": "packages/rafa/src/core/command/parseArgs.test.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/command/parseArgs.ts"
+    },
+    {
+      "from": "packages/rafa/src/core/command/parseArgs.test.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/command/types.ts"
+    },
+    {
+      "from": "packages/rafa/src/core/command/parseArgs.ts",
+      "kind": "type",
+      "to": "packages/rafa/src/core/command/types.ts"
+    },
+    {
       "from": "packages/rafa/src/core/command/registry-types.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/command/command.ts"
@@ -28564,17 +28580,17 @@
     {
       "from": "src/cli/core/assembleContext.test.ts",
       "kind": "type",
+      "to": "packages/rafa/src/core/command/parseArgs.ts"
+    },
+    {
+      "from": "src/cli/core/assembleContext.test.ts",
+      "kind": "type",
       "to": "packages/rafa/src/core/output/index.ts"
     },
     {
       "from": "src/cli/core/assembleContext.test.ts",
       "kind": "value",
       "to": "src/cli/core/assembleContext.ts"
-    },
-    {
-      "from": "src/cli/core/assembleContext.test.ts",
-      "kind": "type",
-      "to": "src/cli/core/parseArgs.ts"
     },
     {
       "from": "src/cli/core/assembleContext.ts",
@@ -28585,6 +28601,11 @@
       "from": "src/cli/core/assembleContext.ts",
       "kind": "type",
       "to": "packages/rafa/src/core/command/index.ts"
+    },
+    {
+      "from": "src/cli/core/assembleContext.ts",
+      "kind": "value",
+      "to": "packages/rafa/src/core/command/parseArgs.ts"
     },
     {
       "from": "src/cli/core/assembleContext.ts",
@@ -28605,26 +28626,6 @@
       "from": "src/cli/core/assembleContext.ts",
       "kind": "value",
       "to": "src/adapters/output/json.ts"
-    },
-    {
-      "from": "src/cli/core/assembleContext.ts",
-      "kind": "value",
-      "to": "src/cli/core/parseArgs.ts"
-    },
-    {
-      "from": "src/cli/core/parseArgs.test.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/command/index.ts"
-    },
-    {
-      "from": "src/cli/core/parseArgs.test.ts",
-      "kind": "value",
-      "to": "src/cli/core/parseArgs.ts"
-    },
-    {
-      "from": "src/cli/core/parseArgs.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/command/index.ts"
     },
     {
       "from": "src/cli/describe.test.ts",
@@ -39223,13 +39224,13 @@
     },
     {
       "from": "src/next/actions.ts",
-      "kind": "type",
-      "to": "packages/rafa/src/core/config/sections.ts"
+      "kind": "value",
+      "to": "packages/rafa/src/core/command/parseArgs.ts"
     },
     {
       "from": "src/next/actions.ts",
-      "kind": "value",
-      "to": "src/cli/core/parseArgs.ts"
+      "kind": "type",
+      "to": "packages/rafa/src/core/config/sections.ts"
     },
     {
       "from": "src/next/actions.ts",
@@ -64779,6 +64780,16 @@
       "path": "packages/rafa/src/core/command/lazy.ts"
     },
     {
+      "cluster": "c11-config-sections",
+      "kind": "test",
+      "path": "packages/rafa/src/core/command/parseArgs.test.ts"
+    },
+    {
+      "cluster": "c11-config-sections",
+      "kind": "source",
+      "path": "packages/rafa/src/core/command/parseArgs.ts"
+    },
+    {
       "cluster": "c27-registry-types.test",
       "kind": "test",
       "path": "packages/rafa/src/core/command/registry-types.test.ts"
@@ -66504,7 +66515,7 @@
       "path": "src/cleanup/steps.ts"
     },
     {
-      "cluster": "c06-index",
+      "cluster": "c11-config-sections",
       "kind": "test",
       "path": "src/cli/core/assembleContext.test.ts"
     },
@@ -66512,16 +66523,6 @@
       "cluster": "c06-index",
       "kind": "source",
       "path": "src/cli/core/assembleContext.ts"
-    },
-    {
-      "cluster": "c06-index",
-      "kind": "test",
-      "path": "src/cli/core/parseArgs.test.ts"
-    },
-    {
-      "cluster": "c06-index",
-      "kind": "source",
-      "path": "src/cli/core/parseArgs.ts"
     },
     {
       "cluster": "c06-index",

@@ -36,10 +36,11 @@ describe('CORE_BARRELS', () => {
     }
   });
 
-  it('lists fourteen barrels, three of them for config, three for loop and two for plan', () => {
+  it('lists fifteen barrels, two of them for command, three for config, three for loop and two for plan', () => {
     expect(barrelPaths()).toEqual([
       'packages/rafa/src/core/adapters/index.ts',
       'packages/rafa/src/core/command/index.ts',
+      'packages/rafa/src/core/command/parseArgs.ts',
       'packages/rafa/src/core/config/index.ts',
       'packages/rafa/src/core/config/load.ts',
       'packages/rafa/src/core/config/sections.ts',

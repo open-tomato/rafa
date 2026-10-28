@@ -43,11 +43,11 @@
  * and an argument's `default` allowed `null` each reddened their own
  * refusal alone.
  *
- * The file moved with `types.ts` into `packages/rafa/src/core/command/`. Its clean
- * probe still reads `ParseArgsSpec` from `src/cli/core/parseArgs.ts`,
- * which stays in the CLI: that path is a string written into a probe
+ * The file moved with `types.ts` into `packages/rafa/src/core/command/`.
+ * Its clean probe reads `ParseArgsSpec` from `parseArgs.ts` beside it,
+ * which followed into core: that path is a string written into a probe
  * outside the repository, not an import of this file, so the import
- * graph counts no edge from core for it.
+ * graph counts no edge for it.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -94,7 +94,7 @@ const EQUALS = [
 /** The probe holding every claim, which must compile clean. */
 const CONFORMING_PROBE = probeSource(
   PORTS_IMPORT,
-  `import type { ParseArgsSpec } from ${JSON.stringify(join(REPO_ROOT, 'src', 'cli', 'core', 'parseArgs.js'))};`,
+  `import type { ParseArgsSpec } from ${JSON.stringify(join(SRC_DIR, 'core', 'command', 'parseArgs.js'))};`,
   ...EQUALS,
   'export const modeIsExact: Equals<T.CliContext["outputMode"], "text" | "json" | "events"> = true;',
   'export const modeIsNotString: Equals<T.CliContext["outputMode"], string> = false;',

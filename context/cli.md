@@ -11,7 +11,8 @@ module's note is the long form.
 
 | Module | Holds |
 | --- | --- |
-| `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
+| `src/cli/core/` | `assembleContext.ts`, copied from open-tomato's `cli-core` with `types.ts` and `parseArgs.ts`, which are core's in `packages/rafa/src/core/command/` |
+| `packages/rafa/src/core/command/parseArgs.ts` | `parseArgs`, the words of a line read into positional words and flags, and `ParseArgsSpec`; read through its own subpath, `@open-tomato/rafa/core/command/parseArgs`, and not the command barrel |
 | `packages/rafa/src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
 | `packages/rafa/src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts; core's since pass 4c, moved from `src/cli/` with its test |
 | `packages/rafa/src/core/command/lazy.ts` | `CommandDeclaration`, a `RafaCommand` less `run`, and `lazyCommand(declaration, load, feature)`, the declaration under a `run` that imports the command's module, holds its default export to a command of the same subject and action and delegates to it; a rejected import or a wrong export exits 1 with `feature "<feature>": command "<spelling>" failed to load: <reason>` |

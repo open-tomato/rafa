@@ -13,6 +13,7 @@
     "./ports": "./src/ports/index.ts",
     "./core/adapters": "./src/core/adapters/index.ts",
     "./core/command": "./src/core/command/index.ts",
+    "./core/command/parseArgs": "./src/core/command/parseArgs.ts",
     "./core/config": "./src/core/config/index.ts",
     "./core/config/load": "./src/core/config/load.ts",
     "./core/config/sections": "./src/core/config/sections.ts",

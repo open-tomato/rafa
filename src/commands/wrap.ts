@@ -68,7 +68,7 @@ interface FlagWord {
 /**
  * The flag `parseArgs` reads `word` as, `next` being the word after it,
  * or null for a word that is no flag. The rules are those of `readLine`
- * in `src/cli/core/parseArgs.ts`.
+ * in `packages/rafa/src/core/command/parseArgs.ts`.
  */
 function flagWord(word: string, next: string | undefined): FlagWord | null {
   const isLong = word.startsWith('--');

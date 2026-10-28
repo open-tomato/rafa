@@ -29,7 +29,7 @@ export const HINT_FLAG = 'hint';
 /**
  * The flag each of the six declares, so `--no-hint` suppresses the
  * ending. Boolean and defaulting to true, which is what makes
- * `--no-hint` read as false for it (`src/cli/core/parseArgs.ts`).
+ * `--no-hint` read as false for it (`parseArgs.ts` beside this file).
  */
 export const HINT_FLAG_SPEC: RafaFlagSpec = Object.freeze({
   name: HINT_FLAG,

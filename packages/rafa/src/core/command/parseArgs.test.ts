@@ -1,5 +1,5 @@
 /**
- * Tests for `parseArgs` (`src/cli/core/parseArgs.ts`).
+ * Tests for `parseArgs` (`packages/rafa/src/core/command/parseArgs.ts`).
  *
  * The source's suite, open-tomato's
  * `packages/shared/cli-core/src/parseArgs.test.ts` at commit
@@ -29,7 +29,7 @@
  * one-dash `-no-` negated, and the negation read before the `=`.
  */
 import type { ParseArgsSpec } from './parseArgs.js';
-import type { ArgSpec, FlagSpec } from '@open-tomato/rafa/core/command';
+import type { ArgSpec, FlagSpec } from './types.js';
 
 import { describe, expect, it } from 'bun:test';
 
