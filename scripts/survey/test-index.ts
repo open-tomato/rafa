@@ -120,6 +120,7 @@ import type { ImportGraph } from './import-graph';
 import type { AgainstMode, WritingMode } from './test-index-args';
 import type { RecordComparison } from './test-index-guard';
 import type { RecordInput, TestRecord } from './test-index-record';
+import type { TestWalk } from './test-index-walk';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
@@ -140,6 +141,7 @@ import { checkHeader, compareToRecord, holdsRecord, renderGuard } from './test-i
 import { renderTestIndexMarkdown } from './test-index-markdown';
 import { parseRecord, recordEntry, renderRecordJson } from './test-index-record';
 import { spawnApis } from './test-index-spawn';
+import { importTargets, reach, walkTest } from './test-index-walk';
 import { readTestKindGlobs } from './test-kinds';
 
 /** What the index is computed from, all of it passed in as data. */
@@ -242,20 +244,6 @@ export function indexFolder(path: string): string {
 export const SURVEY_RULES: IndexRules = { folderOf: indexFolder, setsAside: () => false };
 
 /**
- * Each file's import targets, edges of either kind, in the graph's order.
- *
- * @param graph - The import graph.
- * @returns The targets of each file that imports one.
- */
-function importTargets(graph: ImportGraph): Map<string, string[]> {
-  const next = new Map<string, string[]>();
-  for (const edge of graph.edges) {
-    next.set(edge.from, [...(next.get(edge.from) ?? []), edge.to]);
-  }
-  return next;
-}
-
-/**
  * The rules of the index in projected packages: a file counts as its
  * unit in the cut map, none is set aside, and a spawning test counts the
  * units of every source file reachable from `BIN_ENTRY` along the graph
@@ -290,60 +278,6 @@ export function packageRules(map: CutMap, graph: ImportGraph): IndexRules {
     spawnedReach: [...units].sort(),
     spawnedUnplaced: unplaced.sort(),
   };
-}
-
-/**
- * Every file reachable from `starts` along `next`, the starts included.
- * A file `expand` refuses is reached but not walked past.
- *
- * @param starts - The files the walk begins at.
- * @param next - Each file's import targets.
- * @param expand - Whether the walk goes on past a file.
- * @returns The files reached.
- */
-function reach(
-  starts: Iterable<string>,
-  next: ReadonlyMap<string, readonly string[]>,
-  expand: (path: string) => boolean,
-): Set<string> {
-  const seen = new Set(starts);
-  const queue = [...seen];
-  for (let cursor = 0; cursor < queue.length; cursor += 1) {
-    const path = queue[cursor] ?? '';
-    if (!expand(path)) {
-      continue;
-    }
-    for (const target of next.get(path) ?? []) {
-      if (!seen.has(target)) {
-        seen.add(target);
-        queue.push(target);
-      }
-    }
-  }
-  return seen;
-}
-
-/** What one test's two walks reach. */
-interface TestWalk {
-  /** Files reached without passing a support file, the test included. */
-  readonly direct: ReadonlySet<string>;
-  /** Files reached only past a support file. */
-  readonly throughSupport: ReadonlySet<string>;
-}
-
-/**
- * Walks from a test file: first up to the support files, then on past them.
- *
- * @param test - The test file.
- * @param next - Each file's import targets.
- * @param kindOf - Each file's kind.
- * @returns What the walk reaches directly and only through support files.
- */
-function walkTest(test: string, next: ReadonlyMap<string, readonly string[]>, kindOf: (path: string) => FileKind): TestWalk {
-  const direct = reach([test], next, (path) => path === test || kindOf(path) !== 'test-support');
-  const support = [...direct].filter((path) => kindOf(path) === 'test-support');
-  const past = reach(support, next, () => true);
-  return { direct, throughSupport: new Set([...past].filter((path) => !direct.has(path))) };
 }
 
 /** How one index reads a file: its kind once the rules have set files aside, its folder, and what a spawned process loads. */
