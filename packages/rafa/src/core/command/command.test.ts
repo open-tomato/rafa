@@ -372,17 +372,29 @@ interface Reading {
 }
 
 let tempDir = '';
-let program: ts.Program | null = null;
+/** Every probe's diagnostics, by the probe's file name, once `beforeAll` has read them. */
+let storedReadings: Readonly<Record<string, readonly Reading[]>> | null = null;
 
-/** Every diagnostic the compile holds against one probe. */
-function readingsOf(file: string): Reading[] {
-  if (program === null) throw new Error('the probes were never compiled');
+/**
+ * Every diagnostic the compile holds against one probe, read off the
+ * checker. Called by `beforeAll` alone, so the checker binds and checks
+ * there and not inside the first case.
+ */
+function diagnosticsOf(program: ts.Program, file: string): Reading[] {
   const source = program.getSourceFile(join(tempDir, file));
   if (source === undefined) throw new Error(`the probe ${file} is not in the compile`);
   return ts.getPreEmitDiagnostics(program, source).map((diagnostic) => ({
     code: diagnostic.code,
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
   }));
+}
+
+/** Every diagnostic the compile holds against one probe, as stored. */
+function readingsOf(file: string): readonly Reading[] {
+  if (storedReadings === null) throw new Error('the probes were never compiled');
+  const stored = storedReadings[file];
+  if (stored === undefined) throw new Error(`the probe ${file} is not in the compile`);
+  return stored;
 }
 
 beforeAll(() => {
@@ -396,7 +408,8 @@ beforeAll(() => {
   const configPath = join(REPO_ROOT, 'tsconfig.json');
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, REPO_ROOT, undefined, configPath);
-  program = ts.createProgram({ rootNames: probes.map(([file]) => join(tempDir, file)), options: { ...parsed.options, isolatedDeclarations: false } });
+  const program = ts.createProgram({ rootNames: probes.map(([file]) => join(tempDir, file)), options: { ...parsed.options, isolatedDeclarations: false } });
+  storedReadings = Object.fromEntries(probes.map(([file]) => [file, diagnosticsOf(program, file)]));
 }, 30_000);
 
 afterAll(() => {

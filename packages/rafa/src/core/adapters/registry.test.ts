@@ -162,7 +162,12 @@ function addOn(fields: Record<string, unknown> = {}): AnyAdapter {
 }
 
 let tempDir = '';
-let program: ts.Program | null = null;
+
+/**
+ * The `PortVersions` each compiled file declares, by the path the cases
+ * pass, read off the checker in `beforeAll`.
+ */
+let versions: Readonly<Record<string, Record<string, number | string>>> | null = null;
 
 /**
  * A registry of fixture adapters under the kinds core registers, in the
@@ -204,10 +209,10 @@ function overEmpty(body: () => void): void {
 /**
  * The `PortVersions` a file declares, read off the compiler: each
  * member's number when its type is a number literal, and the type as
- * the checker prints it when not.
+ * the checker prints it when not. Called by `beforeAll` alone, so the
+ * checker binds and checks there and not inside the first case.
  */
-function declaredVersions(file: string): Record<string, number | string> {
-  if (program === null) throw new Error('the program was never compiled');
+function readVersions(program: ts.Program, file: string): Record<string, number | string> {
   const checker = program.getTypeChecker();
   const source = program.getSourceFile(file);
   if (source === undefined) throw new Error(`the program holds no ${file}`);
@@ -226,6 +231,14 @@ function declaredVersions(file: string): Record<string, number | string> {
   }));
 }
 
+/** The `PortVersions` a compiled file declares, as `beforeAll` stored it. */
+function declaredVersions(file: string): Record<string, number | string> {
+  if (versions === null) throw new Error('the program was never compiled');
+  const reading = versions[file];
+  if (reading === undefined) throw new Error(`the program holds no ${file}`);
+  return reading;
+}
+
 beforeAll(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'rafa-registry-'));
   const probe = join(tempDir, 'drifted.ts');
@@ -240,7 +253,8 @@ beforeAll(() => {
     undefined,
     configPath,
   );
-  program = ts.createProgram({ rootNames: [PORTS_ENTRY, probe], options: parsed.options });
+  const program = ts.createProgram({ rootNames: [PORTS_ENTRY, probe], options: parsed.options });
+  versions = Object.fromEntries([PORTS_ENTRY, probe].map((file) => [file, readVersions(program, file)]));
 }, 30_000);
 
 afterAll(() => {

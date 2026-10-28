@@ -50,7 +50,7 @@ import type { Adapter } from './registry.js';
 
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as registry from './registry.js';
@@ -68,8 +68,13 @@ const ROOT_MODULE = 'src/adapter-registry.ts';
 const UNREGISTERED = 'adapter registry: no adapter is registered: call registerCoreAdapters()'
   + ' from src/adapter-registry.ts before reading CORE_ADAPTER_REGISTRY';
 
+/** Every path a case reads the export names of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [BARREL, REGISTRY];
+
 /**
- * Every export name of each file, types included, sorted.
+ * Every export name of each file, types included, sorted. Runs once,
+ * from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays for
+ * the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns The names by path.
@@ -99,6 +104,19 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
   return names;
 }
 
+let exportNames: Record<string, string[]> | null = null;
+
+/**
+ * The export names by path, once `beforeAll` has read them.
+ *
+ * @returns The names by path of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function storedExportNames(): Record<string, string[]> {
+  if (exportNames === null) throw new Error('the export names were never read');
+  return exportNames;
+}
+
 /**
  * Runs a child `bun` that imports `first` before the other two files,
  * then the composition root unless `withRoot` is false, then resolves
@@ -125,6 +143,10 @@ function loadingFirst(first: string, withRoot = true): { exitCode: number; stdou
 }
 
 describe('the adapters barrel', () => {
+  beforeAll(() => {
+    exportNames = readExportNames(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of registry.ts, each once, and no other', () => {
     const expected = Object.keys(registry).sort();
 
@@ -168,7 +190,7 @@ describe('the adapters barrel', () => {
   });
 
   it('exports the type names of registry.ts with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, REGISTRY]);
+    const names = storedExportNames();
 
     expect(names[REGISTRY]).toContain('CORE_ADAPTER_REGISTRY');
     expect(names[REGISTRY]).toContain('AdapterContext');
