@@ -408,10 +408,11 @@ interface Reading {
   readonly message: string;
 }
 
-/** The compile every case reads. */
+/** The compile every case reads, its readings taken when it was built. */
 interface Compiled {
-  readonly program: ts.Program;
   readonly configErrors: readonly ts.Diagnostic[];
+  /** Every probe's diagnostics, by the probe's file name. */
+  readonly readings: Readonly<Record<string, readonly Reading[]>>;
 }
 
 let tempDir = '';
@@ -423,15 +424,25 @@ function compiledProbes(): Compiled {
   return compiled;
 }
 
-/** Every diagnostic the compile holds against one probe. */
-function readingsOf(file: string): Reading[] {
-  const { program } = compiledProbes();
+/**
+ * Every diagnostic the compile holds against one probe, read off the
+ * checker. Called by `beforeAll` alone, so the checker binds and checks
+ * there and not inside the first case.
+ */
+function diagnosticsOf(program: ts.Program, file: string): Reading[] {
   const source = program.getSourceFile(join(tempDir, file));
   if (source === undefined) throw new Error(`the probe ${file} is not in the compile`);
   return ts.getPreEmitDiagnostics(program, source).map((diagnostic) => ({
     code: diagnostic.code,
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
   }));
+}
+
+/** Every diagnostic the compile holds against one probe, as stored. */
+function readingsOf(file: string): readonly Reading[] {
+  const readings = compiledProbes().readings[file];
+  if (readings === undefined) throw new Error(`the probe ${file} is not in the compile`);
+  return readings;
 }
 
 beforeAll(() => {
@@ -448,14 +459,16 @@ beforeAll(() => {
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, REPO_ROOT, undefined, configPath);
 
+  const program = ts.createProgram({
+    rootNames: probes.map(([file]) => join(tempDir, file)),
+    options: { ...parsed.options, isolatedDeclarations: false },
+  });
+
   compiled = {
-    program: ts.createProgram({
-      rootNames: probes.map(([file]) => join(tempDir, file)),
-      options: { ...parsed.options, isolatedDeclarations: false },
-    }),
     configErrors: [...config.error === undefined
       ? []
       : [config.error], ...parsed.errors],
+    readings: Object.fromEntries(probes.map(([file]) => [file, diagnosticsOf(program, file)])),
   };
 }, 30_000);
 
