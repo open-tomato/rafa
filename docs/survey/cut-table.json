@@ -5555,17 +5555,13 @@
       ],
       "filesByFolder": {
         "packages/rafa-run/": 165,
-        "src/claims/": 0,
         "src/commands/claim/": 2,
-        "src/preflight/": 0,
         "src/start/": 29,
         "src/suite/": 2
       },
       "folders": [
         "packages/rafa-run/",
-        "src/claims/",
         "src/commands/claim/",
-        "src/preflight/",
         "src/start/",
         "src/suite/"
       ],
