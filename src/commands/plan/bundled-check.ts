@@ -99,11 +99,11 @@ import {
   pinLine,
   readAgentDirectory,
 } from '@open-tomato/rafa-inventory';
-import { prerequisitesPathForPlan } from '@open-tomato/rafa-run';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { isFile, parsePlan } from '@open-tomato/rafa/core/plan';
+import { prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
 
 /** The folder of the checkout the bundled roots sit in. */

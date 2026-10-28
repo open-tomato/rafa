@@ -13,7 +13,12 @@
  * `config-schema-*.ts` section files, `modules/`, `next/hop-record.ts`,
  * `plan/`, `project/`, `runtime/live-loops.ts` and `utils/`. Each sits
  * at its old path below `src/`; outside `core/` no barrel rule applies,
- * so a file outside the package imports one by its own subpath.
+ * so a file outside the package imports one by its own subpath. Pass 4f
+ * moved three preflight files in the same way, `preflight/run.ts`,
+ * `shell.ts` and `prerequisites-md.ts`, each behind a subpath of its own
+ * (`@open-tomato/rafa/preflight/run` and the two beside it). They are
+ * not in {@link CORE_BARRELS}, which lists files under {@link CORE_FOLDER}
+ * alone.
  *
  * Where core is:
  *

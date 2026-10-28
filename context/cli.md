@@ -882,7 +882,7 @@ New; it replaces no earlier text. What a row or an action added to
 - **Where a wrapped command writes**: through the active output, in every module
   it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`,
-  `start/pause.ts`, `start/preflight.ts`, `preflight/run.ts`,
+  `start/pause.ts`, `start/preflight.ts`, `packages/rafa/src/preflight/run.ts`,
   `start/worktree-setup.ts`, `start/commit.ts`, `start/wrap-up.ts`,
   `start/wrap-up-run.ts`, `start/follow-ups.ts`,
   `start/convention-body.ts`, `start/dispatch.ts`, `start/triage.ts`,

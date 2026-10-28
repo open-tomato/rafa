@@ -11,7 +11,7 @@
  *
  * The inside half: every specifier of a code file `isCoreFile` holds,
  * relative or bare, lands on a file `isCoreFile` holds, or outside the
- * repository (a package, a `node:` or `bun:` builtin). A bare
+ * repository (a package, a `node:` or `bun:` builtin, or `bun`). A bare
  * `@open-tomato/rafa/` specifier inside core fails even when it would
  * land inside.
  *
@@ -49,6 +49,9 @@ import { SWEEP_TIMEOUT } from './sweep-timeout.js';
 setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/** What `Bun.resolveSync` answers for Bun's own module, `bun`. */
+const BUN_MODULE = 'bun';
 
 /** The prefix of a specifier that names core by its package. */
 const PACKAGE_PREFIX = '@open-tomato/rafa/';
@@ -108,13 +111,15 @@ function committableCodeFiles(): string[] {
 /**
  * Whether a resolved location is outside the repository: a builtin, an
  * absolute path the resolver did not bring under the root, or a package
- * folder.
+ * folder. Bun's own module, `import type { Subprocess } from 'bun'` in
+ * `packages/rafa/src/preflight/shell.ts`, resolves to `bun` with no
+ * prefix, and is a builtin too.
  *
  * @param landed - What the resolver answered.
  * @returns `true` when it is not a file of the repository.
  */
 function isOutsideRepository(landed: string): boolean {
-  return landed.startsWith('/') || landed.includes('node_modules/') || /^[a-z]+:/.test(landed);
+  return landed === BUN_MODULE || landed.startsWith('/') || landed.includes('node_modules/') || /^[a-z]+:/.test(landed);
 }
 
 /**
@@ -370,6 +375,16 @@ describe('the planted-tree controls', () => {
     expect(reading.insideViolations).toEqual([]);
     expect(reading.outsideSpecifiers).toBe(1);
     expect(reading.insideRead).toBe(2);
+  });
+
+  it('passes an inside import of the bare bun builtin, which resolves to bun with no prefix, beside a file of the tree', () => {
+    const reading = readPlanted({
+      'core/a.ts': 'import type { Subprocess } from \'bun\';\nimport { u } from \'../app/util.js\';\nexport type A = Subprocess;\nexport const a = u;\n',
+      'app/util.ts': 'export const u = 1;\n',
+    });
+    expect(reading.insideViolations).toEqual([
+      { from: 'core/a.ts', landed: 'app/util.ts', specifier: '../app/util.js' },
+    ]);
   });
 
   it('fails an outside specifier that resolves to a file outside core', () => {

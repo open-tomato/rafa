@@ -335,14 +335,14 @@
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
+import type { PrerequisiteItem, RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type {
   PreflightItems,
   PrerequisiteReminder,
   PrerequisiteSettings,
-} from '../preflight/prerequisites-md.js';
-import type { PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
-import type { PrerequisiteItem, RafaConfig } from '@open-tomato/rafa/core/config';
-import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+import type { PreflightOptions, PreflightReport, PreflightTiers } from '@open-tomato/rafa/preflight/run';
 import type { PreflightWriterSeams } from '@open-tomato/rafa/store/preflight';
 import type { TierSettings } from '@open-tomato/rafa-inventory';
 import type { ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
@@ -368,6 +368,12 @@ import { registeredDefaults } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { trackerPathFor } from '@open-tomato/rafa/core/plan';
+import {
+  loadPlanPrerequisites,
+  malformedPrerequisiteLines,
+  prerequisitesPathForPlan,
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+import { runPreflight } from '@open-tomato/rafa/preflight/run';
 import { effortStoreDir } from '@open-tomato/rafa/store/location';
 import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '@open-tomato/rafa/store/schema-report';
@@ -376,12 +382,6 @@ import { listOpenTasks } from '@open-tomato/rafa/utils/tracker';
 
 import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
-import {
-  loadPlanPrerequisites,
-  malformedPrerequisiteLines,
-  prerequisitesPathForPlan,
-} from '../preflight/prerequisites-md.js';
-import { runPreflight } from '../preflight/run.js';
 
 import { markInDevelopment, refuseUnownedClaim } from './preflight-claim.js';
 import { reportStartDrift } from './preflight-drift.js';

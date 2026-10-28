@@ -146,44 +146,6 @@ export {
 export { isFirstDispatch } from '../../src/preflight/first-dispatch.js';
 
 export type {
-  MalformedPrerequisite,
-  MarkdownPrerequisite,
-  PlanPrerequisites,
-  PreflightItems,
-  PrerequisiteReminder,
-  PrerequisiteSettings,
-  PrerequisiteTag,
-} from '../../src/preflight/prerequisites-md.js';
-export {
-  loadPlanPrerequisites,
-  malformedPrerequisiteLines,
-  mergePlanPrerequisites,
-  parsePrerequisites,
-  planPrerequisites,
-  prerequisitesPathForPlan,
-} from '../../src/preflight/prerequisites-md.js';
-
-export type {
-  CheckOutcome,
-  PreflightCheck,
-  PreflightEnv,
-  PreflightOptions,
-  PreflightReport,
-  PreflightTier,
-  PreflightTiers,
-  ProbeOptions,
-  ProbeRun,
-  ProbeRunner,
-  ServiceRequestInit,
-  ServiceRequester,
-} from '../../src/preflight/run.js';
-export {
-  PROBE_TIMEOUT_MS,
-  runPreflight,
-  runShellProbe,
-} from '../../src/preflight/run.js';
-
-export type {
   BuildLines,
   InstallOptions,
   InstallSeams,

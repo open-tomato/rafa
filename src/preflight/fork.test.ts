@@ -29,8 +29,8 @@
  *     stdin inherited reads that line.
  */
 import type { ForkOptions } from './fork.js';
-import type { PreflightTiers } from './run.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { PreflightTiers } from '@open-tomato/rafa/preflight/run';
 
 import {
   chmodSync,

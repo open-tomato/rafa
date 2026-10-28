@@ -189,7 +189,11 @@ the project readers (`project/`); the live-loops reading
 (`runtime/live-loops.ts`); and the git, progress and tracker utilities
 (`utils/`). They sit outside `core/`, so no barrel rule holds them: a file
 outside the package imports each by its own subpath, which core's `exports`
-names by a key or a folder wildcard. The move tool,
+names by a key or a folder wildcard. Pass 4f moved run's three preflight files
+that reach only core in the same way, `preflight/run.ts`, `shell.ts` and
+`prerequisites-md.ts`, each behind a key of its own
+(`@open-tomato/rafa/preflight/run` and the two beside it), so the root's
+`./plan` entry takes them from core. The move tool,
 `scripts/codemod/pass-moves.ts`, leaves a colocated test the project's
 `tests.integration` globs match at the root, with its imports rewritten to
 subpaths, and lists it in its output, until #913 places integration tests;
@@ -379,11 +383,14 @@ naming what it reaches above core. A feature package's parked tests wait in
 `src/tests/pr-coupled/`. A file that joins the folder takes its row in the
 same commit. The folder held 63 test files before rafa-1333 and holds 63 after
 it, since none of the nine files' tests reaches the root: each reaches only
-core, its own file and the other moved files, so the move parked nothing. The
-ten section tests are the named exception: each parks under
-`src/tests/core-coupled/` as `config-schema-<section>.test.ts`, not beside its
-file under `packages/rafa/src/`, because it reads `src/config-registry.ts`, the
-root's merged registry, which stays at the root. They leave the folder when #913
+core, its own file and the other moved files, so the move parked nothing. Pass
+4f parked one, 64: `preflight/prerequisites-md.test.ts`, whose merge and loader
+cases need the sections `src/config-registry.ts` registers, moved with the
+three preflight files run handed to core. The ten section tests are the named
+exception: each parks under `src/tests/core-coupled/` as
+`config-schema-<section>.test.ts`, not beside its file under
+`packages/rafa/src/`, because it reads `src/config-registry.ts`, the root's
+merged registry, which stays at the root. They leave the folder when #913
 places integration tests. `CORE_PARKED_TESTS` of `scripts/survey/core-moves.ts`
 names the folder: the barrels sweep reads these files as core's and does not
 hold their imports to the barrel rule. The test-index guard reads them as any

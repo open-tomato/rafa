@@ -188,7 +188,8 @@ export const INVENTORY_NAMED: readonly string[] = [];
  * in pass 4b, so the build is untouched. `src/plan/index.ts` is the
  * published `./plan` entry, a build entry of the CLI in the same way; it
  * left run's list in pass 4f, stays at the root when run's files move,
- * and takes run's preflight names from the facade, `@open-tomato/rafa-run`.
+ * and takes the preflight names from core, whose subpaths
+ * `@open-tomato/rafa/preflight/run` and `prerequisites-md` they sit behind.
  */
 export const CLI_NAMED: readonly string[] = [
   'src/commands/index.ts',

@@ -1,7 +1,7 @@
 /**
  * One preflight check as the runner answers it and the store records it:
  * its tier, its item, its outcome, how long it took and what failed.
- * `src/preflight/run.ts` checks every item and re-exports these types for
+ * `packages/rafa/src/preflight/run.ts` checks every item and re-exports these types for
  * its importers; the store's preflight writer (`./preflight.ts`) keys its
  * CHECKs by them.
  *

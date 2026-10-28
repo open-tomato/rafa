@@ -84,14 +84,13 @@
  *   - `git rev-parse --show-prefix` outside a repository exits 128:
  *     `fatal: not a git repository (or any of the parent directories): .git`.
  */
-import type { PreflightEnv, PreflightOptions, PreflightReport, PreflightTiers } from './run.js';
+import type { PreflightEnv, PreflightOptions, PreflightReport, PreflightTiers } from '@open-tomato/rafa/preflight/run';
 
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { firstLineOf, runPreflight } from './run.js';
+import { firstLineOf, runPreflight } from '@open-tomato/rafa/preflight/run';
 
 /** The lockfile whose presence in the root makes a fork install. */
 export const LOCKFILE = 'bun.lock';

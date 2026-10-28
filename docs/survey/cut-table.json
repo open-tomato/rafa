@@ -2299,6 +2299,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/core-coupled/preflight/prerequisites-md.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/core-coupled/project/package-of.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3754,8 +3759,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 206,
-        "test": 149,
+        "source": 209,
+        "test": 151,
         "testSupport": 9
       },
       "files": [
@@ -4066,6 +4071,11 @@
         "packages/rafa/src/pr/pull-requests-double.ts",
         "packages/rafa/src/pr/types.test.ts",
         "packages/rafa/src/pr/types.ts",
+        "packages/rafa/src/preflight/prerequisites-md.ts",
+        "packages/rafa/src/preflight/run.test.ts",
+        "packages/rafa/src/preflight/run.ts",
+        "packages/rafa/src/preflight/shell.test.ts",
+        "packages/rafa/src/preflight/shell.ts",
         "packages/rafa/src/project/bin-path.test.ts",
         "packages/rafa/src/project/bin-path.ts",
         "packages/rafa/src/project/package-of.ts",
@@ -4125,7 +4135,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 364
+        "packages/rafa/": 369
       },
       "folders": [
         "packages/rafa/"
@@ -5180,8 +5190,8 @@
         }
       ],
       "fileCounts": {
-        "source": 110,
-        "test": 153,
+        "source": 107,
+        "test": 150,
         "testSupport": 0
       },
       "files": [
@@ -5253,12 +5263,6 @@
         "src/preflight/first-dispatch.ts",
         "src/preflight/fork.test.ts",
         "src/preflight/fork.ts",
-        "src/preflight/prerequisites-md.test.ts",
-        "src/preflight/prerequisites-md.ts",
-        "src/preflight/run.test.ts",
-        "src/preflight/run.ts",
-        "src/preflight/shell.test.ts",
-        "src/preflight/shell.ts",
         "src/runtime/install.test.ts",
         "src/runtime/install.ts",
         "src/start/background-wait.test.ts",
@@ -5453,7 +5457,7 @@
         "packages/rafa-run/": 0,
         "src/claims/": 11,
         "src/commands/claim/": 15,
-        "src/preflight/": 10,
+        "src/preflight/": 4,
         "src/start/": 175,
         "src/suite/": 12
       },
@@ -5803,7 +5807,7 @@
       "edges": [],
       "fileCounts": {
         "source": 176,
-        "test": 580,
+        "test": 581,
         "testSupport": 22
       },
       "files": [
@@ -6306,6 +6310,7 @@
         "src/tests/core-coupled/next/hop-record.integration.test.ts",
         "src/tests/core-coupled/plan/doc-task.test.ts",
         "src/tests/core-coupled/ports/index.test.ts",
+        "src/tests/core-coupled/preflight/prerequisites-md.test.ts",
         "src/tests/core-coupled/project/package-of.test.ts",
         "src/tests/core-coupled/project/position.integration.test.ts",
         "src/tests/core-coupled/project/scope-fallback.test.ts",
@@ -6609,7 +6614,7 @@
   "totals": {
     "clearedByIssue118": 0,
     "files": 2197,
-    "leftToPlace": 738,
+    "leftToPlace": 739,
     "nonTestEdges": 4868,
     "unassignedFiles": 28,
     "unrankedEdges": 75,

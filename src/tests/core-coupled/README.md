@@ -62,7 +62,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `effort/store/migrations.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |
 | `effort/store/move.test.ts` | `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |
 | `effort/store/origins.test.ts` | `packages/rafa-effort/src/effort/skill-facts.ts` |
-| `effort/store/preflight.test.ts` | `src/preflight/run.ts` |
+| `effort/store/preflight.test.ts` | `src/config-registry.ts`, and no longer `src/preflight/run.ts`, which moved into core as `packages/rafa/src/preflight/run.ts` (#808, pass 4f) |
 | `effort/store/search-row.test.ts` | `packages/rafa-effort/src/effort/collect.ts`, `packages/rafa-effort/src/effort/report.ts` |
 | `effort/store/settings.test.ts` | `src/config-registry.ts` |
 | `effort/store/stale-docs.test.ts` | `src/tests/merged-stores.ts` |
@@ -72,6 +72,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `next/hop-record.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts` |
 | `plan/doc-task.test.ts` | `src/plan/index.ts`, `packages/rafa/src/plan/validate.ts` |
 | `ports/index.test.ts` | `src/plan/index.ts` |
+| `preflight/prerequisites-md.test.ts` | `src/config-registry.ts` |
 | `project/package-of.test.ts` | `src/tests/package-tree.ts` |
 | `project/position.integration.test.ts` | `src/project/gitignore.ts`, `src/tests/cli-capture.ts` |
 | `project/scope-fallback.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |

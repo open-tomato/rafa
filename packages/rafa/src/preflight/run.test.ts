@@ -1,5 +1,5 @@
 /**
- * Tests for the preflight runner (`src/preflight/run.ts`).
+ * Tests for the preflight runner (`packages/rafa/src/preflight/run.ts`).
  *
  * Every probe runs the real `/bin/sh` under an environment the case
  * builds: `HOME` is a directory under the case's own temporary directory,
@@ -23,7 +23,7 @@
  *   - presence: each kind beside the same check failing, the environment
  *     read being the one handed in and not this process's.
  */
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,9 +31,9 @@ import { delimiter, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '@open-tomato/rafa/core/output';
-import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { setActiveOutput } from '../core/output/index.js';
+import { sinkOutput } from '../tests/output-sinks.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './run.js';
 

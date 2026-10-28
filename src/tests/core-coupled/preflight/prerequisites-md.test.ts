@@ -1,6 +1,6 @@
 /**
  * Tests for the PREREQUISITES markdown reader
- * (`src/preflight/prerequisites-md.ts`).
+ * (`packages/rafa/src/preflight/prerequisites-md.ts`).
  *
  * The source's suite, open-tomato's
  * `services/orchestrator/src/prerequisites/parser.test.ts` at commit
@@ -37,7 +37,7 @@
  * reads is written under the case's own temporary directory, and each
  * loader case asserts the path it names resolves under that directory.
  */
-import '../config-registry.js';
+import '../../../config-registry.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,14 +46,13 @@ import { isAbsolute, join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
-
 import {
   loadPlanPrerequisites,
   mergePlanPrerequisites,
   parsePrerequisites,
   planPrerequisites,
   prerequisitesPathForPlan,
-} from './prerequisites-md.js';
+} from '@open-tomato/rafa/preflight/prerequisites-md';
 
 /** A config naming one item on each tier. */
 const CONFIG_YAML = [

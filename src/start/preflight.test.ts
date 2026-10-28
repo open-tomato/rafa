@@ -103,10 +103,10 @@
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
-import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
-import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { ClaudeSettingSource, TierPin } from '@open-tomato/rafa/core/config/sections';
+import type { PrerequisiteSettings } from '@open-tomato/rafa/preflight/prerequisites-md';
+import type { ProbeRun, ProbeRunner } from '@open-tomato/rafa/preflight/run';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';

@@ -69,8 +69,7 @@ import type { PlanTask } from '@open-tomato/rafa/core/plan';
 import { findPinnedMigrations } from '@open-tomato/rafa-board';
 
 import { parsePlan } from '@open-tomato/rafa/core/plan';
-
-import { parsePrerequisites } from '../preflight/prerequisites-md.js';
+import { parsePrerequisites } from '@open-tomato/rafa/preflight/prerequisites-md';
 
 /** Which of the three rules a problem breaks. */
 export type StoreRuleKind = 'pinned-migration' | 'unprefixed-command' | 'missing-probe';

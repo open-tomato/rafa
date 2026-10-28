@@ -144,10 +144,10 @@ import {
   readMcpServers,
   toolOf,
 } from '@open-tomato/rafa-inventory';
-import { parsePrerequisites, prerequisitesPathForPlan } from '@open-tomato/rafa-run';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { parsePrerequisites, prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 import { bundledBinDirectory } from '@open-tomato/rafa/schema/tiers';
 

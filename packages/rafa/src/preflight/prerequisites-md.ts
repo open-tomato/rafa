@@ -180,11 +180,11 @@ import type {
   PrerequisiteItem,
   PrerequisiteScope,
   RafaConfig,
-} from '@open-tomato/rafa/core/config';
+} from '../core/config/index.js';
 
 import { basename, dirname, join } from 'node:path';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { messageOf } from '../core/config/sections.js';
 
 /**
  * How a PREREQUISITES item is checked: by its probe on every dispatch, by

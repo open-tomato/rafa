@@ -242,26 +242,28 @@ export type {
   OutputProvision,
 } from '@open-tomato/rafa/modules/manifest';
 export type {
-  CheckOutcome,
   MalformedPrerequisite,
   MarkdownPrerequisite,
   PlanPrerequisites,
+  PreflightItems,
+  PrerequisiteReminder,
+  PrerequisiteSettings,
+  PrerequisiteTag,
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+export type {
+  CheckOutcome,
   PreflightCheck,
   PreflightEnv,
-  PreflightItems,
   PreflightOptions,
   PreflightReport,
   PreflightTier,
   PreflightTiers,
-  PrerequisiteReminder,
-  PrerequisiteSettings,
-  PrerequisiteTag,
   ProbeOptions,
   ProbeRun,
   ProbeRunner,
   ServiceRequestInit,
   ServiceRequester,
-} from '@open-tomato/rafa-run';
+} from '@open-tomato/rafa/preflight/run';
 export type {
   FindingKind,
   FindingSignal,
@@ -299,15 +301,13 @@ export type {
   PlanTaskStatus,
 } from '@open-tomato/rafa/core/plan';
 export {
-  PROBE_TIMEOUT_MS,
   loadPlanPrerequisites,
   mergePlanPrerequisites,
   parsePrerequisites,
   planPrerequisites,
   prerequisitesPathForPlan,
-  runPreflight,
-  runShellProbe,
-} from '@open-tomato/rafa-run';
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+export { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '@open-tomato/rafa/preflight/run';
 export { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '@open-tomato/rafa/report/parse';
 export { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 export { renderInjection } from '@open-tomato/rafa/plan/inject';

@@ -7,7 +7,7 @@
  * and `loop-output.test.ts` do, with `.rafa/config.yaml` naming the
  * prerequisite the case is about. Every path a spawned run reads sits
  * under this file's own temporary directory; no case reads the real
- * home. `start/preflight.test.ts` and `src/preflight/run.test.ts` already
+ * home. `start/preflight.test.ts` and `packages/rafa/src/preflight/run.test.ts` already
  * drive every seam of `runStartPreflight` and `runPreflight` directly;
  * what is new here is the join those files leave to a comment: that a
  * failed required item really stops `loop start` before the stand-in is
@@ -36,9 +36,9 @@
  * probe logs the directory it ran in, so the append order of one log
  * file is the order the fork ran them in.
  */
-import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
-import type { PreflightTiers } from '../preflight/run.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { PrerequisiteSettings } from '@open-tomato/rafa/preflight/prerequisites-md';
+import type { PreflightTiers } from '@open-tomato/rafa/preflight/run';
 
 import { execFileSync } from 'node:child_process';
 import {

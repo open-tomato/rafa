@@ -98,15 +98,15 @@
  */
 import type { PreflightItems } from './prerequisites-md.js';
 import type { ShellProcess } from './shell.js';
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
-import type { PreflightCheck, PreflightTier } from '@open-tomato/rafa/store/preflight-check';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
+import type { PreflightCheck, PreflightTier } from '../effort/store/preflight-check.js';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-import { activeOutput } from '@open-tomato/rafa/core/output';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 
 import { collect, killGroup, SHELL, spawnShell } from './shell.js';
 
-export type { CheckOutcome, PreflightCheck, PreflightTier } from '@open-tomato/rafa/store/preflight-check';
+export type { CheckOutcome, PreflightCheck, PreflightTier } from '../effort/store/preflight-check.js';
 
 /** How long a probe, or a service request, may take: 30 seconds. */
 export const PROBE_TIMEOUT_MS = 30_000;

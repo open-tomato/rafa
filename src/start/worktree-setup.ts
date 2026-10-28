@@ -4,8 +4,8 @@
  * as its `cwd`, prints what it wrote, and refuses the run when it fails.
  *
  * It runs through the spawn, the group kill and the stream reader of
- * `../preflight/shell.ts`, whose module note holds the rules they were
- * measured by:
+ * core's `packages/rafa/src/preflight/shell.ts`, whose module note holds
+ * the rules they were measured by:
  *
  *   - **stdin is closed**, so a command that waits for input reads end of
  *     file and ends instead of holding the run: `cat` exits 0 at once.
@@ -44,14 +44,13 @@
  * nothing; a shell that never started has no lines after the first.
  * Nothing here removes or changes the worktree.
  */
-import type { ShellProcess } from '../preflight/shell.js';
 import type { Output } from '@open-tomato/rafa/ports';
+import type { ShellProcess } from '@open-tomato/rafa/preflight/shell';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { collect, killGroup, SHELL, spawnShell } from '../preflight/shell.js';
+import { collect, killGroup, SHELL, spawnShell } from '@open-tomato/rafa/preflight/shell';
 
 /** How long the setup command may run before its group is killed: ten minutes. */
 export const WORKTREE_SETUP_TIMEOUT_MS = 600_000;
