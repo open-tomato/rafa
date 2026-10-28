@@ -70,7 +70,7 @@
  * ## The effort-store rules
  *
  * Beside both, the command checks the plan against the three rules of
- * `src/plan/store-rules.ts`, which `loop start`'s preflight repeats: no
+ * `packages/rafa-run/src/plan/store-rules.ts`, which `loop start`'s preflight repeats: no
  * store change pinned by number, anywhere in the plan; and, in a plan
  * one of whose task lines names ``migration `<id>` ``, no still-to-run
  * task spelling a code span that runs `src/rafa.ts`, `dist/cli.js` or
@@ -154,7 +154,7 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '@open-tomato/rafa-inventory';
-import { prerequisitesPathForPlan, storeRuleLine } from '@open-tomato/rafa-run';
+import { storeRuleLine } from '@open-tomato/rafa-run';
 
 import { expectOneArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -163,6 +163,7 @@ import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { formatCounts, issueLine, plural } from '@open-tomato/rafa/core/plan';
 import { validatePlan } from '@open-tomato/rafa/plan/validate';
+import { prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 
 import { bundledEditLine, findBundledEdits, writeTierPins } from './bundled-check.js';
 import { checkStoreRules } from './store-check.js';

@@ -5,8 +5,9 @@
  * Copied from open-tomato's `packages/shared/cli-core/src/types.ts` at
  * commit `6c774b81fc62489f31748c47e251f11448e3904a` (2026-06-25). The
  * package is not on the public registry, so rafa copies it rather than
- * depending on it, as it copies `parseArgs.ts` and `assembleContext.ts`,
- * which stay in `src/cli/core/`, from the same package.
+ * depending on it, as it copies `parseArgs.ts`, now beside this file,
+ * and `assembleContext.ts`, which stays in `src/cli/core/`, from the
+ * same package.
  *
  * The copy sat beside those two until it moved into `packages/rafa/src/core/command/`,
  * so core's `command.ts` reads it without importing the CLI.

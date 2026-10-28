@@ -4,7 +4,7 @@
  * scripted answer to the question a terminal is put.
  *
  * Six commands end by naming the step that follows
- * (`src/next/ending.ts`), and each one's suite has the same two things
+ * (`packages/rafa-run/src/next/ending.ts`), and each one's suite has the same two things
  * to hold: that the ending ran where it should, and that NOTHING was
  * read where it should not. Left to the system seams the ending would
  * compose the real sources — `git` and `gh` spawned in whatever scratch
@@ -17,14 +17,14 @@
  * refusal each count zero against a run that counts one.
  *
  * The two lines are spelled out rather than built from
- * `src/next/hint.ts`, so a suite asserting on them measures the words a
+ * `packages/rafa-run/src/next/hint.ts`, so a suite asserting on them measures the words a
  * person sees. `hint.test.ts` pins the same two independently, off the
  * same state, which is what keeps this file honest as the wording
  * changes.
  */
-import type { NextEndingSeams } from '../next/ending.js';
-import type { NextState } from '../next/state.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { NextEndingSeams } from '@open-tomato/rafa-run/next/ending';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 /** The pull request the green state names. */
 export const ENDING_PR = 41;

@@ -100,7 +100,7 @@ export const PROMPT_SHAPES: readonly PromptShape[] = [
     label: 'task',
     prefix: 'Your scoped task is: ',
     firstLineInfix: null,
-    source: 'src/start/dispatch.ts',
+    source: 'packages/rafa-run/src/start/dispatch.ts',
   },
   {
     kind: 'plan-generation',
@@ -114,14 +114,14 @@ export const PROMPT_SHAPES: readonly PromptShape[] = [
     label: 'wrap-up',
     prefix: '* Read `@progress.txt` in full.',
     firstLineInfix: null,
-    source: 'src/start/wrap-up.ts',
+    source: 'packages/rafa-run/src/start/wrap-up.ts',
   },
   {
     kind: 'ci-repair',
     label: 'CI repair',
     prefix: 'The pull request for branch ',
     firstLineInfix: ' is not mergeable: ',
-    source: 'src/start/pr-lifecycle.ts',
+    source: 'packages/rafa-run/src/start/pr-lifecycle.ts',
   },
   {
     kind: 'search',

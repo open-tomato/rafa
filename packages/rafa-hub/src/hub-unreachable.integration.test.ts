@@ -35,7 +35,7 @@
  *     way, over a project naming `pr.provider: gh`, a roadmap issue and
  *     a stand-in `gh`, since `openNextSources` refuses any other
  *     provider before the pull `rafa next` makes ever runs
- *     (`src/next/sources.ts`).
+ *     (`packages/rafa-run/src/next/sources.ts`).
  *   - `other` never has its hub redirected or stopped; it is the device
  *     the offline row has to reach once the stopped hub returns.
  *

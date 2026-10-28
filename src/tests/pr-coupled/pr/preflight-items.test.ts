@@ -14,8 +14,8 @@
  * answers 0, so a probe that always failed would not read as a working
  * check here.
  */
-import type { PreflightCheck } from '../../../preflight/run.js';
 import type { PrProviderReading } from '@open-tomato/rafa/pr/provider';
+import type { PreflightCheck } from '@open-tomato/rafa/preflight/run';
 
 import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,6 +23,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { runPreflight } from '@open-tomato/rafa/preflight/run';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,
@@ -32,8 +33,6 @@ import {
   ghOnPathItem,
   ghPreflightItems,
 } from '@open-tomato/rafa-pr/pr/preflight-items';
-
-import { runPreflight } from '../../../preflight/run.js';
 
 /** Every scratch directory made here, removed when the file is done. */
 const scratchDirs: string[] = [];

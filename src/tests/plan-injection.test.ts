@@ -30,10 +30,10 @@
  * two calls that carry the mode to the dispatch and the plan to the
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
-import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { InjectMode } from '@open-tomato/rafa/core/config/sections';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { TaskDispatch, TaskSessionRunner } from '@open-tomato/rafa-run/start/dispatch';
 
 import {
   mkdirSync,
@@ -62,13 +62,13 @@ import { planStubFromPrompt, stampPrompt } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
+import { dispatchTask } from '@open-tomato/rafa-run/start/dispatch';
+import { injectionPlace } from '@open-tomato/rafa-run/start/loop-events';
+import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '@open-tomato/rafa-run/start/run-config';
+import { buildWrapUpPrompt } from '@open-tomato/rafa-run/start/wrap-up';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { renderInjection } from '../plan/index.js';
-import { dispatchTask } from '../start/dispatch.js';
-import { injectionPlace } from '../start/loop-events.js';
-import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
-import { buildWrapUpPrompt } from '../start/wrap-up.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -557,8 +557,8 @@ describe('the wrap-up session', () => {
 
   it('is started with the plan and never with a rendering', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
-    const wrapUpRun = readFileSync(new URL('../start/wrap-up-run.ts', import.meta.url), 'utf8');
-    const wrapUp = readFileSync(new URL('../start/wrap-up.ts', import.meta.url), 'utf8');
+    const wrapUpRun = readFileSync(new URL('../../packages/rafa-run/src/start/wrap-up-run.ts', import.meta.url), 'utf8');
+    const wrapUp = readFileSync(new URL('../../packages/rafa-run/src/start/wrap-up.ts', import.meta.url), 'utf8');
 
     // `start()` hands the plan it read to the wrap-up branch, which hands
     // it on to the session (`start/wrap-up-run.ts`).

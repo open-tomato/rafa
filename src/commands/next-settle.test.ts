@@ -1,6 +1,6 @@
 /**
  * Tests for the settle step of `rafa next` (`next.ts` over
- * `src/next/settle-step.ts`): once a merge action has run, while
+ * `packages/rafa-run/src/next/settle-step.ts`): once a merge action has run, while
  * fragments wait on the base and fold into a version, one more turn
  * proposes `rafa release settle`, asked like `merge` and run unasked
  * only under a `--yes` list naming `settle`.
@@ -29,10 +29,10 @@
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
 import type { NextCeiling } from '../next/ceiling.js';
-import type { NextState } from '../next/state.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import type { PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -45,9 +45,9 @@ import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-dou
 import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 import prMerge from '@open-tomato/rafa-pr/commands/pr/merge';
 import releaseSettle from '@open-tomato/rafa-release/commands/release/settle';
+import { settleState } from '@open-tomato/rafa-run/next/settle-step';
 
 import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
-import { settleState } from '../next/settle-step.js';
 import { dispatchInProject } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';

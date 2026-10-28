@@ -4,16 +4,16 @@
  *
  * ## The source cases
  *
- * `src/start.ts`, `src/start/run-config.ts`, `src/start/run-setup.ts`,
- * `src/start/session.ts`, `src/start/pause.ts`,
- * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
- * `src/start/wrap-up.ts`, `src/start/wrap-up-run.ts`, `src/start/dispatch.ts`,
- * `src/start/triage.ts`, `src/start/release-stage.ts`,
- * `src/start/retry-budget.ts`, `src/start/continue-run.ts`,
- * `src/start/forced-draft.ts`,
+ * `src/start.ts`, `packages/rafa-run/src/start/run-config.ts`, `packages/rafa-run/src/start/run-setup.ts`,
+ * `packages/rafa-run/src/start/session.ts`, `packages/rafa-run/src/start/pause.ts`,
+ * `packages/rafa-run/src/start/preflight.ts`, `packages/rafa/src/preflight/run.ts`, `packages/rafa-run/src/start/commit.ts`,
+ * `packages/rafa-run/src/start/wrap-up.ts`, `packages/rafa-run/src/start/wrap-up-run.ts`, `packages/rafa-run/src/start/dispatch.ts`,
+ * `packages/rafa-run/src/start/triage.ts`, `packages/rafa-run/src/start/release-stage.ts`,
+ * `packages/rafa-run/src/start/retry-budget.ts`, `packages/rafa-run/src/start/continue-run.ts`,
+ * `packages/rafa-run/src/start/forced-draft.ts`,
  * `packages/rafa-board/src/adapters/tracker/resolve.ts`,
  * `packages/rafa-board/src/adapters/tracker/local.ts`,
- * `src/start/pr-lifecycle.ts`, `packages/rafa/src/core/loop/claude.ts` and
+ * `packages/rafa-run/src/start/pr-lifecycle.ts`, `packages/rafa/src/core/loop/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
  * in their code, and each calls `activeOutput()`, or `activeLogger()`,
  * whose console logger writes through the active output. Each is parsed with
@@ -24,7 +24,7 @@
  * ## The release lines
  *
  * A run that reaches its wrap-up now runs the release around that
- * session (`src/start/wrap-up-run.ts`), and no scratch repository here carries a
+ * session (`packages/rafa-run/src/start/wrap-up-run.ts`), and no scratch repository here carries a
  * `package.json` or a `CHANGELOG.md`, so every such run writes the
  * three lines of {@link NO_RELEASE_PREPARED}, {@link
  * NO_RELEASE_REPORTED} and {@link NO_RELEASE_BODY}: step 1 saying it
@@ -158,10 +158,10 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { preserveProgress } from '@open-tomato/rafa-run/start/wrap-up';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { parsePlan } from '../plan/index.js';
-import { preserveProgress } from '../start/wrap-up.js';
 
 import { expectExit } from './cli-capture.js';
 import { PLAN_DONE, PLAN_FLAG, PLAN_OPEN, RUN_TIMEOUT, runLoopStart, scratchPlanter, SESSION_FLAGS, STUB, TASK } from './loop-scratch.js';
@@ -170,28 +170,28 @@ import { consoleAndExitUses } from './source-uses.js';
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
-/** The modules held to the active output, from `src/` (core's and board's through their packages). */
+/** The modules held to the active output, from `src/` (core's, board's and run's through their packages). */
 const ROUTED_MODULES: string[] = [
   'start.ts',
-  'start/run-config.ts',
-  'start/run-setup.ts',
-  'start/session.ts',
-  'start/pause.ts',
-  'start/preflight.ts',
-  'preflight/run.ts',
-  'start/commit.ts',
-  'start/wrap-up.ts',
-  'start/wrap-up-run.ts',
-  'start/promoted-check.ts',
-  'start/dispatch.ts',
-  'start/triage.ts',
-  'start/release-stage.ts',
-  'start/retry-budget.ts',
-  'start/continue-run.ts',
-  'start/forced-draft.ts',
+  '../packages/rafa-run/src/start/run-config.ts',
+  '../packages/rafa-run/src/start/run-setup.ts',
+  '../packages/rafa-run/src/start/session.ts',
+  '../packages/rafa-run/src/start/pause.ts',
+  '../packages/rafa-run/src/start/preflight.ts',
+  '../packages/rafa/src/preflight/run.ts',
+  '../packages/rafa-run/src/start/commit.ts',
+  '../packages/rafa-run/src/start/wrap-up.ts',
+  '../packages/rafa-run/src/start/wrap-up-run.ts',
+  '../packages/rafa-run/src/start/promoted-check.ts',
+  '../packages/rafa-run/src/start/dispatch.ts',
+  '../packages/rafa-run/src/start/triage.ts',
+  '../packages/rafa-run/src/start/release-stage.ts',
+  '../packages/rafa-run/src/start/retry-budget.ts',
+  '../packages/rafa-run/src/start/continue-run.ts',
+  '../packages/rafa-run/src/start/forced-draft.ts',
   '../packages/rafa-board/src/adapters/tracker/resolve.ts',
   '../packages/rafa-board/src/adapters/tracker/local.ts',
-  'start/pr-lifecycle.ts',
+  '../packages/rafa-run/src/start/pr-lifecycle.ts',
   '../packages/rafa/src/core/loop/claude.ts',
   'utils/schedule.ts',
 ];

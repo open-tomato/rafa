@@ -6,7 +6,7 @@
  *
  * {@link testKind} is the pure core: it takes the globs and matches each
  * with `Bun.Glob` against a path relative to the repository root, as
- * `integrationFiles` of `src/suite/checks.ts` does. {@link readTestKindGlobs}
+ * `integrationFiles` of `packages/rafa-run/src/suite/checks.ts` does. {@link readTestKindGlobs}
  * reads the two lists from the project scope through `readProjectScope`
  * of `@open-tomato/rafa/core/config/load`, after `registerCoreConfigSections`
  * of `src/config-registry.ts` has registered the sections and the template

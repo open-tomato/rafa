@@ -75,7 +75,7 @@
  * position file is there is one such notice, the default board then
  * walked unweighed. The listing is read at most once per run, the place
  * and the walk sharing it, as `rafa next`'s walk shares it
- * (`src/next/sources.ts`).
+ * (`packages/rafa-run/src/next/sources.ts`).
  *
  * ## Under `--roadmap`: the away hop's target
  *

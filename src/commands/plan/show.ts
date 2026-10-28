@@ -43,13 +43,10 @@
  * nonzero on one.
  */
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
-import type { PlansDir, TaskCounts } from '@open-tomato/rafa/core/plan';
-import type { PlanIssue, PlanStage, PlanTask } from '@open-tomato/rafa-run';
+import type { PlanIssue, PlansDir, PlanStage, PlanTask, TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-
-import { parsePlan } from '@open-tomato/rafa-run';
 
 import { expectOneArgument, requireProject, resolvePlansDir } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -60,6 +57,7 @@ import {
   isFile,
   issueLine,
   isStampableStub,
+  parsePlan,
   planFileName,
 } from '@open-tomato/rafa/core/plan';
 

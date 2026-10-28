@@ -29,7 +29,7 @@
  *    next `rafa next --roadmap` reads it as stale and follows the new
  *    position instead — never C, never the record's own home — and
  *    leaves the record on disk untouched, exactly as `runHome`
- *    (`src/next/hop-action.ts`) leaves a stale record rather than
+ *    (`packages/rafa-run/src/next/hop-action.ts`) leaves a stale record rather than
  *    closing it.
  *
  * `--output=json` and `eventsOf` (`cli-capture.ts`) are used throughout

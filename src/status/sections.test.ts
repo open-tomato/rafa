@@ -20,9 +20,7 @@
  * was, so a section that always answered `read: false` would fail.
  */
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
-import type { CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
-import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
@@ -32,6 +30,8 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
 import type { BlockedLine } from '@open-tomato/rafa-board/board/blocked-line';
 import type { BoardIssue, BoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
+import type { CleanupSeams } from '@open-tomato/rafa-run/cleanup/index';
+import type { NextBoard, NextRoadmapReading } from '@open-tomato/rafa-run/next/readings';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,8 +44,8 @@ import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-dou
 import { positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
 import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { readBlockedBy } from '@open-tomato/rafa-board/board/blocked';
+import { defaultCleanupSeams } from '@open-tomato/rafa-run/cleanup/index';
 
-import { defaultCleanupSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { readDoctorCleanup } from '../commands/doctor-cleanup.js';
 import {

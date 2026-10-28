@@ -23,8 +23,7 @@ import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claim
 import { CLAIMED_LABEL } from '@open-tomato/rafa/claims/stale';
 import { createRoadmapReadings, DEFAULT_REMOTE, scanClaimBranches } from '@open-tomato/rafa-board/board/roadmap';
 import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
-
-import { findDrift } from '../claims/drift.js';
+import { findDrift } from '@open-tomato/rafa-run/claims/drift';
 
 const TEMPLATE = 'work/{stub}';
 const BRANCH = 'work/rafa-20-x';

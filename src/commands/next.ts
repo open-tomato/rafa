@@ -47,7 +47,7 @@
  *
  * The words after the command are the ones that RUN, `--yes` included:
  * `rafa next` has already asked, so `pr merge`'s own question would be
- * the same decision asked twice (`src/next/actions.ts`). The line is
+ * the same decision asked twice (`packages/rafa-run/src/next/actions.ts`). The line is
  * what happened, not a line to retype.
  *
  * ## The one question handed over
@@ -162,11 +162,11 @@
  * fast-forwarding the base is no command, and `sync` runs through the
  * git seam (`src/next/sync.ts`), while `hop` and `home`, which only the
  * hop rows propose, write the hop record and the position in-process
- * and move through the registered `switch` (`src/next/hop-action.ts`).
+ * and move through the registered `switch` (`packages/rafa-run/src/next/hop-action.ts`).
  * So each action keeps its own refusals, and {@link NextCommandSeams} is
  * the whole of what a test replaces.
  *
- * An action writes through {@link actionOutput} (`src/next/ending.ts`),
+ * An action writes through {@link actionOutput} (`packages/rafa-run/src/next/ending.ts`),
  * which is the caller's output with its `result` taken: an invocation
  * gives ONE result, and the chain's is the report.
  *
@@ -191,10 +191,10 @@
  * it was without it:
  *
  *  - the sources are opened with `roadmap` (`openNextSources`), so the
- *    table reads its hop rows (`src/next/hop-rows.ts`) and the board its
+ *    table reads its hop rows (`packages/rafa-run/src/next/hop-rows.ts`) and the board its
  *    hop reading, and nothing else sends a command more;
  *  - `plan`, `start` and `resume` carry `--roadmap` among the words they
- *    run with (`src/next/actions.ts`), and the proposal line prints it;
+ *    run with (`packages/rafa-run/src/next/actions.ts`), and the proposal line prints it;
  *  - once a loop action has run, {@link NextChainRoadmap.afterLoop} reads
  *    the board again and, while a hop is away, answers the `home` step,
  *    which is put as one more turn — two lines, the question or the
@@ -221,7 +221,7 @@
  * ## The relationships mode
  *
  * Before the first turn, {@link runNext} reads the mode
- * `board.relationships` names (`src/next/relations-mode.ts`) and opens
+ * `board.relationships` names (`packages/rafa-run/src/next/relations-mode.ts`) and opens
  * the sources with what it answers, so every turn's board reads epics
  * and blockers through that adapter. In `labels`, the default, that
  * sends nothing and the sources are opened as before; in `native` it
@@ -232,7 +232,7 @@
  *
  * Once a `merge` or `merge-unchecked` action has run,
  * {@link NextChainOptions.afterMerge} reads the fragments waiting on the
- * base (`src/next/settle-step.ts`, over the settle dry run `pr merge`'s
+ * base (`packages/rafa-run/src/next/settle-step.ts`, over the settle dry run `pr merge`'s
  * own follow-up is decided by) and, while they fold into a version,
  * puts the `settle` step as one more turn — two lines, then the question
  * or the ceiling, then `rafa release settle`. It is asked like `merge`:
@@ -364,7 +364,7 @@ export interface NextChainRoadmap {
   readonly claimAhead?: boolean;
 }
 
-/** What the actions' words carry under `roadmap`, as `src/next/actions.ts` reads it. */
+/** What the actions' words carry under `roadmap`, as `packages/rafa-run/src/next/actions.ts` reads it. */
 function passedOptions(roadmap: NextChainRoadmap | undefined): NextActionOptions {
   return { roadmap: roadmap !== undefined, claimAhead: roadmap?.claimAhead === true };
 }

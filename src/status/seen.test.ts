@@ -25,8 +25,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { runsDir } from '@open-tomato/rafa/core/loop';
+import { defaultWorktreeSeams } from '@open-tomato/rafa-run/cleanup/index';
 
-import { defaultWorktreeSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { plantDemoProject, plantSession, sessionRecord } from '../tests/loop-session-fixtures.js';
 

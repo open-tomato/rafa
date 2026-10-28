@@ -13,16 +13,17 @@
  * read with that same moment, reads as the default build reads with
  * `SCRATCH_NOW`; read with `SCRATCH_NOW` instead, it reads nothing old.
  */
-import type { CleanupRead } from './index.js';
 import type { ScratchOptions, ScratchRepository } from './scratch-repository.js';
+import type { CleanupRead } from '@open-tomato/rafa-run/cleanup/index';
 
 import { statSync } from 'node:fs';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { defaultCleanupSeams, cleanupCounts, readCleanup } from '@open-tomato/rafa-run/cleanup/index';
+import { openUnknownNote } from '@open-tomato/rafa-run/cleanup/remote-only';
 
-import { openUnknownNote } from './remote-only.js';
 import {
   createScratchRepository,
   LOCK_REASON,
@@ -30,8 +31,6 @@ import {
   REMOTE_ONLY_COMMITS,
   SCRATCH_NOW,
 } from './scratch-repository.js';
-
-import { defaultCleanupSeams, cleanupCounts, readCleanup } from './index.js';
 
 describe('readCleanup over a scratch repository', () => {
   let repo: ScratchRepository;

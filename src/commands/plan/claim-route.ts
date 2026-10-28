@@ -1,7 +1,7 @@
 /**
  * The claim a `rafa plan create` run makes on its issue, wired in
  * BEFORE its planning session, so a lost race costs no session
- * (`.rafa/plans/rafa-324-claim-issue-so-two`). `src/claims/plan-claim.ts`
+ * (`.rafa/plans/rafa-324-claim-issue-so-two`). `packages/rafa-run/src/claims/plan-claim.ts`
  * makes the claim and answers claimed, refused or unclaimed; this module
  * is what the command does with each answer, and the loop that lets
  * `--next` walk on past a refused issue.

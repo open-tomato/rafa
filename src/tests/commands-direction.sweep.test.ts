@@ -89,7 +89,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: `${subjectFolder('loop')}readings.ts` },
   { commandFile: 'packages/rafa-release/src/commands/release/status.ts', libraryHalf: 'packages/rafa-release/src/release/status-readings.ts' },
   { commandFile: 'packages/rafa-board/src/commands/epic/move-native.ts', libraryHalf: 'packages/rafa-board/src/board/repository.ts' },
-  { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'src/plan/list.ts' },
+  { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'packages/rafa-run/src/plan/list.ts' },
   { commandFile: 'src/commands/plan/validate.ts', libraryHalf: 'packages/rafa/src/plan/validate.ts' },
   { commandFile: 'src/commands/loop/status.ts', libraryHalf: 'src/loop/blocked-tasks.ts' },
   { commandFile: 'src/commands/doctor-blocked.ts', libraryHalf: 'packages/rafa-board/src/board/blocked-issues.ts' },

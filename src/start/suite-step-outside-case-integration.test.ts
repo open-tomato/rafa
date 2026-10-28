@@ -40,12 +40,10 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { runSuite } from '@open-tomato/rafa/suite/run';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
-
-import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
-
-import { OUTSIDE_CASE_REASON, storedOutsideCaseLine } from './suite-outside-case.js';
-import { addToLedger } from './suite-step.js';
-import { createRunSuiteSteps } from './suite-steps-run.js';
+import { OUTSIDE_CASE_REASON, storedOutsideCaseLine } from '@open-tomato/rafa-run/start/suite-outside-case';
+import { addToLedger } from '@open-tomato/rafa-run/start/suite-step';
+import { createRunSuiteSteps } from '@open-tomato/rafa-run/start/suite-steps-run';
+import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '@open-tomato/rafa-run/suite/baseline';
 
 const BASE = 'base0000';
 const HEAD = 'head1111';

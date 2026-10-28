@@ -3,8 +3,8 @@
  * --as-worktree` spawned over a scratch git repository with a bare `origin`,
  * started twice over the same plan.
  *
- * `src/start/worktree-setup.test.ts` drives the runner over a real shell and
- * `src/start/run-checkout.test.ts` pins where `settleRunCheckout` calls it,
+ * `packages/rafa-run/src/start/worktree-setup.test.ts` drives the runner over a real shell and
+ * `src/tests/run-coupled/start/run-checkout.test.ts` pins where `settleRunCheckout` calls it,
  * both over seams. Neither proves the command spawned: that the key reaches
  * the step through the config, that the command runs in the worktree and
  * not the main checkout, that it runs again on the start that reuses the

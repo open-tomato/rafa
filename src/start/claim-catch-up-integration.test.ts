@@ -21,8 +21,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { addRunWorktree } from './worktree.js';
+import { addRunWorktree } from '@open-tomato/rafa-run/start/worktree';
 
 const BASE = 'main';
 const WORKTREE_DIR = '.rafa/worktrees';

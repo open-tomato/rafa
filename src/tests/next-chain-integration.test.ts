@@ -60,7 +60,7 @@
  *    `"plan create"` before writing `PLAN-<stub>.md` itself.
  *  - `loop start` is replaced with a command that pushes nothing of its
  *    own UNTIL it has switched to the branch for real, through the
- *    actual `offerRunBranch` (`src/start/branch.ts`) over the same git
+ *    actual `offerRunBranch` (`packages/rafa-run/src/start/branch.ts`) over the same git
  *    seam, and only then pushes `"loop start"`. No session is spawned:
  *    the chain only needs to know a loop WOULD have started.
  *
@@ -70,7 +70,7 @@
  * create` claims the issue for real: one empty `claim(rafa-<n>): claim`
  * commit on the pulled base, pushed as `feat/<stub>` (`src/claims/`).
  * `rafa next` reads that plan as unstarted all the same, because its
- * branch holds claim commits alone (`src/next/readings.ts`), and
+ * branch holds claim commits alone (`packages/rafa-run/src/next/readings.ts`), and
  * `loop start` finds the branch on the remote and switches to it with
  * `--track` rather than cutting it with `-c`. That the branch grows
  * from the base `pr merge` just pulled is read off real git: the tip is
@@ -78,7 +78,7 @@
  *
  * `pr merge` and `plan create` are the real registered commands, run
  * exactly as `rafa next`'s own action table would call them
- * (`src/next/actions.ts`); only their seams and, for `plan create`, the
+ * (`packages/rafa-run/src/next/actions.ts`); only their seams and, for `plan create`, the
  * planner adapter are replaced. The probe reads the words `rafa next`
  * runs with off its OWN `argv`, past the record path, rather than
  * hard-coding one ceiling: every case below is the same probe, spawned
@@ -166,7 +166,7 @@ function buildProbe(): string {
     `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
     `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
     `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
-    `import { offerRunBranch } from ${JSON.stringify(join(SRC_DIR, 'start', 'branch.ts'))};`,
+    `import { offerRunBranch } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-run', 'src', 'start', 'branch.ts'))};`,
     `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'pr', 'index.ts'))};`,
     `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'plan', 'plan-stamp.ts'))};`,

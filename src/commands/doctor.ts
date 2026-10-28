@@ -262,20 +262,14 @@ import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { PreflightItems, PrerequisiteReminder } from '@open-tomato/rafa/preflight/prerequisites-md';
+import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '@open-tomato/rafa/preflight/run';
 import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
 import type { DoctorRefsReading, DoctorRefsSeams } from '@open-tomato/rafa-board';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '@open-tomato/rafa-effort';
 import type { AccountSeams, ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
-import type {
-  PreflightCheck,
-  PreflightItems,
-  PreflightOptions,
-  PreflightReport,
-  PreflightTiers,
-  PrerequisiteReminder,
-} from '@open-tomato/rafa-run';
 
 import { basename, resolve } from 'node:path';
 
@@ -287,23 +281,20 @@ import {
 } from '@open-tomato/rafa-board';
 import { readDoctorEffortSync } from '@open-tomato/rafa-effort';
 import { ghPreflightItems, resolvePrProvider } from '@open-tomato/rafa-pr';
-import {
-  DEFAULT_PLAN_FILE,
-  announceRiskTotal,
-  isFirstDispatch,
-  loadPlanPrerequisites,
-  malformedPrerequisiteLines,
-  mergePlanPrerequisites,
-  prerequisitesPathForPlan,
-  resolvePlanPath,
-  runPreflight,
-} from '@open-tomato/rafa-run';
+import { DEFAULT_PLAN_FILE, announceRiskTotal, isFirstDispatch, resolvePlanPath } from '@open-tomato/rafa-run';
 
 import { CommandExit , versionLine } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isFile , trackerPathFor } from '@open-tomato/rafa/core/plan';
+import {
+  loadPlanPrerequisites,
+  malformedPrerequisiteLines,
+  mergePlanPrerequisites,
+  prerequisitesPathForPlan,
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+import { runPreflight } from '@open-tomato/rafa/preflight/run';
 
 import { boardRunner, readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';

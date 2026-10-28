@@ -40,11 +40,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { INHERITED_HEADING, INHERITED_SENTENCE } from '@open-tomato/rafa-run/start/inherited-notice';
 
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
-
-import { INHERITED_HEADING, INHERITED_SENTENCE } from './inherited-notice.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

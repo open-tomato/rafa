@@ -188,6 +188,14 @@ import {
 } from '@open-tomato/rafa/modules/manifest';
 import * as manifestModule from '@open-tomato/rafa/modules/manifest';
 import {
+  loadPlanPrerequisites,
+  mergePlanPrerequisites,
+  parsePrerequisites,
+  planPrerequisites,
+  prerequisitesPathForPlan,
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '@open-tomato/rafa/preflight/run';
+import {
   DISK_FILE_SYSTEM,
   INIT_COMMAND,
   initHint,
@@ -237,14 +245,6 @@ import {
 } from './plan/index.js';
 import * as planEntry from './plan/index.js';
 import plan from './plan.js';
-import {
-  loadPlanPrerequisites,
-  mergePlanPrerequisites,
-  parsePrerequisites,
-  planPrerequisites,
-  prerequisitesPathForPlan,
-} from './preflight/prerequisites-md.js';
-import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './preflight/run.js';
 import { CORE_SERVICES, registerCoreServices } from './service-registry.js';
 import start from './start.js';
 
@@ -540,14 +540,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/plan', ['formatCounts', 'plural']],
   ]],
   ['./commands/plan/show.js', [
-    ['@open-tomato/rafa-run', ['parsePlan']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument', 'requireProject', 'resolvePlansDir']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
-    ['@open-tomato/rafa/core/plan', ['checkbox', 'countTasks', 'formatCounts', 'isFile', 'issueLine', 'isStampableStub', 'planFileName']],
+    ['@open-tomato/rafa/core/plan', ['checkbox', 'countTasks', 'formatCounts', 'isFile', 'issueLine', 'isStampableStub', 'parsePlan', 'planFileName']],
   ]],
   ['./commands/plan/validate.js', [
     ['@open-tomato/rafa-inventory', ['collidingPlanSkills', 'missingAgentLine', 'missingPlanAgents', 'resolveAgentRoster', 'skillCollisionLine', 'unresolvedPlanSkills', 'unresolvedSkillLine']],
-    ['@open-tomato/rafa-run', ['prerequisitesPathForPlan', 'storeRuleLine']],
+    ['@open-tomato/rafa-run', ['storeRuleLine']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectOneArgument']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config', ['ConfigError']],
@@ -555,6 +554,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/plan', ['formatCounts', 'issueLine', 'plural']],
     ['@open-tomato/rafa/plan/validate', ['validatePlan']],
+    ['@open-tomato/rafa/preflight/prerequisites-md', ['prerequisitesPathForPlan']],
     ['./bundled-check.js', ['bundledEditLine', 'findBundledEdits', 'writeTierPins']],
     ['./store-check.js', ['checkStoreRules']],
   ]],
@@ -974,12 +974,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/roadmap.js', [
     ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'ISSUE_LIST_FLAGS']],
   ]],
-  ['./commands/switch.js', [
-    ['@open-tomato/rafa-board', ['ROADMAP_LABEL', 'boardOfEpic', 'createGhBoardListing', 'createGhRunner', 'defaultBoardOnce', 'firstNowEpic', 'horizonOf', 'issueProject', 'issueSubjectConfig', 'lineRefusal', 'parseRoadmapBody', 'readConfiguredRelations', 'readListedEpics', 'resolvePlace', 'scanClaimBranches']],
+  // `switch.ts` moved with run into its package in pass 4f (#808).
+  ['../packages/rafa-run/src/commands/switch.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
     ['@open-tomato/rafa/project/position', ['hop', 'positionFilePath', 'rehome', 'writePositionFile']],
+    ['@open-tomato/rafa-board', ['ROADMAP_LABEL', 'boardOfEpic', 'createGhBoardListing', 'createGhRunner', 'defaultBoardOnce', 'firstNowEpic', 'horizonOf', 'issueProject', 'issueSubjectConfig', 'lineRefusal', 'parseRoadmapBody', 'readConfiguredRelations', 'readListedEpics', 'resolvePlace', 'scanClaimBranches']],
     ['../claims/drift.js', ['checkDrift', 'driftLines']],
   ]],
   ['./commands/init.js', [
@@ -1004,12 +1005,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa-board', ['commandRetrySeams', 'readDoctorRefs', 'registryRoster', 'renderDoctorRefs']],
     ['@open-tomato/rafa-effort', ['readDoctorEffortSync']],
     ['@open-tomato/rafa-pr', ['ghPreflightItems', 'resolvePrProvider']],
-    ['@open-tomato/rafa-run', ['DEFAULT_PLAN_FILE', 'announceRiskTotal', 'isFirstDispatch', 'loadPlanPrerequisites', 'malformedPrerequisiteLines', 'mergePlanPrerequisites', 'prerequisitesPathForPlan', 'resolvePlanPath', 'runPreflight']],
+    ['@open-tomato/rafa-run', ['DEFAULT_PLAN_FILE', 'announceRiskTotal', 'isFirstDispatch', 'resolvePlanPath']],
     ['@open-tomato/rafa/core/command', ['CommandExit', 'versionLine']],
     ['@open-tomato/rafa/core/config', ['ConfigError']],
     ['@open-tomato/rafa/core/config/load', ['loadConfig']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/plan', ['isFile', 'trackerPathFor']],
+    ['@open-tomato/rafa/preflight/prerequisites-md', ['loadPlanPrerequisites', 'malformedPrerequisiteLines', 'mergePlanPrerequisites', 'prerequisitesPathForPlan']],
+    ['@open-tomato/rafa/preflight/run', ['runPreflight']],
     ['./doctor-board.js', ['boardRunner', 'readDoctorBoard', 'relationsResultOf', 'renderDoctorBoard']],
     ['./doctor-cleanup.js', ['readDoctorCleanup', 'renderDoctorCleanup']],
     ['./doctor-config.js', ['loadDoctorConfig']],
@@ -1066,7 +1069,8 @@ const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, command
   ['../packages/rafa-pr/src/commands/pr/index.js', 'PR_FEATURE', [
     'pr current', 'pr show', 'pr view', 'pr open', 'pr retarget', 'pr close', 'pr list', 'pr wait', 'pr merge', 'pr triage',
   ]],
-  ['./commands/claim/index.js', 'RUN_FEATURE', ['claim release', 'claim hand', 'claim accept', 'claim take']],
+  // The run entry moved with run into its package in pass 4f (#808).
+  ['../packages/rafa-run/src/commands/claim/index.js', 'RUN_FEATURE', ['claim release', 'claim hand', 'claim accept', 'claim take']],
   // The release entry moved with release into its package in pass 4d (#808).
   ['../packages/rafa-release/src/commands/release/index.js', 'RELEASE_FEATURE', ['release status', 'release settle', 'release tag', 'release publish', 'release workflows', 'release fragment', 'release list']],
 ];
@@ -1325,7 +1329,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',
-      './commands/switch.js',
+      '../packages/rafa-run/src/commands/switch.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/cleanup.js',

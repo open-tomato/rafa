@@ -75,7 +75,7 @@
  *
  * That dry run's reading, `settleWaitingOn`, is in
  * `packages/rafa-pr/src/pr/settle-waiting.ts`, the library half of this file, since
- * `rafa next`'s settle step (`src/next/settle-step.ts`) is decided by
+ * `rafa next`'s settle step (`packages/rafa-run/src/next/settle-step.ts`) is decided by
  * the same reading. This file imports it and holds no re-export of it;
  * {@link FollowUpPlace} widens that file's `SettleWaitingPlace` with
  * the home and the pid probe the other follow-up reads.

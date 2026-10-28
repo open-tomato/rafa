@@ -8,7 +8,7 @@
  * Every seam is planted: the resolution answers specs a case names, the
  * cheap refusals answer a stub, and the claim answers what the case
  * plants, so nothing here reaches git, GitHub or a store. What the claim
- * itself answers over a remote is `src/claims/plan-claim.test.ts`'s; the
+ * itself answers over a remote is `packages/rafa-run/src/claims/plan-claim.test.ts`'s; the
  * walk reading a passed-over issue as taken is
  * `packages/rafa-board/src/board/spec-source-roadmap.test.ts`'s.
  *
@@ -16,11 +16,11 @@
  * directory under `tmpdir`, whose provider and store the config names.
  */
 import type { ClaimRouteSeams, PassOver } from './claim-route.js';
-import type { PlanClaim, PlanClaimRequest } from '../../claims/plan-claim.js';
 import type { PlanSpecResolution } from '@open-tomato/rafa-board/board/plan-spec';
 import type { RefreshConfig } from '@open-tomato/rafa-board/board/project/refresh';
 import type { SpecLineAhead, SpecSourceKind } from '@open-tomato/rafa-board/board/spec-source';
 import type { AheadCandidate } from '@open-tomato/rafa-board/claims/ahead';
+import type { PlanClaim, PlanClaimRequest } from '@open-tomato/rafa-run/claims/plan-claim';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

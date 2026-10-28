@@ -33,7 +33,7 @@
  * beside its skills. The entry is resolved through {@link realEntry} because
  * the installed rafa is reached through a link — `~/.rafa/bin/rafa` points into
  * `~/.rafa/runtime/<version>/` — and the skills of a runtime sit in that
- * runtime's directory, not in `bin/`. `src/start/runtime.ts` compares entries
+ * runtime's directory, not in `bin/`. `packages/rafa-run/src/start/runtime.ts` compares entries
  * the same way and for the same reason.
  *
  * Run from the checkout as `bun src/rafa.ts`, the entry is

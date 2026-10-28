@@ -13,7 +13,7 @@
  *
  * | Built in | Covers |
  * |---|---|
- * | `src/start/preflight-claim.ts` | the claim stages of `loop start` and of `rafa claim take`, `hand`, `accept` and `release` |
+ * | `packages/rafa-run/src/start/preflight-claim.ts` | the claim stages of `loop start` and of `rafa claim take`, `hand`, `accept` and `release` |
  * | `src/commands/plan/claim-route.ts` | the `rafa:claimed` label `plan create` puts on |
  * | `packages/rafa-board/src/board/plan-spec.ts` | the readiness gate's swap and the `issue ready` offer of `plan create` |
  * | `packages/rafa-board/src/commands/issue/ready.ts` | `rafa issue ready` |
@@ -61,7 +61,7 @@
  * ## Cost
  *
  * One refresh per write, never batched across writes: the stage removal
- * of `src/claims/labels.ts` sends two `removeLabel`s and so two
+ * of `packages/rafa-run/src/claims/labels.ts` sends two `removeLabel`s and so two
  * refreshes of the same issue, the first of which may write a value the
  * second changes again. Each refresh reads the repository, the project,
  * its items and the board; that cost was not measured here.

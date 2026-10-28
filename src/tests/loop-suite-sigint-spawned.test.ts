@@ -2,7 +2,7 @@
  * `rafa loop start` sent SIGINT while its suite step runs, spawned as the
  * real `rafa` binary (`src/tests/cli-capture.ts`): the signal that reaches
  * the runner alone, as `rafa loop stop` sends it, while `bun test` is
- * still running. `src/start/suite-step.ts` reads that as a stop and never
+ * still running. `packages/rafa-run/src/start/suite-step.ts` reads that as a stop and never
  * as a red step (`start.ts`'s `interrupted` flag, `isInterrupted`).
  *
  * The project holds two tasks and one test file, which passes at once

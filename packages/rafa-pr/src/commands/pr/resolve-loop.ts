@@ -15,13 +15,13 @@
  * ## Why the plan is written OUTSIDE the worktree
  *
  * The loop stages and commits whatever a task session left in the tree
- * (`src/start/commit.ts`), so a plan file written inside the worktree
+ * (`packages/rafa-run/src/start/commit.ts`), so a plan file written inside the worktree
  * would be committed onto the pull request's branch and pushed with the
  * resolution in every repository that does not ignore the path. The
  * plan therefore lives under the home, beside the worktrees and not in
  * one: {@link resolveRunDir} is `<home>/.rafa/resolve/pr-<n>/attempt-<k>`,
  * and `--plan` takes the absolute path, which `resolvePlanPath`
- * (`src/start/plan-path.ts`) resolves as given.
+ * (`packages/rafa-run/src/start/plan-path.ts`) resolves as given.
  *
  * ## Why each attempt gets its own directory
  *
@@ -38,7 +38,7 @@
  *
  * The spawned loop ends at its push. Its own CI gate would poll the
  * pull request's checks and spend repair sessions of its own
- * (`src/start/pr-lifecycle.ts`), and those sessions are outside the
+ * (`packages/rafa-run/src/start/pr-lifecycle.ts`), and those sessions are outside the
  * attempt guard: the guard counts RESOLVE runs, and a repair session
  * inside one would fix or fail to fix the pull request without the
  * count moving. So the attempt ends at the push and
@@ -48,7 +48,7 @@
  * ## The spawn
  *
  * `[execPath, entry, ...words]` with the worktree as `cwd`, as
- * `src/start/runtime.ts` spawns an installed runtime, so the child is
+ * `packages/rafa-run/src/start/runtime.ts` spawns an installed runtime, so the child is
  * this rafa and not whatever `rafa` a PATH resolves to. The child's
  * environment names `RAFA_OUTPUT=text`, and its stdout is read a line
  * at a time and handed to {@link ResolveLoopRun.onLine}: a child

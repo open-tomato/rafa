@@ -49,31 +49,31 @@ interface RewiredRow {
  * codemod took the file onto the facade too, so inventory's row is empty.
  * The rewire stage of that item took the other seven files of
  * the row onto the facade: the three effort files of the skills report,
- * `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
+ * `packages/rafa-run/src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
  * `src/inventory/browse.ts`.
  * Board's 19 load-cycle files are mostly run and pr files that board's files
  * reach through `src/claims/`, `src/next/` and `src/start/`. On the graph the
  * fourth decouple item's survey regenerated, the codemod reads 15 of them on
- * a load cycle and `src/claims/drift.ts`, `src/claims/labels.ts`,
- * `src/commands/switch.ts` and `src/start/triage.ts` to rewire. The dry run
+ * a load cycle and `packages/rafa-run/src/claims/drift.ts`, `packages/rafa-run/src/claims/labels.ts`,
+ * `packages/rafa-run/src/commands/switch.ts` and `packages/rafa-run/src/start/triage.ts` to rewire. The dry run
  * takes all four now, the facade having the names they import, so they stay
  * on their paths until the rewire runs. On the graph the fifth decouple
  * item's survey regenerated, with board's back edges into run and pr gone,
  * the codemod reads none of the nineteen on a load cycle and all nineteen to
  * rewire, refusing `scanClaimBranches` of `packages/rafa-board/src/board/roadmap.ts` in
- * `src/next/readings.ts` and `src/next/sources.ts`. The 19 load-cycle files
+ * `packages/rafa-run/src/next/readings.ts` and `packages/rafa-run/src/next/sources.ts`. The 19 load-cycle files
  * took the facade in pass 4c, since decouple 5 ended the cycles that kept
  * them, once those two took `scanClaimBranches` from
  * `packages/rafa-board/src/board/branch-scan.ts`, so board's row was
  * empty until the seven readings interfaces moved into
  * `packages/rafa-board/src/next/relation-readings.ts`, a board file, and
- * `src/next/readings.ts` re-exported them from its path; it is empty again
+ * `packages/rafa-run/src/next/readings.ts` re-exported them from its path; it is empty again
  * since `readings.ts` takes them from the facade by name, before the
  * move. The same stage took
- * `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
+ * `packages/rafa-run/src/plan/store-rules.ts`, `packages/rafa-run/src/start/preflight-claim.ts` and
  * `preflight-drift.ts` onto the facade. `packages/rafa-board/src/claims/ahead.ts` and
  * `packages/rafa-board/src/epic/verify-run.ts` left the row in the fourth decouple item, which
- * places them in board by name, and `src/claims/plan-claim.ts`, which took
+ * places them in board by name, and `packages/rafa-run/src/claims/plan-claim.ts`, which took
  * them by path then, took the facade.
  * Release's one board importer, `packages/rafa-board/src/board/project/facts.ts`, left the row
  * in the fourth decouple item: its one release import by path was
@@ -122,17 +122,17 @@ interface RewiredRow {
  * registry as `pullRequestsIn`. So the row kept 8 load-cycle files and
  * no back-edge file. The seventh decouple item (rafa-1368) took
  * `packages/rafa-pr/src/cleanup/worktrees.ts` and `packages/rafa-pr/src/start/pr-retarget.ts` off the row,
- * since it places them in pr by name, and `src/next/hint.ts`, whose pr
- * imports by path were `src/next/sources.ts` and `relations-mode.ts`,
+ * since it places them in pr by name, and `packages/rafa-run/src/next/hint.ts`, whose pr
+ * imports by path were `packages/rafa-run/src/next/sources.ts` and `relations-mode.ts`,
  * which it places in run. It named the seven run files that import a pr
- * file by path once those placements are made: `src/cleanup/index.ts` and
+ * file by path once those placements are made: `packages/rafa-run/src/cleanup/index.ts` and
  * `steps.ts` (`./worktrees.js`, and `./groups.js` for `steps.ts`),
- * `src/start/wrap-up-run.ts` (`./pr-retarget.js`) and
- * `src/next/owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and
+ * `packages/rafa-run/src/start/wrap-up-run.ts` (`./pr-retarget.js`) and
+ * `packages/rafa-run/src/next/owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and
  * `sources.ts` (files of `src/pr/`), each in the load-cycle group until
  * the item's rewire task read it. Its dry run read the four `src/next/`
  * files on a load cycle and the other three to rewire, and the codemod
- * took `src/cleanup/index.ts`, `steps.ts` and `src/start/wrap-up-run.ts`
+ * took `packages/rafa-run/src/cleanup/index.ts`, `steps.ts` and `packages/rafa-run/src/start/wrap-up-run.ts`
  * onto the facade. So the row kept 9 load-cycle files and no back-edge
  * file. The nine left the row in pass 4e (rafa-1374): decouple 7 cut the
  * imports into run their cycles ran through, the codemod read all nine to
@@ -160,7 +160,7 @@ interface RewiredRow {
  * `packages/rafa-board/src/claims/ahead.ts` and `packages/rafa-board/src/epic/verify-run.ts`, which it places in
  * board by name. `packages/rafa-board/src/commands/board/list.ts` and `packages/rafa-board/src/commands/epic/new.ts`
  * left them in the same item: their one run import by path was
- * `defaultBoardOnce` of `src/commands/switch.ts`, which it moves into
+ * `defaultBoardOnce` of `packages/rafa-run/src/commands/switch.ts`, which it moves into
  * board's `packages/rafa-board/src/board/default-board-once.ts`. `packages/rafa-board/src/commands/issue/ready.ts`
  * and `packages/rafa-board/src/commands/epic/close-triage.ts` left them in the fifth decouple
  * item: their run imports by path were `endWithNextStep` and
@@ -169,8 +169,8 @@ interface RewiredRow {
  * and `triage-resolve.ts` left them in the seventh decouple item: their
  * one run import by path each was a constant, `RUNTIME_SUBDIR`,
  * `RAFA_PACKAGE_NAME` and `CI_POLL_INTERVAL_MS`, which the item moved
- * into core. The same item placed `src/cleanup/steps.ts`,
- * `src/next/owner-gate.ts`, `settle-step.ts` and `sources.ts` in run by
+ * into core. The same item placed `packages/rafa-run/src/cleanup/steps.ts`,
+ * `packages/rafa-run/src/next/owner-gate.ts`, `settle-step.ts` and `sources.ts` in run by
  * name, so their run imports are inside run and they left the row, and
  * placed `packages/rafa-pr/src/cleanup/worktrees.ts` and `packages/rafa-pr/src/start/pr-retarget.ts` in pr,
  * so `packages/rafa-pr/src/cleanup/groups.ts`, `packages/rafa-pr/src/commands/pr/merge-loop-worktree.ts`

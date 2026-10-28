@@ -125,10 +125,10 @@ const NAMED_LISTS: readonly (readonly [name: string, list: readonly string[], le
   ['rafa-inventory', INVENTORY_NAMED, 0, []],
   ['rafa-board', BOARD_NAMED, 22, []],
   ['rafa-pr', PR_NAMED, 8, ['packages/rafa-pr/src/pr/index.ts']],
-  ['rafa-run', RUN_NAMED, 22, []],
+  ['rafa-run', RUN_NAMED, 21, []],
   ['rafa-release', RELEASE_NAMED, 6, []],
   ['rafa-effort', EFFORT_NAMED, 0, []],
-  ['@open-tomato/rafa', CLI_NAMED, 5, []],
+  ['@open-tomato/rafa', CLI_NAMED, 6, []],
 ];
 
 /**
@@ -222,7 +222,7 @@ describe('placeFile', () => {
     expect(placeFile('packages/eslint-config-extra/base.ts').package).toBe(CLI_PACKAGE);
   });
 
-  it('places every file under packages/rafa/ in core, effort\'s and board\'s files in their packages by folder, and src/effort/store/index.ts in the CLI by name', () => {
+  it('places every file under packages/rafa/ in core, effort\'s and board\'s files in their packages by folder, and src/effort/store/index.ts and src/plan/index.ts in the CLI by name', () => {
     expect(placeFile('packages/rafa/src/effort/store/sqlite.ts').package).toBe(CORE_PACKAGE);
     expect(placeFile('packages/rafa/src/effort/store/testdata/merge-scenarios.ts').package).toBe(CORE_PACKAGE);
     expect(placeFile('packages/rafa-effort/src/effort/report.ts')).toEqual({
@@ -236,6 +236,7 @@ describe('placeFile', () => {
       package: 'rafa-effort',
     });
     expect(placeFile('src/effort/store/index.ts')).toEqual({ by: 'named', folder: undefined, package: CLI_PACKAGE });
+    expect(placeFile('src/plan/index.ts')).toEqual({ by: 'named', folder: undefined, package: CLI_PACKAGE });
     expect(placeFile('packages/rafa-board/src/board/project/rules.ts')).toEqual({
       by: 'folder',
       folder: 'packages/rafa-board/',
@@ -609,7 +610,7 @@ describe('the two outputs', () => {
     plant([
       ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts'],
       ['packages/rafa-board/src/board/place.ts', 'src/utils/tracker.ts'],
-      ['packages/rafa-board/src/board/place.ts', 'src/start/session.ts', 'type'],
+      ['packages/rafa-board/src/board/place.ts', 'packages/rafa-run/src/start/session.ts', 'type'],
       ['src/stretch/run.ts', 'packages/rafa-board/src/board/place.ts'],
     ]),
   );
@@ -662,7 +663,7 @@ describe('the two outputs', () => {
     expect(lines).toContain('| `rafa-board` | `@open-tomato/rafa` | 1 |');
     expect(lines).toContain('- `packages/rafa/src/core/config/config-schema.ts` imports `src/config-schema-planted.ts` (value)');
     expect(lines).toContain('| `src/utils/tracker.ts` | 1 | `@open-tomato/rafa` | left to place |');
-    expect(lines).toContain('| `src/start/session.ts` | 1 | `rafa-run` | by rule |');
+    expect(lines).toContain('| `packages/rafa-run/src/start/session.ts` | 1 | `rafa-run` | by rule |');
     expect(lines).toContain('| `src/utils/` | 1 | 1 | 1 |');
     expect(lines).toContain('| `src/stretch/` | 1 | `rafa-board` (1) | - |');
   });
@@ -698,7 +699,7 @@ describe('main', () => {
   it('reads docs/survey/import-graph.json under the root and writes both outputs beside it', async () => {
     const graph = plant([
       ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts'],
-      ['packages/rafa-board/src/board/place.ts', 'src/start/session.ts'],
+      ['packages/rafa-board/src/board/place.ts', 'packages/rafa-run/src/start/session.ts'],
     ]);
     mkdirSync(join(root, 'docs/survey'), { recursive: true });
     writeFileSync(join(root, GRAPH_PATH), JSON.stringify(graph));

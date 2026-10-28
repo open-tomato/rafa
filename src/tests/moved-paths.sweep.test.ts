@@ -106,11 +106,19 @@ function escapeForRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 }
 
-/** The `from` paths (as listed, `.ts` kept) the text names, joined over whitespace. */
+/**
+ * The `from` paths (as listed, `.ts` kept) the text names, joined over whitespace.
+ *
+ * A plain `includes` of the stem comes first: the pattern can only match
+ * where the stem occurs, so it reads the same, and building and running a
+ * look-behind pattern for every path over every file took the live scan
+ * past {@link SWEEP_TIMEOUT} once pass 4f's 107 paths counted.
+ */
 export function stalePathsIn(text: string, froms: readonly string[]): string[] {
   const joined = text.replace(/\s+/g, ' ');
   return froms.filter((from) => {
     const stem = from.replace(/\.ts$/, '');
+    if (!joined.includes(stem)) return false;
     const pattern = new RegExp(`(?<![\\w./@-])${escapeForRegExp(stem)}(?![\\w-]|/)`);
     return pattern.test(joined);
   });

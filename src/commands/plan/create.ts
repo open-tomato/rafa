@@ -19,7 +19,7 @@
  * ({@link HINT_FLAG_SPEC}), and `endingWith` reads it AFTER `src/plan.ts`
  * has returned, to end a run that wrote a plan by naming the one step
  * that follows — the loop on the plan it has just written
- * (`src/next/ending.ts`). A run that refused writes nothing and ends
+ * (`packages/rafa-run/src/next/ending.ts`). A run that refused writes nothing and ends
  * with no hint, since the refusal travels out of the inner run. The
  * flag is `hint` and not `next` because `--next` is one of the three
  * above, and `parseArgs` reads `--no-next` as false for it.

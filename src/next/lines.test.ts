@@ -6,7 +6,7 @@
  */
 
 import type { NextDryRun, NextStop } from './lines.js';
-import type { NextState } from './state.js';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 import { describe, expect, it } from 'bun:test';
 

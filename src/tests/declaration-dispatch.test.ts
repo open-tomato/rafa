@@ -145,11 +145,11 @@
  * `reads no home definition unless the setting sources include user`
  * pairs the default with such sources over the same roots.
  */
-import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { TaskDispatch, TaskSessionRunner } from '@open-tomato/rafa-run/start/dispatch';
 
 import {
   mkdirSync,
@@ -173,9 +173,8 @@ import {
 import { runClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { commitFinishedTask } from '../start/commit.js';
-import { dispatchTask } from '../start/dispatch.js';
+import { commitFinishedTask } from '@open-tomato/rafa-run/start/commit';
+import { dispatchTask } from '@open-tomato/rafa-run/start/dispatch';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';

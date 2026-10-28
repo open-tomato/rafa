@@ -554,7 +554,7 @@ The wrap-up session always receives `full` regardless of the configured mode.
 
 ## PREREQUISITES.md format
 
-`<plan.dir>/PREREQUISITES-<stub>.md` lists the setup a plan needs that no task can put in place. It is parsed: `src/preflight/prerequisites-md.ts` reads it and merges its items into the configured `prerequisites` for the plan beside it, `<plan.dir>/PLAN-<stub>.md`, and for no other plan.
+`<plan.dir>/PREREQUISITES-<stub>.md` lists the setup a plan needs that no task can put in place. It is parsed: `packages/rafa/src/preflight/prerequisites-md.ts` reads it and merges its items into the configured `prerequisites` for the plan beside it, `<plan.dir>/PLAN-<stub>.md`, and for no other plan.
 
 ```markdown
   # Prerequisites

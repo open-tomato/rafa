@@ -15,7 +15,7 @@
  *
  * {@link findBundledEdits} reads the code spans of every task line still
  * to run, unticked or blocked, the lines a `rafa:*` block the plan never
- * closed hides included, as `src/plan/store-rules.ts` reads them: a
+ * closed hides included, as `packages/rafa-run/src/plan/store-rules.ts` reads them: a
  * ticked task will not run again. A span holding no whitespace is read
  * as a path against `repoRoot`, and its links are resolved with
  * `realpathSync`, so `.claude/agents/doc-updater.md` and
@@ -99,11 +99,11 @@ import {
   pinLine,
   readAgentDirectory,
 } from '@open-tomato/rafa-inventory';
-import { prerequisitesPathForPlan } from '@open-tomato/rafa-run';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { isFile, parsePlan } from '@open-tomato/rafa/core/plan';
+import { prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
 
 /** The folder of the checkout the bundled roots sit in. */

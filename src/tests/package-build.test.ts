@@ -71,10 +71,10 @@
  *     restored byte-identical (sha256).
  *   - `src/continue-decision-prompt.md` and `src/continue-criteria.md`,
  *     the `loop start --continue` contract and base criteria, are copied
- *     into `dist/` the same way, and `start/decision-prompt.ts` sits one
- *     directory below them in a checkout as `epic/verify-plan.ts` does,
- *     so a case resolves both through `readBundledFile` pointed at
- *     `dist/`.
+ *     into `dist/` the same way; in a checkout they stay in the root's
+ *     `src/` and `start/decision-prompt.ts`, in run's package since pass
+ *     4f, looks four folders up for them, so a case resolves both
+ *     through `readBundledFile` pointed at `dist/`.
  *   - `src/bundled/` is copied whole to `dist/bundled/`: the rafa tier,
  *     its skills and agents, which sits beside the entry in both a
  *     checkout and a build (`packages/rafa/src/schema/tiers.ts`). The dev-planner skill
@@ -505,12 +505,12 @@ import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '@open-tomato/rafa-board/ep
 import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '@open-tomato/rafa-pr/pr/plans/load';
 import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '@open-tomato/rafa-release/release/templates';
+import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '@open-tomato/rafa-run/start/decision-prompt';
 
 import * as configSource from '../config/index.js';
 import * as rootSource from '../index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
-import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

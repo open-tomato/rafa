@@ -13,7 +13,12 @@
  * `config-schema-*.ts` section files, `modules/`, `next/hop-record.ts`,
  * `plan/`, `project/`, `runtime/live-loops.ts` and `utils/`. Each sits
  * at its old path below `src/`; outside `core/` no barrel rule applies,
- * so a file outside the package imports one by its own subpath.
+ * so a file outside the package imports one by its own subpath. Pass 4f
+ * moved three preflight files in the same way, `preflight/run.ts`,
+ * `shell.ts` and `prerequisites-md.ts`, each behind a subpath of its own
+ * (`@open-tomato/rafa/preflight/run` and the two beside it). They are
+ * not in {@link CORE_BARRELS}, which lists files under {@link CORE_FOLDER}
+ * alone.
  *
  * Where core is:
  *
@@ -87,6 +92,12 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  * `src/config-registry.ts`, which imports `index.ts` back, and
  * `sections.ts` directly.
  *
+ * `command` has two. `index.ts` holds the command contract.
+ * `parseArgs.ts`, moved from `src/cli/core/` so run reaches no root
+ * file, is read through a subpath of its own, `core/command/parseArgs`,
+ * rather than a line of `index.ts`. It is no split: it re-exports
+ * nothing and imports `types.ts` alone, with `import type`.
+ *
  * `plan` has two. The leaf `blocks.ts` sits alone behind
  * `block-reader.ts`, because `parse.ts` imports `packages/rafa/src/utils/tracker.ts`,
  * which imports `blocks.ts` back, and one barrel over both would close
@@ -116,7 +127,7 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['packages/rafa/src/core/adapters/index.ts'],
-  command: ['packages/rafa/src/core/command/index.ts'],
+  command: ['packages/rafa/src/core/command/index.ts', 'packages/rafa/src/core/command/parseArgs.ts'],
   config: [
     'packages/rafa/src/core/config/index.ts',
     'packages/rafa/src/core/config/load.ts',

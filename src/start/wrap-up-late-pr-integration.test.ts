@@ -30,11 +30,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { RELEASE_BLOCK_OPEN } from '@open-tomato/rafa-release/release/branch-forecast';
+import { eventsFilePath } from '@open-tomato/rafa-run/start/loop-events';
 
 import { expectExit } from '../tests/cli-capture.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
-
-import { eventsFilePath } from './loop-events.js';
 
 /** This file's own test timeout. */
 const CASE_TIMEOUT_MS = 60_000;
@@ -235,10 +234,10 @@ import { join } from 'node:path';
 import { registerCoreConfigSections } from ${JSON.stringify(moduleUrl('../config-registry.ts'))};
 import { setActiveOutput } from ${JSON.stringify(fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output')))};
 import { sinkOutput } from ${JSON.stringify(fileURLToPath(import.meta.resolve('@open-tomato/rafa/tests/output-sinks')))};
-import { openCheckoutExpectation } from ${JSON.stringify(moduleUrl('./checkout-watch.ts'))};
-import { bindEventsFile } from ${JSON.stringify(moduleUrl('./loop-events.ts'))};
-import { loadRunConfig } from ${JSON.stringify(moduleUrl('./run-config.ts'))};
-import { runWrapUp } from ${JSON.stringify(moduleUrl('./wrap-up-run.ts'))};
+import { openCheckoutExpectation } from ${JSON.stringify(moduleUrl('../../packages/rafa-run/src/start/checkout-watch.ts'))};
+import { bindEventsFile } from ${JSON.stringify(moduleUrl('../../packages/rafa-run/src/start/loop-events.ts'))};
+import { loadRunConfig } from ${JSON.stringify(moduleUrl('../../packages/rafa-run/src/start/run-config.ts'))};
+import { runWrapUp } from ${JSON.stringify(moduleUrl('../../packages/rafa-run/src/start/wrap-up-run.ts'))};
 
 registerCoreConfigSections();
 const [repo, home, runId, branch, stub, infosFile, plan] = process.argv.slice(1);

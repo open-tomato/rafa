@@ -15,18 +15,19 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
-
 import {
   CLAIM_ACCEPT_DECLARATION,
   CLAIM_HAND_DECLARATION,
   CLAIM_RELEASE_DECLARATION,
   CLAIM_SUBJECT,
   CLAIM_TAKE_DECLARATION,
-} from './declarations.js';
-
-import { RUN_FEATURE } from './index.js';
+} from '@open-tomato/rafa-run/commands/claim/declarations';
+import { RUN_FEATURE } from '@open-tomato/rafa-run/commands/claim/index';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** The command modules' folder: they live in the run package since pass 4f, this file at the root. */
+const MOVED_DIR = join(HERE, '..', '..', '..', 'packages', 'rafa-run', 'src', 'commands', 'claim');
 
 /** Each declaration in roster order, beside the module its command is the default export of. */
 const DECLARED: readonly (readonly [string, CommandDeclaration])[] = [
@@ -72,7 +73,7 @@ describe('RUN_FEATURE', () => {
   });
 
   it.each(DECLARED)('loads from %s the command its declaration spells, that declaration under a run', async (path, declaration) => {
-    const loaded = await import(join(HERE, path)) as { default: RafaCommand };
+    const loaded = await import(join(MOVED_DIR, path)) as { default: RafaCommand };
 
     expect(commandSpelling(loaded.default)).toBe(commandSpelling(declaration));
     expect(lessRun(loaded.default)).toEqual(declaration);

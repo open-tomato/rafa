@@ -19,7 +19,7 @@
  * The step ran and the label landed, and the chain then read the labels
  * it had cached BEFORE the step: `openNextSources` built one board for
  * the whole command, and that board memoises the issue it reads
- * (`src/next/sources.ts`). Its own unit suite counted the reads and was
+ * (`packages/rafa-run/src/next/sources.ts`). Its own unit suite counted the reads and was
  * right about them; nothing read the board across a turn, so nothing
  * saw the staleness. This file does, over the real chain.
  *

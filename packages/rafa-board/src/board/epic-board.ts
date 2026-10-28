@@ -3,7 +3,7 @@
  * boards, whether a board's checklist lists an epic, and the board an
  * epic moves with.
  *
- * These lived in `src/commands/switch.ts`, where `rafa switch <epic>`
+ * These lived in `packages/rafa-run/src/commands/switch.ts`, where `rafa switch <epic>`
  * first needed them; they moved here when `./blocker-epic.ts` needed
  * the same answer, so a board-layer reader does not import a command.
  * `rafa switch`, `rafa board list` and the boards row of `rafa doctor`

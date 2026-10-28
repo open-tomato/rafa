@@ -230,10 +230,11 @@ Commands that call the refresh outside the label wrapper:
 - `rafa issue create` — add the new issue, then refresh it with the item the
   add answered as a known item, and print `#<n> added but not filled:
   <reason>` when the refresh did not fill it
-- `rafa start` (each task's triage) — the same add-then-refresh for each bug the
-  task's report filed on the public `github` tracker, through `addFiledBugs`
-  (`packages/rafa-board/src/board/project/add-filed.ts`, called from
-  `src/start/triage.ts`), every line a `Triage: ` warning after the triage's own
+- `rafa start` (each task's triage) — the same add-then-refresh for each bug
+  the task's report filed on the public `github` tracker, through
+  `addFiledBugs` (`packages/rafa-board/src/board/project/add-filed.ts`, called
+  from `packages/rafa-run/src/start/triage.ts`), every line a `Triage: `
+  warning after the triage's own
 - `rafa epic close` (the gate) — the same for each bug a failed check filed on
   the public `github` tracker, through `addFiledBugs`, called from
   `packages/rafa-board/src/commands/epic/close-triage.ts`, every line a warning

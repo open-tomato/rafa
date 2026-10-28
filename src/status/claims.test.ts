@@ -12,10 +12,10 @@
  */
 import type { ClaimBranches, ClaimLabels } from './claims.js';
 import type { StatusConfig, StatusSeams } from './sections.js';
-import type { NextBoard } from '../next/readings.js';
 import type { ClaimRecord } from '@open-tomato/rafa/claims/record';
 import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
 import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
+import type { NextBoard } from '@open-tomato/rafa-run/next/readings';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

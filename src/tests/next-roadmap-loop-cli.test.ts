@@ -15,7 +15,7 @@
  * that — a small program of its own, spawned as a probe, composing the
  * real `next`, `switch` and `plan create` commands over a stand-in
  * planner adapter and a stand-in `loop start` that opens a real session
- * record through `openRunSession` (`src/start/session.ts`) and then
+ * record through `openRunSession` (`packages/rafa-run/src/start/session.ts`) and then
  * "opens" the pull request that closes C by rewriting the file the
  * stand-in `gh`'s `pr list` answers from — never a real branch, a real
  * session or a real pull request, since nothing this suite checks reads
@@ -24,7 +24,7 @@
  * The position file is planted at home (`epic #100 on board #10`)
  * before the probe runs, rather than left absent: `hop`'s own record
  * reads home off the position file when there is one
- * (`homeOf`, `src/next/hop-rows.ts`), and off a plainer fallback that
+ * (`homeOf`, `packages/rafa-run/src/next/hop-rows.ts`), and off a plainer fallback that
  * carries no epic when there is not, which would read as a different
  * place from the one the real `switch` command resolves once it runs
  * and stale the record on the very turn that opens it. Starting from an
@@ -218,13 +218,13 @@ function buildProbe(prlistFile: string): string {
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
-    `import { createSwitchCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'switch.ts'))};`,
+    `import { createSwitchCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-run', 'src', 'commands', 'switch.ts'))};`,
     `import planCreateDeclared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
     `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
     `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
     `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
     `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
-    `import { openRunSession } from ${JSON.stringify(join(SRC_DIR, 'start', 'session.ts'))};`,
+    `import { openRunSession } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-run', 'src', 'start', 'session.ts'))};`,
     `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'plan', 'plan-stamp.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',

@@ -124,7 +124,7 @@ describe('the roster in a fresh process', () => {
     const modules = reading.featureActions.map(modulePath);
     expect(reading.loaded.filter((path) => modules.includes(path))).toEqual([]);
     // Controls: the reading sees the declarations and a core command, so an empty answer is no blind one.
-    expect(reading.loaded).toContain('src/commands/claim/declarations.ts');
+    expect(reading.loaded).toContain('packages/rafa-run/src/commands/claim/declarations.ts');
     expect(reading.loaded).toContain('packages/rafa-pr/src/commands/pr/declarations.ts');
     expect(reading.loaded).toContain('src/commands/plan/list.ts');
   }, RUN_TIMEOUT);
@@ -145,7 +145,7 @@ describe('the roster in a fresh process', () => {
     expect(reading.refusal).not.toContain('failed to load');
     const siblings = reading.featureActions.filter((action) => action.feature === RUN_COMMAND.feature && action !== ran);
     expect(siblings.length).toBeGreaterThan(0);
-    expect(reading.loaded).toContain('src/commands/claim/release.ts');
+    expect(reading.loaded).toContain('packages/rafa-run/src/commands/claim/release.ts');
     expect(reading.loaded.filter((path) => siblings.map(modulePath).includes(path))).toEqual([]);
   }, RUN_TIMEOUT);
 

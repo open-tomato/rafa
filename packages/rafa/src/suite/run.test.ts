@@ -23,7 +23,7 @@
  *   - `no-match`: `./nope`. Exit 1, stderr only: Bun wrote no JUnit file.
  *
  * One fixture was recorded the same way under bun 1.3.14, the version
- * `package.json` pins, and stays at the root's `src/suite/testdata/` for
+ * `package.json` pins, and stays at the root's `packages/rafa-run/src/suite/testdata/` for
  * the inherited-failure test, `packages/rafa-pr/src/triage/inherited.test.ts`, the one
  * that reads it:
  *

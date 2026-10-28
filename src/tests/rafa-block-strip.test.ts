@@ -24,8 +24,8 @@
  * otherwise an absence assertion on an empty body would pass
  * vacuously.
  */
-import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { TaskSessionRunner } from '@open-tomato/rafa-run/start/dispatch';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -50,9 +50,8 @@ import { buildCommitMessage, MAX_SUBJECT_LENGTH } from '@open-tomato/rafa/core/g
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
-
-import { commitFinishedTask } from '../start/commit.js';
-import { dispatchTask } from '../start/dispatch.js';
+import { commitFinishedTask } from '@open-tomato/rafa-run/start/commit';
+import { dispatchTask } from '@open-tomato/rafa-run/start/dispatch';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';

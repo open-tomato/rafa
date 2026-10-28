@@ -45,11 +45,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { CHECKOUT_MOVED } from '@open-tomato/rafa-run/start/checkout-guard';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { plantScratchRepo } from '../tests/cli-capture.js';
-
-import { CHECKOUT_MOVED } from './checkout-guard.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

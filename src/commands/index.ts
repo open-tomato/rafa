@@ -50,7 +50,7 @@
  * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status`,
  * `list` and `wait`, which act on a run through its session record and share
  * `loop/loop-sessions.ts`, `wait` following the run's events file through
- * `src/loop/events-file.ts` too, nor `init`, which sets up a project through
+ * `packages/rafa-run/src/loop/events-file.ts` too, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
  * `src/preflight/` and starts no run, nor the nine `issue` actions,
  * six of which act on the tracker the chain resolves while `ready` and
@@ -64,7 +64,7 @@
  * `packages/rafa-board/src/board/owner-resolve.ts`, nor `board sync`, which brings the
  * repository's GitHub project in step through
  * `packages/rafa-board/src/board/project/sync.ts`, nor `self-update`, which installs the
- * checkout through `src/runtime/install.ts`, nor `module list` and
+ * checkout through `packages/rafa-run/src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `packages/rafa/src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
  * definitions through `packages/rafa-inventory/src/agents/roster.ts`, nor `agent list`, which

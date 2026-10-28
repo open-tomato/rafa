@@ -5,7 +5,7 @@
  * it (`.rafa/specs/rafa-244-epics-group-issues-features.md`).
  *
  * `packages/rafa-board/src/board/epic-walk.test.ts` drives the descent itself over planted
- * fakes, `src/next/sources.test.ts` drives `ghNextBoard`'s wiring of it
+ * fakes, `packages/rafa-run/src/next/sources.test.ts` drives `ghNextBoard`'s wiring of it
  * the same way, and `packages/rafa-board/src/board/spec-source-roadmap.test.ts` drives
  * `pickRoadmapIssue`'s. None of the three runs the real, registered
  * `rafa next` or `rafa plan create` command over a real `gh` on the

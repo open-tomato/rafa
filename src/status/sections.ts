@@ -5,12 +5,12 @@
  *
  * | Section | Composed from | Reaches |
  * | --- | --- | --- |
- * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
+ * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`packages/rafa-run/src/next/readings.ts`) | git, the plans directory |
  * | `loops` | `readSessions` (`packages/rafa/src/core/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`packages/rafa/src/core/loop/session-readings.ts`), `blockedTasks` (`src/loop/blocked-tasks.ts`) | `.rafa/runs/`, the trackers |
- * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
- * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`packages/rafa-board/src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
+ * | `pull` | `readOpenPull` (`packages/rafa-run/src/next/readings.ts`) over `createGhPullRequests` | `gh` |
+ * | `board` | `ghNextBoard` (`packages/rafa-run/src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`packages/rafa-board/src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`packages/rafa-run/src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
- * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests, and for the open ones when an unmerged branch is on `origin` alone |
+ * | `housekeeping` | `readCleanup`, `cleanupCounts` (`packages/rafa-run/src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests, and for the open ones when an unmerged branch is on `origin` alone |
  *
  * Nothing here prints, and nothing spawns except through
  * {@link StatusSeams}, whose defaults are the system's own, so a unit
@@ -134,7 +134,7 @@
  * read (`nextOwnerGate` over the section's bounded runner, provider and
  * the one board listing), and the line is carried while the gate lets no
  * merge through: `waiting`, `unresolved` or `unknown`, as the
- * `pr-owner-review` row of `rafa next` reads it (`src/next/hop-rows.ts`).
+ * `pr-owner-review` row of `rafa next` reads it (`packages/rafa-run/src/next/hop-rows.ts`).
  * `approved` and `not-gated` carry none, since nothing waits on an
  * owner there. A reading that fails is never read as approved: a pull
  * request that could not be read, or a gate that rejected, is carried as

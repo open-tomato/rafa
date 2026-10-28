@@ -46,7 +46,7 @@
  * filed issue and the roadmap beside it) itself, and routes every
  * `gh api` call to the facts fake (`board/project/facts-fake.ts`) or the
  * project fake (`board/project/project-fake.ts`), as
- * `src/start/triage.test.ts` builds it, so the real refresh fills the
+ * `src/tests/run-coupled/start/triage.test.ts` builds it, so the real refresh fills the
  * added item and no case reaches `gh`. The refused add is read beside the
  * same close with the number unset, whose exit code, bug line and
  * refusal line it matches.

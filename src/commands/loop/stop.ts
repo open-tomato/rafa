@@ -43,7 +43,7 @@
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '@open-tomato/rafa/core/loop/readings';
-import type { PlanTask } from '@open-tomato/rafa-run';
+import type { PlanTask } from '@open-tomato/rafa/core/plan';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

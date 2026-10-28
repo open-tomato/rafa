@@ -93,9 +93,9 @@
  * re-anchored on the line above it. A leg that silently lands
  * somewhere else reads exactly like a module nothing guards.
  */
-import type { TaskCommitRunner } from '../start/commit.js';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { TaskCommitRunner } from '@open-tomato/rafa-run/start/commit';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -121,8 +121,7 @@ import {
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
-
-import { commitFinishedTask, finishCleanExit, NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
+import { commitFinishedTask, finishCleanExit, NOTHING_REPORTED_OR_COMMITTED } from '@open-tomato/rafa-run/start/commit';
 
 /** The first open task in every planted tracker. */
 const FIRST_TASK = 'Capture the three gates into per-run capture files';

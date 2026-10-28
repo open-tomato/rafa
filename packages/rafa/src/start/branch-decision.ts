@@ -26,7 +26,7 @@
  * ## When there is no offer at all
  *
  * {@link readBranchOffer} answers `stand-aside` three ways, and each of
- * them leaves the branch guard in `src/start/run-setup.ts` to have the last word:
+ * them leaves the branch guard in `packages/rafa-run/src/start/run-setup.ts` to have the last word:
  *
  *  - `--any-branch`, on the base: an operator who asked to run on `main`
  *    is not then asked whether to leave it. It outranks `--create-branch`
@@ -115,7 +115,7 @@
  * No plan stub, and no terminal without `--create-branch`, stand aside
  * here as they do on the base. A run left on this standing, the offer
  * having stood aside or been declined, is refused by the guard in
- * `src/start/run-setup.ts` with {@link detachedHeadRefusal}, under
+ * `packages/rafa-run/src/start/run-setup.ts` with {@link detachedHeadRefusal}, under
  * `--any-branch` as without it.
  *
  * Measured on git 2.53.0 under Linux with `LC_ALL=C` set (2026-10-12),
@@ -145,7 +145,7 @@
  * `git rev-parse --abbrev-ref HEAD` answers the literal `HEAD` when no
  * branch is checked out (measured on git 2.53.0 under Linux, 2026-10-01,
  * in a repository after `git switch --detach`: stdout `HEAD`, exit 0),
- * which is also a name a ref can carry, so `src/start/run-checkout.ts`
+ * which is also a name a ref can carry, so `packages/rafa-run/src/start/run-checkout.ts`
  * reads the run's branch with `readCheckedOutBranch` (`packages/rafa/src/utils/git.ts`),
  * which answers null there, and hands this standing on in its place.
  *
@@ -361,7 +361,7 @@ export function anyBranchStandsAside(
 /**
  * What to do about the branch: ask a question, take the branch without
  * asking because `--create-branch` said so, or stand aside and leave the
- * guard in `src/start/run-setup.ts` to have the last word. See the module note for
+ * guard in `packages/rafa-run/src/start/run-setup.ts` to have the last word. See the module note for
  * the order these are read in.
  */
 export function readBranchOffer(situation: BranchSituation): BranchOffer {

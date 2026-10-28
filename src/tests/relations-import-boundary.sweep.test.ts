@@ -71,8 +71,11 @@ const SRC_ROOT = join(REPO_ROOT, 'src');
 /** Board's `src/`, which holds its files since pass 4c and mirrors the layout under `src/`. */
 const BOARD_SRC_ROOT = join(REPO_ROOT, 'packages', 'rafa-board', 'src');
 
+/** Run's `src/`, which holds its files since pass 4f and mirrors the layout under `src/`. */
+const RUN_SRC_ROOT = join(REPO_ROOT, 'packages', 'rafa-run', 'src');
+
 /** The folders scanned, each file keyed by its path below the one holding it. */
-const SOURCE_ROOTS: readonly string[] = [SRC_ROOT, BOARD_SRC_ROOT];
+const SOURCE_ROOTS: readonly string[] = [SRC_ROOT, BOARD_SRC_ROOT, RUN_SRC_ROOT];
 
 /** The two modules that define the four names this file tracks. */
 const EPICS_MODULE = join(BOARD_SRC_ROOT, 'board', 'epics.ts');
@@ -84,7 +87,8 @@ const TRACKED_NAMES = ['EPIC_LABEL_PREFIX', 'SPEC_BLOCKED_LABEL', 'groupByEpicLa
 /**
  * Every file outside `src/board/relations/` allowed to import a tracked
  * name, each with why. A path is relative to `src/`, or to
- * `packages/rafa-board/src/` for board's files, forward-slashed.
+ * `packages/rafa-board/src/` for board's files and
+ * `packages/rafa-run/src/` for run's, forward-slashed.
  */
 const ALLOWED_IMPORTERS: Readonly<Record<string, string>> = Object.freeze({
   'board/epics.ts': 'the labels-family module itself; its own labels-mode source calls readBlockedBy on a member',

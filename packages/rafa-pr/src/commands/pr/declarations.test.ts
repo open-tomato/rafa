@@ -79,9 +79,9 @@ describe('what declarations.ts imports', () => {
     const planted = [
       'import type { RafaCommand } from \'@open-tomato/rafa/core/command\';',
       'import type { PrSeams } from \'./pr-context.js\';',
-      'import { endingWith } from \'../../../../../src/next/ending.js\';',
+      'import { rafa } from \'../../../../../src/rafa.js\';',
     ].join('\n');
 
-    expect(underSrc(readImports(planted, HERE))).toEqual(['./pr-context.js', '../../../../../src/next/ending.js']);
+    expect(underSrc(readImports(planted, HERE))).toEqual(['./pr-context.js', '../../../../../src/rafa.js']);
   });
 });

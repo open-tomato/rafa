@@ -2,7 +2,7 @@
  * The effort-store rules read over one plan file and its PREREQUISITES
  * file, shared by `rafa plan validate` (`./validate.ts`) and
  * `rafa plan create` (`src/plan.ts`), so the two commands hold a plan to
- * one reading of `src/plan/store-rules.ts`.
+ * one reading of `packages/rafa-run/src/plan/store-rules.ts`.
  *
  * ## The reading
  *
@@ -43,16 +43,13 @@ import type { StoreRuleProblem } from '@open-tomato/rafa-run';
 import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 
-import {
-  findStoreRuleProblems,
-  prerequisitesPathForPlan,
-  storeRuleLine,
-} from '@open-tomato/rafa-run';
+import { findStoreRuleProblems, storeRuleLine } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { isFile, plural, rejectedPath } from '@open-tomato/rafa/core/plan';
+import { prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 
 /** The text at `path`, or null when no file sits there. */
 function readFileOrNull(path: string | null): string | null {

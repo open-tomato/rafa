@@ -23,9 +23,9 @@
  * the run's head branch. All three run over a real scratch repository
  * with a bare `origin`, with the recorded `gh` fake as the provider.
  */
-import type { ReleaseStageSettings } from './release-stage.js';
 import type { ReportChange } from '@open-tomato/rafa/report/parse';
 import type { Instinct } from '@open-tomato/rafa-inventory/schema/instinct';
+import type { ReleaseStageSettings } from '@open-tomato/rafa-run/start/release-stage';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,13 +44,11 @@ import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
 import { createGhPullRequests, createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 import { retargetedLine, retargetPullRequest } from '@open-tomato/rafa-pr/start/pr-retarget';
-
-import { resolveBaseBranch } from '../cleanup/index.js';
-
-import { checkWrapUpAnswer, readHead } from './promoted-check.js';
-import { finishRelease, prepareReleaseStage } from './release-stage.js';
-import { deliverPullRequest } from './wrap-up-run.js';
-import { buildWrapUpPrompt, lessonsToPromote } from './wrap-up.js';
+import { resolveBaseBranch } from '@open-tomato/rafa-run/cleanup/index';
+import { checkWrapUpAnswer, readHead } from '@open-tomato/rafa-run/start/promoted-check';
+import { finishRelease, prepareReleaseStage } from '@open-tomato/rafa-run/start/release-stage';
+import { buildWrapUpPrompt, lessonsToPromote } from '@open-tomato/rafa-run/start/wrap-up';
+import { deliverPullRequest } from '@open-tomato/rafa-run/start/wrap-up-run';
 
 const BRANCH = 'feat/rafa-25-rafa-learns-own-runs';
 const FENCE = '```';

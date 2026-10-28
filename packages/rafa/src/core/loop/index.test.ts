@@ -33,7 +33,7 @@
  * barrel must not hold.
  *
  * The sixth case holds `SESSION_ID_FLAG` by value: it moved here from
- * `src/start/dispatch.ts`, which keeps no re-export, so every file that
+ * `packages/rafa-run/src/start/dispatch.ts`, which keeps no re-export, so every file that
  * spawns a session under its own id takes it from this barrel.
  *
  * Seven mutations were driven against this file on 2026-10-12, one run

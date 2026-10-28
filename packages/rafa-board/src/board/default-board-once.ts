@@ -11,7 +11,7 @@
  * with {@link DEFAULT_BOARD_REFUSAL_EXIT} and the line
  * `❌ Could not find the default board: <reason>`.
  *
- * It moved here from `src/commands/switch.ts` (decouple 4, #808), so the
+ * It moved here from `packages/rafa-run/src/commands/switch.ts` (decouple 4, #808), so the
  * two board commands that ask it take it from board rather than from a
  * run file.
  */
@@ -26,7 +26,7 @@ import { resolveDefaultBoard } from './boards.js';
 import { openBoards } from './epic-board.js';
 import { createGhRoadmapSearch } from './roadmap.js';
 
-/** The exit code of a default board that cannot be found: the value of `SWITCH_REFUSAL_EXIT` (`src/commands/switch.ts`). */
+/** The exit code of a default board that cannot be found: the value of `SWITCH_REFUSAL_EXIT` (`packages/rafa-run/src/commands/switch.ts`). */
 export const DEFAULT_BOARD_REFUSAL_EXIT = 2;
 
 /** The default board's number, asked at most once; any failure refused with {@link DEFAULT_BOARD_REFUSAL_EXIT}. */

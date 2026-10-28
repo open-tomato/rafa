@@ -35,10 +35,10 @@
  * step's own: `runSuite`'s real spawner, the real test-file walk, a real
  * tracker file.
  */
-import type { StepOutcome, SuiteStepContext } from './suite-step.js';
-import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
 import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
+import type { StepOutcome, SuiteStepContext } from '@open-tomato/rafa-run/start/suite-step';
+import type { SuiteBaseline } from '@open-tomato/rafa-run/suite/baseline';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,10 +50,8 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
-
-import { baselineOf } from '../suite/baseline.js';
-
-import { runStageStep } from './suite-step.js';
+import { runStageStep } from '@open-tomato/rafa-run/start/suite-step';
+import { baselineOf } from '@open-tomato/rafa-run/suite/baseline';
 
 /** How long one case may take: up to three real `bun test` runs. */
 const CASE_TIMEOUT_MS = 60_000;

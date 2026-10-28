@@ -11,6 +11,7 @@
     { "path": "./packages/rafa-inventory" },
     { "path": "./packages/rafa-pr" },
     { "path": "./packages/rafa-release" },
+    { "path": "./packages/rafa-run" },
     { "path": "./packages/rafa-sync-service" }
   ]
 }

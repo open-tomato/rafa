@@ -2,7 +2,7 @@
  * Spawned `bun src/rafa.ts switch` over a stand-in board carrying one
  * drifted line (`.rafa/plans/rafa-324-claim-issue-so-two`, "Drift
  * check"): board #10's checklist ticks epic #100 while #100 still
- * carries `rafa:in-development`. `checkDrift` (`src/claims/drift.ts`)
+ * carries `rafa:in-development`. `checkDrift` (`packages/rafa-run/src/claims/drift.ts`)
  * reports that as a `ticked-labelled` finding.
  *
  * A local branch `feat/rafa-100-x` names #100's claim, so the second

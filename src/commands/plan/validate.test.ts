@@ -53,10 +53,10 @@ import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { issueLine } from '@open-tomato/rafa/core/plan';
 import { validatePlan } from '@open-tomato/rafa/plan/validate';
+import { parsePrerequisites } from '@open-tomato/rafa/preflight/prerequisites-md';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { parsePlan } from '../../plan/index.js';
-import { parsePrerequisites } from '../../preflight/prerequisites-md.js';
 import {
   dispatchCaptured,
   dispatchInProject,

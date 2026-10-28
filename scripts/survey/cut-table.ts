@@ -14,7 +14,7 @@
  *
  *   1. a file a package names is that package's. A test file whose name
  *      is a named file's with `.test` before the extension follows it:
- *      `src/next/readings.test.ts` goes where `src/next/readings.ts`
+ *      `packages/rafa-run/src/next/readings.test.ts` goes where `packages/rafa-run/src/next/readings.ts`
  *      goes. The run rule named `packages/rafa/src/start/branch-decision.ts`
  *      beside `RUN_NAMED` until the fourth decouple item (rafa-1333) moved
  *      it into core's package, where the `packages/rafa/` folder places it;
@@ -325,7 +325,17 @@ export const CUT_RULES: CutRules = {
       named: [...PR_NAMED, 'packages/rafa-pr/src/pr/index.ts'],
     },
     {
-      folders: ['packages/rafa-run/', 'src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],
+      // #1380: pass 4f moved run's files into `packages/rafa-run/` and
+      // emptied `src/claims/` and `src/preflight/`, so they leave the
+      // list. `src/commands/claim/` stays for the claim declaration tests
+      // `declarations-integration.test.ts` and
+      // `index-integration.test.ts`, `src/start/` for its 28 integration
+      // tests and `src/suite/` for `run-baseline-integration.test.ts` and
+      // `run-recheck-integration.test.ts`, at the root until #913, as
+      // `src/tiers/` stays for inventory's; `src/start/` also holds
+      // `base-prompts.sweep.test.ts`, which stems no listed file and
+      // waits on #1360's rule for the move tool.
+      folders: ['packages/rafa-run/', 'src/commands/claim/', 'src/start/', 'src/suite/'],
       name: 'rafa-run',
       named: RUN_NAMED,
     },

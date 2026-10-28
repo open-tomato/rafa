@@ -2,7 +2,7 @@
  * The Output this process writes through, and the mode it renders in.
  *
  * A function that prints asks {@link activeOutput} for the output rather
- * than taking one as an argument, as `src/start/stamp.ts` holds a run's
+ * than taking one as an argument, as `packages/rafa-run/src/start/stamp.ts` holds a run's
  * plan stub: an `Output` threaded through every function that prints
  * would add an argument to call sites that have nothing to say about
  * output. The output is held in two places, and the readers answer the

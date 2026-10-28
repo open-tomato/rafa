@@ -140,9 +140,9 @@
  * runner and its timeout.
  */
 import type { DoctorResult, DoctorSeams } from './doctor.js';
-import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
+import type { ProbeOptions, ProbeRun } from '@open-tomato/rafa/preflight/run';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

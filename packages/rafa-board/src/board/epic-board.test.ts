@@ -1,7 +1,7 @@
 /**
  * Tests for which board an epic sits on (`packages/rafa-board/src/board/epic-board.ts`): the
  * open boards, whether a board lists an epic, and the board an epic moves
- * with. These cases moved here from `src/commands/switch.test.ts` with
+ * with. These cases moved here from `src/tests/run-coupled/commands/switch.test.ts` with
  * the functions they cover.
  *
  * The board: three open `type:roadmap` boards, #31 (the default in most

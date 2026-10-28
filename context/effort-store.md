@@ -203,13 +203,13 @@ and the merge trail (`merges` and `merge_conflicts` tables).
 **A loop never records to a copy, and says what it does not know.**
 `loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
 empty string, right after the detached refusal and before `--runtime`
-hands the run on (`refuseEffortDirRun`, `src/start/run-config.ts`):
-`❌ RAFA_EFFORT_DIR is set (<dir>); a loop records to the project's own
-store. Unset it and run again.` Its preflight then reads the project's
-store through `readSchemaReport`, read-only, and warns once for each
-logged migration this rafa does not know whose `breaks` is empty, in
-the words of `unknownAdditiveWarning` (`schema-report.ts`): `⚠ effort
-store holds migration <id> this rafa does not know (applied by <by>);
+hands the run on (`refuseEffortDirRun`,
+`packages/rafa-run/src/start/run-config.ts`): `❌ RAFA_EFFORT_DIR is set (<dir>);
+a loop records to the project's own store. Unset it and run again.` Its
+preflight then reads the project's store through `readSchemaReport`, read-only,
+and warns once for each logged migration this rafa does not know whose `breaks`
+is empty, in the words of `unknownAdditiveWarning` (`schema-report.ts`): `⚠
+effort store holds migration <id> this rafa does not know (applied by <by>);
 it is additive, so this run reads and writes the store as it is`. A
 refused store gets no warning there, since its first open refuses it;
 one that cannot be read is one warning naming why, and none halts.
@@ -733,13 +733,13 @@ A mint with the reason `host` or `path` empties the table instead, because that
 file is a copy at a new location that must build its own claim history.
 `readReplacedStoreIds` (`packages/rafa/src/effort/store/store-replaced.ts`)
 answers the ids, earliest first, or none for a store without the table or with
-it empty; `holdsClaim` (`src/claims/device.ts`) is true for the current id and
-each replaced one. The table is absent from a store an older runtime left. The
-three before it, which migration `store-meta` creates, are the store's own
-identity and its merge trail: `store_meta` holds one row (`id = 1`) naming the
-origin the store stamps, its project and the host, path and file identity it was
-minted under; `merges` records each merge and `merge_conflicts` each incoming
-row one could not settle. Migration `store-meta-generation` adds
+it empty; `holdsClaim` (`packages/rafa-run/src/claims/device.ts`) is true for
+the current id and each replaced one. The table is absent from a store an older
+runtime left. The three before it, which migration `store-meta` creates, are the
+store's own identity and its merge trail: `store_meta` holds one row (`id = 1`)
+naming the origin the store stamps, its project and the host, path and file
+identity it was minted under; `merges` records each merge and `merge_conflicts`
+each incoming row one could not settle. Migration `store-meta-generation` adds
 `store_meta.generation`, a nullable non-empty text column; NULL there means a
 runtime that did not know the column wrote the row. `mergeStore`
 (`store/merge-store.ts`) writes one `merges` row per merge into the build it
@@ -1228,7 +1228,7 @@ by `rafa effort report --skills`, which reads `invoked` and never
 `store/preflight.ts` writes a run's checks in one transaction, one row
 per check keyed by `(run_id, position)`, since a run can check one item
 twice. A check's type, tier and outcome are core's
-(`store/preflight-check.ts`, re-exported by `src/preflight/run.ts`). No column says the run halted: a run halted when a required check
+(`store/preflight-check.ts`, re-exported by `packages/rafa/src/preflight/run.ts`). No column says the run halted: a run halted when a required check
 did not pass, and `readPreflightHalts` reads that off the rows.
 `loop start` writes it through `start/preflight.ts` before any session,
 and writes nothing for a run with no item to check. `rafa doctor` checks

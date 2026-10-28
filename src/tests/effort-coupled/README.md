@@ -22,7 +22,7 @@ package once its coupling is gone, or into the module it really tests.
 
 | Test file | Reaches |
 | --- | --- |
-| `effort/classify.test.ts` | by path at run time, no import: `src/start/dispatch.ts`, `src/plan-prompt.md`, `src/start/wrap-up.ts`, `src/start/pr-lifecycle.ts`, `packages/rafa-inventory/src/inventory/search/prompt.ts` |
+| `effort/classify.test.ts` | by path at run time, no import: `packages/rafa-run/src/start/dispatch.ts`, `src/plan-prompt.md`, `packages/rafa-run/src/start/wrap-up.ts`, `packages/rafa-run/src/start/pr-lifecycle.ts`, `packages/rafa-inventory/src/inventory/search/prompt.ts` |
 | `effort/collect.test.ts` | `src/tests/cli-capture.ts` |
 | `effort/dashboard-status.test.ts` | `src/tests/loop-session-fixtures.ts` |
 | `effort/report-skills.test.ts` | `packages/rafa-inventory/src/inventory/record.ts`, `packages/rafa-inventory/src/schema/instinct.ts`, `packages/rafa-inventory/src/tiers/resolve.ts` |

@@ -1,6 +1,6 @@
 /**
- * What `src/start/release-stage.test.ts` and
- * `src/start/release-stage-forecast.test.ts` share: the plan, the
+ * What `src/tests/run-coupled/start/release-stage.test.ts` and
+ * `src/tests/run-coupled/start/release-stage-forecast.test.ts` share: the plan, the
  * settings and the records a stubbed release stage runs over, and
  * {@link stub}, a complete stub of the stage's seams that records what
  * it was asked.
@@ -23,13 +23,13 @@
  * {@link stub} sets the active output, which is module state: a file
  * using it resets it to null in an `afterEach`.
  */
-import type { ReleaseStageInput, ReleaseStageSeams, ReleaseStageSettings } from '../start/release-stage.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import type { GitResult, PrProviderReading, PullRequestDetail, PullRequests, PullRequestSummary, PushOutcome } from '@open-tomato/rafa-pr/pr/index';
 import type { BranchForecast, BranchForecastInput } from '@open-tomato/rafa-release/release/branch-forecast';
 import type { ChangelogNote } from '@open-tomato/rafa-release/release/changelog';
 import type { ReleasePrepared, ReleaseSkipped } from '@open-tomato/rafa-release/release/prepare';
 import type { ReleaseRefused, ReleaseVerified } from '@open-tomato/rafa-release/release/verify';
+import type { ReleaseStageInput, ReleaseStageSeams, ReleaseStageSettings } from '@open-tomato/rafa-run/start/release-stage';
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';

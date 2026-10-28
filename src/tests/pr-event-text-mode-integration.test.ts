@@ -20,9 +20,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { runsDir } from '@open-tomato/rafa/core/loop';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { EVENTS_EXTENSION } from '@open-tomato/rafa-run/start/loop-events';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { EVENTS_EXTENSION } from '../start/loop-events.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

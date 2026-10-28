@@ -19,8 +19,8 @@
  * The issue files are read straight off the directory, so a second issue
  * could not hide behind the tracker's own listing.
  */
-import type { StaleDocsTaskInput, StartStaleDocsConfig } from './stale-docs.js';
 import type { TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
+import type { StaleDocsTaskInput, StartStaleDocsConfig } from '@open-tomato/rafa-run/start/stale-docs';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,8 +39,7 @@ import { parseTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 import { STALE_DOCS_MARKER, staleDocsTitle } from '@open-tomato/rafa-release/docs/release-issue';
-
-import { createStartStaleDocs } from './stale-docs.js';
+import { createStartStaleDocs } from '@open-tomato/rafa-run/start/stale-docs';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-start-stale-docs-integration-'));
 let rootCount = 0;

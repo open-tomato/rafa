@@ -47,11 +47,10 @@ import { readSessions } from '@open-tomato/rafa/core/loop';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { BLOCKER_PROMPT_PREFIX } from '@open-tomato/rafa-run/start/dispatch';
 
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
-
-import { BLOCKER_PROMPT_PREFIX } from './dispatch.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
