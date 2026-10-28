@@ -83,7 +83,7 @@ root `tsconfig.json` and each composite member's `tsconfig.json` extend
 `tsconfig.packages.json`, which extends
 `@open-tomato/rafa-typescript-config/base`, the name the root's
 `workspace:*` line links into `node_modules`. So the root config and the
-four composite members are held to both flags by `bun run check-types`, with
+nine composite members are held to both flags by `bun run check-types`, with
 no flag on the command line. The package's `base.test.ts` holds both flags and
 `declaration`. `declaration` sits beside them because `tsc` refuses
 `isolatedDeclarations` without it; under the base's `noEmit` it writes no
@@ -91,7 +91,7 @@ file. The root `tsconfig.json` excludes `**/*.test.ts`,
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
 runner's type step does, for the test files a task adds or edits: its scratch
 config extends `tsconfig.json` and takes the flags with it. The
-`tsconfig.json` of each of the four composite members leaves its test files out
+`tsconfig.json` of each of the nine composite members leaves its test files out
 too, as the root does, so `check-types` holds no test file anywhere: `tsc`
 reports no `isolatedDeclarations` error for a program with any other error,
 and the test files carry hundreds (the spike's probe 8, #804).
@@ -309,7 +309,7 @@ barrel. No non-test file under `packages/rafa/src/` imports
 core's own, so no barrel rule holds the effort store, the ports or a moved file
 outside `core/`. They reach core's barrels by relative path, as
 `effort/store/move.ts` and `utils/tracker.ts` do. A scan of the non-test files
-at this commit found every such import names one of the fourteen barrels and no
+at this commit found every such import names one of the fifteen barrels and no
 deeper file. A grep at this commit found no barrel imported from inside core,
 but no sweep measures that half.
 
@@ -1202,7 +1202,7 @@ names come from, and the facade entry is no node.
   `bun run check-types` runs `tsc --noEmit` over the root, whose `tsconfig.json`
   leaves out `packages/` and the test files, then `bun run --filter
   './packages/*' check-types`, which runs the `check-types` script of each
-  member that has one: `tsc --build` in the four composite members. `bun run
+  member that has one: `tsc --build` in the nine composite members. `bun run
   lint` lints package code from the root config like `src/`, its `testdata/`
   folders included, and so does the runner's lint step on a task's diff; the
   root `eslint.config.mjs` ignores `**/.tsbuild/**`, so the root `eslint .`
@@ -1216,39 +1216,42 @@ names come from, and the facade entry is no node.
   root `tsconfig.json`; without that entry, `bunx eslint packages` reported 21
   `import/no-unresolved` errors (measured on ESLint 9.39.5). Two globs make
   several projects, so the resolver also sets `noWarnOnMultipleProjects`, or
-  every run prints `Multiple projects found` to stderr. Before its move, a
-  facade over `src/` holds no `tsconfig.json`, so the graph check asks it no
-  `check-types` script and the references build skips it, as it skips the config
-  packages. `packages/rafa-inventory`, which holds its own files, has a
-  composite `tsconfig.json` referencing `../rafa`, a `check-types` script and an
-  entry in the solution file, and its `bunfig.toml` preloads `test-preload.ts`,
-  which registers core's section alone, so `bun test` run from its folder reads
-  core's settings.
-- **The composite recipe builds the four composite members' declarations.**
-  The `tsconfig.json` of `packages/rafa`, `packages/rafa-hub`,
-  `packages/rafa-sync-service` and `packages/rafa-inventory` keeps the
-  `extends` of `tsconfig.packages.json` and sets `composite: true`,
-  `noEmit: false`, `emitDeclarationOnly: true`, `rootDir` (`"src"`, or `"."` in
-  `packages/rafa-inventory`, whose `index.ts` sits beside `src/`), `outDir:
-  ".tsbuild"` and `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last
-  so two packages never share one (TS6377). It leaves its test files out, and
-  its `references` name what it imports: core none, and every other member
-  `../rafa`. `tsc --build` builds a
+  every run prints `Multiple projects found` to stderr. Before a feature
+  package's move, its facade over `src/` held no `tsconfig.json`, so the graph
+  check asked it no `check-types` script and the references build skipped it,
+  as it skips the config packages. Now each feature package holds its own files
+  and a composite `tsconfig.json`: `packages/rafa-inventory`, for one,
+  references `../rafa`, has a `check-types` script and an entry in the solution
+  file, and its `bunfig.toml` preloads `test-preload.ts`, which registers
+  core's section alone, so `bun test` run from its folder reads core's settings.
+- **The composite recipe builds the nine composite members' declarations.**
+  The `tsconfig.json` of `packages/rafa`, `packages/rafa-board`,
+  `packages/rafa-effort`, `packages/rafa-hub`, `packages/rafa-inventory`,
+  `packages/rafa-pr`, `packages/rafa-release`, `packages/rafa-run` and
+  `packages/rafa-sync-service` keeps the `extends` of `tsconfig.packages.json`
+  and sets `composite: true`, `noEmit: false`, `emitDeclarationOnly: true`,
+  `rootDir` (`"src"` in `packages/rafa`, `packages/rafa-hub` and
+  `packages/rafa-sync-service`, or `"."` in the six feature packages, whose
+  `index.ts` sits beside `src/`), `outDir: ".tsbuild"` and
+  `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages
+  never share one (TS6377). It leaves its test files out, and its `references`
+  name what it imports: core none, and every other member `../rafa` and the
+  feature packages it imports. `tsc --build` builds a
   reference first, reads core through `paths` from that reference's
   declarations, and is a no-op on a second run. `.tsbuild/` is gitignored at
   every depth. Each of the three code packages' `turbo.json` extends the root's
   (`"extends": ["//"]`) and declares `check-types.outputs` as `.tsbuild/**`, so
   a cache hit restores the declarations a dependent's build reads. The two
-  config packages emit nothing and carry no override. `packages/rafa-inventory`
-  has no `turbo.json`, so its `check-types` runs under the root's definition,
-  which declares no outputs. A service with its
+  config packages emit nothing and carry no override. The six feature packages
+  have no `turbo.json` either, so their `check-types` runs under the root's
+  definition, which declares no outputs. A service with its
   reference to core dropped fails with `TS6307` and `TS6059` on core's files,
   and still writes their `.d.ts` files beside core's sources, so a run that
   fails that way leaves stray files under `packages/rafa/src/` to remove; list
   them with `git ls-files --others --exclude-standard`.
 - **The solution file builds the members in dependency order.** The root
   `tsconfig.references.json` holds `"files": []` and one reference per
-  composite member, so `tsc --build tsconfig.references.json` builds all four
+  composite member, so `tsc --build tsconfig.references.json` builds all nine
   and refuses a reference cycle with `TS6202`, exit 4. Ring 1 runs it. The root
   umbrella `tsconfig.json` keeps `tsc --noEmit` and no `references`, so ring 0
   reads core's source through `paths` as before.
