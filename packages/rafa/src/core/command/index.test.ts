@@ -32,7 +32,7 @@
  */
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as command from './command.js';
@@ -62,8 +62,13 @@ const SPENDS = 'packages/rafa/src/core/command/spends.ts';
 const TYPES = 'packages/rafa/src/core/command/types.ts';
 const VERSION = 'packages/rafa/src/core/command/version.ts';
 
+/** Every path a case reads the export names of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [COMMAND, CONFIRM, GLOBAL_FLAGS, LAZY, REGISTRY_TYPES, RUNNING, SHARED_FLAGS, SPENDS, TYPES, VERSION, BARREL];
+
 /**
- * Every export name of each file, types included, sorted.
+ * Every export name of each file, types included, sorted. Runs once,
+ * from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays for
+ * the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns The names by path.
@@ -93,6 +98,19 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
   return names;
 }
 
+let exportNames: Record<string, string[]> | null = null;
+
+/**
+ * The export names by path, once `beforeAll` has read them.
+ *
+ * @returns The names by path of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function storedExportNames(): Record<string, string[]> {
+  if (exportNames === null) throw new Error('the export names were never read');
+  return exportNames;
+}
+
 /**
  * The names more than one of the lists holds, sorted.
  *
@@ -119,6 +137,10 @@ const BEHIND: Readonly<Record<string, unknown>> = {
 };
 
 describe('the command barrel', () => {
+  beforeAll(() => {
+    exportNames = readExportNames(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of the ten files, each once, and no other', () => {
     const expected = [
       ...Object.keys(command),
@@ -147,7 +169,7 @@ describe('the command barrel', () => {
   });
 
   it('reads ten files that hold no name in common, type or runtime', () => {
-    const names = readExportNames([COMMAND, CONFIRM, GLOBAL_FLAGS, LAZY, REGISTRY_TYPES, RUNNING, SHARED_FLAGS, SPENDS, TYPES, VERSION]);
+    const names = storedExportNames();
 
     expect(names[COMMAND]?.length).toBeGreaterThan(0);
     expect(names[CONFIRM]?.length).toBeGreaterThan(0);
@@ -184,19 +206,7 @@ describe('the command barrel', () => {
   });
 
   it('exports the type names of the ten files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([
-      BARREL,
-      COMMAND,
-      CONFIRM,
-      GLOBAL_FLAGS,
-      LAZY,
-      REGISTRY_TYPES,
-      RUNNING,
-      SHARED_FLAGS,
-      SPENDS,
-      TYPES,
-      VERSION,
-    ]);
+    const names = storedExportNames();
     const expected = [
       ...(names[COMMAND] ?? []),
       ...(names[CONFIRM] ?? []),
