@@ -51,7 +51,7 @@
  */
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as claude from './claude.js';
@@ -69,8 +69,13 @@ const CLAUDE = 'packages/rafa/src/core/loop/claude.ts';
 const SESSION_ENV = 'packages/rafa/src/core/loop/session-env.ts';
 const SUITE_FAILURE = 'packages/rafa/src/core/loop/suite-failure.ts';
 
+/** Every path a case reads the export names of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [SESSIONS, CLAUDE, SESSION_ENV, BARREL, SUITE_FAILURE];
+
 /**
- * Every export name of each file, types included, sorted.
+ * Every export name of each file, types included, sorted. Runs once,
+ * from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays for
+ * the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns The names by path.
@@ -100,6 +105,19 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
   return names;
 }
 
+let exportNames: Record<string, string[]> | null = null;
+
+/**
+ * The export names by path, once `beforeAll` has read them.
+ *
+ * @returns The names by path of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function storedExportNames(): Record<string, string[]> {
+  if (exportNames === null) throw new Error('the export names were never read');
+  return exportNames;
+}
+
 /**
  * The names more than one of the lists holds, sorted.
  *
@@ -115,6 +133,10 @@ function onTwo(lists: readonly (readonly string[])[]): string[] {
 const BEHIND: Readonly<Record<string, unknown>> = { ...sessions, ...claude, ...sessionEnv };
 
 describe('the loop barrel', () => {
+  beforeAll(() => {
+    exportNames = readExportNames(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of the three files, each once, and no other', () => {
     const expected = [...Object.keys(sessions), ...Object.keys(claude), ...Object.keys(sessionEnv)].sort();
 
@@ -126,7 +148,7 @@ describe('the loop barrel', () => {
   });
 
   it('reads three files that share no name, type or runtime', () => {
-    const names = readExportNames([SESSIONS, CLAUDE, SESSION_ENV]);
+    const names = storedExportNames();
 
     expect(names[SESSIONS]?.length).toBeGreaterThan(0);
     expect(names[CLAUDE]?.length).toBeGreaterThan(0);
@@ -162,7 +184,7 @@ describe('the loop barrel', () => {
   });
 
   it('exports the type names of the three files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, SESSIONS, CLAUDE, SESSION_ENV, SUITE_FAILURE]);
+    const names = storedExportNames();
     const expected = [
       ...(names[SESSIONS] ?? []),
       ...(names[CLAUDE] ?? []),
