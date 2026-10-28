@@ -151,8 +151,8 @@ being asked to read `progress.txt` and decide.
 ### How it works
 
 1. Code computes `promotable` over the adapter's `pullBlessed` bundle
-   (`lessonsToPromote` in `packages/rafa-run/src/start/wrap-up.ts`; `rafa instinct
-   promote` does the same) — lessons that recurred
+   (`lessonsToPromote` in `packages/rafa-run/src/start/wrap-up.ts`; `rafa
+   instinct promote` does the same) — lessons that recurred
    `learning.promote.after` distinct times and meet
    `learning.promote.minConfidence`. The port offers no held set, so a
    lesson tasks may not use is never promotable, and under `local` the
@@ -175,12 +175,12 @@ being asked to read `progress.txt` and decide.
    - Every listed id must be answered.
    - Every named path must have changed in the working tree.
    - A promoted lesson gets `promoted_to: <path>`, a new optional field.
-     The port has no field-update call: `packages/rafa-run/src/start/promoted-check.ts`
-     pushes the blessed record back with `promoted_to` set, from a
-     source it already holds, so `merge` collapses it as `same-action`
-     with `usage_count` and confidence unchanged. A user-scope lesson
-     has no held member to take a description from, so that push is
-     refused with a warning.
+     The port has no field-update call:
+     `packages/rafa-run/src/start/promoted-check.ts` pushes the blessed
+     record back with `promoted_to` set, from a source it already holds,
+     so `merge` collapses it as `same-action` with `usage_count` and
+     confidence unchanged. A user-scope lesson has no held member to take
+     a description from, so that push is refused with a warning.
    - A promoted lesson leaves every blessed bundle, because the page now
      carries it.
 

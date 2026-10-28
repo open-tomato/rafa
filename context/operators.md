@@ -246,11 +246,11 @@ rafa· inherited        src/parse/parse.test.ts > parse > drops the last line
 rafa· error            ❌ Task failed (exit 1). Marked as blocked. Run again to retry.
 ```
 
-`packages/rafa-run/src/start/loop-events.ts` builds each line. A `retry` line says the run
-went back into its loop after a stop instead of halting, which retry in
-a row of how many, under `--retry` or `loop.retries`
-(`packages/rafa-run/src/start/retry-budget.ts`), the count starting over once a later task
-is done, neither the stopped one nor a repair;
+`packages/rafa-run/src/start/loop-events.ts` builds each line. A `retry` line
+says the run went back into its loop after a stop instead of halting, which
+retry in a row of how many, under `--retry` or `loop.retries`
+(`packages/rafa-run/src/start/retry-budget.ts`), the count starting over once
+a later task is done, neither the stopped one nor a repair;
 it ends nothing, so `rafa loop wait` and `rafa stretch item` read on past
 it. A stop it retries writes no `task-blocked` line: a task stop writes
 one only once no retry is granted, so a `task-blocked` line still means
@@ -275,8 +275,8 @@ the `pr` line. None of these ends on an `error` line.
 
 An `inherited` line names
 the run-start failure, by file and case, that a reported bug was read as
-(`packages/rafa-run/src/start/triage.ts`): nothing was filed for it. A task's tokens are input,
-cache creation and output from its session log, read as
+(`packages/rafa-run/src/start/triage.ts`): nothing was filed for it. A task's
+tokens are input, cache creation and output from its session log, read as
 `rafa effort collect` reads it; the effort store is never opened. A
 session's own stdout goes to `info`, which the events adapter drops.
 
@@ -285,10 +285,10 @@ is the first non-blank line of the error's message.
 
 ### The events file
 
-Every event `packages/rafa-run/src/start/loop-events.ts` emits is also appended to the
-run's events file, `.rafa/runs/<session-id>.events.ndjson`, beside its
-record: one JSON line, `{ name, summary, data, ts }`, the object the
-output's `emit` receives minus `type`, in every output mode, text
+Every event `packages/rafa-run/src/start/loop-events.ts` emits is also
+appended to the run's events file, `.rafa/runs/<session-id>.events.ndjson`,
+beside its record: one JSON line, `{ name, summary, data, ts }`, the object
+the output's `emit` receives minus `type`, in every output mode, text
 included. `bindEventsFile` names the file (making the runs folder if it
 is missing) and `unbindEventsFile` ends the append; with none bound,
 nothing is written. The append is best-effort: a failed write prints one
@@ -298,7 +298,7 @@ session record and unbinds it in the run's `finally` (`src/start.ts`);
 anything the run throws is first written as an `error` event, then
 rethrown, but for the `LoopEnd` a `--continue` run ends with, exit code
 20, 21 or 22, which has emitted its own events before it is thrown
-(`packages/rafa-run/src/start/continue-exits.ts`). A test binds its own temp root and
-unbinds after.
+(`packages/rafa-run/src/start/continue-exits.ts`). A test binds its own temp
+root and unbinds after.
 The record, `<session-id>.json`, stays the only `.json` file a run
 writes, so `loop list`, `status` and `stop` read it alone.

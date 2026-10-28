@@ -55,13 +55,14 @@ core roster carries help snapshots too.
 
 `pr wait` composes `waitForChecks` (`packages/rafa-pr/src/pr/checks.ts`) over
 the provider's `checks` and is READ-ONLY: no repair session, no comment, no
-label, no merge — `verifyPullRequest` (`packages/rafa-run/src/start/pr-lifecycle.ts`) keeps those,
-and the deadline and the poll interval are that gate's own constants. The same
-`waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop agree
-about what green means and how often a pull request is asked. Green exits 0; red
-exits 1; a pull request with NO checks at all exits 1 too, with the head line
-`no check registered yet`. Zero checks are polled again at the poll interval
-while the head is younger than `FIRST_CHECK_GRACE_MS` (120 seconds,
+label, no merge — `verifyPullRequest`
+(`packages/rafa-run/src/start/pr-lifecycle.ts`) keeps those, and the deadline
+and the poll interval are that gate's own constants. The same `waitForChecks`
+the loop's own CI gate uses, so one `pr wait` and the loop agree about what
+green means and how often a pull request is asked. Green exits 0; red exits 1; a
+pull request with NO checks at all exits 1 too, with the head line `no check
+registered yet`. Zero checks are polled again at the poll interval while the
+head is younger than `FIRST_CHECK_GRACE_MS` (120 seconds,
 `packages/rafa-pr/src/pr/checks.ts`), since GitHub registers a push's runs some
 seconds after the push; past that grace the ending is `none` at once. The age is
 the head commit's committed date (`headCommittedAt` on the pull request's
@@ -73,12 +74,12 @@ scheduled for it, only when one more read of its detail says `conflicting`; any
 other reading gets `rafa pr wait <n>` to ask again and `rafa pr show <n>`, and
 says nothing about merging. The deadline passing with checks still running exits
 3. A green wait writes its report through the output and then names the one step
-that follows, which for checks that have just passed is the merge
-(`packages/rafa-run/src/next/ending.ts`, `--no-hint` to turn it off); every other ending carries
-the report as the message of its exit, because the dispatcher drops a command's
-payload when it ends non-zero, and gets no hint, since that report already names
-the rafa command for what it found. The clock and the wait between polls are
-seams, so its tests spend no real second.
+   that follows, which for checks that have just passed is the merge
+   (`packages/rafa-run/src/next/ending.ts`, `--no-hint` to turn it off); every
+   other ending carries the report as the message of its exit, because the
+   dispatcher drops a command's payload when it ends non-zero, and gets no hint,
+   since that report already names the rafa command for what it found. The clock
+   and the wait between polls are seams, so its tests spend no real second.
 
 ### The provider and preflight
 
@@ -96,9 +97,10 @@ body write — there being no body — and says so each time. A push of a claim
 branch the remote refuses because another store now owns the claim halts the run
 instead, exit 1 with the "claim lost" report, its commits kept on `lost/<stub>`
 and no compare URL printed (`packages/rafa-run/src/start/pr-lifecycle.ts` over
-`packages/rafa-run/src/claims/lost.ts`). No other provider is built; the functions in
-`packages/rafa-pr/src/pr/gh.ts` move behind one `PullRequests` interface in
-`packages/rafa/src/pr/types.ts` so a second provider is an adapter later.
+`packages/rafa-run/src/claims/lost.ts`). No other provider is built; the
+functions in `packages/rafa-pr/src/pr/gh.ts` move behind one `PullRequests`
+interface in `packages/rafa/src/pr/types.ts` so a second provider is an adapter
+later.
 
 Every `pr` action without a usable `gh` exits 2 with the same message.
 
@@ -274,13 +276,13 @@ sentence replaces nothing.
    then: read while a loop is live, it exits 1 and names each tracker, unless
    `--force` is on the line. With no loop live the update goes on and warns
    once, naming each such tracker, so a tracker a parked plan left behind does
-   not hold it (`packages/rafa-run/src/runtime/install.ts`). Both are only printed: `pr merge`
-   never runs settle, and `rafa release tag` is no longer named here, since
-   settle tags or names the tag itself.
+   not hold it (`packages/rafa-run/src/runtime/install.ts`). Both are only
+   printed: `pr merge` never runs settle, and `rafa release tag` is no longer
+   named here, since settle tags or names the tag itself.
 8. Last, name the one step that follows — with the base pulled and both
    branches gone, the next plan or the loop on a plan already there
-   (`packages/rafa-run/src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
-   DECLINED ends without it: nothing moved, so the hint would put the
+   (`packages/rafa-run/src/next/ending.ts`, `--no-hint` to turn it off). A merge
+   that was DECLINED ends without it: nothing moved, so the hint would put the
    question that was just answered no.
 
 A failure after the merge never undoes it; it prints the remaining steps as
