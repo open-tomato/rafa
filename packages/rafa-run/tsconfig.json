@@ -1,8 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.packages.json",
-  // Composite, in pr's form, so `tsc --build` reads the declarations of
-  // the packages run depends on through the references below.
+  // Composite, in pr's form, so `tsc --build` builds core, board, effort,
+  // inventory, pr and release first and reads their declarations from
+  // each package's .tsbuild through the references below. The six are
+  // the packages run's sources import, the six its package.json declares:
+  // effort is named although board's and release's references bring it
+  // in, since `src/start/preflight-sync.ts` imports effort's entry itself.
   "compilerOptions": {
     "composite": true,
     "noEmit": false,
