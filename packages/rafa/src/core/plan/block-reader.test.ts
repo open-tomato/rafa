@@ -28,7 +28,7 @@
  */
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as barrel from './block-reader.js';
@@ -40,8 +40,13 @@ const BARREL = 'packages/rafa/src/core/plan/block-reader.ts';
 const PLAN_BARREL = 'packages/rafa/src/core/plan/index.ts';
 const BLOCKS = 'packages/rafa/src/core/plan/blocks.ts';
 
+/** Every path a case reads the export names of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [BARREL, BLOCKS, PLAN_BARREL];
+
 /**
- * Every export name of each file, types included, sorted.
+ * Every export name of each file, types included, sorted. Runs once,
+ * from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays for
+ * the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns The names by path.
@@ -71,7 +76,24 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
   return names;
 }
 
+let exportNames: Record<string, string[]> | null = null;
+
+/**
+ * The export names by path, once `beforeAll` has read them.
+ *
+ * @returns The names by path of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function storedExportNames(): Record<string, string[]> {
+  if (exportNames === null) throw new Error('the export names were never read');
+  return exportNames;
+}
+
 describe('the block-reader barrel', () => {
+  beforeAll(() => {
+    exportNames = readExportNames(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of blocks.ts, each once, and no other', () => {
     const expected = Object.keys(blocks).sort();
 
@@ -89,7 +111,7 @@ describe('the block-reader barrel', () => {
   });
 
   it('exports the type names of blocks.ts with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, BLOCKS]);
+    const names = storedExportNames();
 
     expect(names[BLOCKS]).toContain('RafaBlock');
     expect(names[BLOCKS]).toContain('readRafaBlocks');
@@ -98,7 +120,7 @@ describe('the block-reader barrel', () => {
   });
 
   it('holds no name the other plan barrel holds, type or runtime', () => {
-    const names = readExportNames([BARREL, PLAN_BARREL]);
+    const names = storedExportNames();
     const onTwo = (names[BARREL] ?? []).filter((name) => (names[PLAN_BARREL] ?? []).includes(name));
 
     expect(names[BARREL]?.length).toBeGreaterThan(0);
