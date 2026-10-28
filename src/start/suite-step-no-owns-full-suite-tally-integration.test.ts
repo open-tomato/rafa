@@ -55,11 +55,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { SLOW_SWEEP_SECONDS } from '@open-tomato/rafa-run/start/sweep-timing';
 
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
-
-import { SLOW_SWEEP_SECONDS } from './sweep-timing.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

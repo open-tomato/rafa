@@ -9,9 +9,10 @@
  * the exact failure the extraction exists to prevent.
  *
  * So the drift guard reads the READER SOURCES: the sentence must appear
- * in `conflict-sentence.ts` and nowhere else under the root's `src/` or
- * `packages/rafa-pr/src/`, where the module and its readers live since
- * pass 4e. Its control is the same scan finding the one copy, so a scan
+ * in `conflict-sentence.ts` and nowhere else under the root's `src/`,
+ * `packages/rafa-pr/src/`, where the module and its plans live since
+ * pass 4e, or `packages/rafa-run/src/`, where the wrap-up prompt lives
+ * since pass 4f. Its control is the same scan finding the one copy, so a scan
  * that matched nothing anywhere cannot pass it. The scan UNESCAPES each
  * file first: the sentence holds apostrophes, and the lint config's
  * single quotes with no `avoidEscape` mean a copy of it in TypeScript is
@@ -39,8 +40,8 @@ import { describe, expect, setDefaultTimeout, test } from 'bun:test';
 import { PROMPT_SHAPES } from '@open-tomato/rafa-effort/effort/classify';
 import { MECHANICAL_CONFLICT_SENTENCE, mechanicalConflictBullet } from '@open-tomato/rafa-pr/pr/conflict-sentence';
 import { loadPinnedPlan, pinnedPlanValues } from '@open-tomato/rafa-pr/pr/plans/load';
+import { buildWrapUpPrompt } from '@open-tomato/rafa-run/start/wrap-up';
 
-import { buildWrapUpPrompt } from '../../../start/wrap-up.js';
 import { SWEEP_TIMEOUT } from '../../sweep-timeout.js';
 
 setDefaultTimeout(SWEEP_TIMEOUT);
@@ -60,6 +61,9 @@ const SRC_DIR = join(import.meta.dir, '..', '..', '..');
 
 /** Pr's `src/`, which the drift guard walks beside the root's since pass 4e. */
 const PR_SRC_DIR = join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src');
+
+/** Run's `src/`, which the drift guard walks beside the root's since pass 4f. */
+const RUN_SRC_DIR = join(SRC_DIR, '..', 'packages', 'rafa-run', 'src');
 
 /** Where the one copy of the sentence is allowed to be. */
 const SOURCE_FILE = fileURLToPath(import.meta.resolve('@open-tomato/rafa-pr/pr/conflict-sentence'));
@@ -141,12 +145,12 @@ describe('the pinned plans as readers', () => {
   });
 });
 
-describe('the drift guard over src/ and packages/rafa-pr/src/', () => {
-  const holders = [SRC_DIR, PR_SRC_DIR]
+describe('the drift guard over src/, packages/rafa-pr/src/ and packages/rafa-run/src/', () => {
+  const holders = [SRC_DIR, PR_SRC_DIR, RUN_SRC_DIR]
     .flatMap((dir) => sourceFiles(dir))
     .filter((path) => unescaped(path).includes(MECHANICAL_CONFLICT_SENTENCE));
 
-  test('exactly one file under src/ and packages/rafa-pr/src/ holds the sentence', () => {
+  test('exactly one file under src/, packages/rafa-pr/src/ and packages/rafa-run/src/ holds the sentence', () => {
     expect(holders).toEqual([SOURCE_FILE]);
   });
 

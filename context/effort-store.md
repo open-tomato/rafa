@@ -203,7 +203,7 @@ and the merge trail (`merges` and `merge_conflicts` tables).
 **A loop never records to a copy, and says what it does not know.**
 `loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
 empty string, right after the detached refusal and before `--runtime`
-hands the run on (`refuseEffortDirRun`, `src/start/run-config.ts`):
+hands the run on (`refuseEffortDirRun`, `packages/rafa-run/src/start/run-config.ts`):
 `❌ RAFA_EFFORT_DIR is set (<dir>); a loop records to the project's own
 store. Unset it and run again.` Its preflight then reads the project's
 store through `readSchemaReport`, read-only, and warns once for each
@@ -733,7 +733,7 @@ A mint with the reason `host` or `path` empties the table instead, because that
 file is a copy at a new location that must build its own claim history.
 `readReplacedStoreIds` (`packages/rafa/src/effort/store/store-replaced.ts`)
 answers the ids, earliest first, or none for a store without the table or with
-it empty; `holdsClaim` (`src/claims/device.ts`) is true for the current id and
+it empty; `holdsClaim` (`packages/rafa-run/src/claims/device.ts`) is true for the current id and
 each replaced one. The table is absent from a store an older runtime left. The
 three before it, which migration `store-meta` creates, are the store's own
 identity and its merge trail: `store_meta` holds one row (`id = 1`) naming the

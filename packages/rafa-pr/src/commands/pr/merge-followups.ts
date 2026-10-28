@@ -12,7 +12,7 @@
  *     which both read from core's runtime barrel
  *     (`@open-tomato/rafa/core/runtime`), (`this is no rafa checkout`) and refuses again, at the
  *     `runtime-exists` reason, while `~/.rafa/runtime/<version>/` is
- *     already there (`src/runtime/install.ts`). Naming it in another
+ *     already there (`packages/rafa-run/src/runtime/install.ts`). Naming it in another
  *     project, or for an installed version, would send the operator at
  *     a guaranteed refusal.
  *   - `rafa release settle` applies while fragments wait on the base
@@ -65,7 +65,7 @@
  * settling and updating are the operator's call — or, for settle,
  * `rafa next`'s workflow action. {@link RAFA_PACKAGE_NAME} is imported
  * from core's runtime barrel, `@open-tomato/rafa/core/runtime`, the
- * same binding `src/runtime/install.ts`, the module `self-update`
+ * same binding `packages/rafa-run/src/runtime/install.ts`, the module `self-update`
  * installs through, imports, so the name this reading tests and the
  * name that install refuses over are one string.
  *
@@ -86,7 +86,7 @@
  * symbol that left it: `versionTag` is in
  * `packages/rafa-release/src/release/version-tag.ts`, and {@link SettleWaiting}, the shape of
  * what the settle dry run folded, is in `packages/rafa-pr/src/pr/settle-waiting.ts`,
- * since `src/next/settle-step.ts` reads it too and library code imports
+ * since `packages/rafa-run/src/next/settle-step.ts` reads it too and library code imports
  * nothing under `src/commands/`.
  */
 import type { SettleWaiting } from '../../pr/settle-waiting.js';

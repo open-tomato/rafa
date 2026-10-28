@@ -106,7 +106,7 @@
  *
  * The conflict sentence is NOT written here. It lives in
  * `../conflict-sentence.ts`, the one source `buildWrapUpPrompt`
- * (`src/start/wrap-up.ts`) reads it from as well: the wrap-up prompt
+ * (`packages/rafa-run/src/start/wrap-up.ts`) reads it from as well: the wrap-up prompt
  * and these plans must say the same thing about a mechanical conflict,
  * and the only way two readers cannot drift is one source. This module
  * is a reader of that source, not a second copy of it.

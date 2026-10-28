@@ -45,7 +45,7 @@ flowchart TD
 
 What is coupled here, in one sentence each:
 
-- **Consent is per action, spelled in argv** (`src/next/actions.ts`): `merge` gets `--yes`, `ready` and `unblock` get nothing, so the person answers twice. The chain cannot say "I already asked" in any way the step understands.
+- **Consent is per action, spelled in argv** (`packages/rafa-run/src/next/actions.ts`): `merge` gets `--yes`, `ready` and `unblock` get nothing, so the person answers twice. The chain cannot say "I already asked" in any way the step understands.
 - **The terminal is the chain's** (`src/commands/next.ts:217`): one step out of nine gets it back. Any other step that reads stdin, or spawns something that does, reads nothing.
 - **The chain knows the commands' flags by name.** Add a flag to `pr merge` and the chain's table must learn it; the chain and the command drift in two files.
 

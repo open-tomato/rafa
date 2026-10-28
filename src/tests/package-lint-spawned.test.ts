@@ -3,7 +3,7 @@
  * lints at least one file, and a copy of a package with a planted
  * `import/order` violation exits 1 naming the rule. The scratch copy lives
  * under the gitignored `.tmp/` so Node resolution finds the root's
- * `node_modules`, as `src/start/lint-step.packages.test.ts` does.
+ * `node_modules`, as `packages/rafa-run/src/start/lint-step.packages.test.ts` does.
  */
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

@@ -6,7 +6,7 @@
  * {@link SettleWaiting} is the shape two readers of that dry run share:
  * `rafa pr merge`'s settle follow-up, which turns it into the line
  * `<n> fragments wait on <base> and fold into <version>`, and `rafa
- * next`'s settle step (`src/next/settle-step.ts`), which turns it into
+ * next`'s settle step (`packages/rafa-run/src/next/settle-step.ts`), which turns it into
  * a state of its chain. {@link settleWaitingOn} is the reading both are
  * decided by, so the two cannot disagree about where settle is named:
  * the settle dry run (`readSettle`, `packages/rafa-release/src/release/settle.ts`) over

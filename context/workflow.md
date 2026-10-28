@@ -71,7 +71,7 @@ task of the plan or the tracker names an agent no loaded tier serves:
 one no tier holds, one `tiers.agents` switches off, one only an unloaded
 tier holds, or one two loaded tiers hold with different contents, whose
 refusal names both paths and the pin line that settles it
-(`src/start/preflight.ts`). The same resolution covers the three skill
+(`packages/rafa-run/src/start/preflight.ts`). The same resolution covers the three skill
 trees, so a `skills=` name of those tasks that two loaded tiers hold
 with different contents refuses the run too, naming both paths and its
 `tiers.skills` pin line, and so does one the resolution resolves to no
@@ -121,7 +121,7 @@ which never refuses a plan, so a plan written before the rule still runs
 
 **What the doc task is handed.** Its prompt gets a section headed
 `## Documentation to repair` (`packages/rafa-pr/src/docs/task-reading.ts`, placed by
-`src/start/dispatch.ts`) with two parts. The first is the plan's `sighting`
+`packages/rafa-run/src/start/dispatch.ts`) with two parts. The first is the plan's `sighting`
 rows, one `<where>: <what>` line each, as its sessions reported them under
 `stale_docs`. The second is every file the plan's commits touched since the
 merge base with the run's base branch. A plan whose sessions reported no stale
@@ -204,7 +204,7 @@ gate later anyway.
 
 **Runner recorded steps** run at fixed points in the loop. Each reads one
 check-point entry, `checks.task`, `checks.stage` or `checks.loop`, and runs
-what `resolveChecks` (`src/suite/checks.ts`) answers for it:
+what `resolveChecks` (`packages/rafa-run/src/suite/checks.ts`) answers for it:
 - `baseline` — Full suite once at plan start (first dispatch), taken only when
   one of the three entries names a check; with all three empty, none is taken
 - `task` — After each task's session ends and commits: `resolveChecks` over
@@ -322,7 +322,7 @@ always-run files so they still pass the slow-sweep share guard. The step
 captures failures. If any failure is new against the baseline and still red
 when its file is run alone, or green alone after a test file the stage
 changed, the runner inserts a `[BLOCKED]` repair task above the first open
-task (`src/start/suite-blocker.ts`), its blocker the failures, which the
+task (`packages/rafa-run/src/start/suite-blocker.ts`), its blocker the failures, which the
 repair session receives through `BLOCKER_PROMPT_PREFIX` in its prompt, and
 the run stops. A restarted run dispatches that repair first and runs no stage
 step before it, or before any `[BLOCKED]` task, because a due step run there
@@ -471,7 +471,7 @@ root, and you run the loop where you already are.
 the branch `origin/HEAD` names, else `main`. `resolveBaseBranch`
 (`packages/rafa-pr/src/cleanup/branches.ts`) reads it: the start reads it in the project root
 for the branch it cuts and the worktree it adds, the wrap-up reads it in the
-run's own checkout (`src/start/wrap-up-run.ts`) for the pull request. A
+run's own checkout (`packages/rafa-run/src/start/wrap-up-run.ts`) for the pull request. A
 repository with no `origin/HEAD` and no `pr.base` gets `main`. To name another
 base, set `pr.base`, or run `git remote set-head origin -a` so that
 `origin/HEAD` names the remote's default branch. The base is an address written
@@ -535,7 +535,7 @@ rather than waiting on git 2.55 and earlier (git 2.56 and later wait about a
 second first), so two plans started at once in one clone could lose one upstream
 (issue #960). The second step is tried up to `UPSTREAM_TRIES` (5) times, with
 `UPSTREAM_PAUSE_MS` (200) between tries, and only while git reports the config
-as locked (`src/start/worktree-upstream.ts`). A run that gives up removes the
+as locked (`packages/rafa-run/src/start/worktree-upstream.ts`). A run that gives up removes the
 worktree it added, keeps the local branch, and names the branch and that line. A
 run started again finds the branch and leaves its upstream as it was found, so
 the line is run by hand first. Any other failure leaves the worktree in place
@@ -557,7 +557,7 @@ base's tip, so a run started later finds a branch cut from a base that has
 moved since. When `--as-worktree` takes a branch that already exists
 (local, remote-only, or held by the worktree an earlier start left), it
 fetches `origin/<base>` (the base, read as above, never the branch) and reads
-the branch's commits past it (`src/start/claim-catch-up.ts`). A branch holding
+the branch's commits past it (`packages/rafa-run/src/start/claim-catch-up.ts`). A branch holding
 only `claim(rafa-<n>): …` commits is merged with `git merge origin/<base>` in
 the run's worktree before the first task, a merge and never a rewrite of the
 pushed branch, and one line names the commits taken and their range. A branch
@@ -573,7 +573,7 @@ session.** Once `addRunWorktree` has added the plan's worktree or reused the
 one an earlier start left, the run runs the command the key names through
 `/bin/sh -c` with the worktree as its `cwd`. It runs after that step and
 before the branch guard, the preflight, the suite baseline and the first
-session (`src/start/run-checkout.ts`, `src/start/worktree-setup.ts`). It runs
+session (`packages/rafa-run/src/start/run-checkout.ts`, `packages/rafa-run/src/start/worktree-setup.ts`). It runs
 only under `--as-worktree`, never without the flag, and the default, `null`,
 runs nothing. Its stdin is closed, so a command that waits for input ends
 instead of holding the run. Its output is printed once it ends, stdout and
@@ -838,15 +838,15 @@ working tree had conflicts), the run ends `stopped` with exit code 1, the
 report naming the step and branch. A pull request a retry or the runner opened
 is then given the release forecast or failure sentence the release step found
 no pull request to write to (`carryReleaseIntoPullRequest`,
-`src/start/release-body.ts`), before the retarget and the CI wait; one the
+`packages/rafa-run/src/start/release-body.ts`), before the retarget and the CI wait; one the
 release step already wrote to is not written again, and a blocked delivery
 writes nothing. With `pr.provider: none`, no pull request is read or opened:
-the CI gate's `none` path (`src/start/pr-lifecycle.ts`) pushes the branch,
+the CI gate's `none` path (`packages/rafa-run/src/start/pr-lifecycle.ts`) pushes the branch,
 prints the compare URL when origin names a web host, skips the CI wait, and the
 run ends `done` with the branch pushed and no pull request.
 
 **The wrap-up prompt is written for `pr.provider: none` too.**
-`buildWrapUpPrompt` (`src/start/wrap-up.ts`) takes the provider the run
+`buildWrapUpPrompt` (`packages/rafa-run/src/start/wrap-up.ts`) takes the provider the run
 resolved, and under `none` it leaves out the four bullets that find the
 plan's issue number, title the pull request and describe it. It writes one
 bullet where the create and edit step would go instead: the run ends with the
@@ -855,7 +855,7 @@ open, edit or look for one. The rest of the prompt reads as it does under any
 provider, and under every other provider the prompt is unchanged.
 
 **The wrap-up emits `pr` or `no-pr` once, in every output mode.**
-`emitPullRequestEvent` (`src/start/wrap-up-run.ts`) writes the event to
+`emitPullRequestEvent` (`packages/rafa-run/src/start/wrap-up-run.ts`) writes the event to
 the run's events file whatever the mode, so `rafa loop wait` ends a text
 run on it as it does a json or events run. Every mode emits it at the
 delivery's place, after the retries and the runner: over the delivered

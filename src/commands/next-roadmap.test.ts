@@ -26,10 +26,10 @@
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
 import type { NextCeiling } from '../next/ceiling.js';
-import type { HopHome, HopOut } from '../next/hop-rows.js';
-import type { NextState } from '../next/state.js';
 import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { GitResult } from '@open-tomato/rafa-pr/pr/index';
+import type { HopHome, HopOut } from '@open-tomato/rafa-run/next/hop-rows';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

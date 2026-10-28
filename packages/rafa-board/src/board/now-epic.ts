@@ -1,7 +1,7 @@
 /**
  * The first `now` epic of a board that is not done: the pick `rafa epics`
  * makes with no number, the fallback of the current place (`./place.ts`)
- * and where `rafa switch <board>` lands (`src/commands/switch.ts`).
+ * and where `rafa switch <board>` lands (`packages/rafa-run/src/commands/switch.ts`).
  *
  * It was `packages/rafa-board/src/commands/epic/show.ts`'s until `./place.ts` needed it too.
  * `show.ts` reads the current place through `./roadmap-rows.ts`, which

@@ -4,7 +4,7 @@
 by its kind, and each `stale_docs` entry to the `docs` channel. The six kinds
 are `bug`, `own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them
 only a `bug` reaches a tracker as an issue of its own. The loop calls
-`triageReport` from `src/start/triage.ts` and `rafa epic close` from
+`triageReport` from `packages/rafa-run/src/start/triage.ts` and `rafa epic close` from
 `packages/rafa-board/src/commands/epic/close-triage.ts`. The triage writer
 stores every bug and its action in the effort store, keyed by the bug's
 recurrence key, not the artifact the report's findings use, and each routed
@@ -123,7 +123,7 @@ the parser answered, which can differ from where the entry was written when
 the parser dropped an earlier entry with no `what`. No entry is read for a
 machine fault or a `security` flag, and none is compared with anything: a
 page naming a toolchain is still a page. A report whose only content is
-`stale_docs` entries resolves no public tracker (`src/start/triage.ts`),
+`stale_docs` entries resolves no public tracker (`packages/rafa-run/src/start/triage.ts`),
 since resolving runs `gh auth status` and `gh repo view`.
 
 The entries are kept, but not by this channel. The loop stores the report before
@@ -194,7 +194,7 @@ names the kind, the `what` and the artifact that showed it. An `own-fallout`
 repair is declared `build-error-resolver`, the agent of the suite step's
 repair; an `own-gap` repair `loop-implementer`, since it finishes what the
 plan built. Being blocked, the line is the one the next dispatch answers
-first. `isRepairTask` in `src/start/suite-blocker.ts` reads the same sentence
+first. `isRepairTask` in `packages/rafa-run/src/start/suite-blocker.ts` reads the same sentence
 as the suite step's repair.
 
 The cap is per plan, and it is counted from the tracker alone: the file's
@@ -209,8 +209,8 @@ the failure, so an entry is never lost. Each repair the run adds is one
 
 ### The follow-up issue
 
-`src/start/follow-ups.ts` (`fileFollowUps`) writes the plan's follow-up
-issue once, after the last task, from `src/start/wrap-up-run.ts`. Its lines
+`packages/rafa-run/src/start/follow-ups.ts` (`fileFollowUps`) writes the plan's follow-up
+issue once, after the last task, from `packages/rafa-run/src/start/wrap-up-run.ts`. Its lines
 are the plan's `bug_routes` rows routed `follow-up`, in append order, one
 `- <kind>: <what>` line each, redacted and escaped; a plan with none has no
 issue, and nothing is resolved, called or printed for it.
@@ -229,15 +229,15 @@ wrap-up files them again.
 
 ### The conventions section
 
-`src/start/convention-body.ts` (`writeConventionLines`) writes the plan's
+`packages/rafa-run/src/start/convention-body.ts` (`writeConventionLines`) writes the plan's
 `convention` lines into a `## Conventions` section of the open pull request's
-body, from `src/start/wrap-up-run.ts` once the pull request is delivered. Each
+body, from `packages/rafa-run/src/start/wrap-up-run.ts` once the pull request is delivered. Each
 line is `- <what>`, redacted and escaped as a follow-up line is. A section
 that is not there goes below the body's last paragraph; one that is there
 gets the lines it lacks before the next heading of level one or two.
 
 The body is written through the same read-modify-write as the release body
-(`src/start/release-body.ts`), so a body the section would not change is left
+(`packages/rafa-run/src/start/release-body.ts`), so a body the section would not change is left
 alone, and a re-run writes nothing. A `none` provider spawns no `gh`: the
 lines are printed instead. A plan with no `pr-body` row has no section. A
 failure is one warning line, and never stops the run.
@@ -251,7 +251,7 @@ The `stale_docs` table holds one row per entry per session and kind. Its
   `storeTaskReport` for every task, the doc task included. It is the reading
   a plan's doc task is handed.
 - `unsettled`: an entry the doc task could not settle, which is what the doc
-  task's own `stale_docs` field names. `src/start/stale-docs.ts` writes these
+  task's own `stale_docs` field names. `packages/rafa-run/src/start/stale-docs.ts` writes these
   only for a task declared `docs=repair` that ended `done`, and adds each as one
   line to the release's stale-docs issue (see
   `packages/rafa-release/src/docs/release-issue.ts`). A blocked, failed or
@@ -475,7 +475,7 @@ triage:
 Triage builds the record under the `issues` and `errors` keys the run
 resolves from `.rafa/config.yaml`. `bugRulesOf`
 (`packages/rafa/src/config-schema-issues.ts`) turns them into the rules,
-read once per run in `src/start/triage.ts` and handed to every filing. It
+read once per run in `packages/rafa-run/src/start/triage.ts` and handed to every filing. It
 reads:
 
 - `issues.titles.bug` and `issues.titles.summaryMax`: the template and the cap

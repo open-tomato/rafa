@@ -1,7 +1,7 @@
 /**
  * `rafa loop start --create-branch` on a detached HEAD, spawned as
  * `bun src/rafa.ts loop start` through `runRafa` in a scratch git
- * repository. `src/start/run-setup.test.ts` pins the refusal over the
+ * repository. `packages/rafa-run/src/start/run-setup.test.ts` pins the refusal over the
  * functions; this proves the whole command refuses with a non-zero exit,
  * naming the way on, before it creates a branch or opens a session
  * record under `.rafa/runs/`.

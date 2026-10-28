@@ -82,8 +82,7 @@ import { readSessions } from '@open-tomato/rafa/core/loop';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
-
-import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
+import { NOTHING_REPORTED_OR_COMMITTED } from '@open-tomato/rafa-run/start/commit';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { resultEvent } from './loop-session-fixtures.js';

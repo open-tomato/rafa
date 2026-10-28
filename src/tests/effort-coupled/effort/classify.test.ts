@@ -201,7 +201,7 @@ describe('the shape table', () => {
 
   it('proves that guard fails on a prefix nothing injects', () => {
     const source = readFileSync(
-      new URL('../../../start/dispatch.ts', import.meta.url),
+      new URL('../../../../packages/rafa-run/src/start/dispatch.ts', import.meta.url),
       'utf8',
     );
 

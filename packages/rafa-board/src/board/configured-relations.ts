@@ -3,7 +3,7 @@
  * `board.relationships` names them, for a command that has already
  * loaded its config and made its `gh` runner: `rafa roadmap` and
  * `rafa issue list --roadmap` (`packages/rafa-board/src/commands/issue/list.ts`),
- * `rafa switch` (`src/commands/switch.ts`) and `plan create --next`
+ * `rafa switch` (`packages/rafa-run/src/commands/switch.ts`) and `plan create --next`
  * (`./plan-spec.ts`).
  *
  * ## `labels`, the default, reads nothing
@@ -25,7 +25,7 @@
  * reading of the board would.
  *
  * `rafa next` and a command's closing hint load the config themselves and
- * read it in `src/next/relations-mode.ts`, which answers the same
+ * read it in `packages/rafa-run/src/next/relations-mode.ts`, which answers the same
  * adapter.
  */
 import type { EpicRelations } from './epics.js';

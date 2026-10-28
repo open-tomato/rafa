@@ -35,7 +35,7 @@
  * ever planted and no board write is attempted: what each scenario
  * proves is the git side alone. Every device's effort store is minted
  * with a store id of its own before any command runs, so
- * `readDeviceStoreId` (`src/claims/device.ts`) answers it with no row
+ * `readDeviceStoreId` (`packages/rafa-run/src/claims/device.ts`) answers it with no row
  * written first, exactly as `src/tests/plan-claim-race-spawned.test.ts`'s
  * own `mintDeviceStore` does.
  */

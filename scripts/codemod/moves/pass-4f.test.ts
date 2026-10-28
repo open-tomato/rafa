@@ -84,8 +84,10 @@ describe('PASS_4F_MOVES', () => {
     expect(listed.has('src/plan/index.ts')).toBe(false);
   });
 
-  it('lists every RUN_NAMED file', () => {
+  it('lists every RUN_NAMED file, which names each where it sits on this tree', () => {
+    const sittingPaths = new Set(PASS_4F_MOVES.map(sitting));
+
     expect(RUN_NAMED).toHaveLength(21);
-    expect(RUN_NAMED.filter((path) => !listed.has(path))).toEqual([]);
+    expect(RUN_NAMED.filter((path) => !sittingPaths.has(path))).toEqual([]);
   });
 });

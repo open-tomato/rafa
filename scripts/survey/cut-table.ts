@@ -14,7 +14,7 @@
  *
  *   1. a file a package names is that package's. A test file whose name
  *      is a named file's with `.test` before the extension follows it:
- *      `src/next/readings.test.ts` goes where `src/next/readings.ts`
+ *      `packages/rafa-run/src/next/readings.test.ts` goes where `packages/rafa-run/src/next/readings.ts`
  *      goes. The run rule named `packages/rafa/src/start/branch-decision.ts`
  *      beside `RUN_NAMED` until the fourth decouple item (rafa-1333) moved
  *      it into core's package, where the `packages/rafa/` folder places it;

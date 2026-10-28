@@ -38,7 +38,7 @@
  * written, so the flag lets through only an issue an account with write
  * access could have labelled by hand (#752). It exists for a script or
  * an agent driving the command where no answer can be typed. `rafa
- * next` never passes it (`src/next/actions.ts`), and its ceiling still
+ * next` never passes it (`packages/rafa-run/src/next/actions.ts`), and its ceiling still
  * refuses `--yes=ready` (`src/next/ceiling.ts`): a chain reaching this
  * step asks. A value given to it (`--yes=maybe`) is a line refusal with
  * exit code 1, read before anything is opened.

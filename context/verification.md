@@ -79,7 +79,7 @@ directory, so a changed package file belongs in the scoped
 
 **Check points and the runner's recorded steps.** Four recorded steps read
 the check points. Each takes its scope from `resolveChecks`
-(`src/suite/checks.ts`) over its check-point entry and runs what the answer
+(`packages/rafa-run/src/suite/checks.ts`) over its check-point entry and runs what the answer
 names:
 
 - `baseline` — the full suite once at plan start (first dispatch), taken
@@ -258,7 +258,7 @@ which the repair session receives through `BLOCKER_PROMPT_PREFIX`. With
 no open task left, the repair goes after the checklist's last task. A
 red task step after a repair task writes its blocker on that repair's
 line, marking it `[BLOCKED]` again, and inserts no second one
-(`src/start/suite-blocker.ts`). A red pre-wrap-up step inserts a
+(`packages/rafa-run/src/start/suite-blocker.ts`). A red pre-wrap-up step inserts a
 `[BLOCKED]` repair task (kind `pre-wrap-up`) after the checklist's last
 task, and `start.ts` dispatches it in the same run, running the
 pre-wrap-up again after the repair completes; a second red pre-wrap-up,
@@ -325,11 +325,11 @@ JUnit file: Bun prints it to stderr under `# Unhandled error between
 tests` and counts it on the summary's `errors` line. The baseline keeps
 that count only, and a step counting more is red. Its blocker names each
 block's file and first error line, as `src/boom.test.ts threw "error:
-boom"` (`src/start/suite-blocker.ts`), and the blocks with the summary
+boom"` (`packages/rafa-run/src/start/suite-blocker.ts`), and the blocks with the summary
 lines are kept in `.rafa/runs/<session>/suite/<kind>.output.txt`,
 beside the failed cases the next paragraph describes. A task,
 stage or pre-wrap-up step whose only red is that excess is taken once
-more over the same run (`src/start/suite-step.ts`). A retake at or under
+more over the same run (`packages/rafa-run/src/start/suite-step.ts`). A retake at or under
 the baseline's count, and not red by the next paragraph, prints an
 `Intermittent` warning naming the first run's files and lines, and the
 run goes on; a retake over it again is
@@ -343,7 +343,7 @@ step's run is retaken once at most.
 
 **A run that exits nonzero and lists no failing case is red, whatever
 the baseline holds.** The exit code is the reading
-(`failedOutsideAnyCase`, `src/start/suite-outside-case.ts`), and no
+(`failedOutsideAnyCase`, `packages/rafa-run/src/start/suite-outside-case.ts`), and no
 wording of Bun's stderr decides it. A task, stage or pre-wrap-up step is
 red on it even when the baseline counted as many errors. The baseline is
 not red on it: it halts the run, as the next paragraph says. Left as
@@ -359,7 +359,7 @@ A project holding no test file makes Bun print `error: 0 test files
 matching` or `No tests found!` and exit 1, and `runSuite`
 (`packages/rafa/src/suite/run.ts`) marks that run `noTestFiles`.
 `failedOutsideAnyCase` leaves a marked run as it is, and `verdictOf`
-(`src/start/suite-step.ts`) reads it as no failure and no unreported
+(`packages/rafa-run/src/start/suite-step.ts`) reads it as no failure and no unreported
 exit, so a step holding only that run reads green, and its record
 carries no `outsideCase` key. Bun's `--changed` line for an empty scope,
 `--changed: 1 changed file, but no test files are affected`, is not this
@@ -367,7 +367,7 @@ mark: that run exits 0, is not marked, and reads as passing with `Ran 0
 tests across 0 files.`
 
 When a task step folds the marked run with its always-run run,
-`foldResults` (`src/start/task-always-run.ts`) reads the other run and
+`foldResults` (`packages/rafa-run/src/start/task-always-run.ts`) reads the other run and
 drops the mark. A stop code is read before the mark, so a marked run
 beside a SIGINT stop folds to the stop. The four pairings:
 
@@ -395,10 +395,10 @@ them, as before this fix.
 
 **A baseline that failed outside any test case halts the run.** Such a
 run is not written as the baseline (`ensureBaseline`,
-`src/start/suite-step.ts`): it names no failure to split a later step
+`packages/rafa-run/src/start/suite-step.ts`): it names no failure to split a later step
 against, and its errors would be inherited by every step after it. The
 run stops before its first session is dispatched, with `baselineHaltLines`
-(`src/start/suite-outside-case.ts`) printed: the exit code and the reason,
+(`packages/rafa-run/src/start/suite-outside-case.ts`) printed: the exit code and the reason,
 the likely cause (a test file that did not load, with dependencies not
 installed in the checkout as the case seen), that the next run records
 the baseline, and the output tail whole. Nothing is marked on the
@@ -412,11 +412,11 @@ run: `ensureBaseline` records it again with a warning that says so, and a
 baseline with listed failures is inherited as before.
 
 **A baseline with no test file is stored with its mark, and reused.**
-`baselineOf` (`src/suite/baseline.ts`) writes `noTestFiles: true` into
+`baselineOf` (`packages/rafa-run/src/suite/baseline.ts`) writes `noTestFiles: true` into
 the baseline file for a marked result and no key for any other result;
 the version stays 1, and `readBaseline` takes the key as absent or a
 boolean, any other value making the file unreadable. `ensureBaseline`
-(`src/start/suite-step.ts`) reuses a stored baseline that
+(`packages/rafa-run/src/start/suite-step.ts`) reuses a stored baseline that
 `failedOutsideAnyCase` does not read as outside a case, with an info
 line and no `bun test` run. So a new project with no test file records
 its baseline once and reads it quietly after: the mark is what tells it
@@ -447,7 +447,7 @@ line per file (`ERROR_LINES_QUOTED`), cut at 100 characters with `...`
 after the cut (`ERROR_LINE_QUOTED_LENGTH`), for the first three files
 (`ERROR_FILES_QUOTED`), then `and N more lines` for a file's other
 lines and `and N more files` for the files left out
-(`src/start/suite-blocker.ts`). The record and the output file hold
+(`packages/rafa-run/src/start/suite-blocker.ts`). The record and the output file hold
 every line uncut. A case whose `(fail)` line is
 not found on stderr, or that printed nothing, carries no lines, and the
 blocker then names its file and count alone.
@@ -461,7 +461,7 @@ repair session handed it: on 2026-10-10 one run inserted five repair tasks for
 steps only, and each repair session reran it, found it green and changed
 nothing. So a task, stage or pre-wrap-up step that reads new failures runs each
 newly red test file alone, as `bun test ./<file>`, one process per file, before
-it settles (`src/start/suite-retake-alone.ts`); a failure the baseline holds is
+it settles (`packages/rafa-run/src/start/suite-retake-alone.ts`); a failure the baseline holds is
 never retaken, and at most 20 files are (`RETAKE_ALONE_MAX_FILES`). Each newly
 red file reads one of five ways:
 
@@ -520,7 +520,7 @@ red file reads one of five ways:
 
 **A file red only in a step is named again where a person reads.** It
 blocked nothing, so its one warning scrolls away while the state that
-failed it stays in the tree. `src/start/step-only-report.ts` reads the
+failed it stays in the tree. `packages/rafa-run/src/start/step-only-report.ts` reads the
 `stepOnly` entries off the run's record, one item per file with every
 step that read it so, and carries them to two places. The wrap-up
 prompt, and each retry's, lists them under `## Test files red only in a
@@ -615,7 +615,7 @@ under `packages/` are not ignored: they are linted like `src/`, and a
 package file breaking a rule reads red.
 
 **The runner's lint step tells "could not run ESLint" from "found ESLint
-errors" by the JSON report** (`src/start/lint-step.ts`). A nonzero exit
+errors" by the JSON report** (`packages/rafa-run/src/start/lint-step.ts`). A nonzero exit
 whose stdout is ESLint's JSON report names the files with errors and
 the command to run: `found ESLint errors in the task's diff`. A nonzero
 exit with no report is a step that could not run ESLint, and its blocker
@@ -690,12 +690,12 @@ that exists on the base branch is not new and does not block; one that first
 appears in the diff is red. Every task prompt carries one line handing its
 session that check before it reports done; the wrap-up's prompt does not, since
 `dispatchTask` alone adds it (`typeCheckLines` in
-`src/start/task-gate-lines.ts`). The line holds the scratch tsconfig as JSON,
+`packages/rafa-run/src/start/task-gate-lines.ts`). The line holds the scratch tsconfig as JSON,
 with `<test file>` where each test file's path relative to the checkout goes
 (the entry already opens with the checkout's path, so an absolute one doubles it
 and tsc reports TS6053), and `<modules>/.bin/tsc -p <that tsconfig.json>
 --noEmit --pretty false` to run in the checkout, both rendered by the type
-step's own `scratchTsconfigFields` and `tscArgv` (`src/start/type-step.ts`), so
+step's own `scratchTsconfigFields` and `tscArgv` (`packages/rafa-run/src/start/type-step.ts`), so
 the line cannot drift from the step. It asks for every error in a test file the
 task added, and in one it edited for the errors on the lines `git diff <base> --
 <test file>` names, so the session acts on one run with no run at the base. A
@@ -846,7 +846,7 @@ the reference example. This section replaces nothing.
   `pr.provider: gh` in `.rafa/config.yaml`, and `roadmap.issue` too when
   the test needs the board read (`rafa status`, `rafa next`); without it
   the board section warns without calling `gh`. `loop start` is the
-  exception: its risk total (`src/start/risk-total.ts`) reads the
+  exception: its risk total (`packages/rafa-run/src/start/risk-total.ts`) reads the
   accounts through `gh` on every run, whatever the provider, so plant a
   refusing `gh` stand-in for every `loop start` test. This replaces the
   claim that a scratch project calls no `gh` at all.

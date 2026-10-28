@@ -5,7 +5,7 @@
  * owns the folder `other/` (an `Owns:` line, no CODEOWERS file) and
  * names an `Owner:` handle of its own. The open pull request on
  * `feat/owner-gate`, green and mergeable, changes `other/file.ts` alone,
- * so every case reaches `pr-owner-review` (`src/next/hop-rows.ts`) with
+ * so every case reaches `pr-owner-review` (`packages/rafa-run/src/next/hop-rows.ts`) with
  * exactly the same pull request and the same foreign board, and differs
  * only in what the owner gate reads once it asks about Beta's owner:
  *

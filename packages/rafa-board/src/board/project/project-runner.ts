@@ -21,7 +21,7 @@
  * | `packages/rafa-release/src/commands/release/settle-project.ts` | `rafa release settle` |
  * | `./issue-board-refresh.ts` | the refreshing issue board's refresh, and every caller of `refreshIssueItems` |
  * | `src/commands/doctor-project.ts` | the project section of `rafa doctor` |
- * | `src/start/triage.ts` | the `openGh` `loop start`'s triage hands `./add-filed.ts` for the bugs a task's report filed |
+ * | `packages/rafa-run/src/start/triage.ts` | the `openGh` `loop start`'s triage hands `./add-filed.ts` for the bugs a task's report filed |
  *
  * ## Opened once
  *

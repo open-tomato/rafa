@@ -1,7 +1,7 @@
 /**
  * A second scratch-repository suite, over a pull request that reports
  * no check at all (verdict `none`) rather than the green one
- * `./next-chain-integration.test.ts` merges. Row 7 of `src/next/state.ts`'s
+ * `./next-chain-integration.test.ts` merges. Row 7 of `packages/rafa-run/src/next/state.ts`'s
  * table proposes `merge-unchecked` for it, which `rafa next` hands over
  * to a real `pr merge <n> --skip-checks` with no `--yes` of its own
  * (`QUESTION_HANDED_OVER` in `src/commands/next.ts`) — so this probe is

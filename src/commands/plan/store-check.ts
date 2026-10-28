@@ -2,7 +2,7 @@
  * The effort-store rules read over one plan file and its PREREQUISITES
  * file, shared by `rafa plan validate` (`./validate.ts`) and
  * `rafa plan create` (`src/plan.ts`), so the two commands hold a plan to
- * one reading of `src/plan/store-rules.ts`.
+ * one reading of `packages/rafa-run/src/plan/store-rules.ts`.
  *
  * ## The reading
  *

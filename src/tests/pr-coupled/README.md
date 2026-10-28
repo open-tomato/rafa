@@ -9,8 +9,9 @@ A file's text was not rewritten beyond its specifiers. An import of a pr file re
 `@open-tomato/rafa-pr/<subpath>`, an import of a core file keeps its `@open-tomato/rafa/<subpath>` text, and an
 import of a root file reads the relative path from here. A path built from `import.meta` was pointed by hand at the
 file or folder it named before the move: `commands/pr/triage-fixtures.test.ts` reads the captured fixtures in the
-root's `src/tests/fixtures/pr-triage/`, and `pr/conflict-sentence.sweep.test.ts` walks the root's `src/` and
-`packages/rafa-pr/src/` and finds its one allowed copy at `packages/rafa-pr/src/pr/conflict-sentence.ts`.
+root's `src/tests/fixtures/pr-triage/`, and `pr/conflict-sentence.sweep.test.ts` walks the root's `src/`,
+`packages/rafa-pr/src/` and, since run's move in pass 4f, `packages/rafa-run/src/`, and finds its one allowed copy at
+`packages/rafa-pr/src/pr/conflict-sentence.ts`.
 
 An import of a board, release or inventory file reads that file's subpath (`@open-tomato/rafa-board/<subpath>`,
 `@open-tomato/rafa-release/<subpath>`, `@open-tomato/rafa-inventory/<subpath>`). Pr declares the three in its
@@ -54,6 +55,6 @@ package once its coupling is gone, or into the module it really tests.
 | `commands/pr/view.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/pr/wait-grace-driven.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/pr/wait.test.ts` | `src/tests/cli-capture.ts`, `src/tests/ending-probe.ts` |
-| `pr/conflict-sentence.sweep.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `src/start/wrap-up.ts`, `src/tests/sweep-timeout.ts` |
+| `pr/conflict-sentence.sweep.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `packages/rafa-run/src/start/wrap-up.ts`, `src/tests/sweep-timeout.ts` |
 | `pr/preflight-items.test.ts` | nothing since `run.ts` moved into core as `packages/rafa/src/preflight/run.ts` (#808, pass 4f) |
-| `triage/leftover-repair.test.ts` | `src/start/suite-blocker.ts` |
+| `triage/leftover-repair.test.ts` | `packages/rafa-run/src/start/suite-blocker.ts` |

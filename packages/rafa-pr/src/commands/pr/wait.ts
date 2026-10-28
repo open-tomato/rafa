@@ -7,7 +7,7 @@
  *
  * The poll is `packages/rafa-pr/src/pr/checks.ts`'s `waitForChecks` over
  * `PullRequests.checks`, the same pair the loop's own CI gate
- * (`src/start/pr-lifecycle.ts`) and `pr triage --resolve` poll with, and
+ * (`packages/rafa-run/src/start/pr-lifecycle.ts`) and `pr triage --resolve` poll with, and
  * the deadline and the interval are that gate's own: the default
  * deadline is core's `DEFAULT_CI_TIMEOUT_MIN`, which the loop's
  * `--ci-timeout` defaults to, and the interval the gate's

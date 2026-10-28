@@ -125,7 +125,7 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
   endWithNextStep: Object.freeze<ServiceReason>({
     lower: Object.freeze(['board', 'pr']),
     higher: 'run',
-    home: 'src/next/ending.ts',
+    home: 'packages/rafa-run/src/next/ending.ts',
     reach: 119,
     why: 'rafa issue ready, and rafa pr merge, triage and wait after a merge, a triage that ended 0 and a green wait,'
       + ' end naming the next step, which reads the whole next-step state and runs its action through run\'s dispatch.',
@@ -141,7 +141,7 @@ export const SERVICE_REASONS: { readonly [K in keyof RafaServices]: ServiceReaso
   readStaleDocsVersion: Object.freeze<ServiceReason>({
     lower: Object.freeze(['board']),
     higher: 'run',
-    home: 'src/start/stale-docs.ts',
+    home: 'packages/rafa-run/src/start/stale-docs.ts',
     reach: 165,
     why: 'rafa epic close titles the stale-docs issue by the release forecast, which run reads through the tracker'
       + ' chain and the release fold.',

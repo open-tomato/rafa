@@ -58,7 +58,7 @@
  * on any. So a PLANTED branch that still makes a release call of its own
  * beside the hand-over is read as making both.
  */
-import type { EventLine } from './loop/events-file.js';
+import type { EventLine } from '@open-tomato/rafa-run/loop/events-file';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -73,10 +73,10 @@ import { readSessions } from '@open-tomato/rafa/core/loop';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { eventsFileOf, readEventsFrom } from '@open-tomato/rafa-run/loop/events-file';
+import { CHECKOUT_MOVED } from '@open-tomato/rafa-run/start/checkout-guard';
+import { BLOCKER_PROMPT_PREFIX } from '@open-tomato/rafa-run/start/dispatch';
 
-import { eventsFileOf, readEventsFrom } from './loop/events-file.js';
-import { CHECKOUT_MOVED } from './start/checkout-guard.js';
-import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { hostToolDirs } from './tests/stand-in-gh.js';
 

@@ -70,7 +70,7 @@
  * ## The effort-store rules
  *
  * Beside both, the command checks the plan against the three rules of
- * `src/plan/store-rules.ts`, which `loop start`'s preflight repeats: no
+ * `packages/rafa-run/src/plan/store-rules.ts`, which `loop start`'s preflight repeats: no
  * store change pinned by number, anywhere in the plan; and, in a plan
  * one of whose task lines names ``migration `<id>` ``, no still-to-run
  * task spelling a code span that runs `src/rafa.ts`, `dist/cli.js` or

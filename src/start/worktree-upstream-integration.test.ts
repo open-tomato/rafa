@@ -17,7 +17,7 @@
  * The active output is module state shared by every test file, so each
  * case sets a sink and the last one sets it back.
  */
-import type { WorktreeOutcome } from './worktree.js';
+import type { WorktreeOutcome } from '@open-tomato/rafa-run/start/worktree';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -29,11 +29,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { addRunWorktree } from '@open-tomato/rafa-run/start/worktree';
+import { UPSTREAM_TRIES } from '@open-tomato/rafa-run/start/worktree-upstream';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-
-import { UPSTREAM_TRIES } from './worktree-upstream.js';
-import { addRunWorktree } from './worktree.js';
 
 describe('addRunWorktree upstream step against a real repository', () => {
   let scratch = '';

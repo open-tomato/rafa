@@ -15,7 +15,7 @@
  *
  * {@link findBundledEdits} reads the code spans of every task line still
  * to run, unticked or blocked, the lines a `rafa:*` block the plan never
- * closed hides included, as `src/plan/store-rules.ts` reads them: a
+ * closed hides included, as `packages/rafa-run/src/plan/store-rules.ts` reads them: a
  * ticked task will not run again. A span holding no whitespace is read
  * as a path against `repoRoot`, and its links are resolved with
  * `realpathSync`, so `.claude/agents/doc-updater.md` and

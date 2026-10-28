@@ -65,20 +65,23 @@ describe('the survey readers over the live tree', () => {
     expect(map.unplaced([...STRETCH_10_RELEASE_TESTS, stray])).toEqual([stray]);
   });
 
-  it('places a test in a new subfolder by the walk and one by its own directory, and leaves a mixed directory unplaced', () => {
+  it('places a test in a new subfolder by the walk and one by its own directory, and leaves a stray unplaced', () => {
     const map = readCutMap(ROOT, 'docs/survey/cut-table.json');
     const errors = 'src/tests/core-coupled/errors/rafa-codes.test.ts';
     const board = 'src/commands/board/new-file.test.ts';
-    // The files of `scripts/survey/cut-names.ts` put `src/commands/`'s own
-    // files in four units, and no row names the folder.
+    // Since pass 4f moved `switch.ts` into run's package, every file of
+    // `src/commands/` itself is the CLI's, so a new one there is placed by
+    // its own directory. The live table holds no mixed directory since that
+    // move; `cut-map.test.ts` holds the mixed-directory rules on planted
+    // tables.
     const commands = 'src/commands/new-file.test.ts';
     const nowhere = 'src/nowhere/x.test.ts';
 
     expect(map.unitOf(errors)).toBe('@open-tomato/rafa');
     expect(map.unitOf(board)).toBe('rafa-board');
-    expect(map.unitOf(commands)).toBeUndefined();
+    expect(map.unitOf(commands)).toBe('@open-tomato/rafa');
     expect(map.unitOf(nowhere)).toBeUndefined();
-    expect(map.unplaced([errors, board, commands, nowhere])).toEqual([commands, nowhere]);
+    expect(map.unplaced([errors, board, commands, nowhere])).toEqual([nowhere]);
   });
 
   it('classifies the tracked test files, with at least one use-case and one unit test', () => {

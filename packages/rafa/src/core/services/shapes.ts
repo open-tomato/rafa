@@ -67,8 +67,8 @@ import type { GitRunner } from '../git/git.js';
  * How an ending reaches the terminal, the clock, the prompter, git,
  * `gh`, `origin` and the pids; each left out is the system's own.
  *
- * The members of run's `NextEndingSeams` chain (`src/next/ending.ts`,
- * `src/next/hint.ts`, `src/next/sources.ts`) whose types core holds.
+ * The members of run's `NextEndingSeams` chain (`packages/rafa-run/src/next/ending.ts`,
+ * `packages/rafa-run/src/next/hint.ts`, `packages/rafa-run/src/next/sources.ts`) whose types core holds.
  * `readState` and `pullRequests` are left out, since their types are
  * run's and pr's: every member is optional and the check is structural,
  * so an object carrying them still passes where this is asked, and the
@@ -171,7 +171,7 @@ export interface TriageServiceResult {
 
 /**
  * What the `readStaleDocsVersion` service reads. run's
- * `StartStaleDocsConfig` (`src/start/stale-docs.ts`) is a `Pick` of
+ * `StartStaleDocsConfig` (`packages/rafa-run/src/start/stale-docs.ts`) is a `Pick` of
  * `RafaConfig`, so the whole config passes.
  */
 export interface StaleDocsVersionOptions {

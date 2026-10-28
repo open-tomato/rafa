@@ -52,7 +52,7 @@
  * {@link readLocalClaimBranch} reads the same way off the LOCAL branch,
  * `refs/heads/<branch>`, with no fetch at all: it is how `loop start`'s
  * preflight finds a claim commit `plan create` could not push, which
- * waits on the local branch with no upstream (`src/start/preflight-claim.ts`).
+ * waits on the local branch with no upstream (`packages/rafa-run/src/start/preflight-claim.ts`).
  *
  * **A branch's ownership commits are the claim commits in its history
  * that name its own issue.** Its history is walked with a

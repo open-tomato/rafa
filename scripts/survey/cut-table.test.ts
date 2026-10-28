@@ -610,7 +610,7 @@ describe('the two outputs', () => {
     plant([
       ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts'],
       ['packages/rafa-board/src/board/place.ts', 'src/utils/tracker.ts'],
-      ['packages/rafa-board/src/board/place.ts', 'src/start/session.ts', 'type'],
+      ['packages/rafa-board/src/board/place.ts', 'packages/rafa-run/src/start/session.ts', 'type'],
       ['src/stretch/run.ts', 'packages/rafa-board/src/board/place.ts'],
     ]),
   );
@@ -663,7 +663,7 @@ describe('the two outputs', () => {
     expect(lines).toContain('| `rafa-board` | `@open-tomato/rafa` | 1 |');
     expect(lines).toContain('- `packages/rafa/src/core/config/config-schema.ts` imports `src/config-schema-planted.ts` (value)');
     expect(lines).toContain('| `src/utils/tracker.ts` | 1 | `@open-tomato/rafa` | left to place |');
-    expect(lines).toContain('| `src/start/session.ts` | 1 | `rafa-run` | by rule |');
+    expect(lines).toContain('| `packages/rafa-run/src/start/session.ts` | 1 | `rafa-run` | by rule |');
     expect(lines).toContain('| `src/utils/` | 1 | 1 | 1 |');
     expect(lines).toContain('| `src/stretch/` | 1 | `rafa-board` (1) | - |');
   });
@@ -699,7 +699,7 @@ describe('main', () => {
   it('reads docs/survey/import-graph.json under the root and writes both outputs beside it', async () => {
     const graph = plant([
       ['packages/rafa/src/core/config/config-schema.ts', 'src/config-schema-planted.ts'],
-      ['packages/rafa-board/src/board/place.ts', 'src/start/session.ts'],
+      ['packages/rafa-board/src/board/place.ts', 'packages/rafa-run/src/start/session.ts'],
     ]);
     mkdirSync(join(root, 'docs/survey'), { recursive: true });
     writeFileSync(join(root, GRAPH_PATH), JSON.stringify(graph));

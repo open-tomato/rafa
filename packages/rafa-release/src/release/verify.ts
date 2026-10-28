@@ -10,7 +10,7 @@
  * is three readings and a restore — the fragment still parses, it
  * still carries the plan's level, and it is the only file the release
  * step changed — and nothing more: it does not commit, does not push,
- * and does not touch a pull request. `src/start/release-stage.ts` is
+ * and does not touch a pull request. `packages/rafa-run/src/start/release-stage.ts` is
  * the caller that does all three with what this answers.
  *
  * ```text

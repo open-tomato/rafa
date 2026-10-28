@@ -29,9 +29,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { findStoreRuleProblems, storeRuleLine } from '@open-tomato/rafa-run/plan/store-rules';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig } from './cli-capture.js';

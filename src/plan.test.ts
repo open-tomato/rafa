@@ -21,13 +21,13 @@
  * names.
  *
  * The wrapping drops one thing on purpose: the ENDING. The module's
- * default export is `endingWith(...)` (`src/next/ending.ts`), and
+ * default export is `endingWith(...)` (`packages/rafa-run/src/next/ending.ts`), and
  * `wrapPhaseZeroCommand` replaces `run`, so the command the child
  * dispatches ends where `plan` ends and reads no state. That is what
  * keeps every case here from composing the real sources — `git` and
  * `gh` spawned in the scratch repository, for a line no case is about —
  * and leaves the ending to be held where it is driven,
- * `src/next/ending.test.ts`.
+ * `src/tests/run-coupled/next/ending.test.ts`.
  *
  * First on the child's PATH is a stand-in `claude` that leaves a marker
  * and exits 97, and every case holds the marker absent. A command that

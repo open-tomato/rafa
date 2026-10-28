@@ -21,6 +21,7 @@
  * and the scratch reading lists that group empty, so a renderer that
  * printed a remote-only row for every reading would redden it.
  */
+import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type {
   CleanupRead,
   LocalBranch,
@@ -30,14 +31,13 @@ import type {
   RunRow,
   StaleRow,
   WorktreeRow,
-} from '../cleanup/index.js';
-import type { ScratchRepository } from '../cleanup/scratch-repository.js';
+} from '@open-tomato/rafa-run/cleanup/index';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { defaultCleanupSeams, readCleanup, remoteOnlyReason } from '@open-tomato/rafa-run/cleanup/index';
 
-import { defaultCleanupSeams, readCleanup, remoteOnlyReason } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 
 import {

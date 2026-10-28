@@ -50,7 +50,7 @@
  * the declaration module through here. The config's `PrerequisiteItem`
  * stays out by the same rule, spelled `PreflightTiers['required'][number]`
  * here and exported by name from the package root. Two preflight
- * exports stay out too: `forkWorktree` (`src/preflight/fork.ts`), with
+ * exports stay out too: `forkWorktree` (`packages/rafa-run/src/preflight/fork.ts`), with
  * the command runner it spawns through, which nothing calls until the
  * loop forks worktrees, and `firstLineOf`, the wording helper the
  * runner and the fork share.

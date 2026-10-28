@@ -18,7 +18,7 @@
  * read with the branch and the loops before any `gh` is spawned. What
  * moves those refs is the claim commands, `plan create`'s and
  * `loop start`'s claim pushes, and the fetch a refused wrap-up push runs
- * (`src/claims/lost.ts`), so a clone that lost its claim reads the new
+ * (`packages/rafa-run/src/claims/lost.ts`), so a clone that lost its claim reads the new
  * owner here. A claim commit waiting on a LOCAL branch with no upstream
  * is not a claim yet and is not listed.
  *

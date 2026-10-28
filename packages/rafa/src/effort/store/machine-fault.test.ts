@@ -244,7 +244,7 @@ const FILED_BODIES: readonly FiledBody[] = [
   {
     issue: 43,
     what: 'Eight *.test.ts files build a complete PullRequests literal and now miss editBody '
-      + '(src/start/pr-lifecycle.test.ts, '
+      + '(packages/rafa-run/src/start/pr-lifecycle.test.ts, '
       + 'src/commands/pr/{merge,merge-driven,view,list,current,show,pr-context}.test.ts). No '
       + 'gate catches it because tsconfig.json excludes test files; each needs one '
       + 'refuse(\'editBody\') line.',

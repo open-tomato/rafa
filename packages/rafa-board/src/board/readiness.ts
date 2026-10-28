@@ -142,7 +142,7 @@
  * spec ABOUT the rule can still say `migration 12` in backticks. A
  * release number such as `rafa 0.18.0` is not a store change and does
  * not match. {@link findPinnedMigrations} answers the same reading for a
- * whole document, which is how `src/plan/store-rules.ts` refuses a plan
+ * whole document, which is how `packages/rafa-run/src/plan/store-rules.ts` refuses a plan
  * that pins one.
  *
  * A section already reported EMPTY does not also report the placeholders

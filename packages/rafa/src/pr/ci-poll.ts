@@ -2,7 +2,7 @@
  * How often a wait on a pull request's checks reads them again.
  *
  * Two waits poll the same checks: run's CI gate
- * (`src/start/pr-lifecycle.ts`), and pr's `rafa pr wait`
+ * (`packages/rafa-run/src/start/pr-lifecycle.ts`), and pr's `rafa pr wait`
  * (`packages/rafa-pr/src/commands/pr/wait.ts`) and `rafa pr triage --resolve`
  * (`packages/rafa-pr/src/commands/pr/triage-resolve.ts`). They read one interval, this
  * file's, so they agree about how often a pending check is read. It

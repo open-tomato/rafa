@@ -15,7 +15,7 @@
  * `rafa next --dry-run` ends with all three lines; the second reads the
  * same fixture with that version tagged, so the release line is left
  * off. Every earlier line is read off the real state table
- * (`src/next/state.ts`), which this stage never touches, so only the
+ * (`packages/rafa-run/src/next/state.ts`), which this stage never touches, so only the
  * SUFFIX naming the epic is asserted, byte for byte, built from
  * {@link epicEndLines} itself rather than duplicated by hand.
  *
@@ -43,7 +43,7 @@
  * it was not planted to answer.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { DryEpic } from '../next/readings.js';
+import type { DryEpic } from '@open-tomato/rafa-run/next/readings';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

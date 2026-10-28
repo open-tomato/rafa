@@ -68,8 +68,7 @@ import { describe, expect, it } from 'bun:test';
 import { CLAUDE_BASE_ARGS, CLAUDE_BIN } from '@open-tomato/rafa/core/loop';
 import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 import { parseReport } from '@open-tomato/rafa/report/parse';
-
-import { buildTaskPrompt } from '../start/dispatch.js';
+import { buildTaskPrompt } from '@open-tomato/rafa-run/start/dispatch';
 
 /** `src/PROMPT.md`, the file `buildTaskPrompt` places in every task prompt. */
 const PROMPT_FILE = readFileSync(fileURLToPath(new URL('../PROMPT.md', import.meta.url)), 'utf8');

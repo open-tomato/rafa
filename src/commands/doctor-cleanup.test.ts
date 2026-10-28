@@ -20,18 +20,19 @@
  * zero, and a reading git refused.
  */
 import type { DoctorCleanupReading } from './doctor-cleanup.js';
-import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { DoctorCleanupInput } from '../cleanup/settings.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { PullRequests } from '@open-tomato/rafa/pr/types';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { CleanupCounts, CleanupSeams } from '@open-tomato/rafa-run/cleanup/index';
 
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
+import { defaultCleanupSeams, readCleanup } from '@open-tomato/rafa-run/cleanup/index';
+
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 

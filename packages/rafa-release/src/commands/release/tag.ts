@@ -9,7 +9,7 @@
  * publishing.
  *
  * The loop writes a change fragment with every pull request and stops
- * there (`src/start/release-stage.ts`): the merge commit is not its to
+ * there (`packages/rafa-run/src/start/release-stage.ts`): the merge commit is not its to
  * tag, and the version and the changelog section are written on the
  * base branch by `rafa release settle`. This action is the operator
  * step the changelog and release spec puts after the merge (its step

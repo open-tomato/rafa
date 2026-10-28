@@ -83,4 +83,4 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `start/worktree-dir.test.ts` | `src/config-registry.ts` |
 | `utils/git.test.ts` | nothing since `git-identity.ts` moved into core as `packages/rafa/src/tests/git-identity.ts` (#1362) |
 | `utils/progress.test.ts` | `scripts/control-byte-gate/control-byte-gate.ts`, `src/plan.ts` |
-| `utils/tracker.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `src/plan/index.ts`, `src/start/commit.ts`, `src/start/dispatch.ts`, `src/start/stamp.ts` |
+| `utils/tracker.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `src/plan/index.ts`, `packages/rafa-run/src/start/commit.ts`, `packages/rafa-run/src/start/dispatch.ts`, `packages/rafa-run/src/start/stamp.ts` |

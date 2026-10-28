@@ -12,7 +12,7 @@
  * stale-docs issues hold open (read in `./status-stale-docs.ts`).
  *
  * The loop writes a version and a changelog entry with every pull
- * request (`src/start/release-stage.ts`), and stops there: the merge
+ * request (`packages/rafa-run/src/start/release-stage.ts`), and stops there: the merge
  * commit is not its to tag, so the tag and the publish are an operator
  * step (from the changelog and release spec, its step 4). This action is
  * the readout that step is taken from, and it WRITES NOTHING: every git

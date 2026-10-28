@@ -5,7 +5,7 @@
  * (the chain `#H ← #C ← #B`), H and C blocked by each other (the mutual
  * chain `#H ← #C ← #H`), and, with a hop already away, C's own spec
  * carrying no `spec:ready` (`away-ended`'s `notReadyEnded`,
- * `src/next/hop-rows.ts`).
+ * `packages/rafa-run/src/next/hop-rows.ts`).
  *
  * `next-roadmap-hop-cli.test.ts` is the spawned proof that a hop TO
  * another board's epic reads and prints right; this file is the spawned

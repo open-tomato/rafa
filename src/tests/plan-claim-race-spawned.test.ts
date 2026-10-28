@@ -2,8 +2,8 @@
  * `rafa plan create --issue <n>`, spawned twice as the real `rafa` binary
  * (`src/tests/cli-capture.ts`) from two separate clones of one bare
  * remote, each its own device: this is the proof that the compare-and-set
- * `src/claims/plan-claim.ts` documents actually holds over REAL git, not
- * only over the fakes `src/claims/plan-claim.test.ts` and
+ * `packages/rafa-run/src/claims/plan-claim.ts` documents actually holds over REAL git, not
+ * only over the fakes `packages/rafa-run/src/claims/plan-claim.test.ts` and
  * `src/commands/plan/claim-route.test.ts` drive.
  *
  * `src/tests/board-coupled/board/roadmap-claims-remote.test.ts` already proves the READING
@@ -87,7 +87,7 @@ function plantOrigin(): string {
 /**
  * Mints the effort store at `repo` under a store id of its own: a
  * writing open with no rows, exactly as `src/tests/merged-stores.ts`'s
- * `freshDevice` mints one, so `readDeviceStoreId` (`src/claims/device.ts`)
+ * `freshDevice` mints one, so `readDeviceStoreId` (`packages/rafa-run/src/claims/device.ts`)
  * answers `storeId` for a run in `repo` without either clone's run
  * having to write a row of its own first. `readProject` is left at its
  * real default (git's own root commit of `repo`), not a placeholder: a

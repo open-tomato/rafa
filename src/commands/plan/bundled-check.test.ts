@@ -24,8 +24,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parsePrerequisites } from '@open-tomato/rafa/preflight/prerequisites-md';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-
-import { findStoreRuleProblems } from '../../plan/store-rules.js';
+import { findStoreRuleProblems } from '@open-tomato/rafa-run/plan/store-rules';
 
 import { bundledEditLine, findBundledEdits, notePlanBundledEdits, writeTierPins } from './bundled-check.js';
 

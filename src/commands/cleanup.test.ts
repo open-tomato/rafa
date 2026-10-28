@@ -46,6 +46,11 @@
  *   do remove.
  */
 import type { CleanupCommandSeams } from './cleanup.js';
+import type { Key, Terminal } from '../cli/prompt/terminal.js';
+import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
+import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitResult } from '@open-tomato/rafa/core/git';
+import type { PullRequests } from '@open-tomato/rafa/pr/types';
 import type {
   CleanupRead,
   CleanupSeams,
@@ -57,12 +62,7 @@ import type {
   RunRow,
   StaleRow,
   WorktreeRow,
-} from '../cleanup/index.js';
-import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
-import type { Prompter } from '@open-tomato/rafa/core/command';
-import type { GitResult } from '@open-tomato/rafa/core/git';
-import type { PullRequests } from '@open-tomato/rafa/pr/types';
+} from '@open-tomato/rafa-run/cleanup/index';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -71,8 +71,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { forcedFlagRefusal, remoteOnlyReason } from '@open-tomato/rafa-run/cleanup/index';
 
-import { forcedFlagRefusal, remoteOnlyReason } from '../cleanup/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
 import { cleanupData, remoteOnlyRowLine, renderCleanup, runRowLine } from './cleanup-render.js';

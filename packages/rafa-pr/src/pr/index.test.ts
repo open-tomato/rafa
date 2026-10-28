@@ -14,7 +14,7 @@
  * dropped from the export list reddened the gh-adapter case here — bun
  * transpiles without type-checking, so the missing name reads as
  * `undefined` rather than as an error — and `tsc --noEmit` reported it
- * at the import in `src/start/pr-lifecycle.ts` (TS2724).
+ * at the import in `packages/rafa-run/src/start/pr-lifecycle.ts` (TS2724).
  */
 
 import * as provider from '@open-tomato/rafa/pr/provider';

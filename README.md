@@ -1081,7 +1081,7 @@ builds. `bun run snapshot` in this checkout, or `rafa self-update` run
 inside it, builds, copies `dist/` into `~/.rafa/runtime/<version>/` with
 the version from `package.json`, points `~/.rafa/bin/rafa` at the copied
 `cli.js`, and prints the path the link resolves to, exiting 0. Both
-install the same way (`src/runtime/install.ts`). The bin is not in
+install the same way (`packages/rafa-run/src/runtime/install.ts`). The bin is not in
 `~/.bun/bin`, where `bun link` in this checkout re-points `rafa` at the
 checkout's `dist/` with no message, so put `~/.rafa/bin` on `PATH` ahead
 of `~/.bun/bin`; both warn when it is not, and `rafa doctor` checks it.

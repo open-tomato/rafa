@@ -20,7 +20,7 @@
  *    next` proposes nothing and neither `--dry-run` nor `--yes` is
  *    needed to keep the run from acting. Every line printed is hand
  *    derived from the source each command's row is read off
- *    (`src/next/state.ts`'s row 13, `packages/rafa-board/src/commands/epic/show.ts`'s
+ *    (`packages/rafa-run/src/next/state.ts`'s row 13, `packages/rafa-board/src/commands/epic/show.ts`'s
  *    `noNowEpicLine`, `src/status/render.ts`'s six section lines), the
  *    same way `epic-descent-cli.test.ts`'s own byte-for-byte case is.
  *

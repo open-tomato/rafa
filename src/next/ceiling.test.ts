@@ -72,13 +72,13 @@
  * and bare `--yes` answering {@link BARE_YES_ACTIONS} whatever the mode,
  * 51 pass and 1 fail. The fourth is `./actions.test.ts`'s.
  */
-import type { NextActionId } from './state.js';
+import type { NextActionId } from '@open-tomato/rafa-run/next/state';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { NEXT_COMMAND_ACTIONS } from '@open-tomato/rafa-run/next/actions';
 
-import { NEXT_COMMAND_ACTIONS } from './actions.js';
 import {
   allowedUnasked,
   ALWAYS_ASKED,

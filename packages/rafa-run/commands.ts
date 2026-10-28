@@ -4,4 +4,4 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-run --commands`.
  */
 
-export { RUN_FEATURE } from '../../src/commands/claim/index.js';
+export { RUN_FEATURE } from './src/commands/claim/index.js';

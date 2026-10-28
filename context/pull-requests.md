@@ -55,7 +55,7 @@ core roster carries help snapshots too.
 
 `pr wait` composes `waitForChecks` (`packages/rafa-pr/src/pr/checks.ts`) over
 the provider's `checks` and is READ-ONLY: no repair session, no comment, no
-label, no merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those,
+label, no merge — `verifyPullRequest` (`packages/rafa-run/src/start/pr-lifecycle.ts`) keeps those,
 and the deadline and the poll interval are that gate's own constants. The same
 `waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop agree
 about what green means and how often a pull request is asked. Green exits 0; red
@@ -74,7 +74,7 @@ other reading gets `rafa pr wait <n>` to ask again and `rafa pr show <n>`, and
 says nothing about merging. The deadline passing with checks still running exits
 3. A green wait writes its report through the output and then names the one step
 that follows, which for checks that have just passed is the merge
-(`src/next/ending.ts`, `--no-hint` to turn it off); every other ending carries
+(`packages/rafa-run/src/next/ending.ts`, `--no-hint` to turn it off); every other ending carries
 the report as the message of its exit, because the dispatcher drops a command's
 payload when it ends non-zero, and gets no hint, since that report already names
 the rafa command for what it found. The clock and the wait between polls are
@@ -95,8 +95,8 @@ branch, prints the compare URL, skips the CI wait, skips the release stage's
 body write — there being no body — and says so each time. A push of a claim
 branch the remote refuses because another store now owns the claim halts the run
 instead, exit 1 with the "claim lost" report, its commits kept on `lost/<stub>`
-and no compare URL printed (`src/start/pr-lifecycle.ts` over
-`src/claims/lost.ts`). No other provider is built; the functions in
+and no compare URL printed (`packages/rafa-run/src/start/pr-lifecycle.ts` over
+`packages/rafa-run/src/claims/lost.ts`). No other provider is built; the functions in
 `packages/rafa-pr/src/pr/gh.ts` move behind one `PullRequests` interface in
 `packages/rafa/src/pr/types.ts` so a second provider is an adapter later.
 
@@ -274,12 +274,12 @@ sentence replaces nothing.
    then: read while a loop is live, it exits 1 and names each tracker, unless
    `--force` is on the line. With no loop live the update goes on and warns
    once, naming each such tracker, so a tracker a parked plan left behind does
-   not hold it (`src/runtime/install.ts`). Both are only printed: `pr merge`
+   not hold it (`packages/rafa-run/src/runtime/install.ts`). Both are only printed: `pr merge`
    never runs settle, and `rafa release tag` is no longer named here, since
    settle tags or names the tag itself.
 8. Last, name the one step that follows — with the base pulled and both
    branches gone, the next plan or the loop on a plan already there
-   (`src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
+   (`packages/rafa-run/src/next/ending.ts`, `--no-hint` to turn it off). A merge that was
    DECLINED ends without it: nothing moved, so the hint would put the
    question that was just answered no.
 
@@ -473,7 +473,7 @@ changelog) or the push is rejected.
   prompt's own, from one source
   (`packages/rafa-pr/src/pr/conflict-sentence.ts`), which is why THREE suites
   read `buildWrapUpPrompt` and a bullet moved in it can redden any of them:
-  `src/start/wrap-up.test.ts`,
+  `src/tests/run-coupled/start/wrap-up.test.ts`,
   `src/tests/pr-coupled/pr/conflict-sentence.sweep.test.ts` and
   `src/tests/plan-injection.test.ts`, the last because the prompt's FIRST line
   is the `wrap-up` classifier key `PROMPT_SHAPES` reads. Run the three together

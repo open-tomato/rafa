@@ -163,7 +163,7 @@ function plantUnder(base: string, n: number, planting: Planting): Scratch {
 /**
  * Typed by every run here, so that no run composes the real sources for
  * the ending hint in the scratch repository. The ending itself is
- * driven in `src/next/ending.test.ts`.
+ * driven in `src/tests/run-coupled/next/ending.test.ts`.
  */
 const NO_HINT = '--no-hint';
 

@@ -974,12 +974,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/roadmap.js', [
     ['@open-tomato/rafa-board', ['DEFAULT_ISSUE_SEAMS', 'ISSUE_LIST_FLAGS']],
   ]],
-  ['./commands/switch.js', [
-    ['@open-tomato/rafa-board', ['ROADMAP_LABEL', 'boardOfEpic', 'createGhBoardListing', 'createGhRunner', 'defaultBoardOnce', 'firstNowEpic', 'horizonOf', 'issueProject', 'issueSubjectConfig', 'lineRefusal', 'parseRoadmapBody', 'readConfiguredRelations', 'readListedEpics', 'resolvePlace', 'scanClaimBranches']],
+  // `switch.ts` moved with run into its package in pass 4f (#808).
+  ['../packages/rafa-run/src/commands/switch.js', [
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
     ['@open-tomato/rafa/core/git', ['createGitRunner']],
     ['@open-tomato/rafa/project/position', ['hop', 'positionFilePath', 'rehome', 'writePositionFile']],
+    ['@open-tomato/rafa-board', ['ROADMAP_LABEL', 'boardOfEpic', 'createGhBoardListing', 'createGhRunner', 'defaultBoardOnce', 'firstNowEpic', 'horizonOf', 'issueProject', 'issueSubjectConfig', 'lineRefusal', 'parseRoadmapBody', 'readConfiguredRelations', 'readListedEpics', 'resolvePlace', 'scanClaimBranches']],
     ['../claims/drift.js', ['checkDrift', 'driftLines']],
   ]],
   ['./commands/init.js', [
@@ -1068,7 +1069,8 @@ const FEATURE_COMMANDS: readonly (readonly [entry: string, name: string, command
   ['../packages/rafa-pr/src/commands/pr/index.js', 'PR_FEATURE', [
     'pr current', 'pr show', 'pr view', 'pr open', 'pr retarget', 'pr close', 'pr list', 'pr wait', 'pr merge', 'pr triage',
   ]],
-  ['./commands/claim/index.js', 'RUN_FEATURE', ['claim release', 'claim hand', 'claim accept', 'claim take']],
+  // The run entry moved with run into its package in pass 4f (#808).
+  ['../packages/rafa-run/src/commands/claim/index.js', 'RUN_FEATURE', ['claim release', 'claim hand', 'claim accept', 'claim take']],
   // The release entry moved with release into its package in pass 4d (#808).
   ['../packages/rafa-release/src/commands/release/index.js', 'RELEASE_FEATURE', ['release status', 'release settle', 'release tag', 'release publish', 'release workflows', 'release fragment', 'release list']],
 ];
@@ -1327,7 +1329,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',
-      './commands/switch.js',
+      '../packages/rafa-run/src/commands/switch.js',
       './commands/init.js',
       './commands/doctor.js',
       './commands/cleanup.js',

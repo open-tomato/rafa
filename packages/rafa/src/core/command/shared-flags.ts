@@ -2,7 +2,7 @@
  * The flags commands of several features declare, spelled once.
  *
  * {@link HINT_FLAG_SPEC} is the `--no-hint` flag of the six commands
- * that end by naming the step that follows (`src/next/ending.ts`):
+ * that end by naming the step that follows (`packages/rafa-run/src/next/ending.ts`):
  * `pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready` and
  * `loop start`. They belong to four features, and three of them are
  * declared in a declarations file (`packages/rafa-pr/src/commands/pr/declarations.ts`,
@@ -13,7 +13,7 @@
  *
  * {@link DEFAULT_CI_TIMEOUT_MIN} is here for the same reason: the
  * loop's `--ci-timeout` (`src/commands/loop/start.ts`,
- * `src/start/run-setup.ts`) and `pr wait`'s `--timeout`
+ * `packages/rafa-run/src/start/run-setup.ts`) and `pr wait`'s `--timeout`
  * (`packages/rafa-pr/src/commands/pr/declarations.ts`, `packages/rafa-pr/src/commands/pr/wait.ts`) both
  * default to it, and the second is spelled in a declarations file.
  *

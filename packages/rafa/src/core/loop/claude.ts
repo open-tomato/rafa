@@ -167,7 +167,7 @@
  * `with` declaration and the run carries the flag, or an `unless`
  * declaration and the run does not. `through` covers a run because the
  * command runs another's action in-process (`rafa next`,
- * `src/next/actions.ts`), and the recorded command stays the outer one.
+ * `packages/rafa-run/src/next/actions.ts`), and the recorded command stays the outer one.
  * A flag is matched by its name without the dashes, and `--no-<name>`
  * also as the parser keys it, `<name>` set to `false`; a flag recorded
  * as `false` is not carried. With no command recorded, as for a caller
@@ -421,7 +421,7 @@ export interface CapturedSpawnOptions {
    * session of the `claude` planner (`src/adapters/planner/claude.ts`)
    * the project root it writes the plan under, and the loop's task,
    * wrap-up and CI repair sessions the run's checkout
-   * (`src/start/checkout.ts`).
+   * (`packages/rafa-run/src/start/checkout.ts`).
    */
   readonly cwd?: string;
 }

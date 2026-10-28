@@ -29,7 +29,7 @@
  * It imports `config-readers.ts` alone, so it is a leaf as the pair is,
  * and it sits beside `branchFromTemplate`, the writer it reads back.
  * `DEFAULT_BASE_BRANCH`, the base `pr.base` unset is read as, joined it
- * from `src/next/sources.ts`, so a reader of the base takes it beside
+ * from `packages/rafa-run/src/next/sources.ts`, so a reader of the base takes it beside
  * `DEFAULT_BRANCH_TEMPLATE` without reaching `rafa next`'s composition.
  *
  * `merge-method.ts` joined with the words `pr.mergeMethod` takes, its

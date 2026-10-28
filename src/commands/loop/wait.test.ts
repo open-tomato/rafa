@@ -16,7 +16,7 @@
  * note for a missing events file is counted across several polls.
  */
 import type { LoopWaitSeams } from './wait.js';
-import type { LoopEvent } from '../../start/loop-events.js';
+import type { LoopEvent } from '@open-tomato/rafa-run/start/loop-events';
 
 import { appendFileSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,9 +24,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { eventsFilePath, summaryOf } from '@open-tomato/rafa-run/start/loop-events';
+
 import { createAwakeClock } from '../../loop/awake-clock.js';
 import { WAIT_REASONS } from '../../loop/wait-reasons.js';
-import { eventsFilePath, summaryOf } from '../../start/loop-events.js';
 import { dispatchInProject, eventsOf } from '../../tests/cli-capture.js';
 import {
   LOOP_SUBJECTS,

@@ -54,7 +54,7 @@ export const ROADMAP_FLAG = '--roadmap';
  * as `claims.ahead: allow` does on every such run; read in
  * `./spec-source.ts`, the claim it adds is `packages/rafa-board/src/claims/ahead.ts`'s.
  * `rafa next --roadmap` passes it on to `plan create`
- * (`src/next/actions.ts`).
+ * (`packages/rafa-run/src/next/actions.ts`).
  */
 export const CLAIM_AHEAD_FLAG = '--claim-ahead';
 

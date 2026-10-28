@@ -101,10 +101,10 @@
  * Measured again when `shared-flags.ts` moved in, the same way and with
  * the untracked new file read: five cycles at the base and four after
  * the move, none through a file of this folder. The one gone is
- * `src/next/actions.ts` and `src/next/hint.ts`, broken because
+ * `packages/rafa-run/src/next/actions.ts` and `packages/rafa-run/src/next/hint.ts`, broken because
  * `actions.ts` now takes `HINT_FLAG` from this barrel rather than from
  * `hint.ts`. The control, `shared-flags.ts` taking one value
- * (`HINT_TIMEOUT_MS`) from `src/next/hint.ts`, folded this file,
+ * (`HINT_TIMEOUT_MS`) from `packages/rafa-run/src/next/hint.ts`, folded this file,
  * `shared-flags.ts` and `hint.ts` into one strongly connected set of
  * seventy files.
  *

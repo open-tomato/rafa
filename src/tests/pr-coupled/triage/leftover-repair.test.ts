@@ -22,8 +22,7 @@ import {
   leftoverCap,
   leftoverRepairText,
 } from '@open-tomato/rafa-pr/triage/leftover-repair';
-
-import { isRepairTask, REPAIR_AGENT } from '../../../start/suite-blocker.js';
+import { isRepairTask, REPAIR_AGENT } from '@open-tomato/rafa-run/start/suite-blocker';
 
 /** An `own-fallout` entry with plain text. */
 const FALLOUT: LeftoverEntry = { kind: 'own-fallout', what: 'src/a.test.ts went red', artifact: 'expect(received).toBe(expected)' };

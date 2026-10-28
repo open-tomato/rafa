@@ -9,8 +9,8 @@
  * entry reaches no tracker: the store holds one `sighting` row under the
  * plan stub.
  */
-import type { StartTriageOptions } from './triage.js';
 import type { Tracker } from '@open-tomato/rafa/ports';
+import type { StartTriageOptions } from '@open-tomato/rafa-run/start/triage';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,10 +31,9 @@ import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
 import { createPrivateTriageTracker } from '@open-tomato/rafa-pr/triage/triage';
+import { createStartTriage } from '@open-tomato/rafa-run/start/triage';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-
-import { createStartTriage } from './triage.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-start-triage-stale-docs-'));
 

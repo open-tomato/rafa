@@ -161,7 +161,7 @@ decouple item (rafa-1368) added `suite/`, the suite runner, `run.ts`,
 only core, and `pr/ci-poll.ts`, the poll interval, beside `pr/`'s files. It also
 put `RUNTIME_SUBDIR` and `RAFA_PACKAGE_NAME` into `runtime/`'s barrel,
 `@open-tomato/rafa/core/runtime`, beside `identity.ts`; the root's
-`src/start/runtime.ts` and `packages/rafa-pr/src/commands/pr/merge-followups.ts`
+`packages/rafa-run/src/start/runtime.ts` and `packages/rafa-pr/src/commands/pr/merge-followups.ts`
 now read them from there. A file keeps its base name when it moves. A moved file
 keeps no re-export at its old path. The root's build entries are the exception:
 `src/effort/store/index.ts` and `src/ports/index.ts` stand at core's folder
@@ -227,7 +227,7 @@ an `exports` key of `packages/rafa/package.json` to its `./src/` file;
 ninth test, `worktree-dir.test.ts`, was parked under
 `src/tests/core-coupled/start/` before the move and stays there. The flag
 `SESSION_ID_FLAG` (`'--session-id'`) moved at commit d9b339b from
-`src/start/dispatch.ts` into `packages/rafa/src/core/loop/claude.ts`, beside
+`packages/rafa-run/src/start/dispatch.ts` into `packages/rafa/src/core/loop/claude.ts`, beside
 `SETTING_SOURCES_FLAG`, and the loop barrel exports it with no re-export at the
 old path. `packages/rafa-inventory/src/start/serving.ts` is an inventory file by
 name, though it sat under `src/start/` before the move: it imports only
@@ -419,7 +419,7 @@ functions of `section.ts`. The two registered readers are
 core barrel re-exports: a feature file that needs the whole default record or
 the whole spec record takes it from there, typed as `CONFIG_DEFAULTS` and
 `SETTINGS` are, and so imports no root file. The callers at this commit are
-`src/start/preflight.ts`, `src/start/pr-lifecycle.ts`, `packages/rafa-board/src/board/roadmap.ts`,
+`packages/rafa-run/src/start/preflight.ts`, `packages/rafa-run/src/start/pr-lifecycle.ts`, `packages/rafa-board/src/board/roadmap.ts`,
 `packages/rafa-effort/src/effort/collect.ts` and
 `packages/rafa-inventory/src/inventory/index.ts` for the defaults, and
 `packages/rafa-board/src/refs/extract.ts` and `packages/rafa-board/src/refs/verify.ts` for the settings. Each refuses
@@ -478,11 +478,11 @@ reason's `lower`, a sorted list:
   was not re-measured), for `rafa epic close`, which adds a line to the
   release's stale-docs issue, whose module reads the release version helpers of
   `packages/rafa-release/src/release/`.
-- `endWithNextStep`, run's, in `src/next/ending.ts` (reach 119), for board's
+- `endWithNextStep`, run's, in `packages/rafa-run/src/next/ending.ts` (reach 119), for board's
   `rafa issue ready` and, since the seventh decouple item, pr's
   `rafa pr merge`, `triage` and `wait`, which end naming the next step and run
   its action through run's dispatch.
-- `readStaleDocsVersion`, run's, in `src/start/stale-docs.ts` (reach 165), for
+- `readStaleDocsVersion`, run's, in `packages/rafa-run/src/start/stale-docs.ts` (reach 165), for
   `rafa epic close`, which titles the stale-docs issue by the release forecast.
 - `triageReport`, pr's, in `packages/rafa-pr/src/triage/triage.ts` (reach 66),
   for `rafa epic close`, which files each failed criterion as a bug.
@@ -602,8 +602,8 @@ with `packages/rafa/src/plan/validate.ts` gone for core and verify-run for
 board. The sixth decouple item (rafa-1362) took the two stale-docs files off
 `PR_NAMED` for `RELEASE_NAMED`, and the seventh (rafa-1368) placed
 `packages/rafa-pr/src/cleanup/worktrees.ts` and
-`packages/rafa-pr/src/start/pr-retarget.ts` in pr and `src/cleanup/steps.ts`,
-`src/next/owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and `sources.ts`
+`packages/rafa-pr/src/start/pr-retarget.ts` in pr and `packages/rafa-run/src/cleanup/steps.ts`,
+`packages/rafa-run/src/next/owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and `sources.ts`
 in run, each by the latest package it reaches, so `PR_NAMED` holds 8 and
 `RUN_NAMED` 22; pass 4f took `src/plan/index.ts` off `RUN_NAMED` for
 `CLI_NAMED`, so `RUN_NAMED` holds 21. A file a list names is placed in that
@@ -859,13 +859,13 @@ names come from, and the facade entry is no node.
     regenerated without the cycle, so the guard's inventory row is empty;
     `packages/rafa-inventory/src/start/serving.ts` is an inventory file by name,
     so it is no importer. Board held nineteen at pass 3:
-    `packages/rafa-pr/src/bugs/filed-values.ts`, `src/claims/drift.ts`,
-    `src/claims/labels.ts`, `src/commands/switch.ts`, `src/next/hop-action.ts`,
-    `src/next/hop-rows.ts`, `src/next/owner-gate.ts`, `src/next/readings.ts`,
-    `src/next/relations-mode.ts`, `src/next/sources.ts`, `src/next/state.ts`,
+    `packages/rafa-pr/src/bugs/filed-values.ts`, `packages/rafa-run/src/claims/drift.ts`,
+    `packages/rafa-run/src/claims/labels.ts`, `packages/rafa-run/src/commands/switch.ts`, `packages/rafa-run/src/next/hop-action.ts`,
+    `packages/rafa-run/src/next/hop-rows.ts`, `packages/rafa-run/src/next/owner-gate.ts`, `packages/rafa-run/src/next/readings.ts`,
+    `packages/rafa-run/src/next/relations-mode.ts`, `packages/rafa-run/src/next/sources.ts`, `packages/rafa-run/src/next/state.ts`,
     `packages/rafa-pr/src/pr/gh-close.ts`, `packages/rafa-pr/src/pr/gh.ts`,
-    `packages/rafa-pr/src/pr/owner-approval.ts`, `src/start/stale-docs.ts`,
-    `src/start/triage.ts`, `packages/rafa-pr/src/triage/bug-filing.ts`,
+    `packages/rafa-pr/src/pr/owner-approval.ts`, `packages/rafa-run/src/start/stale-docs.ts`,
+    `packages/rafa-run/src/start/triage.ts`, `packages/rafa-pr/src/triage/bug-filing.ts`,
     `packages/rafa-pr/src/triage/refs-section.ts` and
     `packages/rafa-pr/src/triage/triage.ts`. On the graph the fourth decouple
     item's survey regenerated, the dry run reads fifteen of them on a load cycle
@@ -876,8 +876,8 @@ names come from, and the facade entry is no node.
     takes them off the guard's row. On the graph the fifth decouple item's
     survey regenerated, board's back edges into run and pr gone, the dry run
     reads none of the nineteen on a load cycle and all nineteen to rewire, and
-    refuses two statements, `src/next/readings.ts:119` and
-    `src/next/sources.ts:277`, which take `scanClaimBranches` from
+    refuses two statements, `packages/rafa-run/src/next/readings.ts:119` and
+    `packages/rafa-run/src/next/sources.ts:277`, which take `scanClaimBranches` from
     `packages/rafa-board/src/board/roadmap.ts` while the facade lists it under
     another file; the guard checks the path, not the group, so its row is
     unchanged. Pass 4c (rafa-1349) rewired the nineteen onto the facade at
@@ -885,10 +885,10 @@ names come from, and the facade entry is no node.
     (0)` after it. `packages/rafa-board/src/claims/ahead.ts` and
     `packages/rafa-board/src/epic/verify-run.ts` left them in the fourth
     decouple item (rafa-1333), which places both in board by name, and
-    `src/claims/plan-claim.ts`, which took them by path, took the facade. The
+    `packages/rafa-run/src/claims/plan-claim.ts`, which took them by path, took the facade. The
     second decouple item took the importers it freed onto the facades:
-    inventory's `src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and
-    board's `src/plan/store-rules.ts`, `src/start/preflight-claim.ts` and
+    inventory's `packages/rafa-run/src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and
+    board's `packages/rafa-run/src/plan/store-rules.ts`, `packages/rafa-run/src/start/preflight-claim.ts` and
     `preflight-drift.ts`. `packages/rafa-effort/src/effort/epic-cost.ts`, an
     effort file, sat among them until the first decouple item moved
     `packages/rafa/src/board/naming.ts`, its one board import, into core.
@@ -897,16 +897,16 @@ names come from, and the facade entry is no node.
     now. `packages/rafa-board/src/board/project/facts.ts` left the group in the
     fourth decouple item: its one release import by path, of `directoryPrefix`
     and `fragmentIdOf`, now comes from core's
-    `@open-tomato/rafa/release/fragment`. Pr had thirteen: `src/claims/lost.ts`,
+    `@open-tomato/rafa/release/fragment`. Pr had thirteen: `packages/rafa-run/src/claims/lost.ts`,
     `packages/rafa-release/src/cleanup/past-head.ts`,
     `packages/rafa-pr/src/cleanup/worktrees.ts`,
     `packages/rafa-release/src/commands/release/status-fragments.ts`,
-    `packages/rafa-release/src/next/epic-end.ts`, `src/next/hint.ts`,
-    `src/next/hop-rows.ts`, `src/next/readings.ts`,
+    `packages/rafa-release/src/next/epic-end.ts`, `packages/rafa-run/src/next/hint.ts`,
+    `packages/rafa-run/src/next/hop-rows.ts`, `packages/rafa-run/src/next/readings.ts`,
     `packages/rafa-release/src/release/branch-forecast.ts`,
     `packages/rafa-release/src/release/settle-pr.ts`,
-    `src/start/pr-lifecycle.ts`, `packages/rafa-pr/src/start/pr-retarget.ts` and
-    `src/start/suite-blocker.ts`. Five of them,
+    `packages/rafa-run/src/start/pr-lifecycle.ts`, `packages/rafa-pr/src/start/pr-retarget.ts` and
+    `packages/rafa-run/src/start/suite-blocker.ts`. Five of them,
     `packages/rafa-release/src/cleanup/past-head.ts`,
     `packages/rafa-release/src/commands/release/status-fragments.ts`,
     `packages/rafa-release/src/next/epic-end.ts`,
@@ -917,28 +917,28 @@ names come from, and the facade entry is no node.
     sat in this group because the load-cycle group comes first. The sixth
     decouple item (rafa-1362) cut all five off pr: each takes core's git names,
     `MergedPullRequest` or the port from core now, so pr reads the eight left,
-    `src/claims/lost.ts`, `packages/rafa-pr/src/cleanup/worktrees.ts`,
-    `src/next/hint.ts`, `src/next/hop-rows.ts`, `src/next/readings.ts`,
-    `src/start/pr-lifecycle.ts`, `packages/rafa-pr/src/start/pr-retarget.ts` and
-    `src/start/suite-blocker.ts`. The seventh decouple item (rafa-1368) placed
+    `packages/rafa-run/src/claims/lost.ts`, `packages/rafa-pr/src/cleanup/worktrees.ts`,
+    `packages/rafa-run/src/next/hint.ts`, `packages/rafa-run/src/next/hop-rows.ts`, `packages/rafa-run/src/next/readings.ts`,
+    `packages/rafa-run/src/start/pr-lifecycle.ts`, `packages/rafa-pr/src/start/pr-retarget.ts` and
+    `packages/rafa-run/src/start/suite-blocker.ts`. The seventh decouple item (rafa-1368) placed
     `packages/rafa-pr/src/cleanup/worktrees.ts` and
     `packages/rafa-pr/src/start/pr-retarget.ts` in pr by name, so those two are
-    pr's own files and left the group, and `src/next/sources.ts` and
-    `relations-mode.ts`, the pr files `src/next/hint.ts` imported by path, in
+    pr's own files and left the group, and `packages/rafa-run/src/next/sources.ts` and
+    `relations-mode.ts`, the pr files `packages/rafa-run/src/next/hint.ts` imported by path, in
     run, so those two left pr for run. The run files that import a pr file by
-    path once the placement is made, `src/cleanup/index.ts`,
-    `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
-    `src/next/relations-mode.ts`, `src/next/settle-step.ts`,
-    `src/next/sources.ts` and `src/start/wrap-up-run.ts`, sat on the guard's pr
+    path once the placement is made, `packages/rafa-run/src/cleanup/index.ts`,
+    `packages/rafa-run/src/cleanup/steps.ts`, `packages/rafa-run/src/next/owner-gate.ts`,
+    `packages/rafa-run/src/next/relations-mode.ts`, `packages/rafa-run/src/next/settle-step.ts`,
+    `packages/rafa-run/src/next/sources.ts` and `packages/rafa-run/src/start/wrap-up-run.ts`, sat on the guard's pr
     row in this group until the item's rewire task read them, twelve with the
     five left. Its dry run read the four `src/next/` files on a load cycle and
-    the other three to rewire, and the codemod took `src/cleanup/index.ts`,
-    `src/cleanup/steps.ts` and `src/start/wrap-up-run.ts` onto the pr facade, so
+    the other three to rewire, and the codemod took `packages/rafa-run/src/cleanup/index.ts`,
+    `packages/rafa-run/src/cleanup/steps.ts` and `packages/rafa-run/src/start/wrap-up-run.ts` onto the pr facade, so
     pr reads nine. Run had nine: `packages/rafa-pr/src/cleanup/groups.ts`,
-    `src/cleanup/steps.ts`, `packages/rafa-release/src/next/epic-end.ts`,
-    `src/next/owner-gate.ts`,
+    `packages/rafa-run/src/cleanup/steps.ts`, `packages/rafa-release/src/next/epic-end.ts`,
+    `packages/rafa-run/src/next/owner-gate.ts`,
     `packages/rafa-board/src/next/relation-readings.ts`,
-    `src/next/settle-step.ts`, `src/next/sources.ts`,
+    `packages/rafa-run/src/next/settle-step.ts`, `packages/rafa-run/src/next/sources.ts`,
     `packages/rafa-pr/src/triage/base-run.ts` and
     `packages/rafa-pr/src/triage/inherited.ts`. The sixth decouple item cut
     `epic-end.ts` off run, since `watchDryEpic` reads only its board field, so
@@ -948,7 +948,7 @@ names come from, and the facade entry is no node.
     edges the decouple step before pass 4 cuts, since run moves last and no
     package imports it forward. The seventh decouple item left run none: it
     moved the suite runner, which `packages/rafa-pr/src/triage/base-run.ts` and
-    `inherited.ts` imported, into core, placed `src/cleanup/steps.ts`,
+    `inherited.ts` imported, into core, placed `packages/rafa-run/src/cleanup/steps.ts`,
     `owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and `sources.ts` in
     run by name, and placed `packages/rafa-pr/src/cleanup/worktrees.ts`, which
     `packages/rafa-pr/src/cleanup/groups.ts` imported, in pr, so the guard's run
@@ -1050,7 +1050,7 @@ names come from, and the facade entry is no node.
   lists them under `packages/rafa-pr/src/pr/index.ts`, and each was pointed at
   the barrel by hand before the run. Run's rewire refused 36 bindings on 9
   statements in 7 files, 34 of them taken through the barrels
-  `src/plan/index.ts` and `src/cleanup/index.ts` while the facade lists them
+  `src/plan/index.ts` and `packages/rafa-run/src/cleanup/index.ts` while the facade lists them
   under the preflight and cleanup files that define them, and `PreflightCheck`
   taken from `src/preflight/run.ts` while the facade lists it under
   `src/plan/index.ts`, so one rewire met both directions of the refusal; each

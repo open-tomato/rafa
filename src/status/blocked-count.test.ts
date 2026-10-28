@@ -33,13 +33,13 @@
  */
 import type { BlockedCountOptions } from './blocked-count.js';
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
-import type { CleanupSeams } from '../cleanup/index.js';
-import type { NextBoardOptions } from '../next/sources.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 import type { BlockedReading } from '@open-tomato/rafa-board/board/blocked';
 import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
 import type { BoardIssue, BoardIssueLink, BoardIssueLinks, BoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
+import type { CleanupSeams } from '@open-tomato/rafa-run/cleanup/index';
+import type { NextBoardOptions } from '@open-tomato/rafa-run/next/sources';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

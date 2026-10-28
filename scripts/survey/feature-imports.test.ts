@@ -57,7 +57,7 @@ describe('cut table: feature packages and the files left to place', () => {
   });
 
   // The live table held one feature edge into the CLI until the parser
-  // moved into core: `src/next/actions.ts` to `src/cli/core/parseArgs.ts`.
+  // moved into core: `packages/rafa-run/src/next/actions.ts` to `src/cli/core/parseArgs.ts`.
   // With it gone the case above holds for want of any edge, so the planted
   // table below is its control.
   it('reads no feature edge into the CLI at all, while files are still left to place', () => {

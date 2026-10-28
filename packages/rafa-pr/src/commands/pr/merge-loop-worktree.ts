@@ -4,7 +4,7 @@
  * refusing on it.
  *
  * A loop started with a worktree runs in `loop.worktreeDir/<stub>`
- * (`worktreePathFor`, `src/start/worktree.ts`) on `feat/<stub>`, and it
+ * (`worktreePathFor`, `packages/rafa-run/src/start/worktree.ts`) on `feat/<stub>`, and it
  * leaves that worktree behind when it ends. Its pull request is then
  * merged from the main checkout, where `readMergeRefusal`
  * (`packages/rafa-pr/src/pr/merge.ts`) refuses, because the clean-up deletes a branch

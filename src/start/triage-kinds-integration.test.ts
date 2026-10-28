@@ -26,11 +26,11 @@
  *   - a report with no `kind` key is filed exactly as the same report is
  *     with the kind routing left out, draft for draft.
  */
-import type { StartKindOptions } from './triage-kinds.js';
-import type { StartTriageOptions, TaskTriageInput } from './triage.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
 import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
+import type { StartTriageOptions, TaskTriageInput } from '@open-tomato/rafa-run/start/triage';
+import type { StartKindOptions } from '@open-tomato/rafa-run/start/triage-kinds';
 
 import {
   mkdirSync,
@@ -62,10 +62,9 @@ import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adap
 import { createBaseRunCache, runNamedTestAt } from '@open-tomato/rafa-pr/triage/base-run';
 import { LEFTOVER_MARKER } from '@open-tomato/rafa-pr/triage/leftover-repair';
 import { createPrivateTriageTracker } from '@open-tomato/rafa-pr/triage/triage';
+import { createStartTriage } from '@open-tomato/rafa-run/start/triage';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-
-import { createStartTriage } from './triage.js';
 
 /** Each case that runs a test runs `bun test` in a worktree, so it is given room. */
 const RUN_TIMEOUT_MS = 60_000;

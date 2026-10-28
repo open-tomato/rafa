@@ -68,12 +68,15 @@ export const BOARD_NAMED: readonly string[] = [
  * since each reaches only pr and core (`worktrees.ts` `parseWorktrees`
  * of `packages/rafa-pr/src/pr/merge.ts`, `pr-retarget.ts` the port types
  * of `packages/rafa-pr/src/pr/index.ts`), and moved
- * `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
- * `src/next/relations-mode.ts`, `src/next/settle-step.ts` and
- * `src/next/sources.ts` to the run list. Since pass 4e the list names
- * each file at its path in pr's package, `packages/rafa-pr/src/`, where
- * the `packages/rafa-pr/` folder of `CUT_RULES` would place it too; the
- * order is the one it had, since the paths share the prefix.
+ * `packages/rafa-run/src/cleanup/steps.ts`,
+ * `packages/rafa-run/src/next/owner-gate.ts`,
+ * `packages/rafa-run/src/next/relations-mode.ts`,
+ * `packages/rafa-run/src/next/settle-step.ts` and
+ * `packages/rafa-run/src/next/sources.ts` to the run list. Since pass 4e
+ * the list names each file at its path in pr's package,
+ * `packages/rafa-pr/src/`, where the `packages/rafa-pr/` folder of
+ * `CUT_RULES` would place it too; the order is the one it had, since the
+ * paths share the prefix.
  */
 export const PR_NAMED: readonly string[] = [
   'packages/rafa-pr/src/bugs/filed-values.ts',
@@ -88,46 +91,53 @@ export const PR_NAMED: readonly string[] = [
 
 /**
  * The files named for `rafa-run`, the root files that reach the run
- * package, `src/next/preconditions.ts` among them. The five section
- * files, `config-schema-checks.ts`, `config-schema-loop-continue.ts`,
- * `config-schema-loop-retries.ts`, `config-schema-tests.ts` and
- * `config-schema-wrap-up.ts`, left the list in the third decouple item
- * (rafa-1325), which moves them into core's package, where the
- * `packages/rafa/` folder of `CUT_RULES` places them. The fourth decouple
- * item (rafa-1333) moved `packages/rafa/src/plan/validate.ts` into core's
- * package too, and the same folder places it, and placed
+ * package, `packages/rafa-run/src/next/preconditions.ts` among them. The
+ * five section files, `config-schema-checks.ts`,
+ * `config-schema-loop-continue.ts`, `config-schema-loop-retries.ts`,
+ * `config-schema-tests.ts` and `config-schema-wrap-up.ts`, left the list
+ * in the third decouple item (rafa-1325), which moves them into core's
+ * package, where the `packages/rafa/` folder of `CUT_RULES` places them.
+ * The fourth decouple item (rafa-1333) moved
+ * `packages/rafa/src/plan/validate.ts` into core's package too, and the
+ * same folder places it, and placed
  * `packages/rafa-board/src/epic/verify-run.ts` in board by name, since it
  * reaches only board and core. The seventh decouple item (rafa-1368)
- * placed `src/cleanup/steps.ts`, `src/next/owner-gate.ts`,
- * `src/next/relations-mode.ts`, `src/next/settle-step.ts` and
- * `src/next/sources.ts` here by the same rule read with type edges, since
- * each reads run's types and is imported only by run and the CLI, and
- * moved `packages/rafa-pr/src/cleanup/worktrees.ts` to the pr list,
- * since it reaches only pr and core. Pass 4f moved `src/plan/index.ts`,
- * the published `./plan` entry, to the CLI's list.
+ * placed `packages/rafa-run/src/cleanup/steps.ts`,
+ * `packages/rafa-run/src/next/owner-gate.ts`,
+ * `packages/rafa-run/src/next/relations-mode.ts`,
+ * `packages/rafa-run/src/next/settle-step.ts` and
+ * `packages/rafa-run/src/next/sources.ts` here by the same rule read with
+ * type edges, since each reads run's types and is imported only by run
+ * and the CLI, and moved `packages/rafa-pr/src/cleanup/worktrees.ts` to
+ * the pr list, since it reaches only pr and core. Pass 4f moved
+ * `src/plan/index.ts`, the published `./plan` entry, to the CLI's list.
+ * Since pass 4f the list names each file at its path in run's package,
+ * `packages/rafa-run/src/`, where the `packages/rafa-run/` folder of
+ * `CUT_RULES` would place it too; the order is the one it had, since the
+ * paths share the prefix.
  */
 export const RUN_NAMED: readonly string[] = [
-  'src/cleanup/index.ts',
-  'src/cleanup/remote-only.ts',
-  'src/cleanup/runs.ts',
-  'src/cleanup/steps.ts',
-  'src/commands/switch.ts',
-  'src/loop/events-file.ts',
-  'src/next/actions.ts',
-  'src/next/ending.ts',
-  'src/next/hint.ts',
-  'src/next/hop-action.ts',
-  'src/next/hop-rows.ts',
-  'src/next/owner-gate.ts',
-  'src/next/preconditions.ts',
-  'src/next/readings.ts',
-  'src/next/relations-mode.ts',
-  'src/next/settle-step.ts',
-  'src/next/sources.ts',
-  'src/next/state.ts',
-  'src/plan/list.ts',
-  'src/plan/store-rules.ts',
-  'src/runtime/install.ts',
+  'packages/rafa-run/src/cleanup/index.ts',
+  'packages/rafa-run/src/cleanup/remote-only.ts',
+  'packages/rafa-run/src/cleanup/runs.ts',
+  'packages/rafa-run/src/cleanup/steps.ts',
+  'packages/rafa-run/src/commands/switch.ts',
+  'packages/rafa-run/src/loop/events-file.ts',
+  'packages/rafa-run/src/next/actions.ts',
+  'packages/rafa-run/src/next/ending.ts',
+  'packages/rafa-run/src/next/hint.ts',
+  'packages/rafa-run/src/next/hop-action.ts',
+  'packages/rafa-run/src/next/hop-rows.ts',
+  'packages/rafa-run/src/next/owner-gate.ts',
+  'packages/rafa-run/src/next/preconditions.ts',
+  'packages/rafa-run/src/next/readings.ts',
+  'packages/rafa-run/src/next/relations-mode.ts',
+  'packages/rafa-run/src/next/settle-step.ts',
+  'packages/rafa-run/src/next/sources.ts',
+  'packages/rafa-run/src/next/state.ts',
+  'packages/rafa-run/src/plan/list.ts',
+  'packages/rafa-run/src/plan/store-rules.ts',
+  'packages/rafa-run/src/runtime/install.ts',
 ];
 
 /**
