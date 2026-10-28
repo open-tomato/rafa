@@ -43,7 +43,7 @@
  * before any run; the report reads the whole type from here.
  */
 import type { RunnableReference } from './test-reference.js';
-import type { SuiteResult } from '../suite/run.js';
+import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { posix } from 'node:path';
 

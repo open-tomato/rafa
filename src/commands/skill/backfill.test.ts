@@ -34,8 +34,6 @@
  */
 import type { CapturedSession, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,9 +41,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
+import { DRAFT_FILE, REVIEWED_FILE } from '@open-tomato/rafa-inventory/backfill/proposal-file';
 
-import { DRAFT_FILE, REVIEWED_FILE } from '../../backfill/proposal-file.js';
-import { readFrontmatterDocument } from '../../schema/frontmatter.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import {

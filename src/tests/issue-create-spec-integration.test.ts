@@ -1,7 +1,7 @@
 /**
  * An integration suite over `rafa issue create` filing a spec, dispatched
  * in-process over the recorded `gh` fake as a fixture board
- * (`src/commands/issue/create.ts`): the lines the command refuses file
+ * (`packages/rafa-board/src/commands/issue/create.ts`): the lines the command refuses file
  * nothing and exit 1, and `--type=spec --body-file=spec.md` files
  * `type:spec` with the file's bytes, `spec:blocked` added when the body's
  * first line is `Blocked by: #20`.
@@ -10,7 +10,6 @@
  * refused line is checked against the issue count and the `gh` calls
  * that file (`issue create`), beside a line the same board takes.
  */
-import '../adapter-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,10 +17,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createFakeGh } from '../adapters/tracker/github-fake.js';
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { SPEC_LABEL } from '../board/issue.js';
-import { createIssueCreateCommand } from '../commands/issue/create.js';
+import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { createIssueCreateCommand } from '@open-tomato/rafa-board/commands/issue/create';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
 

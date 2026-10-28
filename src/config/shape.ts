@@ -45,20 +45,20 @@
  *
  * Every type is `import type`, so this module loads nothing.
  */
-import type { BoardProjectLimitsShape } from '../config-schema-board-project.js';
-import type { BugsShape } from '../config-schema-bugs.js';
-import type { ChecksShape } from '../config-schema-checks.js';
-import type { ErrorsShape } from '../config-schema-errors.js';
-import type { FeaturesShape } from '../config-schema-features.js';
-import type { HubShape } from '../config-schema-hub.js';
-import type { IssuesShape } from '../config-schema-issues.js';
-import type { LoggerShape } from '../config-schema-logger.js';
-import type { LoopContinueShape } from '../config-schema-loop-continue.js';
-import type { LoopRetriesShape } from '../config-schema-loop-retries.js';
-import type { ReleaseDangerousShape, ReleaseShape } from '../config-schema-release.js';
-import type { TestsShape } from '../config-schema-tests.js';
-import type { TriageShape } from '../config-schema-triage.js';
-import type { WrapUpShape } from '../config-schema-wrap-up.js';
+import type { BoardProjectLimitsShape } from '@open-tomato/rafa/config-schema-board-project';
+import type { BugsShape } from '@open-tomato/rafa/config-schema-bugs';
+import type { ChecksShape } from '@open-tomato/rafa/config-schema-checks';
+import type { ErrorsShape } from '@open-tomato/rafa/config-schema-errors';
+import type { FeaturesShape } from '@open-tomato/rafa/config-schema-features';
+import type { HubShape } from '@open-tomato/rafa/config-schema-hub';
+import type { IssuesShape } from '@open-tomato/rafa/config-schema-issues';
+import type { LoggerShape } from '@open-tomato/rafa/config-schema-logger';
+import type { LoopContinueShape } from '@open-tomato/rafa/config-schema-loop-continue';
+import type { LoopRetriesShape } from '@open-tomato/rafa/config-schema-loop-retries';
+import type { ReleaseDangerousShape, ReleaseShape } from '@open-tomato/rafa/config-schema-release';
+import type { TestsShape } from '@open-tomato/rafa/config-schema-tests';
+import type { TriageShape } from '@open-tomato/rafa/config-schema-triage';
+import type { WrapUpShape } from '@open-tomato/rafa/config-schema-wrap-up';
 import type {
   ModuleSourceKind,
   PrerequisiteKind,
@@ -112,7 +112,7 @@ export type ModuleFileItem =
   };
 
 /**
- * The `loop` namespace: core's two keys, and the keys the
+ * The `loop` namespace: core's three keys, and the keys the
  * `loop-retries`, `loop-continue` and `wrap-up` sections write.
  */
 export interface LoopShape extends LoopRetriesShape, LoopContinueShape, WrapUpShape {
@@ -120,6 +120,8 @@ export interface LoopShape extends LoopRetriesShape, LoopContinueShape, WrapUpSh
   readonly settingSources: string;
   /** `loop.worktreeDir`: where the loop's worktrees are made. */
   readonly worktreeDir: string;
+  /** `loop.worktreeSetup`: the shell command run in a new or reused `--as-worktree` worktree, or null for none. */
+  readonly worktreeSetup: string | null;
 }
 
 /** The `board.project` namespace: core's two keys and the `board-project` section's limits. */

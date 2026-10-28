@@ -49,11 +49,11 @@
  * declaration is spelled `PlanTask['declaration']`, not imported from
  * the declaration module through here. The config's `PrerequisiteItem`
  * stays out by the same rule, spelled `PreflightTiers['required'][number]`
- * here and exported by name from the package root. Two exports of
- * `src/preflight/` stay out too: `forkWorktree` (`fork.ts`), with the
- * command runner it spawns through, which nothing calls until the loop
- * forks worktrees, and `firstLineOf`, the wording helper the runner and
- * the fork share.
+ * here and exported by name from the package root. Two preflight
+ * exports stay out too: `forkWorktree` (`packages/rafa-run/src/preflight/fork.ts`), with
+ * the command runner it spawns through, which nothing calls until the
+ * loop forks worktrees, and `firstLineOf`, the wording helper the
+ * runner and the fork share.
  *
  * ## Four parts live outside this directory
  *
@@ -65,10 +65,12 @@
  * The roadmap puts the report parser under this subpath too, but a
  * report is no plan: it is read out of a session's output, by
  * `packages/rafa/src/report/parse.ts`. The preflight is no plan either: it checks what
- * a run needs, in `src/preflight/`, and reads a plan only for the
- * PREREQUISITES file beside it. Both are exported from here all the
- * same, so a service implementing against `./plan` reaches them through
- * one entry.
+ * a run needs, and reads a plan only for the PREREQUISITES file beside
+ * it. It is core's, in `packages/rafa/src/preflight/`, and this entry
+ * takes its names from the subpaths `@open-tomato/rafa/preflight/run`
+ * and `@open-tomato/rafa/preflight/prerequisites-md`. Both are exported
+ * from here all the same, so a service implementing against `./plan`
+ * reaches them through one entry.
  *
  * ## Importing the entry from inside the package
  *
@@ -87,7 +89,7 @@ export type {
   PrerequisiteReminder,
   PrerequisiteSettings,
   PrerequisiteTag,
-} from '../preflight/prerequisites-md.js';
+} from '@open-tomato/rafa/preflight/prerequisites-md';
 export type {
   CheckOutcome,
   PreflightCheck,
@@ -101,7 +103,7 @@ export type {
   ProbeRunner,
   ServiceRequester,
   ServiceRequestInit,
-} from '../preflight/run.js';
+} from '@open-tomato/rafa/preflight/run';
 export type {
   FindingKind,
   FindingSignal,
@@ -125,7 +127,7 @@ export type {
   InjectionRequest,
   InjectionTask,
   PlanInjection,
-} from './inject.js';
+} from '@open-tomato/rafa/plan/inject';
 export type {
   PlanBlockKind,
   PlanHeader,
@@ -146,9 +148,9 @@ export {
   parsePrerequisites,
   planPrerequisites,
   prerequisitesPathForPlan,
-} from '../preflight/prerequisites-md.js';
-export { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '../preflight/run.js';
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+export { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '@open-tomato/rafa/preflight/run';
 export { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '@open-tomato/rafa/report/parse';
 export { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
-export { renderInjection } from './inject.js';
+export { renderInjection } from '@open-tomato/rafa/plan/inject';
 export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from '@open-tomato/rafa/core/plan';

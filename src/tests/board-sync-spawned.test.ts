@@ -1,5 +1,5 @@
 /**
- * Spawned proof for `rafa board sync` (`src/commands/board/sync.ts`): the
+ * Spawned proof for `rafa board sync` (`packages/rafa-board/src/commands/board/sync.ts`): the
  * spec's definition of done, "a label edited outside rafa makes
  * `--dry-run` print that one change, a sync make it, and a second
  * `--dry-run` print none" (`.rafa/specs/rafa-791-github-project-each-repository.md`,
@@ -9,10 +9,10 @@
  * ## The stand-in `gh`
  *
  * A spawned child reaches `gh` only through its own process, so the
- * in-process router of `src/board/project/sync-fake.ts` cannot serve it
+ * in-process router of `packages/rafa-board/src/board/project/sync-fake.ts` cannot serve it
  * alone. `gh` on the scratch PATH is a shell script that execs bun on
  * `<scratch>/gh-stand-in.ts`, which calls {@link answerStandIn}
- * (`src/board/project/sync-stand-in.ts`): the router rebuilt from
+ * (`packages/rafa-board/src/board/project/sync-stand-in.ts`): the router rebuilt from
  * `<scratch>/board-state.json` for each call, its project items and
  * values written back there after it. Every call is logged as a JSON
  * array to `<scratch>/gh-calls.log`, so the case counts writes and adds
@@ -20,7 +20,7 @@
  *
  * The state holds the open issues' project items, with no values to
  * start. The first `rafa board sync` fills them, the convergence the
- * in-process case of `src/commands/board/sync.test.ts` also starts from,
+ * in-process case of `src/tests/board-coupled/commands/board/sync.test.ts` also starts from,
  * so the drift that follows is the only change a dry run can show. The
  * label edit is a rewrite of the state file's `labels`, as a web UI edit
  * would leave the issue.
@@ -33,7 +33,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { syncAddCalls, syncWriteCalls } from '../board/project/sync-fake.js';
+import { syncAddCalls, syncWriteCalls } from '@open-tomato/rafa-board/board/project/sync-fake';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { callsLogged, editLabelsOutsideRafa, plantStandInGh, withoutProgressLines } from './project-stand-in-spawn.js';

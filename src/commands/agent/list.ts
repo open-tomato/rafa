@@ -6,7 +6,7 @@
  * run cannot reach.
  *
  * Every row is an {@link InventoryRecord} of kind `agent` as
- * `buildInventory` (`src/inventory/index.ts`) decides it, so
+ * `buildInventory` (`packages/rafa-inventory/src/inventory/index.ts`) decides it, so
  * precedence, `collision`, `shadowed-by:` and `visibleToLoop` are
  * decided there and only there, and this command filters and prints
  * them. A `collision` row is one of two loaded tiers' different
@@ -79,23 +79,21 @@
  * naming nothing it can take, a config that cannot be used, and a `-i`
  * that cannot browse. `ctrl-c` inside a browse is exit code 130.
  */
-import type { Inventory } from '../../inventory/index.js';
-import type { InventoryRecord } from '../../inventory/record.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { SkillListFilters, SkillListSeams, SkillTreeListing, StateFilter } from '../skill/list.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { Inventory, InventoryRecord } from '@open-tomato/rafa-inventory';
 
+import { VENDOR_COMMAND, buildInventory, pathDirectories } from '@open-tomato/rafa-inventory';
+
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 import { SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
 
-import { VENDOR_COMMAND } from '../../agents/roster.js';
-import { pathDirectories } from '../../check/references.js';
-import { buildInventory } from '../../inventory/index.js';
-import { loadModules, moduleSettings } from '../../modules/load.js';
-import { expectNoArgument } from '../plan/plan-files.js';
 import {
   browseListing,
   HIDDEN_MARK,

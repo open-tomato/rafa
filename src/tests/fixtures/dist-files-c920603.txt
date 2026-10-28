@@ -49,6 +49,7 @@ continue-criteria.md
 continue-decision-prompt.md
 core/command/command.d.ts
 core/command/confirm.d.ts
+core/command/global-flags.d.ts
 core/command/index.d.ts
 core/command/lazy.d.ts
 core/command/registry-types.d.ts
@@ -59,6 +60,7 @@ core/command/types.d.ts
 core/command/version.d.ts
 core/config/branch-template.d.ts
 core/config/config-items.d.ts
+core/config/config-load-module.d.ts
 core/config/config-load.d.ts
 core/config/config-origins.d.ts
 core/config/config-readers.d.ts
@@ -69,6 +71,7 @@ core/config/core-section.d.ts
 core/config/dangerous.d.ts
 core/config/default-routing.d.ts
 core/config/index.d.ts
+core/config/merge-method.d.ts
 core/config/scope.d.ts
 core/config/section.d.ts
 core/config/sections.d.ts
@@ -149,8 +152,6 @@ ports/index.js
 ports/learning.d.ts
 ports/log-level.d.ts
 ports/spec-review.d.ts
-pr/checks.d.ts
-pr/types.d.ts
 ready-<hash>.js
 release-templates/release-bot-fragment.yml
 release-templates/release-publish.yml

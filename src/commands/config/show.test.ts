@@ -4,9 +4,9 @@
  * home, and the defaults: both views, in text and as json `data`, and
  * the refusals.
  *
- * `pr.base` is the key the project's file sets and `pr.mergeMethod` the
- * one the user's sets, so a reading that named every setting `default`,
- * or every one `project`, would fail on one of them. The module-file
+ * `pr.base` is the key the project's YAML file sets and `pr.mergeMethod`
+ * the one the user's sets, so a reading that named every setting
+ * `default`, or every one `local`, would fail on one of them. The module-file
  * case sets `naming.branch` in the second entry of a `rafa.config.ts`,
  * so an entry index read as 0 for every setting would fail there, and
  * its first entry's `pr.base` is the control reading 0. The template
@@ -17,17 +17,15 @@
 import type { ConfigShowResult, ConfigShowSource } from './show.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
 
-import { setActiveLoggerSettings } from '../../adapters/logger/settings.js';
 import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../../config-registry.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
@@ -137,7 +135,7 @@ describe('rafa config show', () => {
     expect(outcome.exitCode).toBe(0);
     const lines = outcome.stdout.trimEnd().split('\n');
     expect(lines).toHaveLength(SETTING_NAMES.length);
-    expect(lines).toContain(`pr.base: "stretch/9"  from project ${projectFile} entry 0`);
+    expect(lines).toContain(`pr.base: "stretch/9"  from local ${projectFile} entry 0`);
     expect(lines).toContain(`pr.mergeMethod: "rebase"  from user ${userFile} entry 0`);
     expect(lines).toContain(`effort.busyTimeoutMs: ${String(CONFIG_DEFAULTS.effortBusyTimeoutMs)}  from default`);
   });
@@ -150,7 +148,7 @@ describe('rafa config show', () => {
     expect(data.view).toBe('sources');
     if (data.view !== 'sources') return;
     expect(data.settings.map((row) => row.key).sort()).toEqual(SETTING_NAMES.map((setting) => SETTINGS[setting].key).sort());
-    expect(rowOf(data, 'pr.base')).toEqual({ key: 'pr.base', value: 'stretch/9', layer: 'project', file: join(project.root, '.rafa', 'config.yaml'), entry: 0 });
+    expect(rowOf(data, 'pr.base')).toEqual({ key: 'pr.base', value: 'stretch/9', layer: 'local', file: join(project.root, '.rafa', 'config.yaml'), entry: 0 });
     expect(rowOf(data, 'pr.mergeMethod')).toEqual({ key: 'pr.mergeMethod', value: 'rebase', layer: 'user', file: join(project.home, '.rafa', 'config.yaml'), entry: 0 });
     expect(rowOf(data, 'pr.provider')).toEqual({ key: 'pr.provider', value: null, layer: 'default', file: null, entry: null });
   });
@@ -168,6 +166,22 @@ describe('rafa config show', () => {
     expect(outcome.stdout).toContain(`pr.base: "trunk"  from project ${moduleFile} entry 0\n`);
   });
 
+  it('names the YAML file as local over a module file named project, in a project holding both', async () => {
+    const project = plant(PROJECT_CONFIG);
+    const yamlFile = join(project.root, '.rafa', 'config.yaml');
+    const moduleFile = join(project.root, 'rafa.config.ts');
+    writeFileSync(moduleFile, 'export default [{ templates: [\'escalation\'], pr: { base: \'trunk\' } }];\n', 'utf8');
+
+    const outcome = await run(project, ['--sources']);
+    const data = dataOf(await run(project, ['--sources', '--output=json']));
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain(`pr.base: "stretch/9"  from local ${yamlFile} entry 0\n`);
+    expect(outcome.stdout).toContain(`templates: ["escalation"]  from project ${moduleFile} entry 0\n`);
+    expect(rowOf(data, 'pr.base')).toEqual({ key: 'pr.base', value: 'stretch/9', layer: 'local', file: yamlFile, entry: 0 });
+    expect(rowOf(data, 'templates')).toEqual({ key: 'templates', value: ['escalation'], layer: 'project', file: moduleFile, entry: 0 });
+  });
+
   it('names template:<name> and the file naming it for a key a template answered and no file outranked', async () => {
     const project = plant('version: 1\ntemplates: [escalation]\nchecks:\n  stage: [related]\n');
     const projectFile = join(project.root, '.rafa', 'config.yaml');
@@ -177,7 +191,7 @@ describe('rafa config show', () => {
 
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain(`checks.task: ["affected"]  from template:escalation ${projectFile} entry 0\n`);
-    expect(outcome.stdout).toContain(`checks.stage: ["related"]  from project ${projectFile} entry 0\n`);
+    expect(outcome.stdout).toContain(`checks.stage: ["related"]  from local ${projectFile} entry 0\n`);
     expect(rowOf(data, 'checks.loop')).toEqual({ key: 'checks.loop', value: ['full'], layer: 'template:escalation', file: projectFile, entry: 0 });
     expect(rowOf(data, 'checks.publish')).toEqual({ key: 'checks.publish', value: [], layer: 'default', file: null, entry: null });
   });

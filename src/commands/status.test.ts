@@ -24,11 +24,9 @@
  *   the same line without the word, which reads.
  */
 import type { StatusCommandSeams } from './status.js';
-import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
-
-import '../adapter-registry.js';
+import type { PullBeforeReadInput } from '@open-tomato/rafa-effort/effort/sync/contact';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -14,7 +14,8 @@
  * setting at a value that differs from the other's — `version` and
  * `release.strategy` are the exceptions, since each accepts one value. Loading them
  * together through `loadConfig` and reading `PROJECT_VALUES` back off
- * every setting, every source labelled `file`, is what shows the project
+ * every setting, every source labelled `local` (a project's
+ * `.rafa/config.yaml` is its local layer), is what shows the project
  * file outranks the user's key by key rather than by accident; the
  * paired control loads the user file alone, under the same home, and
  * reads `USER_VALUES` back, every source `user`. A third set of values,
@@ -53,6 +54,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import {
   ConfigError,
   ConfigSectionError,
@@ -63,7 +65,6 @@ import {
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
 
-import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-layers-'));
@@ -191,6 +192,7 @@ const PROJECT_TEXT = [
   'loop:',
   '  settingSources: user, project',
   '  worktreeDir: user-trees',
+  '  worktreeSetup: make user-setup',
   '  retries: 3',
   '  retriesOnContinue: 3',
   '  continue:',
@@ -360,6 +362,7 @@ const PROJECT_VALUES: RafaConfig = {
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
   loopWorktreeDir: 'user-trees',
+  loopWorktreeSetup: 'make user-setup',
   loopRetries: 3,
   loopRetriesOnContinue: 3,
   loopContinueCriteria: 'user-criteria.md',
@@ -495,6 +498,7 @@ const USER_TEXT = [
   'loop:',
   '  settingSources: project, local',
   '  worktreeDir: ../project-trees',
+  '  worktreeSetup: bun install --frozen-lockfile',
   '  retries: 1',
   '  retriesOnContinue: false',
   '  continue:',
@@ -649,6 +653,7 @@ const USER_VALUES: RafaConfig = {
   allowList: ['rafa-linear', 'my-output'],
   settingSources: ['project', 'local'],
   loopWorktreeDir: '../project-trees',
+  loopWorktreeSetup: 'bun install --frozen-lockfile',
   loopRetries: 1,
   loopRetriesOnContinue: false,
   loopContinueCriteria: 'project-criteria.md',
@@ -755,7 +760,7 @@ describe('loadConfig across the whole schema', () => {
     const resolved = await loadConfig(roots, {}, quiet);
 
     expect(resolved.config).toEqual(PROJECT_VALUES);
-    expect(resolved.sources).toEqual(sourcesWith({}, 'file'));
+    expect(resolved.sources).toEqual(sourcesWith({}, 'local'));
 
     // The control: the same home with no project file to outrank it
     // answers the user's own values, so the project's above was a real
@@ -791,13 +796,13 @@ describe('loadConfig across the whole schema', () => {
       outputMode: 'cli',
       settingSources: 'cli',
       taskSkills: 'cli',
-    }, 'file'));
+    }, 'local'));
 
     // The control: the same roots with no flag answer the project's
     // values for every setting the flag named above.
     const unflagged = await loadConfig(roots, {}, quiet);
     expect(unflagged.config).toEqual(PROJECT_VALUES);
-    expect(unflagged.sources).toEqual(sourcesWith({}, 'file'));
+    expect(unflagged.sources).toEqual(sourcesWith({}, 'local'));
   });
 });
 
@@ -808,7 +813,7 @@ describe('an unknown key nested under a section', () => {
     const resolved = await loadConfig(roots, {}, warn);
 
     expect(resolved.config.trackerDefault).toBe('linear');
-    expect(resolved.extras).toEqual([{ key: 'tracker.kind', value: 'legacy' }]);
+    expect(resolved.localExtras).toEqual([{ key: 'tracker.kind', value: 'legacy' }]);
     expect(lines).toEqual([
       `rafa config: unknown key "tracker.kind" in ${literalPath(roots.root)} `
         + 'has no effect in this version (known keys under tracker: default, fallback)',
@@ -951,6 +956,10 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
   [
     'loop.worktreeDir', 'loop:\n  worktreeDir: []', 'loop.worktreeDir is a list, expected a directory path',
     'loop:\n  worktreeDir: trees', 'loopWorktreeDir', 'trees',
+  ],
+  [
+    'loop.worktreeSetup', 'loop:\n  worktreeSetup: 7', 'loop.worktreeSetup is 7, expected a shell command',
+    'loop:\n  worktreeSetup: make setup', 'loopWorktreeSetup', 'make setup',
   ],
   [
     'loop.retries', 'loop:\n  retries: 0',
@@ -1398,13 +1407,13 @@ describe('each section, an unusable value refused by name beside an accepting co
   );
 
   it.each(SECTION_CASES)(
-    'accepts a usable %s into the config, sourced from the file',
+    'accepts a usable %s into the config, sourced from the local file',
     async (_label, _unusable, _problem, usable, setting, expected) => {
       const roots = scopes(`${usable}\n`, null);
       const resolved = await loadConfig(roots, {}, quiet);
 
       expect<unknown>(resolved.config[setting]).toEqual(expected);
-      expect(resolved.sources[setting]).toBe('file');
+      expect(resolved.sources[setting]).toBe('local');
     },
   );
 });
@@ -1422,7 +1431,7 @@ describe('maps merged across the user and project layers', () => {
       ['react-query', 'user'],
       ['lint', 'rafa'],
     ]));
-    expect(resolved.sources.tiersSkills).toBe('file');
+    expect(resolved.sources.tiersSkills).toBe('local');
   });
 
   it('merges routing by key over the defaults, user rows then project rows', async () => {
@@ -1487,7 +1496,7 @@ describe('a user-level pin naming an unloaded tier', () => {
  * covers only with an absolute path.
  */
 describe('the release plan\'s six keys, through loadConfig', () => {
-  it('reads all six from .rafa/config.yaml, sourced from the file', async () => {
+  it('reads all six from .rafa/config.yaml, sourced from the local file', async () => {
     const roots = scopes(
       [
         'pr:',
@@ -1514,12 +1523,12 @@ describe('the release plan\'s six keys, through loadConfig', () => {
       dangerousAcceptVersionCollision: true,
     });
     expect(resolved.sources).toMatchObject({
-      prVersionCollision: 'file',
-      releaseFragments: 'file',
-      releaseStrategy: 'file',
-      releaseSettle: 'file',
-      releaseTag: 'file',
-      dangerousAcceptVersionCollision: 'file',
+      prVersionCollision: 'local',
+      releaseFragments: 'local',
+      releaseStrategy: 'local',
+      releaseSettle: 'local',
+      releaseTag: 'local',
+      dangerousAcceptVersionCollision: 'local',
     });
   });
 
@@ -1611,7 +1620,7 @@ describe('the escalation template over the checks and the three glob keys', () =
     expect(resolved.sources).toMatchObject({ checksTask: 'default', testsIntegration: 'default' });
   });
 
-  it('lets a written checks.stage replace the template\'s entry alone, sourced from the file', async () => {
+  it('lets a written checks.stage replace the template\'s entry alone, sourced from the local file', async () => {
     const resolved = await loadConfig(
       scopes('templates: [escalation]\nchecks:\n  stage: [related]\n', null),
       {},
@@ -1619,7 +1628,7 @@ describe('the escalation template over the checks and the three glob keys', () =
     );
 
     expect(resolved.config.checksStage).toEqual(['related']);
-    expect(resolved.sources.checksStage).toBe('file');
+    expect(resolved.sources.checksStage).toBe('local');
     expect(resolved.config.checksTask).toEqual(['affected']);
     expect(resolved.sources.checksTask).toBe('template');
   });
@@ -1640,7 +1649,7 @@ describe('every registered setting, resolved through loadConfig', () => {
 
     for (const name of SETTING_NAMES) {
       expect({ name, value: both.config[name], source: both.sources[name] })
-        .toEqual({ name, value: PROJECT_VALUES[name], source: 'file' });
+        .toEqual({ name, value: PROJECT_VALUES[name], source: 'local' });
       expect({ name, value: userOnly.config[name], source: userOnly.sources[name] })
         .toEqual({ name, value: USER_VALUES[name], source: 'user' });
       expect({ name, value: neither.config[name], source: neither.sources[name] })
@@ -1725,20 +1734,22 @@ describe('loadConfig over a project whose rafa.config.ts holds only types', () =
     expect(resolved.sources.prBase).toBe('user');
   });
 
-  it('reads the TS file over a YAML file of the same scope, warning about the shadow once', async () => {
+  it('reads a YAML file over the TS file of the same scope key by key, warning about neither', async () => {
     const roots = scopes('naming:\n  branch: yaml/{stub}\npr:\n  base: yaml-base\n', null);
+    const yaml = literalPath(roots.root);
     const ts = writeAt(
       join(roots.root, 'rafa.config.ts'),
-      typedModuleText([{ naming: { branch: 'ts/{stub}' } }]),
+      typedModuleText([{ naming: { branch: 'ts/{stub}' }, plan: { dir: 'ts-plans' } }]),
     );
     const { lines, warn } = sink();
     const resolved = await withCwd(roots.root, () => loadConfig(roots, {}, warn));
 
-    expect(resolved.config.namingBranch).toBe('ts/{stub}');
-    expect([resolved.config.prBase, resolved.sources.prBase]).toEqual([CONFIG_DEFAULTS.prBase, 'default']);
-    expect(resolved.shadowed).toEqual([{ layer: 'project', path: literalPath(roots.root), by: ts }]);
-    expect(lines.filter((line) => line.includes(literalPath(roots.root)))).toHaveLength(1);
-    expect(lines).toHaveLength(1);
+    expect([resolved.config.namingBranch, resolved.sources.namingBranch, resolved.provenance.namingBranch])
+      .toEqual(['yaml/{stub}', 'local', { file: yaml, entry: 0 }]);
+    expect([resolved.config.prBase, resolved.sources.prBase]).toEqual(['yaml-base', 'local']);
+    expect([resolved.config.planDir, resolved.sources.planDir, resolved.provenance.planDir])
+      .toEqual(['ts-plans', 'file', { file: ts, entry: 0 }]);
+    expect(lines).toEqual([]);
   });
 
   it('warns about two entries of one TS file setting pr.base at warn, and refuses at error', async () => {

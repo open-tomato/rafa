@@ -10,16 +10,16 @@
  * Each fault is found by the module that already reads it, and printed in
  * that module's words: this one never respells a fault.
  *
- * - An OWNER is the `Owner:` line `readBoardBody` (`src/board/board-body.ts`)
+ * - An OWNER is the `Owner:` line `readBoardBody` (`packages/rafa-board/src/board/board-body.ts`)
  *   reads off each open `type:roadmap` board, asked of GitHub through one
- *   `createOwnerResolver` (`src/board/owner-resolve.ts`), so a handle two
+ *   `createOwnerResolver` (`packages/rafa-board/src/board/owner-resolve.ts`), so a handle two
  *   boards name is asked once. `unresolved` is a fault; `unknown` is a
  *   line saying the owner could not be checked and why, since nobody said
  *   the handle is wrong and nobody said it is right.
  * - The UNLABELLED Roadmaps are `DefaultBoard.unlabelled`, found by
- *   `resolveDefaultBoard` (`src/board/boards.ts`) and worded by
+ *   `resolveDefaultBoard` (`packages/rafa-board/src/board/boards.ts`) and worded by
  *   `unlabelledRoadmapMessage`: one sentence naming every such issue.
- * - The POSITION is checked by `resolvePlace` (`src/board/place.ts`), and
+ * - The POSITION is checked by `resolvePlace` (`packages/rafa-board/src/board/place.ts`), and
  *   each `lost` notice it raises is a fault, printed as its `message`: a
  *   board closed, unlabelled or not on the listing, an epic closed,
  *   untyped or not on the listing, each naming the slots it held and the
@@ -29,11 +29,11 @@
  *
  * ## gh calls
  *
- * The board listing (`src/board/roadmap-board.ts`) is the one the epic
+ * The board listing (`packages/rafa-board/src/board/roadmap-board.ts`) is the one the epic
  * labels row reads (`./doctor-epics.ts`): `./doctor-board.ts` reads it
  * once per run and hands both rows the same answer, so this row adds no
  * listing. The open boards are the listing's own open `type:roadmap` rows
- * (`openBoards`, `src/board/epic-board.ts`), never a second `gh issue list --label`.
+ * (`openBoards`, `packages/rafa-board/src/board/epic-board.ts`), never a second `gh issue list --label`.
  * Beyond that it spends:
  *
  * - one `gh api` per distinct owner handle;
@@ -67,21 +67,27 @@
  * recorded fake runner and a planted position file under `tmpdir`, so
  * none of them reaches GitHub or spawns `gh`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { DefaultBoard } from '../board/boards.js';
-import type { OwnerResolution } from '../board/owner-resolve.js';
-import type { PlaceNotice } from '../board/place.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type {
+  BoardIssue,
+  BoardListing,
+  DefaultBoard,
+  GhRunner,
+  OwnerResolution,
+  PlaceNotice,
+} from '@open-tomato/rafa-board';
+
+import {
+  createGhRoadmapSearch,
+  createOwnerResolver,
+  openBoards,
+  readBoardBody,
+  resolveDefaultBoard,
+  resolvePlace,
+  unlabelledRoadmapMessage,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { readBoardBody } from '../board/board-body.js';
-import { resolveDefaultBoard, unlabelledRoadmapMessage } from '../board/boards.js';
-import { openBoards } from '../board/epic-board.js';
-import { createOwnerResolver } from '../board/owner-resolve.js';
-import { resolvePlace } from '../board/place.js';
-import { createGhRoadmapSearch } from '../board/roadmap.js';
-import { readPositionFile } from '../project/position.js';
+import { readPositionFile } from '@open-tomato/rafa/project/position';
 
 /** The heading the board lines sit under, as `Epic labels:` heads its own. */
 export const BOARDS_HEADING = 'Boards:';

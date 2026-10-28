@@ -12,7 +12,7 @@
  * ## Only where the release is on
  *
  * The row is read and printed only when `resolveReleaseEnabled`
- * (`src/release/enabled.ts`) says the release runs here: under `auto`,
+ * (`packages/rafa-release/src/release/enabled.ts`) says the release runs here: under `auto`,
  * both `release.versionFile` and `release.changelog` are files. A
  * project that never opted in gets no row and sends no git command, so
  * the other rows of `doctor` read as they did before this one.
@@ -21,7 +21,7 @@
  *
  * It reads what `rafa release status` reads, through that action's own
  * readers (`./release/status-fragments.ts` and the library half,
- * `src/release/status-readings.ts`), and assembles no `git` argv of its
+ * `packages/rafa-release/src/release/status-readings.ts`), and assembles no `git` argv of its
  * own:
  *
  *   - the base version and the waiting fragments with their forecast
@@ -53,21 +53,29 @@
  * each of its missing preconditions, read with the rest of the reading
  * and kept in it as `ladder`, so the json result carries it too.
  */
-import type { DoctorLadderConfig, DoctorLadderReading } from './doctor-ladder.js';
-import type { WaitingReading } from './release/status-fragments.js';
-import type { GitRunner } from '../pr/index.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+import type {
+  DoctorLadderConfig,
+  DoctorLadderReading,
+  WaitingReading,
+} from '@open-tomato/rafa-release';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { createGitRunner } from '../pr/index.js';
-import { resolveReleaseEnabled } from '../release/enabled.js';
-import { changelogVersions, readTags } from '../release/status-readings.js';
-
-import { readDoctorLadder, writeDoctorLadder } from './doctor-ladder.js';
-import { forecastPhrase, readWaiting, waitingSettingsOf } from './release/status-fragments.js';
+import { createGitRunner } from '@open-tomato/rafa-pr';
+import {
+  changelogVersions,
+  forecastPhrase,
+  readDoctorLadder,
+  readTags,
+  readWaiting,
+  resolveReleaseEnabled,
+  waitingSettingsOf,
+  writeDoctorLadder,
+} from '@open-tomato/rafa-release';
 
 /** The command the warning names. */
 export const SETTLE_COMMAND = 'rafa release settle';

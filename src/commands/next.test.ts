@@ -8,8 +8,8 @@
  * states whose actions ran. That is what makes "reads the state again"
  * measurable — the reader answers a second state only because it was
  * asked a second time — and it keeps the endings off git, off GitHub and
- * off a real prompt. `src/next/state.test.ts` drives what each state
- * says and `src/next/actions.test.ts` what each action runs; neither is
+ * off a real prompt. `packages/rafa-run/src/next/state.test.ts` drives what each state
+ * says and `src/tests/run-coupled/next/actions.test.ts` what each action runs; neither is
  * driven again here.
  *
  * The dispatched cases drive the real command through the dispatcher,
@@ -51,7 +51,7 @@
  * triage` it runs carries the REAL command's declarations with its
  * `run` alone replaced. That is what makes "no `--resolve`" a reading
  * of the flags the parser filled rather than of a word list:
- * `src/next/actions.test.ts` already holds the words themselves.
+ * `src/tests/run-coupled/next/actions.test.ts` already holds the words themselves.
  *
  * ## What passes while wrong
  *
@@ -110,9 +110,9 @@
  *    `--yes=sync` control and the `--resolve` case, both of which run
  *    under `--yes` with no terminal.
  *  - `--resolve` added to the words `triage` runs with in
- *    `src/next/actions.ts`: 194 pass and 3 fail, the dispatched
+ *    `packages/rafa-run/src/next/actions.ts`: 194 pass and 3 fail, the dispatched
  *    `--resolve` case here and the table and `--resolve` cases of
- *    `src/next/actions.test.ts`.
+ *    `src/tests/run-coupled/next/actions.test.ts`.
  *
  * Two more were driven on 2026-09-28 over `env -u CLAUDECODE bun test
  * src/commands/next.test.ts`, against 35 pass and 0 fail either side,
@@ -133,11 +133,9 @@
 import type { NextChainOptions, NextChainReport } from './next.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextDryRun } from '../next/lines.js';
-import type { NextState } from '../next/state.js';
-import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
-
-import '../adapter-registry.js';
+import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -146,18 +144,18 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import prTriage from '@open-tomato/rafa-pr/commands/pr/triage';
+import { epicEndLines } from '@open-tomato/rafa-release/next/epic-end';
+import { actionOutput } from '@open-tomato/rafa-run/next/ending';
+import { nextQuestion } from '@open-tomato/rafa-run/next/hint';
 
 import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
-import { actionOutput } from '../next/ending.js';
-import { epicEndLines } from '../next/epic-end.js';
-import { nextQuestion } from '../next/hint.js';
 import { CLAIM_AHEAD_FLAG, DRY_RUN_FLAG, MAX_ACTIONS, NEXT_USAGE, ROADMAP_FLAG } from '../next/lines.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createNextCommand, runNextChain } from './next.js';
-import prTriage from './pr/triage.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-command-')));
@@ -251,7 +249,7 @@ const STATES = Object.freeze({
   dirty: stateOf({
     id: 'tree-modified',
     action: 'none',
-    reading: 'the working tree has changes to 1 tracked file: `src/next/state.ts`',
+    reading: 'the working tree has changes to 1 tracked file: `packages/rafa-run/src/next/state.ts`',
     proposal: 'commit or set aside your changes; rafa will not touch them',
     pullRequest: null,
   }),
@@ -392,7 +390,7 @@ describe('the chain', () => {
     expect([driven.asked, driven.ran, driven.reads]).toEqual([[], [], 1]);
     expect(driven.report.stop).toBe('nothing-to-run');
     expect(driven.lines).toEqual([
-      '📍 the working tree has changes to 1 tracked file: `src/next/state.ts`.',
+      '📍 the working tree has changes to 1 tracked file: `packages/rafa-run/src/next/state.ts`.',
       '👉 commit or set aside your changes; rafa will not touch them',
     ]);
   });

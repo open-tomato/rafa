@@ -24,10 +24,8 @@
  * case; a `console.log` in `expectExit` on a match reddened its quiet
  * case alone, and a stderr write in `expectEvent` on a match its own.
  */
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
-
-import '../adapter-registry.js';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

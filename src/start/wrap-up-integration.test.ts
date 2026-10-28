@@ -10,10 +10,10 @@
  *
  * The release fragment cases: `prepareReleaseStage` and `finishRelease`
  * (`./release-stage.js`) run over a real scratch repository with a bare
- * `origin`, exactly as `src/tests/release-stage-integration.test.ts`
- * drives them, but the pull request is a `PullRequests` double
- * (`../pr/pull-requests-double.js`) rather than the `gh` fake, since the
- * subject there is what the stage SENDS a provider — the forecast in
+ * `origin`, exactly as `src/tests/release-stage-integration.test.ts` drives
+ * them, but the pull request is a `PullRequests` double
+ * (`packages/rafa/src/pr/pull-requests-double.ts`) rather than the `gh` fake,
+ * since the subject there is what the stage SENDS a provider — the forecast in
  * the body — and not a provider's own read-modify-write.
  *
  * The `pr.base` case (rafa-628, #627): under `pr.base: integration`, the
@@ -23,11 +23,9 @@
  * the run's head branch. All three run over a real scratch repository
  * with a bare `origin`, with the recorded `gh` fake as the provider.
  */
-import type { ReleaseStageSettings } from './release-stage.js';
-import type { Instinct } from '../schema/instinct.js';
 import type { ReportChange } from '@open-tomato/rafa/report/parse';
-
-import '../adapter-registry.js';
+import type { Instinct } from '@open-tomato/rafa-inventory/schema/instinct';
+import type { ReleaseStageSettings } from '@open-tomato/rafa-run/start/release-stage';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,22 +35,20 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
-
-import { localInstinctsDir } from '../adapters/learning/local.js';
-import { resolveBaseBranch } from '../cleanup/index.js';
-import { actionHash } from '../learning/index.js';
-import { createFakePrGh } from '../pr/gh-fake.js';
-import { createGhPullRequests, createGitRunner } from '../pr/index.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { writeInstinct } from '../schema/instinct.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-
-import { retargetedLine, retargetPullRequest } from './pr-retarget.js';
-import { checkWrapUpAnswer, readHead } from './promoted-check.js';
-import { finishRelease, prepareReleaseStage } from './release-stage.js';
-import { deliverPullRequest } from './wrap-up-run.js';
-import { buildWrapUpPrompt, lessonsToPromote } from './wrap-up.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
+import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { retargetedLine, retargetPullRequest } from '@open-tomato/rafa-pr/start/pr-retarget';
+import { resolveBaseBranch } from '@open-tomato/rafa-run/cleanup/index';
+import { checkWrapUpAnswer, readHead } from '@open-tomato/rafa-run/start/promoted-check';
+import { finishRelease, prepareReleaseStage } from '@open-tomato/rafa-run/start/release-stage';
+import { buildWrapUpPrompt, lessonsToPromote } from '@open-tomato/rafa-run/start/wrap-up';
+import { deliverPullRequest } from '@open-tomato/rafa-run/start/wrap-up-run';
 
 const BRANCH = 'feat/rafa-25-rafa-learns-own-runs';
 const FENCE = '```';

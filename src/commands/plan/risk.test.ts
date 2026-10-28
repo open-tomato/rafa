@@ -27,8 +27,6 @@
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -36,8 +34,8 @@ import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { EVERY_TOOL, RISK_FOOTER } from '@open-tomato/rafa-pr/plan/risk';
 
-import { EVERY_TOOL, RISK_FOOTER } from '../../plan/risk.js';
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createPlanRiskCommand, riskLine, riskPlanPath, strictRefusal } from './risk.js';

@@ -10,8 +10,6 @@ import type { CapturedRun, ScratchRepo } from '../../tests/cli-capture.js';
 import type { SqliteMigration } from '@open-tomato/rafa/store/migrations';
 import type { SchemaReport } from '@open-tomato/rafa/store/schema-report';
 
-import '../../adapter-registry.js';
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,9 +23,9 @@ import { bringForward } from '@open-tomato/rafa/store/bring-forward';
 import { REFUSAL_REASONS } from '@open-tomato/rafa/store/schema-plan';
 import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createSchemaCommand } from './schema.js';
 

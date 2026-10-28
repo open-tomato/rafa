@@ -14,7 +14,7 @@
  * through `foldWithStrategy` — the same path `forecast.ts` and settle
  * take — so nothing here is a shortcut around the module's own contract.
  */
-import type { Fragment } from './fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,13 +24,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/index.js';
-import { expectExit } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { readFragmentTree } from '@open-tomato/rafa-release/release/fragment-tree';
+import { releaseStrategyFor } from '@open-tomato/rafa-release/release/strategy';
 
-import { readFragmentTree } from './fragment-tree.js';
-import { serializeFragment } from './fragment.js';
-import { releaseStrategyFor } from './strategy.js';
+import { expectExit } from '../tests/cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-fold-spawned-')));
@@ -51,12 +51,12 @@ const BASE_VERSION = '0.25.0';
 /** The date every commit in the scratch tree gets, so `{date}` is fixed rather than "today". */
 const COMMIT_DATE = '2026-09-20T12:00:00Z';
 
-/** The absolute path to `fragment-tree.ts`, handed to each spawned racer. */
-const FRAGMENT_TREE_MODULE = fileURLToPath(new URL('./fragment-tree.js', import.meta.url));
-/** The absolute path to `strategy.ts`, handed to each spawned racer. */
-const STRATEGY_MODULE = fileURLToPath(new URL('./strategy.js', import.meta.url));
-/** The absolute path to `pr/index.ts`, handed to each spawned racer. */
-const GIT_RUNNER_MODULE = fileURLToPath(new URL('../pr/index.js', import.meta.url));
+/** The absolute path to `packages/rafa-release/src/release/fragment-tree.ts`, handed to each spawned racer. */
+const FRAGMENT_TREE_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa-release/release/fragment-tree'));
+/** The absolute path to `packages/rafa-release/src/release/strategy.ts`, handed to each spawned racer. */
+const STRATEGY_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa-release/release/strategy'));
+/** The absolute path to core's git barrel, `packages/rafa/src/core/git/index.ts`, handed to each spawned racer. */
+const GIT_RUNNER_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/git'));
 
 /** The fragment text of plan `plan`, at `level`, with one note. */
 function fragmentText(plan: string, level: Fragment['level'], note: string): string {

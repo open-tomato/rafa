@@ -26,10 +26,8 @@
  * what reading the project root gives: the subdirectory holds no plans
  * directory, so a command reading the working directory lists nothing.
  */
-import type { PlanList, PlanListing } from '../../plan/list.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
-
-import '../../adapter-registry.js';
+import type { PlanList, PlanListing } from '@open-tomato/rafa-run/plan/list';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,9 +36,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
+import { listPlans } from '@open-tomato/rafa-run/plan/list';
 
 import { parsePlan } from '../../plan/index.js';
-import { listPlans } from '../../plan/list.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import planListCommand, { openPlans, renderPlanList } from './list.js';

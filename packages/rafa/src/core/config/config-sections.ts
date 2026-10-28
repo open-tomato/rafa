@@ -167,15 +167,16 @@
  * back.
  *
  * The range {@link confidence} accepts, {@link CONFIDENCE_MIN} to
- * {@link CONFIDENCE_MAX}, is declared here and not read from the
- * learning library: core imports nothing above it, and `src/learning/`
- * imports nothing from the rest of `src/`, so each declares the pair the
- * library clamps every lesson's confidence to, and
- * `src/tests/learning-contract.test.ts` holds the two equal.
+ * {@link CONFIDENCE_MAX}, is declared here and not read from the learning
+ * library: core imports nothing above it, and the library under
+ * `packages/rafa-inventory/src/learning/` imports nothing outside its folder,
+ * so each declares the pair the library clamps every lesson's confidence to,
+ * and `src/tests/learning-contract.test.ts` holds the two equal.
  *
- * The reader of `pr.mergeMethod`, over the pull request port's three
- * methods, is not here: it sits with the setting it reads, in
- * `config-schema-release.ts`, so no core file imports `pr/types.ts`.
+ * The reader of `pr.mergeMethod`, over the pull request port's three methods,
+ * is not here: it sits with the setting it reads, in
+ * `config-schema-release.ts`, so this file imports nothing from
+ * `packages/rafa/src/pr/types.ts`.
  */
 import type { SkillTier } from '../../schema/tiers.js';
 
@@ -291,10 +292,10 @@ export type ClaudeSettingSource = (typeof CLAUDE_SETTING_SOURCES)[number];
 /**
  * The pull request providers a file may name: the GitHub CLI, and none.
  *
- * `none` is a provider and not an absence: under it the loop pushes the
- * branch, prints the compare URL and skips the CI wait, which is a
- * behaviour an operator chooses, where a setting left unnamed is one
- * `pr/provider.ts` resolves off the `origin` remote.
+ * `none` is a provider and not an absence: under it the loop pushes the branch,
+ * prints the compare URL and skips the CI wait, which is a behaviour an
+ * operator chooses, where a setting left unnamed is one
+ * `packages/rafa/src/pr/provider.ts` resolves off the `origin` remote.
  */
 export const PR_PROVIDERS = ['gh', 'none'] as const;
 
@@ -448,7 +449,7 @@ export const usdAmount: Reader<number> = (raw, at) => {
  * Accepts an issue number as the board spells one: a whole number above
  * zero, and no string spelled like one.
  *
- * The bound matches `src/board/naming.ts`, which refuses anything else
+ * The bound matches `packages/rafa/src/board/naming.ts`, which refuses anything else
  * with a `RangeError` rather than spelling `rafa-0` into a path. A
  * setting read here is handed straight to `gh issue view <n>`, so `0`,
  * `-1` and `2.5` are refused where the person can still fix the file,
@@ -645,7 +646,7 @@ export const claimsAhead: Reader<ClaimsAhead> = oneOf(CLAIMS_AHEAD);
  *
  * The shape is narrow on purpose. A login read from this setting is put
  * into `repos/{owner}/{repo}/collaborators/<login>/permission` by
- * `src/board/trust.ts`, so anything carrying `/`, `.`, `%`, whitespace
+ * `packages/rafa-board/src/board/trust.ts`, so anything carrying `/`, `.`, `%`, whitespace
  * or a leading `-` would either move that path or arrive at `gh` where a
  * flag goes. It refuses the `app/<name>` spelling `gh --json author`
  * writes for an app account for the same reason: that is `gh`'s

@@ -12,8 +12,6 @@
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { EffortRow } from '@open-tomato/rafa/store/types';
 
-import '../../adapter-registry.js';
-
 import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

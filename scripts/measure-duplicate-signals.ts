@@ -1,11 +1,11 @@
 /**
  * Duplicate signal measure: reads the board's bug issues with `gh` and
  * says how often each signal of the ranked `Possible duplicates` list
- * (`rankedCandidates` of `src/triage/similarity.ts`) holds between two
+ * (`rankedCandidates` of `packages/rafa-pr/src/triage/similarity.ts`) holds between two
  * issues that are one bug, and between two that are not.
  *
- * Each issue's cause label is `causeOf` of `src/triage/scoring-fixture.ts`
- * over `src/triage/testdata/scoring-causes.json` and the board's
+ * Each issue's cause label is `causeOf` of `packages/rafa-pr/src/triage/scoring-fixture.ts`
+ * over `packages/rafa-pr/src/triage/testdata/scoring-causes.json` and the board's
  * `Duplicate of #N` comments. An issue is judged when that label is not
  * null and the judgement's `through`, when set, reaches its number. Every
  * pair of judged issues falls on one side: the pairs whose labels are
@@ -28,16 +28,21 @@
  *
  * Exit codes: 0 printed, 2 the read could not run.
  */
-import type { BoardIssue, CauseJudgement } from '../src/triage/scoring-fixture.js';
-import type { RankedFields } from '../src/triage/similarity.js';
+import type { BoardIssue, CauseJudgement, RankedFields } from '@open-tomato/rafa-pr';
 
 import { resolve } from 'node:path';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import {
+  FIXTURE_REPO,
+  causeOf,
+  causeSignalOf,
+  issueWordsOf,
+  jaccard,
+  sharesBoundary,
+} from '@open-tomato/rafa-pr';
 
-import { parseBugRecord } from '../src/bugs/record.js';
-import { FIXTURE_REPO, causeOf } from '../src/triage/scoring-fixture.js';
-import { causeSignalOf, issueWordsOf, jaccard, sharesBoundary } from '../src/triage/similarity.js';
+import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** Prefix on every line this script writes. */
 export const TAG = '[duplicate-signals]';
@@ -49,7 +54,7 @@ export const MEANINGFUL_CARRIERS = 100;
 const ISSUE_LIMIT = '2000';
 
 /** The judgement file, relative to the checkout. */
-const CAUSES_FILE = 'src/triage/testdata/scoring-causes.json';
+const CAUSES_FILE = 'packages/rafa-pr/src/triage/testdata/scoring-causes.json';
 
 /** The digits a mean word score is printed with. */
 const SCORE_DIGITS = 3;

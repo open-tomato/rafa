@@ -1,7 +1,8 @@
 /**
- * `rafa skill search "<question>" [--all] [--no-model]`: the skills that
- * answer a question, found by the search runner of
- * `src/inventory/search/` and printed with the quote each was kept on.
+ * `rafa skill search "<question>" [--all] [--no-model]`: the skills that answer
+ * a question, found by the search runner of
+ * `packages/rafa-inventory/src/inventory/search/` and printed with the quote
+ * each was kept on.
  *
  * `rafa skill list` says what is installed; this command says which of
  * it answers a question put in words. The runner does the work in two
@@ -73,21 +74,25 @@
  * alone under `--no-model`, as status `ranked`.
  */
 import type { SkillListSeams } from './list.js';
-import type { InventoryKind, InventoryRecord } from '../../inventory/record.js';
-import type { SearchOutcome } from '../../inventory/search/index.js';
-import type { RankedCandidate } from '../../inventory/search/rank.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
+import type {
+  InventoryKind,
+  InventoryRecord,
+  RankedCandidate,
+  SearchOutcome,
+} from '@open-tomato/rafa-inventory';
 
+import { collectSessionRow } from '@open-tomato/rafa-effort';
+import { droppedLine, rankSearch, runSearch } from '@open-tomato/rafa-inventory';
+
+import { expectOneArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { selectEffortStore } from '@open-tomato/rafa/store';
-
-import { droppedLine, rankSearch, runSearch } from '../../inventory/search/index.js';
-import { expectOneArgument, readSwitch } from '../plan/plan-files.js';
 
 import { DEFAULT_SKILL_LIST_SEAMS, projectInventory, warningLines } from './list.js';
 
@@ -272,6 +277,7 @@ async function runSearchCommand(context: RafaContext, seams: SearchSeams, kind: 
           records: inventory.records,
           settingSources,
           store,
+          collectRow: collectSessionRow,
           home: project.home,
           ...(seams.spawn === undefined
             ? {}

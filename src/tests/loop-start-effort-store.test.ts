@@ -29,11 +29,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { bringForward } from '@open-tomato/rafa/store/bring-forward';
 import { unknownAdditiveWarning } from '@open-tomato/rafa/store/schema-report';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 

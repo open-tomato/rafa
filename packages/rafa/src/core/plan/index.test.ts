@@ -37,7 +37,7 @@
  */
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as blockerComment from './blocker-comment.js';
@@ -60,8 +60,13 @@ const PLAN_FILES = 'packages/rafa/src/core/plan/plan-files.ts';
 const PLAN_STAMP = 'packages/rafa/src/core/plan/plan-stamp.ts';
 const TRACKER_PATH = 'packages/rafa/src/core/plan/tracker-path.ts';
 
+/** Every path a case reads the export names of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [PARSE, PLAN_FILES, PLAN_STAMP, DECLARATION, BLOCKER_COMMENT, TRACKER_PATH, BARREL, BLOCK_BARREL];
+
 /**
- * Every export name of each file, types included, sorted.
+ * Every export name of each file, types included, sorted. Runs once,
+ * from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays for
+ * the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns The names by path.
@@ -91,6 +96,19 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
   return names;
 }
 
+let exportNames: Record<string, string[]> | null = null;
+
+/**
+ * The export names by path, once `beforeAll` has read them.
+ *
+ * @returns The names by path of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function storedExportNames(): Record<string, string[]> {
+  if (exportNames === null) throw new Error('the export names were never read');
+  return exportNames;
+}
+
 /**
  * The names more than one of the lists holds, sorted.
  *
@@ -113,6 +131,10 @@ const BEHIND: Readonly<Record<string, unknown>> = {
 };
 
 describe('the plan barrel', () => {
+  beforeAll(() => {
+    exportNames = readExportNames(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of the six files, each once, and no other', () => {
     const expected = [
       ...Object.keys(parse),
@@ -133,7 +155,7 @@ describe('the plan barrel', () => {
   });
 
   it('reads six files that share no name, type or runtime', () => {
-    const names = readExportNames([PARSE, PLAN_FILES, PLAN_STAMP, DECLARATION, BLOCKER_COMMENT, TRACKER_PATH]);
+    const names = storedExportNames();
 
     expect(names[PARSE]?.length).toBeGreaterThan(0);
     expect(names[PLAN_FILES]?.length).toBeGreaterThan(0);
@@ -170,7 +192,7 @@ describe('the plan barrel', () => {
   });
 
   it('exports the type names of the six files with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, PARSE, PLAN_FILES, PLAN_STAMP, DECLARATION, BLOCKER_COMMENT, TRACKER_PATH]);
+    const names = storedExportNames();
     const expected = [
       ...(names[PARSE] ?? []),
       ...(names[PLAN_FILES] ?? []),
@@ -191,7 +213,7 @@ describe('the plan barrel', () => {
   });
 
   it('holds no name the other plan barrel holds, type or runtime', () => {
-    const names = readExportNames([BARREL, BLOCK_BARREL]);
+    const names = storedExportNames();
 
     expect(names[BARREL]?.length).toBeGreaterThan(0);
     expect(names[BLOCK_BARREL]).toContain('RafaBlock');

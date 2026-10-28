@@ -29,7 +29,7 @@
  *
  * This is the command half. The stamp the parallel and backup files are
  * named with, `fileStamp`, is the library half,
- * `src/effort/file-stamp.ts`, which files outside `src/commands/` read
+ * `packages/rafa-effort/src/effort/file-stamp.ts`, which files outside `src/commands/` read
  * too; this file re-exports none of it.
  */
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
@@ -37,13 +37,13 @@ import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
 import type { FixSchemaResult } from '@open-tomato/rafa/store/fix-schema';
 
+import { fileStamp } from '@open-tomato/rafa-effort';
+
+import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { fixStoreSchema, SchemaFixRefusal } from '@open-tomato/rafa/store/fix-schema';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
-
-import { fileStamp } from '../../effort/file-stamp.js';
-import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort fix-schema';

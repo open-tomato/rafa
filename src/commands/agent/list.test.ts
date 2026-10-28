@@ -42,10 +42,8 @@
  */
 import type { AgentListSeams } from './list.js';
 import type { Key, Terminal } from '../../cli/prompt/terminal.js';
-import type { InventoryRecord } from '../../inventory/record.js';
-import type { Resolution } from '../../tiers/resolve.js';
-
-import '../../adapter-registry.js';
+import type { InventoryRecord } from '@open-tomato/rafa-inventory/inventory/record';
+import type { Resolution } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

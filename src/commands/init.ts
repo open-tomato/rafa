@@ -14,7 +14,7 @@
  *   - `--root=<path>` names the root, absolute or relative to the working
  *     directory, and nothing is asked or listed.
  *   - `--yes` takes the first candidate `rootCandidates` answers for the
- *     working directory (`src/project/roots.ts`): the git toplevel, or the
+ *     working directory (`packages/rafa/src/project/roots.ts`): the git toplevel, or the
  *     working directory itself outside a repository.
  *   - Neither: on a terminal it lists the candidates and reads a
  *     candidate's number or a path typed freely
@@ -74,7 +74,7 @@
  *
  * A repository whose pull request provider resolves to `gh` ends with
  * the board step: one question, and the labels, the spec issue template
- * and the pinned Roadmap issue `src/board/setup.ts` makes. The decision,
+ * and the pinned Roadmap issue `packages/rafa-board/src/board/setup.ts` makes. The decision,
  * the question and the lines are `./init-board.ts`'s; what is decided
  * HERE is that it runs LAST, after the scopes are on disk, followed
  * only by the steps below, each needing a board that ran. The
@@ -109,7 +109,7 @@
  * at the top of the run with `--board`'s. The order it decides in is
  * `./init-board-project.ts`'s. Its three long phases, adding the issues,
  * reading their facts and writing their fields, print their progress as
- * they run (`src/board/project/progress.ts`): a start line with the
+ * they run (`packages/rafa-board/src/board/project/progress.ts`): a start line with the
  * total, `adding issues: 283`, a line at most every
  * `board.project.progressSeconds` with the count and the time so far, an
  * end line with the refused count, and a line for each pause between two
@@ -133,7 +133,7 @@
  *
  * ## The `PATH` check
  *
- * Once the scopes are written, `readBinPath` (`src/project/bin-path.ts`)
+ * Once the scopes are written, `readBinPath` (`packages/rafa/src/project/bin-path.ts`)
  * reads the `PATH` of the context's environment, the one this invocation
  * was handed, never a shell profile, and a warning is written when
  * `~/.rafa/bin` is not on it ahead of `~/.bun/bin`. It warns and never
@@ -141,7 +141,7 @@
  *
  * ## The agent warning
  *
- * `vendorableAgents` (`src/agents/vendorable.ts`) then reads the plans
+ * `vendorableAgents` (`packages/rafa-inventory/src/agents/vendorable.ts`) then reads the plans
  * under the config's `plan.dir`, and a warning is written for every
  * `agent=` of a still-to-run task that resolves only in
  * `~/.claude/agents` under the resolved `loop.settingSources`, naming
@@ -158,7 +158,7 @@
  *
  * `init` writes nothing under `.claude/`, the project's or the home's.
  * rafa's own agents and skills are its rafa tier, `bundled/` beside the
- * entry, served per session (`src/tiers/serve.ts`), so a new project
+ * entry, served per session (`packages/rafa-inventory/src/tiers/serve.ts`), so a new project
  * routes to the core roster with no copy made. The one command that
  * does copy an agent into `.claude/agents` is `rafa agent vendor`,
  * which only the warning above names and which `init` never runs.
@@ -189,32 +189,32 @@
 import type { ProjectStepResult } from './init-board-project.js';
 import type { BoardStepResult, EpicGuardStepResult, RelationsMoveStepResult } from './init-board.js';
 import type { ReleaseStepResult } from './init-release.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { VendorableAgent } from '../agents/vendorable.js';
-import type { BinPathReading } from '../project/bin-path.js';
 import type { TrackingApplied, TrackingFlags } from '../project/gitignore.js';
 import type { ChosenRoot, RootReading, RootSource } from '../project/root-choice.js';
-import type { GitToplevelProbe, RefusalSeams, RootCandidates, RootsFileSystem } from '../project/roots.js';
 import type { ScopeWrite, ScopeWriteChange } from '../project/scaffold.js';
 import type { RafaCommand, RafaContext , Prompter } from '@open-tomato/rafa/core/command';
 import type { RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
+import type { GitToplevelProbe, RefusalSeams, RootCandidates, RootsFileSystem } from '@open-tomato/rafa/project/roots';
+import type { GhRunner } from '@open-tomato/rafa-board';
+import type { VendorableAgent } from '@open-tomato/rafa-inventory';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
+import { commandProgressFeed, commandRetrySeams, createGhRunner } from '@open-tomato/rafa-board';
+import { vendorableAgentWarnings, vendorableAgents } from '@open-tomato/rafa-inventory';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
+
 import { CommandExit , createLinePrompter } from '@open-tomato/rafa/core/command';
 import { ConfigError, configFilePath } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { readBinPath } from '@open-tomato/rafa/project/bin-path';
+import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '@open-tomato/rafa/project/roots';
 import { gitRemoteUrl } from '@open-tomato/rafa/schema/project-id';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
-import { commandProgressFeed } from '../board/project/progress.js';
-import { commandRetrySeams } from '../board/project/project-runner.js';
-import { resolvePrProvider } from '../pr/provider.js';
-import { readBinPath } from '../project/bin-path.js';
 import {
   applyTracking,
   GITIGNORE_FILE,
@@ -223,7 +223,6 @@ import {
   withTrackingBlock,
 } from '../project/gitignore.js';
 import { candidateLines, firstCandidate, namedRoot, promptForRoot } from '../project/root-choice.js';
-import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '../project/roots.js';
 import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project/scaffold.js';
 
 import { projectStepChanged, renderProjectStep, runProjectStep } from './init-board-project.js';

@@ -1,0 +1,502 @@
+/**
+ * Tests for the pull request port (`packages/rafa/src/pr/types.ts`).
+ *
+ * The port is almost all types, and a type-level claim made with a test
+ * assertion would prove nothing here: the root tsconfig excludes every
+ * test file, so `check-types` never reads this one, and
+ * `bun:test`'s `expectTypeOf` checks nothing when the suite runs. Each
+ * type claim is COMPILED instead, through the TypeScript compiler API,
+ * under the options the root tsconfig gives `check-types`, exactly as
+ * `packages/rafa/src/core/command/types.test.ts` does. The probes are written to a
+ * temporary directory outside the repository and import the port by
+ * absolute path, so no gate ever reads one.
+ *
+ * The conforming probe holds a whole adapter against {@link PullRequests}
+ * and must compile with no diagnostic; it is what keeps the refusals from
+ * passing vacuously, since a probe that failed to resolve the module
+ * would "refuse" everything. Every refusal probe changes ONE thing and is
+ * held to exactly one diagnostic, its code and a message naming the
+ * change, so a probe failing for another reason does not pass as the
+ * refusal.
+ *
+ * The bivariance control is the reading that matters most. The narrowed
+ * `merge` is refused against the port's function-typed properties
+ * (TS2322) and ACCEPTED by a probe that respells the same members as
+ * method signatures — so the refusal is the property spelling's doing and
+ * not something the adapter breaks either way.
+ *
+ * Measured 2026-09-18 on typescript 5.9.3, 22 pass either side, with the
+ * module restored byte-identical (`shasum -a 256 -c`) after each run.
+ * Five mutations of `types.ts` were driven against this file, one run
+ * each, and every one reddened at least one case:
+ *
+ *   - `merge` respelled as a METHOD signature: the narrowed-merge
+ *     refusal alone, which is the reading the property spelling exists
+ *     for.
+ *   - `MergeMethod` widened to `string`: the adapter probe and the
+ *     `ff` refusal. NOT the runtime guard, which reads
+ *     `MERGE_METHODS` and not the type — the type claim and the
+ *     guard are separate readings. The guard's cases moved with it to
+ *     `packages/rafa/src/core/config/merge-method.test.ts`.
+ *   - `PullRequestState` widened to `string`: the adapter probe and the
+ *     draft-state refusal.
+ *   - `readonly` dropped from `PullRequestSummary.number`: the
+ *     read-only refusal alone.
+ *   - `failedLog` dropped from the port: both omission refusals, and
+ *     the adapter probe, whose literal then carries a member the port
+ *     does not declare.
+ *
+ * Two more were driven on 2026-09-20, when `editBody` was added, with 24
+ * pass either side and the module restored byte-identical after each.
+ * Both reddened five cases, and the lists are the runs and not the
+ * prediction:
+ *
+ *   - `editBody` dropped from the port: the adapter probe and every
+ *     probe whose literal then carries a member the port does not
+ *     declare — the two older omission refusals and the
+ *     detail-answering one — plus the `editBody` omission refusal
+ *     itself, which compiles clean once there is nothing to omit.
+ *   - `editBody` retyped to answer a `PullRequestDetail`: the
+ *     detail-answering refusal, which is the reading, and the four
+ *     probes carrying the conforming `editBody` — an `async () => {}`
+ *     — which no longer conforms, so the adapter probe stops compiling
+ *     clean and the narrowed-merge and two omission refusals each draw
+ *     a diagnostic beside the one they are held to.
+ */
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import ts from 'typescript';
+
+/** Core's `src/` directory, `packages/rafa/src/`, the probes import from. */
+const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
+
+/** The repository root, whose tsconfig the probes compile under. */
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+
+/** The port, as a quoted absolute specifier. */
+const PORT = JSON.stringify(join(SRC_DIR, 'pr', 'types.js'));
+
+/** A probe's source: the port imported as `T`, then the lines given. */
+function probeSource(...lines: string[]): string {
+  return [`import type * as T from ${PORT};`, ...lines, ''].join('\n');
+}
+
+/** One member of an adapter, as its object literal spells it. */
+interface Member {
+  readonly name: string;
+  readonly lines: readonly string[];
+}
+
+/**
+ * Every member a conforming adapter holds, each answering the shape the
+ * port asks for. A refusal probe drops or rewrites exactly one of them.
+ */
+const MEMBERS: readonly Member[] = [
+  { name: 'kind', lines: ['  kind: "gh",'] },
+  { name: 'findOpen', lines: ['  findOpen: async (branch: string) => (branch === "" ? null : summary),'] },
+  { name: 'list', lines: ['  list: async () => [summary],'] },
+  { name: 'listMerged', lines: ['  listMerged: async () => [merged],'] },
+  { name: 'get', lines: ['  get: async (n: number) => (n === 0 ? null : detail),'] },
+  {
+    name: 'checks',
+    lines: ['  checks: async (_n: number) => ({ rows: [], verdict: "none" as const }),'],
+  },
+  { name: 'changedFiles', lines: ['  changedFiles: async (_n: number) => ["packages/rafa-pr/src/pr/gh.ts"],'] },
+  { name: 'reviews', lines: ['  reviews: async (_n: number) => [review],'] },
+  { name: 'browse', lines: ['  browse: async (_n: number) => {},'] },
+  {
+    name: 'merge',
+    lines: [
+      '  merge: async (_n: number, method: T.MergeMethod) => ({',
+      '    merged: method !== "rebase",',
+      '    detail: "merged by " + method,',
+      '  }),',
+    ],
+  },
+  {
+    name: 'close',
+    lines: ['  close: async (_n: number, _comment: string, _options: T.ClosePullRequestOptions) => {},'],
+  },
+  { name: 'create', lines: ['  create: async (_draft: T.PullRequestDraft) => summary,'] },
+  { name: 'editTitle', lines: ['  editTitle: async (_n: number, _title: string) => {},'] },
+  { name: 'editBase', lines: ['  editBase: async (_n: number, _base: string) => {},'] },
+  { name: 'editBody', lines: ['  editBody: async (_n: number, _body: string) => {},'] },
+  { name: 'comments', lines: ['  comments: async (_n: number) => [comment],'] },
+  { name: 'comment', lines: ['  comment: async (_n: number, _body: string) => comment,'] },
+  { name: 'editComment', lines: ['  editComment: async (_id: string, _body: string) => comment,'] },
+  { name: 'failedLog', lines: ['  failedLog: async (_runId: string) => "",'] },
+  { name: 'workflowCount', lines: ['  workflowCount: async () => (summary.number > 0 ? 0 : null),'] },
+];
+
+/** The records every adapter probe is built out of. */
+const RECORDS = [
+  'const author: T.PullRequestAuthor = { login: "marcos", isBot: false };',
+  'const summary: T.PullRequestSummary = {',
+  '  number: 33, title: "rafa-20: pull request commands",',
+  '  url: "https://github.com/open-tomato/rafa/pull/33", state: "open",',
+  '  headRefName: "feat/rafa-20-pr-commands", baseRefName: "main",',
+  '  author, isCrossRepository: false, updatedAt: "2026-09-18T10:00:00Z",',
+  '};',
+  'const detail: T.PullRequestDetail = {',
+  '  ...summary, body: "Closes #20", headRefOid: "deadbeef",',
+  '  headCommittedAt: "2026-10-12T11:59:59Z",',
+  '  mergeable: "mergeable", mergeStateStatus: "CLEAN", labels: ["type:spec"],',
+  '  closes: [{ number: 20, repository: "open-tomato/rafa", url: "https://github.com/open-tomato/rafa/issues/20" }],',
+  '};',
+  // Exported so the probe omitting `listMerged`, its one reader, draws no
+  // unused-local diagnostic beside the one it is held to.
+  'export const merged: T.MergedPullRequest = {',
+  '  number: 33, headRefName: "feat/rafa-20-pr-commands", headRefOid: "deadbeef",',
+  '  mergedAt: "2026-09-18T10:00:00Z",',
+  '};',
+  // Exported for the reason `merged` is: the probe omitting `reviews`
+  // and the method-signature control both leave it unread.
+  'export const review: T.PullRequestReview = {',
+  '  login: "marcos", state: "APPROVED", submittedAt: "2026-09-18T10:00:00Z",',
+  '};',
+  'const comment: T.PullRequestComment = {',
+  '  id: "IC_1", author, body: "<!-- rafa:pr-triage v1 -->",',
+  '  updatedAt: "2026-09-18T10:00:00Z", url: "https://github.com/o/r/pull/33#issuecomment-1",',
+  '};',
+];
+
+/**
+ * An adapter literal typed against `T.PullRequests`, with one member
+ * dropped or rewritten. Named `adapter`, and exported so `noUnusedLocals`
+ * has nothing to say about it.
+ */
+function adapterSource(options: {
+  readonly omit?: string;
+  readonly rewrite?: Member;
+} = {}): string[] {
+  const members = MEMBERS
+    .filter((member) => member.name !== options.omit)
+    .map((member) => (member.name === options.rewrite?.name
+      ? options.rewrite
+      : member));
+
+  return [
+    ...RECORDS,
+    'export const adapter: T.PullRequests = {',
+    ...members.flatMap((member) => member.lines),
+    '};',
+  ];
+}
+
+/** `Equals` holds when two types are the same type, aliases resolved. */
+const EQUALS = [
+  'type Equals<A, B> = (<X>() => X extends A ? 1 : 2) extends (<X>() => X extends B ? 1 : 2)',
+  '  ? true',
+  '  : false;',
+];
+
+/** A `merge` that takes one method only — the contravariance case. */
+const NARROWED_MERGE: Member = {
+  name: 'merge',
+  lines: [
+    '  merge: async (_n: number, method: "squash") => ({ merged: true, detail: method }),',
+  ],
+};
+
+/** The probe holding every claim, which must compile clean. */
+const CONFORMING_PROBE = probeSource(
+  ...EQUALS,
+  ...adapterSource(),
+  'export const methodsAreExact: Equals<T.MergeMethod, "squash" | "merge" | "rebase"> = true;',
+  'export const methodIsNotString: Equals<T.MergeMethod, string> = false;',
+  'export const statesAreExact: Equals<T.PullRequestState, "open" | "closed" | "merged"> = true;',
+  'export const mergeableIsExact: Equals<T.Mergeability, "mergeable" | "conflicting" | "unknown"> = true;',
+  'export const kindIsExact: Equals<T.PullRequests["kind"], "gh"> = true;',
+  'export const detailIsASummary: T.PullRequestSummary = detail;',
+  'export const mergedAtIsNeverNull: Equals<T.MergedPullRequest["mergedAt"], string> = true;',
+  'export const countIsNullable: Equals<Awaited<ReturnType<T.PullRequests["workflowCount"]>>, number | null> = true;',
+  'export const rowsAreTheCheckRows: Equals<T.ChecksReading["rows"], readonly T.CheckRow[]> = true;',
+  'export async function verdictOfPr(pr: T.PullRequests): Promise<T.ChecksVerdict> {',
+  '  return (await pr.checks(33)).verdict;',
+  '}',
+);
+
+/**
+ * The control for the narrowed `merge`: the same members respelled as
+ * METHOD signatures, which TypeScript compares bivariantly, accept the
+ * adapter the port refuses. It must compile clean.
+ */
+const BIVARIANCE_CONTROL = probeSource(
+  ...RECORDS,
+  'interface MethodSpelled {',
+  '  merge(number: number, method: T.MergeMethod): Promise<T.MergeOutcome>;',
+  '}',
+  'export const bivariant: MethodSpelled = {',
+  '  merge: async (_n: number, method: "squash") => ({ merged: true, detail: method }),',
+  '};',
+  'export const used = [author, summary, detail, merged, comment];',
+);
+
+/** One probe changing one thing, and the one diagnostic it must draw. */
+interface Refusal {
+  /** What the probe changed, as the case title reads it. */
+  readonly title: string;
+  /** The probe's file name, unique among the probes. */
+  readonly file: string;
+  readonly source: string;
+  /** The diagnostic's code. */
+  readonly code: number;
+  /** Text the diagnostic's message must hold, naming the change. */
+  readonly names: string;
+}
+
+const REFUSALS: readonly Refusal[] = [
+  {
+    title: 'an adapter with no merge',
+    file: 'omits-merge.ts',
+    source: probeSource(...adapterSource({ omit: 'merge' })),
+    code: 2741,
+    names: '\'merge\'',
+  },
+  {
+    title: 'an adapter with no failedLog',
+    file: 'omits-failed-log.ts',
+    source: probeSource(...adapterSource({ omit: 'failedLog' })),
+    code: 2741,
+    names: '\'failedLog\'',
+  },
+  {
+    title: 'an adapter with no editBody',
+    file: 'omits-edit-body.ts',
+    source: probeSource(...adapterSource({ omit: 'editBody' })),
+    code: 2741,
+    names: '\'editBody\'',
+  },
+  {
+    title: 'an adapter whose editBody answers the edited pull request',
+    file: 'edit-body-answers-detail.ts',
+    source: probeSource(...adapterSource({
+      rewrite: { name: 'editBody', lines: ['  editBody: async (_n: number, _body: string) => detail,'] },
+    })),
+    code: 2322,
+    // The diagnostic names the two promise types rather than the member,
+    // which is the reading: a provider cannot quietly answer a record
+    // where the port promises nothing.
+    names: 'Type \'Promise<PullRequestDetail>\' is not assignable to type \'Promise<void>\'',
+  },
+  {
+    title: 'an adapter with no create',
+    file: 'omits-create.ts',
+    source: probeSource(...adapterSource({ omit: 'create' })),
+    code: 2741,
+    names: '\'create\'',
+  },
+  {
+    title: 'an adapter whose create answers nothing',
+    file: 'create-answers-void.ts',
+    source: probeSource(...adapterSource({
+      rewrite: { name: 'create', lines: ['  create: async (_draft: T.PullRequestDraft) => {},'] },
+    })),
+    code: 2322,
+    // The caller reports the pull request it opened, so a provider
+    // cannot open one and answer nothing about it.
+    names: 'Type \'Promise<void>\' is not assignable to type \'Promise<PullRequestSummary>\'',
+  },
+  {
+    title: 'an adapter with no editTitle',
+    file: 'omits-edit-title.ts',
+    source: probeSource(...adapterSource({ omit: 'editTitle' })),
+    code: 2741,
+    names: '\'editTitle\'',
+  },
+  {
+    title: 'an adapter with no workflowCount',
+    file: 'omits-workflow-count.ts',
+    source: probeSource(...adapterSource({ omit: 'workflowCount' })),
+    code: 2741,
+    names: '\'workflowCount\'',
+  },
+  {
+    title: 'an adapter with no changedFiles',
+    file: 'omits-changed-files.ts',
+    source: probeSource(...adapterSource({ omit: 'changedFiles' })),
+    code: 2741,
+    names: '\'changedFiles\'',
+  },
+  {
+    title: 'an adapter with no reviews',
+    file: 'omits-reviews.ts',
+    source: probeSource(...adapterSource({ omit: 'reviews' })),
+    code: 2741,
+    names: '\'reviews\'',
+  },
+  {
+    title: 'an adapter with no listMerged',
+    file: 'omits-list-merged.ts',
+    source: probeSource(...adapterSource({ omit: 'listMerged' })),
+    code: 2741,
+    names: '\'listMerged\'',
+  },
+  {
+    title: 'an adapter whose listMerged answers a row merged at null',
+    file: 'list-merged-null-at.ts',
+    source: probeSource(...adapterSource({
+      rewrite: {
+        name: 'listMerged',
+        lines: ['  listMerged: async () => [{ ...merged, mergedAt: null }],'],
+      },
+    })),
+    code: 2322,
+    // A merged row always has its instant; null is what `gh` answers for
+    // a pull request that is NOT merged, which this list never holds.
+    names: 'Type \'null\' is not assignable to type \'string\'',
+  },
+  {
+    title: 'an adapter whose workflowCount answers undefined when it could not read one',
+    file: 'workflow-count-undefined.ts',
+    source: probeSource(...adapterSource({
+      rewrite: {
+        name: 'workflowCount',
+        lines: ['  workflowCount: async () => (summary.number > 0 ? 0 : undefined),'],
+      },
+    })),
+    code: 2322,
+    // Null is the port's word for "could not be read"; undefined is not
+    // an answer a caller switches on.
+    names: 'Type \'undefined\' is not assignable to type \'number | null\'',
+  },
+  {
+    title: 'an adapter whose merge takes one method only',
+    file: 'merge-narrowed.ts',
+    source: probeSource(...adapterSource({ rewrite: NARROWED_MERGE })),
+    code: 2322,
+    names: 'merge',
+  },
+  {
+    title: 'a merge method GitHub has no flag for',
+    file: 'method-ff.ts',
+    source: probeSource('export const method: T.MergeMethod = "ff";'),
+    code: 2322,
+    names: 'Type \'"ff"\' is not assignable',
+  },
+  {
+    title: 'a pull request state outside the three',
+    file: 'state-draft.ts',
+    source: probeSource(
+      'declare const summary: T.PullRequestSummary;',
+      'export const state: T.PullRequestState = "draft";',
+      'export const used = summary;',
+    ),
+    code: 2322,
+    names: 'Type \'"draft"\' is not assignable',
+  },
+  {
+    title: 'a write to a record field',
+    file: 'writes-number.ts',
+    source: probeSource(
+      'export function renumber(summary: T.PullRequestSummary): void {',
+      '  summary.number = 34;',
+      '}',
+    ),
+    code: 2540,
+    names: 'read-only property',
+  },
+];
+
+/** One diagnostic of one probe. */
+interface Reading {
+  readonly code: number;
+  readonly message: string;
+}
+
+/** The compile every case reads, its readings taken when it was built. */
+interface Compiled {
+  readonly configErrors: readonly ts.Diagnostic[];
+  /** Every probe's diagnostics, by the probe's file name. */
+  readonly readings: Readonly<Record<string, readonly Reading[]>>;
+}
+
+let tempDir = '';
+let compiled: Compiled | null = null;
+
+/** The compile, once `beforeAll` has made it. */
+function compiledProbes(): Compiled {
+  if (compiled === null) throw new Error('the probes were never compiled');
+  return compiled;
+}
+
+/**
+ * Every diagnostic the compile holds against one probe, read off the
+ * checker. Called by `beforeAll` alone, so the checker binds and checks
+ * there and not inside the first case.
+ */
+function diagnosticsOf(program: ts.Program, file: string): Reading[] {
+  const source = program.getSourceFile(join(tempDir, file));
+  if (source === undefined) throw new Error(`the probe ${file} is not in the compile`);
+  return ts.getPreEmitDiagnostics(program, source).map((diagnostic) => ({
+    code: diagnostic.code,
+    message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+  }));
+}
+
+/** Every diagnostic the compile holds against one probe, as stored. */
+function readingsOf(file: string): readonly Reading[] {
+  const readings = compiledProbes().readings[file];
+  if (readings === undefined) throw new Error(`the probe ${file} is not in the compile`);
+  return readings;
+}
+
+beforeAll(() => {
+  tempDir = mkdtempSync(join(tmpdir(), 'rafa-pr-types-'));
+
+  const probes: [string, string][] = [
+    ['adapter.ts', CONFORMING_PROBE],
+    ['bivariance.ts', BIVARIANCE_CONTROL],
+    ...REFUSALS.map((refusal): [string, string] => [refusal.file, refusal.source]),
+  ];
+  for (const [file, source] of probes) writeFileSync(join(tempDir, file), source);
+
+  const configPath = join(REPO_ROOT, 'tsconfig.json');
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, REPO_ROOT, undefined, configPath);
+
+  const program = ts.createProgram({
+    rootNames: probes.map(([file]) => join(tempDir, file)),
+    options: { ...parsed.options, isolatedDeclarations: false },
+  });
+
+  compiled = {
+    configErrors: [...config.error === undefined
+      ? []
+      : [config.error], ...parsed.errors],
+    readings: Object.fromEntries(probes.map(([file]) => [file, diagnosticsOf(program, file)])),
+  };
+}, 30_000);
+
+afterAll(() => {
+  if (tempDir !== '') rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe('the pull request port, compiled', () => {
+  it('reads the root tsconfig with no error', () => {
+    expect(compiledProbes().configErrors.map((error) => error.code)).toEqual([]);
+  });
+
+  it('compiles an adapter holding every member with no diagnostic', () => {
+    expect(readingsOf('adapter.ts')).toEqual([]);
+  });
+
+  it('accepts the narrowed merge when the same members are methods', () => {
+    // The control for the narrowed-merge refusal below: bivariance is
+    // what the port gives up by spelling its members as properties.
+    expect(readingsOf('bivariance.ts')).toEqual([]);
+  });
+
+  for (const refusal of REFUSALS) {
+    it(`refuses ${refusal.title} with one diagnostic naming it`, () => {
+      const readings = readingsOf(refusal.file);
+
+      expect(readings.map((reading) => reading.code)).toEqual([refusal.code]);
+      expect(readings[0]?.message).toContain(refusal.names);
+    });
+  }
+});

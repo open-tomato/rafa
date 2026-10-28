@@ -47,8 +47,7 @@ import {
   projectId,
   projectIdFromRemote,
 } from '@open-tomato/rafa/schema/project-id';
-
-import { gitIdentityEnv } from '../../git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 /** A remote, what the shell normalises it to, and the id it hashes to. */
 const REMOTES: readonly (readonly [string, string, string])[] = [

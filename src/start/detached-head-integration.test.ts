@@ -26,9 +26,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RUNS_DIR, readSessions } from '@open-tomato/rafa/core/loop';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { describeRun } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 import { PLAN_FLAG, PLAN_OPEN, RUN_TIMEOUT, STUB, runLoopStart, scratchPlanter } from '../tests/loop-scratch.js';
 
 /** The branch the run is based on. */

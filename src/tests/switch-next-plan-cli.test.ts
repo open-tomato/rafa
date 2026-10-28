@@ -20,7 +20,7 @@
  *    next` proposes nothing and neither `--dry-run` nor `--yes` is
  *    needed to keep the run from acting. Every line printed is hand
  *    derived from the source each command's row is read off
- *    (`src/next/state.ts`'s row 13, `src/commands/epic/show.ts`'s
+ *    (`packages/rafa-run/src/next/state.ts`'s row 13, `packages/rafa-board/src/commands/epic/show.ts`'s
  *    `noNowEpicLine`, `src/status/render.ts`'s six section lines), the
  *    same way `epic-descent-cli.test.ts`'s own byte-for-byte case is.
  *
@@ -40,15 +40,16 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { noNowEpicLine } from '../commands/epic/show.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { noNowEpicLine } from '@open-tomato/rafa-board/commands/epic/show';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
+
 import { YES_FLAG } from '../next/ceiling.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-switch-next-plan-cli-')));

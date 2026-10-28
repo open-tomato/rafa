@@ -2,11 +2,13 @@
  * The composition root of the adapter registry: core's adapters, listed
  * here and handed to core when {@link registerCoreAdapters} is called.
  *
- * Core declares the registry (`packages/rafa/src/core/adapters/registry.ts`) and
- * imports no adapter: the adapters sit under `src/adapters/`,
- * `packages/rafa/src/effort/store/` and `src/effort/sync/`, above core, and a core
- * file importing them would be an upward edge. This module, outside
- * `packages/rafa/src/core/`, is the one place they are listed, {@link CORE_ADAPTERS}.
+ * Core declares the registry (`packages/rafa/src/core/adapters/registry.ts`)
+ * and imports no adapter: the adapters sit under `src/adapters/`,
+ * `packages/rafa/src/effort/store/`, `packages/rafa-inventory/src/adapters/`
+ * and `packages/rafa-effort/src/effort/sync/`, above core, and a core file
+ * importing them would be an upward edge. This module, outside
+ * `packages/rafa/src/core/`, is the one place they are listed,
+ * {@link CORE_ADAPTERS}.
  *
  * Importing it registers nothing. {@link registerCoreAdapters} calls
  * `registerAdapters` with that list, so `CORE_ADAPTER_REGISTRY` answers
@@ -56,6 +58,17 @@ import type { SelectedEffortStore } from '@open-tomato/rafa/store';
 
 import { homedir } from 'node:os';
 
+import {
+  createGhRunner,
+  createGithubTracker,
+  createLocalTracker,
+  localIssuesDir,
+} from '@open-tomato/rafa-board';
+import { createFileSync, createLocalSync } from '@open-tomato/rafa-effort';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory';
+
+import { createConsoleLogger } from '@open-tomato/rafa/adapters/logger/console';
+import { createEventsOutput } from '@open-tomato/rafa/adapters/output/events';
 import { activeAdapterRegistry, PORT_VERSIONS, registerAdapters } from '@open-tomato/rafa/core/adapters';
 import { activeDefaults } from '@open-tomato/rafa/core/config';
 import { describeValue, STORE_BACKENDS } from '@open-tomato/rafa/core/config/sections';
@@ -63,15 +76,8 @@ import { createTextOutput } from '@open-tomato/rafa/core/output';
 import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
 import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
 
-import { createLocalLearning, localInstinctsDir } from './adapters/learning/local.js';
-import { createConsoleLogger } from './adapters/logger/console.js';
-import { createEventsOutput } from './adapters/output/events.js';
 import { createJsonOutput } from './adapters/output/json.js';
 import { createClaudePlanner } from './adapters/planner/claude.js';
-import { createGhRunner, createGithubTracker } from './adapters/tracker/github.js';
-import { createLocalTracker, localIssuesDir } from './adapters/tracker/local.js';
-import { createFileSync } from './effort/sync/file.js';
-import { createLocalSync } from './effort/sync/select.js';
 
 /** What every refusal opens with: the registry's own opening. */
 const REFUSAL = 'adapter registry';

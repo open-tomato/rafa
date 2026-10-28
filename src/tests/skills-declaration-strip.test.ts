@@ -39,9 +39,9 @@
  * That is what lets `not.toContain('skills')` stand for the whole string
  * rather than for one line of it.
  */
-import type { TaskInfo } from '../utils/tracker.js';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 import type { ClaudeSpawner } from '@open-tomato/rafa/core/loop';
+import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -59,12 +59,10 @@ import {
 import { runClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
-
-import { commitFinishedTask } from '../start/commit.js';
-import { dispatchTask } from '../start/dispatch.js';
-import { setActivePlanStub } from '../start/stamp.js';
-
-import { sinkOutput } from './output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { commitFinishedTask } from '@open-tomato/rafa-run/start/commit';
+import { dispatchTask } from '@open-tomato/rafa-run/start/dispatch';
+import { setActivePlanStub } from '@open-tomato/rafa-run/start/stamp';
 
 /** The two spaces a tracker line puts between text and block. */
 const GAP = '  ';

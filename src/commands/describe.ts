@@ -1,6 +1,7 @@
 /**
  * `rafa describe`: every command rafa dispatches, as the schema 2
- * document `src/cli/describe.ts` builds, for an agent or the TUI to read.
+ * document `packages/rafa/src/cli/describe.ts` builds, for an agent or
+ * the TUI to read.
  *
  * A top-level command, its action spelled as its subject, so it sits
  * directly under `src/commands/`. It wraps no phase 0 command, as
@@ -28,8 +29,9 @@
  */
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
+
 import { version } from '../../package.json';
-import { describeRegistry } from '../cli/describe.js';
 
 /** The command; see the module note. */
 const describeCommand: RafaCommand = {

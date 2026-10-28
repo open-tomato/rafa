@@ -40,12 +40,12 @@
  * it from printing there. The position file (`position.ts`) is this
  * checkout's place on the board for the same reason: tracked, one
  * operator's switch would move every clone that pulls it. The hop
- * record (`src/next/hop-record.ts`) says a hop is under way in this
+ * record (`packages/rafa/src/next/hop-record.ts`) says a hop is under way in this
  * checkout and where its home is: tracked, one clone's hop would read
  * as under way in every other, against a position it never wrote. The cache
  * directory holds what rafa read from GitHub and from `ts-symbols` to
- * spare the next command the reading (`src/board/board-cache.ts`,
- * `src/refs/outline-cache.ts`): tracked, every read would be a diff, and
+ * spare the next command the reading (`packages/rafa-board/src/board/board-cache.ts`,
+ * `packages/rafa-board/src/refs/outline-cache.ts`): tracked, every read would be a diff, and
  * a clone would start from another checkout's reading. A block
  * written before one of those lines existed is rewritten with it on the next
  * {@link writeTrackingGitignore}, as any stale block is.
@@ -130,11 +130,9 @@ import { dirname, isAbsolute, join } from 'node:path';
 
 import { describeValue, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { HOP_FILE } from '../next/hop-record.js';
-
-import { POSITION_FILE } from './position.js';
-import { SCOPE_DIR } from './scope.js';
+import { HOP_FILE } from '@open-tomato/rafa/next/hop-record';
+import { POSITION_FILE } from '@open-tomato/rafa/project/position';
+import { SCOPE_DIR } from '@open-tomato/rafa/project/scope';
 
 /** The file the entry is written to, under the project root. */
 export const GITIGNORE_FILE = '.gitignore';

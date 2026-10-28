@@ -56,12 +56,10 @@ import {
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
-
-import { finishCleanExit } from '../start/commit.js';
-import { dispatchTask, storeTaskReport } from '../start/dispatch.js';
-import { findNextTask } from '../utils/tracker.js';
-
-import { sinkOutput } from './output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { finishCleanExit } from '@open-tomato/rafa-run/start/commit';
+import { dispatchTask, storeTaskReport } from '@open-tomato/rafa-run/start/dispatch';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';

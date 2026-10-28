@@ -26,6 +26,17 @@
  * active registry unchanged (2), the package refusal dropped (1), and
  * the merged checks left empty (2).
  *
+ * The whole-record readers, `registeredDefaults` and
+ * `registeredSettings`, are held to refuse an emptied registry with the
+ * sentence naming `src/config-registry.ts`, and to answer the registered
+ * records as the same objects the `active*` readers answer, over the
+ * fixture sections and over the registration every later file reads.
+ * Three mutations were driven against them on 2026-10-20, with this file
+ * and `src/config-registry.test.ts` run together and `section.ts`
+ * restored sha256-identical after: the refusal dropped (2 fail), the
+ * defaults answered as a copy (2), and the settings answered as another
+ * record (3).
+ *
  * The key indexes (`activeSettingByKey`, `activeSectionPaths` and
  * `activeKnownKeysAbove`) are driven over the fixture sections alone,
  * in an emptied registry, so every key and section they answer is one
@@ -67,6 +78,8 @@ import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   registerConfigSections,
+  registeredDefaults,
+  registeredSettings,
   restoreConfigSections,
   setConfigLoadHook,
   setConfigTemplateHook,
@@ -371,6 +384,41 @@ describe('registerConfigSections', () => {
       expect(activeChecks()).toEqual([]);
       expect(activeSections()).toEqual([]);
     });
+  });
+});
+
+/** The sentence the whole-record readers refuse with over an empty registry, for `reader`. */
+function unregisteredSentence(reader: string): string {
+  return `no config section is registered: call registerCoreConfigSections from src/config-registry.ts before ${reader}`;
+}
+
+describe('registeredDefaults and registeredSettings', () => {
+  it('refuse over an empty registry, each naming src/config-registry.ts and itself', () => {
+    withEmptyRegistry(() => {
+      expect(refusalOf(() => registeredDefaults()).problems).toEqual([unregisteredSentence('registeredDefaults')]);
+      expect(refusalOf(() => registeredSettings()).problems).toEqual([unregisteredSentence('registeredSettings')]);
+    });
+  });
+
+  it('answer the registered records, the same objects the active readers answer', () => {
+    withEmptyRegistry(() => {
+      registerConfigSections([alpha(), beta()]);
+
+      expect<unknown>(registeredDefaults()).toBe(activeDefaults());
+      expect<unknown>(registeredSettings()).toBe(activeSettings());
+      expect<unknown>(registeredDefaults()).toEqual({
+        store: 'sqlite',
+        planDir: '.rafa/plans',
+        dangerousAcceptStaleRefs: false,
+      });
+      expect(registeredSettings().dangerousAcceptStaleRefs).toBe(SETTINGS.dangerousAcceptStaleRefs);
+    });
+  });
+
+  it('answer the record the registry registered for every later file, outside an emptied registry', () => {
+    expect(Object.keys(registeredSettings()).length).toBeGreaterThan(Object.keys(SETTINGS).length);
+    expect<unknown>(registeredDefaults()).toBe(activeDefaults());
+    expect<unknown>(registeredSettings()).toBe(activeSettings());
   });
 });
 

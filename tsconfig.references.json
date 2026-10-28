@@ -5,7 +5,13 @@
   "files": [],
   "references": [
     { "path": "./packages/rafa" },
+    { "path": "./packages/rafa-board" },
+    { "path": "./packages/rafa-effort" },
     { "path": "./packages/rafa-hub" },
+    { "path": "./packages/rafa-inventory" },
+    { "path": "./packages/rafa-pr" },
+    { "path": "./packages/rafa-release" },
+    { "path": "./packages/rafa-run" },
     { "path": "./packages/rafa-sync-service" }
   ]
 }

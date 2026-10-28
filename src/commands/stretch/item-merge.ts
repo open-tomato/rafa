@@ -11,7 +11,7 @@
  * ## The loop's ending
  *
  * The pull request is read from the run's events file
- * (`.rafa/runs/<session-id>.events.ndjson`, `src/loop/events-file.ts`):
+ * (`.rafa/runs/<session-id>.events.ndjson`, `packages/rafa-run/src/loop/events-file.ts`):
  * the first `pr`, `no-pr`, `halt` or `error` event in file order, the
  * order `loop wait` reads them in ({@link readLoopEnding}). A `pr` event
  * carries the pull request's number. When `loop wait` ended non-zero, or
@@ -75,19 +75,20 @@
  * Every process goes through {@link ItemMergeSeams}, so no test runs
  * `rafa`, reaches GitHub or sleeps.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BranchRun } from '../../ci/runs.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { Tracker } from '@open-tomato/rafa/ports';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { readFileSync } from 'node:fs';
+
+import { closedIssuesIn } from '@open-tomato/rafa-board';
+import { eventsFileOf, readEventsFrom } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { closedIssuesIn } from '../../board/roadmap.js';
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
-import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
 import { readPitReadings, renderPitReadings } from '../../stretch/pit-readings.js';

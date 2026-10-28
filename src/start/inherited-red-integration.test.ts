@@ -37,13 +37,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { localIssuesDir } from '../adapters/tracker/local.js';
-import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
-import { hostToolDirs } from '../tests/stand-in-gh.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { INHERITED_HEADING, INHERITED_SENTENCE } from '@open-tomato/rafa-run/start/inherited-notice';
 
-import { INHERITED_HEADING, INHERITED_SENTENCE } from './inherited-notice.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

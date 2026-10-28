@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { buildInventory } from '../inventory/index.js';
+import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
 
 /** How long the session may take to write its init message. */
 const INIT_TIMEOUT_MS = 60_000;

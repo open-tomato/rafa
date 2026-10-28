@@ -17,7 +17,7 @@
  *
  * A barrel that groups a file with a file outside `packages/rafa/src/core/` that
  * imports the barrel back by value is a runtime cycle.
- * `src/utils/tracker.ts` imports `readRafaBlocks` by value, and
+ * `packages/rafa/src/utils/tracker.ts` imports `readRafaBlocks` by value, and
  * `parse.ts`, behind `index.ts`, imported that file by value when the
  * split was made. So `blocks.ts` behind `index.ts` closed a cycle
  * through the tracker. `blocks.ts` imports no file, so a barrel that

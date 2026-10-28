@@ -44,8 +44,13 @@ import { dirname, join, resolve } from 'node:path';
  * package itself, `@open-tomato/rafa-core`, until #808 renames it.
  * `src/tests/core-coupled/core/runtime/identity.test.ts` plants its
  * manifests with the root manifest's `name`, so a drift fails there.
+ * It is also what run's install and pr's merge follow-ups compare a
+ * manifest's `name` against.
  */
-const RAFA_PACKAGE_NAME = '@open-tomato/rafa';
+export const RAFA_PACKAGE_NAME = '@open-tomato/rafa';
+
+/** Where versions sit under the home: `~/.rafa/runtime/<version>/`. */
+export const RUNTIME_SUBDIR: string = join('.rafa', 'runtime');
 
 /** The manifest the walk looks for in each directory. */
 const MANIFEST = 'package.json';

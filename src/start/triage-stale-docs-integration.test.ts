@@ -9,8 +9,8 @@
  * entry reaches no tracker: the store holds one `sighting` row under the
  * plan stub.
  */
-import type { StartTriageOptions } from './triage.js';
 import type { Tracker } from '@open-tomato/rafa/ports';
+import type { StartTriageOptions } from '@open-tomato/rafa-run/start/triage';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,17 +24,16 @@ import {
   it,
 } from 'bun:test';
 
+import { ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { recordTaskReport } from '@open-tomato/rafa/report/record';
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { createPrivateTriageTracker } from '@open-tomato/rafa-pr/triage/triage';
+import { createStartTriage } from '@open-tomato/rafa-run/start/triage';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-import { createPrivateTriageTracker } from '../triage/triage.js';
-
-import { createStartTriage } from './triage.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-start-triage-stale-docs-'));
 

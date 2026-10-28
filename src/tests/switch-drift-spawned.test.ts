@@ -2,7 +2,7 @@
  * Spawned `bun src/rafa.ts switch` over a stand-in board carrying one
  * drifted line (`.rafa/plans/rafa-324-claim-issue-so-two`, "Drift
  * check"): board #10's checklist ticks epic #100 while #100 still
- * carries `rafa:in-development`. `checkDrift` (`src/claims/drift.ts`)
+ * carries `rafa:in-development`. `checkDrift` (`packages/rafa-run/src/claims/drift.ts`)
  * reports that as a `ticked-labelled` finding.
  *
  * A local branch `feat/rafa-100-x` names #100's claim, so the second
@@ -27,10 +27,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
+import { IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once the case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-switch-drift-')));

@@ -61,9 +61,8 @@ import { openSqliteStore, sqliteStorePath } from '@open-tomato/rafa/store/sqlite
 import { readTaskFinishes } from '@open-tomato/rafa/store/task-finishes';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
 import { writeTriage } from '@open-tomato/rafa/store/triage';
-
-import { readSkillFacts } from '../../../../effort/skill-facts.js';
-import { readProgressFindings, writeProgress } from '../../../../utils/progress.js';
+import { readProgressFindings, writeProgress } from '@open-tomato/rafa/utils/progress';
+import { readSkillFacts } from '@open-tomato/rafa-effort/effort/skill-facts';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-forward-compat-'));
 

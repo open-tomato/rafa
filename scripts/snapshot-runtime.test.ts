@@ -6,12 +6,12 @@ import { delimiter, dirname, join, resolve, sep } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { EXIT_DONE, EXIT_REFUSED, RAFA_PACKAGE_NAME } from '../src/runtime/install.js';
+import { EXIT_DONE, EXIT_REFUSED, RAFA_PACKAGE_NAME } from '@open-tomato/rafa-run/runtime/install';
 
 import { defaultSeams, readOptions, runSnapshot, TAG } from './snapshot-runtime.js';
 
 /**
- * `bun run snapshot` as the thin caller of `src/runtime/install.ts`,
+ * `bun run snapshot` as the thin caller of `packages/rafa-run/src/runtime/install.ts`,
  * whose own suite holds the install. These cases hold what the script
  * adds: the checkout and the home it defaults to, the `[snapshot]` prefix,
  * where a refusal goes, and the `PATH` warning after an install.

@@ -26,11 +26,9 @@
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
 import type { NextCeiling } from '../next/ceiling.js';
-import type { NextState } from '../next/state.js';
-import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
-
-import '../adapter-registry.js';
+import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '@open-tomato/rafa-pr/pr/index';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,12 +36,13 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import prMerge from '@open-tomato/rafa-pr/commands/pr/merge';
+
 import { YES_FLAG } from '../next/ceiling.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject } from '../tests/cli-capture.js';
 
 import { createNextCommand, QUESTION_HANDED_OVER, runNextChain } from './next.js';
-import prMerge from './pr/merge.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-handed-over-')));

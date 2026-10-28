@@ -1,14 +1,14 @@
 /**
- * The registry: the fourteen sections of the config schema, handed to
+ * The registry: the fifteen sections of the config schema, handed to
  * core when {@link registerCoreConfigSections} is called, and the merged schema read off
  * them, {@link SETTINGS}, {@link CONFIG_DEFAULTS}, {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and {@link knownKeysAbove}.
  *
  * Core declares the section contract (`packages/rafa/src/core/config/section.ts`) and
  * names no section. This module, outside `packages/rafa/src/core/`, is the one place
- * the fourteen are listed, {@link CONFIG_SECTIONS}: core's own
- * (`CORE_SECTION`) and the thirteen files `src/config-schema-*.ts` that
- * each export one.
+ * the fifteen are listed, {@link CONFIG_SECTIONS}: core's own
+ * (`CORE_SECTION`) and the fourteen files `config-schema-*.ts` that
+ * each export one, under `src/` (ten) or, for four, under `packages/rafa/src/`.
  *
  * Importing it registers nothing. {@link registerCoreConfigSections}
  * calls `registerConfigSections` once, with that list cut into the runs
@@ -72,7 +72,11 @@
  *
  * This module is the one place the six names are built: the core barrel
  * `packages/rafa/src/core/config/index.ts` exports none of them, and a file outside
- * `packages/rafa/src/core/` imports them from here. Core reads the registered
+ * `packages/rafa/src/core/` imports them from here. A feature file reads
+ * the whole {@link SETTINGS} or {@link CONFIG_DEFAULTS} record off the
+ * registration instead, through core's `registeredSettings()` and
+ * `registeredDefaults()`, so it imports nothing of the root.
+ * Core reads the registered
  * settings and defaults through `activeSettings()` and
  * `activeDefaults()`, and the key indexes through `activeSettingByKey()`,
  * `activeSectionPaths()` and `activeKnownKeysAbove()`, all in
@@ -90,43 +94,34 @@ import type {
   SettingSpec,
 } from '@open-tomato/rafa/core/config';
 
-import {
-  activeSettings,
-  CORE_SECTION,
-  registerConfigSections,
-  setConfigLoadHook,
-  setConfigTemplateHook,
-} from '@open-tomato/rafa/core/config';
-
-import { setActiveLoggerSettings } from './adapters/logger/settings.js';
-import { templateEntry } from './config/templates.js';
+import { setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
   BOARD_PROJECT_LIMIT_SETTINGS,
   BOARD_PROJECT_SECTION,
-} from './config-schema-board-project.js';
-import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from './config-schema-bugs.js';
-import { CHECKS_DEFAULTS, CHECKS_SECTION, CHECKS_SETTINGS } from './config-schema-checks.js';
-import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from './config-schema-errors.js';
-import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from './config-schema-features.js';
-import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from './config-schema-hub.js';
-import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from './config-schema-issues.js';
+} from '@open-tomato/rafa/config-schema-board-project';
+import { BUGS_DEFAULTS, BUGS_SECTION, BUGS_SETTINGS } from '@open-tomato/rafa/config-schema-bugs';
+import { CHECKS_DEFAULTS, CHECKS_SECTION, CHECKS_SETTINGS } from '@open-tomato/rafa/config-schema-checks';
+import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from '@open-tomato/rafa/config-schema-errors';
+import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from '@open-tomato/rafa/config-schema-features';
+import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from '@open-tomato/rafa/config-schema-hub';
+import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from '@open-tomato/rafa/config-schema-issues';
 import {
   LOGGER_DEFAULTS,
   LOGGER_SECTION,
   LOGGER_SETTINGS,
   loggerSettingsOf,
-} from './config-schema-logger.js';
+} from '@open-tomato/rafa/config-schema-logger';
 import {
   LOOP_CONTINUE_DEFAULTS,
   LOOP_CONTINUE_SECTION,
   LOOP_CONTINUE_SETTINGS,
-} from './config-schema-loop-continue.js';
+} from '@open-tomato/rafa/config-schema-loop-continue';
 import {
   LOOP_RETRIES_DEFAULTS,
   LOOP_RETRIES_SECTION,
   LOOP_RETRIES_SETTINGS,
-} from './config-schema-loop-retries.js';
+} from '@open-tomato/rafa/config-schema-loop-retries';
 import {
   DANGEROUS_RELEASE_DEFAULTS,
   DANGEROUS_RELEASE_SETTINGS,
@@ -135,12 +130,21 @@ import {
   RELEASE_DEFAULTS,
   RELEASE_SECTION,
   RELEASE_SETTINGS,
-} from './config-schema-release.js';
-import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from './config-schema-tests.js';
-import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from './config-schema-triage.js';
-import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
+} from '@open-tomato/rafa/config-schema-release';
+import { TESTS_DEFAULTS, TESTS_SECTION, TESTS_SETTINGS } from '@open-tomato/rafa/config-schema-tests';
+import { TRIAGE_DEFAULTS, TRIAGE_SECTION, TRIAGE_SETTINGS } from '@open-tomato/rafa/config-schema-triage';
+import { WRAP_UP_DEFAULTS, WRAP_UP_SECTION, WRAP_UP_SETTINGS } from '@open-tomato/rafa/config-schema-wrap-up';
+import {
+  activeSettings,
+  CORE_SECTION,
+  registerConfigSections,
+  setConfigLoadHook,
+  setConfigTemplateHook,
+} from '@open-tomato/rafa/core/config';
 
-/** The fourteen sections, core's first, in the order they are registered. */
+import { templateEntry } from './config/templates.js';
+
+/** The fifteen sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   CORE_SECTION,
   HUB_SECTION,
@@ -172,7 +176,7 @@ export function handConfigToLogger(config: Readonly<RafaConfig>): void {
 /** Core's settings up to `effort.sync`, before the `hub` section. */
 const CORE_HEAD = ['version', 'store', 'effortBusyTimeoutMs', 'effortSync'] as const;
 
-/** Core's settings from `plan.inject` to `loop.worktreeDir`, before the `loop` sections and `pr`. */
+/** Core's settings from `plan.inject` to `loop.worktreeSetup`, before the `loop` sections and `pr`. */
 const CORE_PLAN_TO_LOOP = [
   'inject',
   'planDir',
@@ -193,6 +197,7 @@ const CORE_PLAN_TO_LOOP = [
   'allowList',
   'settingSources',
   'loopWorktreeDir',
+  'loopWorktreeSetup',
 ] as const;
 
 /** Core's `board` settings, before the `board.project` limits. */

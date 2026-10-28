@@ -105,6 +105,12 @@ export interface RafaConfig {
    */
   loopWorktreeDir: string;
   /**
+   * The shell command a `--as-worktree` run runs in its new or reused
+   * worktree before the first session, or null to run nothing.
+   * `loop.worktreeSetup`.
+   */
+  loopWorktreeSetup: string | null;
+  /**
    * The logins trusted with board text besides the repository's own
    * write-holders. `board.trustedAuthors`.
    */

@@ -4,19 +4,18 @@
  * `HOME`: what `two-devices.integration.test.ts` and
  * `hub-unreachable.integration.test.ts` both spawn under.
  *
- * The same spelling as the root's `src/tests/scratch-home-env.ts`, whose
- * module note holds the measurement: bun writes its runtime transpiler
+ * The same spelling as core's `packages/rafa/src/tests/scratch-home-env.ts`,
+ * whose module note holds the measurement: bun writes its runtime transpiler
  * cache to `$HOME/.bun/install/cache/@t@` unless
  * `BUN_RUNTIME_TRANSPILER_CACHE_PATH` says otherwise, and
- * `BUN_INSTALL_CACHE_DIR` alone does not move it. A package may not
- * import from the root's `src/` (`context/source.md`), so this copy
- * stands beside it.
+ * `BUN_INSTALL_CACHE_DIR` alone does not move it. A package may not import from
+ * the root's `src/` (`context/source.md`), so this copy stands beside it.
  *
- * It also spells the git identity of the root's `src/tests/git-identity.ts`
- * — the same name and address in the four `GIT_AUTHOR_*` and
- * `GIT_COMMITTER_*` variables — because a swapped `HOME` hides the
- * operator's `~/.gitconfig`, and a commit with no identity fails with
- * `Author identity unknown`.
+ * It also spells the git identity of core's
+ * `packages/rafa/src/tests/git-identity.ts` — the same name and address in the
+ * four `GIT_AUTHOR_*` and `GIT_COMMITTER_*` variables — because a swapped
+ * `HOME` hides the operator's `~/.gitconfig`, and a commit with no identity
+ * fails with `Author identity unknown`.
  */
 
 /** The value of `BUN_RUNTIME_TRANSPILER_CACHE_PATH` that turns the cache off. */

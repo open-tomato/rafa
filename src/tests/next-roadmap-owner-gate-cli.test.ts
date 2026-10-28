@@ -5,7 +5,7 @@
  * owns the folder `other/` (an `Owns:` line, no CODEOWERS file) and
  * names an `Owner:` handle of its own. The open pull request on
  * `feat/owner-gate`, green and mergeable, changes `other/file.ts` alone,
- * so every case reaches `pr-owner-review` (`src/next/hop-rows.ts`) with
+ * so every case reaches `pr-owner-review` (`packages/rafa-run/src/next/hop-rows.ts`) with
  * exactly the same pull request and the same foreign board, and differs
  * only in what the owner gate reads once it asks about Beta's owner:
  *
@@ -47,7 +47,7 @@
  * and the row's `proposal` print.
  */
 import type { Scratch } from './next-chain-fixtures.js';
-import type { Place, Position } from '../project/position.js';
+import type { Place, Position } from '@open-tomato/rafa/project/position';
 
 import {
   mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
@@ -56,7 +56,7 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { positionFilePath, writePositionFile } from '../project/position.js';
+import { positionFilePath, writePositionFile } from '@open-tomato/rafa/project/position';
 
 import { plantProjectConfig } from './cli-capture.js';
 import {
@@ -177,15 +177,17 @@ function buildProbe(options: ProbeOptions): string {
   return [
     'import { writeFileSync } from "node:fs";',
     `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+    `import { registerCoreServices } from ${JSON.stringify(join(SRC_DIR, 'service-registry.ts'))};`,
     `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
     'registerCoreConfigSections();',
     'registerCoreAdapters();',
+    'registerCoreServices();',
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
-    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
-    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
-    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, 'pr', 'pull-requests-double.ts'))};`,
+    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'commands', 'pr', 'merge.ts'))};`,
+    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'pr', 'index.ts'))};`,
+    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',
     'const events = [];',

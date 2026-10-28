@@ -5,13 +5,12 @@
  * proposal pass that asks a session for what no table can derive, and
  * the apply that writes the reviewed proposals and then derives.
  *
- * The work is `src/backfill/`'s: `derive.ts` answers `stack`, `paths`
- * and `when_to_use` from tables and from a skill's own bytes,
- * `proposal-batch.ts` selects and batches what a session is asked,
- * `propose.ts` runs the sessions and applies the reviewed answers, and
- * `backup.ts` takes the copy that makes a rewrite reversible. This
- * module is the declaration, the reading of the line, and the lines a
- * run prints.
+ * The work is `packages/rafa-inventory/src/backfill/`'s: `derive.ts` answers
+ * `stack`, `paths` and `when_to_use` from tables and from a skill's own bytes,
+ * `proposal-batch.ts` selects and batches what a session is asked, `propose.ts`
+ * runs the sessions and applies the reviewed answers, and `backup.ts` takes the
+ * copy that makes a rewrite reversible. This module is the declaration, the
+ * reading of the line, and the lines a run prints.
  *
  * ## The three modes, and why they are one command
  *
@@ -38,7 +37,7 @@
  * An `--apply` run copies each file it is about to rewrite to
  * `<base>/.rafa/backfill/backup/<relative path>` before the write, both
  * for the proposal rows and for the derivation
- * (`src/backfill/backup.ts`). A file under the checkout the command
+ * (`packages/rafa-inventory/src/backfill/backup.ts`). A file under the checkout the command
  * runs in is not copied: git holds it, and the loop commits the pass's
  * edits like any task's. The copies are taken BEFORE the writes rather
  * than per write, so a run that dies between two files has a copy of
@@ -64,33 +63,47 @@
  * `--project`, a `<dir>` that is no `.claude/skills`, a `<dir>` that is
  * not there, and a proposal file that does not parse.
  */
-import type { BackupResult } from '../../backfill/backup.js';
-import type { DerivationAction, DerivationKind, DerivationOptions, DerivationPlan } from '../../backfill/derive.js';
-import type { ProposalFile } from '../../backfill/proposal-file.js';
-import type { ProposalAction, ProposalActionKind } from '../../backfill/propose.js';
-import type { DemotionScope } from '../../demote/select.js';
-import type { ProjectFound } from '../../project/scope.js';
-import type { InstinctScope } from '../../schema/instinct.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type {
+  BackupResult,
+  DemotionScope,
+  DerivationAction,
+  DerivationKind,
+  DerivationOptions,
+  DerivationPlan,
+  InstinctScope,
+  ProposalAction,
+  ProposalActionKind,
+  ProposalFile,
+} from '@open-tomato/rafa-inventory';
 
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import {
+  ANSWERED_ROW,
+  BACKFILL_PATH,
+  DERIVATION_KINDS,
+  PROPOSAL_ACTION_KINDS,
+  REVIEWED_FILE,
+  applyDerivation,
+  applyProposals,
+  backupDirectory,
+  backupFiles,
+  countBackups,
+  countDerivations,
+  pathDirectories,
+  planDerivation,
+  readProposalFiles,
+  resolveDemotionScope,
+  runProposalPass,
+  selectProposals,
+} from '@open-tomato/rafa-inventory';
+
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
-
-import { backupDirectory, backupFiles, countBackups } from '../../backfill/backup.js';
-import { applyDerivation, countDerivations, DERIVATION_KINDS, planDerivation } from '../../backfill/derive.js';
-import { selectProposals } from '../../backfill/proposal-batch.js';
-import { ANSWERED_ROW, BACKFILL_PATH, readProposalFiles, REVIEWED_FILE } from '../../backfill/proposal-file.js';
-import {
-  applyProposals,
-  PROPOSAL_ACTION_KINDS,
-  runProposalPass,
-} from '../../backfill/propose.js';
-import { pathDirectories } from '../../check/references.js';
-import { resolveDemotionScope } from '../../demote/select.js';
 
 /** The two things neither the context nor the registry carries. */
 export interface SkillBackfillSeams {

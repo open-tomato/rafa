@@ -40,7 +40,6 @@
  *   - **The pipeline ends at `rafa skill check` with no `--fix`**,
  *     which is the DoD the whole backfill exists to reach.
  */
-import '../adapter-registry.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,10 +47,11 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { DRAFT_FILE, parseProposalFile, proposalPath, REVIEWED_FILE, UNANSWERED_ROW } from '../backfill/proposal-file.js';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
+import { DRAFT_FILE, parseProposalFile, proposalPath, REVIEWED_FILE, UNANSWERED_ROW } from '@open-tomato/rafa-inventory/backfill/proposal-file';
+
 import { createSkillBackfillCommand } from '../commands/skill/backfill.js';
 import { createSkillCheckCommand } from '../commands/skill/check.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 
 import { dispatchInProject, plantProjectConfig } from './cli-capture.js';
 

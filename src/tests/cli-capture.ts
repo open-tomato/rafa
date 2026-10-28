@@ -32,7 +32,7 @@
  * `rafa init` hint (`src/cli/dispatch.ts`). A case running `init`, the
  * command that makes a project, asks for none.
  */
-import type { SubjectSpec } from '../cli/registry.js';
+import type { SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, CliEventNamed } from '@open-tomato/rafa/ports';
@@ -43,14 +43,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { builtPath, hostToolDirs, plantGitOnlyDir } from './stand-in-gh.js';
 
 /** The CLI entry a spawned run executes. */

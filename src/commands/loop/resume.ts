@@ -34,13 +34,12 @@ import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { LoopSessionSeams, ResolvedLoopSeams } from '@open-tomato/rafa/core/loop/readings';
 
+import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import {
   isLive,
   refusal,
   resolveLoopSeams,
 } from '@open-tomato/rafa/core/loop/readings';
-
-import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   pickSession,

@@ -4,6 +4,17 @@
 and `api` exchanges, each with its module, cause code and hint when known.
 It sits beside `Output`, and the two never share a job.
 
+The logger's files are core's. The port is in
+`packages/rafa/src/ports/`. The console adapter, the level rule
+(`settings.ts`), the active logger, the `api` filter, the colour rule
+and the contract are under `packages/rafa/src/adapters/logger/`, the
+events output is `packages/rafa/src/adapters/output/events.ts`, and the
+`logger` section is `packages/rafa/src/config-schema-logger.ts`. A file
+outside the package imports the logger by its subpath,
+`@open-tomato/rafa/adapters/logger/<file>`, and the port through
+`@open-tomato/rafa/ports` (`context/source.md`, "Core and its
+barrels").
+
 ### What goes where
 
 - **`Output.info` and `Output.result` are a command's own answer.** A
@@ -32,7 +43,7 @@ composition root `src/adapter-registry.ts` registers `logger/console`.
 
 ### Which entries are written
 
-`src/adapters/logger/settings.ts` holds the rule, `levelEnabled`:
+`packages/rafa/src/adapters/logger/settings.ts` holds the rule, `levelEnabled`:
 
 - An entry is on when its level is at or quieter than the threshold: the
   level its module has under `logger.modules`, else `logger.level`.
@@ -51,7 +62,7 @@ The type has no field for a body, and the filter answers the named
 members and no other, so a record that carries a `body` past the type
 still has it dropped.
 
-`src/adapters/logger/api-filter.ts` filters every exchange before it is
+`packages/rafa/src/adapters/logger/api-filter.ts` filters every exchange before it is
 written:
 
 - the URL's user info and its fragment are dropped
@@ -77,7 +88,7 @@ it starts. `gh` runs as a child process, so rafa never sees its requests.
 
 ### The console adapter
 
-`src/adapters/logger/console.ts` writes through the active output, in the
+`packages/rafa/src/adapters/logger/console.ts` writes through the active output, in the
 shape its mode reads.
 
 Text mode writes a line of its own through `info`, so a `debug` entry a
@@ -119,7 +130,7 @@ filtered exchange under `fields.api`.
 ### Colour
 
 Only the level prefix of a text line is coloured, and only when
-`colourEnabled` says so (`src/adapters/logger/colour.ts`):
+`colourEnabled` says so (`packages/rafa/src/adapters/logger/colour.ts`):
 
 1. `FORCE_COLOR` set to anything but `0`, `false` or nothing turns colour
    on. Set to `0` or `false`, it turns colour off.
@@ -142,7 +153,7 @@ Where the runtime removes the calling frame altogether, as for
 
 ### The active logger, and when config reaches it
 
-`src/adapters/logger/active.ts` holds the logger the process writes
+`packages/rafa/src/adapters/logger/active.ts` holds the logger the process writes
 through, beside the active output. The dispatcher makes one per command
 (`commandLogger`, `src/cli/dispatch.ts`), with the invocation's verbosity
 and colour, and runs the command with it in an async scope
@@ -150,7 +161,7 @@ and colour, and runs the command with it in an async scope
 
 A command's logger exists before the project is found, and the command
 loads its config later. So the settings are held apart from the logger,
-in `src/adapters/logger/settings.ts`, in a scope of the same invocation
+in `packages/rafa/src/adapters/logger/settings.ts`, in a scope of the same invocation
 (`runWithLoggerSettings`): `loadConfig` sets them once a config is read,
 before it prints that load's own warnings, and a logger reads them at
 each entry. Until then the defaults and the verbosity flags apply. Every
@@ -176,7 +187,7 @@ called inside one, and on the module-level value otherwise.
 - **Outside every command**, a set replaces the module-level value: the
   default logger and the default settings until something sets another.
   A test sets it, and so does the config the module loader reads before
-  the dispatch (`src/modules/load.ts`). No command reads it: it is
+  the dispatch (`packages/rafa/src/modules/load.ts`). No command reads it: it is
   hidden while a command runs and read again after.
 - **Each half of the command hook** (`src/status/hook.ts`) runs with
   settings of its own, starting from the defaults. The config it loads
@@ -217,9 +228,9 @@ logger, whatever that invocation loaded. No signal or abort listener
 under `src/` writes through an output or a logger (`context/cli.md` lists
 them).
 
-### Moving a module
+### Moving a module onto the logger
 
-`src/adapters/tracker/resolve.ts` is the first one moved, and the `rafa
+`packages/rafa-board/src/adapters/tracker/resolve.ts` is the first one moved, and the `rafa
 issue` actions reach it (`resolveIssueTracker` names no sink of its own).
 Its default warning sink was a function calling `activeOutput().warn`
 with a `PREFIX`-led string. It is now:
@@ -231,11 +242,12 @@ activeLogger().child({ module: 'tracker', action: 'chain' })
 
 A caller that passes its own `log` sink still gets the plain string, so
 the `PREFIX` stays for that path and for the thrown error. The other
-modules move when a change touches them.
+modules move onto the child logger when a change touches them. A file moved
+into the package is a different move, which `context/source.md` names.
 
 ### Config
 
-`src/config-schema-logger.ts` reads six keys:
+`packages/rafa/src/config-schema-logger.ts` reads six keys:
 
 ```yaml
 logger:
@@ -262,13 +274,13 @@ A module can provide a logger adapter in its manifest, as it provides a
 tracker (`rafa.provides.logger` with a `kind` and an `entry`). Its kind is
 registered when the module loads, and `src/rafa.ts` makes the registry
 it was registered on the active one before it dispatches
-(`activateModuleAdapters`, `src/modules/activate.ts`). The dispatcher's
+(`activateModuleAdapters`, `packages/rafa/src/modules/activate.ts`). The dispatcher's
 resolver reads `CORE_ADAPTER_REGISTRY`, so a `logger.kind` naming the
 module's kind selects it. `context/cli.md` says the same of every port.
 
 ### The contract
 
-`src/adapters/logger/contract.ts` holds eleven cases every adapter passes,
+`packages/rafa/src/adapters/logger/contract.ts` holds eleven cases every adapter passes,
 run with `runLoggerContract`. They ask what was written, never its shape.
 `contract.test.ts` runs them over loggers broken on purpose, so each case
 is shown able to fail.

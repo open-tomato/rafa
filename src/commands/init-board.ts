@@ -4,7 +4,7 @@
  * {@link setUpBoard} came to; then the optional epic guard workflow,
  * with a question of its own.
  *
- * `src/board/setup.ts` makes the board — the fifteen labels, the spec issue
+ * `packages/rafa-board/src/board/setup.ts` makes the board — the fifteen labels, the spec issue
  * template, the pinned Roadmap issue and `roadmap.issue` — and reports
  * each part as created, present or refused. This module is the half
  * that decides whether that runs, and it is where the flags, the
@@ -57,7 +57,7 @@
  * ## The epic guard, asked after the board
  *
  * Once the board has run, {@link runEpicGuardStep} decides whether to
- * write the optional workflow `src/board/epic-guard.ts` ships, which
+ * write the optional workflow `packages/rafa-board/src/board/epic-guard.ts` ships, which
  * removes a second `epic:` label from an issue as it lands. It has its
  * own question because it is a file in the repository's workflows and
  * not part of the board: a board without it is read exactly as before.
@@ -93,7 +93,7 @@
  * When a config layer sets `board.relationships`,
  * {@link runRelationsMoveStep} moves the relationships the board holds in
  * the OTHER mode into the one the key names
- * (`src/board/relations/move.ts` plans and sends; this is where the
+ * (`packages/rafa-board/src/board/relations/move.ts` plans and sends; this is where the
  * printing and the questions live). The first answer wins:
  *
  *   - The key is left at its default: the step answers null, reads,
@@ -122,7 +122,7 @@
  *
  * A relationship write moves no `updated_at`, so the rows the move
  * touched are dropped from a kept `native` listing (`invalidateRows`,
- * `src/board/board-cache.ts`); a `labels` cache is left as it is.
+ * `packages/rafa-board/src/board/board-cache.ts`); a `labels` cache is left as it is.
  *
  * ## Nothing here spawns
  *
@@ -135,24 +135,35 @@
  * `./init-board.test.ts` drives a recorded fake and a scripted
  * prompter.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { RelationsMoveFailure, RelationsMovePlan, RelationsMoveResult } from '../board/relations/move.js';
-import type { BoardPart, BoardSetupReport } from '../board/setup.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode, PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type {
+  BoardPart,
+  BoardSetupReport,
+  GhRunner,
+  RelationsMoveFailure,
+  RelationsMovePlan,
+  RelationsMoveResult,
+} from '@open-tomato/rafa-board';
 
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+import {
+  EPIC_GUARD_PATH,
+  LABELS_READS,
+  anythingAt,
+  boardChanged,
+  createGhBoardListing,
+  createNativeRelations,
+  invalidateRows,
+  planRelationsMove,
+  readBoardRepository,
+  setUpBoard,
+  writeEpicGuard,
+  writeRelationsMove,
+} from '@open-tomato/rafa-board';
 
-import { invalidateRows } from '../board/board-cache.js';
-import { EPIC_GUARD_PATH, writeEpicGuard } from '../board/epic-guard.js';
-import { LABELS_READS } from '../board/relations/labels.js';
-import { planRelationsMove, writeRelationsMove } from '../board/relations/move.js';
-import { createNativeRelations } from '../board/relations/native.js';
-import { readBoardRepository } from '../board/repository.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { anythingAt, boardChanged, setUpBoard } from '../board/setup.js';
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
 export const YES_ANSWERS: readonly string[] = ['y', 'yes'];
@@ -203,7 +214,7 @@ export interface BoardStepOptions {
   readonly isTerminal: () => boolean;
   /** Opens the prompter the question is asked through. Called only to ask. */
   readonly openPrompter: () => Prompter;
-  /** Where the shipped spec template is looked for; `src/board/setup.ts`'s own when left out. */
+  /** Where the shipped spec template is looked for; `packages/rafa-board/src/board/setup.ts`'s own when left out. */
   readonly moduleDir?: string | undefined;
   /**
    * The `naming.branch` template the Roadmap issue's naming paragraph
@@ -433,7 +444,7 @@ export interface EpicGuardStepOptions {
   readonly isTerminal: () => boolean;
   /** Opens the prompter the question is asked through. Called only to ask. */
   readonly openPrompter: () => Prompter;
-  /** Where the shipped workflow is looked for; `src/board/epic-guard.ts`'s own when left out. */
+  /** Where the shipped workflow is looked for; `packages/rafa-board/src/board/epic-guard.ts`'s own when left out. */
   readonly moduleDir?: string | undefined;
 }
 

@@ -28,12 +28,10 @@
  *   - a `convention` entry reaches the pull request body and no
  *     tracker's `create`, the issue directory holding one file only.
  */
-import type { StartTriageOptions, TaskTriageInput } from './triage.js';
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
-
-import '../adapter-registry.js';
+import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
+import type { StartTriageOptions, TaskTriageInput } from '@open-tomato/rafa-run/start/triage';
 
 import {
   existsSync,
@@ -56,23 +54,22 @@ import {
   it,
 } from 'bun:test';
 
+import { ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { resolveTracker } from '@open-tomato/rafa-board/adapters/tracker/resolve';
+import { createBaseRunCache, runNamedTestAt } from '@open-tomato/rafa-pr/triage/base-run';
+import { createPrivateTriageTracker } from '@open-tomato/rafa-pr/triage/triage';
+import { CONVENTIONS_HEADING, writeConventionLines } from '@open-tomato/rafa-run/start/convention-body';
+import { fileFollowUps, followUpsMarker, followUpsTitle } from '@open-tomato/rafa-run/start/follow-ups';
+import { createStartTriage } from '@open-tomato/rafa-run/start/triage';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { resolveTracker } from '../adapters/tracker/resolve.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 import { detail, PROVIDER_GH, SUMMARY } from '../tests/release-stage-fixtures.js';
-import { createBaseRunCache, runNamedTestAt } from '../triage/base-run.js';
-import { createPrivateTriageTracker } from '../triage/triage.js';
-
-import { CONVENTIONS_HEADING, writeConventionLines } from './convention-body.js';
-import { fileFollowUps, followUpsMarker, followUpsTitle } from './follow-ups.js';
-import { createStartTriage } from './triage.js';
 
 /** Each case that runs a test runs `bun test` in a worktree, so it is given room. */
 const RUN_TIMEOUT_MS = 60_000;

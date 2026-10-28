@@ -2,19 +2,19 @@
  * The flags commands of several features declare, spelled once.
  *
  * {@link HINT_FLAG_SPEC} is the `--no-hint` flag of the six commands
- * that end by naming the step that follows (`src/next/ending.ts`):
+ * that end by naming the step that follows (`packages/rafa-run/src/next/ending.ts`):
  * `pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready` and
  * `loop start`. They belong to four features, and three of them are
- * declared in a declarations file (`src/commands/pr/declarations.ts`,
- * `src/commands/issue/declarations.ts`), which imports core's entries
+ * declared in a declarations file (`packages/rafa-pr/src/commands/pr/declarations.ts`,
+ * `packages/rafa-board/src/commands/issue/declarations.ts`), which imports core's entries
  * alone and no module under `src/`. So the flag lives here, where every
  * one of the six can reach it, and each declares this value itself
  * rather than a copy its tests would have to hold equal.
  *
  * {@link DEFAULT_CI_TIMEOUT_MIN} is here for the same reason: the
  * loop's `--ci-timeout` (`src/commands/loop/start.ts`,
- * `src/start/run-setup.ts`) and `pr wait`'s `--timeout`
- * (`src/commands/pr/declarations.ts`, `src/commands/pr/wait.ts`) both
+ * `packages/rafa-run/src/start/run-setup.ts`) and `pr wait`'s `--timeout`
+ * (`packages/rafa-pr/src/commands/pr/declarations.ts`, `packages/rafa-pr/src/commands/pr/wait.ts`) both
  * default to it, and the second is spelled in a declarations file.
  *
  * The file imports nothing by value: it names `command.ts` with
@@ -29,7 +29,7 @@ export const HINT_FLAG = 'hint';
 /**
  * The flag each of the six declares, so `--no-hint` suppresses the
  * ending. Boolean and defaulting to true, which is what makes
- * `--no-hint` read as false for it (`src/cli/core/parseArgs.ts`).
+ * `--no-hint` read as false for it (`parseArgs.ts` beside this file).
  */
 export const HINT_FLAG_SPEC: RafaFlagSpec = Object.freeze({
   name: HINT_FLAG,

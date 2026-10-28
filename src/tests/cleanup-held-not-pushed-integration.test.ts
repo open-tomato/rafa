@@ -16,16 +16,15 @@ import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CleanupCommandSeams } from '../commands/cleanup.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 
-import '../adapter-registry.js';
-
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { createCleanupCommand } from '../commands/cleanup.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { dispatchInProject, plantProjectConfig } from './cli-capture.js';
 

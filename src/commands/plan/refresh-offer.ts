@@ -1,7 +1,7 @@
 /**
  * The question `plan create --issue` and `plan create --next` ask when
  * the issue they were pointed at no longer reads as its saved copy: the
- * {@link RefreshOffer} `src/board/snapshot-settle.ts` takes.
+ * {@link RefreshOffer} `packages/rafa-board/src/board/snapshot-settle.ts` takes.
  *
  * `settleSpecSnapshot` decides WHETHER to ask — only on a changed body,
  * only without `--refresh`, only after every check has run on the body
@@ -41,12 +41,12 @@
  * so every case in `./refresh-offer.test.ts` drives a fake and none of
  * them reads standard input or waits on an answer.
  */
-import type { RefreshOffer, RefreshOfferRequest } from '../../board/snapshot-settle.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { RefreshOffer, RefreshOfferRequest } from '@open-tomato/rafa-board';
+
+import { refreshQuestion } from '@open-tomato/rafa-board';
 
 import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
-
-import { refreshQuestion } from '../../board/snapshot-settle.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */
 export interface RefreshOfferSeams {

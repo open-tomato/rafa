@@ -28,17 +28,20 @@
  *     removed here.
  *
  * The runner is a seam ({@link RecheckBugOptions.runSuite}), so the unit
- * tests plant one; left out it is `runSuite` (`../../suite/run.ts`).
+ * tests plant one; left out it is `runSuite`
+ * (`@open-tomato/rafa/suite/run`).
  */
 import type { RunOutcome } from '../../bugs/recheck-verdict.js';
-import type { SuiteResult, SuiteRunOptions } from '../../suite/run.js';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
+import type { SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
 
 import { join } from 'node:path';
 
+import { createDeadlineSpawner } from '@open-tomato/rafa-run';
+
+import { runSuite } from '@open-tomato/rafa/suite/run';
+
 import { runOutcomeOf, verdictOf } from '../../bugs/recheck-verdict.js';
-import { createDeadlineSpawner } from '../../suite/deadline-spawn.js';
-import { runSuite } from '../../suite/run.js';
 
 /** The runner {@link recheckBug} drives: `runSuite`'s shape. */
 export type RecheckSuiteRunner = (options: SuiteRunOptions) => Promise<SuiteResult>;

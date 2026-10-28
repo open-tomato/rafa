@@ -34,7 +34,7 @@ Non-test imports leaving the cluster, by the cluster they reach:
 | `c03-config` | 80 | 6 | `src/config-schema.ts`, `src/config.ts`, `src/config-load.ts`, `src/config-sections.ts`, `src/adapters/registry.ts`, `src/commands/doctor-render.ts` |
 | `c06-command` | 33 | 8 | `src/cli/command.ts`, `src/cli/registry.ts`, `src/cli/help.ts`, `src/cli/describe.ts`, `src/commands/index.ts`, `src/next/state.ts`, `src/next/ending.ts`, `src/board/leak.ts` |
 | `c05-sessions` | 27 | 8 | `src/project/scope.ts`, `src/loop/sessions.ts`, `src/next/readings.ts`, `src/pr/owner-approval.ts`, `src/board/board-owns.ts`, `src/board/board-body.ts`, `src/board/owner-resolve.ts`, `src/commands/plan/plan-files.ts` |
-| `c07-index` | 19 | 10 | `src/board/trust.ts`, `src/board/issue-board.ts`, `src/board/roadmap-claims.ts`, `src/claims/*.ts` (4), `src/pr/provider.ts`, `src/schema/project-id.ts`, `src/start/branch-decision.ts` |
+| `c07-index` | 19 | 10 | `src/board/trust.ts`, `src/board/issue-board.ts`, `src/board/roadmap-claims.ts`, `src/claims/*.ts` (4), `packages/rafa/src/pr/provider.ts`, `src/schema/project-id.ts`, `src/start/branch-decision.ts` |
 | `c10-index` | 18 | 5 | `src/ports/index.ts`, `src/adapters/tracker/issue-values.ts`, `src/adapters/tracker/resolve.ts`, `src/board/epic-body.ts`, `src/board/epic-template.ts` |
 | `c02-active` | 9 | 2 | `src/adapters/output/active.ts`, `src/board/gate.ts` |
 | `c09-version` | 1 | 1 | `src/commands/pr/merge-cleanup.ts` |

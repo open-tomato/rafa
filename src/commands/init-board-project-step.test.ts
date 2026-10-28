@@ -18,8 +18,8 @@
  */
 import type { ProjectSetupConfig, ProjectSetupOptions, ProjectSetupReport, ProjectStepOptions } from './init-board-project.js';
 import type { BoardStepResult } from './init-board.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,9 +27,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { recordingFeed } from '../board/project/progress-fake.js';
-import { retryLine } from '../board/project/project-runner.js';
-import { answeringGh, flakyGh, recordRetries, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
+import { recordingFeed } from '@open-tomato/rafa-board/board/project/progress-fake';
+import { retryLine } from '@open-tomato/rafa-board/board/project/project-runner';
+import { answeringGh, flakyGh, recordRetries, TIMED_OUT_STDERR } from '@open-tomato/rafa-board/board/project/retry-fake';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import {

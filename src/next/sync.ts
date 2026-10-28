@@ -18,7 +18,7 @@
  * runs a chain of steps — decides what a refusal costs, prints it and
  * picks the exit code. That is the shape of `GitResult` itself
  * (`packages/rafa/src/core/git/git.ts`) and of `readStepOutcome`
- * (`src/start/branch-decision.ts`), whose refusal wording this one
+ * (`packages/rafa/src/start/branch-decision.ts`), whose refusal wording this one
  * follows: `❌` on the first line, the following lines indented, git's
  * own words quoted as it said them.
  *
@@ -29,7 +29,7 @@
  * is therefore read again here, off `git rev-list --left-right --count`,
  * and a divergence is refused BEFORE `git merge` is spawned, naming
  * both counts and leaving the choice between pushing, rebasing and
- * resetting to the person — the refusal `src/start/branch-decision.ts`
+ * resetting to the person — the refusal `packages/rafa/src/start/branch-decision.ts`
  * makes for the same standing, in the same words, since neither module
  * may move a commit the operator has not pushed.
  *
@@ -53,14 +53,14 @@
  * moves whatever HEAD names — so the precondition for calling this is
  * that HEAD IS the base, and the row is what holds it.
  */
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr';
+
+import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { plural } from '@open-tomato/rafa/core/plan';
+import { hasDiverged, parseBaseStanding } from '@open-tomato/rafa/start/branch-decision';
 
-import { gitSaid } from '../pr/index.js';
-import { hasDiverged, parseBaseStanding } from '../start/branch-decision.js';
-
-/** The indent a refusal's following lines carry, as `src/start/branch-decision.ts` indents its own. */
+/** The indent a refusal's following lines carry, as `packages/rafa/src/start/branch-decision.ts` indents its own. */
 const INDENT = '   ';
 
 /** Which base is fast-forwarded, and to which remote's copy of it. */

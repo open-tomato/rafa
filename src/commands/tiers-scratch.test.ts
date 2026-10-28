@@ -9,9 +9,7 @@
  * a project skill and a project agent that each differ from their bundled
  * namesake; the control is the same project without them, which lists none.
  */
-import type { InventoryRecord } from '../inventory/record.js';
-
-import '../adapter-registry.js';
+import type { InventoryRecord } from '@open-tomato/rafa-inventory/inventory/record';
 
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,8 +18,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
+
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { createDoctorCommand } from './doctor.js';
 import { createSkillListCommand } from './skill/list.js';

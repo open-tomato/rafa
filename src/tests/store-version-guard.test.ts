@@ -45,7 +45,7 @@
  * log directory for the scratch repo, the way `collect.test.ts`'s two
  * command cases already do. The scratch repo root is resolved with
  * `realpathSync` before that directory is derived: the dispatcher answers
- * the root as a real path (`src/project/scope.ts`), which resolves
+ * the root as a real path (`packages/rafa/src/project/scope.ts`), which resolves
  * `/var`'s symlink to `/private/var` on macOS, so a directory keyed on
  * the unresolved path would sit beside the one the command actually looks
  * under, and the session half would throw on a missing directory instead
@@ -83,11 +83,10 @@ import { runsDir, sessionFilePath } from '@open-tomato/rafa/core/loop';
 import { recordTaskReport } from '@open-tomato/rafa/report/record';
 import { LEGACY_GATE_OPEN } from '@open-tomato/rafa/store/migrations';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '@open-tomato/rafa/store/sqlite';
-
-import { sessionLogDir } from '../effort/collect.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { sessionLogDir } from '@open-tomato/rafa-effort/effort/collect';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The command every black-boxed run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

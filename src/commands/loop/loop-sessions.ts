@@ -42,7 +42,6 @@
  * {@link NoSessionRefusal}, still exit code 1, so `loop wait` can end
  * them with its own code for no session without reading their words.
  */
-import type { PlanTask } from '../../plan/index.js';
 import type { RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { SessionChange, SessionPhase, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type {
@@ -50,7 +49,7 @@ import type {
   SessionChecklist,
   SessionEta,
 } from '@open-tomato/rafa/core/loop/readings';
-import type { TaskCounts } from '@open-tomato/rafa/core/plan';
+import type { PlanTask, TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

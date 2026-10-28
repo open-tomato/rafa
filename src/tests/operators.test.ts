@@ -14,8 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
-
-import { BUNDLED_AGENTS_DIR } from '../inventory/trees.js';
+import { BUNDLED_AGENTS_DIR } from '@open-tomato/rafa-inventory/inventory/trees';
 
 import { expectExit } from './cli-capture.js';
 

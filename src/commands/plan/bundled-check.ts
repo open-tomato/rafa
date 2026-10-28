@@ -15,7 +15,7 @@
  *
  * {@link findBundledEdits} reads the code spans of every task line still
  * to run, unticked or blocked, the lines a `rafa:*` block the plan never
- * closed hides included, as `src/plan/store-rules.ts` reads them: a
+ * closed hides included, as `packages/rafa-run/src/plan/store-rules.ts` reads them: a
  * ticked task will not run again. A span holding no whitespace is read
  * as a path against `repoRoot`, and its links are resolved with
  * `realpathSync`, so `.claude/agents/doc-updater.md` and
@@ -46,7 +46,7 @@
  * One {@link BundledEdit} per item, in the order the plan first names
  * them, the items of a root named whole sorted by name: its kind and
  * name, the path as the first span naming it typed it, every line that
- * names it, and the pin `pinLine` (`src/tiers/resolve.ts`) writes for it
+ * names it, and the pin `pinLine` (`packages/rafa-inventory/src/tiers/resolve.ts`) writes for it
  * at the `project` tier, so the line is the one `doctor` and the
  * preflight refusal already name. An item named on two lines is one
  * edit holding both.
@@ -86,23 +86,25 @@
  * resolves answers a path it never writes. A pin that cannot be written
  * is warned about and refuses nothing, as no edit does.
  */
-import type { InventoryKind } from '../../inventory/record.js';
 import type { PlanTask } from '@open-tomato/rafa/core/plan';
 import type { GeneratedPlan, Output } from '@open-tomato/rafa/ports';
+import type { InventoryKind } from '@open-tomato/rafa-inventory';
 
 import { readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
+import {
+  BUNDLED_AGENTS_DIR,
+  SKILL_FILE,
+  pinLine,
+  readAgentDirectory,
+} from '@open-tomato/rafa-inventory';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { isFile, parsePlan } from '@open-tomato/rafa/core/plan';
+import { prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 import { BUNDLED_SKILLS_DIR } from '@open-tomato/rafa/schema/tiers';
-
-import { readAgentDirectory } from '../../agents/roster.js';
-import { BUNDLED_AGENTS_DIR } from '../../inventory/trees.js';
-import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
-import { pinLine } from '../../tiers/resolve.js';
-import { SKILL_FILE } from '../../tiers/serve.js';
 
 /** The folder of the checkout the bundled roots sit in. */
 const SOURCE_DIR = 'src';

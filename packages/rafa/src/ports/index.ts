@@ -7,7 +7,7 @@
  * subpath, declared in phase 0 and filled in phase 1. Phase 1 puts one
  * adapter per port under `src/adapters/` and lets an add-on register
  * more by name; core imports an add-on only from a `path` source the
- * config's `allowList:` names (`src/modules/load.ts`). What those adapters
+ * config's `allowList:` names (`packages/rafa/src/modules/load.ts`). What those adapters
  * implement is declared here first, so a service (the orchestrator's
  * worker pool, a Drizzle-backed store) can type an implementation
  * against the subpath without importing the CLI.
@@ -54,7 +54,7 @@
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
  *     which are values and the GitHub adapter's projections, and
  *     `LedgerEntry`, the local ledger's line. rafa ports no OPT ledger,
- *     so the degradation chain (`src/adapters/tracker/resolve.ts`)
+ *     so the degradation chain (`packages/rafa-board/src/adapters/tracker/resolve.ts`)
  *     arrived without it, and the `local` adapter records the reason the
  *     chain hands it in each issue file instead.
  *   - {@link Store}: the effort store port phase 0 already built, in
@@ -67,7 +67,7 @@
  *     {@link BlessedBundle}, {@link MergeRule}, {@link MergeDecision} and
  *     {@link MergeResult} are declared in `./learning.ts` and re-exported
  *     here under the same names. The learning library declares its own
- *     six in `src/learning/types.ts`, since neither side may import the
+ *     six in `packages/rafa-inventory/src/learning/types.ts`, since neither side may import the
  *     other, and `src/tests/learning-contract.test.ts` holds each pair
  *     mutually assignable.
  *   - {@link Output}: open-tomato's `packages/shared/cli-core`, the
@@ -278,7 +278,7 @@ export interface IssueDraft {
    * rafa's own field, absent from the source: true when the issue waits
    * on other issues of the board, which the `github` adapter files as
    * the board's `spec:blocked` label (`SPEC_BLOCKED_LABEL` in
-   * `src/board/blocked.ts`) and the `local` adapter records in the issue
+   * `packages/rafa-board/src/board/blocked.ts`) and the `local` adapter records in the issue
    * file. Absent or false files no such mark. Not {@link blockedBy},
    * which names OPT ledger numbers.
    */
@@ -701,7 +701,7 @@ export interface GeneratedPlan {
    * What the planner's own session said about the spec BEFORE it
    * planned, read out of that session's output: the `rafa:spec-review`
    * block of the readiness gate's check 3
-   * (`src/board/spec-review.ts`).
+   * (`packages/rafa-board/src/board/spec-review.ts`).
    *
    * Optional, because a planner that reads no session output has judged
    * nothing and must still satisfy this port — the fixture planners the
@@ -791,8 +791,8 @@ export type SyncPullResult =
  * How a project's effort store travels between devices: the strategy
  * `effort.sync` selects. `local` and `file` are core's strategies and
  * `git`, `service` and `p2p` modules'; the adapter registry holds core's
- * as `sync/local` (`src/effort/sync/select.ts`) and `sync/file`
- * (`src/effort/sync/file.ts`). Push and pull are directions,
+ * as `sync/local` (`packages/rafa-effort/src/effort/sync/select.ts`) and `sync/file`
+ * (`packages/rafa-effort/src/effort/sync/file.ts`). Push and pull are directions,
  * not strategies: in every strategy a device pushes the rows it wrote
  * and pulls the rows others wrote.
  */

@@ -37,7 +37,7 @@
  *
  * A barrel that groups a file with a file outside `packages/rafa/src/core/` that
  * imports the barrel back by value is a runtime cycle. When the split
- * was made, `parse.ts` imported `src/utils/tracker.ts` by value, for
+ * was made, `parse.ts` imported `packages/rafa/src/utils/tracker.ts` by value, for
  * `splitBlockerComment`, and that file imports `readRafaBlocks` of
  * `blocks.ts` by value. With `blocks.ts` behind this barrel the tracker
  * would have imported this file, and this file `parse.ts`: a cycle of
@@ -47,9 +47,9 @@
  * files under `src/` and `packages/` held six cycles before the move and
  * the same six after it, none through a file of this folder. The
  * control, the same tree with this barrel re-exporting the block
- * reader's runtime names as well and `src/utils/tracker.ts` importing
+ * reader's runtime names as well and `packages/rafa/src/utils/tracker.ts` importing
  * `readRafaBlocks` from it, held a seventh: this file, `parse.ts` and
- * `src/utils/tracker.ts`.
+ * `packages/rafa/src/utils/tracker.ts`.
  *
  * That seventh loaded without a `ReferenceError` in the five orders
  * tried: this file, the tracker, `parse.ts`, `blocks.ts` and
@@ -71,7 +71,7 @@
  * only the store's `effort-levels.ts`, which imports none.
  *
  * `blocker-comment.ts` and `tracker-path.ts` were cut out of
- * `src/utils/tracker.ts`, which stays above core and re-exports their
+ * `packages/rafa/src/utils/tracker.ts`, which stays above core and re-exports their
  * names. `parse.ts` now reads `splitBlockerComment` from
  * `blocker-comment.ts`, so no file of this folder imports the tracker,
  * and the tracker imports this barrel by value with no cycle back. The

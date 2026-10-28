@@ -35,12 +35,12 @@
  * ever planted and no board write is attempted: what each scenario
  * proves is the git side alone. Every device's effort store is minted
  * with a store id of its own before any command runs, so
- * `readDeviceStoreId` (`src/claims/device.ts`) answers it with no row
+ * `readDeviceStoreId` (`packages/rafa-run/src/claims/device.ts`) answers it with no row
  * written first, exactly as `src/tests/plan-claim-race-spawned.test.ts`'s
  * own `mintDeviceStore` does.
  */
 import type { ScratchRepo, CapturedRun } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -52,14 +52,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { formatClaimMessage, parseClaimMessage } from '@open-tomato/rafa/claims/record';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { makeOwnershipCommit, pushNewClaimBranch } from '../claims/git.js';
-import { formatClaimMessage, parseClaimMessage } from '../claims/record.js';
-import { createGitRunner } from '../pr/index.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's own temporary directory, removed once every case has run. */

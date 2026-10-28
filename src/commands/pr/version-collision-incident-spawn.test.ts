@@ -1,5 +1,5 @@
 /**
- * The 0.25.0 incident (`src/release/guard.ts`'s own module note), replayed
+ * The 0.25.0 incident (`packages/rafa-release/src/release/guard.ts`'s own module note), replayed
  * end to end over two REAL spawns of `bun src/rafa.ts`: two clones of one
  * bare origin, a stand-in `gh` on the operator clone's `PATH`, and the
  * three commands an operator would actually type, in order.
@@ -34,7 +34,7 @@
  * reading `merge-guard.test.ts`'s own collision case takes. The checks
  * read empty (verdict `none`), which keeps `rafa pr triage`'s re-run
  * reading from short-circuiting to "green, nothing to triage" before the
- * release guard is ever asked (`src/pr/triage/rerun.ts`: a verdict of
+ * release guard is ever asked (`packages/rafa-pr/src/pr/triage/rerun.ts`: a verdict of
  * `green` answers that regardless of what the guard would say), and `rafa
  * pr merge` is run with `--skip-checks` so the ordinary "no checks"
  * refusal never masks the guard's own. `--no-hint` is on every line so the
@@ -59,9 +59,10 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseFragment } from '../../release/fragment.js';
+import { parseFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { expectExit, plantProjectConfig, runRafa } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 import { hostToolDirs } from '../../tests/stand-in-gh.js';
 
 /** A temporary directory of this file's own. */

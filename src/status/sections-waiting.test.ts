@@ -14,16 +14,16 @@
  * never carried `waiting` would fail.
  */
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
-import type { GhResult } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { BoardIssue } from '../board/roadmap-board.js';
-import type { CleanupSeams } from '../cleanup/index.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
-import type { OwnerApproval } from '../pr/owner-approval.js';
-import type { PullRequestDetail, PullRequestState } from '../pr/types.js';
-import type { Position } from '../project/position.js';
 import type { GitResult, GitRunner } from '@open-tomato/rafa/core/git';
+import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { PullRequestDetail, PullRequestState } from '@open-tomato/rafa/pr/types';
+import type { Position } from '@open-tomato/rafa/project/position';
+import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { BlockedIssuesReport } from '@open-tomato/rafa-board/board/blocked-issues';
+import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
+import type { OwnerApproval } from '@open-tomato/rafa-pr/pr/owner-approval';
+import type { CleanupSeams } from '@open-tomato/rafa-run/cleanup/index';
+import type { NextBoard, NextRoadmapReading } from '@open-tomato/rafa-run/next/readings';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,10 +31,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { typeOfLabels } from '../adapters/tracker/github.js';
-import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
-import { writePositionFile } from '../project/position.js';
+import { hopFilePath, writeHopRecord } from '@open-tomato/rafa/next/hop-record';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { writePositionFile } from '@open-tomato/rafa/project/position';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
+
 import { BRANCH, plantDemoProject } from '../tests/loop-session-fixtures.js';
 
 import { renderStatus } from './render.js';

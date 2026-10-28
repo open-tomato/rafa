@@ -1,11 +1,11 @@
 /**
- * A sweep over the words the ending hint (`src/next/hint.ts`) and the
- * `pr merge` follow-ups (`src/commands/pr/merge-followups.ts`) print:
+ * A sweep over the words the ending hint (`packages/rafa-run/src/next/hint.ts`) and the
+ * `pr merge` follow-ups (`packages/rafa-pr/src/commands/pr/merge-followups.ts`) print:
  * neither may name `git`, `gh` or `bun`, since both are text an
  * operator reads and neither is the tool this session runs.
  *
  * `hintLine` and `nextQuestion` are worded off `state.proposal` alone
- * (`src/next/hint.ts`), and `state.proposal` is what `src/next/state.ts`
+ * (`packages/rafa-run/src/next/hint.ts`), and `state.proposal` is what `packages/rafa-run/src/next/state.ts`
  * fills for each of the eight actions {@link actionInvocation} turns
  * into a command; see its module note for the table. This file reads no
  * seam and spawns nothing: the STATES below carry the same proposal
@@ -31,15 +31,15 @@
  * the check is not vacuous, the way `user-facing-spelling.sweep.test.ts`
  * plants its own hit for the same reason.
  */
-import type { FollowUpReading } from '../commands/pr/merge-followups.js';
-import type { NextState } from '../next/state.js';
+import type { FollowUpReading } from '@open-tomato/rafa-pr/commands/pr/merge-followups';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 import { describe, expect, it } from 'bun:test';
 
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { readFollowUps } from '../commands/pr/merge-followups.js';
-import { actionInvocation } from '../next/actions.js';
-import { hintLine, nextQuestion } from '../next/hint.js';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { readFollowUps } from '@open-tomato/rafa-pr/commands/pr/merge-followups';
+import { actionInvocation } from '@open-tomato/rafa-run/next/actions';
+import { hintLine, nextQuestion } from '@open-tomato/rafa-run/next/hint';
 
 /** The pull request the pull-request states name. */
 const PR = 41;
@@ -68,7 +68,7 @@ function stateOf(over: Partial<NextState>): NextState {
 
 /**
  * One state per action id {@link actionInvocation} turns into a
- * command, worded with the exact proposal text `src/next/state.ts`
+ * command, worded with the exact proposal text `packages/rafa-run/src/next/state.ts`
  * fills for that row — `resume` twice, once per row that proposes it.
  */
 const STATES: readonly NextState[] = Object.freeze([

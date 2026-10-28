@@ -19,11 +19,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-roadmap-cli-')));
 

@@ -2,7 +2,7 @@
  * `rafa loop start` over a stand-in sync strategy a module brings,
  * spawned as the real `rafa` binary (`src/tests/cli-capture.ts`): what the
  * end-of-task `hubContact.pushThenPull()` (`src/start.ts`,
- * `src/effort/sync/contact.ts`) does to the store the run records to.
+ * `packages/rafa-effort/src/effort/sync/contact.ts`) does to the store the run records to.
  *
  * The strategy is the `pull-merge-sync` module under
  * `src/modules/testdata/`, loaded as `effort.sync: service` through
@@ -38,9 +38,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { beginSession } from '@open-tomato/rafa/core/loop';
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 

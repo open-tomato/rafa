@@ -24,7 +24,7 @@
  *      (`.rafa/effort/`) and one never ignored beside it.
  *
  * The commit `effort collect` needs is made the way `makeRepo` in
- * `src/effort/collect.test.ts` does: proof against hooks, gpg signing
+ * `src/tests/effort-coupled/effort/collect.test.ts` does: proof against hooks, gpg signing
  * and a missing identity. Every git run here, that commit and every
  * `git check-ignore`, is scoped to the fixture's own scratch HOME and a
  * `.gitconfig` beside it, global and system config switched off, so
@@ -49,12 +49,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { initHint } from '@open-tomato/rafa/project/scope';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
-import { initHint } from '../project/scope.js';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-scope-')));

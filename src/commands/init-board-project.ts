@@ -28,7 +28,7 @@
  *
  * ## Five parts, each `created`, `present` or `refused`
  *
- * Reported the way `src/board/setup.ts` reports the board's parts, in
+ * Reported the way `packages/rafa-board/src/board/setup.ts` reports the board's parts, in
  * this order:
  *
  *  1. **Scope** ({@link SCOPE_PART}): `gh auth status --active --json
@@ -47,7 +47,7 @@
  *  3. **Add the issues** ({@link ITEMS_PART}): every open issue, every
  *     closed issue with a Rank, and every closed issue whose Stage is In
  *     review, read off the board the refresh reads
- *     (`readRefreshBoard`, `src/board/project/refresh.ts`). Facts are
+ *     (`readRefreshBoard`, `packages/rafa-board/src/board/project/refresh.ts`). Facts are
  *     read only for the closed issues the first two leave out that the
  *     project does not hold already, so a second run reads none it has
  *     added. Each missing issue is added through `ProjectPort.addItem`,
@@ -124,32 +124,43 @@
  * renders them (`../board/project/progress.ts`).
  */
 import type { BoardStepResult } from './init-board.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
-import type { ProgressFeed } from '../board/project/progress.js';
-import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-runner.js';
-import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
-import type { BoardOutcome } from '../board/setup.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type {
+  BoardOutcome,
+  GhRunner,
+  ProgressFeed,
+  Project,
+  ProjectItem,
+  ProjectPort,
+  ProjectRef,
+  ProjectRefresh,
+  ProjectRefreshed,
+  ProjectRunnerSeams,
+  RefreshConfig,
+  RefreshOptions,
+  RetryReport,
+} from '@open-tomato/rafa-board';
 
-import { isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { readIssueFacts } from '../board/project/facts.js';
-import { createGhProjectPort } from '../board/project/gh.js';
-import { openPhase } from '../board/project/progress.js';
-import { openProjectRunner } from '../board/project/project-runner.js';
 import {
+  PROJECT_SCOPE_FIX,
+  createGhProjectPort,
   isMissingProjectScope,
   notRefreshedWarning,
-  PROJECT_SCOPE_FIX,
+  openPhase,
+  openProjectRunner,
+  rankOf,
   rateLimitWarning,
+  readBoardRepository,
+  readIssueFacts,
+  readRefreshBoard,
+  readRoadmapSetting,
+  refreshProjectItems,
   skippedFieldWarning,
-} from '../board/project/refresh-warnings.js';
-import { readRefreshBoard, refreshProjectItems } from '../board/project/refresh.js';
-import { rankOf, stageOf } from '../board/project/rules.js';
-import { readBoardRepository } from '../board/repository.js';
-import { readRoadmapSetting } from '../board/setup-config.js';
+  stageOf,
+} from '@open-tomato/rafa-board';
+
+import { isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { PROJECT_NUMBER_SETTING, writeProjectNumber } from './init-board-project-setting.js';
 import { YES_ANSWERS } from './init-board.js';

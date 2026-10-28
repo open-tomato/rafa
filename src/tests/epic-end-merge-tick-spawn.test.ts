@@ -7,7 +7,7 @@
  * project with no epic prints `rafa next` and `rafa pr merge` output
  * byte-identical to what they always wrote.
  *
- * ## The end of an epic (`src/next/epic-end.ts`)
+ * ## The end of an epic (`packages/rafa-release/src/next/epic-end.ts`)
  *
  * One fixture, read twice: a roadmap naming one epic whose only member
  * is closed, so the walk descends into it and finds nothing left. The
@@ -15,11 +15,11 @@
  * `rafa next --dry-run` ends with all three lines; the second reads the
  * same fixture with that version tagged, so the release line is left
  * off. Every earlier line is read off the real state table
- * (`src/next/state.ts`), which this stage never touches, so only the
+ * (`packages/rafa-run/src/next/state.ts`), which this stage never touches, so only the
  * SUFFIX naming the epic is asserted, byte for byte, built from
  * {@link epicEndLines} itself rather than duplicated by hand.
  *
- * ## The merge tick (`src/commands/pr/merge-tick.ts`, `src/board/epic-tick.ts`)
+ * ## The merge tick (`packages/rafa-pr/src/commands/pr/merge-tick.ts`, `packages/rafa-board/src/board/epic-tick.ts`)
  *
  * A real git repository, merged for real: `merge-driven.test.ts`'s own
  * shape, spawned here instead of dispatched in-process, with a stand-in
@@ -43,7 +43,7 @@
  * it was not planted to answer.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { DryEpic } from '../next/readings.js';
+import type { DryEpic } from '@open-tomato/rafa-run/next/readings';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -52,15 +52,16 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { epicTickSentence } from '../board/epic-tick.js';
-import { tickSentence } from '../board/roadmap-tick.js';
-import { summaryLine } from '../commands/pr/merge.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { epicTickSentence } from '@open-tomato/rafa-board/board/epic-tick';
+import { tickSentence } from '@open-tomato/rafa-board/board/roadmap-tick';
+import { summaryLine } from '@open-tomato/rafa-pr/commands/pr/merge';
+import { epicEndLines } from '@open-tomato/rafa-release/next/epic-end';
+
 import { YES_FLAG } from '../next/ceiling.js';
-import { epicEndLines } from '../next/epic-end.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-end-merge-tick-spawn-')));

@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import {
   buildPlanPrompt,
@@ -36,7 +37,6 @@ import {
 } from '../plan.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));

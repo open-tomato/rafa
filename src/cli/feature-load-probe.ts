@@ -7,16 +7,16 @@
  *
  * ## The modes
  *
- *   - No argument: registers core's config sections and adapters, builds
- *     `createRosterRegistry()`, renders every help level (the root, each
- *     subject, each action) and `describeRegistry`, and prints
- *     `{ loaded, featureActions }`.
+ *   - No argument: registers core's config sections, adapters and
+ *     services, builds `createRosterRegistry()`, renders every help
+ *     level (the root, each subject, each action) and
+ *     `describeRegistry`, and prints `{ loaded, featureActions }`.
  *   - `--run=<subject> <action>`: the same, then runs that command's
  *     `run` over a context holding no project and no argument, catching
  *     what it throws, and prints `refusal` beside the two fields above:
  *     the thrown message, or null when nothing was thrown.
- *   - `--project=<dir> --home=<dir>`: registers core's sections and
- *     adapters, reads the core adapter kinds, calls
+ *   - `--project=<dir> --home=<dir>`: registers core's sections,
+ *     adapters and services, reads the core adapter kinds, calls
  *     `loadInvocationModules` over that working directory and home and
  *     `activateModuleAdapters` over what it loaded, and prints
  *     `{ loaded, kindsBefore, kindsAfter, syncGitResolves }`. No roster
@@ -34,17 +34,18 @@ import { createRequire } from 'node:module';
 import { isAbsolute, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { commandSpelling, isTopLevel } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activateModuleAdapters } from '@open-tomato/rafa/modules/activate';
+import { loadInvocationModules } from '@open-tomato/rafa/modules/load';
 
 import { registerCoreAdapters } from '../adapter-registry.js';
 import { BUNDLED_FEATURES, createRosterRegistry } from '../commands/index.js';
 import { registerCoreConfigSections } from '../config-registry.js';
-import { activateModuleAdapters } from '../modules/activate.js';
-import { loadInvocationModules } from '../modules/load.js';
+import { registerCoreServices } from '../service-registry.js';
 
-import { describeRegistry } from './describe.js';
 import { renderHelp } from './help.js';
 
 /** The repository root, with a trailing separator. */
@@ -110,6 +111,7 @@ async function refusalOf(command: RafaCommand, registry: ReturnType<typeof creat
 async function probeRoster(run: string | undefined): Promise<Record<string, unknown>> {
   registerCoreConfigSections();
   registerCoreAdapters();
+  registerCoreServices();
   const registry = createRosterRegistry();
   renderEverything(registry);
   const actions = featureActions(BUNDLED_FEATURES);
@@ -126,6 +128,7 @@ async function probeRoster(run: string | undefined): Promise<Record<string, unkn
 async function probeModules(cwd: string, home: string): Promise<Record<string, unknown>> {
   registerCoreConfigSections();
   registerCoreAdapters();
+  registerCoreServices();
   const kindsBefore = adapterKinds();
   const modules = await loadInvocationModules({ cwd, home });
   activateModuleAdapters(modules);

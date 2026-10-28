@@ -25,7 +25,8 @@
  *   - `session-env.ts`: the environment a Claude session is spawned
  *     with, which `claude.ts` imports by path;
  *   - `suite-failure.ts`: the type of one failing test, which
- *     `sessions.ts` imports by path and `src/suite/run.ts` re-exports.
+ *     `sessions.ts` imports by path and `packages/rafa/src/suite/run.ts`
+ *     re-exports.
  *
  * The four files share no name, and only `sessions.ts` imports
  * `suite-failure.ts`, for a type. One
@@ -67,14 +68,14 @@
  * ## Why the hop record is not here
  *
  * `hop-record.ts`, the shapes of the hop record and of a place, sits
- * alone behind `hops.ts`. `src/next/hop-record.ts` and
- * `src/project/position.ts` re-export its names, so they import a
+ * alone behind `hops.ts`. `packages/rafa/src/next/hop-record.ts` and
+ * `packages/rafa/src/project/position.ts` re-export its names, so they import a
  * barrel over it by value, and `src/loop/session-record-parse.ts`,
  * which `sessions.ts` imported by value, imported `asHopRecord` from
- * `src/next/hop-record.ts` by value when the split was made; it has
+ * `packages/rafa/src/next/hop-record.ts` by value when the split was made; it has
  * since moved here and imports `hop-record.ts` by path. With `hop-record.ts` behind this
  * barrel that is a cycle of four files: this one, `sessions.ts`, the
- * parser and `src/next/hop-record.ts`. `hops.ts` records the
+ * parser and `packages/rafa/src/next/hop-record.ts`. `hops.ts` records the
  * measurement, and `hops.test.ts` holds that no name is on two loop
  * barrels. `sessions.ts` imports `hop-record.ts` by path, for
  * `HopRecord`.
@@ -86,7 +87,7 @@
  * imported three files by value when it moved:
  * `packages/rafa/src/core/config/config-sections.ts`, for `messageOf`, and two outside
  * `packages/rafa/src/core/`, `src/loop/session-record-parse.ts` and
- * `src/project/scope.ts`. Through them it reached 38 files by value, and
+ * `packages/rafa/src/project/scope.ts`. Through them it reached 38 files by value, and
  * none of the 38 imported it by value. Both have since moved into
  * `packages/rafa/src/core/`, as `session-record-parse.ts` beside it and
  * `packages/rafa/src/core/config/scope.ts`.
@@ -230,6 +231,7 @@ export {
   interruptClaudeSessions,
   runClaude,
   runClaudeCaptured,
+  SESSION_ID_FLAG,
   SETTING_SOURCES_FLAG,
   spawnClaude,
   spawnClaudeCaptured,

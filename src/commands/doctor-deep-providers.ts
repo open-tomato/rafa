@@ -8,14 +8,14 @@
  * {@link readDeepProviders} reads into data; {@link providersSection}
  * turns that data into the rows `./doctor-deep-row.ts` renders. No row
  * is a `PreflightCheck`: the REQUIRED `gh` items stay
- * `src/pr/preflight-items.ts`'s, checked by plain `doctor` under the
+ * `packages/rafa-pr/src/pr/preflight-items.ts`'s, checked by plain `doctor` under the
  * rafa process's own environment, and this reading moves no exit code.
  *
  * ## Which environment
  *
  * Every `gh` this module runs is spawned with {@link DeepProvidersSeams.env}
  * as its WHOLE environment, and found on that environment's `PATH`
- * (`createGhRunner`'s `env` option, `src/adapters/tracker/github.ts`).
+ * (`createGhRunner`'s `env` option, `packages/rafa-board/src/adapters/tracker/github.ts`).
  * `--deep` hands it the environment a loop session would run with
  * (`./doctor-deep-env.ts`), which is the point of the section: a `gh`
  * that is found and logged in from the shell can still be missing from
@@ -27,11 +27,11 @@
  *
  *   1. **The tracker chain**: `tracker.default` then `tracker.fallback`,
  *      a kind named twice listed once, as `resolveTracker` tries them
- *      (`src/adapters/tracker/resolve.ts`). Of the core kinds `github`
+ *      (`packages/rafa-board/src/adapters/tracker/resolve.ts`). Of the core kinds `github`
  *      alone goes through `gh` ({@link GH_TRACKER_KINDS}); an add-on
  *      kind is listed and not probed, since what it needs is its own.
  *   2. **The pull request provider**: `resolvePrProvider`
- *      (`src/pr/provider.ts`), whose reading carries `origin`'s host.
+ *      (`packages/rafa/src/pr/provider.ts`), whose reading carries `origin`'s host.
  *      `pr.provider: none` reads no remote, as plain `doctor` does —
  *      unless the tracker goes through `gh`, which then needs the host.
  *   3. **When either goes through `gh`**, three probes, each run only
@@ -44,7 +44,7 @@
  *        - the active login for that host, read off
  *          `gh auth status --active --hostname <host> --json hosts`,
  *          and its permission on the repository through
- *          `createGhPermissions` (`src/board/trust.ts`), judged by
+ *          `createGhPermissions` (`packages/rafa-board/src/board/trust.ts`), judged by
  *          `readAuthorTrust` with an empty allow-list so the rule for
  *          which permissions are write access is spelled once.
  *
@@ -68,18 +68,20 @@
  * and the loop opens and merges its pull request.
  */
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { GhResult, GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
-import type { TrustReading } from '../board/trust.js';
-import type { PrProviderReading, ResolvePrProviderOptions } from '../pr/provider.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
+import type { GhResult, GhRunner, GhRunnerOptions, TrustReading } from '@open-tomato/rafa-board';
+import type { PrProviderReading, ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
+
+import { createGhPermissions, createGhRunner, readAuthorTrust } from '@open-tomato/rafa-board';
+import {
+  ghHostOf,
+  ghMissingMessage,
+  ghUnauthenticatedMessage,
+  resolvePrProvider,
+} from '@open-tomato/rafa-pr';
 
 import { isMapping } from '@open-tomato/rafa/core/config/sections';
-
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { createGhPermissions, readAuthorTrust } from '../board/trust.js';
-import { ghHostOf, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
-import { resolvePrProvider } from '../pr/provider.js';
 
 /** The section's title. */
 export const PROVIDERS_SECTION_TITLE = 'Providers';

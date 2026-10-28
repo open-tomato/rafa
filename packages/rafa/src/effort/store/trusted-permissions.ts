@@ -1,6 +1,6 @@
 /**
  * The repository permissions that are write access, which the store's
- * barrel exports on the `./store` subpath and `src/board/trust.ts`
+ * barrel exports on the `./store` subpath and `packages/rafa-board/src/board/trust.ts`
  * re-exports for the trust reading that judges a login by them.
  *
  * They sit in core so the barrel exports them without importing the

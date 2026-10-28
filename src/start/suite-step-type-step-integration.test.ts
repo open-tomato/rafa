@@ -29,8 +29,8 @@
  *      `.rafa/worktrees/<stub>`), which holds no `node_modules` of its own,
  *      the step still runs, and reads a new error as red.
  */
-import type { SuiteStepContext } from './suite-step.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { SuiteStepContext } from '@open-tomato/rafa-run/start/suite-step';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -40,12 +40,11 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { runTaskStep } from '@open-tomato/rafa-run/start/suite-step';
 
-import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 import { realNodeModules } from '../tests/real-node-modules.js';
-
-import { runTaskStep } from './suite-step.js';
 
 /** This file's own test timeout: two `tsc` runs, a worktree and a real `bun test` per case. */
 const CASE_TIMEOUT_MS = 120_000;

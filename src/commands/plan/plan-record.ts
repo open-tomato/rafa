@@ -29,7 +29,7 @@
  * verdict no gap of which blocked planning — is written by the GATE
  * itself, in the same write that opens the plan with the assumptions,
  * because the two together are what that verdict does
- * (`src/board/gate.ts`). Nothing in this module runs for it.
+ * (`packages/rafa-board/src/board/gate.ts`). Nothing in this module runs for it.
  *
  * ## A record that fails is a warning, never a refusal
  *
@@ -46,22 +46,23 @@
  * does, so `./plan-record.test.ts` reads the bytes of each message off
  * a sink.
  */
-import type { PlanFieldStamp } from '../../board/plan-field.js';
+import type { PlanFieldStamp } from '@open-tomato/rafa-board';
 
 import fs from 'fs';
 import path from 'path';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-import { activeOutput } from '@open-tomato/rafa/core/output';
-
-import { SKIP_REVIEW_FLAG } from '../../board/gate.js';
-import { issueFieldLine, stampPlanIssue } from '../../board/plan-field.js';
 import {
   REVIEW_MISSING_LINE,
   REVIEW_SKIPPED_LINE,
+  SKIP_REVIEW_FLAG,
+  issueFieldLine,
+  stampPlanIssue,
   stampReviewMissing,
   stampReviewSkipped,
-} from '../../board/review-stamp.js';
+} from '@open-tomato/rafa-board';
+
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { activeOutput } from '@open-tomato/rafa/core/output';
 
 /**
  * Records one line in the generated plan's `rafa:plan` block, answering

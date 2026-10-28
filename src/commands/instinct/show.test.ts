@@ -20,7 +20,6 @@
  * in the same scope, which is shown and exits 0: a command that
  * refused everything would pass the first half on its own.
  */
-import '../../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,7 +27,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { actionHash, ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
+import { actionHash, ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
+
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createInstinctShowCommand, evidenceLine, unknownIdMessage } from './show.js';

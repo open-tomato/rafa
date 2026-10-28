@@ -13,8 +13,6 @@
 import type { LaunchedLoop, StretchItemSeams } from './item.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
-import '../../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,8 +20,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { beginSession } from '@open-tomato/rafa/core/loop';
+import { eventsFilePath } from '@open-tomato/rafa-run/start/loop-events';
 
-import { eventsFilePath } from '../../start/loop-events.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
 import {

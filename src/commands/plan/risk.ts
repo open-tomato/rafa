@@ -1,6 +1,6 @@
 /**
  * `rafa plan risk [<plan>] [--strict]`: the risk reading of one plan
- * (`src/plan/risk.ts`), printed. What a run of the plan may do on this
+ * (`packages/rafa-pr/src/plan/risk.ts`), printed. What a run of the plan may do on this
  * machine and under the person's accounts, read in code: the command
  * starts no Claude session and so declares no `spends`.
  *
@@ -24,7 +24,7 @@
  * `scanSecretNames`: no value can reach a line this command writes.
  *
  * The plan's open task lines are read as well for a whole-suite run
- * their session is told to make (`src/plan/risk/long-runs.ts`): each is
+ * their session is told to make (`packages/rafa-inventory/src/plan/risk/long-runs.ts`): each is
  * a `long-run` `note`, so `--strict` does not refuse on it.
  *
  * ## What it writes
@@ -46,24 +46,22 @@
  * the plan as its value, and the line is refused with exit code 1 rather
  * than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
-import type { AccountSeams } from '../../plan/risk/accounts.js';
-import type { RiskFinding, RiskReport } from '../../plan/risk.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { AccountSeams, RiskFinding, RiskReport } from '@open-tomato/rafa-pr';
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { createGhRunner } from '@open-tomato/rafa-board';
+import { assessPlanRisk, renderRiskText } from '@open-tomato/rafa-pr';
+import { DEFAULT_PLAN_FILE, resolvePlanPath } from '@open-tomato/rafa-run';
+
+import { expectAtMostOneArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isFile, plural } from '@open-tomato/rafa/core/plan';
-
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { assessPlanRisk, renderRiskText } from '../../plan/risk.js';
-import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
-
-import { expectAtMostOneArgument, readSwitch, requireProject, resolveProjectConfig } from './plan-files.js';
 
 /** The command as a refusal names it. */
 const COMMAND = 'rafa plan risk';

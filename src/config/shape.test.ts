@@ -12,11 +12,14 @@
  * read by its own diagnostics. Each refusal is a control: it proves the
  * acceptance beside it could have failed.
  *
- * A second `describe` emits the declarations `tsconfig.config-types.json`
- * writes over `src/config/index.ts`, in memory, and checks a probe in a
- * program that reads those `.d.ts` files and TypeScript's lib alone: a
- * consumer of the published subpath sees `ConfigShape['hub']['url']` as
- * `string`, and a key the hub namespace lacks is refused there.
+ * A second `describe` emits the declarations of the build's two passes in
+ * memory, core's (`packages/rafa/tsconfig.types.json`, which holds the
+ * section files since the third decouple item, rafa-1325) and then
+ * `tsconfig.config-types.json`'s over `src/config/index.ts`, and checks a
+ * probe in a program that reads those `.d.ts` files and TypeScript's lib
+ * alone: a consumer of the published subpath sees
+ * `ConfigShape['hub']['url']` as `string`, and a key the hub namespace
+ * lacks is refused there.
  */
 import { resolve } from 'node:path';
 
@@ -35,6 +38,7 @@ const INDEX = resolve(ROOT, 'src/config/index.ts');
 const SAMPLES: Readonly<Record<string, unknown>> = {
   'hub.url': 'https://hub.example.org',
   'hub.tokenSecret': 'rafa-hub-token',
+  'loop.worktreeSetup': 'bun install --frozen-lockfile',
   'pr.provider': 'gh',
   'pr.base': 'main',
   'board.project.number': 6,
@@ -268,27 +272,70 @@ describe('the nested file shape against the registry', () => {
 const EMITTED = resolve(ROOT, '__emitted');
 
 /**
- * The declarations `tsconfig.config-types.json` emits over
- * `src/config/index.ts`, as the build does, each kept in memory by its
- * path under {@link EMITTED} rather than written.
+ * The `paths` of `tsconfig.config-types.json`, each target under `dist/`
+ * pointed at {@link EMITTED} instead: how the second pass, and a consumer
+ * through the root's `exports`, reach the package's own subpaths.
  */
-function emitDeclarations(): ReadonlyMap<string, string> {
+function emittedPaths(paths: ts.MapLike<string[]>): ts.MapLike<string[]> {
+  return Object.fromEntries(Object.entries(paths).map(([key, targets]) => [
+    key,
+    targets.map((target) => resolve(EMITTED, target.replace(/^\.\/dist\//, ''))),
+  ]));
+}
+
+/** A config file's options, its declarations written under {@link EMITTED} from `rootDir`. */
+function parsePass(config: string, rootDir: string): ts.ParsedCommandLine {
   const parsed = ts.getParsedCommandLineOfConfigFile(
-    resolve(ROOT, 'tsconfig.config-types.json'),
-    { declarationDir: EMITTED, rootDir: resolve(ROOT, 'src') },
+    resolve(ROOT, config),
+    { declarationDir: EMITTED, rootDir: resolve(ROOT, rootDir) },
     { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => {} },
   );
-  if (parsed === undefined) throw new Error('tsconfig.config-types.json did not parse');
-  const emitted = new Map<string, string>();
-  const result = ts.createProgram([INDEX], parsed.options).emit(
-    undefined,
-    (path, text) => emitted.set(path, text),
-    undefined,
-    true,
-  );
+  if (parsed === undefined) throw new Error(`${config} did not parse`);
+  return parsed;
+}
+
+/** A compiler host that reads `files` first and the disk after them. */
+function overlayHost(options: ts.CompilerOptions, files: ReadonlyMap<string, string>): ts.CompilerHost {
+  const host = ts.createCompilerHost(options);
+  const { fileExists, readFile, getSourceFile, directoryExists } = host;
+  host.fileExists = (path) => files.has(path) || fileExists.call(host, path);
+  host.readFile = (path) => files.get(path) ?? readFile.call(host, path);
+  host.getSourceFile = (path, language, ...rest) => {
+    const text = files.get(path);
+    return text === undefined
+      ? getSourceFile.call(host, path, language, ...rest)
+      : ts.createSourceFile(path, text, language);
+  };
+  host.directoryExists = (path) => [...files.keys()].some((file) => file.startsWith(`${path}/`))
+    || (directoryExists?.call(host, path) ?? false);
+  return host;
+}
+
+/** One pass's declarations, added to `emitted` by their path under {@link EMITTED}. */
+function emitPass(program: ts.Program, emitted: Map<string, string>): void {
+  const result = program.emit(undefined, (path, text) => emitted.set(path, text), undefined, true);
   if (result.emitSkipped) throw new Error('the declaration emit was skipped');
+}
+
+/**
+ * The declarations the build's two passes emit, as the build runs them:
+ * core's first, then `tsconfig.config-types.json`'s over
+ * `src/config/index.ts`, reading the first pass's output where the build
+ * reads `dist/`. Each is kept in memory by its path under {@link EMITTED}
+ * rather than written.
+ */
+function emitDeclarations(): ReadonlyMap<string, string> {
+  const emitted = new Map<string, string>();
+  const core = parsePass('packages/rafa/tsconfig.types.json', 'packages/rafa/src');
+  emitPass(ts.createProgram(core.fileNames, core.options), emitted);
+  const config = parsePass('tsconfig.config-types.json', 'src');
+  const options = { ...config.options, paths: emittedPaths(config.options.paths ?? {}) };
+  emitPass(ts.createProgram([INDEX], options, overlayHost(options, emitted)), emitted);
   return emitted;
 }
+
+/** The second pass's own-subpath map over {@link EMITTED}, which the probe resolves through. */
+const PROBE_PATHS = emittedPaths(parsePass('tsconfig.config-types.json', 'src').options.paths ?? {});
 
 /**
  * A probe module beside the emitted `config/index.d.ts`, checked in a
@@ -305,6 +352,7 @@ function probeEmitted(emitted: ReadonlyMap<string, string>, source: string): ts.
     strict: true,
     noEmit: true,
     types: [],
+    paths: PROBE_PATHS,
   };
   const host = ts.createCompilerHost(options);
   const libDir = host.getDefaultLibLocation?.() ?? '';

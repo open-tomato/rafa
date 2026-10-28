@@ -9,7 +9,7 @@
  * (`src/cli/route.ts`). `src/plan.ts` reads its own flags, and the ones
  * declared here are those it reads: `--spec`, `--stub` and
  * `--no-progress` in that module, and the board's ten words in
- * `src/board/flags.ts`, which records why they sit in one module.
+ * `packages/rafa-board/src/board/flags.ts`, which records why they sit in one module.
  *
  * Three of them name the one spec a run plans from and are mutually
  * exclusive — `--spec`, `--issue` and `--next` — so none is `required`
@@ -19,7 +19,7 @@
  * ({@link HINT_FLAG_SPEC}), and `endingWith` reads it AFTER `src/plan.ts`
  * has returned, to end a run that wrote a plan by naming the one step
  * that follows — the loop on the plan it has just written
- * (`src/next/ending.ts`). A run that refused writes nothing and ends
+ * (`packages/rafa-run/src/next/ending.ts`). A run that refused writes nothing and ends
  * with no hint, since the refusal travels out of the inner run. The
  * flag is `hint` and not `next` because `--next` is one of the three
  * above, and `parseArgs` reads `--no-next` as false for it.
@@ -50,13 +50,13 @@
 import type { CommandDeclaration } from '../wrap.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
+import { CREATE_DANGEROUS_PHRASES, registryRoster } from '@open-tomato/rafa-board';
+import { endingWith } from '@open-tomato/rafa-run';
+
 import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
-import { endingWith } from '../../next/ending.js';
 import plan from '../../plan.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
-
-import { CREATE_DANGEROUS_PHRASES, registryRoster } from './refs-check.js';
 
 const declaration: CommandDeclaration = {
   name: 'plan create',

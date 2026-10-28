@@ -21,12 +21,12 @@
  *
  *  - an `epic:` label on an issue that is not `type:epic`. An epic's
  *    own `epic:<slug>` label is not a mark: it names the epic, and is
- *    the slug a move back to `labels` reads (`src/board/relations/move.ts`,
+ *    the slug a move back to `labels` reads (`packages/rafa-board/src/board/relations/move.ts`,
  *    "The old mode's marks");
  *  - a `spec:blocked` label, with whether a `Blocked by:` line sits
  *    beside it. A `Blocked by:` line WITHOUT the label is not named:
  *    the `labels` mode reads the line only while the label is on
- *    (`src/board/relations/labels.ts`), so such a line records no
+ *    (`packages/rafa-board/src/board/relations/labels.ts`), so such a line records no
  *    relationship, `rafa issue unblock` leaves it behind when it takes
  *    the label off, and `rafa init --board` neither moves nor removes
  *    it — naming it would point at a command that does nothing to it.
@@ -66,16 +66,19 @@
  * `./doctor-marks.test.ts` drives in-process fakes, so none reaches
  * GitHub or spawns `gh`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardIssue, BoardIssueLink, BoardListing } from '../board/roadmap-board.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { BoardIssue, BoardIssueLink, BoardListing, GhRunner } from '@open-tomato/rafa-board';
+
+import {
+  EPIC_LABEL_PREFIX,
+  SPEC_BLOCKED_LABEL,
+  hasSpecBlockedLabel,
+  readBlockedBy,
+  readBoardRepository,
+} from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { EPIC_LABEL_PREFIX } from '../board/epics.js';
-import { readBoardRepository } from '../board/repository.js';
 
 import { MOVE_FIX } from './init-board.js';
 

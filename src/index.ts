@@ -1,8 +1,8 @@
 /**
  * The library's entry: the loop, the plan and report parsers, the
  * preflight, the effort store, the config resolver, scope resolution,
- * the adapter registry and the manifest validator, so a service
- * importing the package reaches everything the CLI reaches.
+ * the adapter and service registries and the manifest validator, so a
+ * service importing the package reaches everything the CLI reaches.
  *
  * The spec's `exports` map points the package root, `.`, at
  * `./dist/index.js`, which is this module built, and names what the root
@@ -36,8 +36,9 @@
  *     and the user scope's under a home and ranks the
  *     command line over both, the pure {@link parseConfigText} and
  *     {@link resolveConfig} it is built from, {@link readConfigFile},
- *     {@link ConfigError}, and the names and defaults every setting
- *     takes.
+ *     {@link readProjectScope}, which reads the project's two files
+ *     alone, {@link ConfigError}, and the names and defaults every
+ *     setting takes.
  *   - The whole scope module, `project/scope.ts`: {@link resolveScope},
  *     which walks up from a directory to the nearest one holding a
  *     project config, or else to the main checkout of the
@@ -54,6 +55,12 @@
  *     version core serves of each port, and {@link registerAdapters},
  *     {@link restoreAdapters} and {@link activeAdapterRegistry}, which
  *     register on, put back and read the registry it answers.
+ *   - The whole service registry barrel, `core/services/index.ts`:
+ *     {@link SERVICE_REASONS}, why each of its four keys is a service,
+ *     {@link registerServices}, {@link restoreServices} and
+ *     {@link activeServices}, which register, put back and read the set
+ *     of run's and pr's functions board's commands call, with
+ *     `RafaServices` and the types its keys are written over.
  *   - The whole manifest module, `modules/manifest.ts`:
  *     {@link validateManifest}, which reads the `rafa` manifest of a
  *     module's `package.json` and names every failure, with the schema's
@@ -69,17 +76,21 @@
  *
  * ## The registries load first
  *
- * Neither `config-registry.ts` nor `adapter-registry.ts` registers
- * anything as it is imported. Once its imports have loaded, the entry
- * calls {@link registerCoreConfigSections}, which hands the fourteen
- * sections of the config schema to core, so every setting is
- * registered before a caller of this entry loads or reads a config,
- * then {@link registerCoreAdapters}, which hands core's adapters to the
+ * None of `config-registry.ts`, `adapter-registry.ts` and
+ * `service-registry.ts` registers anything as it is imported. Once its
+ * imports have loaded, the entry calls
+ * {@link registerCoreConfigSections}, which hands the fourteen sections
+ * of the config schema to core, so every setting is registered before a
+ * caller of this entry loads or reads a config, then
+ * {@link registerCoreAdapters}, which hands core's adapters to the
  * adapter registry, so {@link CORE_ADAPTER_REGISTRY} answers every core
- * kind before a caller resolves one. A call is what survives a bundler
- * that drops an import kept for its effect alone. The entry exports
- * both roots, {@link CONFIG_DEFAULTS} (the registry's own) and
- * {@link CORE_ADAPTERS} too; a second call of either registers nothing.
+ * kind before a caller resolves one, then {@link registerCoreServices},
+ * which hands run's and pr's four services to the service registry, so
+ * {@link activeServices} calls them before a board command does. A call
+ * is what survives a bundler that drops an import kept for its effect
+ * alone. The entry exports the three roots, {@link CONFIG_DEFAULTS}
+ * (the registry's own), {@link CORE_ADAPTERS} and {@link CORE_SERVICES}
+ * too; a second call of any of them registers nothing.
  *
  * ## Why the commands carry a `Command` suffix
  *
@@ -125,14 +136,16 @@
  *   - `./ports`. The spec declares it in phase 0 and fills it in phase 1,
  *     from its own entry.
  *   - `./learning`, the library that settles lessons, from its own entry
- *     at `src/learning/index.ts`. It imports nothing from the rest of
- *     `src/`, and no name this entry exports comes from it.
+ *     at `packages/rafa-inventory/src/learning/index.ts`. It imports
+ *     nothing from outside its own folder, and no name this entry exports
+ *     comes from it.
  *
  * Importing the entry imports the SQLite backend, and `bun:sqlite` with
  * it, so the entry needs Bun.
  */
 import { registerCoreAdapters } from './adapter-registry.js';
 import { registerCoreConfigSections } from './config-registry.js';
+import { registerCoreServices } from './service-registry.js';
 
 export type {
   Adapter,
@@ -141,7 +154,25 @@ export type {
   AnyAdapter,
   PortImplementations,
 } from '@open-tomato/rafa/core/adapters';
-export type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
+export type {
+  AddStaleDocLineOptions,
+  AddStaleDocLineService,
+  EndingSeams,
+  EndWithNextStepService,
+  RafaServices,
+  ReadStaleDocsVersionService,
+  ServiceReason,
+  StaleDocLineResult,
+  StaleDocsTracker,
+  StaleDocsVersionOptions,
+  TriageReportService,
+  TriagedAction,
+  TriagedBug,
+  TriagedChannel,
+  TriageServiceOptions,
+  TriageServiceResult,
+} from '@open-tomato/rafa/core/services';
+export type { ConfigRoots, ProjectScopeFiles } from '@open-tomato/rafa/core/config/load';
 export type {
   CommandLineSetting,
   ConfigFile,
@@ -209,45 +240,33 @@ export type {
   ModuleManifest,
   OutputChannel,
   OutputProvision,
-} from './modules/manifest.js';
+} from '@open-tomato/rafa/modules/manifest';
 export type {
-  CheckOutcome,
-  FindingKind,
-  FindingSignal,
-  InjectionFallback,
-  InjectionFallbackReason,
-  InjectionRequest,
-  InjectionTask,
-  LineSpan,
   MalformedPrerequisite,
   MarkdownPrerequisite,
-  PlanBlockKind,
-  PlanHeader,
-  PlanHeaderExtra,
-  PlanHeaderField,
-  PlanInjection,
-  PlanIssue,
-  PlanIssueReason,
-  PlanModel,
   PlanPrerequisites,
-  PlanStage,
-  PlanTask,
-  PlanTaskStatus,
+  PreflightItems,
+  PrerequisiteReminder,
+  PrerequisiteSettings,
+  PrerequisiteTag,
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+export type {
+  CheckOutcome,
   PreflightCheck,
   PreflightEnv,
-  PreflightItems,
   PreflightOptions,
   PreflightReport,
   PreflightTier,
   PreflightTiers,
-  PrerequisiteReminder,
-  PrerequisiteSettings,
-  PrerequisiteTag,
   ProbeOptions,
   ProbeRun,
   ProbeRunner,
-  RafaBlock,
-  RafaBlockKind,
+  ServiceRequestInit,
+  ServiceRequester,
+} from '@open-tomato/rafa/preflight/run';
+export type {
+  FindingKind,
+  FindingSignal,
   ReportAbsenceReason,
   ReportAbsent,
   ReportBlocker,
@@ -259,10 +278,40 @@ export type {
   ReportPresent,
   ReportReading,
   ReportStatus,
-  ServiceRequester,
-  ServiceRequestInit,
   TaskReport,
-} from './plan/index.js';
+} from '@open-tomato/rafa/report/parse';
+export type { LineSpan, RafaBlock, RafaBlockKind } from '@open-tomato/rafa/core/plan/block-reader';
+export type {
+  InjectionFallback,
+  InjectionFallbackReason,
+  InjectionRequest,
+  InjectionTask,
+  PlanInjection,
+} from '@open-tomato/rafa/plan/inject';
+export type {
+  PlanBlockKind,
+  PlanHeader,
+  PlanHeaderExtra,
+  PlanHeaderField,
+  PlanIssue,
+  PlanIssueReason,
+  PlanModel,
+  PlanStage,
+  PlanTask,
+  PlanTaskStatus,
+} from '@open-tomato/rafa/core/plan';
+export {
+  loadPlanPrerequisites,
+  mergePlanPrerequisites,
+  parsePrerequisites,
+  planPrerequisites,
+  prerequisitesPathForPlan,
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+export { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '@open-tomato/rafa/preflight/run';
+export { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '@open-tomato/rafa/report/parse';
+export { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
+export { renderInjection } from '@open-tomato/rafa/plan/inject';
+export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from '@open-tomato/rafa/core/plan';
 export type {
   NoProject,
   ProjectFound,
@@ -270,7 +319,7 @@ export type {
   ScopeFileSystem,
   ScopeResolution,
   ScopeSeams,
-} from './project/scope.js';
+} from '@open-tomato/rafa/project/scope';
 
 export {
   activeAdapterRegistry,
@@ -280,9 +329,16 @@ export {
   registerAdapters,
   restoreAdapters,
 } from '@open-tomato/rafa/core/adapters';
-export { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/load';
+export {
+  activeServices,
+  registerServices,
+  restoreServices,
+  SERVICE_REASONS,
+} from '@open-tomato/rafa/core/services';
+export { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/load';
 export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 export { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
+export { CORE_SERVICES, registerCoreServices } from './service-registry.js';
 export {
   CONFIG_FILE,
   ConfigError,
@@ -304,8 +360,10 @@ export {
   STORE_BACKENDS,
   SYNC_STRATEGIES,
 } from '@open-tomato/rafa/core/config/sections';
-export { default as effortCollectCommand } from './effort/collect.js';
-export { default as effortReportCommand } from './effort/report.js';
+export {
+  collect as effortCollectCommand,
+  report as effortReportCommand,
+} from '@open-tomato/rafa-effort';
 export {
   decodeWirePayload,
   EFFORT_KEY_PROJECTIONS,
@@ -328,29 +386,8 @@ export {
   OUTPUT_CHANNELS,
   RUNNING_MANIFEST_SEAMS,
   validateManifest,
-} from './modules/manifest.js';
+} from '@open-tomato/rafa/modules/manifest';
 export { default as planCommand } from './plan.js';
-export {
-  FINDING_KINDS,
-  FINDING_SIGNALS,
-  isRafaBlockKind,
-  loadPlanPrerequisites,
-  mergePlanPrerequisites,
-  parsePlan,
-  parsePrerequisites,
-  parseReport,
-  PLAN_BLOCK_KINDS,
-  PLAN_HEADER_FIELDS,
-  planPrerequisites,
-  prerequisitesPathForPlan,
-  PROBE_TIMEOUT_MS,
-  RAFA_BLOCK_KINDS,
-  readRafaBlocks,
-  renderInjection,
-  REPORT_STATUSES,
-  runPreflight,
-  runShellProbe,
-} from './plan/index.js';
 export {
   DISK_FILE_SYSTEM,
   INIT_COMMAND,
@@ -360,8 +397,9 @@ export {
   scopeAt,
   ScopeError,
   selfAndAncestors,
-} from './project/scope.js';
+} from '@open-tomato/rafa/project/scope';
 export { default as startCommand } from './start.js';
 
 registerCoreConfigSections();
 registerCoreAdapters();
+registerCoreServices();

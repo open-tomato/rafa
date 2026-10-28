@@ -101,13 +101,11 @@
  */
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
-import type { CommandRegistry } from './registry.js';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { RafaCommand, RafaContext, RunningCommand } from '@open-tomato/rafa/core/command';
 import type { DangerousPhrases } from '@open-tomato/rafa/core/config';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, Output } from '@open-tomato/rafa/ports';
-
-import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -116,6 +114,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import {
   CommandExit,
   restoreRunningCommand,
@@ -127,15 +126,14 @@ import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousP
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/rafa/core/output';
 import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
+import { initHint } from '@open-tomato/rafa/project/scope';
 
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
-import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 
 /** The directory the dispatcher sits in, which the child probe imports from. */
@@ -1063,7 +1061,7 @@ describe('the active output and the exit code', () => {
     writeFileSync(join(cwd, 'probe.ts'), [
       `(await import(${JSON.stringify(join(CLI_DIR, '..', 'adapter-registry.ts'))})).registerCoreAdapters();`,
       `const { dispatch } = await import(${JSON.stringify(join(CLI_DIR, 'dispatch.ts'))});`,
-      `const { createCommandRegistry } = await import(${JSON.stringify(join(CLI_DIR, 'registry.ts'))});`,
+      `const { createCommandRegistry } = await import(${JSON.stringify(fileURLToPath(import.meta.resolve('@open-tomato/rafa/cli/registry')))});`,
       'const registry = createCommandRegistry({',
       '  subjects: [{ name: "loop", summary: "the loop" }],',
       '  commands: [{',

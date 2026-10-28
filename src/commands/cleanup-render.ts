@@ -37,12 +37,12 @@
  *
  * A row of the sixth group ({@link remoteOnlyRowLine}) is the branch's
  * name without `origin/`, which the heading already says, the date of
- * its tip, and the reason `src/cleanup/remote-only.ts` worded: how many
+ * its tip, and the reason `packages/rafa-run/src/cleanup/remote-only.ts` worded: how many
  * of its commits have no patch-equal copy on the base against how many
  * it holds, or that every commit has one. The count is the reading's,
  * never recomputed here, so the line and the JSON data cannot disagree
  * with it. The line names no command: deleting the branch on `origin`
- * is a step `src/cleanup/steps.ts` builds for a row the person ticked,
+ * is a step `packages/rafa-run/src/cleanup/steps.ts` builds for a row the person ticked,
  * and `--dry-run` prints that step's line.
  *
  * ## The remote delete a Stale row names
@@ -59,7 +59,7 @@
  * split is at the first `/`, as git abbreviates an upstream
  * `<remote>/<branch>`; a remote whose own name holds a `/` would be
  * misread, and the line is only ever printed, never run. The branch is
- * shell-quoted as `src/cleanup/steps.ts` quotes its steps.
+ * shell-quoted as `packages/rafa-run/src/cleanup/steps.ts` quotes its steps.
  *
  * ## The JSON data
  *
@@ -90,10 +90,11 @@ import type {
   StaleRow,
   WorktreeBlockKind,
   WorktreeRow,
-} from '../cleanup/index.js';
+} from '@open-tomato/rafa-run';
 
-import { cleanupCounts } from '../cleanup/index.js';
-import { shellQuote } from '../pr/preflight-items.js';
+import { cleanupCounts } from '@open-tomato/rafa-run';
+
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 /** The six group headings, in the order they are listed. */
 export const CLEANUP_GROUP_TITLES: Readonly<{

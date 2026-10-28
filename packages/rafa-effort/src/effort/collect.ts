@@ -1,0 +1,745 @@
+/**
+ * Folds the session and commit collectors into one incremental run.
+ *
+ * The four sibling modules each answer one question — what a session
+ * log holds, what it was dispatched to do, which plan it belongs to,
+ * what a commit changed. This one walks the session log directory and
+ * the commit history, skips whatever the store already holds, and
+ * appends the rest. It owns no parsing of its own: everything it
+ * writes is a projection of what those modules answered, save the one
+ * field no module answers, the session's mode.
+ *
+ * ## Where the session logs are
+ *
+ * `session-log-dirs.ts` says where Claude Code files a project's logs
+ * and which files there are sessions; this module reads them through
+ * it. A run reads the main checkout's folder and every worktree folder
+ * of the project, the worktree directory being `loop.worktreeDir` as
+ * the config resolves it, and stamps each row with the worktree its
+ * folder belongs to, null for the main checkout's. A session id found
+ * in two folders is read once, from the first, and counted in
+ * `duplicates`. {@link CollectOptions.logDir} is the override for the
+ * derivation, and names one folder: none of the worktree folders is
+ * read beside it, and every row it yields is null in `worktree`.
+ *
+ * ## What incrementality is keyed on
+ *
+ * A session row's key is the session id, which is the log's basename.
+ * One row per session, ever.
+ *
+ * The consequence is worth stating rather than discovering: a session
+ * still being APPENDED TO when it is collected is frozen at whatever
+ * it held, and no later run will revisit it — the append-only store
+ * dedupes by that same key, so a second read would be discarded even
+ * if one were taken. The repair is to delete the store file and
+ * re-collect; the rows are a measurement of one machine's runs and
+ * are regenerable from the logs at any time.
+ *
+ * Widening the key with a size or a line count would collect the
+ * grown log again, and that is worse rather than better: nothing in
+ * an append-only store can retract the first row, so the session
+ * would then be counted TWICE by every report that sums rows —
+ * silently, and with both rows looking well-formed. A frozen row is
+ * visible instead, because {@link SessionEffortRow.sizeBytes} and
+ * {@link SessionEffortRow.modifiedAt} are recorded beside the
+ * counters: a row whose size is short of the file on disk is a row
+ * taken mid-session.
+ *
+ * ## The mode is the phase's, not the log's
+ *
+ * Every session row carries a `mode`, and this collector writes `local`
+ * on every one. It is `SESSION_MODE`, read from nothing in the log. The
+ * spec fixes the mode at `local` for this phase and reserves `remote`
+ * for phase 6, and the row's type admits `local` alone, so this module
+ * cannot write another mode and still compile.
+ *
+ * ## One store, both halves
+ *
+ * Both halves go through one {@link EffortStore}, the port declared in
+ * `effort/store/types.ts`. Each reads the keys its kind already holds
+ * with `keys(kind)`, skips by them, and hands the rest to
+ * `append(kind, rows)`. Neither passes a key projection: the store
+ * reads each kind's key out of the port's one closed record for `keys`
+ * and `append` alike, so the set a half skips by and the set its append
+ * dedupes by come from the same place. What the collector still owns is
+ * the key it looks each candidate up by before any row exists: a
+ * session log's basename, which `readSessionLog` stamps on the row as
+ * its `sessionId`, and a parsed commit's `sha`. `skippedOnAppend` is
+ * the reading that says the collector's key and the store's agree.
+ *
+ * The store is the one a caller passes as {@link CollectOptions.store},
+ * else the one the config selects: the project's config under the repo
+ * root over the user scope's under {@link CollectOptions.home}, and
+ * `sqlite` when neither names one. That selection is made ONCE per run,
+ * before either half reads a log or runs git, and both halves use the
+ * one store it answered. So the two halves cannot land in two backends,
+ * and a config the loop cannot run on refuses the run before anything
+ * is read. The same read answers `plan.dir`, the roster's directory,
+ * unless {@link CollectOptions.plansDir} is passed. This command has no
+ * store flag, so the files outrank only the default. A store and a plans
+ * directory both passed in mean neither file is read at all. An unknown
+ * key in either file is warned about through {@link CollectOptions.log},
+ * with everything else the run reports.
+ *
+ * ## `--since` is one instant, resolved once
+ *
+ * The flag is parsed with `Date.parse` and REFUSED when that fails.
+ * Handing the raw string to git instead would look more capable and
+ * be a trap: git's approxidate resolves an unreadable string to NOW
+ * rather than failing — measured, `--since=qqqq` and
+ * `--since='not a date at all'` both resolve to the current second —
+ * so a typo would collect zero commits, exit 0, and print a summary
+ * that reads exactly like an up-to-date store. A refusal is the only
+ * answer that cannot be mistaken for a clean run.
+ *
+ * Resolving it once is also what keeps the two halves talking about
+ * the same window: the session half compares the resolved epoch
+ * against each log's mtime, and the commit half hands git the ISO
+ * form of that same epoch, so neither half re-parses anything.
+ *
+ * ## What the commit half walks
+ *
+ * With no `--since` the walk is the whole history reachable from
+ * HEAD. That is deliberate even though almost every row is then
+ * skipped: `minutesSincePrevious` is a property of the RANGE, so a
+ * full walk measures every gap against its true predecessor while a
+ * bounded one gives its oldest commit a null. Append-only means that
+ * null is permanent — a later full run re-derives the real gap and
+ * the append is dropped on the sha it already holds. So the first
+ * collect on a store should be unbounded; `--since` is for topping
+ * one up.
+ *
+ * No revision range is passed, so `%S` answers `HEAD` and the row's
+ * `branch` is null throughout. That is the honest answer rather than
+ * a missing feature: `%S` is the ref a WALK reached a commit from and
+ * not a property of the commit, so naming a branch would stamp it
+ * onto every ancestor the branch shares with main. Per-plan
+ * attribution runs through the sessions instead, where `gitBranch` is
+ * a field on the record. A caller that wants `%S` populated can pass
+ * its own reader through {@link CollectOptions.readCommits}.
+ *
+ * ## Two reads per session log, on purpose
+ *
+ * The head scan for the enqueue record and the full fold are separate
+ * passes over the same file. The first is bounded to ten lines and
+ * tears its stream down at the match, so the cost is one extra open;
+ * the alternative is teeing one line source into two consumers, which
+ * buys a few milliseconds across the tree and costs the property that
+ * makes both sibling modules testable — each takes a plain
+ * `AsyncIterable<string>` and consumes it exactly once.
+ *
+ * ## Refusals
+ *
+ * An unrecognised argument is an error rather than an ignored token.
+ * A mistyped `--no-sessons` would otherwise collect sessions while
+ * the operator read the summary as proof they had been skipped, and
+ * that is the same class of silent-success failure the `--since`
+ * refusal above exists to prevent. `--no-git` together with
+ * `--no-sessions` is refused for the same reason: it leaves nothing
+ * to collect, and a zero-row run that looks successful is worse than
+ * a message. `--skills` lifts that refusal, since it leaves the stored
+ * sessions to count. The parser is `collect-args.ts`.
+ *
+ * An EMPTY plan roster is not refused — `plan.dir` is untracked by
+ * default and absent on a fresh clone — but it makes every session's
+ * `planStub` resolve to null, which reads as a collector that failed
+ * to attribute anything. The roster size is reported for that reason.
+ *
+ * ## The skill half
+ *
+ * After the session and commit halves, `collect-skills.ts` counts the
+ * `Skill` calls of the sessions this run read into a row, or with
+ * `--skills` of every stored session whose log is in the directory and
+ * the window. It writes the SQLite-only `skill_invocations` table, not
+ * the port, so it lands in `effort.sqlite` under any `store`. Its note
+ * says which sessions it skips and why a count can be `unknown`.
+ *
+ * ## Sync
+ *
+ * Once the rows are stored and the summary written, the command entry
+ * pushes this store's rows to the project's other devices and pulls
+ * theirs, through one contact (`sync/contact.ts`). The contact writes
+ * any problem as a warning, at most one of them saying the hub is
+ * unreachable, and never changes how the command exits. `local` and
+ * `file` are not contacted. {@link collectEffort} makes no contact, so
+ * a caller handing it a store syncs nothing.
+ */
+import type { SkillCollectSummary, SkillLog, SkillScope } from './collect-skills.js';
+import type {
+  CommitLogOptions,
+  CommitLogParseResult,
+  CommitStats,
+} from './commits.js';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
+import type { ProjectLogDir, SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
+import type {
+  EffortStore,
+  SessionEffortRow,
+  SessionMode,
+} from '@open-tomato/rafa/store/types';
+
+import { existsSync, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { resolve } from 'node:path';
+
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError, registeredDefaults } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { activeOutput } from '@open-tomato/rafa/core/output';
+import { readLines, readSessionLog } from '@open-tomato/rafa/effort/session-log';
+import { listProjectSessionLogs, projectLogDirs } from '@open-tomato/rafa/effort/session-log-dirs';
+import { selectEffortStore } from '@open-tomato/rafa/store';
+
+import { attributeSession, planStubsFromFileNames } from './attribution.js';
+import { findFirstEnqueue } from './classify.js';
+import { parseCollectArgs } from './collect-args.js';
+import { collectSkillHalf, formatSkillSummary } from './collect-skills.js';
+import { readCommitLog } from './commits.js';
+import { createHubContact } from './sync/contact.js';
+
+/**
+ * The mode every session row this collector writes carries. A constant
+ * rather than a reading; see the module note.
+ */
+const SESSION_MODE: SessionMode = 'local';
+
+/*
+ * The row the session half writes is declared with the store port it
+ * is appended through, which depends on nothing in this module, and is
+ * re-exported here so the collector still names what it builds.
+ */
+export type { SessionEffortRow } from '@open-tomato/rafa/store/types';
+
+/* The argv parser moved to its own module; re-exported so callers keep one import. */
+export type { CollectArgs } from './collect-args.js';
+export { parseCollectArgs, parseSinceInstant } from './collect-args.js';
+
+/* The session log location moved to its own module; re-exported so callers keep one import. */
+export type { ProjectLogDir, SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
+export { listSessionLogs, projectLogDirName, projectLogDirs, sessionLogDir } from '@open-tomato/rafa/effort/session-log-dirs';
+
+/** Candidates split into the three buckets, which partition them. */
+export interface SessionSelection {
+  /** To be read. */
+  pending: SessionLogCandidate[];
+  /** Held by the store already. */
+  alreadyCollected: SessionLogCandidate[];
+  /** Older than the resolved `--since` instant. */
+  outsideWindow: SessionLogCandidate[];
+}
+
+/** Commit rows split by whether the store already holds them. */
+export interface CommitSelection {
+  pending: CommitStats[];
+  alreadyCollected: CommitStats[];
+}
+
+/** What the session half did. */
+export interface SessionCollectSummary {
+  /** The main checkout's folder, or the `logDir` override. */
+  logDir: string;
+  /** Every folder the run looked in, `logDir` first, then the worktrees' by name. */
+  logDirs: string[];
+  /** Copies of a session id an earlier folder held, never read. */
+  duplicates: number;
+  /**
+   * The file the append targeted, as the store's append answered it:
+   * the kind's own file under NDJSON, the one file every kind shares
+   * under SQLite.
+   */
+  storePath: string;
+  /** Plan stubs the roster held; zero attributes nothing. */
+  planStubCount: number;
+  /** Loose `*.jsonl` files found, each session id once. */
+  candidates: number;
+  outsideWindow: number;
+  alreadyCollected: number;
+  /** Logs read without error. */
+  read: number;
+  /** Logs that threw while being read; counted, never swallowed. */
+  failed: number;
+  appended: number;
+  /**
+   * Rows the store declined on a key it already held. Must be zero:
+   * the pending set was selected against the store's own `keys`, so
+   * anything here means the key the collector looked a row up by and
+   * the key the store dedupes it by disagreed.
+   */
+  skippedOnAppend: number;
+}
+
+/** What the commit half did. */
+export interface CommitCollectSummary {
+  /** The file the append targeted, as on the session summary. */
+  storePath: string;
+  /** The `--since` argument handed to git, ISO, or null. */
+  since: string | null;
+  parsedRows: number;
+  /** Non-blank log lines that were neither a header nor a stat line. */
+  unparsedLineCount: number;
+  alreadyCollected: number;
+  appended: number;
+  /** Must be zero, for the reason on the session summary's field. */
+  skippedOnAppend: number;
+}
+
+/** One collect run. A half that was switched off answers null. */
+export interface CollectResult {
+  repoRoot: string;
+  sessions: SessionCollectSummary | null;
+  commits: CommitCollectSummary | null;
+  /** Null when the session half was off and `--skills` was not given. */
+  skills: SkillCollectSummary | null;
+}
+
+/** How a run is bounded and where it reads from. */
+export interface CollectOptions {
+  /** The project root, with no default. Governs the store and git's cwd. */
+  repoRoot: string;
+  /**
+   * One folder read in place of the derived set: the main checkout's
+   * project folder and its worktrees' under {@link home}. See the module note.
+   */
+  logDir?: string;
+  /**
+   * The worktree directory whose folders the derived set takes, as
+   * `loop.worktreeDir` holds it. Defaults to the config's, or to
+   * `.rafa/worktrees` when no config is read. Unread beside `logDir`.
+   */
+  worktreeDir?: string;
+  /** Defaults to `plan.dir` under the repo root, as the config resolves it. */
+  plansDir?: string;
+  /** The resolved `--since` instant, shared by both halves. */
+  sinceEpochMs?: number | null;
+  /**
+   * The home the user scope's config is read under, and the session
+   * logs are derived under when no `logDir` is passed. No default: the
+   * command passes `homedir()`, so a caller cannot reach the real home by
+   * leaving it out. Its config is unread when a store and `plansDir` are
+   * both passed.
+   */
+  home: string;
+  /**
+   * The store both halves read their keys from and append to. Defaults
+   * to the backend the config under the repo root and the home selects;
+   * passed with `plansDir`, neither file is read. See the module note.
+   */
+  store?: EffortStore;
+  collectSessions?: boolean;
+  collectCommits?: boolean;
+  /**
+   * Which sessions the skill half reads: `appended`, the default, the
+   * ones the session half read into a row this run; `held`, every one
+   * the store holds; null, none. `appended` with the session half off
+   * runs nothing. The half writes `effort.sqlite` under `repoRoot` even
+   * when a store is passed, so a caller whose root is not its own passes
+   * null.
+   */
+  skills?: SkillScope | null;
+  verbose?: boolean;
+  /**
+   * Sink for progress, errors and config warnings. Defaults to the
+   * active output's `info`, read at each line.
+   */
+  log?: (line: string) => void;
+  /** Commit reader seam, so a test needs no repository. */
+  readCommits?: (options: CommitLogOptions) => CommitLogParseResult;
+}
+
+/** Everything the two halves share, resolved once. */
+interface HalfContext {
+  repoRoot: string;
+  /** The folders the session half reads, the first being the summary's `logDir`. */
+  logDirs: ProjectLogDir[];
+  plansDir: string;
+  sinceEpochMs: number | null;
+  /** The one store both halves read keys from and append to. */
+  store: EffortStore;
+  log: (line: string) => void;
+  note: (line: string) => void;
+  readCommits: (options: CommitLogOptions) => CommitLogParseResult;
+}
+
+/**
+ * Splits candidates into the three buckets.
+ *
+ * The window is tested BEFORE the store, so the buckets are disjoint
+ * by precedence rather than by luck and their sizes sum to the
+ * candidate count. A log exactly ON the `--since` instant is inside
+ * the window: the flag names the earliest moment to consider, and an
+ * exclusive bound would drop the one commit or session an operator
+ * copied the timestamp from.
+ */
+export function selectSessionLogs(
+  candidates: readonly SessionLogCandidate[],
+  collected: ReadonlySet<string>,
+  sinceEpochMs: number | null,
+): SessionSelection {
+  const pending: SessionLogCandidate[] = [];
+  const alreadyCollected: SessionLogCandidate[] = [];
+  const outsideWindow: SessionLogCandidate[] = [];
+
+  for (const candidate of candidates) {
+    if (sinceEpochMs !== null && candidate.modifiedAtMs < sinceEpochMs) {
+      outsideWindow.push(candidate);
+      continue;
+    }
+    if (collected.has(candidate.sessionId)) {
+      alreadyCollected.push(candidate);
+      continue;
+    }
+    pending.push(candidate);
+  }
+  return { pending, alreadyCollected, outsideWindow };
+}
+
+/**
+ * Splits parsed commit rows by whether the store already holds them.
+ *
+ * No window test: the walk was already bounded by `--since`, so a row
+ * that arrived here is inside it by construction.
+ */
+export function selectCommits(
+  rows: readonly CommitStats[],
+  collected: ReadonlySet<string>,
+): CommitSelection {
+  const pending: CommitStats[] = [];
+  const alreadyCollected: CommitStats[] = [];
+
+  for (const row of rows) {
+    if (collected.has(row.sha)) {
+      alreadyCollected.push(row);
+      continue;
+    }
+    pending.push(row);
+  }
+  return { pending, alreadyCollected };
+}
+
+/** Reads the plan roster, tolerating a plans directory that is not there. */
+export function readPlanStubs(plansDir: string): string[] {
+  return existsSync(plansDir)
+    ? planStubsFromFileNames(readdirSync(plansDir))
+    : [];
+}
+
+/**
+ * Reads one session log into a store row.
+ *
+ * Two passes; see the module note. The candidate supplies the size
+ * and mtime rather than a second stat, so the row describes the file
+ * as the walk saw it. The mode is read from neither pass; see the
+ * module note on why it is the phase's constant. The worktree is the
+ * candidate's, null when it names none.
+ */
+export async function collectSessionRow(
+  candidate: SessionLogCandidate,
+  planStubs: readonly string[],
+): Promise<SessionEffortRow> {
+  const enqueue = await findFirstEnqueue(readLines(candidate.path));
+  const stats = await readSessionLog(candidate.path);
+  const attribution = attributeSession(stats, enqueue.content, planStubs);
+
+  return {
+    ...stats,
+    kind: attribution.kind,
+    mode: SESSION_MODE,
+    branch: attribution.branch,
+    branchRecordCount: attribution.branchRecordCount,
+    distinctBranchCount: attribution.distinctBranchCount,
+    branchType: attribution.branchType,
+    branchStub: attribution.branchStub,
+    planStub: attribution.planStub,
+    planStubMatch: attribution.planStubMatch,
+    issueIdentifier: attribution.issueIdentifier,
+    taskText: attribution.taskText,
+    enqueueRecordIndex: enqueue.recordIndex,
+    sizeBytes: candidate.sizeBytes,
+    modifiedAt: new Date(candidate.modifiedAtMs).toISOString(),
+    worktree: candidate.worktree ?? null,
+  };
+}
+
+/** An error's message, however it was thrown. */
+function messageOf(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : String(error);
+}
+
+/** What the session half did, and the logs it read into a row, which the skill half reads by default. */
+interface SessionHalf {
+  summary: SessionCollectSummary;
+  read: SessionLogCandidate[];
+}
+
+/** Collects the session half. */
+async function collectSessionHalf(context: HalfContext): Promise<SessionHalf> {
+  const planStubs = readPlanStubs(context.plansDir);
+  const { candidates, duplicates } = listProjectSessionLogs(context.logDirs);
+  const selection = selectSessionLogs(
+    candidates,
+    context.store.keys('sessions'),
+    context.sinceEpochMs,
+  );
+
+  for (const { dir } of context.logDirs) context.note(`sessions: reading ${dir}`);
+  context.note(`sessions: ${candidates.length} logs, ${duplicates.length} held twice`);
+  const stubs = `${planStubs.length} plan stubs`;
+  context.note(`sessions: ${stubs} in ${context.plansDir}`);
+
+  const rows: SessionEffortRow[] = [];
+  const read: SessionLogCandidate[] = [];
+  let failed = 0;
+  for (const candidate of selection.pending) {
+    try {
+      rows.push(await collectSessionRow(candidate, planStubs));
+      read.push(candidate);
+      context.note(`sessions: read ${candidate.sessionId}`);
+    } catch (error) {
+      failed += 1;
+      context.log(`sessions: FAILED ${candidate.path}: ${messageOf(error)}`);
+    }
+  }
+
+  const appended = context.store.append('sessions', rows);
+  const summary = {
+    logDir: context.logDirs[0]?.dir ?? '',
+    logDirs: context.logDirs.map(({ dir }) => dir),
+    duplicates: duplicates.length,
+    storePath: appended.path,
+    planStubCount: planStubs.length,
+    candidates: candidates.length,
+    outsideWindow: selection.outsideWindow.length,
+    alreadyCollected: selection.alreadyCollected.length,
+    read: rows.length,
+    failed,
+    appended: appended.appended,
+    skippedOnAppend: appended.skipped,
+  };
+  return { summary, read };
+}
+
+/**
+ * The logs the skill half reads: under `held`, every loose log in the
+ * session half's folders whose session the store holds, inside the window; under
+ * `appended`, the ones the session half read, or null when it did not run.
+ */
+function skillLogs(context: HalfContext, scope: SkillScope, sessions: SessionHalf | null): SkillLog[] | null {
+  if (scope === 'appended') return sessions?.read ?? null;
+  const held = context.store.keys('sessions');
+  return selectSessionLogs(listProjectSessionLogs(context.logDirs).candidates, new Set(), context.sinceEpochMs)
+    .pending.filter((candidate) => held.has(candidate.sessionId));
+}
+
+/** Collects the commit half. */
+function collectCommitHalf(context: HalfContext): CommitCollectSummary {
+  const since = context.sinceEpochMs === null
+    ? undefined
+    : new Date(context.sinceEpochMs).toISOString();
+
+  const parsed = context.readCommits({ cwd: context.repoRoot, since });
+  const selection = selectCommits(parsed.rows, context.store.keys('commits'));
+  const window = since ?? 'all';
+  context.note(`commits: ${parsed.rows.length} parsed, since ${window}`);
+
+  const appended = context.store.append('commits', selection.pending);
+  return {
+    storePath: appended.path,
+    since: since ?? null,
+    parsedRows: parsed.rows.length,
+    unparsedLineCount: parsed.unparsedLineCount,
+    alreadyCollected: selection.alreadyCollected.length,
+    appended: appended.appended,
+    skippedOnAppend: appended.skipped,
+  };
+}
+
+/**
+ * The store, the plans directory and the worktree directory a run goes
+ * through: each one passed, else the one the config under the repo root
+ * and the home names, with the config's warnings sent to `log`. Passed a
+ * store and a plans directory, it reads no file, and the worktree
+ * directory not passed is the default.
+ *
+ * Called once per run, so each file is read and warned about once.
+ * Throws a `ConfigError` when the config is one the loop cannot run on.
+ */
+async function resolveSources(
+  options: CollectOptions,
+  log: (line: string) => void,
+): Promise<Pick<HalfContext, 'store' | 'plansDir'> & { worktreeDir: string }> {
+  const { repoRoot: root, store, plansDir } = options;
+  if (store !== undefined && plansDir !== undefined) {
+    return { store, plansDir, worktreeDir: options.worktreeDir ?? registeredDefaults().loopWorktreeDir };
+  }
+
+  const { config } = await loadConfig({ root, home: options.home }, {}, log);
+  return {
+    store: store ?? selectEffortStore(root, config),
+    plansDir: plansDir ?? resolve(root, config.planDir),
+    worktreeDir: options.worktreeDir ?? config.loopWorktreeDir,
+  };
+}
+
+/** The folders the session half reads: the `logDir` override alone, else the derived set. */
+function logDirsOf(options: CollectOptions, worktreeDir: string): ProjectLogDir[] {
+  return options.logDir === undefined
+    ? projectLogDirs(options.repoRoot, worktreeDir, options.home)
+    : [{ dir: options.logDir, worktree: null }];
+}
+
+/**
+ * Runs one collect.
+ *
+ * The session and commit halves are independent and neither reads the
+ * other's rows, so switching one off changes nothing about the other's
+ * result. They do share one store and one roster, resolved before either
+ * runs; see the module note. The skill half runs last, over the logs the
+ * session half read, or under `held` over the sessions the store holds.
+ *
+ * Rejects with a `ConfigError`, having read no log and run no git, when
+ * a store or a plans directory is not passed and a config file under the
+ * repo root or the home is one the loop cannot run on.
+ */
+export async function collectEffort(
+  options: CollectOptions,
+): Promise<CollectResult> {
+  const { repoRoot } = options;
+  const verbose = options.verbose ?? false;
+  const log = options.log ?? ((line: string) => activeOutput().info(line));
+  const { worktreeDir, ...sources } = await resolveSources(options, log);
+  const context: HalfContext = {
+    repoRoot,
+    logDirs: logDirsOf(options, worktreeDir),
+    ...sources,
+    sinceEpochMs: options.sinceEpochMs ?? null,
+    log,
+    note: (line: string) => {
+      if (verbose) log(line);
+    },
+    readCommits: options.readCommits ?? readCommitLog,
+  };
+
+  const sessions = options.collectSessions === false
+    ? null
+    : await collectSessionHalf(context);
+  const commits = options.collectCommits === false
+    ? null
+    : collectCommitHalf(context);
+  const scope = options.skills === undefined
+    ? 'appended'
+    : options.skills;
+  const logs = scope === null
+    ? null
+    : skillLogs(context, scope, sessions);
+  const skills = scope === null || logs === null
+    ? null
+    : await collectSkillHalf({ repoRoot, scope, logs, log, note: context.note });
+  return { repoRoot, sessions: sessions?.summary ?? null, commits, skills };
+}
+
+/** Renders a run as the lines the command prints. */
+export function formatCollectSummary(result: CollectResult): string[] {
+  const lines = [`effort collect: ${result.repoRoot}`];
+  const sessions = result.sessions;
+  const commits = result.commits;
+
+  if (sessions === null) {
+    lines.push('  sessions  skipped (--no-sessions)');
+  } else {
+    lines.push(
+      `  sessions  ${sessions.candidates} logs`
+      + `, ${sessions.outsideWindow} outside window`
+      + `, ${sessions.alreadyCollected} already stored`
+      + `, ${sessions.read} read`
+      + `, ${sessions.failed} failed`
+      + `, +${sessions.appended} rows`,
+    );
+    lines.push(formatFolderLine(sessions));
+    lines.push(`  sessions  ${sessions.planStubCount} plan stubs`);
+  }
+
+  if (commits === null) {
+    lines.push('  commits   skipped (--no-git)');
+  } else {
+    lines.push(
+      `  commits   ${commits.parsedRows} parsed`
+      + `, ${commits.alreadyCollected} already stored`
+      + `, +${commits.appended} rows`,
+    );
+  }
+  lines.push(formatSkillSummary(result.skills));
+  return lines;
+}
+
+/** `count` and `noun`, the noun plural unless the count is one. */
+function counted(count: number, noun: string): string {
+  return count === 1
+    ? `${String(count)} ${noun}`
+    : `${String(count)} ${noun}s`;
+}
+
+/** The summary's line naming how many folders the session half read; every one past the first is a worktree's. */
+function formatFolderLine(sessions: SessionCollectSummary): string {
+  return `  sessions  ${counted(sessions.logDirs.length, 'folder')}`
+    + `, ${counted(sessions.logDirs.length - 1, 'worktree')}`
+    + `, ${counted(sessions.duplicates, 'log')} held twice`;
+}
+
+/** Refuses the run with exit code 1, its message one line per refusal. */
+function refuse(problems: readonly string[]): never {
+  throw new CommandExit(1, problems.map((problem) => `rafa effort collect: ${problem}`).join('\n'));
+}
+
+/**
+ * `rafa effort collect` — the command entry, over `repoRoot`, the project
+ * root the dispatcher resolved (`src/commands/wrap.ts`).
+ *
+ * Writes the summary through the active output
+ * (`core/output/active.ts`), one `info` line each, as the run's
+ * progress and config warnings are written ({@link collectEffort}),
+ * then pushes and pulls the store's rows (see the module note's `Sync`).
+ *
+ * Refuses by throwing `CommandExit` with exit code 1 and the refusal as
+ * its message, one line per problem, and neither sets `process.exitCode`
+ * nor calls `process.exit`: the dispatcher is the one place that sets
+ * the exit code. It writes the message to stderr in text mode, the bytes
+ * this command printed there before, and carries it in the terminal
+ * result in json mode.
+ *
+ * A config the loop cannot run on is refused, one line per problem, the
+ * way a bad argument is. That is the use the config module's own error
+ * class exists for. Anything else thrown is a fault rather than a
+ * refusal, and is rethrown.
+ */
+export default async function collect(args: string[], repoRoot: string): Promise<void> {
+  const parsed = parseCollectArgs(args);
+  if (parsed.errors.length > 0) refuse(parsed.errors);
+
+  let result: CollectResult;
+  let resolved: ResolvedConfig;
+  try {
+    result = await collectEffort({
+      repoRoot,
+      home: homedir(),
+      sinceEpochMs: parsed.sinceEpochMs,
+      collectSessions: parsed.collectSessions,
+      collectCommits: parsed.collectCommits,
+      skills: parsed.collectHeldSkills
+        ? 'held'
+        : 'appended',
+      verbose: parsed.verbose,
+    });
+    // Read again for the contact, silently: `collectEffort` warned about it once.
+    resolved = await loadConfig({ root: repoRoot, home: homedir() }, {}, () => {});
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    refuse(error.problems);
+  }
+  for (const line of formatCollectSummary(result)) {
+    activeOutput().info(line);
+  }
+  const warn = (message: string): void => activeOutput().warn(message);
+  await createHubContact({ root: repoRoot, home: homedir(), resolved, warn }).pushThenPull();
+}

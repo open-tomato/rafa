@@ -4,8 +4,8 @@
  * mode, `--force` reaching the install, the wait for a live loop and
  * `dangerous.selfUpdateDuringLoop`, a tracker with a task left with and
  * without a live loop, and its refusals with their exit codes. The
- * install itself is held in `src/runtime/install.test.ts`, and the
- * reading of the live loops in `src/runtime/live-loops.test.ts`.
+ * install itself is held in `packages/rafa-run/src/runtime/install.test.ts`, and the
+ * reading of the live loops in `packages/rafa/src/runtime/live-loops.test.ts`.
  *
  * Each case dispatches a command made over a build seam of its own, in a
  * project planted under this file's temporary directory beside a home of
@@ -20,16 +20,15 @@ import type { SelfUpdateResult, SelfUpdateSeams } from './self-update.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 import type { SessionRecord, SessionState } from '@open-tomato/rafa/core/loop';
 
-import '../adapter-registry.js';
-
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { runBuild } from '@open-tomato/rafa-run/runtime/install';
+
 import { projectConfigText } from '../project/scaffold.js';
-import { runBuild } from '../runtime/install.js';
 import { dispatchInProject, eventsOf, plantProject, plantProjectConfig } from '../tests/cli-capture.js';
 
 import selfUpdateCommand, {

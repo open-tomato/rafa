@@ -14,14 +14,14 @@
  * words them.
  */
 import type { DoctorPreflight, DoctorStartTier } from './doctor.js';
-import type { BoardRow, BoardStatus } from '../board/status.js';
-import type { PreflightCheck, PreflightReport } from '../preflight/run.js';
+import type { PreflightCheck, PreflightReport } from '@open-tomato/rafa/preflight/run';
+import type { BoardRow, BoardStatus } from '@open-tomato/rafa-board';
 
 import { basename, relative, sep } from 'node:path';
 
-import { plural } from '@open-tomato/rafa/core/plan';
+import { boardGaps } from '@open-tomato/rafa-board';
 
-import { boardGaps } from '../board/status.js';
+import { plural } from '@open-tomato/rafa/core/plan';
 
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 

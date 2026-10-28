@@ -2,7 +2,7 @@
  * The demotion pass end to end: `rafa skill demote` and `rafa instinct
  * check`, dispatched together over a planted user scope.
  *
- * `src/demote/apply.test.ts` and `src/commands/skill/demote.test.ts`
+ * `packages/rafa-inventory/src/demote/apply.test.ts` and `src/commands/skill/demote.test.ts`
  * each cover one half of this — the plan a row comes to, and the words
  * a line reads — but neither dispatches `rafa instinct check` over what
  * `--apply` wrote. This file is the one place the whole pipeline runs
@@ -37,7 +37,6 @@
  *     would pass either way, so the tree is asserted to already hold
  *     the moved and written files from the first apply.
  */
-import '../adapter-registry.js';
 
 import {
   existsSync,
@@ -55,10 +54,11 @@ import { dirname, join, relative } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { REVIEWED_STATUS, sourceHash } from '@open-tomato/rafa-inventory/demote/report';
+import { parseInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
+
 import { createInstinctCheckCommand } from '../commands/instinct/check.js';
 import { createSkillDemoteCommand } from '../commands/skill/demote.js';
-import { REVIEWED_STATUS, sourceHash } from '../demote/report.js';
-import { parseInstinct } from '../schema/instinct.js';
 
 import { dispatchInProject, plantProjectConfig } from './cli-capture.js';
 

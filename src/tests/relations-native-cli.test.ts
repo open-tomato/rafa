@@ -42,7 +42,7 @@
  * (native `blockedBy`) on #21, a sub-issue (native `parent`) of epic #6,
  * which board #2 lists. #10's blocker is on another epic, reached through
  * its `parent` node rather than an `epic:<slug>` label, so the one-hop
- * decision (`src/next/hop-chain.ts` over `src/board/blocker-epic.ts`)
+ * decision (`packages/rafa-board/src/next/hop-chain.ts` over `packages/rafa-board/src/board/blocker-epic.ts`)
  * proposes the hop to epic #6 on board #2.
  */
 import type { ScratchRepo } from './cli-capture.js';
@@ -56,12 +56,12 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
-import { positionFilePath } from '../project/position.js';
+import { positionFilePath } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-relations-native-cli-')));

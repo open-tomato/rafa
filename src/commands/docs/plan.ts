@@ -10,7 +10,7 @@
  * the plan goes, and `tracker.default` and `tracker.fallback` for the
  * chain (`adapters/tracker/resolve.ts`), which lands on the first kind
  * whose preflight passes, each kind passed over warned about. Then the
- * open lines, through `readOpenStaleDocLines` (`src/docs/open-lines.ts`):
+ * open lines, through `readOpenStaleDocLines` (`packages/rafa-release/src/docs/open-lines.ts`):
  * every unticked checklist item of every open `chore` issue whose body
  * holds the stale-docs marker, issue by issue in listing order, so a
  * forecast that shifted between two runs, and opened a second issue,
@@ -39,7 +39,7 @@
  *
  * One task line per open line, in reading order. Every task is declared
  * `agent=doc-updater` and none `docs=repair`, so the plan is prose only
- * and takes no closing doc task (`src/plan/doc-task.ts`).
+ * and takes no closing doc task (`packages/rafa/src/plan/doc-task.ts`).
  *
  * ## A line is untrusted text
  *
@@ -71,26 +71,28 @@
  * how many issues. With `--output=json` the terminal result's `data` is
  * a {@link DocsPlanResult}.
  */
-import type { OpenStaleDocLine } from '../../docs/open-lines.js';
-import type { ProjectFound } from '../../project/scope.js';
-import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
 import type { Tracker } from '@open-tomato/rafa/ports';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { IssueSeams } from '@open-tomato/rafa-board';
+import type { OpenStaleDocLine } from '@open-tomato/rafa-release';
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { DEFAULT_ISSUE_SEAMS, resolveTracker } from '@open-tomato/rafa-board';
+import {
+  DOC_UPDATE_TASK_PREFIX,
+  DOC_UPDATE_TITLE,
+  readOpenStaleDocLines,
+} from '@open-tomato/rafa-release';
+
+import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plansDirAt , isStampableStub, planStampLine , escapeBlockerText } from '@open-tomato/rafa/core/plan';
-
-import { resolveTracker } from '../../adapters/tracker/resolve.js';
-import { readOpenStaleDocLines } from '../../docs/open-lines.js';
-import { DOC_UPDATE_TASK_PREFIX, DOC_UPDATE_TITLE } from '../../docs/release-issue.js';
-import { DEFAULT_ISSUE_SEAMS } from '../issue/issue-tracker.js';
-import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa docs plan';

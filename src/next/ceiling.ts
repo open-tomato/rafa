@@ -81,7 +81,7 @@
  * and the flag takes a value — so neither ends with the exit code 1
  * this command's line refusals carry: what is refused is the permission
  * the words ask for, and the spec sets that apart as
- * {@link CEILING_REFUSAL_EXIT}, as `src/pr/provider.ts` does for a
+ * {@link CEILING_REFUSAL_EXIT}, as `packages/rafa/src/pr/provider.ts` does for a
  * repository whose `pr.provider` cannot answer.
  *
  * `ready` is refused rather than quietly dropped because dropping it
@@ -113,13 +113,13 @@
  * `runNextChain` takes as an argument and does not parse. They are one
  * rule read at two boundaries, and `ceiling.test.ts` measures both.
  */
-import type { NextActionId } from './state.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type { NextActionId } from '@open-tomato/rafa-run';
+
+import { LABELS_ONLY_ACTIONS, NEXT_COMMAND_ACTIONS } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { LABELS_ONLY_ACTIONS, NEXT_COMMAND_ACTIONS } from './actions.js';
 
 /** The flag that names the actions which may run unasked. */
 export const YES_FLAG = 'yes';

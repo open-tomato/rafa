@@ -21,9 +21,9 @@
  * {@link FIRST_LINE_MAX} characters beside one under it.
  */
 import type { PitSeams } from './pit-readings.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { FakeRun } from '../ci/runs-fake.js';
 import type { FiledIssue, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
 

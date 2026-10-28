@@ -3,7 +3,7 @@
  * and a stub, how plan stubs are read out of a directory listing, and
  * how a branch stub resolves against them.
  *
- * Moved down from `src/effort/attribution.ts`, which attributes a
+ * Moved down from `packages/rafa-effort/src/effort/attribution.ts`, which attributes a
  * session to its plan, issue and task text and re-exports these names
  * under the same names: the store's row types (`types.ts`) and its plan
  * CI reader (`plan-ci.ts`) need the resolution but not the session

@@ -30,6 +30,14 @@
  * core config barrel alone, so the probe can tell a registration from
  * its absence.
  *
+ * Core's whole-record readers, `registeredSettings()` and
+ * `registeredDefaults()`, which the feature files read in place of
+ * this module, are held to answer {@link SETTINGS} and
+ * {@link CONFIG_DEFAULTS} off the preload's registration, every name in
+ * schema order and each entry the same spec or value; over an emptied
+ * registry both refuse naming this module, the control that the
+ * readers answer the registration and not a record of their own.
+ *
  * The load hook the root sets is held to be {@link handConfigToLogger},
  * and that function to hand the logger the settings of the config it is
  * given, each away from its default so a hook that handed the defaults
@@ -52,6 +60,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { activeLoggerSettings, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import {
   activeChecks,
   activeConfigLoadHook,
@@ -65,12 +74,13 @@ import {
   EMPTY_CONFIG_REGISTRY,
   mergeConfigSections,
   registerConfigSections,
+  registeredDefaults,
+  registeredSettings,
   restoreConfigSections,
   setConfigLoadHook,
   setConfigTemplateHook,
 } from '@open-tomato/rafa/core/config';
 
-import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
 import { templateEntry } from './config/templates.js';
 import {
   CONFIG_DEFAULTS,
@@ -131,6 +141,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['allowList', 'allowList'],
   ['settingSources', 'loop.settingSources'],
   ['loopWorktreeDir', 'loop.worktreeDir'],
+  ['loopWorktreeSetup', 'loop.worktreeSetup'],
   ['loopRetries', 'loop.retries'],
   ['loopRetriesOnContinue', 'loop.retriesOnContinue'],
   ['loopContinueCriteria', 'loop.continue.criteria'],
@@ -397,6 +408,35 @@ describe('the registration the preload made', () => {
   });
 });
 
+describe('the whole-record readers core answers off the registration', () => {
+  it('answers SETTINGS from registeredSettings, every setting in schema order and each as the same spec', () => {
+    const registered = registeredSettings();
+    const differing = SETTING_NAMES.filter((setting) => registered[setting] !== SETTINGS[setting]);
+
+    expect(Object.keys(registered)).toEqual(KEYS.map(([setting]) => setting));
+    expect(differing).toEqual([]);
+  });
+
+  it('answers CONFIG_DEFAULTS from registeredDefaults, every default in schema order and each as the same value', () => {
+    const registered = registeredDefaults();
+    const differing = SETTING_NAMES.filter((setting) => registered[setting] !== CONFIG_DEFAULTS[setting]);
+
+    expect(Object.keys(registered)).toEqual(KEYS.map(([setting]) => setting));
+    expect(differing).toEqual([]);
+  });
+
+  it('refuses both over an empty registry, naming this module, the control', () => {
+    const held = registerConfigSections([]);
+    restoreConfigSections(EMPTY_CONFIG_REGISTRY);
+    try {
+      expect(() => registeredSettings()).toThrow(ConfigSectionError);
+      expect(() => registeredDefaults()).toThrow('call registerCoreConfigSections from src/config-registry.ts before registeredDefaults');
+    } finally {
+      restoreConfigSections(held);
+    }
+  });
+});
+
 describe('registerCoreConfigSections', () => {
   it('registers nothing and keeps both hooks when every setting is held already', () => {
     const before = activeSettings();
@@ -637,7 +677,7 @@ describe('knownKeysAbove', () => {
     ]);
     expect(knownKeysAbove('loop.worktreeDirs')).toEqual([
       'loop',
-      ['settingSources', 'worktreeDir', 'retries', 'retriesOnContinue', 'continue', 'forceWrapUp', 'wrapUp'],
+      ['settingSources', 'worktreeDir', 'worktreeSetup', 'retries', 'retriesOnContinue', 'continue', 'forceWrapUp', 'wrapUp'],
     ]);
     expect(knownKeysAbove('loop.continue.mode')).toEqual(['loop.continue', ['criteria', 'criteriaMode']]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);

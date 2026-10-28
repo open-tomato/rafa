@@ -25,7 +25,7 @@ No edge, in or out, in the graph: 0 outbound, 0 inbound, 0 inside. The reach is 
 
 Today the four pairs are byte-identical (`cmp`), and so are the pair for `doc-updater` and the pair for `qa-bug-reporter`, which the test does not read; `.claude/agents/` has 12 agent files and `src/bundled/agents/` 6. The rules are those of `context/verification.md` (the redirect and `exit=$?` form, and "Never use `until` or `while` + `sleep` to poll for completion"), which the test states by name in its header and does not import.
 
-Test reach, from `docs/survey/test-index.json`: index 0, source count 0, does not spawn. No source file is in its reach, so no changed `.ts` file selects it; it does not carry the sweep suffix either, so the default `tests.alwaysRun` pattern (`src/**/*.sweep.test.ts`, `src/config-schema-tests.ts`) does not add it. It reads fixed paths and not a tree walk; by its header, `src/tests/sweep-suffix.sweep.test.ts` asks for the suffix of a test that calls `git ls-files` or walks the repository root constant, which this one does not. It runs in the full suite only.
+Test reach, from `docs/survey/test-index.json`: index 0, source count 0, does not spawn. No source file is in its reach, so no changed `.ts` file selects it; it does not carry the sweep suffix either, so the default `tests.alwaysRun` pattern (`src/**/*.sweep.test.ts`, `packages/rafa/src/config-schema-tests.ts`) does not add it. It reads fixed paths and not a tree walk; by its header, `src/tests/sweep-suffix.sweep.test.ts` asks for the suffix of a test that calls `git ls-files` or walks the repository root constant, which this one does not. It runs in the full suite only.
 
 ## Entry points
 
@@ -61,7 +61,7 @@ The classes of #119's vocabulary do not fit: nothing here is 🔒, ⚠️ or �
 
 ### Config section
 
-None. The agent list, headings and rules are constants of the file; `tests.alwaysRun` (`src/config-schema-tests.ts`) decides whether the file runs in a scoped check, and it does not name this one.
+None. The agent list, headings and rules are constants of the file; `tests.alwaysRun` (`packages/rafa/src/config-schema-tests.ts`) decides whether the file runs in a scoped check, and it does not name this one.
 
 ### Flows
 

@@ -24,12 +24,12 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { runsDir, readSessions } from '@open-tomato/rafa/core/loop';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { EVENTS_EXTENSION } from '@open-tomato/rafa-run/start/loop-events';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { EVENTS_EXTENSION } from '../start/loop-events.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 const PLAN_FLAG = '--plan=.plans/PLAN-store.md';

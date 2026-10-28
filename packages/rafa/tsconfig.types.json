@@ -17,7 +17,25 @@
     "src/errors/rafa-codes.ts",
     "src/effort/store/findings.ts",
     "src/ports/log-level.ts",
-    "src/report/parse.ts"
+    "src/report/parse.ts",
+    "src/adapters/logger/settings.ts",
+    "src/bugs/places.ts",
+    "src/bugs/record.ts",
+    "src/bugs/title.ts",
+    "src/config-schema-bugs.ts",
+    "src/config-schema-errors.ts",
+    "src/config-schema-features.ts",
+    "src/config-schema-logger.ts",
+    "src/config-schema-board-project.ts",
+    "src/config-schema-checks.ts",
+    "src/config-schema-hub.ts",
+    "src/config-schema-issues.ts",
+    "src/config-schema-loop-continue.ts",
+    "src/config-schema-loop-retries.ts",
+    "src/config-schema-release.ts",
+    "src/config-schema-tests.ts",
+    "src/config-schema-triage.ts",
+    "src/config-schema-wrap-up.ts"
   ],
   "references": []
 }

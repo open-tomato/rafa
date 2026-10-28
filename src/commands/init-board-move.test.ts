@@ -18,10 +18,8 @@
  */
 import type { BoardStepResult, RelationsMoveStepOptions } from './init-board.js';
 import type { InitResult, InitSeams } from './init.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
-
-import '../adapter-registry.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

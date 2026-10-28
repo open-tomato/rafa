@@ -7,7 +7,7 @@
  *
  * The stand-in tells a decision session from a task session by its
  * arguments: a decision session alone is spawned with `--tools
- * Read,Grep,Glob` (`src/start/decision-session.ts`). It counts each kind
+ * Read,Grep,Glob` (`packages/rafa-run/src/start/decision-session.ts`). It counts each kind
  * apart, keeps each prompt, and answers the n-th call of a kind with the
  * n-th answer scripted for it; a task call past its script answers
  * `blocked`, and a decision call past its script answers nothing, which
@@ -20,7 +20,7 @@
  * stop on, fails on the list.
  */
 import type { Scratch } from './loop-scratch.js';
-import type { EventLine } from '../loop/events-file.js';
+import type { EventLine } from '@open-tomato/rafa-run/loop/events-file';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,9 +28,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
-
-import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
-import { BLOCKER_PROMPT_PREFIX } from '../start/dispatch.js';
+import { eventsFileOf, readEventsFrom } from '@open-tomato/rafa-run/loop/events-file';
+import { BLOCKER_PROMPT_PREFIX } from '@open-tomato/rafa-run/start/dispatch';
 
 import { expectExit } from './cli-capture.js';
 import { runLoopStart, scratchPlanter, SESSION_FLAGS, STUB } from './loop-scratch.js';

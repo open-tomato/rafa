@@ -46,18 +46,16 @@ import type { DispatchOutcome } from '../cli/dispatch.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit, commandProblem } from '@open-tomato/rafa/core/command';
 
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { wrapPhaseZeroCommand } from './wrap.js';

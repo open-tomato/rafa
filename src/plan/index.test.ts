@@ -71,18 +71,16 @@ import { describe, expect, it } from 'bun:test';
 import { INJECT_MODES } from '@open-tomato/rafa/core/config/sections';
 import { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from '@open-tomato/rafa/core/plan';
 import { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
-import { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '@open-tomato/rafa/report/parse';
-
+import { renderInjection } from '@open-tomato/rafa/plan/inject';
 import {
   loadPlanPrerequisites,
   mergePlanPrerequisites,
   parsePrerequisites,
   planPrerequisites,
   prerequisitesPathForPlan,
-} from '../preflight/prerequisites-md.js';
-import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '../preflight/run.js';
-
-import { renderInjection } from './inject.js';
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '@open-tomato/rafa/preflight/run';
+import { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '@open-tomato/rafa/report/parse';
 
 import * as entry from './index.js';
 

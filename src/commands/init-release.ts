@@ -7,12 +7,12 @@
  * The changelog and release spec ends its config section with "`rafa init`
  * asks once", and this is that question. What it decides is one setting,
  * `release.enabled`, written into the project's `.rafa/config.yaml` through
- * `src/release/setting.ts`; the other three `release` settings stay
+ * `packages/rafa-release/src/release/setting.ts`; the other three `release` settings stay
  * commented at their defaults, where an operator can read them and set them
  * by hand. The six settings the release-settle plan adds — four under
  * `release`, `pr.versionCollision` and `dangerous.acceptVersionCollision`
  * — are commented lines spelled in this step's library half,
- * `src/release/scaffold.ts`, and placed by the scaffold, so the file
+ * `packages/rafa-release/src/release/scaffold.ts`, and placed by the scaffold, so the file
  * this step edits carries them at their defaults too. This file is the
  * command half: the question, the decision order and the printed line.
  * It imports nothing from the library half and re-exports none of it.
@@ -54,7 +54,7 @@
  * line above it: a repository with no version manifest still gets
  * changelog entries and no bump, which the spec spells out and is a
  * thing to know BEFORE answering. Those presences come from
- * `resolveReleaseEnabled` (`src/release/enabled.ts`), the same reading
+ * `resolveReleaseEnabled` (`packages/rafa-release/src/release/enabled.ts`), the same reading
  * the wrap-up makes, and are read only when the question is actually
  * asked — the flags and an already-set config have decided by then, and
  * two `stat` calls to word a question nobody sees are two too many.
@@ -73,22 +73,22 @@
  * is the project config under the root it is handed, which every case
  * in `./init-release.test.ts` points at its own temporary directory.
  */
-import type { ReleaseFileSettings } from '../release/enabled.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { ReleaseEnabled } from '@open-tomato/rafa/core/config/sections';
+import type { ReleaseFileSettings } from '@open-tomato/rafa-release';
 
 import { writeFileSync } from 'node:fs';
 
+import {
+  RELEASE_ENABLED_SETTING,
+  readReleaseSetting,
+  releaseEnabledIn,
+  resolveReleaseEnabled,
+  withReleaseEnabled,
+} from '@open-tomato/rafa-release';
+
 import { CONFIG_FILE, configFilePath } from '@open-tomato/rafa/core/config';
 import { describeValue, messageOf, RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
-
-import { resolveReleaseEnabled } from '../release/enabled.js';
-import {
-  readReleaseSetting,
-  RELEASE_ENABLED_SETTING,
-  releaseEnabledIn,
-  withReleaseEnabled,
-} from '../release/setting.js';
 
 /** The answers that mean no to the question, which is spelled `[Y/n]`. */
 const NO_ANSWERS: readonly string[] = ['n', 'no'];

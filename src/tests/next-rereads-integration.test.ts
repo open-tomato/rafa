@@ -2,7 +2,7 @@
  * What `rafa next` reads between two turns of its chain, driven over
  * two registered commands and one board they share: `next` itself and
  * the `issue ready` its readiness step runs
- * (`src/commands/next.ts`, `src/commands/issue/ready.ts`).
+ * (`src/commands/next.ts`, `packages/rafa-board/src/commands/issue/ready.ts`).
  *
  * ## Why this file exists
  *
@@ -19,7 +19,7 @@
  * The step ran and the label landed, and the chain then read the labels
  * it had cached BEFORE the step: `openNextSources` built one board for
  * the whole command, and that board memoises the issue it reads
- * (`src/next/sources.ts`). Its own unit suite counted the reads and was
+ * (`packages/rafa-run/src/next/sources.ts`). Its own unit suite counted the reads and was
  * right about them; nothing read the board across a turn, so nothing
  * saw the staleness. This file does, over the real chain.
  *
@@ -34,11 +34,9 @@
  * Restoring the bug — `readNextState(sources)` in place of
  * `readNextState(sources.answer())` — reddens both.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { GitResult, GitRunner } from '../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
-
-import '../adapter-registry.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,14 +44,15 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { createIssueReadyCommand } from '../commands/issue/ready.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { createIssueReadyCommand } from '@open-tomato/rafa-board/commands/issue/ready';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
+
 import { createNextCommand } from '../commands/next.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** A temporary directory of this file's own, for every project it plants. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-rereads-')));

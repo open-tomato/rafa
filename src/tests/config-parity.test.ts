@@ -8,7 +8,8 @@
  * one unknown key uncommented; the user scope's file sets `store` and
  * `output.mode`. Three fixtures under `fixtures/config-parity/` hold what
  * was recorded: `load-config.json` (every setting's value and source,
- * `warnings`, `extras`, `userExtras`), `doctor.txt` and `module-list.txt`
+ * the four files' paths, `warnings` and the four files' unknown keys),
+ * `doctor.txt` and `module-list.txt`
  * (the text lines of `rafa doctor` and `rafa module list`, dispatched
  * in-process through `cli-capture.ts`). Scratch paths are recorded as
  * `<project>` and `<home>`, and the version line as `rafa <version>`, so a
@@ -18,9 +19,14 @@
  * `RAFA_UPDATE_CONFIG_PARITY=1` the fixtures are written before the cases
  * read them, so that run is green by construction and the change is read in
  * the diff. Unset, or set to anything else, nothing is written and the
- * fixtures are read byte for byte. A later task never regenerates them.
+ * fixtures are read byte for byte. A later task regenerates them only for
+ * a change meant to move them, once, recorded here: both YAML files read
+ * as their scope's local layer moved `load-config.json`'s project
+ * settings from source `file` to `local` and each file's path and unknown
+ * keys to the local fields, every value and warning as it was; the core
+ * key `loop.worktreeSetup` added one `load-config.json` entry, its null
+ * default from source `default`, and moved nothing else.
  */
-import '../adapter-registry.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -99,10 +105,14 @@ async function loadedJson(): Promise<string> {
   const record = {
     settings,
     path: resolved.path,
+    localPath: resolved.localPath,
     userPath: resolved.userPath,
+    userLocalPath: resolved.userLocalPath,
     warnings: resolved.warnings,
     extras: resolved.extras,
+    localExtras: resolved.localExtras,
     userExtras: resolved.userExtras,
+    userLocalExtras: resolved.userLocalExtras,
     printedWarnings: warnings,
   };
   return `${scrubbed(JSON.stringify(record, null, 2))}\n`;

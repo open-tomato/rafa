@@ -4,7 +4,7 @@
  * ready`'s own run, put where the refusal used to stand.
  *
  * Check 1 of the readiness gate is a person's decision
- * (`src/board/plan-spec.ts`, `context/pull-requests.md`), and until now
+ * (`packages/rafa-board/src/board/plan-spec.ts`, `context/pull-requests.md`), and until now
  * an operator who had made it still had to make it somewhere else — the
  * run ended with `issue #<n> is not marked spec:ready` and the next move
  * was a second command over the same issue. This module is the seam that
@@ -60,13 +60,17 @@
  * drives a fake and none of them reaches GitHub, opens a terminal or
  * waits on an answer.
  */
-import type { ReadyOffer, ReadyOfferRequest } from '../../board/plan-spec.js';
-import type { ReadyReport, runIssueReady } from '../issue/ready.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type {
+  ReadyOffer,
+  ReadyOfferRequest,
+  ReadyReport,
+  runIssueReady,
+} from '@open-tomato/rafa-board';
+
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board';
 
 import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
-
-import { SPEC_READY_LABEL } from '../../board/readiness.js';
 
 /** What the offer is: one run of `rafa issue ready` over an issue already read. */
 export type ReadyRun = typeof runIssueReady;
@@ -87,7 +91,7 @@ export interface ReadyOfferSeams {
  * with its own; see the module note.
  */
 const runIssueReadyLazily: ReadyRun = async (options) => {
-  const { runIssueReady: run } = await import('../issue/ready.js');
+  const { runIssueReady: run } = await import('@open-tomato/rafa-board/commands/issue/ready');
   return run(options);
 };
 

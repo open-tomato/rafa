@@ -1,10 +1,10 @@
 /**
  * `rafa effort dashboard`: every effort reading in one call, one block
  * per widget in text and one key per widget in the JSON result
- * (`src/effort/dashboard.ts`).
+ * (`packages/rafa-effort/src/effort/dashboard.ts`).
  *
  * Its flags are the trend report's, read by the same parser
- * (`src/effort/report-args.ts`) so the two commands refuse a value alike:
+ * (`packages/rafa-effort/src/effort/report-args.ts`) so the two commands refuse a value alike:
  * `--days=`, `--recent=`, `--loops=` and `--by=`. It reads the store, the
  * session records and the clock, and writes nothing. Starts no Claude
  * session and declares no `spends`.
@@ -12,18 +12,16 @@
  * Exit code 1 for an argument, for a flag value the parser refuses, and
  * for a config the loop cannot run on, one line per problem.
  */
-import type { Dashboard } from '../../effort/dashboard.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { Dashboard } from '@open-tomato/rafa-effort';
 
 import { homedir } from 'node:os';
 
+import { formatDashboard, parseReportArgs, readDashboard } from '@open-tomato/rafa-effort';
+
+import { expectNoArgument, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
-
-import { formatDashboard } from '../../effort/dashboard-format.js';
-import { readDashboard } from '../../effort/dashboard.js';
-import { parseReportArgs } from '../../effort/report-args.js';
-import { expectNoArgument, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort dashboard';

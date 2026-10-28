@@ -140,12 +140,10 @@
  * runner and its timeout.
  */
 import type { DoctorResult, DoctorSeams } from './doctor.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
-
-import '../adapter-registry.js';
+import type { ProbeOptions, ProbeRun } from '@open-tomato/rafa/preflight/run';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -153,35 +151,35 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { versionLine } from '@open-tomato/rafa/core/command';
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { readBinPath } from '@open-tomato/rafa/project/bin-path';
+import { writePositionFile } from '@open-tomato/rafa/project/position';
 import { readLegacyStore } from '@open-tomato/rafa/store/legacy';
 import { writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
-
-import { version } from '../../package.json';
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { unlabelledRoadmapMessage } from '../board/boards.js';
-import { createFakeProjectGh, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
-import { BOARD_LIST_FIELDS } from '../board/roadmap-board.js';
-import { ROADMAP_SETTING, ROADMAP_TITLE } from '../board/roadmap.js';
-import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
-import { ROADMAP_ROW_NAME } from '../board/status.js';
-import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { unlabelledRoadmapMessage } from '@open-tomato/rafa-board/board/boards';
+import { createFakeProjectGh, FAKE_TEMPLATE_FIELDS } from '@open-tomato/rafa-board/board/project/project-fake';
+import { ROADMAP_SETTING, ROADMAP_TITLE } from '@open-tomato/rafa-board/board/roadmap';
+import { BOARD_LIST_FIELDS } from '@open-tomato/rafa-board/board/roadmap-board';
+import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '@open-tomato/rafa-board/board/setup';
+import { ROADMAP_ROW_NAME } from '@open-tomato/rafa-board/board/status';
+import { issueCheckCommand } from '@open-tomato/rafa-board/refs/check-command';
+import { ABSENT, PRESENT, writeRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,
   ghMissingMessage,
   ghOnPathItem,
-} from '../pr/preflight-items.js';
-import { readBinPath } from '../project/bin-path.js';
-import { writePositionFile } from '../project/position.js';
+} from '@open-tomato/rafa-pr/pr/preflight-items';
+
+import { version } from '../../package.json';
+import { dispatch } from '../cli/dispatch.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
-import { issueCheckCommand } from '../refs/check-command.js';
-import { ABSENT, PRESENT, writeRefsBlock } from '../refs/stamp.js';
 import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
 import { BOARDS_HEADING, unresolvedOwnerMessage } from './doctor-boards.js';

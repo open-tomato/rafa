@@ -38,7 +38,7 @@
  */
 import { relative, resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as commit from './commit.js';
@@ -56,9 +56,14 @@ const GH = 'packages/rafa/src/core/git/gh-runner.ts';
 /** The names both files export. The barrel exports each as `git.ts` declares it. */
 const SHARED = ['GitRunner'];
 
+/** Every path a case reads the exports of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [GIT, COMMIT, BARREL, GH];
+
 /**
  * Every export name of each file, types included, with the file that
- * declares it: a re-exported name is followed to its declaration.
+ * declares it: a re-exported name is followed to its declaration. Runs
+ * once, from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays
+ * for the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns By path, each export name with the repository-relative path of its declaring file.
@@ -94,6 +99,19 @@ function readExports(paths: readonly string[]): Record<string, Record<string, st
   return exports;
 }
 
+let storedExports: Record<string, Record<string, string>> | null = null;
+
+/**
+ * The exports by path, once `beforeAll` has read them.
+ *
+ * @returns By path, the declaring file of each export name of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function exportsByPath(): Record<string, Record<string, string>> {
+  if (storedExports === null) throw new Error('the exports were never read');
+  return storedExports;
+}
+
 /**
  * The names of one file's exports, sorted.
  *
@@ -119,6 +137,10 @@ function onTwo(lists: readonly (readonly string[])[]): string[] {
 const BEHIND: Readonly<Record<string, unknown>> = { ...git, ...commit };
 
 describe('the git barrel', () => {
+  beforeAll(() => {
+    storedExports = readExports(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of the two files, each once, and no other', () => {
     const expected = [...Object.keys(git), ...Object.keys(commit)].sort();
 
@@ -128,7 +150,7 @@ describe('the git barrel', () => {
   });
 
   it('reads two files that share the spelled names and no other, none of them a runtime name', () => {
-    const exports = readExports([GIT, COMMIT]);
+    const exports = exportsByPath();
 
     expect(namesOf(exports[GIT]).length).toBeGreaterThan(0);
     expect(namesOf(exports[COMMIT]).length).toBeGreaterThan(0);
@@ -147,7 +169,7 @@ describe('the git barrel', () => {
   });
 
   it('exports the type names of the two files with the runtime ones, each once, and no other', () => {
-    const exports = readExports([BARREL, GIT, COMMIT, GH]);
+    const exports = exportsByPath();
     const expected = [
       ...new Set([...namesOf(exports[GIT]), ...namesOf(exports[COMMIT]), ...namesOf(exports[GH])]),
     ].sort();
@@ -161,7 +183,7 @@ describe('the git barrel', () => {
   });
 
   it('exports each shared name as git.ts declares it, and every other name from its own file', () => {
-    const exports = readExports([BARREL, GIT, COMMIT, GH]);
+    const exports = exportsByPath();
     const gitNames = namesOf(exports[GIT]);
     const ghNames = namesOf(exports[GH]);
     const expected = Object.fromEntries(

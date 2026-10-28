@@ -19,14 +19,17 @@ import { join } from 'node:path';
 
 import { describe, expect, setDefaultTimeout, test } from 'bun:test';
 
-import { resolveBaseBranch } from '../cleanup/index.js';
-import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
+import { resolveBaseBranch } from '@open-tomato/rafa-run/cleanup/index';
+import { buildWrapUpPrompt } from '@open-tomato/rafa-run/start/wrap-up';
 
-import { buildWrapUpPrompt } from './wrap-up.js';
+import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
 
 setDefaultTimeout(SWEEP_TIMEOUT);
 
 const PROMPT_MODULES = ['wrap-up.ts', 'pr-lifecycle.ts', 'wrap-up-run.ts', 'runner-pr.ts'];
+
+/** The prompt modules' folder: they live in the run package since pass 4f, this file at the root. */
+const MOVED_DIR = join(import.meta.dir, '..', '..', 'packages', 'rafa-run', 'src', 'start');
 const LITERAL = 'origin/main';
 
 /** `source` with block and line comments blanked, so only code and strings remain. */
@@ -69,7 +72,7 @@ describe('the base a prompt names under pr.base: integration', () => {
   });
 
   test.each(PROMPT_MODULES)('%s writes no origin/main literal in code', (name) => {
-    const source = readFileSync(join(import.meta.dir, name), 'utf8');
+    const source = readFileSync(join(MOVED_DIR, name), 'utf8');
 
     expect(literalLines(source)).toEqual([]);
   });

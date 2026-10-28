@@ -46,9 +46,8 @@ import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
 import { readTaskFinishes } from '@open-tomato/rafa/store/task-finishes';
 import { readTrackerRef, writeTrackerRef } from '@open-tomato/rafa/store/tracker-refs';
 import { writeTriage } from '@open-tomato/rafa/store/triage';
-
-import { readSkillFacts } from '../../../../effort/skill-facts.js';
-import { readProgressFindings } from '../../../../utils/progress.js';
+import { readProgressFindings } from '@open-tomato/rafa/utils/progress';
+import { readSkillFacts } from '@open-tomato/rafa-effort/effort/skill-facts';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-origins-')));
 afterAll(() => {

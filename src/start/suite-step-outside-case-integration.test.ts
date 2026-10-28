@@ -26,9 +26,9 @@
  * it is written and the run goes on, a task step names the file in its
  * blocker, and no record carries `outsideCase` or a tail.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
-import type { SuiteSpawner } from '../suite/run.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { SuiteSpawner } from '@open-tomato/rafa/suite/run';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,15 +37,13 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
-import { runSuite } from '../suite/run.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-import { findNextTask } from '../utils/tracker.js';
-
-import { OUTSIDE_CASE_REASON, storedOutsideCaseLine } from './suite-outside-case.js';
-import { addToLedger } from './suite-step.js';
-import { createRunSuiteSteps } from './suite-steps-run.js';
+import { runSuite } from '@open-tomato/rafa/suite/run';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { OUTSIDE_CASE_REASON, storedOutsideCaseLine } from '@open-tomato/rafa-run/start/suite-outside-case';
+import { addToLedger } from '@open-tomato/rafa-run/start/suite-step';
+import { createRunSuiteSteps } from '@open-tomato/rafa-run/start/suite-steps-run';
+import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '@open-tomato/rafa-run/suite/baseline';
 
 const BASE = 'base0000';
 const HEAD = 'head1111';

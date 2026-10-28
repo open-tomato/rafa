@@ -8,7 +8,7 @@
  * The store copied is always `<root>/.rafa/effort/`. The copy lands in
  * `--to`, resolved against the project root when relative, or in
  * `<root>/.rafa/scratch/effort-<stamp>/` by default, the stamp read off
- * the clock as `fileStamp` (`src/effort/file-stamp.ts`) spells it. The
+ * the clock as `fileStamp` (`packages/rafa-effort/src/effort/file-stamp.ts`) spells it. The
  * command prints the directory and the `RAFA_EFFORT_DIR=` line to put
  * in front of each command that should use it.
  *
@@ -29,13 +29,13 @@ import type { EffortCopyResult } from '@open-tomato/rafa/store/copy';
 
 import { join, resolve } from 'node:path';
 
+import { fileStamp } from '@open-tomato/rafa-effort';
+
+import { expectNoArgument, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { copyEffortStore, EffortCopyFailure, EffortCopyRefusal } from '@open-tomato/rafa/store/copy';
 import { EFFORT_DIR_VARIABLE } from '@open-tomato/rafa/store/location';
 import { EFFORT_STORE_DIR } from '@open-tomato/rafa/store/ndjson-files';
-
-import { fileStamp } from '../../effort/file-stamp.js';
-import { expectNoArgument, requireProject } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort copy';

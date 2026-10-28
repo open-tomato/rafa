@@ -16,8 +16,8 @@
  *   1. **The config**, as `loop start` resolves it (`config-load.ts`): the
  *      project's config over the user scope's, over the defaults. A config
  *      `loadConfig` refuses is refused. Its rows follow the load
- *      (`./doctor-config.ts`): a `warn` per warning, a shadowed
- *      YAML file's included, and a `note` per `dangerous.*` key passed.
+ *      (`./doctor-config.ts`): a `warn` per warning and a `note` per
+ *      `dangerous.*` key passed.
  *   2. **The plan**: the file `--plan=<file>` names, resolved against the
  *      project root, or the default plan `loop start` falls back to
  *      (`start/plan-path.ts`). A plan named on the line that is no file is
@@ -30,15 +30,15 @@
  *      and so no PREREQUISITES file: `--plan` is how a plan's items reach
  *      the report.
  *   3. **The pull request provider's automatic items**
- *      (`pr/preflight-items.ts`): `gh` on `PATH` and `gh auth status`
- *      for `origin`'s host, both REQUIRED, when the provider resolves
- *      to `gh` (`pr/provider.ts`). They go AHEAD of the configured
+ *      (`pr/preflight-items.ts`): `gh` on `PATH` and `gh auth status` for
+ *      `origin`'s host, both REQUIRED, when the provider resolves to `gh`
+ *      (`packages/rafa/src/pr/provider.ts`). They go AHEAD of the configured
  *      required tier, exactly as `runStartPreflight` puts them
- *      (`start/preflight.ts`), because this command answers what
- *      `loop start` would do and would say the wrong thing if it
- *      checked a different set in a different order. A configured
- *      `pr.provider: none` contributes none and reads no remote at
- *      all; every other reading spawns the `origin` probe once.
+ *      (`start/preflight.ts`), because this command answers what `loop start`
+ *      would do and would say the wrong thing if it checked a different set in
+ *      a different order. A configured `pr.provider: none` contributes none and
+ *      reads no remote at all; every other reading spawns the `origin` probe
+ *      once.
  *   4. **The plan's start-only `[start]` items**
  *      (`preflight/prerequisites-md.ts`), between the provider's items
  *      and the configured required tier, exactly where
@@ -181,7 +181,7 @@
  *
  * Every such run then reads the `effort sync` row
  * (`./doctor-effort-sync.ts`, over the reading of
- * `../effort/sync/doctor-reading.ts`, whose note says which registry each
+ * `packages/rafa-effort/src/effort/sync/doctor-reading.ts`, whose note says which registry each
  * kind is selected through): `ok` naming the strategy `effort.sync` names,
  * `local` when it names none, and `fail` when no adapter serves it,
  * naming for `git`, `service` and `p2p` the `modules:` and `allowList:`
@@ -256,44 +256,45 @@ import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorProjectReading } from './doctor-project.js';
-import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
-import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../effort/sync/doctor-reading.js';
-import type { AccountSeams } from '../plan/risk/accounts.js';
-import type { ResolvePrProviderOptions } from '../pr/provider.js';
-import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
-import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '../preflight/run.js';
-import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { PreflightItems, PrerequisiteReminder } from '@open-tomato/rafa/preflight/prerequisites-md';
+import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '@open-tomato/rafa/preflight/run';
+import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
+import type { DoctorRefsReading, DoctorRefsSeams } from '@open-tomato/rafa-board';
+import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '@open-tomato/rafa-effort';
+import type { AccountSeams, ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
 
 import { basename, resolve } from 'node:path';
+
+import {
+  commandRetrySeams,
+  readDoctorRefs,
+  registryRoster,
+  renderDoctorRefs,
+} from '@open-tomato/rafa-board';
+import { readDoctorEffortSync } from '@open-tomato/rafa-effort';
+import { ghPreflightItems, resolvePrProvider } from '@open-tomato/rafa-pr';
+import { DEFAULT_PLAN_FILE, announceRiskTotal, isFirstDispatch, resolvePlanPath } from '@open-tomato/rafa-run';
 
 import { CommandExit , versionLine } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isFile , trackerPathFor } from '@open-tomato/rafa/core/plan';
-
-import { commandRetrySeams } from '../board/project/project-runner.js';
-import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
-import { ghPreflightItems } from '../pr/preflight-items.js';
-import { resolvePrProvider } from '../pr/provider.js';
-import { isFirstDispatch } from '../preflight/first-dispatch.js';
 import {
   loadPlanPrerequisites,
   malformedPrerequisiteLines,
   mergePlanPrerequisites,
   prerequisitesPathForPlan,
-} from '../preflight/prerequisites-md.js';
-import { runPreflight } from '../preflight/run.js';
-import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
-import { announceRiskTotal } from '../start/risk-total.js';
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+import { runPreflight } from '@open-tomato/rafa/preflight/run';
 
 import { boardRunner, readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
@@ -304,12 +305,10 @@ import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } 
 import { effortSyncRefusal, renderDoctorEffortSync } from './doctor-effort-sync.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorProject, renderDoctorProject } from './doctor-project.js';
-import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
 import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
-import { registryRoster } from './plan/refs-check.js';
 
 /**
  * How the checks run; see the module note. Each left out is the

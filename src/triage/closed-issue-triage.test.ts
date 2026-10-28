@@ -1,7 +1,7 @@
 /**
  * Triage of a bug that recurs in an issue already closed
- * (`src/triage/triage.ts`), over the GitHub adapter's recorded fake
- * (`src/adapters/tracker/github-fake.ts`) and the real SQLite store under a
+ * (`packages/rafa-pr/src/triage/triage.ts`), over the GitHub adapter's recorded fake
+ * (`packages/rafa-board/src/adapters/tracker/github-fake.ts`) and the real SQLite store under a
  * temporary root.
  *
  * A repeat of an issue closed as completed files one new issue that names
@@ -9,9 +9,9 @@
  * issue closed as `NOT_PLANNED` or as `DUPLICATE` gets one comment and no
  * new issue.
  */
-import type { TriageResult } from './triage.js';
-import type { FakeGh } from '../adapters/tracker/github-fake.js';
 import type { ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
+import type { FakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
+import type { TriageResult } from '@open-tomato/rafa-pr/triage/triage';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,10 +19,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createFakeGh } from '../adapters/tracker/github-fake.js';
-import { createGithubTracker } from '../adapters/tracker/github.js';
-
-import { triageReport } from './triage.js';
+import { createGithubTracker } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
+import { triageReport } from '@open-tomato/rafa-pr/triage/triage';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-triage-closed-'));
 let rootCount = 0;

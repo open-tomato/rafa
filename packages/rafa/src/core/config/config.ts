@@ -1,23 +1,32 @@
 /**
- * Reading rafa's settings: the phase 1 schema of the project's config
+ * Reading rafa's settings: the phase 1 schema of the config files
  * (`.rafa/config.yaml`, `rafa.config.ts` or `rafa.config.mjs`).
  *
+ * Four files rank, two per scope ({@link ConfigLayers}): the project's
+ * local file over the project's file, then the user scope's local file
+ * over the user scope's file under `~/.rafa/`. A scope's local file is
+ * its `.rafa/config.yaml`, read over the scope's module file key by key;
+ * which file on disk fills each layer is `config-load.ts`'s to say.
  * Every setting takes the value the COMMAND LINE gave it, else the
- * value the project's config gave it, else the value the user scope's
- * config under `~/.rafa/` gave it, else its default. Each
+ * value of the first of the four files, in that order, that gave it one,
+ * else its default; a map setting merges by key in the reverse order,
+ * the default under the user's files under the project's. Each
  * setting is ranked on its own, so a flag naming one leaves the others
- * to the files and a project file naming one leaves the others to the
- * user's, and {@link ResolvedConfig.sources} records which layer
+ * to the files and a file naming one leaves the others to the files
+ * under it, and {@link ResolvedConfig.sources} records which layer
  * answered each. That record keeps precedence observable when two
- * layers agree: a file spelling the default still reports `file`, where
- * the value alone could not tell a file that was read from one that was
- * skipped. `file` names the project's file, as it did when that was the
- * only file read, and `user` names the user scope's.
+ * layers agree: a file spelling the default still reports its layer,
+ * where the value alone could not tell a file that was read from one
+ * that was skipped. `local` names the project's local file and `file`
+ * the project's other file, as it did when that was the only file read;
+ * `user` names either of the user scope's, and the origin in
+ * {@link ResolvedConfig.provenance}, read off the file that answered,
+ * tells the two apart.
  *
  * A file may name config templates with its `templates` key, and each
  * template's entry sits under that file's own keys and over every lower
- * layer: the project's file over its templates over the user's file over
- * its templates over the default. A setting a template answered and no
+ * file: each of the four over its own templates over the next file down,
+ * the last over the default. A setting a template answered and no
  * file outranked reports `template`, and its `provenance` names the
  * template and the file that named it. {@link layTemplatesUnder} lays
  * them; `config-load.ts` reads them through the template hook.
@@ -37,11 +46,10 @@
  * other two modules export for a caller to import rather than reaching
  * into a sibling; however, most
  * callers import `config-sections.ts`'s names directly,
- * through its barrel `core/config/sections.js`. The pull request port
- * owns `MergeMethod`: a caller reading {@link RafaConfig.prMergeMethod}
- * imports it from `./pr/index.js`, and neither this module nor
- * `config-sections.ts` re-exports it, which would make the config a
- * second place to learn it from.
+ * through its barrel `core/config/sections.js`. `MergeMethod`, the type
+ * of {@link RafaConfig.prMergeMethod}, is `merge-method.ts`'s, exported
+ * by that barrel and re-exported by the pull request port
+ * (`packages/rafa/src/pr/types.ts`); this module does not re-export it.
  *
  *   - `config-sections.ts` holds every rule about a VALUE: the readers,
  *     the closed lists of values, and why nothing is coerced.
@@ -188,7 +196,7 @@
  *     boolean. So a `tracking` flag spelled `yes` is refused rather
  *     than read as true.
  */
-import type { SettingOrigin, ShadowedFile } from './config-origins.js';
+import type { SettingOrigin } from './config-origins.js';
 import type {
   CommandLineSetting,
   ConfigSetting,
@@ -268,10 +276,11 @@ export { MODULE_SOURCE_KINDS, PREREQUISITE_KINDS } from './config-items.js';
 
 /**
  * The layer that answered a setting: the command line, the project's
- * file, the user scope's file, a template either file named, or the
- * default. Which file named the template is the setting's `provenance`.
+ * local file, the project's file, either of the user scope's two files,
+ * a template any file named, or the default. Which user file answered,
+ * and which file named the template, is the setting's `provenance`.
  */
-export type ConfigSource = 'cli' | 'file' | 'user' | 'template' | 'default';
+export type ConfigSource = 'cli' | 'local' | 'file' | 'user' | 'template' | 'default';
 
 /**
  * One layer's say on every setting: a value, or undefined for silence.
@@ -329,8 +338,12 @@ export interface TemplateLayer {
 export interface ConfigLayers {
   /** Command-line values. Absent is the same as no flag given. */
   cli?: ConfigOverrides;
+  /** The project's parsed local file, its `.rafa/config.yaml`, or null when there is none. */
+  local?: ConfigFile | null;
   /** The project's parsed file, or null when there is none. */
   file?: ConfigFile | null;
+  /** The user scope's parsed local file, or null when there is none. Its settings report `user`. */
+  userLocal?: ConfigFile | null;
   /** The user scope's parsed file, or null when there is none. */
   user?: ConfigFile | null;
 }
@@ -343,21 +356,31 @@ export interface ResolvedConfig {
   sources: Readonly<Record<ConfigSetting, ConfigSource>>;
   /** The project's file consulted, or null when there was none. */
   path: string | null;
+  /** The project's local file consulted, or null when there was none. */
+  localPath: string | null;
   /** The user scope's file consulted, or null when there was none. */
   userPath: string | null;
+  /** The user scope's local file consulted, its `~/.rafa/config.yaml`, or null when there was none. */
+  userLocalPath: string | null;
   /** The project file's unknown keys, retained. Empty with no file. */
   extras: readonly ConfigExtra[];
+  /** The project's local file's unknown keys, retained. Empty with no file. */
+  localExtras: readonly ConfigExtra[];
   /** The user file's unknown keys, retained. Empty with no file. */
   userExtras: readonly ConfigExtra[];
-  /** One sentence per retained unknown key, the user file's first. */
+  /** The user scope's local file's unknown keys, retained. Empty with no file. */
+  userLocalExtras: readonly ConfigExtra[];
+  /**
+   * One sentence per retained unknown key, in layer order from the
+   * bottom: the user file's, the user's local file's, the project
+   * file's, then the project's local file's.
+   */
   warnings: readonly string[];
   /**
    * The file and entry that answered each setting, or null where the
    * command line or a default did (`config-origins.ts`).
    */
   provenance: Readonly<Record<ConfigSetting, SettingOrigin | null>>;
-  /** The YAML files a module file of their scope left unread. Empty here; `config-load.ts` fills it. */
-  shadowed: readonly ShadowedFile[];
 }
 
 /**
@@ -640,16 +663,23 @@ export function layTemplatesUnder(file: ConfigFile, templates: readonly Template
 }
 
 /** The source a setting `layer` answered reports: `template` where a template answered it, else `own`. */
-function sourceIn(layer: ConfigFile | null, setting: ConfigSetting, own: ConfigSource): ConfigSource {
-  return layer?.templates?.has(setting) === true
+function sourceIn(layer: ConfigFile, setting: ConfigSetting, own: ConfigSource): ConfigSource {
+  return layer.templates?.has(setting) === true
     ? 'template'
     : own;
 }
 
-/** One setting's answer, and the layer that gave it. */
+/** One file {@link resolveConfig} ranks, with the source its own keys report. */
+interface RankedFile {
+  readonly layer: ConfigFile;
+  readonly source: ConfigSource;
+}
+
+/** One setting's answer, the layer that gave it, and the file that did, null for the command line or a default. */
 interface Ranked<K extends ConfigSetting> {
   value: RafaConfig[K];
   source: ConfigSource;
+  answeredBy: ConfigFile | null;
 }
 
 /** The sentence an operator reads about one retained unknown key. */
@@ -665,14 +695,18 @@ function unknownKeyWarning(key: string, path: string): string {
 
 /**
  * Ranks the layers: for each registered setting, the command line over
- * the project's file, the project's over the user scope's, and the
- * user's over its registered default (`activeDefaults()` in
- * `section.ts`). A file's templates are already laid under it
+ * the project's local file, that over the project's file, that over the
+ * user scope's local file, that over the user scope's file, and that
+ * over its registered default (`activeDefaults()` in `section.ts`). A
+ * map setting merges by key in the reverse order, each file over the
+ * ones beneath it. A file's templates are already laid under it
  * ({@link layTemplatesUnder}), so a setting one answered ranks with its
- * file and reports `template`.
+ * file and reports `template`. Each setting's origin is read off the
+ * file that answered it ({@link originOf}), the highest one naming a map
+ * setting, so the two user files, both reporting `user`, name their own.
  *
- * Pure. Warnings come back as data — one per unknown key either file
- * retained, the user file's first — and are never printed here. A command-line value no
+ * Pure. Warnings come back as data — one per unknown key any file
+ * retained, from the bottom layer up — and are never printed here. A command-line value no
  * setting accepts throws a {@link ConfigError} naming every one, and
  * is never downgraded to the file's value: an operator who mistyped a
  * flag asked for something, and running on something else is the
@@ -683,7 +717,9 @@ function unknownKeyWarning(key: string, path: string): string {
  * any layer, naming the file that chose `service`.
  */
 export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
+  const local = layers.local ?? null;
   const file = layers.file ?? null;
+  const userLocal = layers.userLocal ?? null;
   const user = layers.user ?? null;
   const overrides = layers.cli ?? {};
   const { layer: cli, problems } = readLayer(
@@ -694,24 +730,22 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
   );
   if (problems.length > 0) throw new ConfigError(problems);
 
+  const order = [[local, 'local'], [file, 'file'], [userLocal, 'user'], [user, 'user']] as const;
+  const files: readonly RankedFile[] = order.flatMap(([layer, source]) => layer === null
+    ? []
+    : [{ layer, source }]);
   const defaults = activeDefaults();
   const rank = <K extends ConfigSetting>(setting: K): Ranked<K> => {
     const fromCli = cli[setting];
-    if (fromCli !== undefined) return { value: fromCli, source: 'cli' };
-    const fromFile = file?.values[setting];
-    const fromUser = user?.values[setting];
-    if (isMapSetting(setting)) {
-      const merged = mergeMaps(defaults[setting], fromUser, fromFile);
-      const source = fromFile !== undefined
-        ? sourceIn(file, setting, 'file')
-        : fromUser !== undefined
-          ? sourceIn(user, setting, 'user')
-          : 'default';
-      return { value: merged as RafaConfig[K], source };
-    }
-    if (fromFile !== undefined) return { value: fromFile, source: sourceIn(file, setting, 'file') };
-    if (fromUser !== undefined) return { value: fromUser, source: sourceIn(user, setting, 'user') };
-    return { value: defaults[setting] as RafaConfig[K], source: 'default' };
+    if (fromCli !== undefined) return { value: fromCli, source: 'cli', answeredBy: null };
+    const answered = files.find(({ layer }) => layer.values[setting] !== undefined);
+    const value = isMapSetting(setting)
+      ? mergeMaps(defaults[setting], ...files.map(({ layer }) => layer.values[setting]).reverse()) as RafaConfig[K]
+      : answered === undefined
+        ? defaults[setting] as RafaConfig[K]
+        : answered.layer.values[setting] as RafaConfig[K];
+    if (answered === undefined) return { value, source: 'default', answeredBy: null };
+    return { value, source: sourceIn(answered.layer, setting, answered.source), answeredBy: answered.layer };
   };
   const ranked = registeredNames().map((setting) => [setting, rank(setting)] as const);
   const config = Object.fromEntries(ranked.map(([setting, { value }]) => [setting, value])) as unknown as RafaConfig;
@@ -719,31 +753,32 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     ranked.map(([setting, { source }]) => [setting, source]),
   ) as Record<ConfigSetting, ConfigSource>;
   const provenance = Object.fromEntries(
-    ranked.map(([setting, { source }]) => [setting, originOf(source, setting, file, user)]),
+    ranked.map(([setting, { source, answeredBy }]) => [setting, originOf(source, setting, answeredBy)]),
   ) as Record<ConfigSetting, SettingOrigin | null>;
   const path = file?.path ?? null;
   const userPath = user?.path ?? null;
-  const checkProblems = activeChecks().flatMap((check) => check({ config, sources, path, userPath }));
+  const checkProblems = activeChecks().flatMap((check) => check({ config, sources, path, userPath, provenance }));
   if (checkProblems.length > 0) throw new ConfigError(checkProblems);
   const rafaLoaded = ranked.find(([setting]) => setting === 'tiersRafa')?.[1].value !== 'off';
-  const warnings = [user, file].flatMap((layer) => layer === null
-    ? []
-    : [
-      ...layer.extras.map((extra) => unknownKeyWarning(extra.key, layer.path)),
-      ...(rafaLoaded
-        ? []
-        : unloadedPinWarnings(layer)),
-    ]);
+  const warnings = [...files].reverse().flatMap(({ layer }) => [
+    ...layer.extras.map((extra) => unknownKeyWarning(extra.key, layer.path)),
+    ...(rafaLoaded
+      ? []
+      : unloadedPinWarnings(layer)),
+  ]);
 
   return {
     config,
     sources,
     path,
+    localPath: local?.path ?? null,
     userPath,
+    userLocalPath: userLocal?.path ?? null,
     extras: file?.extras ?? [],
+    localExtras: local?.extras ?? [],
     userExtras: user?.extras ?? [],
+    userLocalExtras: userLocal?.extras ?? [],
     warnings,
     provenance,
-    shadowed: [],
   };
 }

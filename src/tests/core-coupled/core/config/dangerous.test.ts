@@ -40,9 +40,9 @@ import {
 } from '@open-tomato/rafa/core/config/dangerous';
 import { EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '@open-tomato/rafa/core/config/section';
 import { runWithActiveOutput } from '@open-tomato/rafa/core/output/active';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
-import { sinkOutput } from '../../../output-sinks.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-dangerous-'));
 let planted = 0;
@@ -125,12 +125,12 @@ describe('dangerousPassLines', () => {
     ]);
   });
 
-  it('names nothing for a file spelling the default, though its sources name the file', async () => {
+  it('names nothing for a file spelling the default, though its sources name the local file', async () => {
     const project = yamlProject('dangerous:\n  acceptStaleRefs: false\n  selfUpdateDuringLoop: false\n');
 
     const { resolved } = await loadCollecting(project);
 
-    expect(resolved.sources.dangerousAcceptStaleRefs).toBe('file');
+    expect(resolved.sources.dangerousAcceptStaleRefs).toBe('local');
     expect(dangerousPassLines(resolved)).toEqual([]);
   });
 

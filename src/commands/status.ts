@@ -15,7 +15,7 @@
  *
  * Between the two, once the config is known to be usable, it pulls the
  * other devices' effort rows through `pullBeforeRead`
- * (`../effort/sync/contact.ts`), so the store it reads holds what the
+ * (`packages/rafa-effort/src/effort/sync/contact.ts`), so the store it reads holds what the
  * project's sync strategy can bring in first. Under `local` and `file`
  * that contacts nothing. A hub that cannot be reached is one `warn` line
  * before the sections, and the sections are read from the local store
@@ -41,18 +41,18 @@
  *   that could only be printed while everything answered would be no use
  *   when something does not.
  */
-import type { PullBeforeReadInput } from '../effort/sync/contact.js';
-import type { ProjectFound } from '../project/scope.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { PullBeforeReadInput } from '@open-tomato/rafa-effort';
 
+import { pullBeforeRead } from '@open-tomato/rafa-effort';
+
+import { resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
-import { pullBeforeRead } from '../effort/sync/contact.js';
 import { renderStatus, statusData } from '../status/render.js';
 import { readStatusSections } from '../status/sections.js';
-
-import { resolveProjectConfig } from './plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa status';

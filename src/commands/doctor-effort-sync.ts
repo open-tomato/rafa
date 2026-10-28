@@ -2,7 +2,8 @@
  * The `effort sync` row of `rafa doctor`: the lines it prints for whether
  * the strategy the project's `effort.sync` names has an adapter to carry
  * the store, and the text `doctor` exits 1 with when none does. This is
- * the command half of `../effort/sync/doctor-reading.ts`, which holds the
+ * the command half of
+ * `packages/rafa-effort/src/effort/sync/doctor-reading.ts`, which holds the
  * reading itself (`readDoctorEffortSync`), its types
  * (`DoctorEffortSyncReading`, `DoctorEffortSyncSeams`,
  * `DoctorEffortSyncInput`) and the row's name (`EFFORT_SYNC_ROW`), for
@@ -24,9 +25,9 @@
  * `rafa doctor: effort sync: <problem>`, the row's name said once since
  * the reading's `problem` comes without it.
  */
-import type { DoctorEffortSyncReading } from '../effort/sync/doctor-reading.js';
+import type { DoctorEffortSyncReading } from '@open-tomato/rafa-effort';
 
-import { EFFORT_SYNC_ROW } from '../effort/sync/doctor-reading.js';
+import { EFFORT_SYNC_ROW } from '@open-tomato/rafa-effort';
 
 /** The lines text mode writes for the row; see the module note. */
 export function renderDoctorEffortSync(reading: DoctorEffortSyncReading): readonly string[] {

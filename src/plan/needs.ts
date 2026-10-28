@@ -18,7 +18,7 @@
  *     on 2026-09-24), so a declared name only ever meets a bare one.
  *   - Every `tools=` entry shaped `mcp__<server>__…`, or a bare
  *     `mcp__<server>`, names the MCP server `<server>`, looked up by the
- *     MCP reader (`src/inventory/mcp.ts`). The server segment runs to the
+ *     MCP reader (`packages/rafa-inventory/src/inventory/mcp.ts`). The server segment runs to the
  *     first `__` after the prefix, and is compared as written: how Claude
  *     Code spells a server name holding a character a tool name cannot
  *     was not measured.
@@ -29,7 +29,7 @@
  *     `parsePrerequisites` gives a probe (`auto` and `start` items), in
  *     `PREREQUISITES-<stub>.md` beside the plan, is split at `|`, `&&`,
  *     `||` and `;`, and each part's program is its first word as the
- *     skill checker reads one (`toolOf` in `src/check/shell-lines.ts`),
+ *     skill checker reads one (`toolOf` in `packages/rafa-inventory/src/check/shell-lines.ts`),
  *     after any leading `!` and `NAME=value` words. A lookup —
  *     `command -v <name>`, `which <name>`, `type <name>`, `hash <name>` —
  *     names `<name>`, the program the probe asks after, and not the
@@ -123,23 +123,33 @@
  * Nothing here reads the real home or `PATH` unless it is handed them:
  * every location comes from {@link NeedsSeams}.
  */
-import type { InventorySeams } from '../inventory/index.js';
-import type { McpReading, McpScope } from '../inventory/mcp.js';
-import type { InventoryKind, InventoryRecord, InventorySource, InventoryState } from '../inventory/record.js';
+import type {
+  InventoryKind,
+  InventoryRecord,
+  InventorySeams,
+  InventorySource,
+  InventoryState,
+  McpReading,
+  McpScope,
+} from '@open-tomato/rafa-inventory';
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import {
+  buildInventory,
+  checkReferences,
+  mcpDeclarationsOf,
+  mcpServerFor,
+  readMcpServers,
+  toolOf,
+} from '@open-tomato/rafa-inventory';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { parsePlan } from '@open-tomato/rafa/core/plan';
+import { parsePrerequisites, prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
+import { readFrontmatterDocument } from '@open-tomato/rafa/schema/frontmatter';
 import { bundledBinDirectory } from '@open-tomato/rafa/schema/tiers';
-
-import { checkReferences } from '../check/references.js';
-import { toolOf } from '../check/shell-lines.js';
-import { buildInventory } from '../inventory/index.js';
-import { mcpDeclarationsOf, mcpServerFor, readMcpServers } from '../inventory/mcp.js';
-import { parsePrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';
-import { readFrontmatterDocument } from '../schema/frontmatter.js';
 
 /** What a need is for. */
 export type NeedKind = InventoryKind | 'mcp' | 'program';

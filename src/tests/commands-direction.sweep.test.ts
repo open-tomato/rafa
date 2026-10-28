@@ -79,32 +79,33 @@ interface SplitModule {
  * it, `packages/rafa/src/core/loop/readings.ts`. A file outside `packages/rafa/src/core/` imports the
  * barrel and nothing deeper, so the barrel is what an `export … from` of
  * that half resolves to, and a row naming the file behind it would hold
- * nothing. The same holds for `src/commands/plan/plan-files.ts`, whose
+ * nothing. The same holds for `packages/rafa/src/commands/plan/plan-files.ts`, whose
  * half is `packages/rafa/src/core/plan/plan-files.ts` behind `packages/rafa/src/core/plan/index.ts`.
  * Both barrels are spelled under the subject folders of
  * `scripts/survey/core-moves.ts`, so the rows follow core when it moves.
  */
 const SPLIT_MODULES: readonly SplitModule[] = [
-  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: `${subjectFolder('plan')}index.ts` },
+  { commandFile: 'packages/rafa/src/commands/plan/plan-files.ts', libraryHalf: `${subjectFolder('plan')}index.ts` },
   { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: `${subjectFolder('loop')}readings.ts` },
-  { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
-  { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },
-  { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'src/plan/list.ts' },
-  { commandFile: 'src/commands/plan/validate.ts', libraryHalf: 'src/plan/validate.ts' },
+  { commandFile: 'packages/rafa-release/src/commands/release/status.ts', libraryHalf: 'packages/rafa-release/src/release/status-readings.ts' },
+  { commandFile: 'packages/rafa-board/src/commands/epic/move-native.ts', libraryHalf: 'packages/rafa-board/src/board/repository.ts' },
+  { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'packages/rafa-run/src/plan/list.ts' },
+  { commandFile: 'src/commands/plan/validate.ts', libraryHalf: 'packages/rafa/src/plan/validate.ts' },
   { commandFile: 'src/commands/loop/status.ts', libraryHalf: 'src/loop/blocked-tasks.ts' },
-  { commandFile: 'src/commands/doctor-blocked.ts', libraryHalf: 'src/board/blocked-issues.ts' },
+  { commandFile: 'src/commands/doctor-blocked.ts', libraryHalf: 'packages/rafa-board/src/board/blocked-issues.ts' },
   { commandFile: 'src/commands/doctor-cleanup.ts', libraryHalf: 'src/cleanup/settings.ts' },
-  { commandFile: 'src/commands/doctor-effort-sync.ts', libraryHalf: 'src/effort/sync/doctor-reading.ts' },
-  { commandFile: 'src/commands/effort/fix-schema.ts', libraryHalf: 'src/effort/file-stamp.ts' },
-  { commandFile: 'src/commands/instinct/instinct-records.ts', libraryHalf: 'src/schema/scope-records.ts' },
-  { commandFile: 'src/commands/init-release.ts', libraryHalf: 'src/release/scaffold.ts' },
+  { commandFile: 'src/commands/doctor-effort-sync.ts', libraryHalf: 'packages/rafa-effort/src/effort/sync/doctor-reading.ts' },
+  { commandFile: 'src/commands/effort/fix-schema.ts', libraryHalf: 'packages/rafa-effort/src/effort/file-stamp.ts' },
+  { commandFile: 'src/commands/instinct/instinct-records.ts', libraryHalf: 'packages/rafa-inventory/src/schema/scope-records.ts' },
+  { commandFile: 'src/commands/init-release.ts', libraryHalf: 'packages/rafa-release/src/release/scaffold.ts' },
   { commandFile: 'src/commands/ci/status.ts', libraryHalf: 'src/ci/status-reading.ts' },
-  { commandFile: 'src/commands/issue/unblock.ts', libraryHalf: 'src/board/unblock.ts' },
-  { commandFile: 'src/commands/pr/merge-tick.ts', libraryHalf: 'src/board/epic-tick.ts' },
-  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/release/version-tag.ts' },
-  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
-  { commandFile: 'src/commands/pr/merge-cleanup.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
-  { commandFile: 'src/commands/self-update.ts', libraryHalf: 'src/runtime/live-loops.ts' },
+  { commandFile: 'packages/rafa-board/src/commands/issue/unblock.ts', libraryHalf: 'packages/rafa-board/src/board/unblock.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-tick.ts', libraryHalf: 'packages/rafa-board/src/board/epic-tick.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-followups.ts', libraryHalf: 'packages/rafa-release/src/release/version-tag.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-followups.ts', libraryHalf: 'packages/rafa-pr/src/pr/settle-waiting.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/merge-cleanup.ts', libraryHalf: 'packages/rafa-pr/src/pr/settle-waiting.ts' },
+  { commandFile: 'src/commands/self-update.ts', libraryHalf: 'packages/rafa/src/runtime/live-loops.ts' },
+  { commandFile: 'packages/rafa-pr/src/commands/pr/open.ts', libraryHalf: 'packages/rafa-pr/src/commands/pr/open-pull.ts' },
 ];
 
 /**

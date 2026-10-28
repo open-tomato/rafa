@@ -34,12 +34,12 @@
  * found again in `[redacted: HOST]` and a secret whose value is
  * `redacted` in every marker.
  */
-import type { NamedSecret, SecretEnvironment } from '../triage/triage.js';
+import type { NamedSecret, SecretEnvironment } from '@open-tomato/rafa/triage/filed-text';
 
 import { homedir, hostname } from 'node:os';
 
-import { HOME_MARKER, localPathRedactor } from '../triage/local-paths.js';
-import { namedSecrets, redactSecrets } from '../triage/triage.js';
+import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text';
+import { HOME_MARKER, localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 
 /** What stands for an email address in a scrubbed text. */
 export const EMAIL_MARKER = '[redacted: EMAIL]';

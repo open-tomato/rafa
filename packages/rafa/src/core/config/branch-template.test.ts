@@ -1,6 +1,7 @@
 /**
- * Tests for `branch-template.ts`: the glob a template names its plan
- * branches by, and the stub read back off a branch.
+ * Tests for `branch-template.ts`: the base `pr.base` unset is read as,
+ * the glob a template names its plan branches by, and the stub read back
+ * off a branch.
  *
  * Every null sits beside a branch the same template accepts, so a reader
  * that answered null for everything would fail here. Every expected
@@ -8,7 +9,13 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { branchGlob, stubOfBranch } from './branch-template.js';
+import { branchGlob, DEFAULT_BASE_BRANCH, stubOfBranch } from './branch-template.js';
+
+describe('DEFAULT_BASE_BRANCH', () => {
+  it('reads pr.base unset as main', () => {
+    expect(DEFAULT_BASE_BRANCH).toBe('main');
+  });
+});
 
 describe('branchGlob', () => {
   it('names feat/rafa-* under the default template', () => {

@@ -6,6 +6,20 @@
  * with `src/effort/store/`, `src/ports/` and four named files, at the
  * same paths under `packages/rafa/src/`.
  *
+ * Beside `core/`, the package holds the effort store, the ports, and
+ * the folders pass 1 of #808 moved in, the root files that reach no
+ * feature (`scripts/codemod/moves/pass-1.ts`): the logger and events
+ * adapters, `bugs/`, `commands/plan/plan-files.ts`, the
+ * `config-schema-*.ts` section files, `modules/`, `next/hop-record.ts`,
+ * `plan/`, `project/`, `runtime/live-loops.ts` and `utils/`. Each sits
+ * at its old path below `src/`; outside `core/` no barrel rule applies,
+ * so a file outside the package imports one by its own subpath. Pass 4f
+ * moved three preflight files in the same way, `preflight/run.ts`,
+ * `shell.ts` and `prerequisites-md.ts`, each behind a subpath of its own
+ * (`@open-tomato/rafa/preflight/run` and the two beside it). They are
+ * not in {@link CORE_BARRELS}, which lists files under {@link CORE_FOLDER}
+ * alone.
+ *
  * Where core is:
  *
  *   - {@link CORE_FOLDERS} and {@link CORE_NAMED_FILES}: the folders and
@@ -59,7 +73,7 @@ export const CORE_FOLDERS: readonly string[] = [CORE_SOURCE];
 export const CORE_NAMED_FILES: readonly string[] = [];
 
 /** The subject folders under {@link CORE_FOLDER}, sorted. */
-export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan', 'runtime'] as const;
+export const CORE_SUBJECTS = ['adapters', 'command', 'config', 'git', 'loop', 'output', 'plan', 'runtime', 'services'] as const;
 
 /** One subject folder under {@link CORE_FOLDER}. */
 export type CoreSubject = (typeof CORE_SUBJECTS)[number];
@@ -78,8 +92,14 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  * `src/config-registry.ts`, which imports `index.ts` back, and
  * `sections.ts` directly.
  *
+ * `command` has two. `index.ts` holds the command contract.
+ * `parseArgs.ts`, moved from `src/cli/core/` so run reaches no root
+ * file, is read through a subpath of its own, `core/command/parseArgs`,
+ * rather than a line of `index.ts`. It is no split: it re-exports
+ * nothing and imports `types.ts` alone, with `import type`.
+ *
  * `plan` has two. The leaf `blocks.ts` sits alone behind
- * `block-reader.ts`, because `parse.ts` imports `src/utils/tracker.ts`,
+ * `block-reader.ts`, because `parse.ts` imports `packages/rafa/src/utils/tracker.ts`,
  * which imports `blocks.ts` back, and one barrel over both would close
  * a cycle through the tracker. `index.ts` holds `parse.ts` and
  * `plan-files.ts`.
@@ -87,12 +107,15 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  * `runtime` has one, `index.ts`, over `identity.ts`, which imports no
  * file under `src/` and so reaches nothing that imports it back.
  *
+ * `services` has one, `index.ts`, over `registry.ts` and `shapes.ts`,
+ * which import types alone and so load no file that imports it back.
+ *
  * `loop` has three. `session-readings.ts` sits alone behind
  * `readings.ts`, because it imports
  * `src/effort/store/task-finishes.ts`, from which
  * `src/effort/store/development-build.ts` is reached by value, and
  * that file imports `index.ts` back. `hop-record.ts` sits alone behind
- * `hops.ts`, because `src/next/hop-record.ts` imports it by value and
+ * `hops.ts`, because `packages/rafa/src/next/hop-record.ts` imports it by value and
  * was reached by value from `sessions.ts`, through
  * `src/loop/session-record-parse.ts`, when the split was made, so
  * `index.ts` over it would have closed a cycle; that parser has since
@@ -104,7 +127,7 @@ export type CoreSubject = (typeof CORE_SUBJECTS)[number];
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['packages/rafa/src/core/adapters/index.ts'],
-  command: ['packages/rafa/src/core/command/index.ts'],
+  command: ['packages/rafa/src/core/command/index.ts', 'packages/rafa/src/core/command/parseArgs.ts'],
   config: [
     'packages/rafa/src/core/config/index.ts',
     'packages/rafa/src/core/config/load.ts',
@@ -119,6 +142,7 @@ export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   output: ['packages/rafa/src/core/output/index.ts'],
   plan: ['packages/rafa/src/core/plan/block-reader.ts', 'packages/rafa/src/core/plan/index.ts'],
   runtime: ['packages/rafa/src/core/runtime/index.ts'],
+  services: ['packages/rafa/src/core/services/index.ts'],
 };
 
 /**

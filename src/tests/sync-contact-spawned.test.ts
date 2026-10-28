@@ -1,11 +1,11 @@
 /**
  * Where a command pushes then pulls through its hub contact
- * (`src/effort/sync/contact.ts`), spawned as the real `rafa` binary
+ * (`packages/rafa-effort/src/effort/sync/contact.ts`), spawned as the real `rafa` binary
  * (`src/tests/cli-capture.ts`) in scratch projects under this file's
  * temporary directory:
  *
  *   - `rafa effort collect`, once its rows are stored and its summary
- *     written (`src/effort/collect.ts`);
+ *     written (`packages/rafa-effort/src/effort/collect.ts`);
  *   - `rafa loop start`, at the end of each task, through the one contact
  *     it makes for its run (`src/start.ts`);
  *
@@ -21,7 +21,7 @@
  * action beyond a state that reads without throwing.
  *
  * The `service` strategy is the `hub-down-sync` module under
- * `src/modules/testdata/`, loaded through `modules:` and `allowList:`:
+ * `packages/rafa/src/modules/testdata/`, loaded through `modules:` and `allowList:`:
  * its push and pull each log their direction to `.rafa/sync-calls.log`
  * and reject as a hub that cannot be reached. So the log counts the
  * contacts a command made, and each case reads the unreachable line
@@ -43,9 +43,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { hubUnreachableLine } from '../effort/sync/contact.js';
+import { hubUnreachableLine } from '@open-tomato/rafa-effort/effort/sync/contact';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { BASE, NEXT_ISSUE, NEXT_TITLE, ROADMAP_ISSUE, writeStandInGh } from './next-chain-fixtures.js';
@@ -59,7 +60,7 @@ afterAll(() => {
 });
 
 /** The module whose `service` strategy never reaches its hub. */
-const HUB_DOWN_MODULE = fileURLToPath(new URL('../modules/testdata/hub-down-sync', import.meta.url));
+const HUB_DOWN_MODULE = fileURLToPath(new URL('../../packages/rafa/src/modules/testdata/hub-down-sync', import.meta.url));
 
 /** The hub the `service` configs name: a port nothing listens on, never dialled by the fixture. */
 const HUB_URL = 'http://127.0.0.1:9';

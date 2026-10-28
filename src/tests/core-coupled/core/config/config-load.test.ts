@@ -1,7 +1,9 @@
 /**
  * Tests for the disk half of the config: reading one YAML file, and
- * loading each scope's one file through the home seam, a module file
- * (`rafa.config.ts`, `rafa.config.mjs`) ahead of the YAML file.
+ * loading each scope's two files through the home seam, its YAML file
+ * read over its module file (`rafa.config.ts`, `rafa.config.mjs`) as the
+ * local layer, and reading the project's two files alone
+ * (`readProjectScope`).
  *
  * Every case plants its project root and its home side by side under
  * this file's temporary root, and none reads the real home: `loadConfig`
@@ -12,11 +14,11 @@
  *
  * Precedence over every setting at once is `config.test.ts`'s, driven
  * through the pure `resolveConfig`. What is pinned here is the wiring:
- * which file each scope is read from, which layer it lands in, the order
- * the two are judged in, and that a root that is the home is read once.
- * Each layering case plants values that DIFFER between the user file,
- * the project file and the default, so a loader that swapped the two
- * files, or dropped one, answers something else.
+ * which files each scope is read from, which layer each lands in, the
+ * order the four are judged in, and that a root that is the home is
+ * read once. Each layering case plants values that DIFFER between the
+ * files and the default, so a loader that swapped two files, or dropped
+ * one, answers something else.
  *
  * Every refusal and every exclusion is paired with the acceptance that
  * makes it a reading: the user file judged first beside the same
@@ -25,9 +27,12 @@
  * resolving with one, a home read once beside the same text read from
  * two directories, a `flows` refused in the user layer beside the same
  * key warned about in the project's, a value import refused beside the
- * same file importing types alone, a shadowed YAML file beside the same
- * file read where no module file stands, and a duplicate refused at
- * `error` beside the same file warning at the default.
+ * same file importing types alone, a YAML file's key outranking a
+ * module file's beside the same module file answering it alone, a
+ * module file judged before its YAML file beside the same YAML file
+ * refused under a usable module file, a duplicate refused at `error`
+ * beside the same file warning at the default, and `readProjectScope`
+ * calling no hook beside `loadConfig` calling it over the same root.
  *
  * Module files are planted at a path no other case uses: `import()`
  * keeps a module per path and content, so a case reusing a path would
@@ -36,7 +41,8 @@
  *
  * Eighteen mutations of `config-load.ts` were driven against this file,
  * one at a time, each an exact string found once, with the module
- * restored sha256-identical after. Seventeen reddened at least one case:
+ * restored sha256-identical after, while each scope was read from one
+ * file. Seventeen reddened at least one case:
  * no `false` set back, no later entry wiping it, every `false` at a map
  * id set back, none set back, the user file's
  * duplicate level over the project's, `flows` let into the user layer,
@@ -46,7 +52,18 @@
  * an unreadable file, `error` ignored, the project scope judged first,
  * and a YAML file read as merged entries. The green one turns off the
  * refusal on a schema issue, which no file reaches; the module note of
- * `config-load.ts` argues it.
+ * `config-load.ts` argues it. The two on the shadowed file struck code
+ * since retired, and the four on `false` and the entry recorded strike
+ * `config-load-module.ts` now.
+ *
+ * Seven more were driven the same way when each scope came to be read
+ * from two places, against this file and `config-load-templates.test.ts`
+ * together, and all seven reddened at least one case: the project's two
+ * files handed to `resolveConfig` swapped, its YAML file dropped, the
+ * user scope's YAML file dropped, a scope's YAML file judged before its
+ * module file, the project's module file's `merge.duplicates` over its
+ * YAML file's, and `readProjectScope` skipping the duplicate level or
+ * answering its two files swapped.
  *
  * The settings are the sections `src/config-registry.ts` registers when
  * it is imported, as this file imports it. That import also sets the
@@ -78,15 +95,15 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { activeLoggerSettings, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { ConfigError } from '@open-tomato/rafa/core/config/config';
-import { loadConfig, readConfigFile } from '@open-tomato/rafa/core/config/config-load';
+import { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/config-load';
 import { activeConfigLoadHook, setConfigLoadHook } from '@open-tomato/rafa/core/config/section';
 import { setActiveOutput } from '@open-tomato/rafa/core/output/active';
 import { activeStoreSettings, setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
-import { activeLoggerSettings, setActiveLoggerSettings } from '../../../../adapters/logger/settings.js';
 import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
-import { sinkOutput } from '../../../output-sinks.js';
 
 /** Chmod cannot deny a read to root; see the unreadable-file cases. */
 const isRoot = process.getuid?.() === 0;
@@ -286,7 +303,7 @@ describe('loadConfig over YAML files', () => {
     expect(resolved.config).toEqual({ ...CONFIG_DEFAULTS });
     expect(resolved.sources).toEqual(sourcesWith({}));
     expect(Object.values(resolved.provenance).every((origin) => origin === null)).toBe(true);
-    expect([resolved.path, resolved.userPath, resolved.shadowed]).toEqual([null, null, []]);
+    expect([resolved.path, resolved.localPath, resolved.userPath, resolved.userLocalPath]).toEqual([null, null, null, null]);
     expect(lines).toEqual([]);
     expect([readdirSync(roots.root), readdirSync(roots.home)]).toEqual([[], []]);
   });
@@ -319,7 +336,7 @@ describe('loadConfig over YAML files', () => {
     );
 
     expect([omitting.config.effortSync, omitting.sources.effortSync]).toEqual(['file', 'user']);
-    expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
+    expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'local']);
   });
 
   it('leaves the store settings as they were when it refuses a file', async () => {
@@ -348,11 +365,11 @@ describe('loadConfig over YAML files', () => {
       settingSources: ['user'],
     });
     expect(resolved.sources).toEqual(sourcesWith({
-      store: 'file',
+      store: 'local',
       inject: 'cli',
-      settingSources: 'file',
+      settingSources: 'local',
     }));
-    expect(resolved.path).toBe(literalPath(roots.root));
+    expect([resolved.localPath, resolved.path]).toEqual([literalPath(roots.root), null]);
     expect([resolved.provenance.store, resolved.provenance.inject, resolved.provenance.planDir])
       .toEqual([{ file: literalPath(roots.root), entry: 0 }, null, null]);
   });
@@ -363,10 +380,10 @@ describe('loadConfig over YAML files', () => {
 
     expect(resolved.config).toEqual({ ...CONFIG_DEFAULTS, store: 'ndjson' });
     expect(resolved.sources).toEqual(sourcesWith({ store: 'user' }));
-    expect(resolved.userPath).toBe(literalPath(roots.home));
-    expect(resolved.userPath?.startsWith(`${tempRoot}/`)).toBe(true);
+    expect([resolved.userLocalPath, resolved.userPath]).toEqual([literalPath(roots.home), null]);
+    expect(resolved.userLocalPath?.startsWith(`${tempRoot}/`)).toBe(true);
     expect(resolved.provenance.store).toEqual({ file: literalPath(roots.home), entry: 0 });
-    expect(resolved.path).toBeNull();
+    expect([resolved.localPath, resolved.path]).toEqual([null, null]);
 
     // The control: the same root under another home answers the default,
     // so it was the home handed in that answered above.
@@ -382,7 +399,7 @@ describe('loadConfig over YAML files', () => {
 
     expect(existsSync(root)).toBe(false);
     expect(resolved.sources.store).toBe('user');
-    expect(resolved.userPath).toBe(literalPath(home));
+    expect(resolved.userLocalPath).toBe(literalPath(home));
   });
 
   it('lets the project file outrank the user file key by key, each over the default', async () => {
@@ -400,10 +417,10 @@ describe('loadConfig over YAML files', () => {
     });
     expect(resolved.sources).toEqual(sourcesWith({
       store: 'user',
-      inject: 'file',
+      inject: 'local',
       planDir: 'user',
     }));
-    expect([resolved.path, resolved.userPath])
+    expect([resolved.localPath, resolved.userLocalPath])
       .toEqual([literalPath(roots.root), literalPath(roots.home)]);
   });
 
@@ -415,7 +432,7 @@ describe('loadConfig over YAML files', () => {
     expect(flagged.config.planDir).toBe('cli-plans');
     expect(flagged.sources.planDir).toBe('cli');
     expect(unflagged.config.planDir).toBe('project-plans');
-    expect(unflagged.sources.planDir).toBe('file');
+    expect(unflagged.sources.planDir).toBe('local');
   });
 
   it('keeps a false as a value, where the merge would remove the key', async () => {
@@ -423,7 +440,7 @@ describe('loadConfig over YAML files', () => {
     const resolved = await loadConfig(roots, {}, quiet);
 
     expect(CONFIG_DEFAULTS.statusNotice).toBe(true);
-    expect([resolved.config.statusNotice, resolved.sources.statusNotice]).toEqual([false, 'file']);
+    expect([resolved.config.statusNotice, resolved.sources.statusNotice]).toEqual([false, 'local']);
   });
 
   it('warns about the user file unknown keys before the project file, naming each file', async () => {
@@ -434,8 +451,8 @@ describe('loadConfig over YAML files', () => {
     expect(lines).toHaveLength(2);
     expect(lines[0]).toStartWith(warningAbout('nonesuch', literalPath(roots.home)));
     expect(lines[1]).toStartWith(warningAbout('plan.depth', literalPath(roots.root)));
-    expect(resolved.userExtras).toEqual([{ key: 'nonesuch', value: 'a' }]);
-    expect(resolved.extras).toEqual([{ key: 'plan.depth', value: 3 }]);
+    expect(resolved.userLocalExtras).toEqual([{ key: 'nonesuch', value: 'a' }]);
+    expect(resolved.localExtras).toEqual([{ key: 'plan.depth', value: 3 }]);
   });
 
   it('writes through the active output warn by default, and nothing through console.warn', async () => {
@@ -499,7 +516,7 @@ describe('loadConfig over YAML files', () => {
     // The control: a usable user value under the same project file is
     // outranked by it, and the run resolves.
     const usable = scopes('store: ndjson\n', 'store: sqlite\n');
-    expect((await loadConfig(usable, {}, quiet)).sources.store).toBe('file');
+    expect((await loadConfig(usable, {}, quiet)).sources.store).toBe('local');
   });
 
   it('refuses a line indented with a tab before the parser reads it', async () => {
@@ -570,15 +587,15 @@ describe('loadConfig over YAML files', () => {
     const once = sink();
     const resolved = await loadConfig({ root: dir, home: dir }, {}, once.warn);
 
-    expect(resolved.sources.store).toBe('file');
-    expect([resolved.path, resolved.userPath]).toEqual([literalPath(dir), null]);
+    expect(resolved.sources.store).toBe('local');
+    expect([resolved.localPath, resolved.userLocalPath]).toEqual([literalPath(dir), null]);
     expect(once.lines).toHaveLength(1);
 
     // The control: the same text in two directories is read twice.
     const twice = sink();
     const both = await loadConfig(scopes(text, text), {}, twice.warn);
-    expect(both.sources.store).toBe('file');
-    expect(both.userPath).not.toBeNull();
+    expect(both.sources.store).toBe('local');
+    expect(both.userLocalPath).not.toBeNull();
     expect(twice.lines).toHaveLength(2);
   });
 
@@ -589,7 +606,7 @@ describe('loadConfig over YAML files', () => {
     const { lines, warn } = sink();
     const resolved = await loadConfig({ root, home }, {}, warn);
 
-    expect(resolved.userPath).toBeNull();
+    expect(resolved.userLocalPath).toBeNull();
     expect(lines).toHaveLength(1);
     expect(lines[0]).toStartWith(warningAbout('nonesuch', literalPath(root)));
   });
@@ -644,7 +661,7 @@ describe('loadConfig over module files', () => {
     const resolved = await loadConfig(roots, {}, quiet);
 
     expect([resolved.config.store, resolved.config.planDir]).toEqual(['ndjson', 'project-plans']);
-    expect([resolved.sources.store, resolved.sources.planDir]).toEqual(['user', 'file']);
+    expect([resolved.sources.store, resolved.sources.planDir]).toEqual(['user', 'local']);
     expect(resolved.userPath).toBe(userPath);
     expect(resolved.provenance.store).toEqual({ file: userPath, entry: 0 });
   });
@@ -743,34 +760,154 @@ describe('loadConfig over module files', () => {
 });
 
 describe('loadConfig with a scope holding both files', () => {
-  it('reads the module file alone, names the YAML file shadowed and warns about it once', async () => {
-    const roots = scopes('store: ndjson\n', null);
-    const ts = write(projectModulePath(roots.root), moduleText([{ plan: { dir: 'ts-plans' } }]));
+  it('reads the YAML file over the module file key by key, naming the YAML file at entry 0 and warning about neither', async () => {
+    const roots = scopes('store: ndjson\npr:\n  base: yaml-base\n', null);
+    const yaml = literalPath(roots.root);
+    const ts = write(projectModulePath(roots.root), moduleText([{ plan: { dir: 'ts-plans' } }, { pr: { base: 'ts-base' } }]));
     const { lines, warn } = sink();
     const resolved = await loadConfig(roots, {}, warn);
 
-    expect([resolved.config.store, resolved.sources.store]).toEqual([CONFIG_DEFAULTS.store, 'default']);
-    expect(resolved.config.planDir).toBe('ts-plans');
-    expect(resolved.shadowed).toEqual([{ layer: 'project', path: literalPath(roots.root), by: ts }]);
-    expect(lines).toEqual([
-      `rafa config: ${literalPath(roots.root)} is not read: ${ts} holds the project scope's config, `
-        + 'so move its keys into rafa.config.ts and remove it',
-    ]);
-    expect(resolved.warnings).toEqual(lines);
+    expect([resolved.config.prBase, resolved.sources.prBase, resolved.provenance.prBase])
+      .toEqual(['yaml-base', 'local', { file: yaml, entry: 0 }]);
+    expect([resolved.config.store, resolved.sources.store]).toEqual(['ndjson', 'local']);
+    expect([resolved.config.planDir, resolved.sources.planDir, resolved.provenance.planDir])
+      .toEqual(['ts-plans', 'file', { file: ts, entry: 0 }]);
+    expect([resolved.localPath, resolved.path]).toEqual([yaml, ts]);
+    expect(lines).toEqual([]);
+    expect(resolved.warnings).toEqual([]);
 
-    // The control: the same YAML file with no module file beside it is
-    // read, and shadows nothing.
-    const alone = await loadConfig(scopes('store: ndjson\n', null), {}, quiet);
-    expect([alone.config.store, alone.shadowed]).toEqual(['ndjson', []]);
+    // The control: the same module file with no YAML file beside it
+    // answers its own pr.base, so the YAML file's outranked it above.
+    const alone = freshDir('ts-alone');
+    const aloneTs = write(projectModulePath(alone), moduleText([{ plan: { dir: 'ts-plans' } }, { pr: { base: 'ts-base' } }]));
+    const fromModule = await loadConfig({ root: alone, home: freshDir('home') }, {}, quiet);
+    expect([fromModule.config.prBase, fromModule.sources.prBase, fromModule.provenance.prBase])
+      .toEqual(['ts-base', 'file', { file: aloneTs, entry: 1 }]);
   });
 
-  it('names a user scope YAML file a user module file shadows', async () => {
-    const roots = scopes(null, 'store: ndjson\n');
-    const mjs = write(userModulePath(roots.home, 'rafa.config.mjs'), moduleText([{ plan: { dir: 'user-plans' } }]));
-    const resolved = await loadConfig(roots, {}, quiet);
+  it('reads a user scope YAML file over a user module file, both reporting user and each naming its own file', async () => {
+    const roots = scopes(null, 'store: ndjson\nplan:\n  dir: yaml-plans\n');
+    const yaml = literalPath(roots.home);
+    const mjs = write(userModulePath(roots.home, 'rafa.config.mjs'), moduleText([{ plan: { dir: 'user-plans' }, pr: { base: 'mjs-base' } }]));
+    const { lines, warn } = sink();
+    const resolved = await loadConfig(roots, {}, warn);
 
-    expect(resolved.shadowed).toEqual([{ layer: 'user', path: literalPath(roots.home), by: mjs }]);
-    expect([resolved.config.store, resolved.config.planDir]).toEqual([CONFIG_DEFAULTS.store, 'user-plans']);
+    expect([resolved.config.planDir, resolved.sources.planDir, resolved.provenance.planDir])
+      .toEqual(['yaml-plans', 'user', { file: yaml, entry: 0 }]);
+    expect([resolved.config.prBase, resolved.sources.prBase, resolved.provenance.prBase])
+      .toEqual(['mjs-base', 'user', { file: mjs, entry: 0 }]);
+    expect([resolved.config.store, resolved.sources.store]).toEqual(['ndjson', 'user']);
+    expect([resolved.userLocalPath, resolved.userPath]).toEqual([yaml, mjs]);
+    expect(lines).toEqual([]);
+  });
+
+  it('judges the module file before the YAML file of its scope', async () => {
+    const roots = scopes('plan:\n  inject: bogus\n', null);
+    const ts = write(projectModulePath(roots.root), moduleText([{ store: 'postgres' }]));
+
+    expect((await refusal(() => loadConfig(roots, {}, quiet))).problems).toEqual([
+      `${ts}: store is "postgres", expected one of: sqlite, ndjson`,
+    ]);
+
+    // The control: the same YAML file beside a usable module file is
+    // refused on its own, so its problem was there to be named above.
+    const usable = scopes('plan:\n  inject: bogus\n', null);
+    write(projectModulePath(usable.root), moduleText([{ store: 'ndjson' }]));
+    expect((await refusal(() => loadConfig(usable, {}, quiet))).problems).toEqual([
+      `${literalPath(usable.root)}: plan.inject is "bogus", expected one of: full, stage, task`,
+    ]);
+  });
+
+  it('lets the YAML file\'s merge.duplicates outrank the module file\'s', async () => {
+    const roots = scopes('merge:\n  duplicates: allow\n', null);
+    write(projectModulePath(roots.root), moduleText([
+      { merge: { duplicates: 'error' } },
+      { pr: { base: 'first' } },
+      { pr: { base: 'second' } },
+    ]));
+    const { lines, warn } = sink();
+    const resolved = await loadConfig(roots, {}, warn);
+
+    expect(resolved.config.prBase).toBe('second');
+    expect(duplicateLines(lines)).toEqual([]);
+
+    // The control: the same module file alone refuses at its own level.
+    const alone = freshDir('ts-duplicate-error');
+    write(projectModulePath(alone), moduleText([
+      { merge: { duplicates: 'error' } },
+      { pr: { base: 'first' } },
+      { pr: { base: 'second' } },
+    ]));
+    expect((await refusal(() => loadConfig({ root: alone, home: freshDir('home') }, {}, quiet))).problems).toHaveLength(1);
+  });
+});
+
+describe('readProjectScope', () => {
+  it('answers the project\'s two files, each with its templates laid under it, unranked', async () => {
+    const roots = scopes('pr:\n  base: stretch/9\n', 'store: ndjson\n');
+    const ts = write(projectModulePath(roots.root), moduleText([{ templates: ['escalation'], pr: { base: 'trunk' } }]));
+    const { local, file } = await readProjectScope(roots.root);
+
+    expect([local?.path, local?.values.prBase, local?.values.checksTask]).toEqual([literalPath(roots.root), 'stretch/9', undefined]);
+    expect([file?.path, file?.values.prBase, file?.values.checksTask]).toEqual([ts, 'trunk', ['affected']]);
+    expect(file?.templates?.get('checksTask')).toBe('escalation');
+    // No user scope: the home's store is no file's value here.
+    expect([local?.values.store, file?.values.store]).toEqual([undefined, undefined]);
+  });
+
+  it('answers null for each file a project root does not hold', async () => {
+    const { root } = scopes(null, null);
+    const yamlOnly = scopes('store: ndjson\n', null);
+
+    expect(await readProjectScope(root)).toEqual({ local: null, file: null });
+    const read = await readProjectScope(yamlOnly.root);
+    expect([read.local?.values.store, read.file]).toEqual(['ndjson', null]);
+  });
+
+  it('calls no load hook, prints no warning and leaves the store settings as they were', async () => {
+    const held = activeConfigLoadHook();
+    const events: unknown[] = [];
+    const routed: string[] = [];
+    const roots = scopes('effort:\n  busyTimeoutMs: 250\nnonesuch: 1\n', null);
+    try {
+      setConfigLoadHook((config) => events.push(config.effortBusyTimeoutMs));
+      setActiveOutput(sinkOutput({ warn: (message) => routed.push(message) }));
+      setActiveStoreSettings({ busyTimeoutMs: 60_000 });
+      const { local } = await readProjectScope(roots.root);
+
+      expect([events, routed, activeStoreSettings().busyTimeoutMs]).toEqual([[], [], 60_000]);
+      expect(local?.extras).toEqual([{ key: 'nonesuch', value: 1 }]);
+
+      // The control: loadConfig over the same root calls the hook, warns
+      // and hands the store its timeout, so each reading above could fail.
+      await loadConfig(roots);
+      expect([events, routed.length, activeStoreSettings().busyTimeoutMs]).toEqual([[250], 1, 250]);
+    } finally {
+      setConfigLoadHook(held);
+      setActiveOutput(null);
+      setActiveStoreSettings(null);
+    }
+  });
+
+  it('refuses a file loadConfig refuses, naming it', async () => {
+    const roots = scopes('store: postgres\n', null);
+
+    expect((await refusal(() => readProjectScope(roots.root))).problems).toEqual([
+      `${literalPath(roots.root)}: store is "postgres", expected one of: sqlite, ndjson`,
+    ]);
+  });
+
+  it('refuses a key set twice in one file at merge.duplicates error, and reads it at the default', async () => {
+    const entries = [{ pr: { base: 'first' } }, { pr: { base: 'second' } }];
+    const refused = scopes('merge:\n  duplicates: error\n', null);
+    const ts = write(projectModulePath(refused.root), moduleText(entries));
+    const warned = freshDir('ts-duplicate-default');
+    write(projectModulePath(warned), moduleText(entries));
+
+    expect((await refusal(() => readProjectScope(refused.root))).problems).toEqual([
+      `${ts}: pr.base is set more than once within one layer: layer "project" (entries 0, 1)`,
+    ]);
+    expect((await readProjectScope(warned)).file?.values.prBase).toBe('second');
   });
 });
 

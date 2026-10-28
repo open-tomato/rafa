@@ -1,8 +1,8 @@
 /**
  * A scratch-repo integration suite for the release stage
- * (`src/start/release-stage.ts`), run end to end.
+ * (`packages/rafa-run/src/start/release-stage.ts`), run end to end.
  *
- * `src/start/release-stage.test.ts` drives the stage through a full stub
+ * `src/tests/run-coupled/start/release-stage.test.ts` drives the stage through a full stub
  * of its seams — no git, no store, no clock is reached there, by design,
  * so a case pins the ORDER and the ARGV of every effect against a
  * scripted answer. This file is the complementary reading: a real
@@ -27,11 +27,11 @@
  * the base bumped by that level, with the level report beside it.
  */
 import type { CapturedRun } from './cli-capture.js';
-import type { GitRunner, PrProviderReading } from '../pr/index.js';
-import type { ReleaseLevelSource } from '../release/level.js';
-import type { ReleasePreparation } from '../release/prepare.js';
-import type { ReleaseFinish, ReleaseStageSettings } from '../start/release-stage.js';
 import type { ReportChange } from '@open-tomato/rafa/report/parse';
+import type { GitRunner, PrProviderReading } from '@open-tomato/rafa-pr/pr/index';
+import type { ReleaseLevelSource } from '@open-tomato/rafa-release/release/level';
+import type { ReleasePreparation } from '@open-tomato/rafa-release/release/prepare';
+import type { ReleaseFinish, ReleaseStageSettings } from '@open-tomato/rafa-run/start/release-stage';
 
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -43,14 +43,13 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { RELEASE_AUTO } from '@open-tomato/rafa/core/config/sections';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
-
-import { createFakePrGh } from '../pr/gh-fake.js';
-import { createGhPullRequests, createGitRunner } from '../pr/index.js';
-import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests, createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { finishRelease, prepareReleaseStage } from '@open-tomato/rafa-run/start/release-stage';
 
 import { expectExit } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The branch this suite checks out its release from. */
 const BRANCH = 'feat/scratch-release-e2e';
@@ -59,12 +58,12 @@ const BRANCH = 'feat/scratch-release-e2e';
  * The provider reading the body cases run under.
  *
  * A scratch repository's `origin` is a filesystem path, which reads as
- * NOT GitHub (`src/pr/provider.ts`), so the default seam would resolve
+ * NOT GitHub (`packages/rafa/src/pr/provider.ts`), so the default seam would resolve
  * `none` here and the stage would build no provider at all — which is a
  * reading about this planting, not about the write these cases measure.
  * `source: 'config'` is how a repository whose origin says nothing still
  * gets `gh`, and the remote and host go unread on this path. Whether the
- * reading itself is right is `src/start/release-stage.test.ts`'s
+ * reading itself is right is `src/tests/run-coupled/start/release-stage.test.ts`'s
  * question.
  */
 const GH_READING: PrProviderReading = { provider: 'gh', source: 'config', remote: null, host: null };
@@ -248,9 +247,9 @@ const SYSTEM_PATH = ['/usr/bin', '/bin'].join(delimiter);
  * from this file's own URL rather than from `process.cwd()`, since the
  * script it writes sits outside this repository's own tree.
  */
-const RELEASE_STAGE_MODULE = fileURLToPath(new URL('../start/release-stage.ts', import.meta.url));
+const RELEASE_STAGE_MODULE = fileURLToPath(new URL('../../packages/rafa-run/src/start/release-stage.ts', import.meta.url));
 const OUTPUT_ACTIVE_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa/core/output'));
-const OUTPUT_SINKS_MODULE = fileURLToPath(new URL('./output-sinks.ts', import.meta.url));
+const OUTPUT_SINKS_MODULE = fileURLToPath(import.meta.resolve('@open-tomato/rafa/tests/output-sinks'));
 
 /**
  * A standalone script that calls the real `finishRelease` and prints the
@@ -492,7 +491,7 @@ describe('the release stage over a scratch repository', () => {
 });
 
 /**
- * The provider gate (`src/start/release-stage.ts`'s module note, "Which
+ * The provider gate (`packages/rafa-run/src/start/release-stage.ts`'s module note, "Which
  * provider is asked") against a REAL `gh`, rather than the scripted or
  * faked one every other case in this file drives it through: a `gh`
  * stub first on the `PATH` a FRESH process is born with, over

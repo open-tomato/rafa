@@ -1,0 +1,454 @@
+/**
+ * The writes and one read made on an issue: the comments of an issue,
+ * a comment posted, a comment edited, one label swapped for another,
+ * one label put on, one label taken off, an issue closed with a reason and a comment, a
+ * label created in the repository, an issue created with its labels, and
+ * a pull request closed with a comment.
+ *
+ * The readiness gate's not-ready branch posts the planner's gaps as one
+ * comment, edits that comment on a rerun, and swaps `spec:ready` for
+ * `spec:needs-work` (`.rafa/specs/rafa-20-pr-commands.md`). Those are the
+ * only board operations it makes, and this is the seam they go through:
+ * {@link IssueBoard} is the interface the gate is written against, and
+ * {@link createGhIssueBoard} is the one implementation, over the
+ * {@link GhRunner} declared in `packages/rafa-board/src/adapters/tracker/github.ts` and
+ * taken by the pull request provider (`packages/rafa-pr/src/pr/gh.ts`) and the trust
+ * reading (`./trust.ts`) already.
+ * Where a board is built for label writes, it is usually built wrapped
+ * (`./project/issue-board-refresh.ts`): the same commands, each label
+ * write followed by a refresh of the issue on the project.
+ *
+ * {@link IssueBoard.removeLabel} is the one member no gate run reaches:
+ * it is here for the unblock run, which takes `spec:blocked` off an
+ * issue whose blockers have all closed (`./blocked.ts`,
+ * `.rafa/specs/rafa-63-one-command-next-step.md`) and adds nothing. A
+ * caller passing an empty string through `swapLabels` instead would
+ * send `gh issue edit <n> --remove-label spec:blocked --add-label`,
+ * whose trailing flag takes the next word or none, so the removal-only
+ * write is a member of its own rather than a special case of the swap.
+ *
+ * {@link IssueBoard.addLabel} is the same reasoning the other way round:
+ * a claim's issue takes `rafa:claimed` at `plan create` with nothing
+ * taken off (`.rafa/plans/rafa-324-claim-issue-so-two`), and an empty
+ * string through `swapLabels` would leave `--remove-label` taking the
+ * next word as its value, so the addition-only write is its own member.
+ *
+ * Nothing here spawns, so every case in `./issue-board.test.ts` drives a
+ * runner of its own and none of them reaches GitHub or reads the
+ * configuration `gh` keeps under the home.
+ *
+ * {@link IssueBoard.closeIssue} and {@link IssueBoard.createLabel} are
+ * for the epic lifecycle (`.rafa/plans/rafa-246-epic-lifecycle`): an
+ * epic closes or is cancelled through one `gh issue close` carrying its
+ * reason and its trail comment together, so the issue never closes
+ * without the comment saying why, and `rafa epic new` creates the
+ * `epic:<slug>` label its epic will carry. {@link IssueBoard.createIssue}
+ * is `rafa epic new`'s too: the epic issue, created with its labels in the
+ * same command, so it never stands on the board unlabelled.
+ * {@link IssueBoard.closePullRequest} is `rafa epic defer`'s: a no to
+ * keeping a deferred epic's open work closes each of its pull requests
+ * with a comment naming the deferral, in one `gh pr close`. It never
+ * sends `--delete-branch`, so the branch outlives the pull request.
+ *
+ * ## Why not the Tracker port
+ *
+ * `Tracker` (`packages/rafa/src/ports/index.ts`) carries `comment`, and nothing else
+ * this needs: it lists no comments, so the marker comment to edit cannot
+ * be found through it, it edits none, and it moves no labels — its
+ * `create` makes labels and its `transition` opens and closes an issue.
+ * Widening a copied port for one command's gate would change a shape
+ * open-tomato owns, so the gate takes this narrow interface instead and
+ * a later phase can fold it into the port if a second caller wants it.
+ *
+ * ## The commands
+ *
+ * | Member | Command |
+ * |---|---|
+ * | `comments` | `gh api repos/{owner}/{repo}/issues/<n>/comments` |
+ * | `comment` | `gh api repos/{owner}/{repo}/issues/<n>/comments -X POST -f body=<body>` |
+ * | `editComment` | `gh api repos/{owner}/{repo}/issues/comments/<id> -X PATCH -f body=<body>` |
+ * | `swapLabels` | `gh issue edit <n> --remove-label <removed> --add-label <added>` |
+ * | `addLabel` | `gh issue edit <n> --add-label <label>` |
+ * | `removeLabel` | `gh issue edit <n> --remove-label <label>` |
+ * | `closeIssue` | `gh issue close <n> --reason=<reason> --comment=<comment>` |
+ * | `createLabel` | `gh label create <name> --description=<description>` |
+ * | `createIssue` | `gh issue create --title=<title> --body=<body> --label=<label>…` |
+ * | `closePullRequest` | `gh pr close <n> --comment=<comment>` |
+ *
+ * The close reason is one of {@link CLOSE_REASONS}, the two `gh issue
+ * close --reason` accepts, and the comment must be non-empty, since
+ * every change leaves a comment; a pull request close is held to the
+ * same non-empty comment. The comment, the reason and the label
+ * description are sent in the `--flag=value` form, so free text opening
+ * with `-` is the flag's value and never read as a flag of its own; a
+ * label name is a positional and goes through the hyphen check below.
+ * What `gh label create` does with a name the repository already has
+ * was not measured here: it is sent without `--force`, so an existing
+ * label is never overwritten, and a failure is rejected to the caller.
+ * The issue's title, body and labels are all sent in that form too, and
+ * the issue is read off the URL `gh issue create` prints last
+ * ({@link CREATED_ISSUE_URL}, the pattern `./setup.ts` reads the new
+ * Roadmap issue off): an exit 0 printing no such URL is rejected, saying
+ * the issue may exist unrecorded, since it may. A title is refused blank
+ * or spanning lines.
+ *
+ * The comment paths are the REST ones the pull request provider reads
+ * and writes, for the reason it records: a pull request IS an issue to
+ * that endpoint, `gh pr view --json comments` carries the GraphQL node
+ * id where the PATCH path takes the REST id, and the REST resource
+ * answers the whole comment to a write. `{owner}/{repo}` is left for
+ * `gh` to expand from the directory its runner runs in, so no second
+ * source of truth for the repository can disagree with it.
+ *
+ * `--paginate` is not sent, so `comments` reads the first page, as the
+ * pull request provider does and for the same reason: the caller looks
+ * for a marker in the issue's own comments, and an issue with more than
+ * a page of them is not the case this gate is written for. A marker
+ * pushed off the first page costs a second comment, never a wrong one.
+ *
+ * The label swap is ONE `gh issue edit`, both labels in it, because two
+ * commands can half-apply: a removal that lands and an add that does not
+ * leaves the issue carrying neither label and the gate's report claiming
+ * both. What `gh` does with a label the issue does not carry was not
+ * measured — this repository's cases drive a runner, not a repository —
+ * and the gate does not depend on it: it swaps only after the label
+ * check has READ `spec:ready` off the issue, and a failed swap is
+ * reported by its caller rather than thrown past it.
+ *
+ * The removal sends the same `gh issue edit` with `--add-label` left
+ * out, so it half-applies nothing: there is one label in it. What `gh`
+ * does with a label the issue does not carry was not measured here
+ * either, and the unblock run does not depend on it for the same
+ * reason the gate does not: it removes only after having READ
+ * `spec:blocked` off the issue, and a failed removal is reported by its
+ * caller.
+ *
+ * The addition sends that edit with `--remove-label` left out, one label
+ * in it, so it half-applies nothing either. What `gh` does with a label
+ * the repository has not made, or one the issue already carries, was not
+ * measured here; the claim stage writes do not depend on it, since a
+ * label write there is best-effort and its failure is the caller's to
+ * report, never a reason to undo the claim.
+ *
+ * ## Arguments are checked before they reach `gh`
+ *
+ * An issue number must be a positive whole number and a label a
+ * non-empty string that does not open with `-`, or the member throws a
+ * `TypeError` and sends no command. A label opening with `-` would reach
+ * `gh` as a flag rather than as a value, and a number that is not one
+ * would reach the API path as a path segment of its own.
+ */
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+
+import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
+
+import { CREATED_ISSUE_URL } from './setup.js';
+
+/** What every refusal this module raises opens with. */
+const PREFIX = 'board issue';
+
+/** The repository placeholders `gh api` expands from the directory it runs in. */
+const REPO_PATH = '{owner}/{repo}';
+
+/** A comment id as the REST resource carries it: a whole number. */
+const COMMENT_ID = /^[1-9]\d*$/;
+
+/** The reasons `gh issue close --reason` accepts. */
+export const CLOSE_REASONS: readonly ['completed', 'not planned'] = Object.freeze(['completed', 'not planned'] as const);
+
+/** One of {@link CLOSE_REASONS}. */
+export type CloseReason = (typeof CLOSE_REASONS)[number];
+
+/** An issue {@link IssueBoard.createIssue} created. */
+export interface CreatedIssue {
+  readonly number: number;
+  /** The URL `gh issue create` printed. */
+  readonly url: string;
+}
+
+/** One comment on an issue: what the gate needs of it, and nothing more. */
+export interface BoardComment {
+  /** The REST id, as a string: what the edit path takes. */
+  readonly id: string;
+  /** The body as written. */
+  readonly body: string;
+  /** The login that wrote it, or the empty string when none was answered. */
+  readonly author: string;
+}
+
+/**
+ * The reads and writes the readiness gate makes on one issue. Every
+ * member rejects with an `Error` naming the command when `gh` failed or
+ * answered something else than the shape read here.
+ */
+export interface IssueBoard {
+  /** The issue's comments, oldest first, as GitHub orders them. */
+  readonly comments: (issue: number) => Promise<readonly BoardComment[]>;
+  /** Posts one comment and answers it. */
+  readonly comment: (issue: number, body: string) => Promise<BoardComment>;
+  /** Replaces one comment's body and answers it. */
+  readonly editComment: (id: string, body: string) => Promise<BoardComment>;
+  /** Takes `removed` off the issue and puts `added` on it, in one command. */
+  readonly swapLabels: (issue: number, removed: string, added: string) => Promise<void>;
+  /** Puts `label` on the issue and takes nothing off it. */
+  readonly addLabel: (issue: number, label: string) => Promise<void>;
+  /** Takes `label` off the issue and puts nothing on it. */
+  readonly removeLabel: (issue: number, label: string) => Promise<void>;
+  /** Closes the issue with `reason`, posting `comment` in the same command. */
+  readonly closeIssue: (issue: number, reason: CloseReason, comment: string) => Promise<void>;
+  /** Creates the label `name` in the repository, described by `description`. */
+  readonly createLabel: (name: string, description: string) => Promise<void>;
+  /** Creates an issue titled `title` with `body`, carrying every one of `labels`, and answers it. */
+  readonly createIssue: (title: string, body: string, labels: readonly string[]) => Promise<CreatedIssue>;
+  /** Closes the pull request, posting `comment` in the same command and deleting no branch. */
+  readonly closePullRequest: (pullRequest: number, comment: string) => Promise<void>;
+}
+
+/** What {@link createGhIssueBoard} is made with. */
+export interface GhIssueBoardOptions {
+  /** Runs every `gh` command the board sends. */
+  readonly gh: GhRunner;
+}
+
+/** What a failed command wrote, for a message. Never empty. */
+function detailOf(result: GhResult, command: string): string {
+  const written = result.stderr.trim() || result.stdout.trim();
+  return written === ''
+    ? `${command} failed and wrote nothing`
+    : `${command} failed: ${written}`;
+}
+
+/** The rejection a failed command raises. */
+function failure(command: string, result: GhResult): Error {
+  return new Error(`${PREFIX}: ${detailOf(result, command)}`);
+}
+
+/** The issue number `member` was handed, as an argument. */
+function issueNumber(value: number, member: string): string {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError(
+      `${PREFIX}: ${member} refused issue number ${describeValue(value)}, expected a positive whole number`,
+    );
+  }
+  return String(value);
+}
+
+/** The comment id `editComment` was handed, as a path segment. */
+function commentId(value: string): string {
+  if (typeof value !== 'string' || !COMMENT_ID.test(value)) {
+    throw new TypeError(
+      `${PREFIX}: editComment refused comment id ${describeValue(value)},`
+        + ' expected a positive whole number with no leading zero',
+    );
+  }
+  return value;
+}
+
+/** The body a write was handed. */
+function commentBody(value: string, member: string): string {
+  if (typeof value !== 'string') {
+    throw new TypeError(`${PREFIX}: ${member} refused a body ${describeValue(value)}, expected a string`);
+  }
+  return value;
+}
+
+/** The close reason `closeIssue` was handed. */
+function closeReason(value: CloseReason): CloseReason {
+  if (!(CLOSE_REASONS as readonly unknown[]).includes(value)) {
+    throw new TypeError(
+      `${PREFIX}: closeIssue refused reason ${describeValue(value)}, expected one of ${CLOSE_REASONS.join(', ')}`,
+    );
+  }
+  return value;
+}
+
+/** The close comment, which every close carries: a non-empty string. */
+function closeComment(value: string, member = 'closeIssue'): string {
+  if (commentBody(value, member).trim() === '') {
+    throw new TypeError(`${PREFIX}: ${member} refused an empty comment, every close leaves one`);
+  }
+  return value;
+}
+
+/** A label a write was handed; see the module note on the `-` check. */
+function labelName(value: string, member: string, what: string): string {
+  if (typeof value !== 'string' || value === '' || value.startsWith('-')) {
+    throw new TypeError(
+      `${PREFIX}: ${member} refused ${what} ${describeValue(value)},`
+        + ' expected a non-empty name that does not open with a hyphen',
+    );
+  }
+  return value;
+}
+
+/** The title `createIssue` was handed: one line holding some text. */
+function issueTitle(value: string): string {
+  if (typeof value !== 'string' || value.trim() === '' || /[\r\n]/u.test(value)) {
+    throw new TypeError(
+      `${PREFIX}: createIssue refused the title ${describeValue(value)}, expected one line holding some text`,
+    );
+  }
+  return value;
+}
+
+/** The issue `gh issue create` printed the URL of, last; see the module note. */
+function createdIssue(stdout: string): CreatedIssue {
+  const url = stdout.trim().split('\n')
+    .at(-1)
+    ?.trim() ?? '';
+  const number = CREATED_ISSUE_URL.exec(url)?.[1];
+  if (number === undefined) {
+    throw new Error(
+      `${PREFIX}: gh issue create exited 0 and printed no issue URL, so the issue may exist`
+        + ` unrecorded; it wrote ${describeValue(stdout)}`,
+    );
+  }
+  return Object.freeze({ number: Number(number), url });
+}
+
+/** What `command` wrote, parsed. Refuses, naming the command, when it is not JSON. */
+function parseJson(stdout: string, command: string): unknown {
+  try {
+    return JSON.parse(stdout) as unknown;
+  } catch (error) {
+    throw new Error(`${PREFIX}: ${command} wrote output that is not JSON: ${messageOf(error)}`, { cause: error });
+  }
+}
+
+/**
+ * One comment as the REST resource writes it. The id is taken as a
+ * number and spelled back as a string, because the path takes the REST
+ * id; the author is taken from `user.login` when there is one, and left
+ * empty rather than refused, since nothing the gate does depends on it.
+ */
+function readComment(value: unknown, command: string, where: string): BoardComment {
+  if (!isMapping(value)) {
+    throw new Error(`${PREFIX}: ${command} answered ${where} as ${describeValue(value)}, expected a mapping`);
+  }
+  const id = value['id'];
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
+    throw new Error(`${PREFIX}: ${command} answered ${where}.id as ${describeValue(id)}, expected a positive whole number`);
+  }
+  const body = value['body'];
+  if (typeof body !== 'string') {
+    throw new Error(`${PREFIX}: ${command} answered ${where}.body as ${describeValue(body)}, expected a string`);
+  }
+  const user = value['user'];
+  const login = isMapping(user)
+    ? user['login']
+    : null;
+  return {
+    id: String(id),
+    body,
+    author: typeof login === 'string'
+      ? login
+      : '',
+  };
+}
+
+/** Makes the `gh` issue board over `options.gh`; see the module note. */
+export function createGhIssueBoard(options: GhIssueBoardOptions): IssueBoard {
+  const { gh } = options;
+
+  /** What `args` wrote to stdout. Throws, naming `command`, when it failed. */
+  async function succeed(args: readonly string[], command: string): Promise<string> {
+    const result = await gh(args);
+    if (!result.ok) throw failure(command, result);
+    return result.stdout;
+  }
+
+  const commentsPath = (number: string): string => `repos/${REPO_PATH}/issues/${number}/comments`;
+
+  const board: IssueBoard = {
+    comments: async (issue: number): Promise<readonly BoardComment[]> => {
+      const path = commentsPath(issueNumber(issue, 'comments'));
+      const command = `gh api ${path}`;
+      const rows = parseJson(await succeed(['api', path], command), command);
+      if (!Array.isArray(rows)) {
+        throw new Error(`${PREFIX}: ${command} answered ${describeValue(rows)}, expected a list of comments`);
+      }
+      return (rows as readonly unknown[]).map((row, index) => readComment(row, command, `comment ${String(index)}`));
+    },
+
+    comment: async (issue: number, body: string): Promise<BoardComment> => {
+      const path = commentsPath(issueNumber(issue, 'comment'));
+      const text = commentBody(body, 'comment');
+      const command = `gh api -X POST ${path}`;
+      const stdout = await succeed(['api', path, '-X', 'POST', '-f', `body=${text}`], command);
+      return readComment(parseJson(stdout, command), command, 'the comment');
+    },
+
+    editComment: async (id: string, body: string): Promise<BoardComment> => {
+      const path = `repos/${REPO_PATH}/issues/comments/${commentId(id)}`;
+      const text = commentBody(body, 'editComment');
+      const command = `gh api -X PATCH ${path}`;
+      const stdout = await succeed(['api', path, '-X', 'PATCH', '-f', `body=${text}`], command);
+      return readComment(parseJson(stdout, command), command, 'the comment');
+    },
+
+    swapLabels: async (issue: number, removed: string, added: string): Promise<void> => {
+      const number = issueNumber(issue, 'swapLabels');
+      const off = labelName(removed, 'swapLabels', 'the removed label');
+      const on = labelName(added, 'swapLabels', 'the added label');
+      await succeed(
+        ['issue', 'edit', number, '--remove-label', off, '--add-label', on],
+        `gh issue edit ${number} --remove-label ${off} --add-label ${on}`,
+      );
+    },
+
+    addLabel: async (issue: number, label: string): Promise<void> => {
+      const number = issueNumber(issue, 'addLabel');
+      const on = labelName(label, 'addLabel', 'the label');
+      await succeed(
+        ['issue', 'edit', number, '--add-label', on],
+        `gh issue edit ${number} --add-label ${on}`,
+      );
+    },
+
+    removeLabel: async (issue: number, label: string): Promise<void> => {
+      const number = issueNumber(issue, 'removeLabel');
+      const off = labelName(label, 'removeLabel', 'the label');
+      await succeed(
+        ['issue', 'edit', number, '--remove-label', off],
+        `gh issue edit ${number} --remove-label ${off}`,
+      );
+    },
+
+    closeIssue: async (issue: number, reason: CloseReason, comment: string): Promise<void> => {
+      const number = issueNumber(issue, 'closeIssue');
+      const why = closeReason(reason);
+      const text = closeComment(comment);
+      await succeed(
+        ['issue', 'close', number, `--reason=${why}`, `--comment=${text}`],
+        `gh issue close ${number} --reason=${why}`,
+      );
+    },
+
+    createLabel: async (name: string, description: string): Promise<void> => {
+      const label = labelName(name, 'createLabel', 'the label');
+      const text = commentBody(description, 'createLabel');
+      await succeed(
+        ['label', 'create', label, `--description=${text}`],
+        `gh label create ${label}`,
+      );
+    },
+
+    createIssue: async (title: string, body: string, labels: readonly string[]): Promise<CreatedIssue> => {
+      const heading = issueTitle(title);
+      const text = commentBody(body, 'createIssue');
+      const names = labels.map((label) => labelName(label, 'createIssue', 'the label'));
+      const stdout = await succeed(
+        ['issue', 'create', `--title=${heading}`, `--body=${text}`, ...names.map((name) => `--label=${name}`)],
+        'gh issue create',
+      );
+      return createdIssue(stdout);
+    },
+
+    closePullRequest: async (pullRequest: number, comment: string): Promise<void> => {
+      const number = issueNumber(pullRequest, 'closePullRequest');
+      const text = closeComment(comment, 'closePullRequest');
+      await succeed(['pr', 'close', number, `--comment=${text}`], `gh pr close ${number}`);
+    },
+  };
+  return Object.freeze(board);
+}

@@ -60,7 +60,11 @@
  *     (`import-graph.ts`), of either kind: a type-only import ties a test
  *     to a package as much as a value one does. A re-export
  *     (`export … from`) is an edge like any other import, so a test that
- *     reaches a file through a barrel reaches the file's folder.
+ *     reaches a file through a barrel reaches the file's folder. An import
+ *     of a facade (`packages/rafa-<name>/index.ts`), or of its commands
+ *     entry (`packages/rafa-<name>/commands.ts`), is read through that
+ *     member's table: an edge to the file each name taken is re-exported
+ *     from, never to the facade or the entry.
  *   - The walk stops at a `test-support` file: `src/tests/` helpers,
  *     fixtures and fakes. The support files reached are listed apart, and
  *     so is each folder the walk reaches only through them
@@ -121,6 +125,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
 
 import { readCutMap } from './cut-map';
+import { readFacadeTables } from './facade-tables';
 import { classifyFile, isInScope, listTrackedFiles, splitTrackedFiles } from './files';
 import {
   OUTPUT_DIR,
@@ -559,8 +564,8 @@ export function listCommittableFiles(root: string): TrackedFiles {
 }
 
 /**
- * Builds the import graph of `files` in the repository at `root` and
- * reads their texts. The graph is built here again rather than read from
+ * Builds the import graph of `files` in the repository at `root`, read
+ * through its facade entries (`readFacadeTables`), and reads their texts. The graph is built here again rather than read from
  * `docs/survey/import-graph.json`, so the scripts run in any order.
  *
  * @param root - The repository root.
@@ -574,7 +579,14 @@ async function readTree(root: string, files: readonly string[]): Promise<TestInd
     sources.set(path, await Bun.file(join(root, path)).text());
   }
   const metafile = await readMetafile(root, files);
-  const graph = buildImportGraph({ files, metafile, resolve: bunResolver(root), root, sources });
+  const graph = buildImportGraph({
+    facades: readFacadeTables(root),
+    files,
+    metafile,
+    resolve: bunResolver(root),
+    root,
+    sources,
+  });
   return { graph, sources };
 }
 
@@ -622,7 +634,7 @@ interface PackageReading {
  */
 async function readPackages(root: string, files: readonly string[], mapPath: string): Promise<PackageReading> {
   const map = readCutMap(root, mapPath);
-  const globs = readTestKindGlobs(root);
+  const globs = await readTestKindGlobs(root);
   const members = readMembers(root);
   const tree = await readTree(root, files);
   const rules = packageRules(map, tree.graph);

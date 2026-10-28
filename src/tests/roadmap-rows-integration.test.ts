@@ -1,6 +1,6 @@
 /**
  * Board-level integration test for `readRoadmapRows`
- * (`src/board/roadmap-rows.ts`): the real board listing and open pull
+ * (`packages/rafa-board/src/board/roadmap-rows.ts`): the real board listing and open pull
  * request readers run over ONE planted `gh` runner, the branch scan over a
  * planted git runner, and the plan dir is a real temporary directory.
  *
@@ -9,10 +9,10 @@
  * `spec:ready` issue missing a heading. Each case counts the board
  * listing calls and the Roadmap reads: exactly one of each.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
-import type { RoadmapRow, RoadmapRowsOptions } from '../board/roadmap-rows.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { SpecIssue, SpecIssueReader } from '@open-tomato/rafa-board/board/issue';
+import type { RoadmapRow, RoadmapRowsOptions } from '@open-tomato/rafa-board/board/roadmap-rows';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,9 +20,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGhBoardLister } from '../board/boards.js';
-import { LIST_HEADINGS, SPEC_READY_LABEL, TEMPLATE_HEADINGS } from '../board/readiness.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
+import { createGhBoardLister } from '@open-tomato/rafa-board/board/boards';
+import { LIST_HEADINGS, SPEC_READY_LABEL, TEMPLATE_HEADINGS } from '@open-tomato/rafa-board/board/readiness';
+import { createGhOpenPullRequests } from '@open-tomato/rafa-board/board/roadmap';
+import { createGhBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 import {
   blockersText,
   createPlanDirNames,
@@ -30,10 +31,8 @@ import {
   OUTLINE_HEADINGS,
   readRoadmapRows,
   specText,
-} from '../board/roadmap-rows.js';
-import { createGhOpenPullRequests } from '../board/roadmap.js';
-
-import { completeSpecBody } from './spec-bodies.js';
+} from '@open-tomato/rafa-board/board/roadmap-rows';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
 const ROADMAP = 1;
 

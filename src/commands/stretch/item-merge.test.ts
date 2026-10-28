@@ -18,12 +18,10 @@
  * before it, so the filter is seen to drop as well as keep.
  */
 import type { StretchItemSeams } from './item.js';
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
-
-import '../../adapter-registry.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,10 +30,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { beginSession } from '@open-tomato/rafa/core/loop';
+import { eventsFilePath } from '@open-tomato/rafa-run/start/loop-events';
 
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
 import { runListArgs } from '../../ci/runs.js';
-import { eventsFilePath } from '../../start/loop-events.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 

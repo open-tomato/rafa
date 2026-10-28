@@ -9,12 +9,12 @@ import { describe, expect, it } from 'bun:test';
 
 import { familyOf } from '@open-tomato/rafa/errors/codes';
 import { FAMILY_DESCRIPTIONS, listedCodes, RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
+import { FAILURE_STRING_CODES } from '@open-tomato/rafa-inventory/schema/failure-strings';
+import { SKILL_ISSUE_CODES } from '@open-tomato/rafa-inventory/schema/skill';
 
 import { DISPATCH_ERROR_CODES } from '../../../cli/dispatch.js';
 import { ROUTE_REFUSALS } from '../../../cli/route.js';
 import { nearDuplicates, suggestCodes } from '../../../errors/match.js';
-import { FAILURE_STRING_CODES } from '../../../schema/failure-strings.js';
-import { SKILL_ISSUE_CODES } from '../../../schema/skill.js';
 
 const UNIONS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['ROUTE_REFUSALS', ROUTE_REFUSALS],

@@ -3,7 +3,8 @@
 The agent task loop for ralph, packaged and ready to ship. A single-package
 implementation of the loop from `agentic-research`, with all the pieces
 running under bun and ready for publishing to npm as `@open-tomato/rafa`.
-Core and the hub's two packages are bun workspaces beside it, in `packages/`.
+Core, the hub, the two config packages and the six feature packages are bun
+workspaces in `packages/`.
 
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
 before running or suggesting any `gh`, `rafa` or branch-cleanup command.
@@ -16,8 +17,8 @@ takes 6.4 minutes a pass, so it is never the quick check:
 - `changed`: `bun test --changed=<base>`, with `tsc` and `eslint` on the
   changed files. The default.
 - `related`: the test files of the module the change touches, by path
-  (`bun test src/effort/`), when the change reaches past what `changed`
-  finds.
+  (`bun test packages/rafa-effort/src/effort/`), when the change reaches past
+  what `changed` finds.
 
 The full suite is the last warranty: run once, before a merge, after
 every scoped run is green. `context/verification.md` names the changes
@@ -76,5 +77,4 @@ back into every turn and the split would save nothing.
 **80 lines.** `CLAUDE.md` imports it into every turn of every session, so
 it carries the project context and the pointers above and nothing else.
 A finding promoted out of `progress.txt` therefore goes to the `context/`
-page that owns its subject, or to a new page listed above; never inline
-here.
+page that owns its subject, or to a new page listed above; never inline here.

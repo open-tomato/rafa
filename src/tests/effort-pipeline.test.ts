@@ -114,12 +114,10 @@
  * says the set the collector skips by and the set the store dedupes
  * by agree, and the leg that DOES bite it is the selection one above.
  */
-import type { SessionKind } from '../effort/classify.js';
-import type { CollectOptions } from '../effort/collect.js';
-import type { CommitLogParseResult, CommitStats } from '../effort/commits.js';
-import type { EffortGroup, EffortReport } from '../effort/report.js';
-
-import '../adapter-registry.js';
+import type { SessionKind } from '@open-tomato/rafa-effort/effort/classify';
+import type { CollectOptions } from '@open-tomato/rafa-effort/effort/collect';
+import type { CommitLogParseResult, CommitStats } from '@open-tomato/rafa-effort/effort/commits';
+import type { EffortGroup, EffortReport } from '@open-tomato/rafa-effort/effort/report';
 
 import {
   mkdirSync,
@@ -134,14 +132,13 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { readStoreRows } from '@open-tomato/rafa/store/ndjson-files';
-
-import { PROMPT_SHAPES } from '../effort/classify.js';
-import { collectEffort } from '../effort/collect.js';
-import { formatReport } from '../effort/report-format.js';
+import { PROMPT_SHAPES } from '@open-tomato/rafa-effort/effort/classify';
+import { collectEffort } from '@open-tomato/rafa-effort/effort/collect';
 import {
   SESSION_KINDS,
   buildReport,
-} from '../effort/report.js';
+} from '@open-tomato/rafa-effort/effort/report';
+import { formatReport } from '@open-tomato/rafa-effort/effort/report-format';
 
 /** Per-turn usage. One distinct decimal magnitude per column. */
 const TURN_INPUT = 100;

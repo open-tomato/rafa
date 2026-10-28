@@ -226,7 +226,7 @@
     },
     "loopRetries": {
       "value": 2,
-      "source": "file"
+      "source": "local"
     },
     "loopRetriesOnContinue": {
       "value": 1,
@@ -234,6 +234,10 @@
     },
     "loopWorktreeDir": {
       "value": ".rafa/worktrees",
+      "source": "default"
+    },
+    "loopWorktreeSetup": {
+      "value": null,
       "source": "default"
     },
     "loopWrapUpRetries": {
@@ -262,7 +266,7 @@
     },
     "prBase": {
       "value": "trunk",
-      "source": "file"
+      "source": "local"
     },
     "prMergeMethod": {
       "value": "squash",
@@ -334,7 +338,7 @@
     },
     "roadmapIssue": {
       "value": 42,
-      "source": "file"
+      "source": "local"
     },
     "routing": {
       "value": {},
@@ -403,7 +407,7 @@
     },
     "tiersSkills": {
       "value": {},
-      "source": "file"
+      "source": "local"
     },
     "trackerDefault": {
       "value": "github",
@@ -449,21 +453,25 @@
     },
     "version": {
       "value": 1,
-      "source": "file"
+      "source": "local"
     }
   },
-  "path": "<project>/.rafa/config.yaml",
-  "userPath": "<home>/.rafa/config.yaml",
+  "path": null,
+  "localPath": "<project>/.rafa/config.yaml",
+  "userPath": null,
+  "userLocalPath": "<home>/.rafa/config.yaml",
   "warnings": [
     "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)"
   ],
-  "extras": [
+  "extras": [],
+  "localExtras": [
     {
       "key": "unknownParityKey",
       "value": 1
     }
   ],
   "userExtras": [],
+  "userLocalExtras": [],
   "printedWarnings": [
     "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)"
   ]

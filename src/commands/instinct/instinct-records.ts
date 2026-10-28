@@ -5,7 +5,7 @@
  *
  * This is the command half. Reading the scopes — which files in a scope
  * are records, what one file reads as, `readScope` and
- * `readScopes` — is the library half, `src/schema/scope-records.ts`,
+ * `readScopes` — is the library half, `packages/rafa-inventory/src/schema/scope-records.ts`,
  * which the local Learning adapter and the skills report read too; this
  * file re-exports none of it.
  *
@@ -29,9 +29,9 @@
  * cannot be read at all is still reachable by the name it is filed
  * under.
  */
-import type { ProjectFound } from '../../project/scope.js';
-import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { InstinctRecordEntry, ScopeListing } from '@open-tomato/rafa-inventory';
 
 /** The local Learning adapter's own files, which are no records. */
 export const LEARNING_STORE_FILES: readonly string[] = ['instincts.ndjson', 'flags.ndjson'];

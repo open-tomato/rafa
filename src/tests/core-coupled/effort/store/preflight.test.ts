@@ -34,11 +34,10 @@
  * left open (1), `timeout` refused (4), the table folded into the fifth
  * entry (1) and a blank probe allowed (1).
  */
-import type { PreflightCheck, PreflightReport, ProbeRun } from '../../../../preflight/run.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '@open-tomato/rafa/core/config';
+import type { PreflightCheck, PreflightReport, ProbeRun } from '@open-tomato/rafa/preflight/run';
 
 import '../../../../config-registry.js';
-import '../../../../adapter-registry.js';
 
 import {
   existsSync,
@@ -57,6 +56,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { PREREQUISITE_KINDS } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { runPreflight } from '@open-tomato/rafa/preflight/run';
 import { LEGACY_GATE_OPEN } from '@open-tomato/rafa/store/migrations';
 import {
   PREFLIGHT_OUTCOMES,
@@ -65,8 +65,6 @@ import {
   writePreflightChecks,
 } from '@open-tomato/rafa/store/preflight';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '@open-tomato/rafa/store/sqlite';
-
-import { runPreflight } from '../../../../preflight/run.js';
 
 /** A preflight row as the table holds it. */
 interface StoredCheck {

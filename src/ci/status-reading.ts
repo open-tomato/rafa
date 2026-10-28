@@ -21,7 +21,7 @@
  *   and `cancelled` included: only `success` says the branch passed.
  *
  * A red run whose log `gh` no longer holds (`log not found` on stderr,
- * the reading `src/pr/gh.ts` keeps for an old run) is still red; its
+ * the reading `packages/rafa-pr/src/pr/gh.ts` keeps for an old run) is still red; its
  * failed cases read as null and the text says the log is gone. A red run
  * with no bun `(fail)` line, a set-up step that failed, reads an empty
  * list and says so.
@@ -36,7 +36,7 @@
  */
 import type { FailedCaseFile } from './failed-cases.js';
 import type { BranchRun } from './runs.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
 /** What a run reads as. */
 export type CiVerdict = 'green' | 'red' | 'none' | 'running';

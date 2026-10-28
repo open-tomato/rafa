@@ -1,6 +1,6 @@
 /**
  * What `rafa skill check` and `rafa instinct check` share: the words
- * they read off a line, the seams they hand `src/check/run.ts`, the
+ * they read off a line, the seams they hand `packages/rafa-inventory/src/check/run.ts`, the
  * lines they print, and the exit code they refuse with.
  *
  * The two commands differ in exactly three things — the {@link
@@ -68,16 +68,20 @@
  * `--project` value the flag cannot take, and a directory the scan
  * finds nothing to scan at.
  */
-import type { CheckKind } from '../check/layout.js';
-import type { CheckIssue, CheckOptions, CheckReport, DirectoryReport } from '../check/run.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type {
+  CheckIssue,
+  CheckKind,
+  CheckOptions,
+  CheckReport,
+  DirectoryReport,
+} from '@open-tomato/rafa-inventory';
 
 import { resolve } from 'node:path';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import { checkDirectory, pathDirectories } from '@open-tomato/rafa-inventory';
 
-import { pathDirectories } from '../check/references.js';
-import { checkDirectory } from '../check/run.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 /** Answers the directory a relative path on the line is resolved against. */
 export type Cwd = () => string;

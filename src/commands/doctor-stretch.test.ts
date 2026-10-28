@@ -34,17 +34,16 @@ import type { StretchFolderSeams, StretchFs } from '../stretch/folder.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { Output } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
+
 import { agentFilePath, stretchRoot } from '../stretch/folder.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../tests/cli-capture.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { readDoctorStretch, STRETCH_ROW_HEAD, stretchRow, writeDoctorStretch } from './doctor-stretch.js';
 import { createDoctorCommand } from './doctor.js';

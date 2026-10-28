@@ -10,8 +10,8 @@
  * composition root `src/adapter-registry.ts` (see "What core
  * registers"). Enabling a module is phase 7's work; until then an
  * add-on reaches the registry through {@link AdapterRegistry.register},
- * which `src/modules/load.ts` calls for each module `allowList:` names
- * from a `path` source. `src/modules/activate.ts` hands the registry it
+ * which `packages/rafa/src/modules/load.ts` calls for each module `allowList:` names
+ * from a `path` source. `packages/rafa/src/modules/activate.ts` hands the registry it
  * answers to {@link restoreAdapters} for an invocation of the CLI, so
  * every caller below, resolving through {@link CORE_ADAPTER_REGISTRY},
  * finds a loaded module's kind.
@@ -89,15 +89,15 @@
  * `src/adapters/output/`, the logger under `src/adapters/logger/`,
  * `logger/console`, the two trackers under `src/adapters/tracker/`,
  * `tracker/local` and `tracker/github`, the learning adapter under
- * `src/adapters/learning/`, `learning/local`, and the planner under
- * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
- * through {@link CORE_ADAPTER_REGISTRY}. Those are all the core adapters
- * the phase 1 table names. The `sync` port adds `sync/local`, the
- * default strategy of `effort.sync`, from `src/effort/sync/select.ts`,
+ * `packages/rafa-inventory/src/adapters/learning/`, `learning/local`, and
+ * the planner under `src/adapters/planner/`, `planner/claude`, which
+ * `rafa plan` resolves through {@link CORE_ADAPTER_REGISTRY}. Those are all
+ * the core adapters the phase 1 table names. The `sync` port adds `sync/local`,
+ * the default strategy of `effort.sync`, from `packages/rafa-effort/src/effort/sync/select.ts`,
  * whose `selectSync` resolves `effort.sync` through a registry, and
- * `sync/file`, the store carried as a file, from
- * `src/effort/sync/file.ts`. `git`, `service` and `p2p` are modules'
- * strategies, registered by a loaded module.
+ * `sync/file`, the store carried as a file, from `packages/rafa-effort/src/effort/sync/file.ts`.
+ * `git`, `service` and `p2p` are modules' strategies, registered by a loaded
+ * module.
  *
  * ## What an adapter answers
  *
@@ -125,7 +125,7 @@
  * registers throws when any is left out. `store` is the same to
  * `sync/file`: a default of
  * `sqlite` would carry an NDJSON project's store without its sessions
- * (`src/effort/sync/file.ts` says why), so its `create` throws when it is
+ * (`packages/rafa-effort/src/effort/sync/file.ts` says why), so its `create` throws when it is
  * left out or names no backend. The `local` learning adapter's floor
  * defaults to the registered `learning.bless.minConfidence`, and its
  * `create` throws, naming `src/config-registry.ts`, when no section
@@ -269,7 +269,7 @@ export interface AdapterContext {
    *
    * The shape is spelled here rather than imported: it is the
    * `HubContext` the `hub` section declares in
-   * `src/config-schema-hub.ts`, and core imports no section file.
+   * `packages/rafa/src/config-schema-hub.ts`, and core imports no section file.
    * `selectSync` hands that section's value in, so the checker holds
    * the two shapes together there.
    */

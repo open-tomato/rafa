@@ -17,7 +17,7 @@
  * ## Read through the port, off the listing doctor holds
  *
  * Both lists are read through the `native` adapter's reads
- * (`src/board/relations/native.ts`), over the one board listing
+ * (`packages/rafa-board/src/board/relations/native.ts`), over the one board listing
  * `./doctor-board.ts` makes in the `native` mode and shares with the
  * boards row, so the run sends that listing once. The adapter needs the
  * board's repository to tell a local link from a foreign one, read with
@@ -27,7 +27,7 @@
  *
  *  - Blockers: every OPEN issue whose `blockersOf` reading is truncated.
  *    Such an issue reads as waiting whatever its unread blockers hold
- *    (`isWaiting`, `src/board/relations/port.ts`). A closed issue waits
+ *    (`isWaiting`, `packages/rafa-board/src/board/relations/port.ts`). A closed issue waits
  *    on nothing, so its list is not named.
  *  - Sub-issues: every epic, open or closed, whose `membersOf` reading is
  *    truncated. Membership is each row's own `parent`, so no member is
@@ -51,17 +51,12 @@
  * in `./doctor-relations.test.ts` drives a recorded fake runner, so none
  * of them reaches GitHub or spawns `gh`.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { RelationsReading } from '../board/relations/port.js';
-import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
+import type { BoardIssue, BoardListing, GhRunner, RelationsReading } from '@open-tomato/rafa-board';
+
+import { NATIVE_MODE, readBoardRepository, selectBoardRelations } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { plural } from '@open-tomato/rafa/core/plan';
-
-import { selectBoardRelations } from '../board/relations/select.js';
-import { readBoardRepository } from '../board/repository.js';
-
-import { NATIVE_MODE } from './epic/move-native.js';
 
 /** The heading the relationship lines sit under. */
 export const RELATIONS_HEADING = 'Relationships:';

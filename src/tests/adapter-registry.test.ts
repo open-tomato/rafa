@@ -1,12 +1,12 @@
 /**
  * The adapter registry, read the way a caller outside `src/adapters/`
  * reads it: through the adapters barrel's public exports alone, with
- * core's adapters registered by importing the composition root
- * `src/adapter-registry.ts`, one example apiece of three claims the
+ * core's adapters registered by the preload's `registerCoreAdapters()`
+ * call, not by importing the root, one example apiece of three claims the
  * registry stands on.
  *
  * `packages/rafa/src/core/adapters/registry.test.ts` and
- * `src/adapters/tracker/resolve.test.ts`
+ * `packages/rafa-board/src/adapters/tracker/resolve.test.ts`
  * carry the mutation-driven grid behind each of those claims. The
  * running example that makes every one of core's kinds from ONE shared
  * context, with the list of kinds it holds, moved to
@@ -28,8 +28,6 @@
 import type { AnyAdapter } from '@open-tomato/rafa/core/adapters';
 import type { Tracker } from '@open-tomato/rafa/ports';
 
-import '../adapter-registry.js';
-
 import {
   mkdtempSync,
   readFileSync,
@@ -41,11 +39,10 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
-
-import { draftFixture } from '../adapters/tracker/contract.js';
-import { createFakeGh } from '../adapters/tracker/github-fake.js';
-import { parseLocalIssue } from '../adapters/tracker/local.js';
-import { resolveTracker } from '../adapters/tracker/resolve.js';
+import { draftFixture } from '@open-tomato/rafa-board/adapters/tracker/contract';
+import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
+import { parseLocalIssue } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { resolveTracker } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 
 /** What `gh auth status` writes with no hosts, as the fake records it. */
 const NOT_LOGGED_IN = 'You are not logged into any GitHub hosts. To log in, run: gh auth login';

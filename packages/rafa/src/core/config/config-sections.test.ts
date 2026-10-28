@@ -680,7 +680,7 @@ describe('githubLogin', () => {
   it('reads the same shape as the predicate the trust check narrows logins with', () => {
     // The control pairs the two: a reader that accepted what the
     // predicate refuses would put a login into the collaborators path
-    // that `src/board/trust.ts` would not.
+    // that `packages/rafa-board/src/board/trust.ts` would not.
     expect(isGitHubLogin('octocat')).toBe(true);
     expect(isGitHubLogin('dependabot[bot]')).toBe(true);
     expect(isGitHubLogin('../../evil')).toBe(false);

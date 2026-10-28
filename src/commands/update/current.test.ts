@@ -1,10 +1,8 @@
 import type { UpdateCurrentResult, UpdateCurrentSeams } from './current.js';
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { SubjectSpec } from '../../cli/registry.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
+import type { SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { Prompter } from '@open-tomato/rafa/core/command';
-
-import '../../adapter-registry.js';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,8 +10,9 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { BOARD_LABELS } from '../../board/setup.js';
-import { LOCK_FILE, projectLockText, writeProjectLock } from '../../project/lock.js';
+import { BOARD_LABELS } from '@open-tomato/rafa-board/board/setup';
+import { LOCK_FILE, projectLockText, writeProjectLock } from '@open-tomato/rafa-release/project/lock';
+
 import { PROJECT_TREE } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

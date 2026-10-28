@@ -17,8 +17,6 @@ import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { GhRunner } from '@open-tomato/rafa/core/git';
 import type { CliEvent, EditableIssue, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 
-import '../../adapter-registry.js';
-
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,11 +25,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { rerunOf } from '@open-tomato/rafa-pr/triage/bug-filing';
 
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
-import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
-import { rerunOf } from '../../triage/bug-filing.js';
 
 import { recheckBug } from './recheck-run.js';
 import { createRecheckCommand } from './recheck.js';

@@ -61,14 +61,15 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { SPEC_LABEL } from '../board/issue.js';
-import { SPEC_READY_LABEL } from '../board/readiness.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { SPEC_READY_LABEL } from '@open-tomato/rafa-board/board/readiness';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-relations-labels-baseline-')));
@@ -97,7 +98,7 @@ const BLOCKED_ISSUE = 150;
 const OPEN_BLOCKER = 151;
 const CLOSED_BLOCKER = 152;
 
-/** A blocker on another repository, named exactly as `Blocked by:` writes one; see `src/board/blocked.ts`. */
+/** A blocker on another repository, named exactly as `Blocked by:` writes one; see `packages/rafa-board/src/board/blocked.ts`. */
 const FOREIGN_TOKEN = 'external-owner/external-repo#999';
 
 /** One `gh issue view`/`issue list` row, labels already named. */
@@ -144,7 +145,7 @@ function gitSetup(scratch: ScratchRepo): void {
  * Writes the stand-in `gh` into `scratch`'s `bin/`: one `issue view`
  * answer per fixture issue, the board content for the bare `issue
  * list`, an empty `pr list`, the board cache's own watermark read
- * (`src/board/board-cache.ts`) answered with no timestamp so the cache
+ * (`packages/rafa-board/src/board/board-cache.ts`) answered with no timestamp so the cache
  * is read but never written, and the label and title searches
  * `resolveDefaultBoard` would fall back to if `roadmap.issue` were ever
  * not enough, answered empty since it always is. Every call, planned or

@@ -4,7 +4,7 @@
  * request, asks GitHub for the repository `hub.repository` names with
  * that token, and serves the caller when the permission GitHub answers
  * is one of `TRUSTED_PERMISSIONS` (`admin`, `maintain`, `write`), the
- * ones the board's trust check trusts (`src/board/trust.ts`, reached
+ * ones the board's trust check trusts (`packages/rafa-board/src/board/trust.ts`, reached
  * through `@open-tomato/rafa/store`).
  *
  * ## What it asks GitHub

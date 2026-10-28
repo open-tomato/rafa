@@ -1,0 +1,103 @@
+# The rafa release tag workflow: level 3 of the release ladder.
+#
+# Written into a project's `.github/workflows/` by `writeReleaseWorkflow`
+# (`packages/rafa-release/src/release/templates.ts`) for
+# `release.settle: pr` with `release.tag: settle` and
+# `release.publish: ci`. Settle never tags a `pr` delivery: it pushes the
+# release commit to `rafa/release` and opens one release pull request.
+# When that pull request merges, by any merge button, this workflow
+# checks the base branch out at the merge commit, runs
+# `rafa release tag --push`, and then publishes.
+#
+# It runs only on the release pull request's merge: a closed pull
+# request that did not merge, or one from another head or from a fork,
+# runs nothing, since `rafa release tag` refuses `tagged` (exit 1) once
+# every unit is tagged.
+#
+# A tag pushed with the workflow's GITHUB_TOKEN starts no other workflow
+# run, so the publish job calls `release-publish.yml` through
+# `workflow_call` with the merge commit as `ref` instead of waiting for
+# its `push: tags` trigger. That job grants `id-token: write` for npm
+# trusted publishing; the tag job needs only `contents: write`.
+#
+# The publish job runs only when the repository variable
+# `RAFA_RELEASE_PUBLISH` is `ci`: with it unset or holding anything else,
+# GitHub skips the job, and a skipped job does not fail the run. Set it
+# under Settings, Secrets and variables, Actions, Variables, or with
+# `gh variable set RAFA_RELEASE_PUBLISH --body ci`.
+# Tagging runs either way; publishing waits for the switch.
+#
+# rafa needs a config with `release.enabled: true`, and the checkout may
+# hold none: when none of `rafa.config.ts`, `rafa.config.mjs` and
+# `.rafa/config.yaml` is there, the workflow writes `.rafa/config.yaml`
+# with that key. A committed config is left as it is, so a project that
+# needs other release keys in CI commits them.
+#
+# rafa runs from the checkout when the project is rafa itself (its
+# manifest names `@open-tomato/rafa` and git tracks `src/rafa.ts`), and
+# from a global install otherwise, so one file serves both.
+name: Release tag
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: >-
+      github.event.pull_request.merged == true
+      && github.event.pull_request.head.ref == 'rafa/release'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Move to the merge commit
+        env:
+          MERGE_COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+        run: git reset --hard "$MERGE_COMMIT"
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Write the CI config
+        shell: bash
+        run: |
+          if [ ! -f rafa.config.ts ] && [ ! -f rafa.config.mjs ] && [ ! -f .rafa/config.yaml ]; then
+            mkdir -p .rafa
+            printf '%s\n' '# Written by the Release tag workflow: the checkout holds no rafa config.' 'release:' '  enabled: true' > .rafa/config.yaml
+          fi
+
+      - name: Tag
+        shell: bash
+        run: |
+          name=$(node -p "require('./package.json').name")
+          if [ "$name" = '@open-tomato/rafa' ] && git ls-files --error-unmatch src/rafa.ts > /dev/null 2>&1; then
+            bun install --frozen-lockfile
+            bun src/rafa.ts release tag --push --output=json
+          else
+            bun install -g @open-tomato/rafa
+            export PATH="${BUN_INSTALL:-$HOME/.bun}/bin:$PATH"
+            rafa release tag --push --output=json
+          fi
+
+  publish:
+    needs: tag
+    if: vars.RAFA_RELEASE_PUBLISH == 'ci'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/release-publish.yml
+    with:
+      ref: ${{ github.event.pull_request.merge_commit_sha }}
+    secrets: inherit

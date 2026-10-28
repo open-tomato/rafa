@@ -44,7 +44,7 @@ A bug a person files is held to the list: `rafa issue create --type=bug`
 refuses a `--cause` the list lacks and names the line to file it with
 instead, `--cause=<family>:new-context --proposed=<the code>`
 (`context/bug-record.md`). A bug the loop files is never refused over its
-cause. The cause rule (`src/bugs/cause-rule.ts`) files a shaped code the
+cause. The cause rule (`packages/rafa-board/src/bugs/cause-rule.ts`) files a shaped code the
 list lacks as `<family>:new-context`, with the code kept as `proposed`, and
 any other text as `unknown:new-context`, with the words kept as `suspected`
 (`context/triage.md`).
@@ -69,8 +69,8 @@ commit.
 
 `errors.codes` in the project's config is a list of entries with the keys
 `code`, `description`, `hint`, `level` and, optionally, `since`, read by
-`src/config-schema-errors.ts`. `legacy` is rafa's alone: on a project
-entry it is an unknown key.
+`packages/rafa/src/config-schema-errors.ts`. `legacy` is rafa's alone: on a
+project entry it is an unknown key.
 
 ```yaml
 errors:
@@ -149,7 +149,7 @@ the suggestions print without proposals, exit code 0.
 
 A proposal is not yet a cause. The cause rule files a code the list lacks as
 `<family>:new-context`, the code kept as `Proposed cause`
-(`src/bugs/cause-rule.ts`), and that leaf earns no ranking bonus
+(`packages/rafa-board/src/bugs/cause-rule.ts`), and that leaf earns no ranking bonus
 (`context/triage.md`). A bug filed with a proposal is therefore shown by
 `--suggest` and not ranked by its cause, until a fix adds the code to the
 list and new bugs file under it.
@@ -205,7 +205,7 @@ throw new LoopError({
 
 The tree has two levels: `RafaError` at the root and one class per module
 below it. There is no class for each action, since the action is a field
-the thrower gives. `ScopeError` (`src/project/scope.ts`) is the worked
+the thrower gives. `ScopeError` (`packages/rafa/src/project/scope.ts`) is the worked
 example. It sets `static readonly module = 'project'` and has one
 constructor, which takes the code, the message unprefixed and the cause,
 prefixes the message with `rafa scope: `, and hands the rest to
@@ -261,6 +261,6 @@ that does not open with the `name: message` header gets the header above
 it. A thrown value that is not an `Error` gives its string form.
 
 `toBugFields` redacts nothing and fills no version. What it leaves to
-`readBugLine` (`src/commands/issue/create-bug.ts`) is taking local paths
+`readBugLine` (`packages/rafa-board/src/commands/issue/create-bug.ts`) is taking local paths
 and named secrets out of every free text, cutting the artifact, reading
 the error line from its first line, and writing the Versions section.

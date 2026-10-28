@@ -20,7 +20,7 @@
  *   2. **The settings files.** Claude Code then assigns the `env`
  *      mapping of each settings file its `--setting-sources` loads onto
  *      its own environment, which every tool it runs inherits. The three
- *      files are the ones `src/inventory/disabled.ts` reads
+ *      files are the ones `packages/rafa-inventory/src/inventory/disabled.ts` reads
  *      (`overrideSettingsPath`, `OVERRIDE_SCOPES`), nearest first:
  *      `.claude/settings.local.json` and `.claude/settings.json` under
  *      the project root, then `~/.claude/settings.json`. A file is
@@ -98,7 +98,7 @@
  * it is compared entry by entry instead ({@link PathDifference}): the
  * directories the session gains, the ones it loses, and whether the
  * directories both hold are searched in another order. Entries are
- * split by `pathDirectories` (`src/check/references.ts`), which drops
+ * split by `pathDirectories` (`packages/rafa-inventory/src/check/references.ts`), which drops
  * empty ones, and a directory named twice counts where it is first
  * named, since that is where a lookup finds it.
  *
@@ -112,11 +112,15 @@
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
 import type { SpawnEnv } from '@open-tomato/rafa/core/loop';
 
+import {
+  OVERRIDE_SCOPES,
+  overrideSettingsPath,
+  pathDirectories,
+  readSettings,
+} from '@open-tomato/rafa-inventory';
+
 import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 import { sessionSpawnEnv } from '@open-tomato/rafa/core/loop';
-
-import { pathDirectories } from '../check/references.js';
-import { OVERRIDE_SCOPES, overrideSettingsPath, readSettings } from '../inventory/disabled.js';
 
 /** The Claude Code version the settings `env` rules were read from. */
 export const SESSION_ENV_CLI_VERSION = '2.1.280';

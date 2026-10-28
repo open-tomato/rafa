@@ -1,11 +1,11 @@
 /**
  * The count `rafa status` ends its board line with: how many open issues
  * are held back by a blocker, read in the mode the board's relationships
- * port (`src/board/relations/port.ts`) answers.
+ * port (`packages/rafa-board/src/board/relations/port.ts`) answers.
  *
  * | Mode | What is counted | What it reads |
  * | --- | --- | --- |
- * | `labels`, or no port | every open issue labelled `spec:blocked` | `readBlockedIssues` (`src/board/blocked-issues.ts`), its own `gh issue list --label spec:blocked` |
+ * | `labels`, or no port | every open issue labelled `spec:blocked` | `readBlockedIssues` (`packages/rafa-board/src/board/blocked-issues.ts`), its own `gh issue list --label spec:blocked` |
  * | `native` | every open issue on the listing whose `blockedBy` reading still holds it (`isWaiting`) | the one board listing the section already holds |
  *
  * `labels` mode is what `rafa status` counted before the port, command for
@@ -22,15 +22,16 @@
  * rejection, and `readBlockedIssues` answers its own failure as the
  * report's `problem` rather than rejecting.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { BoardRelations } from '../board/relations/port.js';
-import type { BoardListing } from '../board/roadmap-board.js';
+import type {
+  BlockedIssuesReport,
+  BoardListing,
+  BoardRelations,
+  GhRunner,
+} from '@open-tomato/rafa-board';
+
+import { SPEC_BLOCKED_LABEL, isWaiting } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { isWaiting } from '../board/relations/port.js';
 
 /** The half of the port the count reads: its mode, and its reads over one listing. */
 export type BlockedCountRelations = Pick<BoardRelations, 'mode' | 'read'>;

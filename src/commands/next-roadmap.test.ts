@@ -25,13 +25,11 @@
  *    nothing else.
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
-import type { GhResult } from '../adapters/tracker/github.js';
 import type { NextCeiling } from '../next/ceiling.js';
-import type { HopHome, HopOut } from '../next/hop-rows.js';
-import type { NextState } from '../next/state.js';
-import type { GitResult } from '../pr/index.js';
-
-import '../adapter-registry.js';
+import type { GhResult } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { GitResult } from '@open-tomato/rafa-pr/pr/index';
+import type { HopHome, HopOut } from '@open-tomato/rafa-run/next/hop-rows';
+import type { NextState } from '@open-tomato/rafa-run/next/state';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,7 +37,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { dispatchInProject, eventsOf } from '../tests/cli-capture.js';
 
 import { createNextCommand, runNextChain } from './next.js';

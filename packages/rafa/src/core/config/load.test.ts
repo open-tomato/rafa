@@ -9,10 +9,12 @@
  * modules, the runtime names off their namespaces and the type names
  * with the TypeScript checker, as `sections.test.ts` reads its barrel.
  *
- * Two names are held by name, so a reading that came back empty, or one
+ * Four names are held by name, so a reading that came back empty, or one
  * that saw runtime names alone, fails rather than agreeing with itself:
- * `loadConfig`, the one function every command imports, and
- * `ConfigRoots`, the one type `config-load.ts` exports.
+ * `loadConfig`, the one function every command imports,
+ * `readProjectScope`, which reads the project's two files alone, and
+ * `ConfigRoots` and `ProjectScopeFiles`, the two types `config-load.ts`
+ * exports.
  *
  * The last case holds the three barrels apart. `InjectMode` on
  * `sections.ts` and `ConfigError` on `index.ts` are its controls: a
@@ -21,7 +23,7 @@
  */
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as load from './config-load.js';
@@ -34,8 +36,13 @@ const CONFIG_BARREL = 'packages/rafa/src/core/config/index.ts';
 const SECTIONS_BARREL = 'packages/rafa/src/core/config/sections.ts';
 const LOAD = 'packages/rafa/src/core/config/config-load.ts';
 
+/** Every path a case reads the export names of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [BARREL, LOAD, CONFIG_BARREL, SECTIONS_BARREL];
+
 /**
- * Every export name of each file, types included, sorted.
+ * Every export name of each file, types included, sorted. Runs once,
+ * from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays for
+ * the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns The names by path.
@@ -65,11 +72,29 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
   return names;
 }
 
+let exportNames: Record<string, string[]> | null = null;
+
+/**
+ * The export names by path, once `beforeAll` has read them.
+ *
+ * @returns The names by path of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function storedExportNames(): Record<string, string[]> {
+  if (exportNames === null) throw new Error('the export names were never read');
+  return exportNames;
+}
+
 describe('the load barrel', () => {
+  beforeAll(() => {
+    exportNames = readExportNames(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of config-load.ts, each once, and no other', () => {
     const expected = Object.keys(load).sort();
 
     expect(expected).toContain('loadConfig');
+    expect(expected).toContain('readProjectScope');
     expect(Object.keys(barrel).sort()).toEqual(expected);
   });
 
@@ -82,16 +107,18 @@ describe('the load barrel', () => {
   });
 
   it('exports the type names of config-load.ts with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, LOAD]);
+    const names = storedExportNames();
 
     expect(names[LOAD]).toContain('ConfigRoots');
+    expect(names[LOAD]).toContain('ProjectScopeFiles');
     expect(names[LOAD]).toContain('loadConfig');
     expect(Object.keys(load)).not.toContain('ConfigRoots');
+    expect(Object.keys(load)).not.toContain('ProjectScopeFiles');
     expect(names[BARREL]).toEqual(names[LOAD] ?? []);
   });
 
   it('holds no name either of the other two config barrels holds, type or runtime', () => {
-    const names = readExportNames([BARREL, CONFIG_BARREL, SECTIONS_BARREL]);
+    const names = storedExportNames();
     const others = [...(names[CONFIG_BARREL] ?? []), ...(names[SECTIONS_BARREL] ?? [])];
     const onTwo = (names[BARREL] ?? []).filter((name) => others.includes(name));
 

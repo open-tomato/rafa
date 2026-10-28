@@ -10,10 +10,14 @@
  * nothing. Every case uses a stub of its own, so no case reads another's
  * branch, and the lock is cleared after each.
  *
+ * The planted project turns git's wait off (`core.configLockTimeout` 0, read
+ * back by the first case), since git 2.56 retries a held config lock for a
+ * second per try on its own, past bun's test timeout.
+ *
  * The active output is module state shared by every test file, so each
  * case sets a sink and the last one sets it back.
  */
-import type { WorktreeOutcome } from './worktree.js';
+import type { WorktreeOutcome } from '@open-tomato/rafa-run/start/worktree';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,12 +28,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { addRunWorktree } from '@open-tomato/rafa-run/start/worktree';
+import { UPSTREAM_TRIES } from '@open-tomato/rafa-run/start/worktree-upstream';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-
-import { UPSTREAM_TRIES } from './worktree-upstream.js';
-import { addRunWorktree } from './worktree.js';
 
 describe('addRunWorktree upstream step against a real repository', () => {
   let scratch = '';
@@ -66,6 +69,13 @@ describe('addRunWorktree upstream step against a real repository', () => {
     lock = join(project, '.git', 'config.lock');
     run(scratch, ['init', '-q', '--bare', remote]);
     run(scratch, ['init', '-q', '-b', 'main', project]);
+    // git 2.56.0 added core.configLockTimeout (default 1000 ms, read from the
+    // configuration on disk before the lock is taken), so git itself retries a
+    // held .git/config.lock for about a second per try (#1371). Earlier git
+    // ignores the key, so the cases read the same on every version and the
+    // pauses they count are rafa's alone. The worktrees this file adds share
+    // the project's .git/config, so the one key covers them.
+    run(project, ['config', 'core.configLockTimeout', '0']);
     run(project, ['commit', '-q', '--allow-empty', '-m', 'one']);
     run(project, ['remote', 'add', 'origin', remote]);
     run(project, ['push', '-q', 'origin', 'main']);
@@ -82,6 +92,10 @@ describe('addRunWorktree upstream step against a real repository', () => {
 
   afterAll(() => {
     rmSync(scratch, { recursive: true, force: true });
+  });
+
+  it('plants the project with git\'s config lock wait turned off', () => {
+    expect(run(project, ['config', 'core.configLockTimeout'])).toBe('0');
   });
 
   it('refuses after the last try on a lock never released, leaving no worktree and a clean main checkout', () => {

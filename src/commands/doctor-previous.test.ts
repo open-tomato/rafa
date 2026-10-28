@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { PREVIOUS_COPY_WARN_ABOVE } from '../board/previous-copy.js';
+import { PREVIOUS_COPY_WARN_ABOVE } from '@open-tomato/rafa-board/board/previous-copy';
 
 import { previousCopiesWarning, readPreviousCopies } from './doctor-previous.js';
 

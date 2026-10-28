@@ -33,12 +33,12 @@
  * never read, reddened 2 cases; the `known` set dropped from the final
  * reading, so no id is ever checked, reddened 3.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
 
-import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT, readBlockedIssues } from '../board/blocked-issues.js';
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT, readBlockedIssues } from '@open-tomato/rafa-board/board/blocked-issues';
 
 import { BLOCKED_HEADING, renderBlockedIssues } from './doctor-blocked.js';
 

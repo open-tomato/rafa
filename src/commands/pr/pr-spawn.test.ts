@@ -5,7 +5,7 @@
  * `show.test.ts`, `view.test.ts` and `list.test.ts` can prove: every
  * case there dispatches over a `PullRequests` built directly
  * (`gh-fake.ts` or a stub), never through `openPrContext`'s own
- * `ghPullRequestsIn`, which is the path `src/pr/gh.ts` spawns the real
+ * `ghPullRequestsIn`, which is the path `packages/rafa-pr/src/pr/gh.ts` spawns the real
  * CLI from. This file runs `bun src/rafa.ts pr <action>` over the
  * REGISTERED commands (`src/commands/index.ts`), in a scratch git
  * repository whose PATH holds a stand-in `gh` first, exactly as
@@ -36,7 +36,7 @@
  * sends no per-row probe at all). Any other call exits 1 naming what it
  * was asked, so a shape this file did not plan for reddens loud rather
  * than quietly answering something that happens to parse — the same
- * rule `src/pr/gh.ts`'s own module note holds for the adapter's own
+ * rule `packages/rafa-pr/src/pr/gh.ts`'s own module note holds for the adapter's own
  * refusals.
  *
  * Each action's output is held in full and checked against what
@@ -60,10 +60,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { SEPARATOR } from '@open-tomato/rafa-pr/commands/pr/current';
 
-import { SEPARATOR } from './current.js';
+import { plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-spawn-')));
@@ -81,7 +81,7 @@ const GH_CONFIG = 'pr:\n  provider: gh\n';
 /** The branch `pr current` resolves its pull request from. */
 const BRANCH = 'pr-smoke';
 
-/** The fields `gh pr list` and `gh pr view` are asked for; copied from `src/pr/gh.ts`'s own. */
+/** The fields `gh pr list` and `gh pr view` are asked for; copied from `packages/rafa-pr/src/pr/gh.ts`'s own. */
 const SUMMARY_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url';
 const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,commits,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences`;
 const CHECK_FIELDS = 'name,state,link';

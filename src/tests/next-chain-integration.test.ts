@@ -8,7 +8,7 @@
  * stage the chain passes through.
  *
  * `src/commands/next.test.ts` drives the chain's own logic over scripted
- * states and fakes, and `src/commands/pr/merge-driven.test.ts` drives
+ * states and fakes, and `src/tests/pr-coupled/commands/pr/merge-driven.test.ts` drives
  * `pr merge`'s clean-up over a real repository the way this file borrows
  * from. Neither runs the THREE actions in sequence: this is the first
  * suite to walk `merge` → `plan` → `start` as one `rafa next` invocation
@@ -26,7 +26,7 @@
  *
  * ## Why this runs as a spawned process
  *
- * `plan create`'s own board walk (`src/board/plan-spec.ts`) makes its
+ * `plan create`'s own board walk (`packages/rafa-board/src/board/plan-spec.ts`) makes its
  * `gh` and `git` runners itself, unseamed from the command that wraps
  * `src/plan.ts` — the same reason `plan-board-integration.test.ts` runs
  * as a process rather than in this file's own. Worse, `src/plan.ts`
@@ -60,7 +60,7 @@
  *    `"plan create"` before writing `PLAN-<stub>.md` itself.
  *  - `loop start` is replaced with a command that pushes nothing of its
  *    own UNTIL it has switched to the branch for real, through the
- *    actual `offerRunBranch` (`src/start/branch.ts`) over the same git
+ *    actual `offerRunBranch` (`packages/rafa-run/src/start/branch.ts`) over the same git
  *    seam, and only then pushes `"loop start"`. No session is spawned:
  *    the chain only needs to know a loop WOULD have started.
  *
@@ -70,7 +70,7 @@
  * create` claims the issue for real: one empty `claim(rafa-<n>): claim`
  * commit on the pulled base, pushed as `feat/<stub>` (`src/claims/`).
  * `rafa next` reads that plan as unstarted all the same, because its
- * branch holds claim commits alone (`src/next/readings.ts`), and
+ * branch holds claim commits alone (`packages/rafa-run/src/next/readings.ts`), and
  * `loop start` finds the branch on the remote and switches to it with
  * `--track` rather than cutting it with `-c`. That the branch grows
  * from the base `pr merge` just pulled is read off real git: the tip is
@@ -78,7 +78,7 @@
  *
  * `pr merge` and `plan create` are the real registered commands, run
  * exactly as `rafa next`'s own action table would call them
- * (`src/next/actions.ts`); only their seams and, for `plan create`, the
+ * (`packages/rafa-run/src/next/actions.ts`); only their seams and, for `plan create`, the
  * planner adapter are replaced. The probe reads the words `rafa next`
  * runs with off its OWN `argv`, past the record path, rather than
  * hard-coding one ceiling: every case below is the same probe, spawned
@@ -92,7 +92,8 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { planStub } from '../board/naming.js';
+import { planStub } from '@open-tomato/rafa/board/naming';
+
 import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { DRY_RUN_FLAG } from '../next/lines.js';
 
@@ -150,22 +151,24 @@ function buildProbe(): string {
     'import { mkdirSync, writeFileSync } from "node:fs";',
     'import { join } from "node:path";',
     `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+    `import { registerCoreServices } from ${JSON.stringify(join(SRC_DIR, 'service-registry.ts'))};`,
     `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
     'registerCoreConfigSections();',
     'registerCoreAdapters();',
+    'registerCoreServices();',
     `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
-    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
+    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'commands', 'pr', 'merge.ts'))};`,
     `import planCreateDeclared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
     `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-    `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+    `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
     `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
     `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
-    `import { offerRunBranch } from ${JSON.stringify(join(SRC_DIR, 'start', 'branch.ts'))};`,
-    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
-    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, 'pr', 'pull-requests-double.ts'))};`,
+    `import { offerRunBranch } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-run', 'src', 'start', 'branch.ts'))};`,
+    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'pr', 'index.ts'))};`,
+    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     `import { planStubFromPath } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'plan', 'plan-stamp.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',

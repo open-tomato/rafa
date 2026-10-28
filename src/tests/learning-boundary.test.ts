@@ -1,10 +1,11 @@
 /**
- * The `src/learning/` boundary rule in `eslint.config.mjs`, read through
- * ESLint itself against scratch sources placed under `src/learning/`.
+ * The learning library's boundary rule in `eslint.config.mjs`, read through
+ * ESLint itself against scratch sources placed under
+ * `packages/rafa-inventory/src/learning/`.
  *
  * Each scratch source is linted with `lintText` and a `filePath` inside
  * the library, so the root config's `files` globs and the import
- * resolver read it as a module of `src/learning/` without anything being
+ * resolver read it as a module of that folder without anything being
  * written into the tree. If a stray file were left behind, `eslint .`
  * would go red on it.
  *
@@ -45,9 +46,10 @@ function ruleIds(messages: Linter.LintMessage[]): (string | null)[] {
   return messages.map((message) => message.ruleId);
 }
 
-const SCRATCH = 'src/learning/boundary-scratch.ts';
+const LEARNING_DIR = 'packages/rafa-inventory/src/learning';
+const SCRATCH = `${LEARNING_DIR}/boundary-scratch.ts`;
 
-describe('the src/learning/ boundary rule', () => {
+describe('the packages/rafa-inventory/src/learning/ boundary rule', () => {
   test('refuses an import of @open-tomato/rafa/core/config from src/learning/', async () => {
     const messages = await messagesFor(
       SCRATCH,
@@ -55,18 +57,20 @@ describe('the src/learning/ boundary rule', () => {
     );
 
     expect(ruleIds(messages)).toEqual(['import/no-restricted-paths']);
-    expect(messages[0]?.message).toContain('src/learning/ imports nothing from core.');
+    expect(messages[0]?.message).toContain(
+      'packages/rafa-inventory/src/learning/ imports nothing from core.',
+    );
   });
 
-  test('refuses an import of ../plan/index.js from src/learning/', async () => {
+  test('refuses an import of ../tiers/resolve.js from src/learning/', async () => {
     const messages = await messagesFor(
       SCRATCH,
-      'export { parsePlan } from \'../plan/index.js\';\n',
+      'export { resolveTiers } from \'../tiers/resolve.js\';\n',
     );
 
     expect(ruleIds(messages)).toEqual(['import/no-restricted-paths']);
     expect(messages[0]?.message).toContain(
-      'src/learning/ imports nothing from the rest of src/.',
+      'packages/rafa-inventory/src/learning/ imports nothing from the rest of the package\'s src/.',
     );
   });
 
@@ -90,7 +94,7 @@ describe('the src/learning/ boundary rule', () => {
 
   test('lets a parent import that stays in src/learning/ through', async () => {
     const messages = await messagesFor(
-      'src/learning/testdata/boundary-scratch.ts',
+      `${LEARNING_DIR}/testdata/boundary-scratch.ts`,
       'export { actionHash } from \'../identity.js\';\n',
     );
 
@@ -107,7 +111,7 @@ describe('the src/learning/ boundary rule', () => {
 
       expect(ruleIds(messages)).toEqual(['no-restricted-imports']);
       expect(messages[0]?.message).toContain(
-        'src/learning/ touches no filesystem.',
+        'packages/rafa-inventory/src/learning/ touches no filesystem.',
       );
     },
   );

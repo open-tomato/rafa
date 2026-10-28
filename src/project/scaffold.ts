@@ -36,13 +36,14 @@
  * parses to {@link CONFIG_DEFAULTS}, which the tests hold, so a setting
  * added to the schema without a line here is caught there.
  *
- * Five lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
- * `pr.provider`, `pr.base` and `roadmap.issue`, because each resolves to
- * null and null is what a key with no value parses to. Uncommented they
- * are silent, so those five settings resolve from the defaults layer
- * where every other resolves from the file, and the tests name them. The line is written anyway: it tells an operator
- * the key exists and what it takes, which is the whole point of a
- * template of commented settings.
+ * Seven lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
+ * `loop.worktreeSetup`, `pr.provider`, `pr.base`, `board.project.number`
+ * and `roadmap.issue`, because each resolves to null and null is what a
+ * key with no value parses to. Uncommented they are silent, so those
+ * seven settings resolve from the defaults layer where every other
+ * resolves from the file, and the tests name them. The line is written
+ * anyway: it tells an operator the key exists and what it takes, which
+ * is the whole point of a template of commented settings.
  *
  * The `tiers`, `routing`, `task`, `tests` and `checks` sections close
  * the template. `tiers.skills` and `tiers.agents` are written as `{}`, their
@@ -75,19 +76,19 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { configFilePath } from '@open-tomato/rafa/core/config';
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
-
-import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { CHECK_NAMES } from '../config-schema-checks.js';
+import { DEFAULT_ROUTES } from '@open-tomato/rafa-inventory';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
   RELEASE_FRAGMENT_LINES,
-} from '../release/scaffold.js';
-import { DEFAULT_ROUTES } from '../tiers/routing.js';
+} from '@open-tomato/rafa-release';
 
-import { scopeAt } from './scope.js';
+import { CHECK_NAMES } from '@open-tomato/rafa/config-schema-checks';
+import { configFilePath } from '@open-tomato/rafa/core/config';
+import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { scopeAt } from '@open-tomato/rafa/project/scope';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 /** The directories of a project tree, under `<root>/.rafa/`, in the order they are written. */
 export const PROJECT_TREE: readonly ['specs', 'plans', 'runs', 'effort', 'instincts'] = Object.freeze(['specs', 'plans', 'runs', 'effort', 'instincts'] as const);
@@ -153,6 +154,7 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,
   `#   worktreeDir: ${CONFIG_DEFAULTS.loopWorktreeDir}   # where a loop adds its worktrees, read from the project root`,
+  '#   worktreeSetup:               # a shell command run in a new or reused --as-worktree worktree before the first session',
   `#   retries: ${String(CONFIG_DEFAULTS.loopRetries)}               # 1..3 | false, times in a row a run re-enters its loop after a retry-safe stop`,
   `#   retriesOnContinue: ${String(CONFIG_DEFAULTS.loopRetriesOnContinue)}         # 1..3 | false, the retries a --continue run opens when --retry is not typed`,
   '#   continue:',

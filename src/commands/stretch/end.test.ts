@@ -1,7 +1,7 @@
 /**
  * Tests for `rafa stretch end` (`./end.ts`), dispatched in planted
  * projects whose `pr.base` names `stretch/4`. The provider is the port
- * double (`src/pr/pull-requests-double.ts`), so no case reaches GitHub,
+ * double (`packages/rafa/src/pr/pull-requests-double.ts`), so no case reaches GitHub,
  * and `origin/HEAD` is read through a git seam that answers what the
  * case plants. `report.md`, the ledger, `stretch.json`, the body file
  * and `.rafa/config.yaml` are real files.
@@ -14,13 +14,11 @@
  * `main`.
  */
 import type { StretchEndSeams } from './end.js';
-import type { PullRequestsAnswers } from '../../pr/pull-requests-double.js';
-import type { MergedPullRequest, PullRequestDraft, PullRequestSummary } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { GitResult } from '@open-tomato/rafa/core/git';
-
-import '../../adapter-registry.js';
+import type { PullRequestsAnswers } from '@open-tomato/rafa/pr/pull-requests-double';
+import type { MergedPullRequest, PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,8 +27,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 
-import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { appendItem, itemsPath } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 

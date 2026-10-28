@@ -1,13 +1,13 @@
 /**
  * `rafa skill show <name> [--full]`: one skill whole, as the show view
- * of `src/inventory/show.ts` renders it.
+ * of `packages/rafa-inventory/src/inventory/show.ts` renders it.
  *
  * `rafa skill list` says where each skill sits and whether it answers;
  * this command says what one of them IS: its inventory record, its
  * frontmatter as written, every other holder of the name with its
  * source and state, and the body's headings with their file lines.
  * `--full` prints the whole file in place of the frontmatter and the
- * headings. Every part is built by `src/inventory/show.ts`, which
+ * headings. Every part is built by `packages/rafa-inventory/src/inventory/show.ts`, which
  * `rafa agent show` and the browse view share, so no two of them can
  * print one item two ways.
  *
@@ -53,16 +53,15 @@
  * under `--full` and is null without it.
  */
 import type { SkillListSeams } from './list.js';
-import type { Inventory } from '../../inventory/index.js';
-import type { ShowView } from '../../inventory/show.js';
-import type { ProjectFound } from '../../project/scope.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
+import type { Inventory, ShowView } from '@open-tomato/rafa-inventory';
 
+import { findShown, readShowView, renderShowView } from '@open-tomato/rafa-inventory';
+
+import { expectOneArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { findShown, readShowView, renderShowView } from '../../inventory/show.js';
-import { expectOneArgument, readSwitch } from '../plan/plan-files.js';
 
 import { DEFAULT_SKILL_LIST_SEAMS, projectInventory, warningLines } from './list.js';
 

@@ -43,7 +43,7 @@
  *
  * One flag is held apart from that equality, and named: `hint`, which
  * `plan create` and `loop start` declare and no phase 0 parser reads.
- * It is the wrapper's — `endingWith` in `src/next/ending.ts` reads it
+ * It is the wrapper's — `endingWith` in `packages/rafa-run/src/next/ending.ts` reads it
  * off the parsed context once the phase 0 function has returned — so a
  * reader module quoting it would be a fiction. The case holds the rest
  * of each declaration equal to the literals as before AND holds that
@@ -75,8 +75,6 @@ import type { DispatchOutcome } from '../cli/dispatch.js';
 import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
-import '../adapter-registry.js';
-
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -84,28 +82,33 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
+import { BOARD_FEATURE } from '@open-tomato/rafa-board/commands/board/index';
+import { PR_FEATURE } from '@open-tomato/rafa-pr/commands/pr/index';
+import { RELEASE_FEATURE } from '@open-tomato/rafa-release/commands/release/index';
+import { RUN_FEATURE } from '@open-tomato/rafa-run/commands/claim/index';
 
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
-
-import { BOARD_FEATURE } from './board/index.js';
-import { RUN_FEATURE } from './claim/index.js';
-import { PR_FEATURE } from './pr/index.js';
-import { RELEASE_FEATURE } from './release/index.js';
 
 import { BUNDLED_FEATURES, CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS, createRosterRegistry, ROSTER_SUBJECTS } from './index.js';
 
 /** The `src/` directory, which the phase 0 modules sit in. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
-/** The modules reading each command line, from `src/`. */
+/** The modules reading each command line, from `src/` (effort's, board's and run's through their packages' `src/`). */
 const READERS: Readonly<Record<string, readonly string[]>> = {
-  'plan create': ['plan.ts', 'board/flags.ts'],
-  'loop start': ['start.ts', 'start/run-config.ts', 'start/run-setup.ts', 'start/runtime.ts', 'start/continue-args.ts'],
-  'effort collect': ['effort/collect.ts', 'effort/collect-args.ts'],
-  'effort report': ['effort/report.ts', 'effort/report-args.ts'],
+  'plan create': ['plan.ts', '../packages/rafa-board/src/board/flags.ts'],
+  'loop start': [
+    'start.ts',
+    '../packages/rafa-run/src/start/run-config.ts',
+    '../packages/rafa-run/src/start/run-setup.ts',
+    '../packages/rafa-run/src/start/runtime.ts',
+    '../packages/rafa-run/src/start/continue-args.ts',
+  ],
+  'effort collect': ['../packages/rafa-effort/src/effort/collect.ts', '../packages/rafa-effort/src/effort/collect-args.ts'],
+  'effort report': ['../packages/rafa-effort/src/effort/report.ts', '../packages/rafa-effort/src/effort/report-args.ts'],
 };
 
 /** The outputs each command declares: text and json, each phase 0 command now writing through the active output. */
@@ -510,7 +513,7 @@ function typedFlag(flag: RafaCommand['flags'][number]): string {
 /**
  * The flags a WRAPPER declares over a phase 0 command, per command,
  * which no phase 0 parser reads: `hint`, the ending the two of these
- * that are in the cycle finish with, read by `src/next/ending.ts` off
+ * that are in the cycle finish with, read by `packages/rafa-run/src/next/ending.ts` off
  * the parsed context rather than off the words. Held separately below,
  * and held to be there.
  */

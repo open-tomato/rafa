@@ -1,12 +1,12 @@
 /**
  * `rafa plan create` spawned from a linked worktree of a real git
  * repository: the integration proof that the dispatcher's project-root
- * fallback (`src/project/scope.ts`, `src/project/worktree-root.ts`) and
+ * fallback (`packages/rafa/src/project/scope.ts`, `packages/rafa/src/project/worktree-root.ts`) and
  * the planner's cwd fix for #171 (`src/adapters/planner/claude.ts`) work
  * together end to end, over a real `git worktree add` and a spawned
  * `bun src/rafa.ts`, rather than over either module's own seams.
  *
- * `src/project/scope-fallback.test.ts` already proves `resolveScope`
+ * `src/tests/core-coupled/project/scope-fallback.test.ts` already proves `resolveScope`
  * itself answers the main checkout from both a worktree beside the
  * repository and one nested under its `.rafa/worktrees`, running the
  * real git. What nothing else proves is the WHOLE run from either
@@ -34,8 +34,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-worktree-integration-')));

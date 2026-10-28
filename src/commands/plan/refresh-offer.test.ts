@@ -4,7 +4,7 @@
  * an offer at all, the question it puts, the answers that read as yes,
  * and the prompter it opens only to ask and always closes.
  *
- * `src/board/snapshot-settle.test.ts` drives what the answer DOES — the
+ * `packages/rafa-board/src/board/snapshot-settle.test.ts` drives what the answer DOES — the
  * rebuild on a yes, the refusal on a no — and this file drives none of
  * that again. Every case plants a terminal reading and a prompter of its
  * own, so none reads standard input or waits on an answer.
@@ -32,12 +32,12 @@
  *  - the prompter never closed: 6 pass and 2 fail, the two prompter
  *    cases. A prompter left open holds standard input past the question.
  */
-import type { RefreshOfferRequest } from '../../board/snapshot-settle.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { RefreshOfferRequest } from '@open-tomato/rafa-board/board/snapshot-settle';
 
 import { describe, expect, it } from 'bun:test';
 
-import { refreshQuestion } from '../../board/snapshot-settle.js';
+import { refreshQuestion } from '@open-tomato/rafa-board/board/snapshot-settle';
 
 import { createPlanRefreshOffer } from './refresh-offer.js';
 

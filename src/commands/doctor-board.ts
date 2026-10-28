@@ -26,7 +26,7 @@
  * One row per part of the GitHub board `rafa init --board` makes — the
  * labels, the spec issue template, the Roadmap issue and
  * `roadmap.issue` — each read through `readBoardStatus`
- * (`src/board/status.ts`) as present, missing or, for a reading that
+ * (`packages/rafa-board/src/board/status.ts`) as present, missing or, for a reading that
  * failed, unknown. A run with any row that is not present ends those
  * lines with `rafa init --board` as the fix (`./doctor-render.ts`),
  * which is the one command that would change them.
@@ -57,7 +57,7 @@
  * `labels` mode only. Every issue carrying two `epic:` labels and every `epic:` label no
  * `type:epic` issue carries, named under `Epic labels:`
  * (`./doctor-epics.ts`), read off one board listing and worded by
- * `src/board/epic-problems.ts`, the only reader of either fault.
+ * `packages/rafa-board/src/board/epic-problems.ts`, the only reader of either fault.
  *
  * ## The relationships
  *
@@ -105,15 +105,15 @@ import type { DoctorBoardsReport } from './doctor-boards.js';
 import type { DoctorEpicsReport } from './doctor-epics.js';
 import type { DoctorMarksReport } from './doctor-marks.js';
 import type { DoctorRelationsReport } from './doctor-relations.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BlockedIssuesReport } from '../board/blocked-issues.js';
-import type { BoardStatus } from '../board/status.js';
 import type { BoardRelationshipMode, PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { BlockedIssuesReport, BoardStatus, GhRunner } from '@open-tomato/rafa-board';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { readBlockedIssues } from '../board/blocked-issues.js';
-import { createGhBoardListing } from '../board/roadmap-board.js';
-import { readBoardStatus } from '../board/status.js';
+import {
+  createGhBoardListing,
+  createGhRunner,
+  readBlockedIssues,
+  readBoardStatus,
+} from '@open-tomato/rafa-board';
 
 import { renderBlockedIssues } from './doctor-blocked.js';
 import { readDoctorBoards, renderDoctorBoards } from './doctor-boards.js';

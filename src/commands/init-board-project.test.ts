@@ -31,11 +31,9 @@
  * Every root is a directory under this file's own temporary root.
  */
 import type { ProjectSetupConfig, ProjectSetupOptions, ProjectSetupReport } from './init-board-project.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { FakeFactsIssue } from '../board/project/facts-fake.js';
-import type { FakeProjectField, FakeProjectGh } from '../board/project/project-fake.js';
-
-import '../adapter-registry.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { FakeFactsIssue } from '@open-tomato/rafa-board/board/project/facts-fake';
+import type { FakeProjectField, FakeProjectGh } from '@open-tomato/rafa-board/board/project/project-fake';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,20 +42,20 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseConfigText } from '@open-tomato/rafa/core/config';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createFakeFactsGh } from '@open-tomato/rafa-board/board/project/facts-fake';
+import { createGhProjectPort } from '@open-tomato/rafa-board/board/project/gh';
+import { commandProgressFeed } from '@open-tomato/rafa-board/board/project/progress';
+import { recordingFeed } from '@open-tomato/rafa-board/board/project/progress-fake';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from '@open-tomato/rafa-board/board/project/project-fake';
+import { openProjectRunner, retryReporter } from '@open-tomato/rafa-board/board/project/project-runner';
+import { callNumber } from '@open-tomato/rafa-board/board/project/retry';
+import { flakyGh, TIMED_OUT_STDERR } from '@open-tomato/rafa-board/board/project/retry-fake';
+import { createBoardSyncCommand } from '@open-tomato/rafa-board/commands/board/sync';
 
-import { createFakeFactsGh } from '../board/project/facts-fake.js';
-import { createGhProjectPort } from '../board/project/gh.js';
-import { recordingFeed } from '../board/project/progress-fake.js';
-import { commandProgressFeed } from '../board/project/progress.js';
-import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
-import { openProjectRunner, retryReporter } from '../board/project/project-runner.js';
-import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
-import { callNumber } from '../board/project/retry.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
-import { sinkOutput } from '../tests/output-sinks.js';
 
-import { createBoardSyncCommand } from './board/sync.js';
 import {
   PROJECT_HEADING,
   projectPartLine,

@@ -38,7 +38,7 @@
  *   - `hop`: only on a run started with `loop start --roadmap` while a
  *     `rafa next --roadmap` hop is away, the hop record as
  *     `.rafa/hop.json` held it when the run began
- *     (`src/next/hop-record.ts`, `start/session.ts`). A record of any
+ *     (`packages/rafa/src/next/hop-record.ts`, `start/session.ts`). A record of any
  *     other run carries no `hop` key at all, never one set to null, so
  *     such a record is written byte for byte as it was before the field.
  *     Once written, every later write of the record keeps it as it is.
@@ -221,7 +221,7 @@
  * refused on read. This module re-exports what a caller reads from
  * there, so `./sessions.js` stays the one import a record's reader
  * needs: `isPositiveWhole` and `RECORD_EXTENSION` among them, which
- * `src/stretch/folder.ts` and `src/cleanup/runs.ts` read.
+ * `src/stretch/folder.ts` and `packages/rafa-run/src/cleanup/runs.ts` read.
  */
 import type { HopRecord } from './hop-record.js';
 import type {

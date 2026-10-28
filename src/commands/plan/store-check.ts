@@ -2,7 +2,7 @@
  * The effort-store rules read over one plan file and its PREREQUISITES
  * file, shared by `rafa plan validate` (`./validate.ts`) and
  * `rafa plan create` (`src/plan.ts`), so the two commands hold a plan to
- * one reading of `src/plan/store-rules.ts`.
+ * one reading of `packages/rafa-run/src/plan/store-rules.ts`.
  *
  * ## The reading
  *
@@ -20,7 +20,7 @@
  * `loop start`'s preflight would refuse is never announced as ready. On
  * any problem it moves the plan, and the PREREQUISITES file when there
  * is one, into `rejected/` beside them (`rejectedPath` in
- * `../../core/plan/plan-files.ts`, shared with `src/board/gate.ts` so neither
+ * `../../core/plan/plan-files.ts`, shared with `packages/rafa-board/src/board/gate.ts` so neither
  * module imports the other), where the next `loop start` does not pick them
  * up and an operator can still read what the session cost, and throws
  * `CommandExit(1)` listing one `storeRuleLine` per problem, the plan
@@ -37,19 +37,19 @@
  * which answers a path it never writes. `loop start`'s preflight reads
  * the plan where the loop finds it, with the same rules.
  */
-import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { GeneratedPlan, Output } from '@open-tomato/rafa/ports';
+import type { StoreRuleProblem } from '@open-tomato/rafa-run';
 
 import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+
+import { findStoreRuleProblems, storeRuleLine } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
 import { isFile, plural, rejectedPath } from '@open-tomato/rafa/core/plan';
-
-import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';
-import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
+import { prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 
 /** The text at `path`, or null when no file sits there. */
 function readFileOrNull(path: string | null): string | null {

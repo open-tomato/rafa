@@ -3,7 +3,7 @@
  * checkout, under a parent folder holding a `.rafa/config.yaml` of its
  * own. `.rafa/` is gitignored, so the worktree has none; the scope walk
  * must stop at the worktree's top level and answer the MAIN CHECKOUT's
- * project (`src/project/scope.ts`) rather than climb into the parent
+ * project (`packages/rafa/src/project/scope.ts`) rather than climb into the parent
  * folder's. The two projects name different version files, so the
  * version the readout prints says which project answered.
  */
@@ -14,8 +14,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-status-worktree-')));
 

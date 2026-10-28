@@ -32,17 +32,15 @@ import type { ScratchRepository } from './scratch-repository.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CapturedRun } from '../tests/cli-capture.js';
 
-import '../adapter-registry.js';
-
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { defaultCleanupSeams, readCleanup, remoteOnlyReason } from '@open-tomato/rafa-run/cleanup/index';
+
 import { cleanupGroups, cleanupQuestion, createCleanupCommand } from '../commands/cleanup.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, plantProjectConfig } from '../tests/cli-capture.js';
 
 import { createScratchRepository, REMOTE_ONLY_BRANCHES, REMOTE_ONLY_COMMITS, SCRATCH_NOW } from './scratch-repository.js';
-
-import { defaultCleanupSeams, readCleanup, remoteOnlyReason } from './index.js';
 
 const DOWN: Key = { name: 'down' };
 const ENTER: Key = { name: 'enter' };

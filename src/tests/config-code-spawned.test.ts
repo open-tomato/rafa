@@ -12,8 +12,9 @@
  *     and not `feat/<stub>`, and runs the task there;
  *   - `config show --sources` names the file and entry 0 for
  *     `naming.branch`, in text and as json data;
- *   - `doctor` lists a `.rafa/config.yaml` left beside the module as
- *     not read, with the fix.
+ *   - `doctor` reads a `.rafa/config.yaml` left beside the module as
+ *     the local layer over it: its unknown key is the one warning naming
+ *     it, and no line calls either file not read.
  *
  * The second repository is a clone whose head branch commits a
  * `rafa.config.ts` the base never held, with a `bun.lock` conflicting
@@ -26,7 +27,7 @@
  *     and goes past the rule, to the worktree the refusal never added.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,9 +35,10 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { resolveWorktreePath } from '@open-tomato/rafa-pr/pr/worktree';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
-import { resolveWorktreePath } from '../pr/worktree.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { plantFakeGh } from './replaying-fake-gh.js';
@@ -61,8 +63,8 @@ const CONFIG_TS = 'export default [{ naming: { branch: \'work/{stub}\' }, pr: { 
 /** The module the pull request's head carries: the template alone, the project's `pr` being the operator's. */
 const HEAD_CONFIG_TS = 'export default [{ naming: { branch: \'work/{stub}\' } }];\n';
 
-/** The YAML file a case leaves beside the module. */
-const LEFT_YAML = 'pr:\n  provider: none\n';
+/** The YAML file a case leaves beside the module, holding one key no setting names. */
+const LEFT_YAML = 'pr:\n  provider: none\nnonesuch: 1\n';
 
 /** What a spawned run's streams hold, as one string a case searches. */
 function said(run: { readonly stdout: string; readonly stderr: string }): string {
@@ -184,18 +186,21 @@ describe('a rafa.config.ts naming the branch template', () => {
     expect(json.stdout).toContain(`"key":"naming.branch","value":"work/{stub}","layer":"project","file":${JSON.stringify(file)},"entry":0`);
   }, CASE_TIMEOUT_MS);
 
-  it('has doctor list a YAML file left beside it as not read, with the fix', () => {
+  it('has doctor read a YAML file left beside it as the local layer, listing neither file as not read', () => {
     const scratch = plantModuleRepo();
     const yaml = plantProjectConfig(scratch.repo, LEFT_YAML);
+    const module = join(scratch.repo, 'rafa.config.ts');
 
     const run = runRafa(scratch, scratch.repo, ['doctor']);
 
     const lines = said(run).split('\n');
-    const row = lines.find((line) => line.includes(`${yaml} is not read`));
-    expect(row).toBeDefined();
-    expect(row).toContain('rafa.config.ts');
-    expect(row).toContain('move its keys into rafa.config.ts and remove it');
-    expect(lines.filter((line) => line.includes('is not read'))).toHaveLength(1);
+    // The YAML file is read: its unknown key is the one line naming it,
+    // which is also the control that doctor prints the load's warnings.
+    expect(lines.filter((line) => line.includes(yaml))).toEqual([
+      expect.stringContaining(`unknown key "nonesuch" in ${yaml}`),
+    ]);
+    expect(lines.filter((line) => line.includes('is not read'))).toEqual([]);
+    expect(lines.filter((line) => line.includes(module))).toEqual([]);
   }, CASE_TIMEOUT_MS);
 });
 

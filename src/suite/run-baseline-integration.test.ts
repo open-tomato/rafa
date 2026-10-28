@@ -18,8 +18,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { baselineOf, splitFailures } from './baseline.js';
-import { runSuite } from './run.js';
+import { runSuite } from '@open-tomato/rafa/suite/run';
+import { baselineOf, splitFailures } from '@open-tomato/rafa-run/suite/baseline';
 
 /** The first line of the message Bun writes for a failing `toBe`, where it writes one. */
 const TO_BE_MESSAGE = 'expect(received).toBe(expected)';

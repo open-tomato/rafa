@@ -2,8 +2,8 @@
  * Tests for the hop record's shapes (`hop-record.ts`): `isRecord`,
  * `asPlace` and `asHopRecord`, called on parsed values directly.
  *
- * The place cases came from `src/project/position.test.ts` and the hop
- * record cases from `src/next/hop-record.test.ts`, where they read a
+ * The place cases came from `packages/rafa/src/project/position.test.ts` and the hop
+ * record cases from `packages/rafa/src/next/hop-record.test.ts`, where they read a
  * planted file; the file readers keep the cases that show a null answer
  * here reads as a wrong shape there. Each case that answers null sits
  * beside one that answers the value, so a check that always refused

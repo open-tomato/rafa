@@ -354,7 +354,7 @@ The block strip rule means:
 - A block in a stage description does not appear in the operator log line
 - A block anywhere in the plan does not appear in a commit subject or commit body
 
-The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`packages/rafa/src/core/plan/blocks.ts`):
+The strip happens where the loop reads the next task, `findNextTask` in `packages/rafa/src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`packages/rafa/src/core/plan/blocks.ts`):
 
 - Only a closed, top-level `rafa:*` block hides its lines. Every other fence is transparent, so a `- [ ] ` line at column 0 inside a `markdown` or `text` illustration, or inside a `rafa:` fence nested in one, is dispatched as a task. A plan that illustrates the format indents its example lines.
 - A `rafa:` fence that is never closed hides nothing, because taking the rest of the document as its body would end the plan with its tasks unrun. `parsePlan` reports it as `unclosed-block`, and each open task line after it as `task-in-block`.
@@ -554,7 +554,7 @@ The wrap-up session always receives `full` regardless of the configured mode.
 
 ## PREREQUISITES.md format
 
-`<plan.dir>/PREREQUISITES-<stub>.md` lists the setup a plan needs that no task can put in place. It is parsed: `src/preflight/prerequisites-md.ts` reads it and merges its items into the configured `prerequisites` for the plan beside it, `<plan.dir>/PLAN-<stub>.md`, and for no other plan.
+`<plan.dir>/PREREQUISITES-<stub>.md` lists the setup a plan needs that no task can put in place. It is parsed: `packages/rafa/src/preflight/prerequisites-md.ts` reads it and merges its items into the configured `prerequisites` for the plan beside it, `<plan.dir>/PLAN-<stub>.md`, and for no other plan.
 
 ```markdown
   # Prerequisites
