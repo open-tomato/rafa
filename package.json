@@ -140,7 +140,7 @@
     "device:check": "bash scripts/device/check.sh"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.1",
     "@eslint/markdown": "^8.0.3",
     "@open-tomato/define-config": "0.5.0",
     "@open-tomato/rafa-board": "workspace:*",
