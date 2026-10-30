@@ -17,15 +17,25 @@
  *   - `canary`: token groups that must be present next to every
  *     forbidden one. See "Guards".
  *
- * The cases fall in three kinds:
+ * The cases fall in these kinds:
  *
  *   - **answerable**: the task text must bring in one known lesson.
  *   - **abstention**: the task text names invented files and subjects,
  *     and must be handed no lesson at all.
  *   - **update**: two actions for one trigger. Within `GAP` both are
  *     flagged and leave the blessed bundle, so rafa answers with a clean
- *     miss rather than a stale pair. The contrast case shows what
- *     happens past `GAP`.
+ *     miss rather than a stale pair. The pinned contrast case shows what
+ *     happens past `GAP`, and the boundary pairs sit at gaps of 0.05,
+ *     0.10 and 0.15.
+ *   - **crowding**: more lessons on one file than the cap, where the
+ *     five delivered are named.
+ *   - **nonsense canary**: a discarded action's invented word, which no
+ *     rendered section may carry.
+ *   - **recorded gaps**, as `it.failing`: a second trigger wording on the
+ *     same file, and the conflict line a flagged pair should render.
+ *   - **paraphrases**: ten tasks that mean a trigger and share none of
+ *     its words. How many reach their lesson is printed after the run,
+ *     a baseline rather than a check.
  *
  * ## Guards
  *
@@ -65,12 +75,13 @@
 import type { TaskInput } from './resolve-skills.js';
 import type { BlessedBundle, InstinctRecord, MergeResult } from '../learning/index.js';
 
-import { describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 
+import { questionWords, wordsMatch } from '../inventory/search/rank.js';
 import { actionHash, bless, merge, triggerKey } from '../learning/index.js';
 
 import { LESSONS_HEADING, renderLessonsSection } from './sections.js';
-import { selectLessons } from './select-lessons.js';
+import { LESSON_LIMIT, selectLessons } from './select-lessons.js';
 
 /** The blessing floor, `learning.bless.minConfidence`'s default. */
 const MIN_CONFIDENCE = 0.5;
@@ -463,10 +474,211 @@ const CONTRAST_CHECK: DoorCheck = {
   canary: [['30 seconds']],
 };
 
-/** Every check the fixture holds, linted as the file loads. */
-const CHECKS: readonly DoorCheck[] = [...ANSWERABLE_CHECKS, ...UPDATE_CHECKS, CONTRAST_CHECK];
+/** What `pushes` leave held, each push one source's seeds, in order. */
+function heldOf(...pushes: readonly (readonly LessonSeed[])[]): InstinctRecord[] {
+  return pushes.reduce<InstinctRecord[]>((each, seeds, index) => push(each, `session-${index}`, seeds), []);
+}
 
-const LINT = CHECKS.flatMap(lintCheck);
+/** The blessed bundle over what `pushes` leave held. */
+function bundleOf(...pushes: readonly (readonly LessonSeed[])[]): BlessedBundle {
+  return bless(heldOf(...pushes), { minConfidence: MIN_CONFIDENCE });
+}
+
+/** The file the crowding case's lessons all name. */
+const CROWD_PATH = 'packages/rafa-run/src/suite/port-pool.ts';
+
+/**
+ * The crowding case: seven decoys share the target's artifact path and
+ * its trigger words, three of them more trusted, so the target is the
+ * fourth of eight and the cap of five has to cut by confidence.
+ */
+const CROWD = bundleOf([
+  ...[0.85, 0.8, 0.75, 0.55, 0.55, 0.5, 0.5].map((confidence, index): LessonSeed => ({
+    id: `crowd-decoy-${index}`,
+    trigger: `when the port pool leaks a port under load ${index}`,
+    action: `Decoy action ${index} for the port pool.`,
+    confidence,
+    artifact: CROWD_PATH,
+  })),
+  {
+    id: 'crowd-target',
+    trigger: 'when the port pool leaks a port under load',
+    action: 'Close the listener in afterAll before the pool hands the port on.',
+    confidence: 0.6,
+    artifact: CROWD_PATH,
+  },
+]);
+
+const CROWD_CHECK: DoorCheck = {
+  name: 'the target is among the five delivered, crowded by seven decoys on its file and trigger words',
+  task: `The port pool leaks a port under load; fix ${CROWD_PATH}.`,
+  lesson: 'crowd-target',
+  expected: [['afterAll']],
+  forbidden: [],
+  canary: [],
+  bundle: CROWD,
+};
+
+/** The file the thirty-lesson case's lessons all name. */
+const FILE30_PATH = 'packages/rafa-effort/src/effort/collect.ts';
+
+/**
+ * Thirty lessons on one file, kept by its path alone. Their confidences
+ * are 0.50 to 0.79 shuffled (`7 × i mod 30`), and `file-02` is raised to
+ * 0.75 to tie `file-25` at the fifth place.
+ */
+const FILE30 = bundleOf(Array.from({ length: 30 }, (_, index): LessonSeed => {
+  const id = `file-${String(index).padStart(2, '0')}`;
+  const hundredths = id === 'file-02'
+    ? 75
+    : 50 + (7 * index) % 30;
+  return {
+    id,
+    trigger: `when collector case ${id} applies`,
+    action: `Collector action ${id}.`,
+    confidence: hundredths / 100,
+    artifact: FILE30_PATH,
+  };
+}));
+
+/**
+ * The five of {@link FILE30} that should win: 0.79, 0.78, 0.77, 0.76, and
+ * on the tie at 0.75 `file-02` over `file-25`, by `bless`'s id order,
+ * which the confidence sort keeps.
+ */
+const FILE30_WINNERS = ['file-17', 'file-04', 'file-21', 'file-08', 'file-02'];
+
+/** One paraphrase: a task that means a lesson's trigger and shares none of its words. */
+interface Paraphrase {
+  readonly lesson: string;
+  readonly task: string;
+}
+
+/**
+ * Ten paraphrases over {@link LESSONS}. The second names its lesson's
+ * artifact path; the config lesson cannot, since `config-schema-checks.ts`
+ * holds its trigger's word `config`.
+ */
+const PARAPHRASES: readonly Paraphrase[] = [
+  { lesson: 'bun-test-hangs', task: 'The suite stays running forever once every spec is green.' },
+  { lesson: 'bun-test-hangs', task: 'Stop the e2e run from hanging at the end; see packages/rafa-run/src/suite/spawn-server.ts.' },
+  { lesson: 'config-field-stripped', task: 'A newly declared option vanishes at run time.' },
+  { lesson: 'config-field-stripped', task: 'Declare a new option on the settings type.' },
+  { lesson: 'wrapped-markdown', task: 'Change a paragraph in a prose doc whose lines are broken manually.' },
+  { lesson: 'drizzle-custom', task: 'Author the SQL schema change yourself instead of generating it.' },
+  { lesson: 'git-add-batch', task: 'Staging several paths at once leaves the index empty.' },
+  { lesson: 'tsc-test-errors', task: 'The compiler complains about a spec once it is checked.' },
+  { lesson: 'release-tag', task: 'Publish version 0.49.0 to the registry.' },
+  { lesson: 'killed-child-exit', task: 'Check what status a subprocess ends with after SIGTERM.' },
+];
+
+/** The fixture problems of `paraphrase`: any word it shares with its lesson's trigger. */
+function lintParaphrase(paraphrase: Paraphrase): readonly string[] {
+  const lesson = LESSONS.find((each) => each.id === paraphrase.lesson);
+  if (lesson === undefined) return [`paraphrase names no lesson: ${paraphrase.lesson}`];
+
+  const triggerWords = questionWords(lesson.trigger);
+  return questionWords(paraphrase.task)
+    .filter((word) => triggerWords.some((other) => wordsMatch(word, other)))
+    .map((word) => `paraphrase of ${paraphrase.lesson} shares \`${word}\` with its trigger`);
+}
+
+/** The boundary triggers: leader 0.65 against 0.60, 0.55 and 0.50. */
+const LOCKFILE_TRIGGER = 'when the lockfile drifts';
+const CACHE_KEY_TRIGGER = 'when the cache key collides';
+const WATCHER_TRIGGER = 'when the watcher misses a rename';
+
+/** The nonsense word only the discarded watcher action carries. */
+const NONSENSE = 'ZORBLAX';
+
+/**
+ * The boundary pairs, the older action pushed first and the newer one,
+ * the leader at 0.65, second. 0.05 and 0.10 are within `GAP` (0.65 −
+ * 0.55 is 0.10000000000000009 in floating point, and `merge` compares
+ * whole hundredths), so both are flagged; 0.15 discards the older one.
+ */
+const BOUNDARY_HELD = heldOf(
+  [
+    ANCHOR,
+    { id: 'lockfile-delete', trigger: LOCKFILE_TRIGGER, action: 'Delete bun.lock and reinstall.', confidence: 0.6 },
+    { id: 'cache-salt', trigger: CACHE_KEY_TRIGGER, action: 'Salt the key with the branch name.', confidence: 0.55 },
+    { id: 'watcher-restart', trigger: WATCHER_TRIGGER, action: `Restart the ${NONSENSE} watcher on every rename.`, confidence: 0.5 },
+  ],
+  [
+    { id: 'lockfile-frozen', trigger: LOCKFILE_TRIGGER, action: 'Run bun install --frozen-lockfile and read the diff.', confidence: 0.65, createdAt: '2026-10-01T00:00:00Z' },
+    { id: 'cache-hash', trigger: CACHE_KEY_TRIGGER, action: 'Hash the full input list into the key.', confidence: 0.65, createdAt: '2026-10-01T00:00:00Z' },
+    { id: 'watcher-parent', trigger: WATCHER_TRIGGER, action: 'Watch the parent folder so a rename stays in view.', confidence: 0.65, createdAt: '2026-10-01T00:00:00Z' },
+  ],
+);
+const BOUNDARY = bless(BOUNDARY_HELD, { minConfidence: MIN_CONFIDENCE });
+
+const BOUNDARY_CHECKS: readonly DoorCheck[] = [
+  {
+    name: 'a gap of 0.05 flags both lockfile actions, and neither is handed out',
+    task: `The lockfile drifts after every install. The loader is ${ANCHOR_PATH}.`,
+    expected: [],
+    forbidden: [['Delete bun.lock'], ['frozen-lockfile']],
+    canary: ANCHOR_CANARY,
+    bundle: BOUNDARY,
+  },
+  {
+    name: 'a gap of 0.10 flags both cache-key actions, and neither is handed out',
+    task: `Two jobs share one cache key and it collides. The loader is ${ANCHOR_PATH}.`,
+    expected: [],
+    forbidden: [['branch name'], ['full input list']],
+    canary: ANCHOR_CANARY,
+    bundle: BOUNDARY,
+  },
+  {
+    name: 'a gap of 0.15 discards the older watcher action, and only the leader is handed out',
+    task: 'The watcher misses a rename inside src/; make it see moves.',
+    expected: [],
+    forbidden: [[NONSENSE], ['on every rename']],
+    canary: [['parent folder']],
+    bundle: BOUNDARY,
+  },
+];
+
+/** The file both wordings name. */
+const RUNNER_PATH = 'packages/rafa-run/src/suite/runner.ts';
+
+/** One file, two trigger wordings: the older lesson, then the one that replaces it. */
+const WORDING = bundleOf(
+  [{ id: 'runner-timeout', trigger: 'if the test runner never exits', action: 'Raise the test timeout to 60 seconds.', confidence: 0.6, artifact: RUNNER_PATH }],
+  [{ id: 'build-hangs', trigger: 'when the build hangs', action: 'Stop the process group the runner leaves behind.', confidence: 0.6, artifact: RUNNER_PATH, createdAt: '2026-10-01T00:00:00Z' }],
+);
+
+const WORDING_CHECK: DoorCheck = {
+  name: 'a newer lesson under another trigger wording replaces the older one on the same file',
+  task: `Make ${RUNNER_PATH} finish cleanly.`,
+  lesson: 'build-hangs',
+  expected: [],
+  forbidden: [['60 seconds']],
+  canary: [['process group']],
+  bundle: WORDING,
+};
+
+/** The line a flagged pair should render as: both actions, both confidences. */
+const CONFLICT_CHECK: DoorCheck = {
+  name: 'a flagged pair renders one line naming both actions with their confidences',
+  task: HUB_PORT_TASK,
+  expected: [['disagree*'], ['8010'], ['8766'], ['0.55'], ['0.50']],
+  forbidden: [],
+  canary: [],
+};
+
+/** Every check the fixture holds, linted as the file loads. */
+const CHECKS: readonly DoorCheck[] = [
+  ...ANSWERABLE_CHECKS,
+  ...UPDATE_CHECKS,
+  CONTRAST_CHECK,
+  CROWD_CHECK,
+  ...BOUNDARY_CHECKS,
+  WORDING_CHECK,
+  CONFLICT_CHECK,
+];
+
+const LINT = [...CHECKS.flatMap(lintCheck), ...PARAPHRASES.flatMap(lintParaphrase)];
 if (LINT.length > 0) throw new Error(`lesson-door fixture lint:\n${LINT.join('\n')}`);
 
 describe('present: the adebench matcher port', () => {
@@ -564,6 +776,11 @@ describe('lesson door: abstention tasks are handed no lesson', () => {
   }
 });
 
+/**
+ * Today's behaviour, which the conflict-line case below is set to
+ * replace: once a flagged pair renders its own line, the two checks here
+ * turn red and give way to that case.
+ */
 describe('lesson door: an update within GAP is a clean miss, never a stale pair', () => {
   it('holds both publish actions and both hub ports as flagged', () => {
     const statuses = (trigger: string): readonly string[] => HELD
@@ -601,8 +818,113 @@ describe('lesson door: no task is handed a retired action next to the current on
   }
 });
 
-describe('lesson door: an update past GAP keeps the held action', () => {
+/**
+ * Pinned on purpose, a decision of the user's: a newer action at 0.5
+ * against a held one at 0.75 is discarded, and the established lesson
+ * is handed out alone. A change to this rule has to change this case.
+ */
+describe('lesson door: pinned, an update past GAP keeps the held action', () => {
   it(CONTRAST_CHECK.name, () => {
     expect(explain(runCheck(CONTRAST_CHECK))).toBeNull();
   });
+});
+
+describe('lesson door: crowding the cap', () => {
+  it(CROWD_CHECK.name, () => {
+    expect(door(CROWD_CHECK.task, CROWD).ids).toHaveLength(LESSON_LIMIT);
+    expect(explain(runCheck(CROWD_CHECK))).toBeNull();
+  });
+
+  it('thirty lessons on one file hand out the five the rule names', () => {
+    expect(door(`Speed up the collector in ${FILE30_PATH}.`, FILE30).ids).toEqual(FILE30_WINNERS);
+  });
+});
+
+describe('lesson door: boundary pairs at gaps of 0.05, 0.10 and 0.15', () => {
+  it('holds both lockfile and both cache-key actions as flagged, and only the leading watcher action', () => {
+    const held = (trigger: string): readonly string[] => BOUNDARY_HELD
+      .filter((each) => each.trigger === trigger)
+      .map((each) => `${each.id} ${each.status}`)
+      .sort();
+
+    expect(held(LOCKFILE_TRIGGER)).toEqual(['lockfile-delete flagged', 'lockfile-frozen flagged']);
+    expect(held(CACHE_KEY_TRIGGER)).toEqual(['cache-hash flagged', 'cache-salt flagged']);
+    expect(held(WATCHER_TRIGGER)).toEqual(['watcher-parent active']);
+  });
+
+  for (const check of BOUNDARY_CHECKS) {
+    it(check.name, () => {
+      expect(explain(runCheck(check))).toBeNull();
+    });
+  }
+});
+
+describe(`lesson door: the discarded action's ${NONSENSE} reaches no section`, () => {
+  const bundles: Readonly<Record<string, BlessedBundle>> = { BLESSED, BOUNDARY, CROWD, FILE30, WORDING };
+  const tasks = [
+    ...CHECKS.map((check) => check.task),
+    ...ABSTENTION,
+    ...PARAPHRASES.map((paraphrase) => paraphrase.task),
+  ];
+
+  for (const [name, bundle] of Object.entries(bundles)) {
+    it(`over ${name}`, () => {
+      const carrying = tasks.filter((task) => present(door(task, bundle).rendered, [NONSENSE]) !== null);
+
+      expect(carrying).toEqual([]);
+    });
+  }
+});
+
+/**
+ * Records a gap: rafa replaces a lesson only within one exact trigger,
+ * so under a second wording both lessons stay held and both are handed
+ * out on the file they share. Drop `.failing` when a replacement reaches
+ * across wordings.
+ */
+describe('lesson door: a second trigger wording for the same file', () => {
+  it.failing(WORDING_CHECK.name, () => {
+    expect(explain(runCheck(WORDING_CHECK))).toBeNull();
+  });
+});
+
+/**
+ * The user's decision: a flagged pair must not go silent. It renders one
+ * line naming both actions with their confidences, for instance "When
+ * the hub port is taken: two lessons disagree (0.55 / 0.50): start
+ * rafa-hub on port 8010, or start it on port 8766.", and takes one of
+ * the {@link LESSON_LIMIT} slots. The change (`bless` passing flagged
+ * pairs on, the renderer printing the line) is its own spec; drop
+ * `.failing` when it lands.
+ */
+describe('lesson door: a flagged pair renders as one conflict line', () => {
+  it.failing(CONFLICT_CHECK.name, () => {
+    const lines = door(CONFLICT_CHECK.task).rendered.split('\n').slice(1);
+    const conflict = lines.filter((line) => missing(line, CONFLICT_CHECK.expected).length === 0);
+
+    expect(conflict).toHaveLength(1);
+    expect(lines.length).toBeLessThanOrEqual(LESSON_LIMIT);
+    expect(explain(runCheck(CONFLICT_CHECK))).toBeNull();
+  });
+});
+
+/**
+ * Ten tasks that mean a lesson's trigger and share none of its words.
+ * How many reach their lesson is a reported number, never a pass or a
+ * fail: it is the baseline a smarter match is measured against.
+ */
+const PARAPHRASE_READINGS = PARAPHRASES.map((paraphrase) => ({
+  ...paraphrase,
+  handed: door(paraphrase.task).ids,
+}));
+
+afterAll(() => {
+  const reached = PARAPHRASE_READINGS.filter((reading) => reading.handed.includes(reading.lesson));
+  const lines = PARAPHRASE_READINGS.map((reading) => {
+    const mark = reading.handed.includes(reading.lesson)
+      ? 'reached'
+      : 'missed ';
+    return `  ${mark} ${reading.lesson}: handed ${reading.handed.join(', ') || 'none'}`;
+  });
+  console.info([`lesson door paraphrase baseline: ${reached.length}/${PARAPHRASES.length} reach their lesson`, ...lines].join('\n'));
 });
