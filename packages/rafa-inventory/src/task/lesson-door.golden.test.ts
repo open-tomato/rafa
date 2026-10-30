@@ -293,17 +293,14 @@ describe('lesson door: answerable tasks bring in their lesson', () => {
 });
 
 /**
- * Both abstention cases fail today, so they run as `it.failing` and turn
- * red the day they pass. `RANK_FLOOR` is 0, so one shared trigger word
- * keeps a lesson: `tests` (a prefix of `test`) and `add` hand the first
- * task three lessons, and `refresh` hands the second one. The change
- * they ask for is a floor of its own for `selectLessons`: at least two
- * question words matched in the trigger. Every expected lesson above
- * matches two or more. Drop `.failing` when that lands.
+ * Both abstention cases share one ordinary word with a held trigger:
+ * `tests` (a prefix of `test`) and `add` in the first, `refresh` in the
+ * second. Under a floor of one matched word they were handed four
+ * lessons between them; `TRIGGER_WORD_FLOOR` asks for two.
  */
 describe('lesson door: abstention tasks are handed no lesson', () => {
   for (const task of ABSTENTION) {
-    it.failing(task, () => {
+    it(task, () => {
       const { ids, rendered } = door(task);
 
       expect(ids).toEqual([]);
