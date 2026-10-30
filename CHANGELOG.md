@@ -9,6 +9,15 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.48.0 — 2026-10-30, chore(deps): bump the minor-and-patch group with 3 updates; chore(deps): bump actions/setup-node from 4 to 7; chore(deps): bump dependabot/fetch-metadata from 2 to 3; chore(deps): bump actions/checkout from 4 to 7; A project names the command a loop runs in its worktree
+<!-- rafa:fragments fix-rafa-tooling-stretch-merge fix-doctor-cleanup-row-clock dependabot-1323 dependabot-1242 dependabot-1244 dependabot-1243 rafa-1252-bug-sweep-35 rafa-1311-spec-monorepo-decouple-1 rafa-1317-spec-monorepo-decouple-2 rafa-1320-spec-monorepo-pass-4a rafa-1325-spec-monorepo-decouple-3 rafa-1327-spec-monorepo-pass-4b rafa-1333-spec-monorepo-decouple-4 rafa-1336-spec-monorepo-decouple-5 rafa-1341-spec-cleanup-scratch-repository rafa-1347-spec-loop-worktreesetup-command rafa-1349-spec-monorepo-pass-4c rafa-1362-spec-monorepo-decouple-6 rafa-1366-spec-monorepo-pass-4d rafa-1368-spec-monorepo-decouple-7 rafa-1372-spec-upstream-step-s rafa-1374-spec-monorepo-pass-4e rafa-1378-spec-core-s-compiler rafa-1380-spec-monorepo-pass-4f -->
+
+- chore(deps): bump the minor-and-patch group with 3 updates
+- chore(deps): bump actions/setup-node from 4 to 7
+- chore(deps): bump dependabot/fetch-metadata from 2 to 3
+- chore(deps): bump actions/checkout from 4 to 7
+- config: `loop.worktreeSetup` names a shell command that a `--as-worktree` run executes in its worktree, right after the worktree is added or reused and before the preflight and the first session. Null, the default, runs nothing; a nonzero exit or the ten-minute limit refuses the run and leaves the worktree for a rerun. The `rafa init` template lists the key under `loop`, and this repository sets it to `bun install --frozen-lockfile` so a worktree resolves its workspace packages to itself (#1345).
+
 ## 0.47.0 — 2026-10-22, The project's test kinds and check points read from a tracked file; Pass 1 of the monorepo migration, the cut; The person sets the checks each step runs
 <!-- rafa:fragments rafa-1226-bug-sweep-34 rafa-1253-bug-sweep-36 rafa-1270-spec-project-s-test rafa-1271-spec-monorepo-pass-1 rafa-1272-spec-monorepo-pass-2 rafa-1289-spec-integration-test-pass rafa-1290-spec-monorepo-pass-3a rafa-1291-spec-monorepo-pass-3b rafa-1292-spec-monorepo-pass-3c rafa-1293-spec-monorepo-pass-3d rafa-1294-spec-monorepo-pass-3e rafa-1295-spec-monorepo-pass-3f rafa-908-spec-person-sets-checks -->
 
