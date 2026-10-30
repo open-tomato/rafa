@@ -69,6 +69,20 @@
  * the local `refs/remotes/origin/HEAD`, as `rafa cleanup` reads it, so
  * a clone where that ref is unset relies on `pr.base` alone.
  *
+ * ## A base another worktree holds
+ *
+ * Before either probe too, {@link baseHeldElsewhere} reads whether
+ * another checkout holds the base, from `git worktree list --porcelain`
+ * and, only when some checkout holds it, `git rev-parse --show-toplevel`
+ * for this one. Where one does, the base is pulled there and this
+ * checkout detaches at it (`cleanUpSteps`' module note): a merge run
+ * from a session worktree while the main checkout sat on `integration`
+ * stopped at `git switch integration` before this, with every step left
+ * to paste. A listing that failed is warned about and read as no other
+ * holder, so the clean-up switches here and reports git's own refusal
+ * if there is one. The ready line and the kept line then say where the
+ * base was pulled.
+ *
  * {@link REMOTE} is the one spelling of the remote here: the probe and
  * the delete step are handed the same word, where letting
  * `cleanUpSteps` fall back to its own default would leave the probe
@@ -98,7 +112,7 @@
  * the home and the pid probe the other follow-up reads.
  */
 import type { FollowUp } from './merge-followups.js';
-import type { GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
+import type { GitResult, GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { SettleWaitingPlace } from '../../pr/settle-waiting.js';
 import type { PidProbe } from '@open-tomato/rafa/core/loop';
 
@@ -111,7 +125,14 @@ import { RUNTIME_SUBDIR } from '@open-tomato/rafa/core/runtime';
 import { liveLoopsOf } from '@open-tomato/rafa/runtime/live-loops';
 
 import { isKept, readRemoteHead } from '../../cleanup/branches.js';
-import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
+import {
+  cleanUpSteps,
+  commandLine,
+  gitSaid,
+  parseWorktrees,
+  remainingFrom,
+  worktreesHolding,
+} from '../../pr/index.js';
 import { settleWaitingOn } from '../../pr/settle-waiting.js';
 
 import { readFollowUps, readPackageFacts } from './merge-followups.js';
@@ -196,6 +217,25 @@ export function localHoldsBranch(git: GitRunner, branch: string, warn: Report): 
 }
 
 /**
+ * The path of another worktree that holds `base`, or null when this
+ * checkout holds it, none does, or the worktrees cannot be read, which
+ * is warned about. See the module note.
+ */
+export function baseHeldElsewhere(git: GitRunner, base: string, warn: Report): string | null {
+  const unread = (probe: GitResult): null => {
+    warn(`could not read which worktree holds ${base}, so it is switched to here: ${gitSaid(probe)}`);
+    return null;
+  };
+  const listed = git(['worktree', 'list', '--porcelain']);
+  if (!listed.ok) return unread(listed);
+  const worktrees = parseWorktrees(listed.stdout);
+  if (!worktrees.some((entry) => entry.branch === base)) return null;
+  const root = git(['rev-parse', '--show-toplevel']);
+  if (!root.ok) return unread(root);
+  return worktreesHolding(worktrees, base, root.stdout.trim())[0]?.path ?? null;
+}
+
+/**
  * Why `branch` is kept on both sides, or null when the clean-up deletes
  * it. Reads git only past `pr.base`, for the remote's `HEAD`; see the
  * module note.
@@ -212,14 +252,26 @@ export function keptBecause(git: GitRunner, branch: string, settings: KeepSettin
     : null;
 }
 
+/** Where the base ended up: checked out here, or pulled in the worktree at `heldAt`. */
+function basePulled(base: string, heldAt: string | null): string {
+  return heldAt === null
+    ? `${base} is checked out and pulled`
+    : `${base} is pulled in ${heldAt} and this checkout is detached at it`;
+}
+
 /** The line saying a kept branch is kept, and why. */
-export function keptLine(base: string, branch: string, why: string): string {
-  return `${base} is checked out and pulled; ${branch} is kept locally and on ${REMOTE}, since ${why}.`;
+export function keptLine(base: string, branch: string, why: string, heldAt: string | null = null): string {
+  return `${basePulled(base, heldAt)}; ${branch} is kept locally and on ${REMOTE}, since ${why}.`;
 }
 
 /** The line saying what is ready, which each delete having run changes. */
-export function readyLine(base: string, branch: string, present: BranchesPresent): string {
-  const pulled = `${base} is checked out and pulled`;
+export function readyLine(
+  base: string,
+  branch: string,
+  present: BranchesPresent,
+  heldAt: string | null = null,
+): string {
+  const pulled = basePulled(base, heldAt);
   if (present.local) {
     return present.remote
       ? `${pulled}, and ${branch} is gone locally and on ${REMOTE}.`
@@ -237,13 +289,19 @@ function quotedLines(said: string): readonly string[] {
     : said.split('\n').map((line) => `${INDENT}${line}`);
 }
 
+/** What changes the steps besides the branches present: a kept branch, and a base held elsewhere. */
+export interface CleanUpShape {
+  readonly kept?: boolean;
+  readonly baseHeldAt?: string | null;
+}
+
 /** Runs the clean-up, reporting each step, and refuses at the first that failed; see the module note. */
 export function runCleanUp(
   git: GitRunner,
   merged: MergedPull,
   present: BranchesPresent,
   info: Report,
-  kept = false,
+  shape: CleanUpShape = {},
 ): readonly MergeStepReport[] {
   const steps = cleanUpSteps({
     branch: merged.headRefName,
@@ -251,7 +309,7 @@ export function runCleanUp(
     remote: REMOTE,
     localBranchPresent: present.local,
     remoteBranchPresent: present.remote,
-    kept,
+    ...shape,
   });
   const reports: MergeStepReport[] = [];
   for (const step of steps) {
@@ -277,11 +335,11 @@ export function runCleanUp(
 }
 
 /**
- * Reads whether the head branch is kept, probes both branches when it
- * is not, walks the clean-up, and reports what is ready: the whole
- * clean-up `rafa pr merge` runs after the provider merged. The remote
- * is probed before the local branch, so their warnings come in that
- * order.
+ * Reads whether the head branch is kept and where the base is held,
+ * probes both branches when the head is not kept, walks the clean-up,
+ * and reports what is ready: the whole clean-up `rafa pr merge` runs
+ * after the provider merged. The remote is probed before the local
+ * branch, so their warnings come in that order.
  */
 export function cleanUpAfterMerge(
   git: GitRunner,
@@ -290,17 +348,18 @@ export function cleanUpAfterMerge(
   report: { readonly info: Report; readonly warn: Report },
 ): CleanUpOutcome {
   const kept = keptBecause(git, merged.headRefName, settings);
+  const baseHeldAt = baseHeldElsewhere(git, merged.baseRefName, report.warn);
   if (kept !== null) {
-    const steps = runCleanUp(git, merged, { local: false, remote: false }, report.info, true);
-    report.info(keptLine(merged.baseRefName, merged.headRefName, kept));
+    const steps = runCleanUp(git, merged, { local: false, remote: false }, report.info, { kept: true, baseHeldAt });
+    report.info(keptLine(merged.baseRefName, merged.headRefName, kept, baseHeldAt));
     return { steps, kept };
   }
   const present: BranchesPresent = {
     remote: remoteHoldsBranch(git, merged.headRefName, report.warn),
     local: localHoldsBranch(git, merged.headRefName, report.warn),
   };
-  const steps = runCleanUp(git, merged, present, report.info);
-  report.info(readyLine(merged.baseRefName, merged.headRefName, present));
+  const steps = runCleanUp(git, merged, present, report.info, { baseHeldAt });
+  report.info(readyLine(merged.baseRefName, merged.headRefName, present, baseHeldAt));
   return { steps, kept: null };
 }
 
