@@ -9,6 +9,13 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.49.0 — 2026-10-30, rafa pr merge keeps a trunk head branch on both sides; rafa pr merge cleans up when another worktree holds the base
+<!-- rafa:fragments rafa-1266 rafa-1266-base-worktree -->
+
+- pr: rafa pr merge never deletes a head branch that is pr.base, the remote's default branch, main where pr.base names none, or a branch cleanup.keep names, and prints one line saying it kept it
+- pr: rafa pr merge --keep-branch keeps any head branch on both sides
+- pr: rafa pr merge pulls a base another worktree holds in that worktree and detaches the current checkout at it, where git switch used to fail after the merge
+
 ## 0.48.0 — 2026-10-30, chore(deps): bump the minor-and-patch group with 3 updates; chore(deps): bump actions/setup-node from 4 to 7; chore(deps): bump dependabot/fetch-metadata from 2 to 3; chore(deps): bump actions/checkout from 4 to 7; A project names the command a loop runs in its worktree
 <!-- rafa:fragments fix-rafa-tooling-stretch-merge fix-doctor-cleanup-row-clock dependabot-1323 dependabot-1242 dependabot-1244 dependabot-1243 rafa-1252-bug-sweep-35 rafa-1311-spec-monorepo-decouple-1 rafa-1317-spec-monorepo-decouple-2 rafa-1320-spec-monorepo-pass-4a rafa-1325-spec-monorepo-decouple-3 rafa-1327-spec-monorepo-pass-4b rafa-1333-spec-monorepo-decouple-4 rafa-1336-spec-monorepo-decouple-5 rafa-1341-spec-cleanup-scratch-repository rafa-1347-spec-loop-worktreesetup-command rafa-1349-spec-monorepo-pass-4c rafa-1362-spec-monorepo-decouple-6 rafa-1366-spec-monorepo-pass-4d rafa-1368-spec-monorepo-decouple-7 rafa-1372-spec-upstream-step-s rafa-1374-spec-monorepo-pass-4e rafa-1378-spec-core-s-compiler rafa-1380-spec-monorepo-pass-4f -->
 
