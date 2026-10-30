@@ -52,6 +52,23 @@
  * git holds elsewhere is present, and `readMergeRefusal` refuses it
  * before anything is merged.
  *
+ * ## The branches it keeps
+ *
+ * Before either probe, {@link keptBecause} reads whether the head
+ * branch is one the clean-up never deletes: the branch `pr.base`
+ * names, the branch the remote's `HEAD` names, `main` where `pr.base`
+ * names none, a branch a `cleanup.keep` pattern names, or any branch
+ * under `--keep-branch`. The first four are the set `rafa cleanup`
+ * never lists, read through the same functions
+ * (`packages/rafa-pr/src/cleanup/branches.ts`), so the two commands
+ * agree on what a trunk is. A pull request from a trunk, such as
+ * `integration` into `main` at a release, merged and then deleted the
+ * trunk on both sides before this (`open-tomato/rafa#1266`). A kept
+ * branch is probed on neither side and deleted on neither, and the
+ * ready line says it was kept and why. The remote's `HEAD` is read off
+ * the local `refs/remotes/origin/HEAD`, as `rafa cleanup` reads it, so
+ * a clone where that ref is unset relies on `pr.base` alone.
+ *
  * {@link REMOTE} is the one spelling of the remote here: the probe and
  * the delete step are handed the same word, where letting
  * `cleanUpSteps` fall back to its own default would leave the probe
@@ -89,9 +106,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { DEFAULT_BASE_BRANCH } from '@open-tomato/rafa/core/config/sections';
 import { RUNTIME_SUBDIR } from '@open-tomato/rafa/core/runtime';
 import { liveLoopsOf } from '@open-tomato/rafa/runtime/live-loops';
 
+import { isKept, readRemoteHead } from '../../cleanup/branches.js';
 import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
 import { settleWaitingOn } from '../../pr/settle-waiting.js';
 
@@ -123,6 +142,24 @@ export interface MergeStepReport {
 export interface BranchesPresent {
   readonly local: boolean;
   readonly remote: boolean;
+}
+
+/** What decides whether the head branch is kept; see the module note. */
+export interface KeepSettings {
+  /** `pr.base`, or null when nobody has named one. */
+  readonly base: string | null;
+  /** `cleanup.keep`: glob patterns naming branches `rafa cleanup` never lists. */
+  readonly keep: readonly string[];
+  /** True when `--keep-branch` was given. */
+  readonly keepBranch: boolean;
+}
+
+/** What the clean-up ran, and why the head branch was kept when it was. */
+export interface CleanUpOutcome {
+  /** Each step that ran or was skipped, in order. */
+  readonly steps: readonly MergeStepReport[];
+  /** Why the head branch was kept on both sides, or null when the clean-up deleted it. */
+  readonly kept: string | null;
 }
 
 /** What the clean-up reads off the merged pull request. */
@@ -158,6 +195,28 @@ export function localHoldsBranch(git: GitRunner, branch: string, warn: Report): 
   return true;
 }
 
+/**
+ * Why `branch` is kept on both sides, or null when the clean-up deletes
+ * it. Reads git only past `pr.base`, for the remote's `HEAD`; see the
+ * module note.
+ */
+export function keptBecause(git: GitRunner, branch: string, settings: KeepSettings): string | null {
+  if (settings.base !== null && branch === settings.base) return 'it is pr.base';
+  if (branch === readRemoteHead(git)) return `it is ${REMOTE}'s default branch`;
+  if (settings.base === null && branch === DEFAULT_BASE_BRANCH) {
+    return `it is ${DEFAULT_BASE_BRANCH}, the base where pr.base names none`;
+  }
+  if (isKept(branch, settings.keep)) return 'a cleanup.keep pattern names it';
+  return settings.keepBranch
+    ? '--keep-branch was given'
+    : null;
+}
+
+/** The line saying a kept branch is kept, and why. */
+export function keptLine(base: string, branch: string, why: string): string {
+  return `${base} is checked out and pulled; ${branch} is kept locally and on ${REMOTE}, since ${why}.`;
+}
+
 /** The line saying what is ready, which each delete having run changes. */
 export function readyLine(base: string, branch: string, present: BranchesPresent): string {
   const pulled = `${base} is checked out and pulled`;
@@ -184,6 +243,7 @@ export function runCleanUp(
   merged: MergedPull,
   present: BranchesPresent,
   info: Report,
+  kept = false,
 ): readonly MergeStepReport[] {
   const steps = cleanUpSteps({
     branch: merged.headRefName,
@@ -191,6 +251,7 @@ export function runCleanUp(
     remote: REMOTE,
     localBranchPresent: present.local,
     remoteBranchPresent: present.remote,
+    kept,
   });
   const reports: MergeStepReport[] = [];
   for (const step of steps) {
@@ -216,23 +277,31 @@ export function runCleanUp(
 }
 
 /**
- * Probes both branches, walks the clean-up, and reports what is ready:
- * the whole clean-up `rafa pr merge` runs after the provider merged.
- * The remote is probed before the local branch, so their warnings come
- * in that order.
+ * Reads whether the head branch is kept, probes both branches when it
+ * is not, walks the clean-up, and reports what is ready: the whole
+ * clean-up `rafa pr merge` runs after the provider merged. The remote
+ * is probed before the local branch, so their warnings come in that
+ * order.
  */
 export function cleanUpAfterMerge(
   git: GitRunner,
   merged: MergedPull,
+  settings: KeepSettings,
   report: { readonly info: Report; readonly warn: Report },
-): readonly MergeStepReport[] {
+): CleanUpOutcome {
+  const kept = keptBecause(git, merged.headRefName, settings);
+  if (kept !== null) {
+    const steps = runCleanUp(git, merged, { local: false, remote: false }, report.info, true);
+    report.info(keptLine(merged.baseRefName, merged.headRefName, kept));
+    return { steps, kept };
+  }
   const present: BranchesPresent = {
     remote: remoteHoldsBranch(git, merged.headRefName, report.warn),
     local: localHoldsBranch(git, merged.headRefName, report.warn),
   };
   const steps = runCleanUp(git, merged, present, report.info);
   report.info(readyLine(merged.baseRefName, merged.headRefName, present));
-  return steps;
+  return { steps, kept: null };
 }
 
 /** The text of a file, or the empty string when it cannot be read. */

@@ -1,5 +1,5 @@
 /**
- * `rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]`:
+ * `rafa pr merge [<n>] [--yes] [--skip-checks] [--keep-branch] [--method=squash|merge|rebase]`:
  * the pull request merged through the provider, and the five git steps
  * after it run here, each one reported.
  *
@@ -101,6 +101,18 @@
  * `./merge-cleanup.ts`'s, whose module note says how each branch is
  * probed and on which remote; this module calls them in that order and
  * nothing else.
+ *
+ * ## `--keep-branch`
+ *
+ * The clean-up never deletes a trunk: a head branch that is `pr.base`,
+ * the remote's default branch, `main` where `pr.base` names none, or a
+ * branch `cleanup.keep` names is kept on both sides, with one line
+ * saying so (`./merge-cleanup.ts`, `open-tomato/rafa#1266`).
+ * `--keep-branch` keeps any other head branch the same way, on request.
+ * It is spelled for what it keeps rather than as a `--skip-` flag:
+ * `--skip-checks` lets a merge past a refusal, and this one lets nothing
+ * past anything. {@link PrMergeResult.kept} says why the branch was
+ * kept, and is null where the clean-up deleted it.
  *
  * ## The roadmap tick
  *
@@ -291,7 +303,7 @@ export interface PrMergeResult {
   readonly number: number;
   /** `argument` when `<n>` named it, `branch` when the checked-out branch did. */
   readonly source: PullSource;
-  /** The head branch, which the clean-up deletes. */
+  /** The head branch, which the clean-up deletes unless it keeps it; see {@link PrMergeResult.kept}. */
   readonly branch: string;
   /** The base branch, which the clean-up switches to and pulls. */
   readonly base: string;
@@ -306,6 +318,8 @@ export interface PrMergeResult {
   readonly detail: string;
   /** Each clean-up step that ran or was skipped, in order; empty for a declined merge. */
   readonly steps: readonly MergeStepReport[];
+  /** Why the clean-up kept the head branch on both sides, or null when it deleted it or nothing merged. */
+  readonly kept: string | null;
   /** The follow-ups that apply, settle last; empty when neither does. */
   readonly followUps: readonly FollowUp[];
   /** What the tick of the first board in `roadmapTicks` came to, the default board's when it was ticked; null when none was. */
@@ -546,6 +560,7 @@ async function askToMerge(
 export async function runMerge(context: RafaContext, seams: MergeSeams): Promise<PrMergeResult> {
   const yes = readBooleanFlag(context.flags, 'yes', USAGE);
   const skipChecks = readBooleanFlag(context.flags, 'skip-checks', USAGE);
+  const keepBranch = readBooleanFlag(context.flags, 'keep-branch', USAGE);
   const wanted = readMethodFlag(context.flags, USAGE);
   const asked = readPullArgument(context.args, USAGE);
   const pr = await openPrContext(context, seams);
@@ -599,6 +614,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     declined: true,
     detail: '',
     steps: [],
+    kept: null,
     followUps: [],
     roadmapTick: null,
     roadmapTicks: null,
@@ -625,7 +641,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
   const commentUrl = await commentIfUnchecked(pr.pulls, detail.number, answer.unchecked, { info, warn });
   const roadmapTicks = await reportTick(context, pr, seams, detail);
 
-  const steps = cleanUpAfterMerge(git, detail, { info, warn });
+  const { steps, kept } = cleanUpAfterMerge(git, detail, { base: pr.base, keep: pr.cleanupKeep, keepBranch }, { info, warn });
   const board = await reportAfterCleanUp(context, pr, seams, detail);
   await refreshProjectAfterMerge({
     body: detail.body,
@@ -653,6 +669,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     declined: false,
     detail: outcome.detail,
     steps,
+    kept,
     followUps,
     roadmapTick: roadmapTicks?.[0] ?? null,
     roadmapTicks,
