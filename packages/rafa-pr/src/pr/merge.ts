@@ -118,6 +118,16 @@
  * dropped so the report still names it in its place; {@link remainingFrom}
  * leaves it out of the commands to paste, since running it would fail.
  *
+ * ## A kept branch
+ *
+ * A branch the caller keeps ({@link CleanUpPlan.kept}) has neither
+ * delete in the list, not even as a skipped step: a trunk merged into
+ * another branch, such as `integration` into `main`, is not finished
+ * work (`open-tomato/rafa#1266`). With both deletes out of the list,
+ * {@link remainingFrom} cannot name either in the tail a failed step
+ * prints, so no failure tells the operator to delete a trunk by hand.
+ * Which branches are kept is the caller's reading.
+ *
  * ## What is kept verbatim
  *
  * A {@link WorkingTreeStatus} entry, and a tracked one, is the porcelain
@@ -552,16 +562,22 @@ export interface CleanUpPlan {
    * drops the remote delete from the list; see the module note.
    */
   readonly remoteBranchPresent: boolean;
+  /**
+   * True when the branch is kept on both sides, which drops both
+   * deletes from the list; see the module note. False when absent.
+   */
+  readonly kept?: boolean;
 }
 
 /**
  * The clean-up after a merge, in the order it runs: switch to the base,
  * pull it fast-forward only, delete the local branch (skipped when there
- * is none), delete the remote branch when it is still there, prune. Frozen, and the same array the
+ * is none), delete the remote branch when it is still there, prune. A
+ * kept branch has neither delete. Frozen, and the same array the
  * runner walks and a failure prints the tail of.
  */
 export function cleanUpSteps(plan: CleanUpPlan): readonly MergeStep[] {
-  const { base, branch, remote = DEFAULT_REMOTE, localBranchPresent, remoteBranchPresent } = plan;
+  const { base, branch, remote = DEFAULT_REMOTE, localBranchPresent, remoteBranchPresent, kept = false } = plan;
   const steps: MergeStep[] = [
     { id: 'switch-base', label: `switch to ${base}`, argv: ['git', 'switch', base] },
     {
@@ -569,16 +585,18 @@ export function cleanUpSteps(plan: CleanUpPlan): readonly MergeStep[] {
       label: `pull ${base}, fast-forward only`,
       argv: ['git', 'pull', '--ff-only'],
     },
-    {
+  ];
+  if (!kept) {
+    steps.push({
       id: 'delete-local',
       label: `delete the local branch ${branch}`,
       argv: ['git', 'branch', '-D', branch],
       ...(localBranchPresent
         ? {}
         : { skip: `no local branch ${branch}; nothing to delete` }),
-    },
-  ];
-  if (remoteBranchPresent) {
+    });
+  }
+  if (!kept && remoteBranchPresent) {
     steps.push({
       id: 'delete-remote',
       label: `delete ${remote}/${branch}`,

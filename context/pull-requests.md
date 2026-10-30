@@ -22,8 +22,10 @@ Ten actions read and control pull requests:
   (`packages/rafa-pr/src/commands/pr/list-forecast.ts`, over
   `packages/rafa-release/src/release/body-forecast.ts`; no fetch, no fold, no
   extra `gh` command)
-- `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
-  merge the PR; `--skip-checks` is for a PR that reports no checks at all
+- `pr merge [<n>] [--yes] [--skip-checks] [--keep-branch]
+  [--method=squash|merge|rebase]` — merge the PR; `--skip-checks` is for a
+  PR that reports no checks at all; a trunk head branch is kept on both
+  sides, and `--keep-branch` keeps any other head branch the same way
 - `pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config]
   [--max-attempts=2]` — assess it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
@@ -249,7 +251,14 @@ sentence replaces nothing.
    <name>; nothing to delete`; the remote delete and the prune still run,
    and the exit code stays 0. A branch checked out in another worktree is
    present, so step 1 still refuses it, or frees it when an ended loop
-   worktree holds it.
+   worktree holds it. A head branch that is a trunk is kept on both sides
+   and probed on neither: `pr.base`, the branch `origin`'s `HEAD` names,
+   `main` where `pr.base` names none, or a branch a `cleanup.keep` pattern
+   names, the set `rafa cleanup` never lists (#1266). `--keep-branch` keeps
+   any other head branch the same way. Neither delete is then in the list,
+   so a failed step's tail names neither, and one line says
+   `<base> is checked out and pulled; <branch> is kept locally and on
+   origin, since <why>.`; the json result's `kept` holds the why.
 5. Tick the roadmap and print what is ready.
 6. Run the unblock reading over every open issue labelled `spec:blocked` whose
    `Blocked by:` line names an issue this PR closes, asking `#<n> was blocked by

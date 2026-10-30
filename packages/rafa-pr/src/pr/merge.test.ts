@@ -550,6 +550,13 @@ describe('cleanUpSteps', () => {
     ]);
   });
 
+  it('leaves both deletes out of a kept branch, and so out of a failed step\'s tail', () => {
+    const steps = cleanUpSteps({ ...plan, branch: 'integration', kept: true });
+    expect(steps.map((step) => step.id)).toEqual(['switch-base', 'pull-base', 'prune-remotes']);
+    expect(remainingFrom(steps, 'pull-base').map((step) => commandLine(step)))
+      .toEqual(['git pull --ff-only', 'git fetch --prune']);
+  });
+
   it('undoes nothing: no step reverts, resets or force-pushes', () => {
     const words = cleanUpSteps(plan).flatMap((step) => step.argv);
     for (const banned of ['revert', 'reset', '--force', '-f', '--force-with-lease']) {

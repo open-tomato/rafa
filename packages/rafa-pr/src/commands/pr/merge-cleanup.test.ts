@@ -10,7 +10,7 @@
  * `merge.test.ts` and `merge-driven.test.ts` run the same functions
  * through `rafa pr merge` itself.
  */
-import type { FollowUpPlace } from './merge-cleanup.js';
+import type { FollowUpPlace, KeepSettings } from './merge-cleanup.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import type { MergeGuardSettings } from '@open-tomato/rafa-release/release/guard-merge';
@@ -30,6 +30,7 @@ import { createGitRunner } from '../../pr/index.js';
 import {
   cleanUpAfterMerge,
   followUpsFor,
+  keptBecause,
   localHoldsBranch,
   readyLine,
   remoteHoldsBranch,
@@ -202,6 +203,50 @@ describe('runCleanUp', () => {
   });
 });
 
+/** The git line `readRemoteHead` reads the remote's default branch with. */
+const REMOTE_HEAD = 'symbolic-ref --quiet --short refs/remotes/origin/HEAD';
+
+/** The keep settings of a project naming no base and no pattern, the flag off. */
+const NOTHING_KEPT: KeepSettings = { base: null, keep: [], keepBranch: false };
+
+/** The promotion pull request the incident merged: the trunk into the release branch. */
+const PROMOTED = { number: 1265, headRefName: 'integration', baseRefName: 'main' };
+
+describe('keptBecause', () => {
+  it('keeps the branch pr.base names, asking git nothing', () => {
+    const { git, calls } = fakeGit();
+    expect(keptBecause(git, 'integration', { ...NOTHING_KEPT, base: 'integration' })).toBe('it is pr.base');
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps the remote\'s default branch even where pr.base names another', () => {
+    const { git } = fakeGit({ [REMOTE_HEAD]: { ok: true, stdout: 'origin/integration\n', stderr: '' } });
+    expect(keptBecause(git, 'integration', { ...NOTHING_KEPT, base: 'develop' }))
+      .toBe('it is origin\'s default branch');
+  });
+
+  it('keeps main where pr.base names none and the remote names no default', () => {
+    const { git } = fakeGit({ [REMOTE_HEAD]: { ok: false, stdout: '', stderr: '' } });
+    expect(keptBecause(git, 'main', NOTHING_KEPT)).toBe('it is main, the base where pr.base names none');
+  });
+
+  it('keeps a branch a cleanup.keep pattern names', () => {
+    const { git } = fakeGit();
+    expect(keptBecause(git, 'release/1.2', { ...NOTHING_KEPT, keep: ['release/*'] }))
+      .toBe('a cleanup.keep pattern names it');
+  });
+
+  it('keeps any branch under --keep-branch', () => {
+    const { git } = fakeGit();
+    expect(keptBecause(git, 'feat/x', { ...NOTHING_KEPT, keepBranch: true })).toBe('--keep-branch was given');
+  });
+
+  it('keeps nothing else: a feature branch is deleted', () => {
+    const { git } = fakeGit({ [REMOTE_HEAD]: { ok: true, stdout: 'origin/main\n', stderr: '' } });
+    expect(keptBecause(git, 'feat/x', { base: 'integration', keep: ['release/*'], keepBranch: false })).toBeNull();
+  });
+});
+
 describe('cleanUpAfterMerge', () => {
   it('probes the remote before the local branch, runs the steps, and ends on the ready line', () => {
     const { git, calls } = fakeGit({
@@ -210,11 +255,75 @@ describe('cleanUpAfterMerge', () => {
     });
     const info = collector();
     const warned = collector();
-    const steps = cleanUpAfterMerge(git, MERGED, { info: info.report, warn: warned.report });
-    expect(calls.slice(0, 2)).toEqual(['ls-remote --heads origin feat/x', 'show-ref --verify --quiet refs/heads/feat/x']);
+    const { steps, kept } = cleanUpAfterMerge(git, MERGED, NOTHING_KEPT, { info: info.report, warn: warned.report });
+    expect(calls.slice(0, 3)).toEqual([
+      REMOTE_HEAD,
+      'ls-remote --heads origin feat/x',
+      'show-ref --verify --quiet refs/heads/feat/x',
+    ]);
     expect(warned.lines.map((line) => line.split(' ')[0])).toEqual(['origin', 'could']);
     expect(steps.map((step) => step.id)).toEqual(['switch-base', 'pull-base', 'delete-local', 'prune-remotes']);
+    expect(kept).toBeNull();
     expect(info.lines.at(-1)).toBe('main is checked out and pulled, and feat/x is gone locally; origin had already deleted it.');
+  });
+
+  it('still deletes a feature branch on both sides where the project names trunks', () => {
+    const { git, calls } = fakeGit({
+      'ls-remote --heads origin feat/x': { ok: true, stdout: 'abc\trefs/heads/feat/x\n', stderr: '' },
+    });
+    const { kept } = cleanUpAfterMerge(git, MERGED, { ...NOTHING_KEPT, base: 'integration' }, {
+      info: collector().report,
+      warn: collector().report,
+    });
+    expect(kept).toBeNull();
+    expect(calls).toContain('branch -D feat/x');
+    expect(calls).toContain('push origin --delete feat/x');
+  });
+
+  it('keeps a trunk head on both sides, probing neither, and says so in one line', () => {
+    const { git, calls } = fakeGit();
+    const info = collector();
+    const { steps, kept } = cleanUpAfterMerge(git, PROMOTED, { ...NOTHING_KEPT, base: 'integration' }, {
+      info: info.report,
+      warn: collector().report,
+    });
+    expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch --prune']);
+    expect(steps.map((step) => step.id)).toEqual(['switch-base', 'pull-base', 'prune-remotes']);
+    expect(kept).toBe('it is pr.base');
+    expect(info.lines.filter((line) => line.includes('kept'))).toEqual([
+      'main is checked out and pulled; integration is kept locally and on origin, since it is pr.base.',
+    ]);
+  });
+
+  it('names no trunk delete in the tail a failed step prints', () => {
+    const { git } = fakeGit({ 'pull --ff-only': { ok: false, stdout: '', stderr: 'fatal: diverged' } });
+    let thrown: unknown = null;
+    try {
+      cleanUpAfterMerge(git, PROMOTED, { ...NOTHING_KEPT, base: 'integration' }, {
+        info: collector().report,
+        warn: collector().report,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(CommandExit);
+    const message = (thrown as CommandExit).message;
+    expect(message).not.toContain('branch -D');
+    expect(message).not.toContain('--delete');
+    expect(message.split('\n').slice(-2)).toEqual(['   git pull --ff-only', '   git fetch --prune']);
+  });
+
+  it('keeps a feature branch under --keep-branch, deleting it on neither side', () => {
+    const { git, calls } = fakeGit();
+    const info = collector();
+    const { kept } = cleanUpAfterMerge(git, MERGED, { ...NOTHING_KEPT, keepBranch: true }, {
+      info: info.report,
+      warn: collector().report,
+    });
+    expect(kept).toBe('--keep-branch was given');
+    expect(calls).toEqual([REMOTE_HEAD, 'switch main', 'pull --ff-only', 'fetch --prune']);
+    expect(info.lines.at(-1))
+      .toBe('main is checked out and pulled; feat/x is kept locally and on origin, since --keep-branch was given.');
   });
 });
 

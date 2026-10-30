@@ -250,7 +250,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr view': [['n'], []],
   'pr list': [[], []],
   'pr wait': [['n'], ['timeout', 'hint']],
-  'pr merge': [['n'], ['yes', 'skip-checks', 'method', 'hint']],
+  'pr merge': [['n'], ['yes', 'skip-checks', 'keep-branch', 'method', 'hint']],
   'pr triage': [['n'], ['comment', 'resolve', 'allow-local-config', 'max-attempts', 'hint']],
   'pr open': [[], ['head', 'base', 'title', 'body-file']],
   'pr retarget': [['n'], ['base']],

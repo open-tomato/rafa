@@ -184,8 +184,10 @@
  *     `pr wait [<n>] [--timeout=<minutes>]`, its checks polled until
  *     they settle or the deadline passes with nothing written, exiting 0
  *     green, 1 red and on no checks at all, and 3 at the deadline; and
- *     `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]`,
- *     one merged and both branches cleaned up after it;
+ *     `pr merge [<n>] [--yes] [--skip-checks] [--keep-branch]
+ *     [--method=squash|merge|rebase]`, one merged and both branches
+ *     cleaned up after it, unless the head is a trunk or
+ *     `--keep-branch` keeps it;
  *     `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`,
  *     one opened from a pushed head, or the one already open on the head
  *     printed and none opened;
