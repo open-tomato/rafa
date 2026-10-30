@@ -1,0 +1,6 @@
+# the extract and every engine report are measured data, not source
+extract/
+*.json
+!package.json
+*.log
+node_modules/

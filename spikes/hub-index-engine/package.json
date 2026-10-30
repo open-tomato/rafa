@@ -1,0 +1,10 @@
+{
+  "name": "hub-index-engine-spike",
+  "private": true,
+  "type": "module",
+  "description": "Spike: FTS5 + sqlite-vec vs LanceDB under Bun over an anonymised effort-store extract. Never merged.",
+  "dependencies": {
+    "@lancedb/lancedb": "0.41.0",
+    "sqlite-vec": "0.1.9"
+  }
+}
