@@ -557,6 +557,32 @@ describe('cleanUpSteps', () => {
       .toEqual(['git pull --ff-only', 'git fetch --prune']);
   });
 
+  it('pulls a base another worktree holds there, then detaches this checkout at it', () => {
+    const steps = cleanUpSteps({ ...plan, baseHeldAt: '/repo/main checkout' });
+    expect(steps.map((step) => step.id)).toEqual([
+      'pull-base',
+      'switch-base',
+      'delete-local',
+      'delete-remote',
+      'prune-remotes',
+    ]);
+    expect(steps.slice(0, 2).map((step) => step.argv)).toEqual([
+      ['git', '-C', '/repo/main checkout', 'pull', '--ff-only'],
+      ['git', 'switch', '--detach', 'main'],
+    ]);
+    expect(steps.slice(0, 2).map((step) => step.label)).toEqual([
+      'pull main in /repo/main checkout, fast-forward only',
+      'detach this checkout at main',
+    ]);
+    const pasted = remainingFrom(steps, 'pull-base').map((step) => commandLine(step));
+    expect(pasted.slice(0, 2)).toEqual(['git -C \'/repo/main checkout\' pull --ff-only', 'git switch --detach main']);
+  });
+
+  it('switches to the base as before when no other worktree holds it', () => {
+    expect(cleanUpSteps({ ...plan, baseHeldAt: null }).map((step) => step.argv))
+      .toEqual(cleanUpSteps(plan).map((step) => step.argv));
+  });
+
   it('undoes nothing: no step reverts, resets or force-pushes', () => {
     const words = cleanUpSteps(plan).flatMap((step) => step.argv);
     for (const banned of ['revert', 'reset', '--force', '-f', '--force-with-lease']) {
