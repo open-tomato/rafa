@@ -219,7 +219,11 @@ const report = {
   embeddings: 'deterministic hashed bag of words, 384 dims, no model call',
   rows: rows.length,
   queryTerms: terms,
-  vectorIndex: withVectorIndex ? 'ivfPq(256, 48)' : 'none: brute force under 50k rows',
+  vectorIndex: withVectorIndex
+    ? 'ivfPq(256, 48)'
+    : flags.includes('--no-vector-index')
+      ? 'none: --no-vector-index, brute force'
+      : 'none: under 50k rows, brute force',
   rebuild: {
     totalMs: built.addMs + built.ftsMs + (built.vectorIndexMs ?? 0),
     addMs: built.addMs,
