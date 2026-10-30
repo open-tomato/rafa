@@ -640,6 +640,7 @@ describe('the clean-up', () => {
       'worktree list --porcelain',
       'rev-parse --show-toplevel',
       'symbolic-ref --quiet --short refs/remotes/origin/HEAD',
+      'worktree list --porcelain',
       `ls-remote --heads origin ${BRANCH}`,
       `show-ref --verify --quiet refs/heads/${BRANCH}`,
       `switch ${BASE}`,
@@ -652,6 +653,31 @@ describe('the clean-up', () => {
     expect(lines).toContain(`switch to ${BASE}: done`);
     expect(lines).toContain(`delete origin/${BRANCH}: done`);
     expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled, and ${BRANCH} is gone locally and on origin.`);
+  });
+
+  it('pulls a base another worktree holds there and detaches this checkout, switching nowhere', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const main = `${project.root}-main`;
+    const seams = caseSeams(stub.pulls, project, {
+      git: {
+        'worktree list --porcelain':
+          ok(`worktree ${main}\nbranch refs/heads/${BASE}\n\nworktree ${project.root}\nbranch refs/heads/${BRANCH}\n\n`),
+      },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.git.ran()).not.toContain(`switch ${BASE}`);
+    expect(seams.git.ran().slice(-5)).toEqual([
+      `-C ${main} pull --ff-only`,
+      `switch --detach ${BASE}`,
+      `branch -D ${BRANCH}`,
+      `push origin --delete ${BRANCH}`,
+      'fetch --prune',
+    ]);
+    expect(lines.at(-1))
+      .toBe(`${BASE} is pulled in ${main} and this checkout is detached at it, and ${BRANCH} is gone locally and on origin.`);
   });
 
   it('leaves the remote delete out where the remote no longer holds the branch, and says so', async () => {

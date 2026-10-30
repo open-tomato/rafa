@@ -258,7 +258,13 @@ sentence replaces nothing.
    any other head branch the same way. Neither delete is then in the list,
    so a failed step's tail names neither, and one line says
    `<base> is checked out and pulled; <branch> is kept locally and on
-   origin, since <why>.`; the json result's `kept` holds the why.
+   origin, since <why>.`; the json result's `kept` holds the why. A base
+   another worktree holds — the main checkout on `integration` while the
+   merge runs from a session worktree — would fail `git switch <base>`, so
+   the two base steps change places: `git -C <path> pull --ff-only` in that
+   worktree, then `git switch --detach <base>` here, and the ready line says
+   `<base> is pulled in <path> and this checkout is detached at it`. The
+   holder is read from `git worktree list --porcelain` after the merge.
 5. Tick the roadmap and print what is ready.
 6. Run the unblock reading over every open issue labelled `spec:blocked` whose
    `Blocked by:` line names an issue this PR closes, asking `#<n> was blocked by

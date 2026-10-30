@@ -92,11 +92,10 @@
  * `process.cwd()` from a path reached through a symlink would refuse
  * its own worktree as somebody else's.
  *
- * Only the PULL REQUEST's branch is checked. The base being checked out
- * elsewhere blocks the first clean-up step, but that is `git switch`'s
- * own refusal, reported as a failed step with the rest of the list
- * printed after it — and the spec names one refusal here, for the
- * branch the clean-up DELETES.
+ * Only the PULL REQUEST's branch is refused on. The base being checked
+ * out elsewhere does not refuse: the clean-up works around it instead
+ * (see "A base another worktree holds" below), since the spec names one
+ * refusal here, for the branch the clean-up DELETES.
  *
  * ## Why the local delete is `-D`, and the remote one conditional
  *
@@ -127,6 +126,24 @@
  * {@link remainingFrom} cannot name either in the tail a failed step
  * prints, so no failure tells the operator to delete a trunk by hand.
  * Which branches are kept is the caller's reading.
+ *
+ * ## A base another worktree holds
+ *
+ * Git checks a branch out in one worktree at a time, so `git switch
+ * <base>` fails with `'<base>' is already used by worktree at <path>`
+ * where another checkout holds the base: a merge run from a session
+ * worktree while the main checkout sits on `integration`, say. That
+ * failure stopped the clean-up at its first step, after the merge, and
+ * left every step to paste. For a base held at
+ * {@link CleanUpPlan.baseHeldAt}, the two base steps change and swap
+ * places: the pull runs IN that worktree (`git -C <path> pull
+ * --ff-only`), and this checkout then detaches at the pulled base
+ * (`git switch --detach <base>`), which git allows while another
+ * worktree holds the branch. The pull goes first so the detach lands on
+ * the merged tip, and the detach still takes this checkout off the head
+ * branch, so the local delete after it can run. A fast-forward-only
+ * pull writes no history, and it stops on its own when that worktree's
+ * changes are in the way, which reports as any failed step does.
  *
  * ## What is kept verbatim
  *
@@ -567,25 +584,55 @@ export interface CleanUpPlan {
    * deletes from the list; see the module note. False when absent.
    */
   readonly kept?: boolean;
+  /**
+   * The path of another worktree that holds `base`, or null when none
+   * does, which pulls the base there and detaches this checkout at it;
+   * see the module note. Null when absent.
+   */
+  readonly baseHeldAt?: string | null;
+}
+
+/**
+ * The two steps that bring this checkout onto the pulled base: switch
+ * and pull here, or, where another worktree holds the base, pull there
+ * and detach here. See the module note.
+ */
+function baseSteps(base: string, heldAt: string | null): MergeStep[] {
+  if (heldAt === null) {
+    return [
+      { id: 'switch-base', label: `switch to ${base}`, argv: ['git', 'switch', base] },
+      { id: 'pull-base', label: `pull ${base}, fast-forward only`, argv: ['git', 'pull', '--ff-only'] },
+    ];
+  }
+  return [
+    {
+      id: 'pull-base',
+      label: `pull ${base} in ${heldAt}, fast-forward only`,
+      argv: ['git', '-C', heldAt, 'pull', '--ff-only'],
+    },
+    { id: 'switch-base', label: `detach this checkout at ${base}`, argv: ['git', 'switch', '--detach', base] },
+  ];
 }
 
 /**
  * The clean-up after a merge, in the order it runs: switch to the base,
  * pull it fast-forward only, delete the local branch (skipped when there
  * is none), delete the remote branch when it is still there, prune. A
- * kept branch has neither delete. Frozen, and the same array the
- * runner walks and a failure prints the tail of.
+ * kept branch has neither delete, and a base another worktree holds is
+ * pulled there before this checkout detaches at it. Frozen, and the
+ * same array the runner walks and a failure prints the tail of.
  */
 export function cleanUpSteps(plan: CleanUpPlan): readonly MergeStep[] {
-  const { base, branch, remote = DEFAULT_REMOTE, localBranchPresent, remoteBranchPresent, kept = false } = plan;
-  const steps: MergeStep[] = [
-    { id: 'switch-base', label: `switch to ${base}`, argv: ['git', 'switch', base] },
-    {
-      id: 'pull-base',
-      label: `pull ${base}, fast-forward only`,
-      argv: ['git', 'pull', '--ff-only'],
-    },
-  ];
+  const {
+    base,
+    branch,
+    remote = DEFAULT_REMOTE,
+    localBranchPresent,
+    remoteBranchPresent,
+    kept = false,
+    baseHeldAt = null,
+  } = plan;
+  const steps: MergeStep[] = baseSteps(base, baseHeldAt);
   if (!kept) {
     steps.push({
       id: 'delete-local',

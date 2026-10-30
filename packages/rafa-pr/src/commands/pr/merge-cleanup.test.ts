@@ -28,9 +28,11 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { createGitRunner } from '../../pr/index.js';
 
 import {
+  baseHeldElsewhere,
   cleanUpAfterMerge,
   followUpsFor,
   keptBecause,
+  keptLine,
   localHoldsBranch,
   readyLine,
   remoteHoldsBranch,
@@ -148,6 +150,15 @@ describe('readyLine', () => {
   });
 });
 
+describe('readyLine and keptLine for a base another worktree holds', () => {
+  it('say where the base was pulled and that this checkout is detached at it', () => {
+    expect(readyLine('main', 'feat/x', { local: true, remote: true }, '/repo'))
+      .toBe('main is pulled in /repo and this checkout is detached at it, and feat/x is gone locally and on origin.');
+    expect(keptLine('main', 'integration', 'it is pr.base', '/repo'))
+      .toBe('main is pulled in /repo and this checkout is detached at it; integration is kept locally and on origin, since it is pr.base.');
+  });
+});
+
 describe('runCleanUp', () => {
   it('runs every step in order and reports each done', () => {
     const { git, calls } = fakeGit();
@@ -247,7 +258,78 @@ describe('keptBecause', () => {
   });
 });
 
+/** The git lines `baseHeldElsewhere` reads the checkouts with. */
+const WORKTREES = 'worktree list --porcelain';
+const TOPLEVEL = 'rev-parse --show-toplevel';
+
+/** What `git worktree list --porcelain` prints for a main checkout on `integration` and a session worktree. */
+const TWO_CHECKOUTS = [
+  'worktree /repo',
+  'HEAD 17ad52742f6c033d33c7c034ed8d44a63b6df889',
+  'branch refs/heads/integration',
+  '',
+  'worktree /repo/.claude/worktrees/session',
+  'HEAD 67672f618d097f1c8143ac288986f80e322f77a7',
+  'branch refs/heads/claude/session',
+  '',
+].join('\n');
+
+/** The answers of a session worktree whose base the main checkout holds. */
+const IN_SESSION_WORKTREE: Readonly<Record<string, GitResult>> = {
+  [WORKTREES]: { ok: true, stdout: TWO_CHECKOUTS, stderr: '' },
+  [TOPLEVEL]: { ok: true, stdout: '/repo/.claude/worktrees/session\n', stderr: '' },
+};
+
+describe('baseHeldElsewhere', () => {
+  it('answers the other worktree that holds the base', () => {
+    const { git } = fakeGit(IN_SESSION_WORKTREE);
+    expect(baseHeldElsewhere(git, 'integration', collector().report)).toBe('/repo');
+  });
+
+  it('answers null when this checkout holds the base', () => {
+    const { git } = fakeGit({ ...IN_SESSION_WORKTREE, [TOPLEVEL]: { ok: true, stdout: '/repo\n', stderr: '' } });
+    expect(baseHeldElsewhere(git, 'integration', collector().report)).toBeNull();
+  });
+
+  it('answers null without reading the root when no checkout holds the base', () => {
+    const { git, calls } = fakeGit(IN_SESSION_WORKTREE);
+    expect(baseHeldElsewhere(git, 'main', collector().report)).toBeNull();
+    expect(calls).toEqual([WORKTREES]);
+  });
+
+  it('warns and answers null when the worktrees cannot be listed', () => {
+    const { git } = fakeGit({ [WORKTREES]: { ok: false, stdout: '', stderr: 'fatal: broken' } });
+    const warned = collector();
+    expect(baseHeldElsewhere(git, 'integration', warned.report)).toBeNull();
+    expect(warned.lines).toEqual([
+      'could not read which worktree holds integration, so it is switched to here: fatal: broken',
+    ]);
+  });
+});
+
 describe('cleanUpAfterMerge', () => {
+  it('pulls a base the main checkout holds there and detaches this worktree, so no switch is refused', () => {
+    const merged = { number: 1392, headRefName: 'fix/x', baseRefName: 'integration' };
+    const { git, calls } = fakeGit({
+      ...IN_SESSION_WORKTREE,
+      'ls-remote --heads origin fix/x': { ok: true, stdout: 'abc\trefs/heads/fix/x\n', stderr: '' },
+      'show-ref --verify --quiet refs/heads/fix/x': { ok: false, stdout: '', stderr: '' },
+    });
+    const info = collector();
+    const { steps } = cleanUpAfterMerge(git, merged, NOTHING_KEPT, { info: info.report, warn: collector().report });
+    expect(calls).not.toContain('switch integration');
+    expect(calls.slice(-4)).toEqual([
+      '-C /repo pull --ff-only',
+      'switch --detach integration',
+      'push origin --delete fix/x',
+      'fetch --prune',
+    ]);
+    expect(steps.every((step) => step.ok)).toBe(true);
+    expect(info.lines.at(-1)).toBe(
+      'integration is pulled in /repo and this checkout is detached at it, and fix/x is gone on origin; there was no local branch to delete.',
+    );
+  });
+
   it('probes the remote before the local branch, runs the steps, and ends on the ready line', () => {
     const { git, calls } = fakeGit({
       'ls-remote --heads origin feat/x': { ok: false, stdout: '', stderr: 'remote gone' },
@@ -256,8 +338,9 @@ describe('cleanUpAfterMerge', () => {
     const info = collector();
     const warned = collector();
     const { steps, kept } = cleanUpAfterMerge(git, MERGED, NOTHING_KEPT, { info: info.report, warn: warned.report });
-    expect(calls.slice(0, 3)).toEqual([
+    expect(calls.slice(0, 4)).toEqual([
       REMOTE_HEAD,
+      WORKTREES,
       'ls-remote --heads origin feat/x',
       'show-ref --verify --quiet refs/heads/feat/x',
     ]);
@@ -287,7 +370,7 @@ describe('cleanUpAfterMerge', () => {
       info: info.report,
       warn: collector().report,
     });
-    expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch --prune']);
+    expect(calls).toEqual([WORKTREES, 'switch main', 'pull --ff-only', 'fetch --prune']);
     expect(steps.map((step) => step.id)).toEqual(['switch-base', 'pull-base', 'prune-remotes']);
     expect(kept).toBe('it is pr.base');
     expect(info.lines.filter((line) => line.includes('kept'))).toEqual([
@@ -321,7 +404,7 @@ describe('cleanUpAfterMerge', () => {
       warn: collector().report,
     });
     expect(kept).toBe('--keep-branch was given');
-    expect(calls).toEqual([REMOTE_HEAD, 'switch main', 'pull --ff-only', 'fetch --prune']);
+    expect(calls).toEqual([REMOTE_HEAD, WORKTREES, 'switch main', 'pull --ff-only', 'fetch --prune']);
     expect(info.lines.at(-1))
       .toBe('main is checked out and pulled; feat/x is kept locally and on origin, since --keep-branch was given.');
   });
