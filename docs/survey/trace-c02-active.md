@@ -36,7 +36,7 @@ Non-test imports leaving the cluster (223 edges, 87 distinct files), by the clus
 
 | Target cluster | Edges | Distinct files | Files a cut would have to give `c02-active` access to |
 | --- | --- | --- | --- |
-| `c03-config` | 82 | 24 | `src/config.ts`, `src/config-load.ts`, `src/config-schema.ts`, `src/config-schema-tests.ts`, `src/config-schema-wrap-up.ts`, `src/config-sections.ts`, `src/adapters/registry.ts`, `src/agents/roster.ts`, `src/tiers/{delivery,resolve,routing,serve,skill-names}.ts`, `src/inventory/{record,trees,search/rank}.ts`, `src/schema/tiers.ts`, `src/effort/sync/contact.ts`, `src/start/{plan-path,preflight-sync,risk-total}.ts`, `src/task/skill-index.ts`, `src/utils/{agent-definition,session-env}.ts` |
+| `c03-config` | 82 | 24 | `src/config.ts`, `src/config-load.ts`, `src/config-schema.ts`, `packages/rafa/src/config-schema-tests.ts`, `packages/rafa/src/config-schema-wrap-up.ts`, `src/config-sections.ts`, `src/adapters/registry.ts`, `src/agents/roster.ts`, `src/tiers/{delivery,resolve,routing,serve,skill-names}.ts`, `src/inventory/{record,trees,search/rank}.ts`, `src/schema/tiers.ts`, `src/effort/sync/contact.ts`, `src/start/{plan-path,preflight-sync,risk-total}.ts`, `src/task/skill-index.ts`, `src/utils/{agent-definition,session-env}.ts` |
 | `c07-index` | 34 | 16 | `src/pr/{index,provider,preflight-items}.ts`, `src/utils/git.ts`, `src/claims/{device,plan-claim}.ts`, `src/commands/plan/claim-route.ts`, `src/start/{branch,branch-decision,claim-catch-up,pr-lifecycle,preflight-claim,runner-pr}.ts`, `src/board/{issue-board,trust}.ts`, `src/schema/project-id.ts` |
 | `c06-command` | 22 | 3 | `src/cli/command.ts`, `src/cli/running.ts`, `src/commands/plan/validate.ts` |
 | `c04-sqlite` | 20 | 11 | `src/effort/store/{dispatches,findings,location,preflight,schema-report,sqlite}.ts`, `src/effort/session-log.ts`, `src/report/{parse,record}.ts`, `src/utils/progress.ts`, `src/cli/version.ts` |
@@ -116,7 +116,7 @@ The members with the most non-test importers outside the cluster:
 | `src/utils/plan-stamp.ts` | 4 | 1 |
 | `src/effort/attribution.ts` | 4 | 0 |
 | `src/effort/classify.ts` | 4 | 4 |
-| `src/suite/run.ts` | 4 | 2 |
+| `packages/rafa/src/suite/run.ts` | 4 | 2 |
 
 `active.ts` (the active output), `plan/parse.ts` and `plan/blocks.ts` (the plan reading every plan command uses), `utils/claude.ts` (the `claude` spawn), `utils/declaration.ts` (the `{agent=… }` routing token), `utils/tracker.ts` and `utils/plan-stamp.ts` are shared infrastructure that sits here by import weight, as `github.ts` does in `c01-github`; the rest are the loop's own parts.
 
@@ -126,7 +126,7 @@ The members with the most non-test importers outside the cluster:
 | --- | --- | --- | --- |
 | Commands | **partial** | 3 `RafaCommand` definitions in `src/commands/instinct/`; `loop start` and `plan create` run this cluster's `start()` and `plan` from definitions in `c06-command` | `run` is `run(context: RafaContext): Promise<void>`, not `run(ctx, options) → { outcome, context?, message? }`; `loop start` and `plan create` are definitions outside the cluster that call `start(args, repoRoot)` with raw words; registration is a central static import |
 | Steps with guards | **partial** | the loop's steps exist as named units with seams (`start/preflight.ts`, `start/suite-step.ts`, `start/wrap-up-run.ts`, `start/checkout-watch.ts`, `start/session.ts`, `start/release-stage.ts`, `start/pr-lifecycle.ts`); guards are code inside them | no registry, no step id, no guard class declared, no `expect`, no `ctx.answered`, no dry-run path; `start()` calls them in a hand-written order |
-| Config section | **partial** | the `tests` section (`src/config-schema-tests.ts`) and the `loop.wrapUp` section (`src/config-schema-wrap-up.ts`) have their own files; the other 20 keys the cluster reads sit in `src/config-schema.ts` | no file for the `loop`, `plan`, `task`, `learning`, `tiers` and `prerequisites` keys; they are in the shared `SETTINGS`, `RafaConfig` and `CONFIG_DEFAULTS`, read through `ResolvedConfig` and `Pick<RafaConfig, …>`; no `rafa.config.ts` |
+| Config section | **partial** | the `tests` section (`packages/rafa/src/config-schema-tests.ts`) and the `loop.wrapUp` section (`packages/rafa/src/config-schema-wrap-up.ts`) have their own files; the other 20 keys the cluster reads sit in `src/config-schema.ts` | no file for the `loop`, `plan`, `task`, `learning`, `tiers` and `prerequisites` keys; they are in the shared `SETTINGS`, `RafaConfig` and `CONFIG_DEFAULTS`, read through `ResolvedConfig` and `Pick<RafaConfig, …>`; no `rafa.config.ts` |
 | Flows | **partial** | four multi-step paths the cluster drives end to end (below) | each is a hand-ordered function chain; no flow list, no `flow show`, no step id to drop or swap |
 
 ### Commands
@@ -185,8 +185,8 @@ Twenty-four keys across the cluster's readers. Two sections already have their o
 
 | Key | Declared in | Read by the cluster in |
 | --- | --- | --- |
-| `tests.fullSuiteTriggers`, `tests.integration`, `tests.alwaysRun` | `src/config-schema-tests.ts` (143, 147, 148) | `src/start/suite-step.ts`, `src/start/suite-stage-step.ts`, `src/start/task-always-run.ts` and `src/start.ts` (`testsAlwaysRun`) |
-| `loop.wrapUp.retries` | `src/config-schema-wrap-up.ts` (96) | `src/start/wrap-up-run.ts` |
+| `tests.fullSuiteTriggers`, `tests.integration`, `tests.alwaysRun` | `packages/rafa/src/config-schema-tests.ts` (143, 147, 148) | `src/start/suite-step.ts`, `src/start/suite-stage-step.ts`, `src/start/task-always-run.ts` and `src/start.ts` (`testsAlwaysRun`) |
+| `loop.wrapUp.retries` | `packages/rafa/src/config-schema-wrap-up.ts` (96) | `src/start/wrap-up-run.ts` |
 | `plan.dir` | `src/config-schema.ts` (type 226, default 361, spec 431) | `src/start.ts`, `src/plan.ts`, `src/adapters/planner/claude.ts` |
 | `plan.inject` | `src/config-schema.ts` (430) | `src/start.ts`, `src/start/run-config.ts`, `src/start/dispatch.ts`, `src/plan/inject.ts` |
 | `loop.settingSources` | `src/config-schema.ts` (type 258, default 377, spec 475) | `src/start.ts`, `src/start/dispatch.ts`, `wrap-up.ts`, `wrap-up-run.ts`, `wrap-up-retry.ts`, `preflight.ts`, `src/utils/claude.ts`, `src/plan.ts` |
@@ -199,7 +199,7 @@ Twenty-four keys across the cluster's readers. Two sections already have their o
 | `tracking.specs`, `tracking.plans`, `tracking.all` | `src/config-schema.ts` (460–462) | `src/start/run-setup.ts` |
 | `claims.ahead` | `src/config-schema.ts` (494) | `src/plan.ts` |
 
-The cluster also reads `pr.provider` and `pr.base` (`src/start/preflight.ts`, `wrap-up-run.ts`), which `PR_SETTINGS` owns, and `roadmap.issue` (`src/start/preflight-drift.ts`), owned by the board. `learning.*` is read here and by the `instinct` commands, so it is shared across commands rather than owned by the loop. Tests: `src/config-schema-tests.test.ts` and `src/config-schema-wrap-up.test.ts` cover the two split sections, and no test covers the rest as a section.
+The cluster also reads `pr.provider` and `pr.base` (`src/start/preflight.ts`, `wrap-up-run.ts`), which `PR_SETTINGS` owns, and `roadmap.issue` (`src/start/preflight-drift.ts`), owned by the board. `learning.*` is read here and by the `instinct` commands, so it is shared across commands rather than owned by the loop. Tests: `src/tests/core-coupled/config-schema-tests.test.ts` and `src/tests/core-coupled/config-schema-wrap-up.test.ts` cover the two split sections, and no test covers the rest as a section.
 
 ### Flows
 

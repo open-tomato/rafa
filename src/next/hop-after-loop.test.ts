@@ -20,16 +20,15 @@
  *  - Sources with no `roadmap` answer null without walking the board,
  *    counted.
  */
-import type { HopTarget, NextHopReading, NextRoadmapReading, NextSources } from './readings.js';
-import type { PullRequests } from '../pr/index.js';
 import type { HopRecord } from '@open-tomato/rafa/next/hop-record';
+import type { PullRequests } from '@open-tomato/rafa-pr/pr/index';
+import type { HopTarget, NextHopReading, NextRoadmapReading, NextSources } from '@open-tomato/rafa-run/next/readings';
 
 import { describe, expect, it } from 'bun:test';
 
 import { plansDirAt } from '@open-tomato/rafa/core/plan';
-
-import { homeAfterLoop } from './hop-rows.js';
-import { readHomeAfterLoop } from './state.js';
+import { homeAfterLoop } from '@open-tomato/rafa-run/next/hop-rows';
+import { readHomeAfterLoop } from '@open-tomato/rafa-run/next/state';
 
 /** Home: board #10 with no epic chosen. */
 const HOME = Object.freeze({ board: 10, epic: null });

@@ -26,11 +26,11 @@
  *   - a report with no `kind` key is filed exactly as the same report is
  *     with the kind routing left out, draft for draft.
  */
-import type { StartKindOptions } from './triage-kinds.js';
-import type { StartTriageOptions, TaskTriageInput } from './triage.js';
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
+import type { ResolveTrackerOptions, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
+import type { StartTriageOptions, TaskTriageInput } from '@open-tomato/rafa-run/start/triage';
+import type { StartKindOptions } from '@open-tomato/rafa-run/start/triage-kinds';
 
 import {
   mkdirSync,
@@ -52,20 +52,19 @@ import {
   it,
 } from 'bun:test';
 
+import { ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readBugRoutesForPlan } from '@open-tomato/rafa/store/bug-routes';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { createBaseRunCache, runNamedTestAt } from '@open-tomato/rafa-pr/triage/base-run';
+import { LEFTOVER_MARKER } from '@open-tomato/rafa-pr/triage/leftover-repair';
+import { createPrivateTriageTracker } from '@open-tomato/rafa-pr/triage/triage';
+import { createStartTriage } from '@open-tomato/rafa-run/start/triage';
 
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { ISSUES_DEFAULTS } from '../config-schema-issues.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-import { createBaseRunCache, runNamedTestAt } from '../triage/base-run.js';
-import { LEFTOVER_MARKER } from '../triage/leftover-repair.js';
-import { createPrivateTriageTracker } from '../triage/triage.js';
-
-import { createStartTriage } from './triage.js';
 
 /** Each case that runs a test runs `bun test` in a worktree, so it is given room. */
 const RUN_TIMEOUT_MS = 60_000;

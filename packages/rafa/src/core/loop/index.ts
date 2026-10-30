@@ -25,7 +25,8 @@
  *   - `session-env.ts`: the environment a Claude session is spawned
  *     with, which `claude.ts` imports by path;
  *   - `suite-failure.ts`: the type of one failing test, which
- *     `sessions.ts` imports by path and `src/suite/run.ts` re-exports.
+ *     `sessions.ts` imports by path and `packages/rafa/src/suite/run.ts`
+ *     re-exports.
  *
  * The four files share no name, and only `sessions.ts` imports
  * `suite-failure.ts`, for a type. One
@@ -230,6 +231,7 @@ export {
   interruptClaudeSessions,
   runClaude,
   runClaudeCaptured,
+  SESSION_ID_FLAG,
   SETTING_SOURCES_FLAG,
   spawnClaude,
   spawnClaudeCaptured,

@@ -35,11 +35,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { readStaleDocsForPlan } from '@open-tomato/rafa/store/stale-docs';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { DOC_TASK_HEADING } from '@open-tomato/rafa-pr/docs/task-reading';
 
-import { DOC_TASK_HEADING } from '../docs/task-reading.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 /** The CLI entry this file spawns. */

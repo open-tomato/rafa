@@ -6,6 +6,10 @@ imports from outside its folder. Each edge that would point upward once the pack
 tree is read at commit 83e438e. A content schema is a frontmatter or record schema for a file rafa reads, such as a
 skill, an agent or an instinct. The decision stage of the plan comes after this page.
 
+Pass 4e (rafa-1374) moved pr's files and tests after this record was written. A path that names one of them is written
+at its place now, under `packages/rafa-pr/`, or under `src/tests/pr-coupled/` for a parked test. The rest of this record
+stays as written at its commit and is not regenerated.
+
 ## How the rows were read
 - **Importers.** The edges come from the import graph reader of `scripts/survey/import-graph.ts`, run over the tracked
   files of `src/` and of each packages/<name>/src/ at 83e438e. Each file's imports are the ones `bun build --metafile`
@@ -169,14 +173,14 @@ Importers outside the folder, by future package:
 - `src/board/plan-spec.ts`: value, cluster c6
 
 **rafa-pr**
-- `src/commands/pr/triage-trust.ts`: value, cluster c1
-- `src/pr/none.ts`: value, cluster c1
-- `src/pr/provider.ts`: value, cluster c1
+- `packages/rafa-pr/src/commands/pr/triage-trust.ts`: value, cluster c1
+- `packages/rafa-pr/src/pr/none.ts`: value, cluster c1
+- `packages/rafa/src/pr/provider.ts`: value, cluster c1
 
 **@open-tomato/rafa-cli (what is left)**
 - `src/commands/init.ts`: value, cluster c1
 - `src/commands/update/current.ts`: value, cluster c1
-- `src/plan/risk/accounts.ts`: value, cluster c1
+- `packages/rafa-pr/src/plan/risk/accounts.ts`: value, cluster c1
 
 Imported from inside the folder, listed apart: `src/schema/instinct.ts` (value).
 
@@ -284,7 +288,7 @@ Importers outside the folder, by future package:
 - `src/commands/skill/list.ts`: value, cluster c2
 - `src/plan.ts`: value, cluster c6
 - `src/plan/needs.ts`: value, cluster c4
-- `src/plan/risk.ts`: value, cluster c4
+- `packages/rafa-pr/src/plan/risk.ts`: value, cluster c4
 - `src/utils/session-env.ts`: value, cluster c4
 
 **unassigned (no package yet)**

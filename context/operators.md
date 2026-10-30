@@ -10,7 +10,7 @@ may become a feature.
 `src/bundled/operators/` holds them, `agents/<name>.md` and
 `skills/<name>/SKILL.md`. The build copies `src/bundled/` whole, so they ship in
 the package. The rafa tier reads only `bundled/agents` (`BUNDLED_AGENTS_DIR`,
-`src/inventory/trees.ts`) and `bundled/skills` (`BUNDLED_SKILLS_DIR`,
+`packages/rafa-inventory/src/inventory/trees.ts`) and `bundled/skills` (`BUNDLED_SKILLS_DIR`,
 `packages/rafa/src/schema/tiers.ts`), so no loop session is ever served an
 operator and the planner never routes a task to one.
 `src/tests/operators.test.ts` holds both, and runs `rafa skill check` over the
@@ -58,10 +58,10 @@ the watchtower finds it by), `bucket.md`, `loop-<issue>.log`,
 (the analyst's one write) and `report.md`. Its wrap-up writes the next
 stretch's opening message to `.rafa/stretch/engineer-prompt.md`.
 
-The integration branch is `stretch/<n>`, and `pr.base` points at it
-for the stretch. `release settle` folds `origin/<pr.base>`
-(`src/release/settle-worktree.ts`), so the wrap-up points `pr.base`
-back at `main` before it settles: one version per stretch, cut after
+The integration branch is `stretch/<n>`, and `pr.base` points at it for the
+stretch. `release settle` folds `origin/<pr.base>`
+(`packages/rafa-release/src/release/settle-worktree.ts`), so the wrap-up points
+`pr.base` back at `main` before it settles: one version per stretch, cut after
 the integration branch reaches `main`.
 
 ### Starting them
@@ -116,7 +116,7 @@ between two items is listed, while the open-bug count still reads
 `openIssues('bug')` alone. Each bug's filed time is the `createdAt` that listing
 carries, so no `gh issue view` runs per bug. GitHub answers it from `gh issue
 list --state all --search created:>=<since>`
-(`src/adapters/tracker/github-filed-issues.ts`), whose search index can lag a
+(`packages/rafa-board/src/adapters/tracker/github-filed-issues.ts`), whose search index can lag a
 filing by seconds, so a bug filed in the moments before the reading may be
 missing from the line; the local tracker answers the record's `capturedAt`, the
 time the issue was created, not a file's time on disk. A bug whose time does not
@@ -246,11 +246,11 @@ rafa· inherited        src/parse/parse.test.ts > parse > drops the last line
 rafa· error            ❌ Task failed (exit 1). Marked as blocked. Run again to retry.
 ```
 
-`src/start/loop-events.ts` builds each line. A `retry` line says the run
-went back into its loop after a stop instead of halting, which retry in
-a row of how many, under `--retry` or `loop.retries`
-(`src/start/retry-budget.ts`), the count starting over once a later task
-is done, neither the stopped one nor a repair;
+`packages/rafa-run/src/start/loop-events.ts` builds each line. A `retry` line
+says the run went back into its loop after a stop instead of halting, which
+retry in a row of how many, under `--retry` or `loop.retries`
+(`packages/rafa-run/src/start/retry-budget.ts`), the count starting over once
+a later task is done, neither the stopped one nor a repair;
 it ends nothing, so `rafa loop wait` and `rafa stretch item` read on past
 it. A stop it retries writes no `task-blocked` line: a task stop writes
 one only once no retry is granted, so a `task-blocked` line still means
@@ -275,8 +275,8 @@ the `pr` line. None of these ends on an `error` line.
 
 An `inherited` line names
 the run-start failure, by file and case, that a reported bug was read as
-(`src/start/triage.ts`): nothing was filed for it. A task's tokens are input,
-cache creation and output from its session log, read as
+(`packages/rafa-run/src/start/triage.ts`): nothing was filed for it. A task's
+tokens are input, cache creation and output from its session log, read as
 `rafa effort collect` reads it; the effort store is never opened. A
 session's own stdout goes to `info`, which the events adapter drops.
 
@@ -285,10 +285,10 @@ is the first non-blank line of the error's message.
 
 ### The events file
 
-Every event `src/start/loop-events.ts` emits is also appended to the
-run's events file, `.rafa/runs/<session-id>.events.ndjson`, beside its
-record: one JSON line, `{ name, summary, data, ts }`, the object the
-output's `emit` receives minus `type`, in every output mode, text
+Every event `packages/rafa-run/src/start/loop-events.ts` emits is also
+appended to the run's events file, `.rafa/runs/<session-id>.events.ndjson`,
+beside its record: one JSON line, `{ name, summary, data, ts }`, the object
+the output's `emit` receives minus `type`, in every output mode, text
 included. `bindEventsFile` names the file (making the runs folder if it
 is missing) and `unbindEventsFile` ends the append; with none bound,
 nothing is written. The append is best-effort: a failed write prints one
@@ -298,7 +298,7 @@ session record and unbinds it in the run's `finally` (`src/start.ts`);
 anything the run throws is first written as an `error` event, then
 rethrown, but for the `LoopEnd` a `--continue` run ends with, exit code
 20, 21 or 22, which has emitted its own events before it is thrown
-(`src/start/continue-exits.ts`). A test binds its own temp root and
-unbinds after.
+(`packages/rafa-run/src/start/continue-exits.ts`). A test binds its own temp
+root and unbinds after.
 The record, `<session-id>.json`, stays the only `.json` file a run
 writes, so `loop list`, `status` and `stop` read it alone.

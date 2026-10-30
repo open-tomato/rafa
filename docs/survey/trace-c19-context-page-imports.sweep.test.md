@@ -26,7 +26,7 @@ No edge, in or out, in the graph: 0 outbound, 0 inbound, 0 inside. The reach is 
 
 A map counts as split when a `context/` directory sits beside it, so a package split in the future is covered the day it lands, with no name added to the file. The pointers it extracts are those of the shape `context/<page>.md` (`CONTEXT_POINTER`), read from the raw text because a pointer is written inside a code span and masking first would hide it.
 
-Test reach, from `docs/survey/test-index.json`: index 0, source count 0, does not spawn. It imports no project file and reads the tree at run time, so it carries the sweep suffix, and the default `tests.alwaysRun` pattern (`src/**/*.sweep.test.ts`, `src/config-schema-tests.ts`) runs it beside every scoped check, which is the mechanism a sweep needs and the reason a `changed` run would never select it.
+Test reach, from `docs/survey/test-index.json`: index 0, source count 0, does not spawn. It imports no project file and reads the tree at run time, so it carries the sweep suffix, and the default `tests.alwaysRun` pattern (`src/**/*.sweep.test.ts`, `packages/rafa/src/config-schema-tests.ts`) runs it beside every scoped check, which is the mechanism a sweep needs and the reason a `changed` run would never select it.
 
 ## Entry points
 

@@ -5,10 +5,10 @@
  * the registry its subjects and commands in.
  *
  * The registry itself, `createCommandRegistry` and the refusals it
- * throws, stays the CLI's, in `src/cli/registry.ts`, which imports
- * these names from here and re-exports them under the same names. Core
- * holds the contract alone, so `RafaContext` can name the registry a
- * command runs with without importing a file above core.
+ * throws, stays the CLI's, in `packages/rafa/src/cli/registry.ts`, which
+ * imports these names from here and re-exports them under the same
+ * names. Core holds the contract alone, so `RafaContext` can name the
+ * registry a command runs with without importing a file above core.
  *
  * Every name here is a type: the file imports `RafaCommand` from
  * `command.ts` beside it with `import type`, and nothing by value.

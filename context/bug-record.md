@@ -3,9 +3,9 @@
 Every bug has the same fields under the same headings, and a title
 rendered from them (#951). Two writers build the record. `rafa issue
 create --type=bug` reads its flags into one (`src/bugs/`, and
-`src/commands/issue/create-bug.ts`) and refuses a record missing a
+`packages/rafa-board/src/commands/issue/create-bug.ts`) and refuses a record missing a
 required field, naming it. Triage builds the same record for a bug the
-loop files, from a session's report, in `src/triage/bug-filing.ts`
+loop files, from a session's report, in `packages/rafa-pr/src/triage/bug-filing.ts`
 (#991), and never refuses one over its fields: a value it cannot use is
 filed as `unknown` or `unknown:new-context`, and the session's own word
 is kept in the body. `context/error-codes.md` is the authority for the
@@ -18,7 +18,7 @@ dispatch and the checkout:
 - **Reproduce**, when the session gives none or `unknown`: "seen while
   running task <line> of plan <stub>", or "seen while running `<the
   command>`" for a dispatch with no plan stub.
-- **Cause**, by the cause rule (`src/bugs/cause-rule.ts`): a code of the
+- **Cause**, by the cause rule (`packages/rafa-board/src/bugs/cause-rule.ts`): a code of the
   list is kept as written; a shaped code the list lacks is
   `<family>:new-context` with the code as `proposed`, or
   `unknown:new-context` when its family is unlisted; any other text is
@@ -146,14 +146,14 @@ for the module or another wording.
   action and in reproduce.
 - **The versions** are the rafa version, the short commit with `-dirty`
   when a tracked file has changes, and the package as `name@version`
-  (`src/bugs/versions.ts`).
-- **The package** is the nearest manifest above the file the error
-  points at (`packageOf`, `packages/rafa/src/project/package-of.ts`): from the file's
+  (`packages/rafa/src/bugs/versions.ts`).
+- **The package** is the nearest manifest above the file the error points at
+  (`packageOf`, `packages/rafa/src/project/package-of.ts`): from the file's
   directory up to the checkout's root, the first `package.json` holding a
-  `name`. The `workspaces` globs are never read. The file is `--path`,
-  else the first file of the checkout the artifact names
-  (`packages/rafa/src/bugs/stack-path.ts`); with none, the checkout's own package. A
-  relative `--path` is read from the directory rafa runs in, and one
+  `name`. The `workspaces` globs are never read. The file is `--path`, else the
+  first file of the checkout the artifact names
+  (`packages/rafa/src/bugs/stack-path.ts`); with none, the checkout's own
+  package. A relative `--path` is read from the directory rafa runs in, and one
   outside the checkout, or naming no file, is refused.
 - **The checkout** is the one the command runs in. A project's root is
   its main checkout, and a command run from a worktree resolves to it,
@@ -181,7 +181,7 @@ are, and refuses one whose label would pass GitHub's 50 characters. The
 
 `rafa issue list --type=bug` prints a header and the columns id, state,
 module, action and summary, the last three read back from each title
-(`renderBugList`, `src/commands/issue/list.ts`). A part a title lacks is
+(`renderBugList`, `packages/rafa-board/src/commands/issue/list.ts`). A part a title lacks is
 `-`, so a bug filed before the template lists whole under summary. Json
 mode is unchanged.
 
@@ -263,7 +263,8 @@ bugs:
 ```
 
 Both keys refuse `0`, a fraction, a quoted number and a boolean, and
-neither has an "off" spelling. The reader is `packages/rafa/src/config-schema-bugs.ts`.
+neither has an "off" spelling. The reader is
+`packages/rafa/src/config-schema-bugs.ts`.
 
 ### `--dry-run`
 
@@ -273,7 +274,7 @@ and stops: no tracker is resolved and nothing is filed.
 
 ### Config
 
-`src/config-schema-issues.ts` reads five keys:
+`packages/rafa/src/config-schema-issues.ts` reads five keys:
 
 ```yaml
 issues:

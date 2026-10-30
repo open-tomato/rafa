@@ -40,13 +40,13 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit, restoreRunningCommand } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { dispatch } from './dispatch.js';
-import { createCommandRegistry } from './registry.js';
 
 /** A temporary directory of this file's own, outside the repository. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-dispatch-hook-')));

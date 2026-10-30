@@ -7,7 +7,7 @@
  *
  * The setting is written INTO the commented config `rafa init` writes
  * (`src/project/scaffold.ts`), never over it, for the reason
- * `src/board/setup-config.ts` gives for `roadmap.issue`: a
+ * `packages/rafa-board/src/board/setup-config.ts` gives for `roadmap.issue`: a
  * `Bun.YAML.stringify` of the parsed document would drop every comment
  * an operator reads to learn what can be set.
  *
@@ -34,7 +34,7 @@
  * mapping such as `board: {relationships: native}` or
  * `  project: {number: 3}` — is REFUSED with null, never appended to:
  * `Bun.YAML.parse` answers the last of two duplicate keys silently
- * (`src/board/setup-config.ts` records the reading), so a second key
+ * (`packages/rafa-board/src/board/setup-config.ts` records the reading), so a second key
  * would read back as the new number and leave the file holding two.
  *
  * ## The parse-back

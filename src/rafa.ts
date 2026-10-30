@@ -40,13 +40,15 @@
  * `process.exitCode` rather than calling `process.exit`, so nothing a
  * command wrote is truncated mid-flush.
  *
- * It imports `src/config-registry.ts` and `src/adapter-registry.ts`,
- * neither of which registers anything as it is imported: once its
- * imports have loaded, the module calls `registerCoreConfigSections`,
- * which hands the fourteen sections of the config schema to core, then
- * `registerCoreAdapters`, both before it loads the project's modules,
- * so every setting is registered before anything run here reads a
- * config and core's adapters before anything resolves one. From
+ * It imports `src/config-registry.ts`, `src/adapter-registry.ts` and
+ * `src/service-registry.ts`, none of which registers anything as it is
+ * imported: once its imports have loaded, the module calls
+ * `registerCoreConfigSections`, which hands the fourteen sections of the
+ * config schema to core, then `registerCoreAdapters`, then
+ * `registerCoreServices`, all before it loads the project's modules, so
+ * every setting is registered before anything run here reads a config,
+ * core's adapters before anything resolves one, and run's and pr's
+ * services before a board command calls one. From
  * `src/commands/index.ts` it imports `createRosterRegistry` rather than
  * the default `CORE_REGISTRY`, since the roster it dispatches through
  * depends on the features the loaded config turns off, which is known
@@ -66,10 +68,12 @@ import { dispatch } from './cli/dispatch.js';
 import { renderHelp } from './cli/help.js';
 import { createRosterRegistry } from './commands/index.js';
 import { registerCoreConfigSections } from './config-registry.js';
+import { registerCoreServices } from './service-registry.js';
 import { createStatusHook } from './status/hook.js';
 
 registerCoreConfigSections();
 registerCoreAdapters();
+registerCoreServices();
 
 const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
 activateModuleAdapters(modules);

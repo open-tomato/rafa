@@ -2,7 +2,7 @@
  * A spawned `bun src/rafa.ts next --dry-run` beside a live run record
  * whose task has left uncommitted edits in the checkout (#444).
  *
- * `src/next/state-live-run.test.ts` drives the table's order over fakes
+ * `packages/rafa-run/src/next/state-live-run.test.ts` drives the table's order over fakes
  * of git; nothing there runs the registered command over a real
  * repository. This file does: the record is planted with this test
  * process's own pid, so it reads `running`, a tracked file is edited
@@ -25,11 +25,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { beginSession } from '@open-tomato/rafa/core/loop';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-beside-loop-')));
 

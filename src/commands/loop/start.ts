@@ -4,8 +4,8 @@
  *
  * The command is aliased `start`, so the phase 0 spelling
  * `rafa start --plan=<file>` still runs it, after one deprecation line on
- * stderr. `src/start.ts`, `src/start/run-config.ts` and
- * `src/start/run-setup.ts` read its flags, and the ones declared here
+ * stderr. `src/start.ts`, `packages/rafa-run/src/start/run-config.ts` and
+ * `packages/rafa-run/src/start/run-setup.ts` read its flags, and the ones declared here
  * are those they read. The CI defaults are the loop's own constants, so
  * the help cannot drift from them.
  *
@@ -13,7 +13,7 @@
  * runs arrive in phase 6, and `start/run-config.ts` refuses it until
  * then, before anything else is read.
  *
- * `--create-branch` is read by `src/start/run-setup.ts` ahead of its
+ * `--create-branch` is read by `packages/rafa-run/src/start/run-setup.ts` ahead of its
  * branch guard, and only on `main` or `master` or with no branch checked
  * out: it answers yes to the question the run would otherwise ask a
  * terminal (`start/branch.ts`). It is declared beside `--any-branch`
@@ -32,19 +32,19 @@
  * this tree's own ({@link HINT_FLAG_SPEC}), and `endingWith` reads it
  * once `start` has returned, to end a finished run by naming the one
  * step that follows — with the pull request pushed, the wait on its
- * checks (`src/next/ending.ts`). A run that refused or was interrupted
+ * checks (`packages/rafa-run/src/next/ending.ts`). A run that refused or was interrupted
  * throws out of the inner run and ends with no hint.
  *
- * `--retry=<n>` is read by `src/start/run-setup.ts` with the other flags
+ * `--retry=<n>` is read by `packages/rafa-run/src/start/run-setup.ts` with the other flags
  * `start()` reads itself, and refused there, before the run is deferred
  * or its session record opened, for anything but a whole number from 1
  * to 3. It declares no default: what it outranks is `loop.retries`,
  * `false` unless a config names a count, and the help says so. The
- * count is of retries in a row (`src/start/retry-budget.ts`).
+ * count is of retries in a row (`packages/rafa-run/src/start/retry-budget.ts`).
  *
  * `--continue`, `--decide=<strategy>`, `--approach=<text>`,
  * `--after=<line>` and `--force-wrap-up` are read by
- * `src/start/continue-args.ts`, through `readRunArgs`, and every
+ * `packages/rafa-run/src/start/continue-args.ts`, through `readRunArgs`, and every
  * combination it refuses is refused there, before the run is deferred
  * or its session record opened. Under `--continue` the retries a run
  * opens without `--retry` are `loop.retriesOnContinue`'s, and the spend

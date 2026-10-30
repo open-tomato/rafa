@@ -167,7 +167,7 @@
  * `with` declaration and the run carries the flag, or an `unless`
  * declaration and the run does not. `through` covers a run because the
  * command runs another's action in-process (`rafa next`,
- * `src/next/actions.ts`), and the recorded command stays the outer one.
+ * `packages/rafa-run/src/next/actions.ts`), and the recorded command stays the outer one.
  * A flag is matched by its name without the dashes, and `--no-<name>`
  * also as the parser keys it, `<name>` set to `false`; a flag recorded
  * as `false` is not carried. With no command recorded, as for a caller
@@ -218,6 +218,13 @@ export const CLAUDE_BASE_ARGS: readonly string[] = [
 export const SETTING_SOURCES_FLAG = '--setting-sources';
 
 /**
+ * The flag a session is spawned with to run under the id the loop
+ * picked for it. A task session's id goes ahead of its declaration's
+ * flags; see the module note.
+ */
+export const SESSION_ID_FLAG = '--session-id';
+
+/**
  * Builds the argument list for one session: the base arguments, the
  * setting sources, the served flags, then the flags.
  *
@@ -233,7 +240,7 @@ export const SETTING_SOURCES_FLAG = '--setting-sources';
  * for a decision `core/plan/declaration.ts` already makes.
  *
  * `served` is `ServedSet.flags` from `serveResolution`
- * (`src/tiers/serve.ts`), the session-only flags handing the run's
+ * (`packages/rafa-inventory/src/tiers/serve.ts`), the session-only flags handing the run's
  * served directory over, and is taken as it is for the same reason.
  * It defaults to empty, so a caller that serves nothing spawns what it
  * spawned before. It goes BEFORE `flags`, never after: `--tools` has to
@@ -408,13 +415,13 @@ export interface CapturedSession {
 export interface CapturedSpawnOptions {
   /**
    * The session's working directory, or the loop's own when absent. The
-   * search session (`src/inventory/search/index.ts`) names the scratch
+   * search session (`packages/rafa-inventory/src/inventory/search/index.ts`) names the scratch
    * copy of its candidates, each check session of the epic verification
-   * run (`src/epic/verify-run.ts`) a detached worktree of main, the plan
+   * run (`packages/rafa-board/src/epic/verify-run.ts`) a detached worktree of main, the plan
    * session of the `claude` planner (`src/adapters/planner/claude.ts`)
    * the project root it writes the plan under, and the loop's task,
    * wrap-up and CI repair sessions the run's checkout
-   * (`src/start/checkout.ts`).
+   * (`packages/rafa-run/src/start/checkout.ts`).
    */
   readonly cwd?: string;
 }

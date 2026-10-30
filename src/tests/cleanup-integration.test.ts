@@ -26,9 +26,10 @@ import { existsSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { cleanupQuestion, createCleanupCommand } from '../commands/cleanup.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { dispatchInProject, plantProjectConfig } from './cli-capture.js';
 

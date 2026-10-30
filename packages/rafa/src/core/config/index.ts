@@ -46,7 +46,7 @@
  * imports the barrel back by value is a runtime cycle. None of the
  * eight files behind this one imports outward by value:
  * `core-section.ts` reads the routing defaults from `default-routing.ts`
- * beside it, and `src/tiers/routing.ts` imports them from this barrel by
+ * beside it, and `packages/rafa-inventory/src/tiers/routing.ts` imports them from this barrel by
  * value with nothing here importing it back. No file behind it
  * imports a section file (`src/config-schema-*.ts`), by value or as a
  * type: `config-merged.ts`, which spread the eleven into one schema,
@@ -69,7 +69,7 @@
  *
  * Measured again when core's keys moved into `core-section.ts`, on bun
  * 1.3.14: each barrel, each of the five files, `section.ts`,
- * `src/tiers/routing.ts` and each section file loaded first in a fresh
+ * `packages/rafa-inventory/src/tiers/routing.ts` and each section file loaded first in a fresh
  * `bun` process, `SETTINGS` and `CONFIG_DEFAULTS` holding 89 entries and
  * `CORE_SECTION` 42 each time. The control, `config-schema-hub.ts`
  * reading `SETTINGS` off this barrel at load, threw `Cannot access
@@ -87,7 +87,7 @@
  * the value imports of the five files behind this one reach no section
  * file and not the registry, and each config barrel, each of the five
  * files, `config-load.ts`, the registry, `packages/rafa/src/effort/store/settings.ts`,
- * `src/tiers/routing.ts`, `packages/rafa/src/core/adapters/registry.ts` and each
+ * `packages/rafa-inventory/src/tiers/routing.ts`, `packages/rafa/src/core/adapters/registry.ts` and each
  * section file loaded first in a fresh `bun` process, the registry then
  * answering 89 registered settings and 89 defaults each time.
  *
@@ -113,7 +113,7 @@
  * or `registeredSettings()` from here, which answer the registered
  * records typed whole.
  * Neither are the hub's `HubContext` and `HubTimeout`, which a file
- * imports from `src/config-schema-hub.ts`.
+ * imports from `packages/rafa/src/config-schema-hub.ts`.
  *
  * The published surface is narrower than this file. `src/index.ts`
  * re-exports part of it, and of the runtime names leaves out core's

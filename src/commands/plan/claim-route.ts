@@ -1,7 +1,7 @@
 /**
  * The claim a `rafa plan create` run makes on its issue, wired in
  * BEFORE its planning session, so a lost race costs no session
- * (`.rafa/plans/rafa-324-claim-issue-so-two`). `src/claims/plan-claim.ts`
+ * (`.rafa/plans/rafa-324-claim-issue-so-two`). `packages/rafa-run/src/claims/plan-claim.ts`
  * makes the claim and answers claimed, refused or unclaimed; this module
  * is what the command does with each answer, and the loop that lets
  * `--next` walk on past a refused issue.
@@ -33,7 +33,7 @@
  * is no claim branch of the issue, or a claim ahead whose line ahead
  * could not be claimed (both or neither: the home claim commit waits on
  * the local branch as with no remote). An answer that carries a claim
- * ahead report (`src/claims/ahead.ts`) prints it next, one line for the
+ * ahead report (`packages/rafa-board/src/claims/ahead.ts`) prints it next, one line for the
  * line ahead claimed and a warning for one not claimed. The warnings a
  * claimed or unclaimed answer carries, a label that could not be
  * written among them, are printed after it.
@@ -41,7 +41,7 @@
  * ## Claim ahead
  *
  * A `--next` spec carries what claim ahead reads (`ResolvedSpec.ahead`,
- * `src/board/spec-source.ts`). With `claims.ahead: allow` or the run's
+ * `packages/rafa-board/src/board/spec-source.ts`). With `claims.ahead: allow` or the run's
  * `--claim-ahead` ({@link ClaimRouteSeams.claimsAhead}, `aheadEnabled`),
  * {@link aheadRequestOf} reads the line after the pick and hands the
  * claim an `ahead` request naming it and the board it was walked on;
@@ -55,7 +55,7 @@
  *
  * A refused `--next` pick is printed as passed, with the reason naming
  * its owner, and the spec is resolved again with every issue refused so
- * far handed in as `passOver` (`src/board/spec-source-roadmap.ts`), which
+ * far handed in as `passOver` (`packages/rafa-board/src/board/spec-source-roadmap.ts`), which
  * reads each as taken by the branch that refused it. So the walk goes on
  * to the next line, and ends as a walk ends: on a line to plan, or
  * stopped with nothing left. An issue refused twice in one run is a
@@ -66,25 +66,35 @@
  * A store that cannot be read is not caught here: `readDeviceStoreId`
  * throws what the store's open throws, and the command ends on it.
  */
-import type { GateIssue } from '../../board/gate.js';
-import type { PlanSpecResolution } from '../../board/plan-spec.js';
-import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { ResolvedSpec } from '../../board/spec-source.js';
-import type { AheadRequest } from '../../claims/ahead.js';
-import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from '../../claims/plan-claim.js';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { ClaimsAhead } from '@open-tomato/rafa/core/config/sections';
 import type { Output } from '@open-tomato/rafa/ports';
+import type {
+  AheadRequest,
+  GateIssue,
+  PlanSpecResolution,
+  RefreshConfig,
+  ResolvedSpec,
+} from '@open-tomato/rafa-board';
+import type {
+  PlanClaim,
+  PlanClaimContext,
+  PlanClaimRequest,
+} from '@open-tomato/rafa-run';
+
+import {
+  aheadClaimedLine,
+  aheadEnabled,
+  aheadNotClaimedWarning,
+  createGhRunner,
+  createRefreshingGhIssueBoard,
+} from '@open-tomato/rafa-board';
+import { resolvePrProvider } from '@open-tomato/rafa-pr';
+import { readDeviceStoreId } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-
-import { createGhRunner } from '../../adapters/tracker/github.js';
-import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
-import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
-import { readDeviceStoreId } from '../../claims/device.js';
-import { resolvePrProvider } from '../../pr/provider.js';
 
 /** The exit code a refused `--issue` or `--spec` run ends with: another store holds the issue. */
 export const CLAIM_REFUSAL_EXIT = 1;

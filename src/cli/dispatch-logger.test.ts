@@ -21,13 +21,13 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { activeLogger, setActiveLogger } from '@open-tomato/rafa/adapters/logger/active';
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
 import { dispatch } from './dispatch.js';
-import { createCommandRegistry } from './registry.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-dispatch-logger-')));
 

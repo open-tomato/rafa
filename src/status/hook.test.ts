@@ -32,10 +32,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { resolveScope } from '@open-tomato/rafa/project/scope';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { projectConfigText } from '../project/scaffold.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { createStatusHook, isQuietCommand, QUIET_COMMANDS } from './hook.js';
 import { CLEANUP_COMMAND, NOTICE_PREFIX, STATUS_COMMAND } from './notice.js';

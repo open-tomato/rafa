@@ -1,8 +1,8 @@
 /**
  * `rafa effort report`: the stored effort rolled up per plan, written by
- * the phase 0 command in `src/effort/report.ts`.
+ * the phase 0 command in `packages/rafa-effort/src/effort/report.ts`.
  *
- * The spelling is phase 0's, so no alias is needed. `src/effort/report.ts`
+ * The spelling is phase 0's, so no alias is needed. `packages/rafa-effort/src/effort/report.ts`
  * reads its own flags and refuses any other, and the ones declared here
  * are those it reads. `--json` among them is phase 0's spelling of json
  * mode, kept for one release as a deprecated spelling of `--output=json`:

@@ -32,10 +32,10 @@
  *      leaves `bunfig.toml` alone: the task step runs at scope `affected`
  *      with `--changed=` in its command and prints no no-check line.
  */
-import type { StepOutcome, SuiteStepContext } from './suite-step.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';
 import type { SessionStep } from '@open-tomato/rafa/core/loop';
+import type { SuiteResult, SuiteRunOptions } from '@open-tomato/rafa/suite/run';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { StepOutcome, SuiteStepContext } from '@open-tomato/rafa-run/start/suite-step';
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -46,12 +46,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { ensureBaseline, planOwnsReader, runPreWrapUpStep, runStageStep, runTaskStep } from '@open-tomato/rafa-run/start/suite-step';
 
 import { plantProjectConfig } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-
-import { ensureBaseline, planOwnsReader, runPreWrapUpStep, runStageStep, runTaskStep } from './suite-step.js';
 
 /** The plan's one stage. */
 const STAGE_NAME = 'One';

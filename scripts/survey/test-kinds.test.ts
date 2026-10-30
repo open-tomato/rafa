@@ -4,8 +4,9 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { TESTS_DEFAULTS } from '@open-tomato/rafa/config-schema-tests';
+
 import { templateEntry } from '../../src/config/templates';
-import { TESTS_DEFAULTS } from '../../src/config-schema-tests';
 
 import { readTestKindGlobs, testKind } from './test-kinds';
 

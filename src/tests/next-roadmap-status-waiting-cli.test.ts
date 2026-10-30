@@ -17,7 +17,7 @@
  * `owningBoard` reads as `BOARD_TARGET`'s, foreign to home; its `Owner:`
  * handle, `@beta-team`, resolves (`gh api users/beta-team` exits 0) but
  * has left no review, so the gate reads `waiting`
- * (`readOwnerApproval`, `src/pr/owner-approval.ts`) and
+ * (`readOwnerApproval`, `packages/rafa-pr/src/pr/owner-approval.ts`) and
  * `rafa status` prints the waiting line under the board line.
  *
  * Three cases:
@@ -46,11 +46,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { hopFilePath } from '@open-tomato/rafa/next/hop-record';
 import { positionFilePath } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-status-waiting-cli-')));
@@ -105,7 +105,7 @@ function viewOf(issue: (typeof ALL_ISSUES)[number]): object {
   return { number: issue.number, title: issue.title, body: issue.body, state: issue.state, labels: issue.labels, author: { login: 'me' } };
 }
 
-/** The fields `gh pr view` reads a detail through, as `src/pr/gh.ts` sends them. */
+/** The fields `gh pr view` reads a detail through, as `packages/rafa-pr/src/pr/gh.ts` sends them. */
 const DETAIL_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url,body,commits,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences';
 
 /** The pull request `PULL`'s detail, `state` the one thing a case varies. */

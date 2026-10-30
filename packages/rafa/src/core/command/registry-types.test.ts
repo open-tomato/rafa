@@ -12,7 +12,7 @@
  * `string`, `readonly SubjectSpec[]` and `readonly RafaCommand[]`; that
  * a feature is a `CommandRegistryInput`, so one feature's lists build a
  * registry as they stand; and that the command barrel and
- * `src/cli/registry.ts` both export it as the same type as
+ * `packages/rafa/src/cli/registry.ts` both export it as the same type as
  * `registry-types.ts` declares. It must compile with no diagnostic.
  *
  * Every refusal probe changes one thing and is held to exactly one
@@ -70,7 +70,7 @@ const EQUALS = [
 const CONFORMING_PROBE = probeSource(
   `import type * as C from ${specifierOf(join(COMMAND_DIR, 'command.js'))};`,
   `import type * as B from ${specifierOf(join(COMMAND_DIR, 'index.js'))};`,
-  `import type * as L from ${specifierOf(join(REPO_ROOT, 'src', 'cli', 'registry.js'))};`,
+  `import type * as L from ${specifierOf(join(REPO_ROOT, 'packages', 'rafa', 'src', 'cli', 'registry.js'))};`,
   ...EQUALS,
   'export const nameIsExact: Equals<R.CommandFeature["name"], string> = true;',
   'export const subjectsAreExact: Equals<R.CommandFeature["subjects"], readonly R.SubjectSpec[]> = true;',
@@ -147,10 +147,11 @@ interface Reading {
   message: string;
 }
 
-/** The compile every case reads. */
+/** The compile every case reads, its readings taken when it was built. */
 interface Compiled {
-  program: ts.Program;
   configErrors: readonly ts.Diagnostic[];
+  /** Every probe's diagnostics, by the probe's file name. */
+  readings: Readonly<Record<string, readonly Reading[]>>;
 }
 
 let tempDir = '';
@@ -168,20 +169,35 @@ function compiledProbes(): Compiled {
 }
 
 /**
- * Every diagnostic the compile holds against one probe.
+ * Every diagnostic the compile holds against one probe, read off the
+ * checker. Called by `beforeAll` alone, so the checker binds and checks
+ * there and not inside the first case.
  *
+ * @param program - The compile holding the probe.
  * @param file - The probe's file name.
  * @returns Its diagnostics.
  * @throws When the probe is not in the compile.
  */
-function readingsOf(file: string): Reading[] {
-  const { program } = compiledProbes();
+function diagnosticsOf(program: ts.Program, file: string): Reading[] {
   const source = program.getSourceFile(join(tempDir, file));
   if (source === undefined) throw new Error(`the probe ${file} is not in the compile`);
   return ts.getPreEmitDiagnostics(program, source).map((diagnostic) => ({
     code: diagnostic.code,
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
   }));
+}
+
+/**
+ * Every diagnostic the compile holds against one probe, as stored.
+ *
+ * @param file - The probe's file name.
+ * @returns Its diagnostics.
+ * @throws When the probe is not in the compile.
+ */
+function readingsOf(file: string): readonly Reading[] {
+  const readings = compiledProbes().readings[file];
+  if (readings === undefined) throw new Error(`the probe ${file} is not in the compile`);
+  return readings;
 }
 
 beforeAll(() => {
@@ -197,14 +213,16 @@ beforeAll(() => {
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, REPO_ROOT, undefined, configPath);
 
+  const program = ts.createProgram({
+    rootNames: probes.map(([file]) => join(tempDir, file)),
+    options: parsed.options,
+  });
+
   compiled = {
-    program: ts.createProgram({
-      rootNames: probes.map(([file]) => join(tempDir, file)),
-      options: parsed.options,
-    }),
     configErrors: [...config.error === undefined
       ? []
       : [config.error], ...parsed.errors],
+    readings: Object.fromEntries(probes.map(([file]) => [file, diagnosticsOf(program, file)])),
   };
 }, 30_000);
 

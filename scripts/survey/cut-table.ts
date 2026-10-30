@@ -14,8 +14,10 @@
  *
  *   1. a file a package names is that package's. A test file whose name
  *      is a named file's with `.test` before the extension follows it:
- *      `src/start/branch-decision.test.ts` goes where
- *      `src/start/branch-decision.ts` goes;
+ *      `packages/rafa-run/src/next/readings.test.ts` goes where `packages/rafa-run/src/next/readings.ts`
+ *      goes. The run rule named `packages/rafa/src/start/branch-decision.ts`
+ *      beside `RUN_NAMED` until the fourth decouple item (rafa-1333) moved
+ *      it into core's package, where the `packages/rafa/` folder places it;
  *   2. otherwise the longest folder that holds it decides, among the
  *      packages' folders and the unassigned folders. A folder closes
  *      with its `/`, so `packages/rafa/` (core) does not hold
@@ -25,8 +27,9 @@
  *      every file no line above holds.
  *
  * What the CLI holds by rule is the dispatcher (`src/cli/`, with the bin
- * entry `src/rafa.ts`), the roster (`src/commands/index.ts`) and
- * `src/schema/agent.ts`. No path in the tree is named as "the default
+ * entry `src/rafa.ts`), the roster (`src/commands/index.ts`),
+ * `src/schema/agent.ts` and the browse view `src/inventory/browse.ts`,
+ * which reaches `src/cli/prompt/`: `CLI_NAMED` of `cut-names.ts`. No path in the tree is named as "the default
  * workflows", so the files that will be them are among the files left to
  * place. Inside `src/schema/` the placement is per file, as
  * `docs/survey/content-schema-importers.md` names it.
@@ -42,7 +45,11 @@
  * An upward edge from a file under `packages/rafa/src/core/config/` into a
  * `src/config-schema-<section>.ts` file is marked as cleared by #118,
  * which makes each package own its config section. It still counts as
- * upward: `remaining` is the count less the cleared edges.
+ * upward: `remaining` is the count less the cleared edges. The rule reads
+ * none since the third decouple item (rafa-1325) moved the eleven
+ * sections into core's package, where an import from core's config folder
+ * into a section is inside core and no upward edge; it stays for a section
+ * that moves back into a feature package that publishes on its own.
  *
  * The files left to place are the files of step 3. Each carries the
  * number of upward edges that end on it, since placing it lower is what
@@ -61,6 +68,7 @@ import { join, posix } from 'node:path';
 import { CORE_PACKAGE as CORE_PACKAGE_FOLDER, subjectFolder } from './core-moves';
 import {
   BOARD_NAMED,
+  CLI_NAMED,
   EFFORT_NAMED,
   INVENTORY_NAMED,
   PR_NAMED,
@@ -275,53 +283,80 @@ export const CUT_RULES: CutRules = {
       named: [],
     },
     {
+      // #1321: pass 4a emptied `src/agents/`, `src/backfill/`, `src/check/`,
+      // `src/demote/`, `src/learning/` and `src/task/`, so they leave the
+      // list. `src/tiers/` stays for `resolve.integration.test.ts`, at the
+      // root until #913; `src/inventory/` and `src/schema/` hold the
+      // CLI-named pairs; `src/bundled/` holds content and no code file.
       folders: ['packages/rafa-inventory/', 
-        'src/agents/',
-        'src/backfill/',
         'src/bundled/',
-        'src/check/',
-        'src/demote/',
         'src/inventory/',
-        'src/learning/',
         'src/schema/',
-        'src/task/',
         'src/tiers/',
       ],
       name: 'rafa-inventory',
       named: INVENTORY_NAMED,
     },
     {
+      // #1349: pass 4c emptied `src/adapters/tracker/`,
+      // `src/board/project/` and `src/refs/`, so they leave the list.
+      // `src/board/`, `src/commands/board/`, `src/commands/epic/` and
+      // `src/commands/issue/` stay for their integration tests, at the
+      // root until #913, as `src/tiers/` stays for inventory's.
       folders: ['packages/rafa-board/', 
-        'src/adapters/tracker/',
         'src/board/',
-        'src/board/project/',
         'src/commands/board/',
         'src/commands/epic/',
         'src/commands/issue/',
-        'src/refs/',
       ],
       name: 'rafa-board',
       named: BOARD_NAMED,
     },
     {
+      // #1374: pass 4e moved pr's files into `packages/rafa-pr/`.
+      // `src/commands/pr/`, `src/pr/` and `src/triage/` stay for their
+      // four integration tests, at the root until #913, as `src/tiers/`
+      // stays for inventory's; they also hold `pr-spawn.test.ts`,
+      // `version-collision-incident-spawn.test.ts`,
+      // `plans/validate.test.ts` and `closed-issue-triage.test.ts`, which
+      // stem no listed file and wait on #1360's rule for the move tool.
       folders: ['packages/rafa-pr/', 'src/commands/pr/', 'src/pr/', 'src/triage/'],
       name: 'rafa-pr',
-      named: [...PR_NAMED, 'src/pr/index.ts'],
+      named: [...PR_NAMED, 'packages/rafa-pr/src/pr/index.ts'],
     },
     {
-      folders: ['packages/rafa-run/', 'src/claims/', 'src/commands/claim/', 'src/preflight/', 'src/start/', 'src/suite/'],
+      // #1380: pass 4f moved run's files into `packages/rafa-run/` and
+      // emptied `src/claims/` and `src/preflight/`, so they leave the
+      // list. `src/commands/claim/` stays for the claim declaration tests
+      // `declarations-integration.test.ts` and
+      // `index-integration.test.ts`, `src/start/` for its 28 integration
+      // tests and `src/suite/` for `run-baseline-integration.test.ts` and
+      // `run-recheck-integration.test.ts`, at the root until #913, as
+      // `src/tiers/` stays for inventory's; `src/start/` also holds
+      // `base-prompts.sweep.test.ts`, which stems no listed file and
+      // waits on #1360's rule for the move tool.
+      folders: ['packages/rafa-run/', 'src/commands/claim/', 'src/start/', 'src/suite/'],
       name: 'rafa-run',
-      named: [...RUN_NAMED, 'src/start/branch-decision.ts'],
+      named: RUN_NAMED,
     },
     {
+      // #1366: pass 4d moved release's files into
+      // `packages/rafa-release/`. `src/commands/release/` stays for its
+      // three integration tests, at the root until #913, as `src/tiers/`
+      // stays for inventory's; `src/release/` stays for
+      // `fold-spawned.test.ts`, which stems no listed file and waits on
+      // #1360's rule for the move tool.
       folders: ['packages/rafa-release/', 'src/commands/release/', 'src/release/'],
       name: 'rafa-release',
       named: RELEASE_NAMED,
     },
     {
-      folders: ['packages/rafa-effort/', 'src/effort/'],
+      // #1327: pass 4b emptied `src/effort/` but for
+      // `src/effort/store/index.ts`, the CLI's by name, so the folder
+      // leaves the list.
+      folders: ['packages/rafa-effort/'],
       name: 'rafa-effort',
-      named: [...EFFORT_NAMED, 'src/schema/frontmatter.ts'],
+      named: EFFORT_NAMED,
     },
     {
       folders: ['packages/rafa-hub/'],
@@ -336,7 +371,7 @@ export const CUT_RULES: CutRules = {
     {
       folders: ['src/cli/'],
       name: CLI_PACKAGE,
-      named: ['src/commands/index.ts', 'src/rafa.ts', 'src/schema/agent.ts'],
+      named: CLI_NAMED,
     },
   ],
   rest: CLI_PACKAGE,

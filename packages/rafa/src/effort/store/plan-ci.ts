@@ -94,7 +94,7 @@ export const PLAN_CI_VERDICTS: readonly PlanCiVerdict[] = ['green', 'red', 'none
 
 /**
  * What of a pull request a reading needs: the three fields of
- * `PullRequestDetail` (`src/pr/types.ts`) it reads, spelled here so the
+ * `PullRequestDetail` (`packages/rafa/src/pr/types.ts`) it reads, spelled here so the
  * store imports nothing of the `pr` module.
  */
 export interface PlanCiPullRequest {

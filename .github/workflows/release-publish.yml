@@ -1,12 +1,12 @@
 # The rafa release publish workflow: level 2 of the release ladder.
 #
 # Written into a project's `.github/workflows/` by `writeReleaseWorkflow`
-# (`src/release/templates.ts`) for `release.publish: ci`. A pushed tag,
-# or a workflow that tags in its own run and calls this one with the tag
-# as `ref`, checks the tag out, runs the gates and then
-# `rafa release publish`, which publishes every release unit whose tag
-# points at the checked-out commit and skips a version the registry
-# already holds.
+# (`packages/rafa-release/src/release/templates.ts`) for
+# `release.publish: ci`. A pushed tag, or a workflow that tags in its own
+# run and calls this one with the tag as `ref`, checks the tag out, runs
+# the gates and then `rafa release publish`, which publishes every
+# release unit whose tag points at the checked-out commit and skips a
+# version the registry already holds.
 #
 # npm trusted publishing needs npm 11.5.1 or newer, `id-token: write` on
 # the job, and a trusted publisher configured on npmjs.com for each
@@ -55,7 +55,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
@@ -66,7 +66,7 @@ jobs:
           bun-version-file: package.json
 
       - name: Set up node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org

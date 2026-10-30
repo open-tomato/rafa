@@ -11,8 +11,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { eventsFilePath } from '@open-tomato/rafa-run/start/loop-events';
+
 import { WAIT_NO_SESSION_EXIT, waitExitCode } from '../loop/wait-reasons.js';
-import { eventsFilePath } from '../start/loop-events.js';
 
 import { expectExit, plantScratchRepo, runRafa, startRafa } from './cli-capture.js';
 import { plantSession, sessionRecord } from './loop-session-fixtures.js';

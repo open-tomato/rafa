@@ -1,6 +1,6 @@
 /**
  * `rafa plan risk [<plan>] [--strict]`: the risk reading of one plan
- * (`src/plan/risk.ts`), printed. What a run of the plan may do on this
+ * (`packages/rafa-pr/src/plan/risk.ts`), printed. What a run of the plan may do on this
  * machine and under the person's accounts, read in code: the command
  * starts no Claude session and so declares no `spends`.
  *
@@ -24,7 +24,7 @@
  * `scanSecretNames`: no value can reach a line this command writes.
  *
  * The plan's open task lines are read as well for a whole-suite run
- * their session is told to make (`src/plan/risk/long-runs.ts`): each is
+ * their session is told to make (`packages/rafa-inventory/src/plan/risk/long-runs.ts`): each is
  * a `long-run` `note`, so `--strict` does not refuse on it.
  *
  * ## What it writes

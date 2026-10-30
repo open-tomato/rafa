@@ -11,7 +11,9 @@
  * ## What sits behind it
  *
  *   - `git.ts`: the runner that spawns `git` in a directory and answers
- *     what git said instead of throwing, with the reader of that answer;
+ *     what git said instead of throwing, with the reader of that answer,
+ *     and the reader of `git status --porcelain` with git's path
+ *     unquoting;
  *   - `commit.ts`: staging and committing one task's work on the loop's
  *     behalf, the subject derived from the task text, and the argv of
  *     each step;
@@ -50,16 +52,19 @@
  * file imports one file outside `packages/rafa/src/core/` by value,
  * `packages/rafa/src/schema/tiers.ts`, and it does not reach this barrel.
  *
- * `src/pr/index.ts`, the `pr` subject's barrel, re-exports the four
- * names of `git.ts` from this file, as it re-exported them from
- * `git.ts` before the move. `config-sections.ts` imports
- * `src/pr/types.ts` directly and not that barrel, which is why the edge
+ * `packages/rafa-pr/src/pr/index.ts`, the `pr` subject's barrel, re-exports four names
+ * of `git.ts` from this file (`GitResult`, `GitRunner`,
+ * `createGitRunner`, `gitSaid`), as it re-exported them from `git.ts`
+ * before the move; the working tree reader and `unquoteGitPath`, which
+ * came here later from `packages/rafa-pr/src/pr/merge.ts`, it does not re-export.
+ * `config-sections.ts` imports
+ * `packages/rafa/src/pr/types.ts` directly and not that barrel, which is why the edge
  * closes nothing.
  *
  * Measured when the two moved: the value imports of the non-test files
  * under `src/` and `packages/` held six cycles before the move and the
  * same six after it, none through a file of this folder. The control,
- * the same tree with `src/pr/types.ts` taking one value (`gitSaid`) from
+ * the same tree with `packages/rafa/src/pr/types.ts` taking one value (`gitSaid`) from
  * this barrel, held a seventh: that file, `config-sections.ts`, `git.ts`
  * and this one. No load order of the control was run.
  *
@@ -79,7 +84,7 @@
  * `git.ts` declares, and no other name is here.
  */
 export type { GhResult, GhRunner } from './gh-runner.js';
-export type { GitResult, GitRunner } from './git.js';
+export type { GitResult, GitRunner, WorkingTreeStatus } from './git.js';
 export type {
   CommitAttempt,
   CommitMessage,
@@ -93,7 +98,7 @@ export type {
   SubjectOptions,
 } from './commit.js';
 
-export { createGitRunner, gitSaid } from './git.js';
+export { createGitRunner, gitSaid, parseWorkingTree, unquoteGitPath } from './git.js';
 export {
   buildCommitMessage,
   COMMIT_TYPE_RULES,

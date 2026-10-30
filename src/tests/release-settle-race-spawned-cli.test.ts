@@ -1,9 +1,9 @@
 /**
- * `rafa release settle` (`src/commands/release/settle.ts`), spawned as
+ * `rafa release settle` (`packages/rafa-release/src/commands/release/settle.ts`), spawned as
  * the real `rafa` binary — `src/tests/cli-capture.ts` — racing for the
  * same push over one bare origin.
  *
- * `src/release/settle-push.test.ts` already proves the refused-push rule
+ * `packages/rafa-release/src/release/settle-push.test.ts` already proves the refused-push rule
  * in-process: it wraps `SettleWorktree.git` so a chosen push is preceded
  * by a commit the test lands itself, SIMULATING a race inside one call.
  * This file's own question is narrower and disjoint from that one —
@@ -31,7 +31,7 @@
  * and settle exits 1 without trying a third time.
  */
 import type { ScratchRepo, CapturedRun } from './cli-capture.js';
-import type { Fragment } from '../release/fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -41,11 +41,11 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry an asynchronously spawned run executes; mirrors `cli-capture.ts`'s own. */

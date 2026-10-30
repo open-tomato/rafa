@@ -130,8 +130,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { openNdjsonStore } from '@open-tomato/rafa/store';
 import { readStoreRows } from '@open-tomato/rafa/store/ndjson-files';
-
-import { collectEffort } from '../effort/collect.js';
+import { collectEffort } from '@open-tomato/rafa-effort/effort/collect';
 
 import { resolveLiveParity } from './parity-fixture.js';
 

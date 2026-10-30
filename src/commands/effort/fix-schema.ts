@@ -29,7 +29,7 @@
  *
  * This is the command half. The stamp the parallel and backup files are
  * named with, `fileStamp`, is the library half,
- * `src/effort/file-stamp.ts`, which files outside `src/commands/` read
+ * `packages/rafa-effort/src/effort/file-stamp.ts`, which files outside `src/commands/` read
  * too; this file re-exports none of it.
  */
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';

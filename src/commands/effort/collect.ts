@@ -1,11 +1,11 @@
 /**
  * `rafa effort collect`: session and commit rows appended to the effort
- * store by the phase 0 command in `src/effort/collect.ts`, and the skills
+ * store by the phase 0 command in `packages/rafa-effort/src/effort/collect.ts`, and the skills
  * each session invoked counted into `skill_invocations`.
  *
  * The spelling is phase 0's, so no alias is needed.
- * `src/effort/collect.ts` reads its own flags through its parser in
- * `src/effort/collect-args.ts` and refuses any other, and the ones
+ * `packages/rafa-effort/src/effort/collect.ts` reads its own flags through its parser in
+ * `packages/rafa-effort/src/effort/collect-args.ts` and refuses any other, and the ones
  * declared here are those it reads.
  */
 import type { RafaCommand } from '@open-tomato/rafa/core/command';

@@ -36,8 +36,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { REVIEWED_STATUS } from '@open-tomato/rafa-inventory/demote/report';
 
-import { REVIEWED_STATUS } from '../../demote/report.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createSkillDemoteCommand, readApply, readDemoteDirectory, verdictLine } from './demote.js';

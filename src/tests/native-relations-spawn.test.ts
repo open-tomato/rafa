@@ -28,18 +28,18 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionAt, writePositionFile } from '@open-tomato/rafa/project/position';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { BOARDS_LIST_ARGS } from '@open-tomato/rafa-board/board/boards';
+import { EPIC_GUARD_PATH } from '@open-tomato/rafa-board/board/epic-guard';
+import { BOARD_LISTING_LIMIT, boardListingCommand } from '@open-tomato/rafa-board/board/roadmap-board';
+import { BOARD_LABELS, LABEL_LIST_LIMIT } from '@open-tomato/rafa-board/board/setup';
+import { NATIVE_MODE, nativeParentLine } from '@open-tomato/rafa-board/commands/epic/move-native';
+import { NATIVE_UNBLOCK_LINE } from '@open-tomato/rafa-board/commands/issue/unblock-native';
+import { freedHeaderLine, freedIssueLine } from '@open-tomato/rafa-pr/commands/pr/merge-freed';
 
-import { BOARDS_LIST_ARGS } from '../board/boards.js';
-import { EPIC_GUARD_PATH } from '../board/epic-guard.js';
-import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
-import { BOARD_LABELS, LABEL_LIST_LIMIT } from '../board/setup.js';
-import { NATIVE_MODE, nativeParentLine } from '../commands/epic/move-native.js';
 import { EPIC_GUARD_NATIVE_REFUSAL } from '../commands/init-board.js';
-import { NATIVE_UNBLOCK_LINE } from '../commands/issue/unblock-native.js';
-import { freedHeaderLine, freedIssueLine } from '../commands/pr/merge-freed.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-native-relations-spawn-')));

@@ -44,12 +44,13 @@
  */
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
 import type { PidProbe, SessionState } from '@open-tomato/rafa/core/loop';
-import type { WorktreeSeams } from '@open-tomato/rafa-run';
+import type { WorktreeSeams } from '@open-tomato/rafa-pr';
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { defaultWorktreeSeams, readCleanup } from '@open-tomato/rafa-run';
+import { defaultWorktreeSeams } from '@open-tomato/rafa-pr';
+import { readCleanup } from '@open-tomato/rafa-run';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions, SESSION_STATES } from '@open-tomato/rafa/core/loop';

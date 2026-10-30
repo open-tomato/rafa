@@ -5,7 +5,7 @@
  *
  *   - A scripted runner, handed over through `openGh`, that answers the
  *     two `gh auth status` forms as each case scripts them and passes
- *     every `gh api` to the recorded fake in `src/pr/gh-fake.ts`, where
+ *     every `gh api` to the recorded fake in `packages/rafa-pr/src/pr/gh-fake.ts`, where
  *     a case plants the permission the collaborators endpoint answers.
  *     `gh` is still found by `Bun.which` on the case's `PATH`, so each
  *     of these cases plants an executable `gh` in a temporary `bin` it
@@ -20,7 +20,7 @@
  * No case reads the real `PATH`, the real home or the real `origin`.
  */
 import type { DeepProvidersReading, DeepProvidersSeams } from './doctor-deep-providers.js';
-import type { GhResult, GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner, GhRunnerOptions } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,8 +28,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createFakePrGh } from '../pr/gh-fake.js';
-import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '@open-tomato/rafa-pr/pr/preflight-items';
 
 import {
   activeLoginOf,

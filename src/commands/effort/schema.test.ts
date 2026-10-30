@@ -23,9 +23,9 @@ import { bringForward } from '@open-tomato/rafa/store/bring-forward';
 import { REFUSAL_REASONS } from '@open-tomato/rafa/store/schema-plan';
 import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { readStoreMeta } from '@open-tomato/rafa/store/store-meta';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
-import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createSchemaCommand } from './schema.js';
 

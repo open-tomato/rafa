@@ -23,34 +23,34 @@ export default [
   },
   ...baseConfig,
   {
-    // The learning library's boundary: `src/learning/` is a pure library
-    // shipped as `@open-tomato/rafa/learning`, so it imports nothing from
-    // the rest of `src/` or from core's package, `packages/rafa/src/`, and
-    // touches no filesystem. `node:crypto` (for sha256) and packages such
-    // as `bun:test` stay allowed. The zones are resolved, not matched by
-    // specifier, so `@open-tomato/rafa/core/config` from `src/learning/`
-    // is refused while `../x.js` from a subdirectory of it is not.
-    // `src/tests/learning-boundary.test.ts` lints a file planted under
-    // `src/learning/` against this block.
-    files: ['src/learning/**/*.ts'],
+    // The learning library's boundary: `packages/rafa-inventory/src/learning/`
+    // is a pure library shipped as `@open-tomato/rafa/learning`, so it imports
+    // nothing from the rest of inventory's `src/` or from core's package,
+    // `packages/rafa/src/`, and touches no filesystem. `node:crypto` (for
+    // sha256) and packages such as `bun:test` stay allowed. The zones are
+    // resolved, not matched by specifier, so `@open-tomato/rafa/core/config`
+    // from that folder is refused while `../x.js` from a subdirectory of it
+    // is not. `src/tests/learning-boundary.test.ts` lints a file planted under
+    // `packages/rafa-inventory/src/learning/` against this block.
+    files: ['packages/rafa-inventory/src/learning/**/*.ts'],
     rules: {
       'import/no-restricted-paths': ['error', {
         zones: [{
-          target: './src/learning',
-          from: './src',
+          target: './packages/rafa-inventory/src/learning',
+          from: './packages/rafa-inventory/src',
           except: ['./learning'],
-          message: 'src/learning/ imports nothing from the rest of src/.',
+          message: 'packages/rafa-inventory/src/learning/ imports nothing from the rest of the package\'s src/.',
         }, {
-          target: './src/learning',
+          target: './packages/rafa-inventory/src/learning',
           from: './packages/rafa/src',
-          message: 'src/learning/ imports nothing from core.',
+          message: 'packages/rafa-inventory/src/learning/ imports nothing from core.',
         }],
       }],
       'no-restricted-imports': ['error', {
         paths: ['node:fs', 'node:fs/promises', 'fs', 'fs/promises'].map(
           (name) => ({
             name,
-            message: 'src/learning/ touches no filesystem.',
+            message: 'packages/rafa-inventory/src/learning/ touches no filesystem.',
           }),
         ),
       }],
@@ -60,10 +60,9 @@ export default [
     // A config section adds its fields to `RafaConfig` by declaration
     // merging: `interface RafaConfig extends HubSettings {}` inside a
     // `declare module` on `packages/rafa/src/core/config/config-schema.ts`.
-    // The empty body is the point, so these files alone, at the root and
-    // in core's package, allow an interface whose one supertype is its
-    // whole content.
-    files: ['src/config-schema-*.ts', 'packages/rafa/src/config-schema-*.ts'],
+    // The empty body is the point, so these files alone, in core's
+    // package, allow an interface whose one supertype is its whole content.
+    files: ['packages/rafa/src/config-schema-*.ts'],
     rules: {
       '@typescript-eslint/no-empty-object-type': ['error', {
         allowInterfaces: 'with-single-extends',

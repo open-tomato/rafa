@@ -45,9 +45,9 @@
  * question is answered by a scripted prompter recording what it was
  * asked.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '../pr/index.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,11 +55,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { KNOWN_LIST_LIMIT } from '../board/blocked-issues.js';
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
-import { createIssueUnblockCommand } from '../commands/issue/unblock.js';
-import { createPrMergeCommand } from '../commands/pr/merge.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { SPEC_BLOCKED_LABEL } from '@open-tomato/rafa-board/board/blocked';
+import { KNOWN_LIST_LIMIT } from '@open-tomato/rafa-board/board/blocked-issues';
+import { createIssueUnblockCommand } from '@open-tomato/rafa-board/commands/issue/unblock';
+import { createPrMergeCommand } from '@open-tomato/rafa-pr/commands/pr/merge';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
 

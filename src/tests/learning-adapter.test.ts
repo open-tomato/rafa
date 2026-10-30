@@ -5,8 +5,8 @@
  * line, and a flag on the bundle's leader, written by id, survives a
  * later push.
  */
-import type { DescribedInstinctRecord, PushLogLine } from '../adapters/learning/local.js';
 import type { Learning, SyncPayload } from '@open-tomato/rafa/ports';
+import type { DescribedInstinctRecord, PushLogLine } from '@open-tomato/rafa-inventory/adapters/learning/local';
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,8 +14,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createLocalLearning, localInstinctsDir } from '../adapters/learning/local.js';
-import { actionHash } from '../learning/index.js';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 
 const NOW = '2026-09-14T10:00:00.000Z';
 const FIRST = '2026-09-12T10:00:00.000Z';

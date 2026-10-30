@@ -23,8 +23,8 @@
  * without `user`, so a row that is absent is absent for its reason and
  * not because nothing was read.
  */
-import type { InventorySeams } from '../inventory/index.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { InventorySeams } from '@open-tomato/rafa-inventory/inventory/index';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,9 +32,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SKILL_USE_CLI_VERSION } from '../effort/skill-use.js';
-import { buildInventory } from '../inventory/index.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
+import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
+import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
 
 import { renderDeepRow } from './doctor-deep-row.js';
 import {
@@ -296,7 +296,7 @@ describe('the SKILL_USE_CLI_VERSION pin', () => {
       name: 'Claude Code',
       detail: '2.1.999 is installed, and the skill-use collector reads logs of 2.1.280, '
         + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
-      fix: 'record the skill-use fixture again under the installed version (src/effort/skill-use.ts) '
+      fix: 'record the skill-use fixture again under the installed version (packages/rafa-effort/src/effort/skill-use.ts) '
         + 'before moving SKILL_USE_CLI_VERSION',
     }]);
   });

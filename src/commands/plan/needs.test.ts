@@ -20,9 +20,9 @@
  * holding it. The spawned end-to-end cases are
  * `src/tests/plan-needs.test.ts`'s.
  */
-import type { PlanSpecOptions, PlanSpecResolution } from '../../board/plan-spec.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { PlanSpecOptions, PlanSpecResolution } from '@open-tomato/rafa-board/board/plan-spec';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

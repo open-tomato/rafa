@@ -7,6 +7,11 @@
  * check-point table, with the stage at `related`; `context/verification.md`
  * records it. The `Config` import is type-only, erased before the file
  * runs, so the file needs nothing at run time.
+ *
+ * `loop.worktreeSetup` runs `bun install --frozen-lockfile` in each
+ * `--as-worktree` worktree before the first session (#1345): a loop
+ * worktree with no install resolves the feature packages through the
+ * main checkout and loads core twice.
  */
 
 import type { Config } from './src/config/index.js';
@@ -23,5 +28,6 @@ export default [
       releasePullRequest: ['integration'],
       publish: ['full'],
     },
+    loop: { worktreeSetup: 'bun install --frozen-lockfile' },
   },
 ] satisfies Config as Config;

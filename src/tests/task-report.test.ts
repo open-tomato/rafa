@@ -106,9 +106,9 @@
  * machine, never reaching a real `gh` in git's directory. The blocker case
  * reads its one `gh auth status` call.
  */
-import type { TaskSessionRunner } from '../start/dispatch.js';
 import type { CapturedSpawnOptions, CapturingSpawner } from '@open-tomato/rafa/core/loop';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { TaskSessionRunner } from '@open-tomato/rafa-run/start/dispatch';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -135,23 +135,22 @@ import {
   it,
 } from 'bun:test';
 
-import { CLAUDE_BASE_ARGS } from '@open-tomato/rafa/core/loop';
+import { CLAUDE_BASE_ARGS, SESSION_ID_FLAG } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { projectConfigText } from '../project/scaffold.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import {
   dispatchTask,
   renderProgressForDispatch,
   runTaskSession,
-  SESSION_ID_FLAG,
   storeTaskReport,
-} from '../start/dispatch.js';
+} from '@open-tomato/rafa-run/start/dispatch';
+
+import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** What a run with no config spawns every session under, spelled out. */

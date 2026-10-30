@@ -1,10 +1,10 @@
 /**
  * `rafa effort dashboard`: every effort reading in one call, one block
  * per widget in text and one key per widget in the JSON result
- * (`src/effort/dashboard.ts`).
+ * (`packages/rafa-effort/src/effort/dashboard.ts`).
  *
  * Its flags are the trend report's, read by the same parser
- * (`src/effort/report-args.ts`) so the two commands refuse a value alike:
+ * (`packages/rafa-effort/src/effort/report-args.ts`) so the two commands refuse a value alike:
  * `--days=`, `--recent=`, `--loops=` and `--by=`. It reads the store, the
  * session records and the clock, and writes nothing. Starts no Claude
  * session and declares no `spends`.

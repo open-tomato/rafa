@@ -11,7 +11,7 @@
  * ## The loop's ending
  *
  * The pull request is read from the run's events file
- * (`.rafa/runs/<session-id>.events.ndjson`, `src/loop/events-file.ts`):
+ * (`.rafa/runs/<session-id>.events.ndjson`, `packages/rafa-run/src/loop/events-file.ts`):
  * the first `pr`, `no-pr`, `halt` or `error` event in file order, the
  * order `loop wait` reads them in ({@link readLoopEnding}). A `pr` event
  * carries the pull request's number. When `loop wait` ended non-zero, or

@@ -27,9 +27,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
-
-import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
-import { MODULE_SYNC_STRATEGIES } from '../effort/sync/select.js';
+import { readDoctorEffortSync } from '@open-tomato/rafa-effort/effort/sync/doctor-reading';
+import { MODULE_SYNC_STRATEGIES } from '@open-tomato/rafa-effort/effort/sync/select';
 
 import { effortSyncRefusal, renderDoctorEffortSync } from './doctor-effort-sync.js';
 

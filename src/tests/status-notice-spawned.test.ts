@@ -5,7 +5,7 @@
  * The plain command is `plan list`: it runs inside a project, spends
  * nothing and is neither `status` nor `cleanup`. A worktree under
  * `.claude/worktrees/` goes idle when the times of its directory and of
- * its `HEAD`, `logs/HEAD` and `index` (the files `src/cleanup/worktrees.ts`
+ * its `HEAD`, `logs/HEAD` and `index` (the files `packages/rafa-pr/src/cleanup/worktrees.ts`
  * reads) are set past `cleanup.worktreeIdleDays`.
  *
  * Held here: a first command prints no notice and writes
@@ -24,10 +24,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { NOTICE_PREFIX } from '../status/notice.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 120_000 };
 

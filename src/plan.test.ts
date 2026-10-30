@@ -21,13 +21,13 @@
  * names.
  *
  * The wrapping drops one thing on purpose: the ENDING. The module's
- * default export is `endingWith(...)` (`src/next/ending.ts`), and
+ * default export is `endingWith(...)` (`packages/rafa-run/src/next/ending.ts`), and
  * `wrapPhaseZeroCommand` replaces `run`, so the command the child
  * dispatches ends where `plan` ends and reads no state. That is what
  * keeps every case here from composing the real sources — `git` and
  * `gh` spawned in the scratch repository, for a line no case is about —
  * and leaves the ending to be held where it is driven,
- * `src/next/ending.test.ts`.
+ * `src/tests/run-coupled/next/ending.test.ts`.
  *
  * First on the child's PATH is a stand-in `claude` that leaves a marker
  * and exits 97, and every case holds the marker absent. A command that
@@ -53,7 +53,7 @@
  * sources is refused before any read, and `--dry-run` stops before the
  * planner. `--next` is not driven here — its walk is three more `gh` and
  * `git` reads, driven over planted runners in
- * `src/board/plan-spec.test.ts` and end to end in the integration suite.
+ * `packages/rafa-board/src/board/plan-spec.test.ts` and end to end in the integration suite.
  *
  * Check 4 is driven through the same `--issue=20` read, over a body
  * naming `src/gone.ts`, which no scratch repository tracks, so the
@@ -69,7 +69,7 @@
  * `shasum -c`).
  *
  * That every `--spec` case is green is a reading of its own: the board
- * seams are built for every run (`src/board/plan-spec.ts`) and a file
+ * seams are built for every run (`packages/rafa-board/src/board/plan-spec.ts`) and a file
  * route calls none of them, so a resolution that spawned `gh` eagerly
  * would redden this whole file.
  *
@@ -140,7 +140,7 @@
  * held.
  *
  * One mutation of `plan.ts` was driven on 2026-09-20 over
- * `env -u CLAUDECODE bun test src/board/gate.test.ts src/plan.test.ts`,
+ * `env -u CLAUDECODE bun test packages/rafa-board/src/board/gate.test.ts src/plan.test.ts`,
  * the module restored from a scratch copy and verified with
  * `shasum -c`: the `recordMissingReview` call dropped left 41 pass and
  * 1 fail against 42 pass either side — the `missing-review` case, the
@@ -154,7 +154,7 @@
  * pass either side — the `absent-review` case, which then exited 3 with
  * the gate's refusal in place of the session's own failure. Four other
  * mutations driven the same day over `gate.ts` are recorded in
- * `src/board/gate.test.ts`; two of them redden cases in this file.
+ * `packages/rafa-board/src/board/gate.test.ts`; two of them redden cases in this file.
  *
  * ## The epic context
  *
@@ -165,10 +165,10 @@
  * handed over as its control. The `--issue=20` fixture carries no
  * `epic:` label, so the stand-in `gh` is asked nothing more for it.
  */
-import type { GhRunner } from './adapters/tracker/github.js';
-import type { EpicContext } from './board/epic-context.js';
-import type { ResolvedSpec } from './board/spec-source.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { EpicContext } from '@open-tomato/rafa-board/board/epic-context';
+import type { ResolvedSpec } from '@open-tomato/rafa-board/board/spec-source';
 
 import {
   chmodSync,
@@ -186,10 +186,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { epicContextArgs } from '@open-tomato/rafa-board/board/epic-context';
+import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '@open-tomato/rafa-board/refs/stamp';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { epicContextArgs } from './board/epic-context.js';
-import { specPath } from './board/naming.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import {
   buildPlanPrompt,
@@ -205,10 +208,7 @@ import {
   SKILL_INDEX_HEADING,
 } from './plan.js';
 import { projectConfigText } from './project/scaffold.js';
-import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from './refs/stamp.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
-import { scratchHomeEnv } from './tests/scratch-home-env.js';
-import { completeSpecBody } from './tests/spec-bodies.js';
 import { hostToolDirs } from './tests/stand-in-gh.js';
 
 /** This file's directory, `src/`, where the modules the probe imports sit. */
@@ -314,14 +314,14 @@ const PROBE = [
   `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
   'registerCoreConfigSections();',
   'registerCoreAdapters();',
-  `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, 'board', 'spec-review.ts'))};`,
+  `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'board', 'spec-review.ts'))};`,
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',
@@ -432,7 +432,7 @@ function plantScratch(options: ScratchOptions = {}): Scratch {
 
   // The two board reads `--issue` makes, answered by a stand-in: the
   // issue, and check 0's permission lookup on the author who opened it
-  // (`src/board/plan-spec.ts`). No case here reaches GitHub, and a
+  // (`packages/rafa-board/src/board/plan-spec.ts`). No case here reaches GitHub, and a
   // third read would exit 1 naming its words.
   const gh = join(bin, 'gh');
   writeFileSync(gh, [

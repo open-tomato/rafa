@@ -1,6 +1,6 @@
 /**
  * Runtime snapshot: `bun run snapshot`, a thin caller of
- * `src/runtime/install.ts`, which `rafa self-update` calls too. That
+ * `packages/rafa-run/src/runtime/install.ts`, which `rafa self-update` calls too. That
  * module's note is the long form: what it reads, the order it runs in, the
  * refusals, and how it replaces a runtime in use.
  *

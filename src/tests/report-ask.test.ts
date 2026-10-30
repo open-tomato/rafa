@@ -49,8 +49,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { readRafaBlocks } from '@open-tomato/rafa/core/plan/block-reader';
 import { parseReport } from '@open-tomato/rafa/report/parse';
-
-import { buildTaskPrompt } from '../start/dispatch.js';
+import { buildTaskPrompt } from '@open-tomato/rafa-run/start/dispatch';
 
 /** `src/PROMPT.md`, the file the build copies and the loop reads. */
 const PROMPT_FILE = readFileSync(fileURLToPath(new URL('../PROMPT.md', import.meta.url)), 'utf8');

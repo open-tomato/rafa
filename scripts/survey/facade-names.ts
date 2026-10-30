@@ -6,10 +6,13 @@
  *
  * The universe is the root program: the `fileNames` and options of the
  * root `tsconfig.json` (so `paths` resolves `@open-tomato/rafa/*` into
- * core), built once with `ts.createProgram`. A file is set aside when
- * `classifyFile` reads it as `test` or `test-support`, or when `placeFile`
- * puts it in the package being read. Every other file is an outside
- * importer, a file of an unassigned folder and a file under `scripts/`
+ * core), built once with `ts.createProgram`, and the files of
+ * `packages/` the program reaches from it: a feature package's own files
+ * are outside importers of the other packages (effort's of inventory's
+ * `bareSkillName`) though the root tsconfig excludes `packages/`. A file is
+ * set aside when `classifyFile` reads it as `test` or `test-support`, or
+ * when `placeFile` puts it in the package being read. Every other file is an
+ * outside importer, a file of an unassigned folder and a file under `scripts/`
  * included.
  *
  * For each outside file the reader walks the `import` and `export … from`
@@ -34,12 +37,19 @@
  * `import('./x.js').T` record nothing.
  *
  * A specifier that resolves to a facade entry (`packages/rafa-<name>/index.ts`,
- * placed in the package by its folder) is read through the entry's table
- * of `facade-tables.ts`: each name taken is recorded as if taken from the
- * file the entry re-exports it from, under the name it has there
+ * or the commands entry beside it, `packages/rafa-<name>/commands.ts`,
+ * each placed in the package by its folder) is read through the entry's
+ * table of `facade-tables.ts`: each name taken is recorded as if taken
+ * from the file the entry re-exports it from, under the name it has there
  * (`default` for `default as d`), so an importer rewired to the facade
  * reads the same as one by relative path and the entry is never a name's
- * `exportedBy`. A name the table lacks records nothing.
+ * `exportedBy`. A name the table lacks records no name and is the problem
+ * `unexported-name`, through either entry.
+ *
+ * Each name records the entry it is taken through, its `entry`:
+ * `commands` when every import of it resolves to a commands entry, else
+ * `index`. A name taken through both entries, or by path as well as
+ * through the commands entry, belongs to the index.
  *
  * Each name's `exportedBy` is the file the entry re-exports it from: the
  * package's own index, `src/<name>/index.ts`, when its exports hold the
@@ -51,13 +61,13 @@
  * of that file.
  *
  * Run from the repository root,
- * `bun scripts/survey/facade-names.ts --package=<rafa-effort|…> [--json|--entry]`
- * prints the names (tab-separated), the reading as JSON, or the text of
- * the facade's `index.ts`; see {@link main}.
+ * `bun scripts/survey/facade-names.ts --package=<rafa-effort|…> [--json|--entry|--commands]`
+ * prints the names (tab-separated), the reading as JSON, the text of the
+ * facade's `index.ts`, or the text of its `commands.ts`; see {@link main}.
  */
 
 import type { CutRules } from './cut-table';
-import type { FacadeTables } from './facade-tables';
+import type { FacadeEntryKind, FacadeTables } from './facade-tables';
 
 import { realpathSync } from 'node:fs';
 import { join, posix, relative, sep } from 'node:path';
@@ -65,7 +75,7 @@ import { join, posix, relative, sep } from 'node:path';
 import ts from 'typescript';
 
 import { CUT_RULES, placeFile } from './cut-table';
-import { readFacadeTables } from './facade-tables';
+import { facadeEntryOf, readFacadeTables } from './facade-tables';
 import { classifyFile } from './files';
 import { stableJson } from './import-graph';
 
@@ -86,6 +96,11 @@ export interface FacadeName {
   readonly viaDefault: boolean;
   /** The outside files that import it, sorted. */
   readonly importers: readonly string[];
+  /**
+   * The entry it is taken through: `commands` when every import of it
+   * resolves to the commands entry, else `index`.
+   */
+  readonly entry: FacadeEntryKind;
 }
 
 /** One declaration, as a problem names it. */
@@ -120,8 +135,18 @@ export interface CollisionProblem {
   readonly declarations: readonly FacadeDeclaration[];
 }
 
+/** A name taken through a facade entry, either one, that the entry does not export. */
+export interface UnexportedNameProblem {
+  readonly kind: 'unexported-name';
+  readonly importer: string;
+  /** The entry the importer's specifier resolves to. */
+  readonly target: string;
+  /** The name taken: the exported name, or `default`. */
+  readonly name: string;
+}
+
 /** What keeps a facade entry from standing for the imports. */
-export type FacadeProblem = AnonymousDefaultProblem | CollisionProblem | NamespaceImportProblem;
+export type FacadeProblem = AnonymousDefaultProblem | CollisionProblem | NamespaceImportProblem | UnexportedNameProblem;
 
 /** A dynamic `import()` from an outside file that lands in the package. */
 export interface DynamicImport {
@@ -162,7 +187,7 @@ export interface FacadeRun {
 }
 
 /** How the CLI is called. */
-export const USAGE = 'usage: bun scripts/survey/facade-names.ts --package=<name> [--json|--entry]';
+export const USAGE = 'usage: bun scripts/survey/facade-names.ts --package=<name> [--json|--entry|--commands]';
 
 /** One import of a name, before the names are grouped. */
 interface NameUse {
@@ -171,6 +196,16 @@ interface NameUse {
   readonly isValue: boolean;
   readonly importer: string;
   readonly target: string;
+  /** The facade entry the import resolved to, or `undefined` for a file taken by path. */
+  readonly entry: FacadeEntryKind | undefined;
+}
+
+/** One imported or re-exported element, as an importer's statement names it. */
+interface ElementSite {
+  readonly importer: string;
+  readonly target: string;
+  readonly exportName: string;
+  readonly location: ts.Node;
 }
 
 /** What one walk of the outside files collects. */
@@ -331,7 +366,7 @@ function describeDeclaration(context: ReadContext, declaration: ts.Declaration, 
 function recordElement(
   context: ReadContext,
   collected: Collected,
-  site: { importer: string; target: string; exportName: string; location: ts.Node },
+  site: ElementSite & { entry: FacadeEntryKind | undefined },
 ): void {
   const resolved = resolveAlias(context, site.location);
   if (resolved === undefined) {
@@ -347,6 +382,7 @@ function recordElement(
   }
   collected.uses.push({
     declaration: describeDeclaration(context, resolved.declaration, ownName(resolved.declaration) ?? name),
+    entry: site.entry,
     exportName: site.exportName,
     importer: site.importer,
     isValue: (resolved.symbol.flags & ts.SymbolFlags.Value) !== 0,
@@ -355,33 +391,29 @@ function recordElement(
 }
 
 /**
- * Where one name taken from a target is taken from: through the target's
- * facade table when the target is a facade entry, else the target itself.
- *
- * @returns The file and the name there, or `undefined` for a name the
- *   entry's table lacks.
+ * Records one element. A target that is a facade entry is read through
+ * its table: the name is recorded as taken from the file the entry
+ * re-exports it from, under its name there, with the entry it was taken
+ * through; a name the table lacks is the problem `unexported-name`. Any
+ * other target is recorded as itself, through no entry.
  */
-function throughFacade(context: ReadContext, target: string, exportName: string): { target: string; exportName: string } | undefined {
-  const rows = context.facades.get(target);
+function recordTaken(context: ReadContext, collected: Collected, site: ElementSite): void {
+  const rows = context.facades.get(site.target);
   if (rows === undefined) {
-    return { exportName, target };
+    recordElement(context, collected, { ...site, entry: undefined });
+    return;
   }
-  const row = rows.find((candidate) => candidate.name === exportName);
-  return row === undefined
-    ? undefined
-    : { exportName: row.sourceName, target: row.source };
-}
-
-/** Records one element, read through a facade when its target is one. */
-function recordTaken(
-  context: ReadContext,
-  collected: Collected,
-  site: { importer: string; target: string; exportName: string; location: ts.Node },
-): void {
-  const taken = throughFacade(context, site.target, site.exportName);
-  if (taken !== undefined) {
-    recordElement(context, collected, { ...site, ...taken });
+  const row = rows.find((candidate) => candidate.name === site.exportName);
+  if (row === undefined) {
+    collected.problems.push({ importer: site.importer, kind: 'unexported-name', name: site.exportName, target: site.target });
+    return;
   }
+  recordElement(context, collected, {
+    ...site,
+    entry: facadeEntryOf(site.target) ?? 'index',
+    exportName: row.sourceName,
+    target: row.source,
+  });
 }
 
 /** Records the bindings of one `import … from` landing in the package. */
@@ -544,6 +576,9 @@ function groupNames(context: ReadContext, uses: readonly NameUse[]): { names: Fa
     }
     names.push({
       declaredIn: group[0]!.declaration.file,
+      entry: group.every((use) => use.entry === 'commands')
+        ? 'commands'
+        : 'index',
       importers: [...new Set(group.map((use) => use.importer))].sort(compareText),
       kind: group[0]!.isValue
         ? 'value'
@@ -560,6 +595,9 @@ export function renderProblem(problem: FacadeProblem): string {
   if (problem.kind === 'collision') {
     const declarations = problem.declarations.map((declaration) => `${declaration.file}:${declaration.name}@${declaration.position}`);
     return ['collision', problem.name, ...declarations].join('\t');
+  }
+  if (problem.kind === 'unexported-name') {
+    return [problem.kind, problem.importer, problem.target, problem.name].join('\t');
   }
   return [problem.kind, problem.importer, problem.target].join('\t');
 }
@@ -606,7 +644,11 @@ export function readFacadeNames(root: string, pkg: string, options: FacadeOption
     rules,
   };
   const collected: Collected = { dynamicImports: [], problems: [], uses: [] };
-  for (const fileName of fileNames) {
+  const packageFiles = program
+    .getSourceFiles()
+    .map((file) => file.fileName)
+    .filter((fileName) => repoPath(realRoot, fileName).startsWith('packages/'));
+  for (const fileName of new Set([...fileNames, ...packageFiles])) {
     const path = repoPath(realRoot, fileName);
     const file = program.getSourceFile(fileName);
     if (file === undefined || classifyFile(path) !== 'source' || inPackage(context, path)) {
@@ -642,7 +684,37 @@ function exportLine(keyword: string, items: readonly string[], specifier: string
 }
 
 /**
- * Writes the text of a facade's `index.ts` from a reading. Pure.
+ * Writes an entry's text: the header, then the re-exports of the names
+ * given.
+ */
+function renderEntry(header: readonly string[], names: readonly FacadeName[], facadeDir: string): string {
+  const dir = facadeDir.replace(/\/+$/, '');
+  const sources = [...new Set(names.map((name) => name.exportedBy))].sort(compareText);
+  const groups = sources.map((source) => {
+    const specifier = facadeSpecifier(dir, source);
+    const group = names
+      .filter((name) => name.exportedBy === source)
+      .sort((left, right) => compareText(left.name, right.name));
+    const types = group.filter((name) => name.kind === 'type').map((name) => name.name);
+    const values = group.filter((name) => name.kind === 'value').map((name) => (name.viaDefault
+      ? `default as ${name.name}`
+      : name.name));
+    return [
+      ...(types.length > 0
+        ? [exportLine('export type', types, specifier)]
+        : []),
+      ...(values.length > 0
+        ? [exportLine('export', values, specifier)]
+        : []),
+    ].join('\n');
+  });
+  return `${[header.join('\n'), ...groups].join('\n\n')}\n`;
+}
+
+/**
+ * Writes the text of a facade's `index.ts` from a reading: the names taken
+ * through the index, never those taken through the commands entry alone.
+ * Pure.
  *
  * @param reading - The reading of {@link readFacadeNames}.
  * @param facadeDir - The facade's folder, repository-relative
@@ -659,28 +731,30 @@ export function renderFacadeEntry(reading: FacadeReading, facadeDir: string): st
     ' * package imports from it, re-exported from where it lives today.',
     ` * Written by \`bun scripts/survey/facade-names.ts --package=${reading.package} --entry\`.`,
     ' */',
-  ].join('\n');
-  const dir = facadeDir.replace(/\/+$/, '');
-  const sources = [...new Set(reading.names.map((name) => name.exportedBy))].sort(compareText);
-  const groups = sources.map((source) => {
-    const specifier = facadeSpecifier(dir, source);
-    const names = reading.names
-      .filter((name) => name.exportedBy === source)
-      .sort((left, right) => compareText(left.name, right.name));
-    const types = names.filter((name) => name.kind === 'type').map((name) => name.name);
-    const values = names.filter((name) => name.kind === 'value').map((name) => (name.viaDefault
-      ? `default as ${name.name}`
-      : name.name));
-    return [
-      ...(types.length > 0
-        ? [exportLine('export type', types, specifier)]
-        : []),
-      ...(values.length > 0
-        ? [exportLine('export', values, specifier)]
-        : []),
-    ].join('\n');
-  });
-  return `${[header, ...groups].join('\n\n')}\n`;
+  ];
+  return renderEntry(header, reading.names.filter((name) => name.entry === 'index'), facadeDir);
+}
+
+/**
+ * Writes the text of a facade's `commands.ts` from a reading: the names
+ * taken through the commands entry alone. Pure.
+ *
+ * @param reading - The reading of {@link readFacadeNames}.
+ * @param facadeDir - The facade's folder, repository-relative
+ *   (`packages/rafa-pr/`).
+ * @returns The entry, in the form {@link renderFacadeEntry} writes, under
+ *   a header naming the `--commands` flag; the header alone when no name
+ *   is taken through the commands entry.
+ */
+export function renderCommandsEntry(reading: FacadeReading, facadeDir: string): string {
+  const header = [
+    '/**',
+    ` * The commands entry of \`${reading.package}\`: every name a file outside`,
+    ' * the package takes through it alone, re-exported from where it lives today.',
+    ` * Written by \`bun scripts/survey/facade-names.ts --package=${reading.package} --commands\`.`,
+    ' */',
+  ];
+  return renderEntry(header, reading.names.filter((name) => name.entry === 'commands'), facadeDir);
 }
 
 /** The folder of a package's facade: `packages/<name less its scope>/`. */
@@ -691,24 +765,27 @@ export function facadeFolder(pkg: string): string {
 /** The parsed arguments of the CLI. */
 interface FacadeArgs {
   readonly pkg: string;
-  readonly mode: 'entry' | 'json' | 'lines';
+  readonly mode: 'commands' | 'entry' | 'json' | 'lines';
 }
+
+/** The flags that each pick what the CLI prints, one at most. */
+const MODE_FLAGS: readonly string[] = ['--json', '--entry', '--commands'];
 
 /**
  * Reads the arguments after the script's path.
  *
  * @throws When `--package=` is missing or repeated, an argument is
- *   unknown, or `--json` and `--entry` are both passed; the message holds
- *   {@link USAGE}.
+ *   unknown, or more than one of `--json`, `--entry` and `--commands` is
+ *   passed; the message holds {@link USAGE}.
  */
 function parseFacadeArgs(args: readonly string[]): FacadeArgs {
   let pkg: string | undefined;
-  const modes: ('entry' | 'json')[] = [];
+  const modes: ('commands' | 'entry' | 'json')[] = [];
   for (const arg of args) {
     if (arg.startsWith('--package=') && pkg === undefined && arg.length > '--package='.length) {
       pkg = arg.slice('--package='.length);
-    } else if (arg === '--json' || arg === '--entry') {
-      modes.push(arg.slice(2) as 'entry' | 'json');
+    } else if (MODE_FLAGS.includes(arg)) {
+      modes.push(arg.slice(2) as 'commands' | 'entry' | 'json');
     } else {
       throw new Error(`refused argument ${arg}\n${USAGE}`);
     }
@@ -717,7 +794,7 @@ function parseFacadeArgs(args: readonly string[]): FacadeArgs {
     throw new Error(`no --package= given\n${USAGE}`);
   }
   if (modes.length > 1) {
-    throw new Error(`--json and --entry are one of\n${USAGE}`);
+    throw new Error(`--json, --entry and --commands are one of\n${USAGE}`);
   }
   return { mode: modes[0] ?? 'lines', pkg };
 }
@@ -733,8 +810,9 @@ function parseFacadeArgs(args: readonly string[]): FacadeArgs {
  *   per name (`name`, `kind`, `declaredIn`, `exportedBy`) on stdout, one
  *   line per problem and dynamic import on stderr, exit 0. `--json`: the
  *   reading as `stableJson`. `--entry`: the facade entry, exit 1 with the
- *   problems on stderr when any exists. A refused argument or a package
- *   outside the rules is exit 1 with the message on stderr.
+ *   problems on stderr when any exists. `--commands`: the commands entry,
+ *   refused on the same problems. A refused argument or a package outside
+ *   the rules is exit 1 with the message on stderr.
  */
 export function main(root: string, args: readonly string[], options: FacadeOptions = {}): FacadeRun {
   let parsed: FacadeArgs;
@@ -750,10 +828,13 @@ export function main(root: string, args: readonly string[], options: FacadeOptio
   if (parsed.mode === 'json') {
     return { exitCode: 0, stderr: [], stdout: [stableJson(reading).trimEnd()] };
   }
-  if (parsed.mode === 'entry') {
+  if (parsed.mode === 'entry' || parsed.mode === 'commands') {
+    const render = parsed.mode === 'entry'
+      ? renderFacadeEntry
+      : renderCommandsEntry;
     return problems.length > 0
       ? { exitCode: 1, stderr: problems, stdout: [] }
-      : { exitCode: 0, stderr: [], stdout: [renderFacadeEntry(reading, facadeFolder(parsed.pkg)).trimEnd()] };
+      : { exitCode: 0, stderr: [], stdout: [render(reading, facadeFolder(parsed.pkg)).trimEnd()] };
   }
   const lines = reading.names.map((name) => [name.name, name.kind, name.declaredIn, name.exportedBy].join('\t'));
   return { exitCode: 0, stderr: [...problems, ...dynamics], stdout: lines };

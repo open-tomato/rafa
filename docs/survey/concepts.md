@@ -520,13 +520,13 @@ Coverage: 1577 of 1577 tracked files read (src/ and packages/*/src/).
 | The service strategy makes one contact per command through createHubContact (src/effort/sync/contact.ts), which never throws and never sets the exit code. | bold | `context/effort-store.md` |
 | The service strategy syncs rows through a wire format over HTTP, defined in src/effort/sync/wire.ts, and merged only by mergeStore. | bold | `context/effort-store.md` |
 | The session sets CLAUDECODE, and with it set the runner prints no (pass) line and no name for a file without a failure; the counts and the exit code do not change. env -u CLAUDECODE bun test prints every case. | bold | `context/verification.md` |
-| The spec issue template is src/board/templates/spec.md | bold | `context/cli.md` |
+| The spec issue template is packages/rafa-board/src/board/templates/spec.md | bold | `context/cli.md` |
 | The spend mark ends a roster line | bold | `context/cli.md` |
 | The swap preserves the local store's identity when it stays the same store in the same place. | bold | `context/effort-merge.md` |
 | The Sync port defines how stores exchange rows between devices. | bold | `context/effort-store.md` |
 | The task session's type gate runs tsc on files matching | bold | `context/verification.md` |
 | The three resolvers are planner, tag and none. | bold | `context/workflow.md` |
-| The words plan create reads live in src/board/flags.ts | bold | `context/cli.md` |
+| The words plan create reads live in packages/rafa-board/src/board/flags.ts | bold | `context/cli.md` |
 | The wrap-up emits pr or no-pr once, in every output mode. | bold | `context/workflow.md` |
 | This table is generated from rafa's routing defaults | bold | `context/workflow.md` |
 | The three channels | heading | `context/triage.md` |

@@ -36,7 +36,7 @@
  * check that refuses before the plan is ever parsed for tasks.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,12 +44,11 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { branchName, planStub } from '@open-tomato/rafa/board/naming';
+import { parseClaimMessage } from '@open-tomato/rafa/claims/record';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { branchName, planStub } from '../board/naming.js';
-import { parseClaimMessage } from '../claims/record.js';
-import { createGitRunner } from '../pr/index.js';
-import { REMOTE } from '../start/branch-decision.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

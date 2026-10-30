@@ -6,7 +6,7 @@
  *
  * {@link testKind} is the pure core: it takes the globs and matches each
  * with `Bun.Glob` against a path relative to the repository root, as
- * `integrationFiles` of `src/suite/checks.ts` does. {@link readTestKindGlobs}
+ * `integrationFiles` of `packages/rafa-run/src/suite/checks.ts` does. {@link readTestKindGlobs}
  * reads the two lists from the project scope through `readProjectScope`
  * of `@open-tomato/rafa/core/config/load`, after `registerCoreConfigSections`
  * of `src/config-registry.ts` has registered the sections and the template
@@ -14,7 +14,7 @@
  * `rafa.config.mjs` at the root, and `.rafa/config.yaml`, the local layer.
  * Each arrives with the templates its `templates` key names already laid
  * under its own keys. A key the local file sets comes first, then the
- * module file's, then `TESTS_DEFAULTS` of `src/config-schema-tests.ts`,
+ * module file's, then `TESTS_DEFAULTS` of `packages/rafa/src/config-schema-tests.ts`,
  * whose two lists are empty. A list a file sets empty stays empty, since
  * a list written `[]` has been said. No pattern is copied here.
  *
@@ -23,8 +23,7 @@
  * are refused by `readProjectScope`, naming the file.
  */
 
-import { TESTS_DEFAULTS } from '@open-tomato/rafa-run';
-
+import { TESTS_DEFAULTS } from '@open-tomato/rafa/config-schema-tests';
 import { readProjectScope } from '@open-tomato/rafa/core/config/load';
 
 import { registerCoreConfigSections } from '../../src/config-registry';

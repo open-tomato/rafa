@@ -19,7 +19,7 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Why a rewired package's file is still imported by path. */
-type KeptGroup = 'backEdge' | 'declarationGraph' | 'libraryChunks' | 'loadCycle';
+type KeptGroup = 'backEdge' | 'loadCycle';
 
 /** One rewired package and the files allowed to import it by path. */
 interface RewiredRow {
@@ -30,259 +30,185 @@ interface RewiredRow {
 }
 
 /**
- * One row per rewired package. Effort's six load-cycle files would put the
- * facade on a cycle through effort if they imported it by name, and its two
- * declaration-graph files are reached from `src/config/index.ts`, whose
- * declarations ship as `dist/config/*.d.ts`. Inventory's five load-cycle
- * files would do the same through inventory, and its two back-edge files
- * are effort files, and effort comes before inventory in the move order.
- * Board's 25 load-cycle files are mostly run and pr files that board's files
- * reach through `src/claims/`, `src/next/` and `src/start/`, and its one
- * effort importer, `src/effort/epic-cost.ts`, is a back edge the load-cycle
- * group takes first; its two declaration-graph files are effort's two. Its
- * 21 library-chunk files are reached statically from a library entry, and
- * through the facade that graph would reach board's lazy command modules, so
- * the splitting build would write each as a chunk of its own (one of them
- * rewired alone writes 58 more chunks than the build at `c920603`).
- * Release's one board importer, `src/board/project/facts.ts`, is a back edge
- * the load-cycle group takes first, and its two declaration-graph files are
- * effort's two. Its eight library-chunk files are reached statically from a
- * library entry, and through the facade that graph would reach release's lazy
- * command modules (`RELEASE_FEATURE` re-exports `src/commands/release/index.ts`),
- * one of them rewired alone writing 95 more chunks than the build at `c920603`.
- * Pr's 16 load-cycle files are claims, cleanup, next, start and release files
- * pr's files reach, six of them release files that are back edges the
- * load-cycle group takes first. Its 19 back-edge files are board, release and
- * effort files, every one earlier in the move order, and its two
- * declaration-graph files are effort's two. Its 33 library-chunk files are
- * reached statically from a library entry, and through the facade that graph
- * would reach pr's lazy command modules (`PR_FEATURE` re-exports
- * `src/commands/pr/index.ts`), one of them rewired alone writing 127 more
- * chunks than the build at `c920603`.
- * Run's 15 load-cycle files are board, pr and release files run's files
+ * One row per rewired package. Effort's row is empty. Its six load-cycle
+ * files left the row when the first decouple item moved their only
+ * effort imports into core, as `packages/rafa/src/schema/frontmatter.ts` and
+ * `packages/rafa/src/utils/agent-definition.ts`, and its two
+ * declaration-graph files, `src/config-registry.ts` and
+ * `src/config/shape.ts`, which `src/config/index.ts` reaches and whose
+ * declarations ship as `dist/config/*.d.ts`, left every row in the third
+ * decouple item (rafa-1325), which ended the group, as the first ended
+ * `libraryChunks`: they imported each package only through its section
+ * files, `src/config-schema-<section>.ts`, which that item takes out of
+ * the named lists and moves into core. Inventory's last
+ * load-cycle file, `packages/rafa-effort/src/effort/skill-use.ts`, imports `bareSkillName` from
+ * `packages/rafa-inventory/src/tiers/skill-names.ts`; the import graph held the search's edge into
+ * `packages/rafa-effort/src/effort/collect.ts`, which reaches it through `collect-skills.ts`, so
+ * the codemod read a cycle through inventory when the rewire ran. The second
+ * decouple item cut that edge, and once its survey was regenerated the
+ * codemod took the file onto the facade too, so inventory's row is empty.
+ * The rewire stage of that item took the other seven files of
+ * the row onto the facade: the three effort files of the skills report,
+ * `packages/rafa-run/src/start/dispatch.ts`, `handout.ts` and `preflight.ts`, and the CLI's
+ * `src/inventory/browse.ts`.
+ * Board's 19 load-cycle files are mostly run and pr files that board's files
+ * reach through `src/claims/`, `src/next/` and `src/start/`. On the graph the
+ * fourth decouple item's survey regenerated, the codemod reads 15 of them on
+ * a load cycle and `packages/rafa-run/src/claims/drift.ts`, `packages/rafa-run/src/claims/labels.ts`,
+ * `packages/rafa-run/src/commands/switch.ts` and `packages/rafa-run/src/start/triage.ts` to rewire. The dry run
+ * takes all four now, the facade having the names they import, so they stay
+ * on their paths until the rewire runs. On the graph the fifth decouple
+ * item's survey regenerated, with board's back edges into run and pr gone,
+ * the codemod reads none of the nineteen on a load cycle and all nineteen to
+ * rewire, refusing `scanClaimBranches` of `packages/rafa-board/src/board/roadmap.ts` in
+ * `packages/rafa-run/src/next/readings.ts` and `packages/rafa-run/src/next/sources.ts`. The 19 load-cycle files
+ * took the facade in pass 4c, since decouple 5 ended the cycles that kept
+ * them, once those two took `scanClaimBranches` from
+ * `packages/rafa-board/src/board/branch-scan.ts`, so board's row was
+ * empty until the seven readings interfaces moved into
+ * `packages/rafa-board/src/next/relation-readings.ts`, a board file, and
+ * `packages/rafa-run/src/next/readings.ts` re-exported them from its path; it is empty again
+ * since `readings.ts` takes them from the facade by name, before the
+ * move. The same stage took
+ * `packages/rafa-run/src/plan/store-rules.ts`, `packages/rafa-run/src/start/preflight-claim.ts` and
+ * `preflight-drift.ts` onto the facade. `packages/rafa-board/src/claims/ahead.ts` and
+ * `packages/rafa-board/src/epic/verify-run.ts` left the row in the fourth decouple item, which
+ * places them in board by name, and `packages/rafa-run/src/claims/plan-claim.ts`, which took
+ * them by path then, took the facade.
+ * Release's one board importer, `packages/rafa-board/src/board/project/facts.ts`, left the row
+ * in the fourth decouple item: its one release import by path was
+ * `directoryPrefix` and `fragmentIdOf`, which it takes from
+ * `@open-tomato/rafa/release/fragment` now. `packages/rafa-release/src/docs/release-issue.ts`
+ * stayed, for `SettleForecast` and `nextVersion`, until the sixth decouple
+ * item placed it in release by name, so its imports are inside release
+ * and the row is empty.
+ * Pr's 13 load-cycle files are claims, cleanup, next, start and release files
+ * pr's files reach, three of them release files that are back edges the
+ * load-cycle group takes first. `packages/rafa/src/claims/git.ts`,
+ * `packages/rafa/src/start/branch-decision.ts` and `packages/rafa-release/src/release/fragment-tree.ts` left the
+ * row in the fourth decouple item: their one pr import by path was the pr
+ * barrel, for core's git names and `WorkingTreeStatus`, which they take from
+ * `@open-tomato/rafa/core/git` now. Its 12 back-edge files are release
+ * files, every one earlier in the move order.
+ * `packages/rafa-board/src/commands/issue/create.ts` left them in the same item: its one pr
+ * import by path was `TRIAGE_MODULE`, which it takes from
+ * `@open-tomato/rafa/triage/filed-text` now. So did
+ * `packages/rafa-board/src/commands/issue/create-bug.ts`, whose pr imports by path were
+ * `packages/rafa/src/bugs/fill.ts` and `packages/rafa/src/bugs/versions.ts`,
+ * which the item's move list took into core.
+ * `packages/rafa-board/src/board/project/add-filed.ts`, `packages/rafa-board/src/commands/epic/close-triage.ts`
+ * and `packages/rafa-board/src/commands/epic/close.ts` left them in the fifth decouple item:
+ * their pr imports by path were `triageReport` and its types, which they
+ * reach through core's service registry,
+ * `@open-tomato/rafa/core/services`, and its `TriagedBug` and
+ * `TriageServiceResult`. `packages/rafa-board/src/commands/epic/close-docs.ts`, the last
+ * board file among them, left them in the same item: its pr import by
+ * path was `addStaleDocLine`, which it reaches through the same registry.
+ * The sixth decouple item took ten back-edge and three load-cycle files
+ * off the row, the release commands, `packages/rafa-release/src/next/epic-end.ts`,
+ * `packages/rafa-release/src/release/branch-forecast.ts`, `prepare.ts` and `verify.ts`: their
+ * one pr import by path was the pr barrel, for core's git names, which
+ * they take from `@open-tomato/rafa/core/git` now. `packages/rafa-release/src/cleanup/past-head.ts`
+ * left it in the same item: its one pr import by path was
+ * `MergedPullRequest` of `packages/rafa/src/pr/types.ts`, which the item's
+ * core move list took into core. `packages/rafa-release/src/release/settle-pr.ts` left it in
+ * the same item: its one pr import by path was the pr barrel, for the port
+ * types it takes from `@open-tomato/rafa/pr/types` now.
+ * `packages/rafa-release/src/commands/release/status-stale-docs.ts` left it in the same item:
+ * its one pr import by path was `packages/rafa-release/src/docs/open-lines.ts`, which the item
+ * placed in release by name. `packages/rafa-release/src/commands/release/settle.ts`, the last
+ * release file on the row, left it in the same item: its one pr import
+ * by path was `ghPullRequestsIn`, which it reaches through core's service
+ * registry as `pullRequestsIn`. So the row kept 8 load-cycle files and
+ * no back-edge file. The seventh decouple item (rafa-1368) took
+ * `packages/rafa-pr/src/cleanup/worktrees.ts` and `packages/rafa-pr/src/start/pr-retarget.ts` off the row,
+ * since it places them in pr by name, and `packages/rafa-run/src/next/hint.ts`, whose pr
+ * imports by path were `packages/rafa-run/src/next/sources.ts` and `relations-mode.ts`,
+ * which it places in run. It named the seven run files that import a pr
+ * file by path once those placements are made: `packages/rafa-run/src/cleanup/index.ts` and
+ * `steps.ts` (`./worktrees.js`, and `./groups.js` for `steps.ts`),
+ * `packages/rafa-run/src/start/wrap-up-run.ts` (`./pr-retarget.js`) and
+ * `packages/rafa-run/src/next/owner-gate.ts`, `relations-mode.ts`, `settle-step.ts` and
+ * `sources.ts` (files of `src/pr/`), each in the load-cycle group until
+ * the item's rewire task read it. Its dry run read the four `src/next/`
+ * files on a load cycle and the other three to rewire, and the codemod
+ * took `packages/rafa-run/src/cleanup/index.ts`, `steps.ts` and `packages/rafa-run/src/start/wrap-up-run.ts`
+ * onto the facade. So the row kept 9 load-cycle files and no back-edge
+ * file. The nine left the row in pass 4e (rafa-1374): decouple 7 cut the
+ * imports into run their cycles ran through, the codemod read all nine to
+ * rewire and none on a load cycle, and it took them onto the facade. So
+ * the row is empty: no file outside pr imports a pr file by path.
+ * Run's five load-cycle files are board, pr and release files run's files
  * reach, every one a back edge the load-cycle group takes first, since run
- * moves last. Its 17 back-edge files are board, pr, effort and inventory
- * files, every one earlier in the move order, and its two declaration-graph
- * files are effort's two. Its six library-chunk files are the library entry
- * `src/index.ts` and the five files it reaches statically, through which
- * the facade would reach run's lazy command modules (`RUN_FEATURE`
- * re-exports `src/commands/claim/index.ts`), one of them rewired alone
- * writing 133 more chunks than the build at `c920603`.
+ * moves last. Board's `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/project/rules.ts`,
+ * `packages/rafa-board/src/board/roadmap-claims.ts` and `packages/rafa-board/src/board/setup.ts` left them, and
+ * `packages/rafa-board/src/board/issue-edit-state.ts` left the back-edge files, in the fourth
+ * decouple item: their run imports by path were
+ * `packages/rafa/src/plan/validate.ts`, `packages/rafa/src/claims/stale.ts`,
+ * `packages/rafa/src/claims/git.ts` and
+ * `packages/rafa/src/start/branch-decision.ts`, which the item's move list
+ * took into core. Pr's `packages/rafa-pr/src/triage/kind-route.ts` and `leftover-repair.ts`
+ * left the row in the third decouple item: their one run import by path
+ * was the `LoopRetries` type of `packages/rafa/src/config-schema-loop-retries.ts`. Pr's
+ * `packages/rafa-pr/src/triage/base-run.ts` and `inherited.ts` left the row in the seventh
+ * decouple item: their run imports by path were the suite runner,
+ * `src/suite/run.ts`, which the item moved into core as
+ * `packages/rafa/src/suite/run.ts`. Run's
+ * five back-edge files are pr files, every one earlier in the move
+ * order. `packages/rafa-board/src/board/spec-source.ts` and `packages/rafa-board/src/commands/epic/close.ts`
+ * left them in the fourth decouple item: their one run import by path was
+ * `packages/rafa-board/src/claims/ahead.ts` and `packages/rafa-board/src/epic/verify-run.ts`, which it places in
+ * board by name. `packages/rafa-board/src/commands/board/list.ts` and `packages/rafa-board/src/commands/epic/new.ts`
+ * left them in the same item: their one run import by path was
+ * `defaultBoardOnce` of `packages/rafa-run/src/commands/switch.ts`, which it moves into
+ * board's `packages/rafa-board/src/board/default-board-once.ts`. `packages/rafa-board/src/commands/issue/ready.ts`
+ * and `packages/rafa-board/src/commands/epic/close-triage.ts` left them in the fifth decouple
+ * item: their run imports by path were `endWithNextStep` and
+ * `readStaleDocsVersion`, which they call through core's service
+ * registry. Pr's `packages/rafa-pr/src/commands/pr/merge-cleanup.ts`, `merge-followups.ts`
+ * and `triage-resolve.ts` left them in the seventh decouple item: their
+ * one run import by path each was a constant, `RUNTIME_SUBDIR`,
+ * `RAFA_PACKAGE_NAME` and `CI_POLL_INTERVAL_MS`, which the item moved
+ * into core. The same item placed `packages/rafa-run/src/cleanup/steps.ts`,
+ * `packages/rafa-run/src/next/owner-gate.ts`, `settle-step.ts` and `sources.ts` in run by
+ * name, so their run imports are inside run and they left the row, and
+ * placed `packages/rafa-pr/src/cleanup/worktrees.ts` and `packages/rafa-pr/src/start/pr-retarget.ts` in pr,
+ * so `packages/rafa-pr/src/cleanup/groups.ts`, `packages/rafa-pr/src/commands/pr/merge-loop-worktree.ts`
+ * and `retarget.ts`, whose run imports by path were those two files, left
+ * it too. `packages/rafa-pr/src/commands/pr/merge.ts`, `triage.ts` and `wait.ts` left it
+ * in the same item: their run import by path was `endWithNextStep`,
+ * which they call through core's service registry. So the row is empty:
+ * no file outside run imports a run file by path.
+ * No row keeps a file for the library build any more. Board, release, pr
+ * and run each take their feature object through a commands entry,
+ * `@open-tomato/rafa-<name>/commands`, which the roster alone imports, so a
+ * library entry that reaches a facade no longer reaches the feature's lazy
+ * command modules, the cause that kept 68 files on their paths, and those
+ * files import the facades.
  */
 const REWIRED: readonly RewiredRow[] = [
   {
-    allowed: {
-      'src/agents/roster.ts': 'loadCycle',
-      'src/check/run.ts': 'loadCycle',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
-      'src/inventory/record.ts': 'loadCycle',
-      'src/inventory/trees.ts': 'loadCycle',
-      'src/schema/instinct.ts': 'loadCycle',
-      'src/tiers/serve.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-effort',
   },
   {
-    allowed: {
-      'src/effort/report-skills.ts': 'backEdge',
-      'src/effort/skill-facts.ts': 'backEdge',
-      'src/effort/skill-use.ts': 'loadCycle',
-      'src/start/dispatch.ts': 'loadCycle',
-      'src/start/handout.ts': 'loadCycle',
-      'src/start/preflight.ts': 'loadCycle',
-      'src/start/serving.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-inventory',
   },
   {
-    allowed: {
-      'src/adapter-registry.ts': 'libraryChunks',
-      'src/adapters/planner/claude.ts': 'libraryChunks',
-      'src/bugs/filed-values.ts': 'loadCycle',
-      'src/claims/ahead.ts': 'loadCycle',
-      'src/claims/drift.ts': 'loadCycle',
-      'src/claims/labels.ts': 'loadCycle',
-      'src/claims/plan-claim.ts': 'libraryChunks',
-      'src/commands/plan/blocked-offer.ts': 'libraryChunks',
-      'src/commands/plan/claim-route.ts': 'libraryChunks',
-      'src/commands/plan/plan-record.ts': 'libraryChunks',
-      'src/commands/plan/ready-offer.ts': 'libraryChunks',
-      'src/commands/plan/refresh-offer.ts': 'libraryChunks',
-      'src/commands/plan/review-gate.ts': 'libraryChunks',
-      'src/commands/plan/spec-route.ts': 'libraryChunks',
-      'src/commands/switch.ts': 'loadCycle',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
-      'src/effort/epic-cost.ts': 'loadCycle',
-      'src/epic/verify-run.ts': 'loadCycle',
-      'src/next/hop-action.ts': 'loadCycle',
-      'src/next/hop-rows.ts': 'loadCycle',
-      'src/next/owner-gate.ts': 'loadCycle',
-      'src/next/readings.ts': 'loadCycle',
-      'src/next/relations-mode.ts': 'loadCycle',
-      'src/next/sources.ts': 'loadCycle',
-      'src/next/state.ts': 'loadCycle',
-      'src/plan.ts': 'libraryChunks',
-      'src/plan/store-rules.ts': 'loadCycle',
-      'src/pr/gh-close.ts': 'loadCycle',
-      'src/pr/gh.ts': 'loadCycle',
-      'src/pr/owner-approval.ts': 'loadCycle',
-      'src/start/decision-prompt.ts': 'libraryChunks',
-      'src/start/follow-ups.ts': 'libraryChunks',
-      'src/start/forced-draft.ts': 'libraryChunks',
-      'src/start/preflight-claim.ts': 'loadCycle',
-      'src/start/preflight-drift.ts': 'loadCycle',
-      'src/start/release-stage.ts': 'libraryChunks',
-      'src/start/risk-total.ts': 'libraryChunks',
-      'src/start/runner-pr.ts': 'libraryChunks',
-      'src/start/stale-docs.ts': 'loadCycle',
-      'src/start/suite-steps-run.ts': 'libraryChunks',
-      'src/start/triage.ts': 'loadCycle',
-      'src/suite/checks.ts': 'libraryChunks',
-      'src/suite/owns.ts': 'libraryChunks',
-      'src/suite/scope.ts': 'libraryChunks',
-      'src/triage/bug-filing.ts': 'loadCycle',
-      'src/triage/refs-section.ts': 'loadCycle',
-      'src/triage/triage.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-board',
   },
   {
-    allowed: {
-      'src/board/project/facts.ts': 'loadCycle',
-      'src/cleanup/groups.ts': 'libraryChunks',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
-      'src/docs/release-issue.ts': 'loadCycle',
-      'src/next/settle-step.ts': 'libraryChunks',
-      'src/next/sources.ts': 'libraryChunks',
-      'src/pr/settle-waiting.ts': 'libraryChunks',
-      'src/start/release-body.ts': 'libraryChunks',
-      'src/start/release-stage.ts': 'libraryChunks',
-      'src/start/runner-pr.ts': 'libraryChunks',
-      'src/start/stale-docs.ts': 'libraryChunks',
-    },
+    allowed: {},
     packageName: 'rafa-release',
   },
   {
-    allowed: {
-      'src/board/project/add-filed.ts': 'backEdge',
-      'src/claims/ahead.ts': 'libraryChunks',
-      'src/claims/git.ts': 'loadCycle',
-      'src/claims/lost.ts': 'loadCycle',
-      'src/claims/plan-claim.ts': 'libraryChunks',
-      'src/cleanup/index.ts': 'libraryChunks',
-      'src/cleanup/past-head.ts': 'loadCycle',
-      'src/cleanup/remote-only.ts': 'libraryChunks',
-      'src/cleanup/worktrees.ts': 'loadCycle',
-      'src/commands/epic/close-docs.ts': 'backEdge',
-      'src/commands/epic/close-triage.ts': 'backEdge',
-      'src/commands/epic/close.ts': 'backEdge',
-      'src/commands/issue/create-bug.ts': 'backEdge',
-      'src/commands/issue/create.ts': 'backEdge',
-      'src/commands/plan/claim-route.ts': 'libraryChunks',
-      'src/commands/release/fragment.ts': 'backEdge',
-      'src/commands/release/list.ts': 'backEdge',
-      'src/commands/release/publish.ts': 'backEdge',
-      'src/commands/release/release-commit.ts': 'backEdge',
-      'src/commands/release/settle.ts': 'backEdge',
-      'src/commands/release/status-fragments.ts': 'loadCycle',
-      'src/commands/release/status-packages.ts': 'backEdge',
-      'src/commands/release/status-stale-docs.ts': 'backEdge',
-      'src/commands/release/status.ts': 'backEdge',
-      'src/commands/release/tag-units.ts': 'backEdge',
-      'src/commands/release/tag.ts': 'backEdge',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
-      'src/effort/report-doc-bugs.ts': 'backEdge',
-      'src/next/epic-end.ts': 'loadCycle',
-      'src/next/hint.ts': 'loadCycle',
-      'src/next/hop-rows.ts': 'loadCycle',
-      'src/next/readings.ts': 'loadCycle',
-      'src/release/branch-forecast.ts': 'loadCycle',
-      'src/release/fragment-tree.ts': 'loadCycle',
-      'src/release/prepare.ts': 'backEdge',
-      'src/release/settle-pr.ts': 'loadCycle',
-      'src/release/verify.ts': 'backEdge',
-      'src/start.ts': 'libraryChunks',
-      'src/start/branch-decision.ts': 'loadCycle',
-      'src/start/branch.ts': 'libraryChunks',
-      'src/start/checkout-guard.ts': 'libraryChunks',
-      'src/start/claim-catch-up.ts': 'libraryChunks',
-      'src/start/convention-body.ts': 'libraryChunks',
-      'src/start/doc-task.ts': 'libraryChunks',
-      'src/start/follow-ups.ts': 'libraryChunks',
-      'src/start/forced-draft.ts': 'libraryChunks',
-      'src/start/lint-step.ts': 'libraryChunks',
-      'src/start/pr-lifecycle.ts': 'loadCycle',
-      'src/start/pr-retarget.ts': 'loadCycle',
-      'src/start/preflight-claim.ts': 'libraryChunks',
-      'src/start/preflight-drift.ts': 'libraryChunks',
-      'src/start/preflight.ts': 'libraryChunks',
-      'src/start/promoted-check.ts': 'libraryChunks',
-      'src/start/release-body.ts': 'libraryChunks',
-      'src/start/release-stage.ts': 'libraryChunks',
-      'src/start/risk-total.ts': 'libraryChunks',
-      'src/start/runner-pr.ts': 'libraryChunks',
-      'src/start/stale-docs.ts': 'libraryChunks',
-      'src/start/suite-blocker.ts': 'loadCycle',
-      'src/start/suite-step.ts': 'libraryChunks',
-      'src/start/task-always-run.ts': 'libraryChunks',
-      'src/start/task-gate-lines.ts': 'libraryChunks',
-      'src/start/triage-kinds.ts': 'libraryChunks',
-      'src/start/triage.ts': 'libraryChunks',
-      'src/start/type-step.ts': 'libraryChunks',
-      'src/start/worktree-upstream.ts': 'libraryChunks',
-      'src/start/worktree.ts': 'libraryChunks',
-      'src/start/wrap-up-run.ts': 'libraryChunks',
-      'src/start/wrap-up.ts': 'libraryChunks',
-    },
+    allowed: {},
     packageName: 'rafa-pr',
   },
   {
-    allowed: {
-      'src/board/gate.ts': 'loadCycle',
-      'src/board/issue-edit-state.ts': 'backEdge',
-      'src/board/project/rules.ts': 'loadCycle',
-      'src/board/roadmap-claims.ts': 'loadCycle',
-      'src/board/setup.ts': 'loadCycle',
-      'src/board/spec-source.ts': 'backEdge',
-      'src/cleanup/groups.ts': 'loadCycle',
-      'src/cleanup/steps.ts': 'loadCycle',
-      'src/commands/board/list.ts': 'backEdge',
-      'src/commands/epic/close-triage.ts': 'backEdge',
-      'src/commands/epic/close.ts': 'backEdge',
-      'src/commands/epic/new.ts': 'backEdge',
-      'src/commands/issue/ready.ts': 'backEdge',
-      'src/commands/plan/bundled-check.ts': 'libraryChunks',
-      'src/commands/plan/claim-route.ts': 'libraryChunks',
-      'src/commands/plan/store-check.ts': 'libraryChunks',
-      'src/commands/pr/merge-cleanup.ts': 'backEdge',
-      'src/commands/pr/merge-followups.ts': 'backEdge',
-      'src/commands/pr/merge-loop-worktree.ts': 'backEdge',
-      'src/commands/pr/merge.ts': 'backEdge',
-      'src/commands/pr/retarget.ts': 'backEdge',
-      'src/commands/pr/triage-resolve.ts': 'backEdge',
-      'src/commands/pr/triage.ts': 'backEdge',
-      'src/commands/pr/wait.ts': 'backEdge',
-      'src/config-registry.ts': 'declarationGraph',
-      'src/config/shape.ts': 'declarationGraph',
-      'src/effort/report-skills-read.ts': 'backEdge',
-      'src/index.ts': 'libraryChunks',
-      'src/inventory/search/index.ts': 'backEdge',
-      'src/next/epic-end.ts': 'loadCycle',
-      'src/next/owner-gate.ts': 'loadCycle',
-      'src/next/relation-readings.ts': 'loadCycle',
-      'src/next/settle-step.ts': 'loadCycle',
-      'src/next/sources.ts': 'loadCycle',
-      'src/plan.ts': 'libraryChunks',
-      'src/start.ts': 'libraryChunks',
-      'src/triage/base-run.ts': 'loadCycle',
-      'src/triage/inherited.ts': 'loadCycle',
-      'src/triage/kind-route.ts': 'loadCycle',
-      'src/triage/leftover-repair.ts': 'loadCycle',
-    },
+    allowed: {},
     packageName: 'rafa-run',
   },
 ];

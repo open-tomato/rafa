@@ -10,16 +10,16 @@
  * Each fault is found by the module that already reads it, and printed in
  * that module's words: this one never respells a fault.
  *
- * - An OWNER is the `Owner:` line `readBoardBody` (`src/board/board-body.ts`)
+ * - An OWNER is the `Owner:` line `readBoardBody` (`packages/rafa-board/src/board/board-body.ts`)
  *   reads off each open `type:roadmap` board, asked of GitHub through one
- *   `createOwnerResolver` (`src/board/owner-resolve.ts`), so a handle two
+ *   `createOwnerResolver` (`packages/rafa-board/src/board/owner-resolve.ts`), so a handle two
  *   boards name is asked once. `unresolved` is a fault; `unknown` is a
  *   line saying the owner could not be checked and why, since nobody said
  *   the handle is wrong and nobody said it is right.
  * - The UNLABELLED Roadmaps are `DefaultBoard.unlabelled`, found by
- *   `resolveDefaultBoard` (`src/board/boards.ts`) and worded by
+ *   `resolveDefaultBoard` (`packages/rafa-board/src/board/boards.ts`) and worded by
  *   `unlabelledRoadmapMessage`: one sentence naming every such issue.
- * - The POSITION is checked by `resolvePlace` (`src/board/place.ts`), and
+ * - The POSITION is checked by `resolvePlace` (`packages/rafa-board/src/board/place.ts`), and
  *   each `lost` notice it raises is a fault, printed as its `message`: a
  *   board closed, unlabelled or not on the listing, an epic closed,
  *   untyped or not on the listing, each naming the slots it held and the
@@ -29,11 +29,11 @@
  *
  * ## gh calls
  *
- * The board listing (`src/board/roadmap-board.ts`) is the one the epic
+ * The board listing (`packages/rafa-board/src/board/roadmap-board.ts`) is the one the epic
  * labels row reads (`./doctor-epics.ts`): `./doctor-board.ts` reads it
  * once per run and hands both rows the same answer, so this row adds no
  * listing. The open boards are the listing's own open `type:roadmap` rows
- * (`openBoards`, `src/board/epic-board.ts`), never a second `gh issue list --label`.
+ * (`openBoards`, `packages/rafa-board/src/board/epic-board.ts`), never a second `gh issue list --label`.
  * Beyond that it spends:
  *
  * - one `gh api` per distinct owner handle;

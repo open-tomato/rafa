@@ -2,8 +2,9 @@
  * The facade tables over planted entry texts and a planted tree: the rows
  * of an entry by name, source, source name and kind; each refusal by
  * name, with a control that the same entry less the refused line parses;
- * the bindings an importer takes from one specifier; and the tables of a
- * planted tree under `mkdtemp`, resolved by bun.
+ * the bindings an importer takes from one specifier; which entry a path
+ * is; and the tables of a planted tree under `mkdtemp`, resolved by bun,
+ * with a member holding both its index and its commands entry.
  */
 import type { FacadeRefusal } from './facade-tables';
 import type { ResolveImport } from './import-graph';
@@ -14,9 +15,20 @@ import { dirname, join, posix } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { FacadeEntryError, parseFacadeEntry, readFacadeBindings, readFacadeTables } from './facade-tables';
+import { FacadeEntryError, facadeEntryOf, parseFacadeEntry, readFacadeBindings, readFacadeTables } from './facade-tables';
 
 const ENTRY = 'packages/rafa-alpha/index.ts';
+
+/** The planted member's commands entry, beside its index. */
+const COMMANDS = 'packages/rafa-alpha/commands.ts';
+
+/** The commands entry in the pass 2 form: a header and the feature statement. */
+const COMMANDS_TEXT = [
+  '/** The planted commands entry. */',
+  '',
+  'export { ALPHA_FEATURE } from \'../../src/alpha/feature.js\';',
+  '',
+].join('\n');
 
 /** Resolves `./x.js` against the importer's folder to `x.ts`; nothing else resolves. */
 const plantedResolve: ResolveImport = (specifier, from) => (specifier.startsWith('.')
@@ -156,6 +168,23 @@ describe('readFacadeBindings', () => {
   });
 });
 
+describe('facadeEntryOf', () => {
+  it('names the index and the commands entry of a rafa-* member', () => {
+    expect(facadeEntryOf(ENTRY)).toBe('index');
+    expect(facadeEntryOf('packages/rafa-alpha/commands.ts')).toBe('commands');
+  });
+
+  it.each([
+    'packages/eslint-config/index.ts',
+    'packages/rafa-alpha/other.ts',
+    'packages/rafa-alpha/src/commands.ts',
+    'src/commands.ts',
+    'src/alpha/index.ts',
+  ])('names no entry for %s', (path) => {
+    expect(facadeEntryOf(path)).toBeUndefined();
+  });
+});
+
 describe('readFacadeTables over a planted tree', () => {
   let root = '';
 
@@ -176,6 +205,8 @@ describe('readFacadeTables over a planted tree', () => {
     ].join('\n'));
     plant(ENTRY, FACADE_TEXT);
     plant('packages/rafa-beta/index.ts', 'export { answer } from \'../../src/alpha/run.js\';\n');
+    plant('src/alpha/feature.ts', 'export const ALPHA_FEATURE = { name: \'alpha\' };\n');
+    plant(COMMANDS, COMMANDS_TEXT);
     // A member with no entry, and an index outside the `rafa-` prefix: neither is a facade.
     plant('packages/rafa-hub/package.json', '{}\n');
     plant('packages/eslint-config/index.ts', 'export const rules = {};\n');
@@ -187,11 +218,37 @@ describe('readFacadeTables over a planted tree', () => {
 
   it('reads every rafa-* entry into a map keyed by entry path, resolved by bun', () => {
     const tables = readFacadeTables(root);
-    expect([...tables.keys()]).toEqual([ENTRY, 'packages/rafa-beta/index.ts']);
+    expect([...tables.keys()]).toEqual([COMMANDS, ENTRY, 'packages/rafa-beta/index.ts']);
     expect(tables.get(ENTRY)).toEqual(parseFacadeEntry(FACADE_TEXT, ENTRY, plantedResolve));
     expect(tables.get('packages/rafa-beta/index.ts')).toEqual([
       { kind: 'value', name: 'answer', source: 'src/alpha/run.ts', sourceName: 'answer' },
     ]);
+  });
+
+  it('reads the commands entry beside the index, keyed by its own path, its one row from its own file', () => {
+    const tables = readFacadeTables(root);
+    expect(tables.get(COMMANDS)).toEqual([
+      { kind: 'value', name: 'ALPHA_FEATURE', source: 'src/alpha/feature.ts', sourceName: 'ALPHA_FEATURE' },
+    ]);
+    expect(tables.get(ENTRY)?.map((row) => row.name)).not.toContain('ALPHA_FEATURE');
+  });
+
+  it('reads no commands entry where the member holds none, the control', () => {
+    rmSync(join(root, COMMANDS));
+    try {
+      expect([...readFacadeTables(root).keys()]).toEqual([ENTRY, 'packages/rafa-beta/index.ts']);
+    } finally {
+      plant(COMMANDS, COMMANDS_TEXT);
+    }
+  });
+
+  it('refuses a planted commands entry that is not of the facade form, by its own path', () => {
+    plant('packages/rafa-gamma/commands.ts', 'export const GAMMA_FEATURE = {};\n');
+    try {
+      expect(() => readFacadeTables(root)).toThrow('packages/rafa-gamma/commands.ts:1: a facade entry holds re-exports only, not local declaration');
+    } finally {
+      rmSync(join(root, 'packages/rafa-gamma'), { force: true, recursive: true });
+    }
   });
 
   it('refuses a planted entry that is not of the facade form', () => {

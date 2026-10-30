@@ -13,7 +13,7 @@
  */
 import type { BranchRun } from './runs.js';
 import type { CiStatusReading, CiVerdict } from './status-reading.js';
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
 

@@ -4,7 +4,7 @@
  *
  * Declared here, below the `github` tracker that spawns `gh`, so the
  * adapter registry types its `gh` option without importing the tracker.
- * `src/adapters/tracker/github.ts` imports both names from this file
+ * `packages/rafa-board/src/adapters/tracker/github.ts` imports both names from this file
  * and re-exports them under the same names, so none of its importers
  * changes.
  */

@@ -200,7 +200,7 @@ const FILED_BODIES: readonly FiledBody[] = [
     issue: 36,
     what: 'the two shipped CI pinned plans carry no slot for the failing log, so the spec\'s '
       + '`resolve-ci-install` and `resolve-ci-lint` tasks reach build-error-resolver without '
-      + 'the log excerpt in the task text; src/pr/plans/load.ts anticipates such a slot but '
+      + 'the log excerpt in the task text; packages/rafa-pr/src/pr/plans/load.ts anticipates such a slot but '
       + 'resolve-ci-install.md and resolve-ci-lint.md have none, and a value for a slot a '
       + 'template lacks is silently unused',
     artifact: 'src/pr/plans/resolve-ci-install.md',
@@ -244,7 +244,7 @@ const FILED_BODIES: readonly FiledBody[] = [
   {
     issue: 43,
     what: 'Eight *.test.ts files build a complete PullRequests literal and now miss editBody '
-      + '(src/start/pr-lifecycle.test.ts, '
+      + '(packages/rafa-run/src/start/pr-lifecycle.test.ts, '
       + 'src/commands/pr/{merge,merge-driven,view,list,current,show,pr-context}.test.ts). No '
       + 'gate catches it because tsconfig.json excludes test files; each needs one '
       + 'refuse(\'editBody\') line.',

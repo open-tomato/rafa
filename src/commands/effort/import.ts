@@ -2,7 +2,7 @@
  * `rafa effort import <file> [--dry-run]`: another device's effort store
  * file, the `effort.sqlite` a `rafa effort copy` carried, pulled into
  * this project's store through the `file` sync strategy
- * (`src/effort/sync/file.ts`), whose pull is `mergeStore`
+ * (`packages/rafa-effort/src/effort/sync/file.ts`), whose pull is `mergeStore`
  * (`packages/rafa/src/effort/store/merge-store.ts`, whose note is the long form).
  * Starts no Claude session and declares no `spends`.
  *

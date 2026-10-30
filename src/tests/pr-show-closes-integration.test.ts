@@ -1,7 +1,7 @@
 /**
  * An integration suite over `rafa pr show` on a fixture pull request that
  * closes #7 by a body keyword and #9 from the Development panel
- * (`src/commands/pr/show.ts`), dispatched in-process over the real `gh`
+ * (`packages/rafa-pr/src/commands/pr/show.ts`), dispatched in-process over the real `gh`
  * pull-request adapter and the recorded `gh` fake: `--output=json` answers
  * both issues in `detail.closes`, with the body reading naming #7 alone, and
  * the text marks #9 as not named by the body.
@@ -13,9 +13,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createPrShowCommand, NOT_IN_BODY } from '../commands/pr/show.js';
-import { createFakePrGh } from '../pr/gh-fake.js';
-import { createGhPullRequests } from '../pr/index.js';
+import { createPrShowCommand, NOT_IN_BODY } from '@open-tomato/rafa-pr/commands/pr/show';
+import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/index';
 
 import { dispatchInProject, eventsOf, plantProject } from './cli-capture.js';
 

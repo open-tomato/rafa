@@ -5,7 +5,7 @@
  * waiting line while a hop's pull request waits on its owner's review
  * (`.rafa/specs/rafa-247-rafa-next-roadmap.md`). It reads
  * nothing and prints nothing: the caller hands in a {@link PlaceView}
- * built from the place `resolvePlace` (`src/board/place.ts`) answered
+ * built from the place `resolvePlace` (`packages/rafa-board/src/board/place.ts`) answered
  * and the board listing it already read, and writes the lines itself.
  *
  * ## The place line

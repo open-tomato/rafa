@@ -9,7 +9,7 @@
  * by the three COMMANDS a person actually runs, each dispatched for
  * real over a planted `gh`, so a fix that keeps every unit suite green
  * but drops the wiring between a command and `readEpicProblems`
- * (`src/board/epic-problems.ts`) would still show here.
+ * (`packages/rafa-board/src/board/epic-problems.ts`) would still show here.
  *
  * The fixture: two epics, `epic:auth` (#1) and `epic:billing` (#2), each
  * with its own `horizon:` label and a checklist naming #5, its one
@@ -28,10 +28,10 @@
  *  - `rafa roadmap`, whose Roadmap checklist names the epic #1 so its
  *    epic table is shown, warns about both faults, in the same words.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { DoctorSeams } from '../commands/doctor.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,14 +39,15 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BOARD_LIST_FIELDS } from '../board/roadmap-board.js';
+import { BOARD_LIST_FIELDS } from '@open-tomato/rafa-board/board/roadmap-board';
+import { createIssueReadyCommand } from '@open-tomato/rafa-board/commands/issue/ready';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
+
 import { EPICS_HEADING } from '../commands/doctor-epics.js';
 import { createDoctorCommand } from '../commands/doctor.js';
-import { createIssueReadyCommand } from '../commands/issue/ready.js';
 import { createRoadmapCommand } from '../commands/roadmap.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** A temporary directory of this file's own, for every project it plants. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-labels-cross-command-')));

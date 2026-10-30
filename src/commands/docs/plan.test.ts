@@ -9,9 +9,9 @@
  * Every dispatched case runs from a project of its own under this file's
  * temporary directory (`tests/cli-capture.ts`).
  */
-import type { OpenStaleDocLine } from '../../docs/open-lines.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 import type { IssueDraft, Tracker } from '@open-tomato/rafa/ports';
+import type { OpenStaleDocLine } from '@open-tomato/rafa-release/docs/open-lines';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,10 +22,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { parsePlan , parseTaskDeclaration , unescapeBlockerText } from '@open-tomato/rafa/core/plan';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { STALE_DOCS_MARKER } from '@open-tomato/rafa-release/docs/release-issue';
 
-import { createFakeGh } from '../../adapters/tracker/github-fake.js';
-import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
-import { STALE_DOCS_MARKER } from '../../docs/release-issue.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {

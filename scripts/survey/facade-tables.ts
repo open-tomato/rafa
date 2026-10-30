@@ -23,8 +23,12 @@
  * name; a dynamic `import()` is not read here.
  *
  * {@link readFacadeTables} reads every `packages/rafa-*\/index.ts` under a
- * root into a map keyed by entry path, resolving each specifier with bun
- * from the entry's folder.
+ * root, and beside it the member's commands entry, `commands.ts`, where
+ * one exists, into a map keyed by entry path, resolving each specifier
+ * with bun from the entry's folder. The commands entry is the package's
+ * second entry, `@open-tomato/rafa-<name>/commands`, which carries the
+ * feature object alone; it is parsed under the same facade form.
+ * {@link facadeEntryOf} names which of the two an entry path is.
  */
 
 import type { EdgeKind, ResolveImport } from './import-graph';
@@ -40,8 +44,33 @@ const PACKAGES_DIR = 'packages';
 /** The prefix of a facade member's folder name. */
 const FACADE_PREFIX = 'rafa-';
 
-/** The file of a member that is its facade entry. */
-const ENTRY_FILE = 'index.ts';
+/** The two entries a member may hold: its facade and its commands entry. */
+export type FacadeEntryKind = 'commands' | 'index';
+
+/** The file of a member that is each entry. */
+const ENTRY_FILES: Readonly<Record<FacadeEntryKind, string>> = {
+  commands: 'commands.ts',
+  index: 'index.ts',
+};
+
+/** The entries, in the path order of their files. */
+const ENTRY_KINDS: readonly FacadeEntryKind[] = ['commands', 'index'];
+
+/**
+ * Which entry a repository-relative path is: `commands` for
+ * `packages/rafa-<name>/commands.ts`, `index` for
+ * `packages/rafa-<name>/index.ts`.
+ *
+ * @param path - A repository-relative path, with `/`.
+ * @returns The entry, or `undefined` for any other path.
+ */
+export function facadeEntryOf(path: string): FacadeEntryKind | undefined {
+  const parts = path.split('/');
+  if (parts.length !== 3 || parts[0] !== PACKAGES_DIR || !parts[1]!.startsWith(FACADE_PREFIX)) {
+    return undefined;
+  }
+  return ENTRY_KINDS.find((kind) => ENTRY_FILES[kind] === parts[2]);
+}
 
 /** One name an entry re-exports. */
 export interface FacadeRow {
@@ -298,12 +327,14 @@ function entryResolver(root: string): ResolveImport {
 }
 
 /**
- * Reads every facade entry of a tree, `packages/rafa-*\/index.ts`, and parses
+ * Reads every facade entry of a tree, `packages/rafa-*\/index.ts`, and each
+ * commands entry beside one, `packages/rafa-*\/commands.ts`, and parses
  * each with {@link parseFacadeEntry}.
  *
  * @param root - The repository root.
- * @returns The rows of each entry, keyed by entry path, in path order;
- *   empty when the tree has no `packages/` folder.
+ * @returns The rows of each entry, keyed by entry path, in path order (a
+ *   member's commands entry before its index); empty when the tree has no
+ *   `packages/` folder.
  * @throws FacadeEntryError on an entry that is not of the facade form.
  */
 export function readFacadeTables(root: string): Map<string, FacadeRow[]> {
@@ -318,10 +349,12 @@ export function readFacadeTables(root: string): Map<string, FacadeRow[]> {
     .map((dirent) => dirent.name)
     .sort();
   for (const member of members) {
-    const entryPath = `${PACKAGES_DIR}/${member}/${ENTRY_FILE}`;
-    const absolute = join(root, entryPath);
-    if (existsSync(absolute)) {
-      tables.set(entryPath, parseFacadeEntry(readFileSync(absolute, 'utf8'), entryPath, resolve));
+    for (const kind of ENTRY_KINDS) {
+      const entryPath = `${PACKAGES_DIR}/${member}/${ENTRY_FILES[kind]}`;
+      const absolute = join(root, entryPath);
+      if (existsSync(absolute)) {
+        tables.set(entryPath, parseFacadeEntry(readFileSync(absolute, 'utf8'), entryPath, resolve));
+      }
     }
   }
   return tables;

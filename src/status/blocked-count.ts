@@ -1,11 +1,11 @@
 /**
  * The count `rafa status` ends its board line with: how many open issues
  * are held back by a blocker, read in the mode the board's relationships
- * port (`src/board/relations/port.ts`) answers.
+ * port (`packages/rafa-board/src/board/relations/port.ts`) answers.
  *
  * | Mode | What is counted | What it reads |
  * | --- | --- | --- |
- * | `labels`, or no port | every open issue labelled `spec:blocked` | `readBlockedIssues` (`src/board/blocked-issues.ts`), its own `gh issue list --label spec:blocked` |
+ * | `labels`, or no port | every open issue labelled `spec:blocked` | `readBlockedIssues` (`packages/rafa-board/src/board/blocked-issues.ts`), its own `gh issue list --label spec:blocked` |
  * | `native` | every open issue on the listing whose `blockedBy` reading still holds it (`isWaiting`) | the one board listing the section already holds |
  *
  * `labels` mode is what `rafa status` counted before the port, command for

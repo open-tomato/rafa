@@ -86,7 +86,7 @@
  * diagnostics, since the type import it no longer names is an unused
  * local under the root tsconfig.
  *
- * The learning records moved to `src/learning/types.ts` on 2026-09-25,
+ * The learning records moved to `packages/rafa-inventory/src/learning/types.ts` on 2026-09-25,
  * and the entry re-exports them. Each of the six is held to resolve to
  * its declaration there, through the export's alias, and the entry is
  * held to declare none of their names itself, so a copy that matches
@@ -99,7 +99,7 @@
  * `src/learning/`; the entry re-exports them from there, and that leaf
  * is the declaration each is held to. `src/tests/learning-contract.test.ts`
  * holds it to the library's. Measured that day at 43 pass: the held
- * path left at `src/learning/types.ts` reddened the six cases and
+ * path left at `packages/rafa-inventory/src/learning/types.ts` reddened the six cases and
  * nothing else.
  *
  * The `Sync` port arrived on 2026-09-29 with its four refusals. Six
@@ -190,8 +190,8 @@ const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 /** Core's source directory, `packages/rafa/src/`, which `./ports` is resolved from. */
 const SRC_DIR = join(REPO_ROOT, 'packages', 'rafa', 'src');
 
-/** The root's `src/`, for the one probe import above core. */
-const ROOT_SRC_DIR = join(REPO_ROOT, 'src');
+/** Board's `src/` since pass 4c, for the one probe import above core. */
+const BOARD_SRC_DIR = join(REPO_ROOT, 'packages', 'rafa-board', 'src');
 
 /** The entry under test, as the compiler holds it. */
 const ENTRY_FILE = join(SRC_DIR, 'ports', 'index.ts');
@@ -376,7 +376,7 @@ function instinctLiteral(signal: string): string {
 const CONFORMING_PROBE = probeSource(
   `import { openNdjsonStore } from ${specifierOf('effort', 'store', 'ndjson.js')};`,
   `import { openSqliteStore } from ${specifierOf('effort', 'store', 'sqlite.js')};`,
-  `import { parseSpecReview } from ${JSON.stringify(join(ROOT_SRC_DIR, 'board', 'spec-review.js'))};`,
+  `import { parseSpecReview } from ${JSON.stringify(join(BOARD_SRC_DIR, 'board', 'spec-review.js'))};`,
   `import { copyEffortStore } from ${specifierOf('effort', 'store', 'copy.js')};`,
   `import { mergeStore } from ${specifierOf('effort', 'store', 'merge-store.js')};`,
   ...trackerLiteral('"obsidian"', 'async () => ({})'),

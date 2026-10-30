@@ -12,7 +12,7 @@
  * `hub.storePath` and `hub.auth.cacheFor` (default `10m`, from `1m` to
  * `24h`, `false` to ask GitHub on every request), with `0` and negative
  * values refused. The client's keys (`hub.url`, `hub.tokenSecret`,
- * `hub.timeout`) are core's, read by `src/config-schema-hub.ts` from a
+ * `hub.timeout`) are core's, read by `packages/rafa/src/config-schema-hub.ts` from a
  * project's `.rafa/config.yaml`; this file is the server's own and
  * never a project's.
  *

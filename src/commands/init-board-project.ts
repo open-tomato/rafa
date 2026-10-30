@@ -28,7 +28,7 @@
  *
  * ## Five parts, each `created`, `present` or `refused`
  *
- * Reported the way `src/board/setup.ts` reports the board's parts, in
+ * Reported the way `packages/rafa-board/src/board/setup.ts` reports the board's parts, in
  * this order:
  *
  *  1. **Scope** ({@link SCOPE_PART}): `gh auth status --active --json
@@ -47,7 +47,7 @@
  *  3. **Add the issues** ({@link ITEMS_PART}): every open issue, every
  *     closed issue with a Rank, and every closed issue whose Stage is In
  *     review, read off the board the refresh reads
- *     (`readRefreshBoard`, `src/board/project/refresh.ts`). Facts are
+ *     (`readRefreshBoard`, `packages/rafa-board/src/board/project/refresh.ts`). Facts are
  *     read only for the closed issues the first two leave out that the
  *     project does not hold already, so a second run reads none it has
  *     added. Each missing issue is added through `ProjectPort.addItem`,

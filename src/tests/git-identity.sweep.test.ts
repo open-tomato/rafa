@@ -1,3 +1,11 @@
+/**
+ * Sweeps the tree for spawned processes that set a scratch identity or
+ * `HOME` without the helpers of `packages/rafa/src/tests/git-identity.ts`
+ * and `scratch-home-env.ts`.
+ *
+ * The file stays at `src/tests/`, not beside its helpers in core's package,
+ * for the sweep timeout it reads from `./sweep-timeout.js` (#1362).
+ */
 import { join, relative } from 'node:path';
 
 import { describe, expect, setDefaultTimeout, test } from 'bun:test';
@@ -43,8 +51,8 @@ const TMPDIR_KEY = /(^|[\s{,])TMPDIR\s*:/;
  */
 const EXEMPT = new Set([
   SELF,
-  'src/tests/git-identity.ts',
-  'src/tests/scratch-home-env.ts',
+  'packages/rafa/src/tests/git-identity.ts',
+  'packages/rafa/src/tests/scratch-home-env.ts',
   'packages/rafa-hub/src/testdata/scratch-home-env.ts',
   'src/tests/cli-capture.test.ts',
 ]);

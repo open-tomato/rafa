@@ -23,7 +23,9 @@
  * a change meant to move them, once, recorded here: both YAML files read
  * as their scope's local layer moved `load-config.json`'s project
  * settings from source `file` to `local` and each file's path and unknown
- * keys to the local fields, every value and warning as it was.
+ * keys to the local fields, every value and warning as it was; the core
+ * key `loop.worktreeSetup` added one `load-config.json` entry, its null
+ * default from source `default`, and moved nothing else.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

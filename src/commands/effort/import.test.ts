@@ -4,7 +4,7 @@
  * another device's store in a directory of its own. Each case runs as an
  * installed runtime with no live loop and reads no git, unless it says
  * otherwise. `mergeStore`'s own cases hold the union and the file
- * adapter's (`src/effort/sync/file.test.ts`) hold the pull, so these hold
+ * adapter's (`src/tests/effort-coupled/effort/sync/file.test.ts`) hold the pull, so these hold
  * what the command adds: that it pulls through the `file` strategy, that
  * its lines and exit codes are `rafa effort merge`'s, and its argument
  * and flag.
@@ -17,10 +17,10 @@
  * refusal has the same import as a dry run beside it, which runs.
  */
 import type { ImportCommandSeams } from './import.js';
-import type { FileSyncOptions } from '../../effort/sync/file.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { RuntimeIdentity } from '@open-tomato/rafa/core/runtime';
 import type { SyncPullRequest } from '@open-tomato/rafa/ports';
+import type { FileSyncOptions } from '@open-tomato/rafa-effort/effort/sync/file';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,9 +33,9 @@ import { beginSession } from '@open-tomato/rafa/core/loop';
 import { bringForward } from '@open-tomato/rafa/store/bring-forward';
 import { MOVE_TO_SQLITE } from '@open-tomato/rafa/store/merge-store';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
+import { createFileSync } from '@open-tomato/rafa-effort/effort/sync/file';
+import { createLocalSync } from '@open-tomato/rafa-effort/effort/sync/select';
 
-import { createFileSync } from '../../effort/sync/file.js';
-import { createLocalSync } from '../../effort/sync/select.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 

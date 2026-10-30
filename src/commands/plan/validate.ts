@@ -70,7 +70,7 @@
  * ## The effort-store rules
  *
  * Beside both, the command checks the plan against the three rules of
- * `src/plan/store-rules.ts`, which `loop start`'s preflight repeats: no
+ * `packages/rafa-run/src/plan/store-rules.ts`, which `loop start`'s preflight repeats: no
  * store change pinned by number, anywhere in the plan; and, in a plan
  * one of whose task lines names ``migration `<id>` ``, no still-to-run
  * task spelling a code span that runs `src/rafa.ts`, `dist/cli.js` or
@@ -79,7 +79,7 @@
  * `PREREQUISITES-<stub>.md` beside it, read by `./store-check.ts`, the
  * one reading `rafa plan create` refuses a generated plan with too. They
  * need no project, so they run whether or not one was found; like the
- * roster, they are the command's and not `validatePlan`'s, which `src/board/gate.ts` weighs a
+ * roster, they are the command's and not `validatePlan`'s, which `packages/rafa-board/src/board/gate.ts` weighs a
  * planner's plan with and which reads one file only.
  *
  * ## The bundled-item edits
@@ -137,9 +137,10 @@
 import type { BundledEdit } from './bundled-check.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { PlanValidation } from '@open-tomato/rafa/plan/validate';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '@open-tomato/rafa-inventory';
-import type { PlanValidation, StoreRuleProblem } from '@open-tomato/rafa-run';
+import type { StoreRuleProblem } from '@open-tomato/rafa-run';
 
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
@@ -153,7 +154,7 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '@open-tomato/rafa-inventory';
-import { prerequisitesPathForPlan, storeRuleLine, validatePlan } from '@open-tomato/rafa-run';
+import { storeRuleLine } from '@open-tomato/rafa-run';
 
 import { expectOneArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -161,6 +162,8 @@ import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { formatCounts, issueLine, plural } from '@open-tomato/rafa/core/plan';
+import { validatePlan } from '@open-tomato/rafa/plan/validate';
+import { prerequisitesPathForPlan } from '@open-tomato/rafa/preflight/prerequisites-md';
 
 import { bundledEditLine, findBundledEdits, writeTierPins } from './bundled-check.js';
 import { checkStoreRules } from './store-check.js';

@@ -124,7 +124,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
 import { createGhRunner } from '@open-tomato/rafa-board';
-import { SKILL_USE_CLI_VERSION, readFrontmatter } from '@open-tomato/rafa-effort';
+import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort';
 import {
   PROVENANCE_FIELD,
   SERVE_CLI_VERSION,
@@ -134,6 +134,7 @@ import {
 } from '@open-tomato/rafa-inventory';
 
 import { CLAUDE_BIN } from '@open-tomato/rafa/core/loop';
+import { readFrontmatter } from '@open-tomato/rafa/schema/frontmatter';
 
 import { PATH_KEY, readSessionEnv } from './doctor-deep-env.js';
 import { renderDeepSection } from './doctor-deep-row.js';
@@ -365,7 +366,7 @@ export function skillUseVersionRows(installed: string | null, pinned: string = S
     'Claude Code',
     `${installed} is installed, and the skill-use collector reads logs of ${pinned}, `
       + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
-    'record the skill-use fixture again under the installed version (src/effort/skill-use.ts) before moving SKILL_USE_CLI_VERSION',
+    'record the skill-use fixture again under the installed version (packages/rafa-effort/src/effort/skill-use.ts) before moving SKILL_USE_CLI_VERSION',
   )];
 }
 

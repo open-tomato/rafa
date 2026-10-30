@@ -5,8 +5,8 @@
  * what the resolution is handed.
  *
  * The routes themselves are driven elsewhere and this file drives none
- * of them again: `src/board/spec-source-roadmap.test.ts` walks the
- * roadmap and `src/board/plan-spec.test.ts` runs the board checks over
+ * of them again: `packages/rafa-board/src/board/spec-source-roadmap.test.ts` walks the
+ * roadmap and `packages/rafa-board/src/board/plan-spec.test.ts` runs the board checks over
  * planted `gh` and `git` runners. What is measured here is the half that is the
  * COMMAND's — that the words reach `readSpecSourceFlags`, that the
  * `findSpec` handed over is this module's candidate rule and not the
@@ -33,8 +33,8 @@
  *    13 pass and 1 fail, the offers case alone.
  */
 import type { SpecRouteSeams } from './spec-route.js';
-import type { AlternativeOffer } from '../../board/blocked-line.js';
-import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '../../board/plan-spec.js';
+import type { AlternativeOffer } from '@open-tomato/rafa-board/board/blocked-line';
+import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '@open-tomato/rafa-board/board/plan-spec';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -43,8 +43,7 @@ import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
-
-import { noSourceMessage, SOURCE_REFUSAL_EXIT } from '../../board/spec-source.js';
+import { noSourceMessage, SOURCE_REFUSAL_EXIT } from '@open-tomato/rafa-board/board/spec-source';
 
 import { findSpec, resolveCreateSpec, specCandidates, usageRefusal } from './spec-route.js';
 

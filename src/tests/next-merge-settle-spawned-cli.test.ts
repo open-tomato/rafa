@@ -38,7 +38,7 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { plantProjectConfig } from './cli-capture.js';
 import {
@@ -104,16 +104,18 @@ function buildProbe(): string {
   return [
     'import { writeFileSync } from "node:fs";',
     `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+    `import { registerCoreServices } from ${JSON.stringify(join(SRC_DIR, 'service-registry.ts'))};`,
     `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
     'registerCoreConfigSections();',
     'registerCoreAdapters();',
+    'registerCoreServices();',
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
-    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
-    `import { createReleaseSettleCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'release', 'settle.ts'))};`,
-    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
-    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, 'pr', 'pull-requests-double.ts'))};`,
+    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'commands', 'pr', 'merge.ts'))};`,
+    `import { createReleaseSettleCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-release', 'src', 'commands', 'release', 'settle.ts'))};`,
+    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'pr', 'index.ts'))};`,
+    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',
     'const events = [];',

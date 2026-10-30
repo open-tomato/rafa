@@ -6,7 +6,7 @@
  *
  * ## The source cases
  *
- * `src/plan.ts`, `src/effort/collect.ts`, `src/effort/report.ts`,
+ * `src/plan.ts`, `packages/rafa-effort/src/effort/collect.ts`, `packages/rafa-effort/src/effort/report.ts`,
  * `packages/rafa/src/core/config/config.ts` and `packages/rafa/src/core/config/config-load.ts` hold
  * no `console` member and no `process.exit` in their code, read with
  * the walk in `source-uses.ts`, whose control is `loop-output.test.ts`'s.
@@ -38,7 +38,7 @@
  * `plan create` is dispatched in both modes by `src/plan.test.ts`, which
  * hands it a fixture planner. `--json` beside `--output=json`, and a
  * config warning in both modes, run over a planted store in
- * `src/effort/report.test.ts`.
+ * `src/tests/effort-coupled/effort/report.test.ts`.
  *
  * Sixteen mutations were driven on 2026-09-15, one run each over this
  * file and ten other suites (`wrap`, `report`, `effort-report-backends`,
@@ -61,8 +61,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { consoleAndExitUses } from './source-uses.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
@@ -75,11 +76,11 @@ const RAFA_ENTRY = join(SRC_DIR, 'rafa.ts');
 /** How long a case spawning the CLI may run. */
 const RUN_TIMEOUT = 30_000;
 
-/** Each module held to the active output, from `src/` (core's through `../packages/rafa/src/`), and whether it writes at all. */
+/** Each module held to the active output, from `src/` (core's through `../packages/rafa/src/`, effort's through `../packages/rafa-effort/src/`), and whether it writes at all. */
 const ROUTED_MODULES: readonly (readonly [string, boolean])[] = [
   ['plan.ts', true],
-  ['effort/collect.ts', true],
-  ['effort/report.ts', true],
+  ['../packages/rafa-effort/src/effort/collect.ts', true],
+  ['../packages/rafa-effort/src/effort/report.ts', true],
   ['../packages/rafa/src/core/config/config.ts', false],
   ['../packages/rafa/src/core/config/config-load.ts', true],
 ];

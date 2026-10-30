@@ -5,12 +5,12 @@
  *
  * | Section | Composed from | Reaches |
  * | --- | --- | --- |
- * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
+ * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`packages/rafa-run/src/next/readings.ts`) | git, the plans directory |
  * | `loops` | `readSessions` (`packages/rafa/src/core/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`packages/rafa/src/core/loop/session-readings.ts`), `blockedTasks` (`src/loop/blocked-tasks.ts`) | `.rafa/runs/`, the trackers |
- * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
- * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
+ * | `pull` | `readOpenPull` (`packages/rafa-run/src/next/readings.ts`) over `createGhPullRequests` | `gh` |
+ * | `board` | `ghNextBoard` (`packages/rafa-run/src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`packages/rafa-board/src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`packages/rafa-run/src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
- * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests, and for the open ones when an unmerged branch is on `origin` alone |
+ * | `housekeeping` | `readCleanup`, `cleanupCounts` (`packages/rafa-run/src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests, and for the open ones when an unmerged branch is on `origin` alone |
  *
  * Nothing here prints, and nothing spawns except through
  * {@link StatusSeams}, whose defaults are the system's own, so a unit
@@ -52,7 +52,7 @@
  *
  * - **Each `gh` command** goes through a runner opened with the time
  *   still left as its `timeoutMs` (`createGhRunner`,
- *   `src/adapters/tracker/github.ts`), so a command still running at the
+ *   `packages/rafa-board/src/adapters/tracker/github.ts`), so a command still running at the
  *   deadline is killed rather than left holding the process open. Past
  *   the deadline a command is not spawned at all: it answers `ok: false`
  *   saying so. A section's commands run one after another, so a runner
@@ -66,7 +66,7 @@
  * `housekeeping` is not raced: its one `gh` command is the merged
  * listing, which the runner bounds, and `readCleanup` turns a listing
  * that failed or timed out into a note (`readProviderMerges`,
- * `src/cleanup/groups.ts`) rather than failing the counts git read.
+ * `packages/rafa-pr/src/cleanup/groups.ts`) rather than failing the counts git read.
  *
  * ## A provider that is not `gh`
  *
@@ -84,7 +84,7 @@
  * `type:roadmap`. A project with neither gets no `place` key at all, so
  * its text and its JSON are what they were before boards.
  *
- * The board listing (`createGhBoardListing`, `src/board/roadmap-board.ts`)
+ * The board listing (`createGhBoardListing`, `packages/rafa-board/src/board/roadmap-board.ts`)
  * is read once per `rafa status`: the same memoised read is handed to
  * `ghNextBoard` as its `listing`, so a walk that meets an epic line
  * spends no second one. The place is `resolvePlace` over that listing,
@@ -134,7 +134,7 @@
  * read (`nextOwnerGate` over the section's bounded runner, provider and
  * the one board listing), and the line is carried while the gate lets no
  * merge through: `waiting`, `unresolved` or `unknown`, as the
- * `pr-owner-review` row of `rafa next` reads it (`src/next/hop-rows.ts`).
+ * `pr-owner-review` row of `rafa next` reads it (`packages/rafa-run/src/next/hop-rows.ts`).
  * `approved` and `not-gated` carry none, since nothing waits on an
  * owner there. A reading that fails is never read as approved: a pull
  * request that could not be read, or a gate that rejected, is carried as
@@ -155,7 +155,7 @@
  *
  * `housekeeping.idleWorktrees` counts the listed worktrees whose
  * `WorktreeRow.blockers` hold no `recent` blocker: nothing touched them
- * within `cleanup.worktreeIdleDays` (`src/cleanup/worktrees.ts`). A
+ * within `cleanup.worktreeIdleDays` (`packages/rafa-pr/src/cleanup/worktrees.ts`). A
  * worktree blocked for being dirty or locked is still idle by that rule.
  */
 import type { BlockedCount, BlockedCountRelations } from './blocked-count.js';
@@ -176,8 +176,6 @@ import type {
 } from '@open-tomato/rafa-board';
 import type {
   GitRunner,
-  NextBoardOptions,
-  NextOwnerGateOptions,
   OwnerApproval,
   PrProviderReading,
   PullRequests,
@@ -186,6 +184,8 @@ import type {
   CleanupCounts,
   CleanupSeams,
   NextBoard,
+  NextBoardOptions,
+  NextOwnerGateOptions,
   NextRoadmapReading,
   NextSources,
   OpenPull,
@@ -206,16 +206,15 @@ import {
   resolvePlace,
 } from '@open-tomato/rafa-board';
 import {
-  DEFAULT_BASE_BRANCH,
   createGhPullRequests,
   createGitRunner,
-  ghNextBoard,
-  nextOwnerGate,
   resolvePrProvider,
 } from '@open-tomato/rafa-pr';
 import {
   cleanupCounts,
   defaultCleanupSeams,
+  ghNextBoard,
+  nextOwnerGate,
   readBranch,
   readBranchPlan,
   readCleanup,
@@ -223,7 +222,7 @@ import {
   readPlans,
 } from '@open-tomato/rafa-run';
 
-import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { DEFAULT_BASE_BRANCH, messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { isLive, readSessionChecklist } from '@open-tomato/rafa/core/loop/readings';
 import { plansDirAt } from '@open-tomato/rafa/core/plan';

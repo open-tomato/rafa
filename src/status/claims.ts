@@ -11,14 +11,14 @@
  * `refs/remotes/origin/feat/rafa-*` under the default `feat/{stub}`:
  * {@link readClaimBranches} lists them with one `for-each-ref`, keeps
  * the ones `claimBranchIssue` reads an issue off under the same
- * template, and reads each with `readClaimBranch` (`src/claims/git.ts`),
+ * template, and reads each with `readClaimBranch` (`packages/rafa/src/claims/git.ts`),
  * which reads the remote-tracking ref and runs no fetch. Only the
  * template given is read: under `work/{stub}`, `feat/rafa-7-x` is no
  * claim, and under the default `work/rafa-7-x` is none either. `rafa status` fetches nothing, so this is a local reading,
  * read with the branch and the loops before any `gh` is spawned. What
  * moves those refs is the claim commands, `plan create`'s and
  * `loop start`'s claim pushes, and the fetch a refused wrap-up push runs
- * (`src/claims/lost.ts`), so a clone that lost its claim reads the new
+ * (`packages/rafa-run/src/claims/lost.ts`), so a clone that lost its claim reads the new
  * owner here. A claim commit waiting on a LOCAL branch with no upstream
  * is not a claim yet and is not listed.
  *
@@ -34,7 +34,7 @@
  * | `handingTo` | a pending handover's receiver, null when none is pending |
  * | `releasedBy` | the store that released it, null while held |
  * | `stage` | the stage labels on the issue, `rafa:claimed` and `rafa:in-development`; null when they were not read |
- * | `state` | `readClaimState` (`src/claims/stale.ts`) over the ownership, the tip's committer date, the labels, `claims.staleAfter` and the clock |
+ * | `state` | `readClaimState` (`packages/rafa/src/claims/stale.ts`) over the ownership, the tip's committer date, the labels, `claims.staleAfter` and the clock |
  * | `idleMs` | the clock less the tip's committer date, never below 0 |
  *
  * ## The labels
@@ -50,22 +50,19 @@
  * as `rafa claim take` does: a label that could not be read never makes
  * a claim a takeover candidate.
  */
+import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
+import type { ClaimOwnership, ClaimStateName } from '@open-tomato/rafa/claims/stale';
 import type { ClaimsStaleAfter } from '@open-tomato/rafa/core/config/sections';
 import type { BoardIssue } from '@open-tomato/rafa-board';
 import type { GitRunner } from '@open-tomato/rafa-pr';
-import type { ClaimBranchReading, ClaimOwnership, ClaimStateName } from '@open-tomato/rafa-run';
 
 import { gitSaid } from '@open-tomato/rafa-pr';
-import {
-  REMOTE,
-  STAGE_LABELS,
-  claimBranchGlob,
-  claimBranchIssue,
-  readClaimBranch,
-  readClaimState,
-} from '@open-tomato/rafa-run';
+import { STAGE_LABELS } from '@open-tomato/rafa-run';
 
+import { claimBranchGlob, claimBranchIssue, readClaimBranch } from '@open-tomato/rafa/claims/git';
+import { readClaimState } from '@open-tomato/rafa/claims/stale';
 import { DEFAULT_BRANCH_TEMPLATE } from '@open-tomato/rafa/core/config/sections';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 /** One claim branch as `rafa status` shows it; see the module note's table. */
 export interface ClaimRow {

@@ -43,11 +43,11 @@
  * and an argument's `default` allowed `null` each reddened their own
  * refusal alone.
  *
- * The file moved with `types.ts` into `packages/rafa/src/core/command/`. Its clean
- * probe still reads `ParseArgsSpec` from `src/cli/core/parseArgs.ts`,
- * which stays in the CLI: that path is a string written into a probe
+ * The file moved with `types.ts` into `packages/rafa/src/core/command/`.
+ * Its clean probe reads `ParseArgsSpec` from `parseArgs.ts` beside it,
+ * which followed into core: that path is a string written into a probe
  * outside the repository, not an import of this file, so the import
- * graph counts no edge from core for it.
+ * graph counts no edge for it.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -94,7 +94,7 @@ const EQUALS = [
 /** The probe holding every claim, which must compile clean. */
 const CONFORMING_PROBE = probeSource(
   PORTS_IMPORT,
-  `import type { ParseArgsSpec } from ${JSON.stringify(join(REPO_ROOT, 'src', 'cli', 'core', 'parseArgs.js'))};`,
+  `import type { ParseArgsSpec } from ${JSON.stringify(join(SRC_DIR, 'core', 'command', 'parseArgs.js'))};`,
   ...EQUALS,
   'export const modeIsExact: Equals<T.CliContext["outputMode"], "text" | "json" | "events"> = true;',
   'export const modeIsNotString: Equals<T.CliContext["outputMode"], string> = false;',
@@ -239,10 +239,11 @@ interface Reading {
   message: string;
 }
 
-/** The compile every case reads. */
+/** The compile every case reads, its readings taken when it was built. */
 interface Compiled {
-  program: ts.Program;
   configErrors: readonly ts.Diagnostic[];
+  /** Every probe's diagnostics, by the probe's file name. */
+  readings: Readonly<Record<string, readonly Reading[]>>;
 }
 
 let tempDir = '';
@@ -254,15 +255,25 @@ function compiledProbes(): Compiled {
   return compiled;
 }
 
-/** Every diagnostic the compile holds against one probe. */
-function readingsOf(file: string): Reading[] {
-  const { program } = compiledProbes();
+/**
+ * Every diagnostic the compile holds against one probe, read off the
+ * checker. Called by `beforeAll` alone, so the checker binds and checks
+ * there and not inside the first case.
+ */
+function diagnosticsOf(program: ts.Program, file: string): Reading[] {
   const source = program.getSourceFile(join(tempDir, file));
   if (source === undefined) throw new Error(`the probe ${file} is not in the compile`);
   return ts.getPreEmitDiagnostics(program, source).map((diagnostic) => ({
     code: diagnostic.code,
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
   }));
+}
+
+/** Every diagnostic the compile holds against one probe, as stored. */
+function readingsOf(file: string): readonly Reading[] {
+  const readings = compiledProbes().readings[file];
+  if (readings === undefined) throw new Error(`the probe ${file} is not in the compile`);
+  return readings;
 }
 
 beforeAll(() => {
@@ -278,14 +289,16 @@ beforeAll(() => {
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, REPO_ROOT, undefined, configPath);
 
+  const program = ts.createProgram({
+    rootNames: probes.map(([file]) => join(tempDir, file)),
+    options: parsed.options,
+  });
+
   compiled = {
-    program: ts.createProgram({
-      rootNames: probes.map(([file]) => join(tempDir, file)),
-      options: parsed.options,
-    }),
     configErrors: [...config.error === undefined
       ? []
       : [config.error], ...parsed.errors],
+    readings: Object.fromEntries(probes.map(([file]) => [file, diagnosticsOf(program, file)])),
   };
 }, 30_000);
 

@@ -168,11 +168,11 @@ describe.each(JOBS)('the job %s', (job, gates) => {
     expect(install).toBeLessThan(firstGate);
   });
 
-  it('checks out with actions/checkout@v4 and takes bun from package.json with setup-bun@v2', () => {
+  it('checks out with actions/checkout@v7 and takes bun from package.json with setup-bun@v2', () => {
     const all = stepsOf(job);
     const setup = all.find((step) => step.uses === 'oven-sh/setup-bun@v2');
 
-    expect(all.some((step) => step.uses === 'actions/checkout@v4')).toBe(true);
+    expect(all.some((step) => step.uses === 'actions/checkout@v7')).toBe(true);
     expect(setup?.with?.['bun-version-file']).toBe('package.json');
   });
 
@@ -193,7 +193,7 @@ describe('the job verify, ring 0', () => {
   });
 
   it('checks out the default shallow history and sets no env', () => {
-    const checkout = stepsOf('verify').find((step) => step.uses === 'actions/checkout@v4');
+    const checkout = stepsOf('verify').find((step) => step.uses === 'actions/checkout@v7');
 
     expect(checkout?.with).toBeUndefined();
     expect(WORKFLOW.jobs['verify']?.env).toBeUndefined();
@@ -202,7 +202,7 @@ describe('the job verify, ring 0', () => {
 
 describe('the job affected, ring 1', () => {
   it('checks out the whole history, so the base turbo compares against is reachable', () => {
-    const checkout = stepsOf('affected').find((step) => step.uses === 'actions/checkout@v4');
+    const checkout = stepsOf('affected').find((step) => step.uses === 'actions/checkout@v7');
 
     expect(checkout?.with?.['fetch-depth']).toBe(0);
   });
@@ -226,7 +226,7 @@ describe('the job affected, ring 1', () => {
 
   it('would see a shallow checkout, the control over a job with fetch-depth 1', () => {
     const shallow = parse(TEXT.replace('fetch-depth: 0', 'fetch-depth: 1'));
-    const checkout = shallow.jobs['affected']?.steps.find((step) => step.uses === 'actions/checkout@v4');
+    const checkout = shallow.jobs['affected']?.steps.find((step) => step.uses === 'actions/checkout@v7');
 
     expect(checkout?.with?.['fetch-depth']).toBe(1);
   });

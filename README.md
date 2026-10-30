@@ -889,15 +889,18 @@ sort out what happened.
 | Key | Default | What it sets |
 |---|---|---|
 | `loop.worktreeDir` | `.rafa/worktrees` | the directory where `--as-worktree` creates worktrees, absolute or relative to the project root |
+| `loop.worktreeSetup` | `null` | a shell command run in a new or reused `--as-worktree` worktree before the first session; null runs nothing |
 | `dangerous.selfUpdateDuringLoop` | `false` | whether `rafa self-update` runs while a loop of this project is live |
 
-Both take a string and a boolean as written; quoted values are refused.
+All three take a string or a boolean as written; a boolean in quotes is refused.
 
 ```yaml
 # empty: loops run in the current checkout, guarded
 # --as-worktree puts them in .rafa/worktrees (the default)
 
 loop:
+  # worktreeSetup: null                          # the default: nothing runs in a new worktree
+  # worktreeSetup: bun install --frozen-lockfile # installs the packages before the first session
   worktreeDir: ../rafa-loops   # worktrees beside the repository
 
 dangerous:
@@ -1078,7 +1081,7 @@ builds. `bun run snapshot` in this checkout, or `rafa self-update` run
 inside it, builds, copies `dist/` into `~/.rafa/runtime/<version>/` with
 the version from `package.json`, points `~/.rafa/bin/rafa` at the copied
 `cli.js`, and prints the path the link resolves to, exiting 0. Both
-install the same way (`src/runtime/install.ts`). The bin is not in
+install the same way (`packages/rafa-run/src/runtime/install.ts`). The bin is not in
 `~/.bun/bin`, where `bun link` in this checkout re-points `rafa` at the
 checkout's `dist/` with no message, so put `~/.rafa/bin` on `PATH` ahead
 of `~/.bun/bin`; both warn when it is not, and `rafa doctor` checks it.

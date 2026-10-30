@@ -9,7 +9,7 @@
  * INSTALLED, where each one comes from, which holder of a name answers,
  * and which of them a session the loop spawns can reach. Every row is
  * an {@link InventoryRecord} of kind `skill` as `buildInventory`
- * (`src/inventory/index.ts`) decides it, so precedence, `collision`,
+ * (`packages/rafa-inventory/src/inventory/index.ts`) decides it, so precedence, `collision`,
  * `shadowed-by:`, `disabled:` and `visibleToLoop` are decided there and
  * only there, and this command filters and prints them.
  *
@@ -111,7 +111,7 @@ import type { ModuleLoadSeams } from '@open-tomato/rafa/modules/load';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { Inventory, InventoryRecord } from '@open-tomato/rafa-inventory';
 
-import { browse, buildInventory, pathDirectories } from '@open-tomato/rafa-inventory';
+import { buildInventory, pathDirectories } from '@open-tomato/rafa-inventory';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -121,6 +121,7 @@ import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 import { isSkillTier, SKILL_TIERS } from '@open-tomato/rafa/schema/tiers';
 
 import { processTerminal, refuseWithoutTerminal } from '../../cli/prompt/terminal.js';
+import { browse } from '../../inventory/browse.js';
 
 /** What neither the context nor the registry carries. */
 export interface SkillListSeams {

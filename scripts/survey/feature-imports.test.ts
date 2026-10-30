@@ -56,13 +56,16 @@ describe('cut table: feature packages and the files left to place', () => {
     expect(edgesOnLeftToPlace(readCutTable())).toEqual([]);
   });
 
-  it('reads feature edges into the CLI that land on a file the CLI holds by rule, so the none above is not vacuous', () => {
+  // The live table held one feature edge into the CLI until the parser
+  // moved into core: `packages/rafa-run/src/next/actions.ts` to `src/cli/core/parseArgs.ts`.
+  // With it gone the case above holds for want of any edge, so the planted
+  // table below is its control.
+  it('reads no feature edge into the CLI at all, while files are still left to place', () => {
     const table = readCutTable();
-    const left = new Set(table.leftToPlace.map((file) => file.path));
-    const heldByRule = featureEdgesIntoCli(table).filter(({ edge }) => !left.has(edge.to));
+    const edges = featureEdgesIntoCli(table).map(({ pkg, edge }) => `${edge.from} -> ${edge.to} (${edge.kind}, ${pkg})`);
 
-    expect(left.size).toBeGreaterThan(0);
-    expect(heldByRule.length).toBeGreaterThan(0);
+    expect(table.leftToPlace.length).toBeGreaterThan(0);
+    expect(edges).toEqual([]);
   });
 
   it('names importer and target for an edge a planted table lands on a left-to-place file', () => {

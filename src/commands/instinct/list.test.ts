@@ -38,11 +38,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
+import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
+import { readRecord } from '@open-tomato/rafa-inventory/schema/scope-records';
 
-import { actionHash } from '../../learning/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
-import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
-import { readRecord } from '../../schema/scope-records.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import {

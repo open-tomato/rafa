@@ -30,7 +30,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { sessionLogDir } from '../../effort/collect.js';
+import { sessionLogDir } from '@open-tomato/rafa-effort/effort/collect';
+
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 import { createAgentSearchCommand } from '../agent/search.js';
 
