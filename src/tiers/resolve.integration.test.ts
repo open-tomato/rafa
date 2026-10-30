@@ -5,9 +5,9 @@
  * project → rafa → user, and that the user tier does not resolve under
  * `project,local`.
  */
-import type { TierRow, TierSettings } from './resolve.js';
-import type { InventorySeams } from '../inventory/index.js';
 import type { ClaudeSettingSource } from '@open-tomato/rafa/core/config/sections';
+import type { InventorySeams } from '@open-tomato/rafa-inventory/inventory/index';
+import type { TierRow, TierSettings } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,9 +15,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { buildInventory } from '../inventory/index.js';
-
-import { findTierItem, readItemBytes, resolveTiers } from './resolve.js';
+import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
+import { findTierItem, readItemBytes, resolveTiers } from '@open-tomato/rafa-inventory/tiers/resolve';
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-tiers-resolve-')));
 

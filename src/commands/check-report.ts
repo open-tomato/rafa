@@ -1,6 +1,6 @@
 /**
  * What `rafa skill check` and `rafa instinct check` share: the words
- * they read off a line, the seams they hand `src/check/run.ts`, the
+ * they read off a line, the seams they hand `packages/rafa-inventory/src/check/run.ts`, the
  * lines they print, and the exit code they refuse with.
  *
  * The two commands differ in exactly three things — the {@link

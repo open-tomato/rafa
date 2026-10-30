@@ -1,21 +1,21 @@
 ## Triage
 
-`src/triage/` routes each out-of-scope entry of a task report by its kind, and
-each `stale_docs` entry to the `docs` channel. The six kinds are `bug`,
-`own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them only a
-`bug` reaches a tracker as an issue of its own. The loop calls `triageReport`
-from `src/start/triage.ts` and `rafa epic close` from
-`src/commands/epic/close-triage.ts`. The triage writer stores every bug and its
-action in the effort store, keyed by the bug's recurrence key, not the
-artifact the report's findings use, and each routed entry leaves one row in
-the `bug_routes` table (`packages/rafa/src/effort/store/bug-routes.ts`) naming
-the kind the
-session said, the kind the loop routed it under and the route it took.
+`packages/rafa-pr/src/triage/` routes each out-of-scope entry of a task report
+by its kind, and each `stale_docs` entry to the `docs` channel. The six kinds
+are `bug`, `own-fallout`, `own-gap`, `convention`, `docs` and `machine`; of them
+only a `bug` reaches a tracker as an issue of its own. The loop calls
+`triageReport` from `packages/rafa-run/src/start/triage.ts` and `rafa epic
+close` from `packages/rafa-board/src/commands/epic/close-triage.ts`. The triage
+writer stores every bug and its action in the effort store, keyed by the bug's
+recurrence key, not the artifact the report's findings use, and each routed
+entry leaves one row in the `bug_routes` table
+(`packages/rafa/src/effort/store/bug-routes.ts`) naming the kind the session
+said, the kind the loop routed it under and the route it took.
 
 ### The kinds and their routes
 
-`src/triage/kind-route.ts` routes an entry after the security rule and the
-kind check. Read top to bottom:
+`packages/rafa-pr/src/triage/kind-route.ts` routes an entry after the security
+rule and the kind check. Read top to bottom:
 
 | Kind | Route |
 | --- | --- |
@@ -41,10 +41,10 @@ is written for it, so no security entry leaves the private channel.
 
 The session that reports a red test is not the one that turned it red, and it
 cannot see the plan's base, so the loop checks every `own-` claim and every
-`bug` that names a test or a path. `checkKind` (`src/triage/own-check.ts`)
-reads the entry down a decision table, the first row that holds answering.
-An entry the session said is `convention`, `docs` or `machine` is taken as
-said and nothing is read.
+`bug` that names a test or a path. `checkKind`
+(`packages/rafa-pr/src/triage/own-check.ts`) reads the entry down a decision
+table, the first row that holds answering. An entry the session said is
+`convention`, `docs` or `machine` is taken as said and nothing is read.
 
 | The entry | Answer |
 | --- | --- |
@@ -64,20 +64,20 @@ with any leading `./` taken off; when it is absolute and ends in one; or when
 it is a bare file name and a plan file has that base name.
 
 **What it costs.** The head is read first: the named test file runs once at
-`HEAD` of the run checkout, and only when the case is red there does it run
-once at the plan's base. Each run is one test file, never the suite. It runs
-in a detached temporary worktree of that commit with the run checkout's
-`node_modules` linked in, removed afterwards, and is cached per commit and
-file for the whole run, so two bugs naming two cases of one file cost one
-run (`src/triage/base-run.ts`). A file missing at the commit, under
-`node_modules` or outside the checkout is not run, and reads as
-`unrunnable`, so its entry is a `bug`. The plan's base is the merge base of
-`HEAD` and `refs/remotes/origin/<pr.base>`, and the plan's files are the
-paths `git diff --name-only -z` names between that base and `HEAD`
-(`src/triage/plan-commits.ts`). A report with no test named costs those git
-reads, made again for each report. A failed read reads as a base or a file
-list the loop cannot use, so the entry is a `bug`: the cost falls on filing,
-never on hiding.
+`HEAD` of the run checkout, and only when the case is red there does it run once
+at the plan's base. Each run is one test file, never the suite. It runs in a
+detached temporary worktree of that commit with the run checkout's
+`node_modules` linked in, removed afterwards, and is cached per commit and file
+for the whole run, so two bugs naming two cases of one file cost one run
+(`packages/rafa-pr/src/triage/base-run.ts`). A file missing at the commit, under
+`node_modules` or outside the checkout is not run, and reads as `unrunnable`, so
+its entry is a `bug`. The plan's base is the merge base of `HEAD` and
+`refs/remotes/origin/<pr.base>`, and the plan's files are the paths `git diff
+--name-only -z` names between that base and `HEAD`
+(`packages/rafa-pr/src/triage/plan-commits.ts`). A report with no test named
+costs those git reads, made again for each report. A failed read reads as a base
+or a file list the loop cannot use, so the entry is a `bug`: the cost falls on
+filing, never on hiding.
 
 ### The channels
 
@@ -123,8 +123,9 @@ the parser answered, which can differ from where the entry was written when
 the parser dropped an earlier entry with no `what`. No entry is read for a
 machine fault or a `security` flag, and none is compared with anything: a
 page naming a toolchain is still a page. A report whose only content is
-`stale_docs` entries resolves no public tracker (`src/start/triage.ts`),
-since resolving runs `gh auth status` and `gh repo view`.
+`stale_docs` entries resolves no public tracker
+(`packages/rafa-run/src/start/triage.ts`), since resolving runs `gh auth status`
+and `gh repo view`.
 
 The entries are kept, but not by this channel. The loop stores the report before
 it is triaged, and `storeTaskReport` (`packages/rafa/src/report/record.ts`)
@@ -137,26 +138,26 @@ stored as a `sighting` row whose `where` is the first path its `what`, then its
 
 ### The body the loop files
 
-A bug the loop files carries the bug record (`context/bug-record.md`), built
-by `bugFilingOf` (`src/triage/bug-filing.ts`) from the session's report, the
-dispatch it ran under and the checkout. Its body opens with the sentence
-saying where it came from, then a `Supersedes` section when the bug came
-back, then `What`, `Artifact`, `Refs` when the artifact names a path or a
-symbol, `Recurrence key`, `Plan`, `Task` and `Feedback`.
-The sections above `Feedback` are the ones `./bug-key.ts` and
-`./similarity.ts` read, and the record adds nothing to them. After `Feedback`
-come the record's sections, one per field holding a value, in `BUG_FIELDS`
-order: `Reproduce`, `Rerun`, `Cause`, `Proposed cause`, `Suspected cause`,
-`Module`, `Action`, `Project`, `Environment` and `Versions`. Last are
-`Reported module` and `Reported action`, the session's word for a `Module` or
-`Action` the record holds as `unknown`. A new issue's `Possible duplicates`
-section, when the similarity step filed one, comes after those two.
+A bug the loop files carries the bug record (`context/bug-record.md`), built by
+`bugFilingOf` (`packages/rafa-pr/src/triage/bug-filing.ts`) from the session's
+report, the dispatch it ran under and the checkout. Its body opens with the
+sentence saying where it came from, then a `Supersedes` section when the bug
+came back, then `What`, `Artifact`, `Refs` when the artifact names a path or a
+symbol, `Recurrence key`, `Plan`, `Task` and `Feedback`. The sections above
+`Feedback` are the ones `./bug-key.ts` and `./similarity.ts` read, and the
+record adds nothing to them. After `Feedback` come the record's sections, one
+per field holding a value, in `BUG_FIELDS` order: `Reproduce`, `Rerun`, `Cause`,
+`Proposed cause`, `Suspected cause`, `Module`, `Action`, `Project`,
+`Environment` and `Versions`. Last are `Reported module` and `Reported action`,
+the session's word for a `Module` or `Action` the record holds as `unknown`. A
+new issue's `Possible duplicates` section, when the similarity step filed one,
+comes after those two.
 
 `Reproduce` is the session's word, else `seen while running task <line> of
 plan <stub>`, or ``seen while running `<command>` `` for a dispatch with no
 plan stub. The record never holds `unknown` there.
 
-`Cause` follows the cause rule (`src/bugs/cause-rule.ts`), which never refuses
+`Cause` follows the cause rule (`packages/rafa-board/src/bugs/cause-rule.ts`), which never refuses
 a session's words. A code of the list is kept as written. A shaped code the
 list lacks is `<family>:new-context`, with the code kept as `Proposed cause`,
 or `unknown:new-context` when its family is unlisted. Any other text is
@@ -179,10 +180,10 @@ other record sections.
 
 ### The repair task and its cap
 
-`src/triage/leftover-repair.ts` writes the repair of an `own-fallout` or
-`own-gap` entry through `insertTrackerTask` (`packages/rafa/src/utils/tracker.ts`),
-directly above the plan's first open task, `[ ]` or `[BLOCKED]`, or after the
-last task when none is open:
+`packages/rafa-pr/src/triage/leftover-repair.ts` writes the repair of an
+`own-fallout` or `own-gap` entry through `insertTrackerTask`
+(`packages/rafa/src/utils/tracker.ts`), directly above the plan's first open
+task, `[ ]` or `[BLOCKED]`, or after the last task when none is open:
 
 ```text
 - [BLOCKED] Repair the own-fallout leftover: <what> <!-- leftover -->  {agent=build-error-resolver}  <!-- blocked: ... -->
@@ -194,8 +195,8 @@ names the kind, the `what` and the artifact that showed it. An `own-fallout`
 repair is declared `build-error-resolver`, the agent of the suite step's
 repair; an `own-gap` repair `loop-implementer`, since it finishes what the
 plan built. Being blocked, the line is the one the next dispatch answers
-first. `isRepairTask` in `src/start/suite-blocker.ts` reads the same sentence
-as the suite step's repair.
+first. `isRepairTask` in `packages/rafa-run/src/start/suite-blocker.ts` reads
+the same sentence as the suite step's repair.
 
 The cap is per plan, and it is counted from the tracker alone: the file's
 `<!-- leftover -->` lines, ticked ones included, are the plan's repairs. No
@@ -209,11 +210,12 @@ the failure, so an entry is never lost. Each repair the run adds is one
 
 ### The follow-up issue
 
-`src/start/follow-ups.ts` (`fileFollowUps`) writes the plan's follow-up
-issue once, after the last task, from `src/start/wrap-up-run.ts`. Its lines
-are the plan's `bug_routes` rows routed `follow-up`, in append order, one
-`- <kind>: <what>` line each, redacted and escaped; a plan with none has no
-issue, and nothing is resolved, called or printed for it.
+`packages/rafa-run/src/start/follow-ups.ts` (`fileFollowUps`) writes the plan's
+follow-up issue once, after the last task, from
+`packages/rafa-run/src/start/wrap-up-run.ts`. Its lines are the plan's
+`bug_routes` rows routed `follow-up`, in append order, one `- <kind>: <what>`
+line each, redacted and escaped; a plan with none has no issue, and nothing is
+resolved, called or printed for it.
 
 The issue is of type `bug`, titled `Follow-ups of <stub>`, and its body opens
 with `<!-- rafa:follow-ups <stub> -->`, so it is told from a person's issue
@@ -229,18 +231,19 @@ wrap-up files them again.
 
 ### The conventions section
 
-`src/start/convention-body.ts` (`writeConventionLines`) writes the plan's
-`convention` lines into a `## Conventions` section of the open pull request's
-body, from `src/start/wrap-up-run.ts` once the pull request is delivered. Each
-line is `- <what>`, redacted and escaped as a follow-up line is. A section
-that is not there goes below the body's last paragraph; one that is there
-gets the lines it lacks before the next heading of level one or two.
+`packages/rafa-run/src/start/convention-body.ts` (`writeConventionLines`) writes
+the plan's `convention` lines into a `## Conventions` section of the open pull
+request's body, from `packages/rafa-run/src/start/wrap-up-run.ts` once the pull
+request is delivered. Each line is `- <what>`, redacted and escaped as a
+follow-up line is. A section that is not there goes below the body's last
+paragraph; one that is there gets the lines it lacks before the next heading of
+level one or two.
 
 The body is written through the same read-modify-write as the release body
-(`src/start/release-body.ts`), so a body the section would not change is left
-alone, and a re-run writes nothing. A `none` provider spawns no `gh`: the
-lines are printed instead. A plan with no `pr-body` row has no section. A
-failure is one warning line, and never stops the run.
+(`packages/rafa-run/src/start/release-body.ts`), so a body the section would not
+change is left alone, and a re-run writes nothing. A `none` provider spawns no
+`gh`: the lines are printed instead. A plan with no `pr-body` row has no
+section. A failure is one warning line, and never stops the run.
 
 ### Stale-doc rows: two kinds
 
@@ -250,12 +253,13 @@ The `stale_docs` table holds one row per entry per session and kind. Its
 - `sighting`: an entry a task reported as a stale line, written by
   `storeTaskReport` for every task, the doc task included. It is the reading
   a plan's doc task is handed.
-- `unsettled`: an entry the doc task could not settle, which is what the
-  doc task's own `stale_docs` field names. `src/start/stale-docs.ts` writes
-  these only for a task declared `docs=repair` that ended `done`, and adds
-  each as one line to the release's stale-docs issue (see
-  `src/docs/release-issue.ts`). A blocked, failed or interrupted doc task
-  stores nothing: its next attempt reports again.
+- `unsettled`: an entry the doc task could not settle, which is what the doc
+  task's own `stale_docs` field names.
+  `packages/rafa-run/src/start/stale-docs.ts` writes these only for a task
+  declared `docs=repair` that ended `done`, and adds each as one line to the
+  release's stale-docs issue (see
+  `packages/rafa-release/src/docs/release-issue.ts`). A blocked, failed or
+  interrupted doc task stores nothing: its next attempt reports again.
 
 The unique index covers the session, the kind, the place and the text, so a
 report written twice writes its rows once. `kind` is in the index, so an
@@ -266,7 +270,7 @@ their `id`.
 ### Documentation-only failures in `rafa epic close`
 
 A failed acceptance check of `rafa epic close` whose criterion's text names
-only documentation is no bug. `namesOnlyDocs` (`src/triage/doc-only.ts`)
+only documentation is no bug. `namesOnlyDocs` (`packages/rafa/src/triage/doc-only.ts`)
 decides it: at least one path named, and every named path a `.md` or `.mdx`
 file, a path under `docs/` or `context/`, or a `README` or `CHANGELOG`. A
 criterion naming a source file beside a page, or no path at all, is filed as
@@ -288,27 +292,28 @@ refused all the same, since the criterion does not hold.
 `rafa effort report` prints two readings of the triage.
 
 The first is one line, `filed bugs naming only documentation: N of M`, from
-`src/effort/report-doc-bugs.ts`. M counts the `out_of_scope_bugs` rows of
-scope `rafa`, the bugs a tracker could be handed, and N counts those whose
-`what` and `artifact` read as ONE text name only documentation, by
-`namesOnlyDocs`. The two fields are joined by a line break because the
-reading is split across the pair both ways: a `what` naming a page beside an
-`artifact` naming a source file is a bug about code, and a `what` naming a
-page beside an artifact quoting the page's sentence is a bug about the page.
-A `machine` row is in neither figure. This count is the control for a session
-filing a stale page as a bug instead of a `stale_docs` entry. It reads zero
-while the sessions keep the two fields apart; a figure that rises says they
+`packages/rafa-effort/src/effort/report-doc-bugs.ts`. M counts the
+`out_of_scope_bugs` rows of scope `rafa`, the bugs a tracker could be handed,
+and N counts those whose `what` and `artifact` read as ONE text name only
+documentation, by `namesOnlyDocs`. The two fields are joined by a line break
+because the reading is split across the pair both ways: a `what` naming a page
+beside an `artifact` naming a source file is a bug about code, and a `what`
+naming a page beside an artifact quoting the page's sentence is a bug about the
+page. A `machine` row is in neither figure. This count is the control for a
+session filing a stale page as a bug instead of a `stale_docs` entry. It reads
+zero while the sessions keep the two fields apart; a figure that rises says they
 have stopped.
 
 The second is the section `out-of-scope entries by routed kind`
-(`src/effort/report-kinds.ts`, rendered by `src/effort/report-format.ts`): one
-row per plan, under its stub with the rows of no plan last, giving its
-entries, those routed `filed`, the share of them filed, and the count under
-each kind in the order of `BUG_KINDS`. It counts the kind the loop routed each
-entry under, so a sweep whose entries are its own fallout reads a low share
-and one that files everything reads a high one. A store with no `bug_routes`
-row prints no section; a store that cannot be read prints the heading with
-the problem in place of the rows.
+(`packages/rafa-effort/src/effort/report-kinds.ts`, rendered by
+`packages/rafa-effort/src/effort/report-format.ts`): one row per plan, under its
+stub with the rows of no plan last, giving its entries, those routed `filed`,
+the share of them filed, and the count under each kind in the order of
+`BUG_KINDS`. It counts the kind the loop routed each entry under, so a sweep
+whose entries are its own fallout reads a low share and one that files
+everything reads a high one. A store with no `bug_routes` row prints no section;
+a store that cannot be read prints the heading with the problem in place of the
+rows.
 
 ### The key and the two-step match
 
@@ -391,23 +396,22 @@ bugs that have none today, which would add a tracker read to private bugs.
 
 When `TriageOptions.inherited` provides the run-start baseline's failures, a
 public bug that `./inherited.ts` reads as one of those is a red test the run
-started with, not one its task made: its action is `inherited`. The bug
-matches a failure when it names a test file and case whose base name and
-case name equal the failure's, and, when the failure has a message, its
-evidence line holds that message. A failure with no message, or a blank one,
-is matched on test file and case alone: Bun 1.3.14 writes a failing `toBe`'s
-`<failure>` with no `message` attribute where 1.4.2 writes one, so under the
-pinned Bun a baseline failure often carries none. Nothing is
-filed for it. Its key is looked up as steps 1 and 2 above look one up, and
-the issue they find has its state read; an open one is commented on unless
-it already was this run. The key goes into the option's `commented` set once
-the comment is made, so one red test reported by every task of a run comments
-once. A closed issue, or none, is left alone, and create is never called.
-Closed as completed, the run still files nothing, since it inherited the
-failure before its own work. Security and machine-scoped bugs are never read
-against the failures. The check's red-on-both answer
-(`src/triage/own-check.ts`) is unfiled in the same way, with its route row
-`inherited`.
+started with, not one its task made: its action is `inherited`. The bug matches
+a failure when it names a test file and case whose base name and case name equal
+the failure's, and, when the failure has a message, its evidence line holds that
+message. A failure with no message, or a blank one, is matched on test file and
+case alone: Bun 1.3.14 writes a failing `toBe`'s `<failure>` with no `message`
+attribute where 1.4.2 writes one, so under the pinned Bun a baseline failure
+often carries none. Nothing is filed for it. Its key is looked up as steps 1 and
+2 above look one up, and the issue they find has its state read; an open one is
+commented on unless it already was this run. The key goes into the option's
+`commented` set once the comment is made, so one red test reported by every task
+of a run comments once. A closed issue, or none, is left alone, and create is
+never called. Closed as completed, the run still files nothing, since it
+inherited the failure before its own work. Security and machine-scoped bugs are
+never read against the failures. The check's red-on-both answer
+(`packages/rafa-pr/src/triage/own-check.ts`) is unfiled in the same way, with
+its route row `inherited`.
 
 ### State read on a repeat
 
@@ -427,26 +431,26 @@ its place: a security bug is commented on as found without a state read.
 
 Five keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 
-- `triage.similarity.threshold`: `false` to turn the step off, or a number
-  from 0 to 1 naming the minimum score. Default is `0.3`, which on the
-  1,013 filings of `src/triage/testdata/scoring.json` gave 84% of repeats
-  right (696 of 827) and 3% of new causes wrong (6 of 186); `0.2` gave 86%
-  and 20%. `src/triage/similarity-scoring.test.ts` holds the default to at
-  least 84% and at most 4%. Lower matches more repeats and puts more new
-  causes on the wrong issue.
+- `triage.similarity.threshold`: `false` to turn the step off, or a number from
+  0 to 1 naming the minimum score. Default is `0.3`, which on the 1,013 filings
+  of `packages/rafa-pr/src/triage/testdata/scoring.json` gave 84% of repeats
+  right (696 of 827) and 3% of new causes wrong (6 of 186); `0.2` gave 86% and
+  20%. `packages/rafa-pr/src/triage/similarity-scoring.test.ts` holds the
+  default to at least 84% and at most 4%. Lower matches more repeats and puts
+  more new causes on the wrong issue.
 
 - `triage.similarity.candidates`: the count of open bugs, highest rank first,
   that the `Possible duplicates` section lists when the step files a bug with
   no match at the threshold. Default is `3`.
 
-- `triage.similarity.weights.causeLeaf`, `.causeFamily` and `.boundary`:
-  the bonuses `rankedCandidates` (`src/triage/similarity.ts`) adds to an
-  open bug's word score for the same cause code, the same cause family with
-  another leaf, and the same module and action, capped at 1 (see "Similarity
-  and duplicates"). Each is a number from 0 to 1, and `0` turns its signal
-  off. Defaults are `0.15`, `0.05` and `0.10`. They order the list of
-  `Possible duplicates` only; the same-bug decision stays on the word score
-  and the threshold. A number outside 0 to 1, `true` and `false` are refused.
+- `triage.similarity.weights.causeLeaf`, `.causeFamily` and `.boundary`: the
+  bonuses `rankedCandidates` (`packages/rafa-pr/src/triage/similarity.ts`) adds
+  to an open bug's word score for the same cause code, the same cause family
+  with another leaf, and the same module and action, capped at 1 (see
+  "Similarity and duplicates"). Each is a number from 0 to 1, and `0` turns its
+  signal off. Defaults are `0.15`, `0.05` and `0.10`. They order the list of
+  `Possible duplicates` only; the same-bug decision stays on the word score and
+  the threshold. A number outside 0 to 1, `true` and `false` are refused.
 
 With an empty config the three weights take their defaults. Setting one to
 `0` turns its signal off and leaves the other two as they are:
@@ -474,8 +478,9 @@ triage:
 
 Triage builds the record under the `issues` and `errors` keys the run
 resolves from `.rafa/config.yaml`. `bugRulesOf`
-(`src/config-schema-issues.ts`) turns them into the rules, read once per run
-in `src/start/triage.ts` and handed to every filing. It reads:
+(`packages/rafa/src/config-schema-issues.ts`) turns them into the rules,
+read once per run in `packages/rafa-run/src/start/triage.ts` and handed to every
+filing. It reads:
 
 - `issues.titles.bug` and `issues.titles.summaryMax`: the template and the cap
   the summary is cut under, so a title reads back as its fields.

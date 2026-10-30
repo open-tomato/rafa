@@ -2,7 +2,7 @@
  * The shapes a spec review is read into: the verdicts and readings a
  * `rafa:spec-review` block answers, the gaps it names and the issues it
  * reports. Core's `Planner` port names {@link SpecReviewReading}, so they
- * sit here, below the board; `src/board/spec-review.ts` reads the block
+ * sit here, below the board; `packages/rafa-board/src/board/spec-review.ts` reads the block
  * into them, re-exports them under the same names, and keeps the parser,
  * the headings and the two fallback gaps.
  */

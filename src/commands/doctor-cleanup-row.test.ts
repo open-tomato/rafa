@@ -4,6 +4,9 @@
  * count of each group, in text and in json's `cleanup`, and over a
  * repository with nothing to clean (one commit, one branch) there is
  * no row.
+ *
+ * The repository is built with `now: new Date()`, the real clock, because
+ * the spawned CLI reads `Date.now()` and fixed dates would go stale.
  */
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { ScratchRepo } from '../tests/cli-capture.js';
@@ -14,14 +17,15 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createScratchRepository, SCRATCH_NOW, STALE_AGE_DAYS } from '../cleanup/scratch-repository.js';
-import { projectConfigText } from '../project/scaffold.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
+import { createScratchRepository } from '../cleanup/scratch-repository.js';
 import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
 
 const SPAWN_TIMEOUT = 60_000;
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+/** The real clock, read once: the spawned `rafa doctor` reads `Date.now()` against `cleanup.staleDays`, so the repository is built around it and not around the fixed `SCRATCH_NOW`. */
+const buildMoment = new Date();
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-doctor-cleanup-')));
 
@@ -35,27 +39,13 @@ function around(repo: string, home: string): ScratchRepo {
   return { ...planted, repo, home };
 }
 
-/**
- * The project config with a `cleanup.staleDays` read off the real clock.
- * The spawned doctor reads ages against `new Date()`, not
- * {@link SCRATCH_NOW}, so with the default 30 days every branch dated
- * {@link SCRATCH_NOW} read stale from 2026-10-24 12:00 UTC on. The days
- * since {@link SCRATCH_NOW}, plus half of {@link STALE_AGE_DAYS}, keep
- * `stale` past the line and every other branch short of it on any date.
- */
-function clockProofConfig(): string {
-  const elapsedDays = Math.ceil((Date.now() - SCRATCH_NOW.getTime()) / MS_PER_DAY);
-  const staleDays = Math.max(elapsedDays, 0) + STALE_AGE_DAYS / 2;
-  return `${projectConfigText()}cleanup:\n  staleDays: ${String(staleDays)}\n`;
-}
-
 describe('rafa doctor over the cleanup scratch repository', () => {
   let scratch: ScratchRepository;
   let target: ScratchRepo;
 
   beforeAll(() => {
-    scratch = createScratchRepository();
-    plantProjectConfig(scratch.clone, clockProofConfig());
+    scratch = createScratchRepository({ now: buildMoment });
+    plantProjectConfig(scratch.clone);
     target = around(scratch.clone, scratch.home);
   });
 

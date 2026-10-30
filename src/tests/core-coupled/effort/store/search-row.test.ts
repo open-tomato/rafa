@@ -17,8 +17,8 @@
  * report can filter by is asserted here too, against `SESSION_KINDS`,
  * with `task` as the control that the lookup answers a member at all.
  */
-import type { SessionEffortRow } from '../../../../effort/collect.js';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
+import type { SessionEffortRow } from '@open-tomato/rafa-effort/effort/collect';
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,8 +28,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
 import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { SESSION_KINDS } from '../../../../effort/report.js';
+import { SESSION_KINDS } from '@open-tomato/rafa-effort/effort/report';
 
 /** A search session's row as the collector writes one, every field present. */
 const SEARCH_SESSION: SessionEffortRow = {

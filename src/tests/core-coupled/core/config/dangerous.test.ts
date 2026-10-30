@@ -40,9 +40,9 @@ import {
 } from '@open-tomato/rafa/core/config/dangerous';
 import { EMPTY_CONFIG_REGISTRY, registerConfigSections, restoreConfigSections } from '@open-tomato/rafa/core/config/section';
 import { runWithActiveOutput } from '@open-tomato/rafa/core/output/active';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
-import { sinkOutput } from '../../../output-sinks.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-dangerous-'));
 let planted = 0;

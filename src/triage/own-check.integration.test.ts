@@ -11,10 +11,10 @@
  * `src/untouched.ts` alone. Nothing here mocks git or bun, so the case
  * proves the three halves of the check agree about one repository.
  */
-import type { BaseRunCache } from './base-run.js';
-import type { KindCheck, KindCheckEntry } from './own-check.js';
-import type { PlanFilesReading } from './plan-commits.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { BaseRunCache } from '@open-tomato/rafa-pr/triage/base-run';
+import type { KindCheck, KindCheckEntry } from '@open-tomato/rafa-pr/triage/own-check';
+import type { PlanFilesReading } from '@open-tomato/rafa-pr/triage/plan-commits';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,10 +23,9 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '@open-tomato/rafa/core/git';
-
-import { createBaseRunCache, runNamedTestAt } from './base-run.js';
-import { checkKind, namedTestOf } from './own-check.js';
-import { readPlanBase, readPlanFiles } from './plan-commits.js';
+import { createBaseRunCache, runNamedTestAt } from '@open-tomato/rafa-pr/triage/base-run';
+import { checkKind, namedTestOf } from '@open-tomato/rafa-pr/triage/own-check';
+import { readPlanBase, readPlanFiles } from '@open-tomato/rafa-pr/triage/plan-commits';
 
 /** Each case runs `bun test` in a worktree, so it is given room. */
 const RUN_TIMEOUT_MS = 60_000;

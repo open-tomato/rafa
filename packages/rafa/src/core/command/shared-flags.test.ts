@@ -5,7 +5,7 @@
  * The hint flag's spec is held field by field, the description spelled
  * in full, since the help of six commands prints it and
  * `src/cli/help.test.ts` freezes that help; its freeze; and that its
- * name is the {@link HINT_FLAG} the hint reads (`src/next/hint.ts`).
+ * name is the {@link HINT_FLAG} the hint reads (`packages/rafa-run/src/next/hint.ts`).
  * The CI default is held at 20, the minutes the help of `loop start`
  * and `pr wait` prints.
  */

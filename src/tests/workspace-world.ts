@@ -17,11 +17,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { projectConfigText } from '../project/scaffold.js';
-import { serializeFragment } from '../release/fragment.js';
 
 import { plantProjectConfig } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** The root manifest on `main`: a version and the workspace globs. */
 export const ROOT_MANIFEST = '{\n\t"name": "demo",\n\t"version": "0.4.0",\n\t"workspaces": ["packages/*"]\n}\n';

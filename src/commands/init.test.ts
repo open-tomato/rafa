@@ -60,7 +60,7 @@
  * `init` has just written, and the rerun that asks nothing because the
  * config already answers. What the step decides on its own and what the
  * edit does to the text are held in `init-release.test.ts` and
- * `src/release/setting.test.ts`. Every case whose world has no
+ * `src/tests/release-coupled/release/setting.test.ts`. Every case whose world has no
  * `package.json` and no `CHANGELOG.md` is the ordinary one here, since
  * a world is planted empty; the case that plants both is what shows the
  * two lines above the question are absent when nothing is missing.
@@ -73,13 +73,13 @@
  * reached for a runner would say so rather than spawn one. The board
  * cases hand in an `origin` of their own and a `gh` runner over one
  * imaginary repository ({@link fakeGh}); what each part of the board
- * comes to is held in `init-board.test.ts` and `src/board/setup.test.ts`,
+ * comes to is held in `init-board.test.ts` and `src/tests/board-coupled/board/setup.test.ts`,
  * and what is held here is the step reaching the command's output, its
  * json result and its warnings.
  */
 import type { InitResult, InitSeams } from './init.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import {
   existsSync,
@@ -101,8 +101,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { parseConfigText } from '@open-tomato/rafa/core/config';
 import { readBinPath } from '@open-tomato/rafa/project/bin-path';
 import { rootCandidates } from '@open-tomato/rafa/project/roots';
+import { BOARD_LABELS } from '@open-tomato/rafa-board/board/setup';
 
-import { BOARD_LABELS } from '../board/setup.js';
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { candidateLines } from '../project/root-choice.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
@@ -237,7 +237,7 @@ interface FakeGhOptions {
  * label and no issue, keeping the first two words of every call and the
  * last argument of every `gh issue create`, its body. What
  * each part of the board comes to is held in `init-board.test.ts` and
- * `src/board/setup.test.ts`; this is here so a case can drive the step
+ * `src/tests/board-coupled/board/setup.test.ts`; this is here so a case can drive the step
  * through the command without reaching GitHub.
  */
 function fakeGh(options: FakeGhOptions = {}) {

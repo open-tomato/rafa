@@ -2,7 +2,7 @@
  * `rafa loop start`, spawned as the real `rafa` binary
  * (`src/tests/cli-capture.ts`), over a claim another clone takes while
  * the first one's own run is still going — the scenario
- * `src/start/pr-lifecycle.test.ts`'s `refusedPushReaderIn, over a bare
+ * `packages/rafa-run/src/start/pr-lifecycle.test.ts`'s `refusedPushReaderIn, over a bare
  * remote and two clones` already drives over the gate's functions
  * in-process, proven here over the whole command line instead
  * (`.rafa/plans/rafa-324-claim-issue-so-two`).
@@ -13,7 +13,7 @@
  * `--no-ci-wait`, which skips `verifyPullRequest` — the gate this file
  * means to reach — altogether (`src/start.ts`); with `pr.provider: none`
  * that gate still costs no network, since it only pushes the branch
- * itself rather than opening a pull request (`src/pr/none.ts`). One
+ * itself rather than opening a pull request (`packages/rafa-pr/src/pr/none.ts`). One
  * stand-in `claude` answers both of the run's real sessions, the task's
  * and the wrap-up's: each writes a tracked marker file, for the loop's
  * own `commitTaskWork` to commit, and — the first time only, an idle
@@ -24,7 +24,7 @@
  * push runs, `origin`'s tip is `device-b`'s take commit, a commit the
  * local `feat/<stub>` does not carry: git refuses the push as it
  * refuses any tip that is not a fast-forward, and the gate's own
- * reading of that refusal (`src/claims/lost.ts`) is what this file
+ * reading of that refusal (`packages/rafa-run/src/claims/lost.ts`) is what this file
  * proves end to end.
  *
  * Four facts, each read off something neither run's own stdout can be
@@ -43,7 +43,7 @@
  *     and on `device-b` because its own push did.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { GitRunner } from '../pr/index.js';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -55,11 +55,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { formatClaimMessage } from '@open-tomato/rafa/claims/record';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
-
-import { pushNewClaimBranch } from '../claims/git.js';
-import { formatClaimMessage } from '../claims/record.js';
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { hostToolDirs } from './stand-in-gh.js';

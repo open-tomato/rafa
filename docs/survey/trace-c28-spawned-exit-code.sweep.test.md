@@ -18,7 +18,7 @@ The contract the exports are read against is `run(ctx, options)` from #119 (step
 
 Outbound: no imports of project files, so 0 edges to any cluster (0 value, 0 type). Inbound: 0 edges; nothing imports it. By path it reads all 889 tracked `src/*.test.ts` files (git's `*` crosses directories), so it reads members of every cluster that holds a test and no source file. The 19 tracked `.test.ts` files under `packages/` are outside its pathspec.
 
-Test reach, from `docs/survey/test-index.json`: the test has index 0 (no source file reached, no folder counted) and `spawns` true, with itself as the only `spawnsVia` (its `node:child_process` import, used for the one `git ls-files` call; the detectors' `Bun.spawnSync` and `spawn` texts are planted strings it parses). It is one of 44 of the 908 indexed tests at 0. It is the always-run kind: its `.sweep.test.ts` suffix is what `tests.alwaysRun` (`src/config-schema-tests.ts`, default `src/**/*.sweep.test.ts`) matches, so a task's scoped run takes it beside the `--changed` selection. A full pass reads 889 files and parses each one with the compiler, so it is far from the cheapest 0-index test.
+Test reach, from `docs/survey/test-index.json`: the test has index 0 (no source file reached, no folder counted) and `spawns` true, with itself as the only `spawnsVia` (its `node:child_process` import, used for the one `git ls-files` call; the detectors' `Bun.spawnSync` and `spawn` texts are planted strings it parses). It is one of 44 of the 908 indexed tests at 0. It is the always-run kind: its `.sweep.test.ts` suffix is what `tests.alwaysRun` (`packages/rafa/src/config-schema-tests.ts`, default `src/**/*.sweep.test.ts`) matches, so a task's scoped run takes it beside the `--changed` selection. A full pass reads 889 files and parses each one with the compiler, so it is far from the cheapest 0-index test.
 
 ## Entry points
 
@@ -30,7 +30,7 @@ No member is imported from outside the cluster. No `RafaCommand` is registered f
 | --- | --- | --- | --- |
 | Commands | **missing** | none | the cluster is a test; no `RafaCommand` |
 | Steps with guards | **missing** | none; the test is a gate, run by `bun test` and by the always-run sweeps step | no step, no guard class; what it guards is a style rule on 889 tests |
-| Config section | **missing** | none; reads no config key | none needed; it is selected by `tests.alwaysRun`, which `src/config-schema-tests.ts` owns |
+| Config section | **missing** | none; reads no config key | none needed; it is selected by `tests.alwaysRun`, which `packages/rafa/src/config-schema-tests.ts` owns |
 | Flows | **missing** | none | no multi-step path; list, parse, detect, compare |
 
 ### Commands

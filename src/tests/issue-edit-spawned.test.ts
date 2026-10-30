@@ -1,8 +1,8 @@
 /**
  * `rafa issue edit`, spawned as the real `rafa` binary (`src/tests/cli-capture.ts`)
  * in a scratch project whose `gh` is a stand-in: the proof that the registered
- * command (`src/commands/issue/edit.ts`) holds over the real process, not only
- * over the fake tracker `src/commands/issue/edit-run.test.ts` drives in-process.
+ * command (`packages/rafa-board/src/commands/issue/edit.ts`) holds over the real process, not only
+ * over the fake tracker `src/tests/board-coupled/commands/issue/edit-run.test.ts` drives in-process.
  *
  * The scratch `bin/` holds a stand-in `gh` (a bun script, {@link plantStandInGh}'s
  * shape with the issue held as a JSON file under the scratch root) answering
@@ -31,7 +31,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
+import { IN_DEVELOPMENT_LABEL } from '@open-tomato/rafa/claims/stale';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 

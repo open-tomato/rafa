@@ -130,7 +130,7 @@ import { copyFileSync, mkdirSync, statSync, utimesSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join } from 'node:path';
 
-import { listSessionLogs, sessionLogDir } from '../effort/collect.js';
+import { listSessionLogs, sessionLogDir } from '@open-tomato/rafa-effort/effort/collect';
 
 /** The variable that has to read exactly `1` for the parity tests to run. */
 export const LIVE_PARITY_ENV = 'RAFA_LIVE_PARITY';

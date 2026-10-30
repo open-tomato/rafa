@@ -1,0 +1,153 @@
+# The rafa release bot fragment workflow: the fragment of a Dependabot
+# pull request, for levels 3 and 4 of the release ladder.
+#
+# Written into a project's `.github/workflows/` by `writeReleaseWorkflow`
+# (`packages/rafa-release/src/release/templates.ts`) at levels 3 and 4
+# while `.github/dependabot.yml` exists. A bot pull request has no
+# wrap-up to write its fragment, so this workflow writes one with
+# `rafa release fragment --plan=dependabot-<number>`, at `patch` when
+# `dependabot/fetch-metadata` reads the update as `direct:production` and
+# at `none` otherwise, commits it as `chore: release fragment
+# dependabot-<number>` and pushes it to the pull request's branch. A
+# branch that already adds a fragment named for the pull request
+# (`dependabot-<number>.md`, or `-2`, `-3` and on) is left as it is.
+#
+# A `pull_request` run started by Dependabot gets a read-only token, so
+# this runs on `pull_request_target`, in the base branch's context with a
+# writable one. That is why nothing from the pull request's branch runs
+# here: the branch is checked out under `head/` only to add one file and
+# push, while bun is set up from, and rafa installed or run from, the
+# base branch's checkout under `base/`. rafa reads its config (a
+# `rafa.config.ts` included) and loads its modules from the directory it
+# runs in, so the fragment is written in `base/` and copied to `head/`.
+#
+# A commit pushed with the workflow's GITHUB_TOKEN starts no other
+# workflow run, and Dependabot stops rebasing a branch someone else has
+# pushed to; a rebase it is asked for drops the fragment commit, and the
+# `synchronize` run that follows writes it again.
+#
+# rafa needs a config with `release.enabled: true`, and the base's
+# checkout may hold none: when none of `rafa.config.ts`, `rafa.config.mjs`
+# and `.rafa/config.yaml` is there, the workflow writes
+# `.rafa/config.yaml` with that key in `base/`. A committed config is left
+# as it is, so a project that needs other release keys in CI commits
+# them. The written config stays in the runner's checkout: the commit
+# stages the fragment alone.
+#
+# rafa runs from the base's checkout when the project is rafa itself (its
+# manifest names `@open-tomato/rafa` and git tracks `src/rafa.ts`), and
+# from a global install otherwise, so one file serves both.
+name: Release bot fragment
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-bot-fragment-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  fragment:
+    if: >-
+      github.actor == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fetch metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+
+      - name: Checkout the base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+          fetch-depth: 0
+
+      - name: Checkout the head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: head
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Look for the fragment
+        id: held
+        shell: bash
+        working-directory: head
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          added=$(git diff --name-only --diff-filter=A "origin/$BASE_REF...HEAD")
+          if printf '%s\n' "$added" | grep -Eq "(^|/)dependabot-$PR_NUMBER(-[0-9]+)?\.md$"; then
+            echo "held=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "held=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up bun
+        if: steps.held.outputs.held == 'false'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: base/package.json
+
+      - name: Write the CI config
+        if: steps.held.outputs.held == 'false'
+        shell: bash
+        working-directory: base
+        run: |
+          if [ ! -f rafa.config.ts ] && [ ! -f rafa.config.mjs ] && [ ! -f .rafa/config.yaml ]; then
+            mkdir -p .rafa
+            printf '%s\n' '# Written by the Release bot fragment workflow: the checkout holds no rafa config.' 'release:' '  enabled: true' > .rafa/config.yaml
+          fi
+
+      - name: Write the fragment
+        id: write
+        if: steps.held.outputs.held == 'false'
+        shell: bash
+        working-directory: base
+        env:
+          DEPENDENCY_TYPE: ${{ steps.metadata.outputs.dependency-type }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [ "$DEPENDENCY_TYPE" = 'direct:production' ]; then
+            level=patch
+          else
+            level=none
+          fi
+          name=$(node -p "require('./package.json').name")
+          if [ "$name" = '@open-tomato/rafa' ] && git ls-files --error-unmatch src/rafa.ts > /dev/null 2>&1; then
+            bun install --frozen-lockfile
+            written=$(bun src/rafa.ts release fragment "--plan=dependabot-$PR_NUMBER" "--level=$level" "--title=$PR_TITLE" | tail -n 1)
+          else
+            bun install -g @open-tomato/rafa
+            export PATH="${BUN_INSTALL:-$HOME/.bun}/bin:$PATH"
+            written=$(rafa release fragment "--plan=dependabot-$PR_NUMBER" "--level=$level" "--title=$PR_TITLE" | tail -n 1)
+          fi
+          mkdir -p "../head/$(dirname "$written")"
+          cp "$written" "../head/$written"
+          echo "path=$written" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        if: steps.held.outputs.held == 'false'
+        shell: bash
+        working-directory: head
+        env:
+          FRAGMENT: ${{ steps.write.outputs.path }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "$FRAGMENT"
+          git commit -m "chore: release fragment dependabot-$PR_NUMBER"
+          git push origin "HEAD:$HEAD_REF"

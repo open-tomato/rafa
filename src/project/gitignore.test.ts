@@ -80,8 +80,7 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createTextOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { gitIdentityEnv } from '../tests/git-identity.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import {
   applyTracking,

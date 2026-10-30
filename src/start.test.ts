@@ -58,7 +58,7 @@
  * on any. So a PLANTED branch that still makes a release call of its own
  * beside the hand-over is read as making both.
  */
-import type { EventLine } from './loop/events-file.js';
+import type { EventLine } from '@open-tomato/rafa-run/loop/events-file';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -70,14 +70,14 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { eventsFileOf, readEventsFrom } from '@open-tomato/rafa-run/loop/events-file';
+import { CHECKOUT_MOVED } from '@open-tomato/rafa-run/start/checkout-guard';
+import { BLOCKER_PROMPT_PREFIX } from '@open-tomato/rafa-run/start/dispatch';
 
-import { eventsFileOf, readEventsFrom } from './loop/events-file.js';
-import { CHECKOUT_MOVED } from './start/checkout-guard.js';
-import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
-import { gitIdentityEnv } from './tests/git-identity.js';
-import { scratchHomeEnv } from './tests/scratch-home-env.js';
 import { hostToolDirs } from './tests/stand-in-gh.js';
 
 /** One call inside the branch, as the source writes it. */
@@ -208,7 +208,7 @@ function plantedStart(body: readonly string[]): string {
 describe('the wrap-up branch of start.ts', () => {
   it('hands the whole wrap-up to runWrapUp and calls nothing else', () => {
     expect(NAMES).toEqual(['runWrapUp']);
-    expect(importedFrom(START, './start/wrap-up-run.js')).toEqual(['runWrapUp']);
+    expect(importedFrom(START, '@open-tomato/rafa-run')).toContain('runWrapUp');
   });
 
   it('reads a branch making a release call of its own beside the hand-over as making both', () => {
@@ -266,6 +266,7 @@ describe('the two directories start.ts points each call at', () => {
     expect(START).toContain('const { checkout, branch } = await settleRunCheckout({');
     expect(input).toContain('projectRoot: repoRoot,');
     expect(input).toContain('worktreeDir: runConfig.config.loopWorktreeDir,');
+    expect(input).toContain('worktreeSetup: runConfig.config.loopWorktreeSetup,');
     expect(input).toContain('prBase: runConfig.config.prBase,');
     expect(input).toContain('args,');
     expect(input).not.toContain('checkout');
@@ -656,7 +657,7 @@ describe('the events file start.ts binds around the run', () => {
 
   it('binds the run\'s events file under the project root straight after opening the session record', () => {
     expect(STATEMENTS.next).toBe('bindEventsFile(repoRoot, session.id);');
-    expect(importedFrom(START, './start/loop-events.js')).toEqual(expect.arrayContaining(['bindEventsFile', 'unbindEventsFile']));
+    expect(importedFrom(START, '@open-tomato/rafa-run')).toEqual(expect.arrayContaining(['bindEventsFile', 'unbindEventsFile']));
   });
 
   it('unbinds it in the run\'s finally, beside the session\'s end, after the decisions\' end', () => {

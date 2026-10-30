@@ -3,7 +3,7 @@
  * a stopped run left, spawned as `bun src/rafa.ts loop start` through a
  * real git repository with a bare `origin`.
  *
- * `src/start/worktree.test.ts` pins `addRunWorktree`'s reuse over porcelain
+ * `src/tests/run-coupled/start/worktree.test.ts` pins `addRunWorktree`'s reuse over porcelain
  * listings, and `worktree-start-integration.test.ts` runs a FIRST start to
  * a real task commit. Neither proves the whole command, run again over
  * what the first one left: that the second start adds no entry to `git
@@ -45,11 +45,12 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { describeRun, expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostGitDir } from './stand-in-gh.js';
 
 /** The CLI entry the second start spawns. */

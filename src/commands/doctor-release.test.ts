@@ -22,9 +22,9 @@
  *     not a runner that was never going to be asked.
  */
 import type { DoctorReleaseReading } from './doctor-release.js';
-import type { Fragment } from '../release/fragment.js';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { Output } from '@open-tomato/rafa/ports';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,12 +33,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/index.js';
-import { serializeFragment } from '../release/fragment.js';
-import { readSettle } from '../release/settle.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { readSettle } from '@open-tomato/rafa-release/release/settle';
+
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../tests/cli-capture.js';
-import { gitIdentityEnv } from '../tests/git-identity.js';
-import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import {
   readDoctorRelease,

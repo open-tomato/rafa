@@ -1,7 +1,7 @@
 /**
  * Spawned `bun src/rafa.ts` runs proving `rafa epics` kept its output
  * when it moved under the `epic` subject as `rafa epic show`
- * (`src/commands/epic/show.ts`), reached through the subject's plural
+ * (`packages/rafa-board/src/commands/epic/show.ts`), reached through the subject's plural
  * and its lasting subject-alone alias `epic`.
  *
  * ## The pre-move capture
@@ -48,10 +48,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** The file holding the pre-move captures; see the module note. */
 const PRE_MOVE_FILE = join(import.meta.dir, 'fixtures', 'epics-pre-move.json');

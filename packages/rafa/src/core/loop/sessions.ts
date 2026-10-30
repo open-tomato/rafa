@@ -221,7 +221,7 @@
  * refused on read. This module re-exports what a caller reads from
  * there, so `./sessions.js` stays the one import a record's reader
  * needs: `isPositiveWhole` and `RECORD_EXTENSION` among them, which
- * `src/stretch/folder.ts` and `src/cleanup/runs.ts` read.
+ * `src/stretch/folder.ts` and `packages/rafa-run/src/cleanup/runs.ts` read.
  */
 import type { HopRecord } from './hop-record.js';
 import type {

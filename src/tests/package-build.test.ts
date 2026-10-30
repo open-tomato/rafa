@@ -34,32 +34,35 @@
  *     both. An unused export appended to a module changed no chunk at
  *     all, which is why that reading was taken on a change the bundle
  *     keeps.
- *   - `bun scripts/build/bundle.ts` runs the next two builds, each with
+ *   - `bun scripts/build/bundle.ts` runs the next three builds, each with
  *     every publishable workspace package as `--external`, and fails
  *     when a bundle holds a file of one (see that script's module note).
  *     It is copied into the scratch package beside the manifest.
  *   - `src/rafa.ts` is built on its own, with `--outfile=dist/cli.js`.
  *     The build keeps the dispatcher's `#!/usr/bin/env bun` line and
  *     writes the file executable, which is what lets `bin` point at it.
- *   - The six library entries are built together with `--splitting`.
- *     Without it each entry is a bundle of its own, and `parsePlan`,
- *     `parseReport`, `openSqliteStore` and `EFFORT_KEY_PROJECTIONS` were
- *     each a different value from `dist/index.js` than from their
- *     subpath's bundle, so `src/index.ts`'s rule that a subpath's names
- *     are the root's own bindings held in source only. With it, the
- *     shared code moves into chunks beside `index.js` and all four were
- *     identical. `--root=src` spells out where each entry lands: at its
- *     source's path under `dist/`.
+ *   - The five library entries under `src/` are built together with
+ *     `--splitting`. Without it each entry is a bundle of its own, and
+ *     `parsePlan`, `parseReport`, `openSqliteStore` and
+ *     `EFFORT_KEY_PROJECTIONS` were each a different value from
+ *     `dist/index.js` than from their subpath's bundle, so
+ *     `src/index.ts`'s rule that a subpath's names are the root's own
+ *     bindings held in source only. With it, the shared code moves into
+ *     chunks beside `index.js` and all four were identical. `--root=src` spells out where each entry lands: at its
+ *     source's path under `dist/`. The learning entry, in the inventory
+ *     package since pass 4a and so outside `src/`, is built alone to
+ *     `dist/learning/index.js`; no name of the root entry comes from it.
  *   - `tsc -p packages/rafa/tsconfig.types.json` and then
  *     `tsc -p tsconfig.config-types.json` follow them and write the
  *     declarations of the `./config` subpath, the one entry whose types
  *     the manifest publishes; see "The config subpath's declarations".
- *   - `src/PROMPT.md`, `src/plan-prompt.md` and `src/epic-verify-prompt.md`
- *     are copied into `dist/`. `start.ts` and `plan.ts` find the first two
- *     beside themselves through `import.meta.url`, and a bundle inlining
- *     either module answers its OWN directory. The two built files reading
- *     `import.meta.url` are `cli.js` and `index.js`, both directly in
- *     `dist/`. `epic/verify-plan.ts` sits one directory below its prompt
+ *   - `src/PROMPT.md`, `src/plan-prompt.md` and
+ *     `packages/rafa-board/src/epic-verify-prompt.md` (moved with board's
+ *     files in pass 4c) are copied into `dist/`. `start.ts` and `plan.ts`
+ *     find the first two beside themselves through `import.meta.url`, and
+ *     a bundle inlining either module answers its OWN directory. The two
+ *     built files reading `import.meta.url` are `cli.js` and `index.js`,
+ *     both directly in `dist/`. `epic/verify-plan.ts` sits one directory below its prompt
  *     in a checkout, so it looks beside itself first and in its parent
  *     second, and a case resolves the prompt through `readVerifyPrompt`
  *     pointed at `dist/`. Dropping it from the `cp` was driven on
@@ -68,10 +71,10 @@
  *     restored byte-identical (sha256).
  *   - `src/continue-decision-prompt.md` and `src/continue-criteria.md`,
  *     the `loop start --continue` contract and base criteria, are copied
- *     into `dist/` the same way, and `start/decision-prompt.ts` sits one
- *     directory below them in a checkout as `epic/verify-plan.ts` does,
- *     so a case resolves both through `readBundledFile` pointed at
- *     `dist/`.
+ *     into `dist/` the same way; in a checkout they stay in the root's
+ *     `src/` and `start/decision-prompt.ts`, in run's package since pass
+ *     4f, looks four folders up for them, so a case resolves both
+ *     through `readBundledFile` pointed at `dist/`.
  *   - `src/bundled/` is copied whole to `dist/bundled/`: the rafa tier,
  *     its skills and agents, which sits beside the entry in both a
  *     checkout and a build (`packages/rafa/src/schema/tiers.ts`). The dev-planner skill
@@ -130,40 +133,50 @@
  * The two templates above are named files; the pinned resolve plans,
  * the board templates and the release workflow templates are
  * DIRECTORIES, so the build script ends with a loop over a table of
- * `<source under src>:<name under dist>` pairs. Three readings shape it:
+ * `<source>:<name under dist>` pairs, each source a path from the package
+ * root since pass 4c moved the board tree to
+ * `packages/rafa-board/src/board/templates/`, pass 4d the release tree
+ * to `packages/rafa-release/src/release/templates/`, and pass 4e the
+ * plans tree to `packages/rafa-pr/src/pr/plans/`. Three readings shape
+ * it:
  *
- *   - It copies `*.md` and `*.yml` and nothing else. `src/pr/plans/`
- *     holds `load.ts` and `load.test.ts` beside the four plans, and
- *     copying the directory whole would publish both, since `files`
- *     publishes all of `dist`. A case reads `dist/plans` for a `.ts`
+ *   - It copies `*.md` and `*.yml` and nothing else.
+ *     `packages/rafa-pr/src/pr/plans/` holds `load.ts` and
+ *     `load.test.ts` beside the four plans, and copying the directory
+ *     whole would publish both, since `files` publishes all of
+ *     `dist`. A case reads `dist/plans` for a `.ts`
  *     file and names the two source modules that would land there.
  *     The `*.yml` copy is for the epic guard workflow
- *     `src/board/templates/epic-guard.yml` and the release ladder's
- *     `src/release/templates/*.yml`, and a case resolves each through
- *     `readEpicGuard` and `readReleaseTemplate` pointed at `dist/`.
+ *     `packages/rafa-board/src/board/templates/epic-guard.yml` and the
+ *     release ladder's `packages/rafa-release/src/release/templates/*.yml`,
+ *     and a case resolves each through `readEpicGuard` and
+ *     `readReleaseTemplate` pointed at `dist/`.
  *     Each pattern is copied file by file behind an `[ -e ]` guard, so
- *     a tree holding no YAML (`src/pr/plans/`) or no markdown
- *     (`src/release/templates/`) is not a failure.
+ *     a tree holding no YAML (`packages/rafa-pr/src/pr/plans/`) or no
+ *     markdown (`packages/rafa-release/src/release/templates/`) is not a
+ *     failure.
  *   - A tree lands DIRECTLY under `dist/`, as `dist/plans`,
  *     `dist/templates` and `dist/release-templates`, not at its source
  *     path; the release tree takes its own name because `templates` is
  *     the board's. A bundle reading
  *     `import.meta.url` answers its own directory, which is `dist/` for
- *     `cli.js`, so `src/pr/plans/load.ts`'s first candidate is
+ *     `cli.js`, so the first candidate of
+ *     `packages/rafa-pr/src/pr/plans/load.ts` is
  *     `<moduleDir>/plans/<name>.md`; `PINNED_PLANS_DIRNAME` is that
  *     name, and a case resolves every pinned plan through
  *     `readPinnedPlan` pointed at `dist/` rather than only comparing
  *     bytes.
  *   - A tree that is not there is SKIPPED, and a tree that is there
  *     with neither markdown nor YAML in it fails the build: the loop
- *     counts what it copied and exits 1 on none. `src/board/templates/`
- *     now carries `spec.md`, the spec issue template, and carried no
- *     tracked file when the clause was written: `cp
- *     src/board/templates/*.md` against an absent directory would have
- *     stopped the build, and the guard is what the next empty tree
- *     needs too. Measured
- *     on bun 1.3.14, in a probe package carrying this clause alone:
- *     with the directory absent, the `[ -d ]` guard skipped it and the
+ *     counts what it copied and exits 1 on none. The board tree
+ *     (`src/board/templates/` then, and
+ *     `packages/rafa-board/src/board/templates/` since pass 4c) now
+ *     carries `spec.md`, the spec issue template, and carried no tracked
+ *     file when the clause was written: `cp src/board/templates/*.md`
+ *     against an absent directory would have stopped the build, and the
+ *     guard is what the next empty tree needs too. Measured on bun
+ *     1.3.14, in a probe package carrying this clause alone: with the
+ *     directory absent, the `[ -d ]` guard skipped it and the
  *     run exited 0; with it present and holding no markdown, the `cp`
  *     matched nothing and the run exited 1. So the skip cannot hide a
  *     tree that is there and ships nothing. When the release tree
@@ -176,9 +189,9 @@
  *
  * That last reading is why the board tree's case reads a PLANTED file:
  * `beforeAll` writes {@link PLANTED_BOARD_TEMPLATE} into the scratch
- * package's `src/board/templates/` before the build runs, and it was
- * how the clause was read on a tree with a file in it while this
- * repository carried none. It is kept now that `spec.md` is tracked,
+ * package's `packages/rafa-board/src/board/templates/` before the build
+ * runs, and it was how the clause was read on a tree with a file in it
+ * while this repository carried none. It is kept now that `spec.md` is tracked,
  * since it is the one file in either tree whose presence the case
  * itself guarantees: both tree cases list whatever markdown the scratch
  * package's source tree holds — the real template included — and hold
@@ -251,25 +264,24 @@
  *
  * ## The learning subpath, by the package's name
  *
- * `./learning` joined the exports map and the build's entry list
- * together, for the library under `src/learning/`. The computed cases
- * above read it by path, as `dist/learning/index.js`; two more import it
- * as a consumer does, by `@open-tomato/rafa/learning`, from a scratch
- * directory whose `node_modules/@open-tomato/rafa` links to the scratch
- * package, so the name resolves through the manifest's own exports map.
- * One imports it under bun and holds its names to the source entry's and
- * its `actionHash` to the source's answer; the other does the same under
- * node, which is what lets `README.md` name `./learning` among the
- * subpaths that load there: the library needs only `node:crypto`. Both
- * import `@open-tomato/rafa/unmapped` from the same directory first, as
- * the control that a name the map does not carry is refused, so the
- * link is not what makes the import pass.
+ * `./learning` joined the exports map and the build's entry list together, for
+ * the library under `packages/rafa-inventory/src/learning/`. The computed cases
+ * above read it by path, as `dist/learning/index.js`; two more import it as a
+ * consumer does, by `@open-tomato/rafa/learning`, from a scratch directory
+ * whose `node_modules/@open-tomato/rafa` links to the scratch package, so the
+ * name resolves through the manifest's own exports map. One imports it under
+ * bun and holds its names to the source entry's and its `actionHash` to the
+ * source's answer; the other does the same under node, which is what lets
+ * `README.md` name `./learning` among the subpaths that load there: the library
+ * needs only `node:crypto`. Both import `@open-tomato/rafa/unmapped` from the
+ * same directory first, as the control that a name the map does not carry is
+ * refused, so the link is not what makes the import pass.
  *
  * Two mutations of `package.json` were driven on 2026-09-25 with bun
  * 1.3.14 and node 22.14.0, one run of this file each, 54 pass before and
  * after and the manifest restored byte-identical (sha256). Dropping the
  * `./learning` exports entry reddened 3 of 54: the exports map case and
- * both name cases. Dropping `src/learning/index.ts` from the build's
+ * both name cases. Dropping `packages/rafa-inventory/src/learning/index.ts` from the build's
  * entry list reddened 5 of 54: the exports-target case, the two computed
  * `dist/learning/index.js` cases and both name cases.
  *
@@ -487,20 +499,20 @@ import ts from 'typescript';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import * as portsSource from '@open-tomato/rafa/ports';
 import * as storeSource from '@open-tomato/rafa/store';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { EPIC_GUARD_FILE, readEpicGuard } from '@open-tomato/rafa-board/board/epic-guard';
+import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '@open-tomato/rafa-board/epic/verify-plan';
+import * as learningSource from '@open-tomato/rafa-inventory/learning/index';
+import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '@open-tomato/rafa-pr/pr/plans/load';
+import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '@open-tomato/rafa-release/release/templates';
+import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '@open-tomato/rafa-run/start/decision-prompt';
 
-import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
 import * as configSource from '../config/index.js';
-import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
 import * as rootSource from '../index.js';
-import * as learningSource from '../learning/index.js';
 import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
-import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
-import { RELEASE_PUBLISH_FILE, RELEASE_TEMPLATES_DIRNAME, readReleaseTemplate } from '../release/templates.js';
-import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { eventsOf, expectExit, plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** The repository root: this file sits in `src/tests/`. */
@@ -542,6 +554,16 @@ const EXPORTS = {
   './config-schema-errors': { types: './dist/config-schema-errors.d.ts' },
   './config-schema-features': { types: './dist/config-schema-features.d.ts' },
   './config-schema-logger': { types: './dist/config-schema-logger.d.ts' },
+  './config-schema-board-project': { types: './dist/config-schema-board-project.d.ts' },
+  './config-schema-checks': { types: './dist/config-schema-checks.d.ts' },
+  './config-schema-hub': { types: './dist/config-schema-hub.d.ts' },
+  './config-schema-issues': { types: './dist/config-schema-issues.d.ts' },
+  './config-schema-loop-continue': { types: './dist/config-schema-loop-continue.d.ts' },
+  './config-schema-loop-retries': { types: './dist/config-schema-loop-retries.d.ts' },
+  './config-schema-release': { types: './dist/config-schema-release.d.ts' },
+  './config-schema-tests': { types: './dist/config-schema-tests.d.ts' },
+  './config-schema-triage': { types: './dist/config-schema-triage.d.ts' },
+  './config-schema-wrap-up': { types: './dist/config-schema-wrap-up.d.ts' },
 };
 
 /** The prefix of a specifier that names one of the package's own subpaths. */
@@ -560,7 +582,21 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * the config through core's `registeredDefaults()` and
  * `registeredSettings()`: `src/config-registry.ts` and the section files
  * then sit in a chunk of their own, apart from the error codes and the
- * logger settings they shared one with.
+ * logger settings they shared one with. It has one `index-<hash>.js` fewer
+ * since the 68 library-chunk files took the facades: a shared chunk the
+ * splitting build no longer writes once pr's 33 take `@open-tomato/rafa-pr`,
+ * the effort store's copy, wire, merge and migrate files, which now sit in
+ * the chunk they imported from, beside the store's sqlite backend and
+ * core's command, git and loop helpers. It has one `index-<hash>.js` more
+ * since the inventory and board importers took their facades: a shared
+ * chunk the splitting build now writes for the facade statements. It has
+ * two `index-<hash>.js` fewer since pass 4a moved the learning library
+ * into the inventory package and the learning entry came to be built
+ * alone: its four modules, which sat in a chunk of their own beside an
+ * empty one, now sit in the shared chunk the inventory files are in, and
+ * no lazy command module entered a library entry. It has
+ * `core/command/global-flags.d.ts` since the root help's global flags
+ * moved out of `src/cli/help.ts` into core, for board's reference check.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -739,7 +775,7 @@ const ROOT_SEAM_NAMES = [
 const TEMPLATES: [string, string][] = [
   ['src/PROMPT.md', 'PROMPT.md'],
   ['src/plan-prompt.md', 'plan-prompt.md'],
-  ['src/epic-verify-prompt.md', 'epic-verify-prompt.md'],
+  ['packages/rafa-board/src/epic-verify-prompt.md', 'epic-verify-prompt.md'],
   ['src/continue-decision-prompt.md', 'continue-decision-prompt.md'],
   ['src/continue-criteria.md', 'continue-criteria.md'],
 ];
@@ -750,9 +786,9 @@ const TEMPLATES: [string, string][] = [
  * note on the clause.
  */
 const ASSET_TREES: [string, string][] = [
-  ['src/pr/plans', 'plans'],
-  ['src/board/templates', 'templates'],
-  ['src/release/templates', RELEASE_TEMPLATES_DIRNAME],
+  ['packages/rafa-pr/src/pr/plans', 'plans'],
+  ['packages/rafa-board/src/board/templates', 'templates'],
+  ['packages/rafa-release/src/release/templates', RELEASE_TEMPLATES_DIRNAME],
 ];
 
 /**
@@ -829,7 +865,7 @@ beforeAll(() => {
   linkFacades(PACKAGE_DIR);
   linkDefineConfig(PACKAGE_DIR);
   linkTypeScript(PACKAGE_DIR);
-  const boardTemplates = join(PACKAGE_DIR, 'src', 'board', 'templates');
+  const boardTemplates = join(PACKAGE_DIR, 'packages', 'rafa-board', 'src', 'board', 'templates');
   mkdirSync(boardTemplates, { recursive: true });
   writeFileSync(join(boardTemplates, PLANTED_BOARD_TEMPLATE), PLANTED_BOARD_BODY, 'utf8');
   writeFileSync(STALE_CHUNK, 'export const stale = true;\n', 'utf8');
@@ -1166,7 +1202,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name to their types, and nothing else', () => {
+  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name, the fourteen config sections among them, to their types, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -1269,7 +1305,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(21);
+    expect(targets).toHaveLength(31);
     expect(missing).toEqual([]);
   });
 
@@ -1684,7 +1720,7 @@ describe('the prompt templates in the build', () => {
   });
 
   it('lands the epic verification prompt where readVerifyPrompt looks for it from a bundle in dist', () => {
-    const source = readFileSync(join(PACKAGE_DIR, 'src', VERIFY_PROMPT_FILE), 'utf8');
+    const source = readFileSync(join(PACKAGE_DIR, 'packages', 'rafa-board', 'src', VERIFY_PROMPT_FILE), 'utf8');
 
     expect(readVerifyPrompt(DIST)).toBe(source);
   });
@@ -1891,8 +1927,8 @@ describe('the asset trees in the build', () => {
     expect(readFileSync(built, 'utf8')).toBe(PLANTED_BOARD_BODY);
   });
 
-  it('copies no TypeScript out of src/pr/plans, so the reader modules stay unpublished', () => {
-    const source = readdirSync(join(PACKAGE_DIR, 'src/pr/plans')).sort();
+  it('copies no TypeScript out of packages/rafa-pr/src/pr/plans, so the reader modules stay unpublished', () => {
+    const source = readdirSync(join(PACKAGE_DIR, 'packages/rafa-pr/src/pr/plans')).sort();
     const copied = readdirSync(join(DIST, 'plans')).filter((file) => file.endsWith('.ts'));
 
     expect(PLAN_READER_MODULES.filter((module) => !source.includes(module))).toEqual([]);
@@ -1902,7 +1938,7 @@ describe('the asset trees in the build', () => {
   it('lands each pinned plan where readPinnedPlan looks for it from a bundle in dist', () => {
     const differing = PINNED_PLAN_CLASSES.filter(
       (triageClass) => readPinnedPlan(triageClass, { moduleDir: DIST })
-        !== readFileSync(join(PACKAGE_DIR, 'src/pr/plans', pinnedPlanFileName(triageClass)), 'utf8'),
+        !== readFileSync(join(PACKAGE_DIR, 'packages/rafa-pr/src/pr/plans', pinnedPlanFileName(triageClass)), 'utf8'),
     );
 
     expect(PINNED_PLAN_CLASSES.length).toBeGreaterThan(0);
@@ -1910,13 +1946,13 @@ describe('the asset trees in the build', () => {
   });
 
   it('lands the epic guard workflow where readEpicGuard looks for it from a bundle in dist', () => {
-    const source = readFileSync(join(PACKAGE_DIR, 'src/board/templates', EPIC_GUARD_FILE), 'utf8');
+    const source = readFileSync(join(PACKAGE_DIR, 'packages/rafa-board/src/board/templates', EPIC_GUARD_FILE), 'utf8');
 
     expect(readEpicGuard(DIST)).toBe(source);
   });
 
   it('lands the release publish workflow where readReleaseTemplate looks for it from a bundle in dist', () => {
-    const source = readFileSync(join(PACKAGE_DIR, 'src/release/templates', RELEASE_PUBLISH_FILE), 'utf8');
+    const source = readFileSync(join(PACKAGE_DIR, 'packages/rafa-release/src/release/templates', RELEASE_PUBLISH_FILE), 'utf8');
 
     expect(readReleaseTemplate(RELEASE_PUBLISH_FILE, DIST)).toBe(source);
   });
@@ -1964,6 +2000,17 @@ describe('the published declarations name no facade package', () => {
 
     expect(facadeNamings('dist/planted.d.ts', planted)).toEqual([
       'dist/planted.d.ts:2: import type { X } from \'@open-tomato/rafa-inventory\';',
+    ]);
+  });
+
+  it('finds a planted declaration naming a facade package\'s commands entry, by file and line', () => {
+    const planted = [
+      `import type { PR_FEATURE } from '${facadePackageName('pr')}/commands';`,
+      'export type B = typeof PR_FEATURE;',
+    ].join('\n');
+
+    expect(facadeNamings('dist/planted.d.ts', planted)).toEqual([
+      'dist/planted.d.ts:1: import type { PR_FEATURE } from \'@open-tomato/rafa-pr/commands\';',
     ]);
   });
 

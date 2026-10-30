@@ -9,7 +9,7 @@
  * under this file's own temporary root, holding the bytes `rafa init`
  * writes as its config. No case spawns a process, touches the home or
  * reads a real project. What the edit does to the text is
- * `src/release/setting.ts`'s and is held beside it; what is held here is
+ * `packages/rafa-release/src/release/setting.ts`'s and is held beside it; what is held here is
  * what decides that it happens at all, and the setting the config names
  * afterwards is read back through `parseConfigText` rather than matched
  * as a substring.
@@ -26,7 +26,7 @@
  *
  * Two mutations were driven on 2026-09-20 with both modules restored
  * from a scratch copy after each and verified with `shasum`, over
- * `bun test src/release/setting.test.ts src/commands/init-release.test.ts
+ * `bun test src/tests/release-coupled/release/setting.test.ts src/commands/init-release.test.ts
  * src/commands/init.test.ts`, which reads 78 pass either side of both:
  *
  *  - the `--yes` answer dropped from `runReleaseStep`, so a line that
@@ -40,8 +40,8 @@
  *    here, each of the three a case that reads the setting back out of
  *    a config the step had written.
  */
-import type { ReleaseFileSettings } from '../release/enabled.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { ReleaseFileSettings } from '@open-tomato/rafa-release/release/enabled';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,15 +50,15 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
-
-import { CONFIG_DEFAULTS } from '../config-registry.js';
-import { projectConfigText } from '../project/scaffold.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
   RELEASE_FRAGMENT_LINES,
-} from '../release/scaffold.js';
-import { withReleaseEnabled } from '../release/setting.js';
+} from '@open-tomato/rafa-release/release/scaffold';
+import { withReleaseEnabled } from '@open-tomato/rafa-release/release/setting';
+
+import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { projectConfigText } from '../project/scaffold.js';
 
 import {
   askRelease,

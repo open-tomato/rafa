@@ -3,7 +3,7 @@
  * `instinct check`, spawned rather than dispatched in-process, over
  * fixtures planted in one temporary project.
  *
- * `src/check/run.test.ts` measures the four check modules against
+ * `packages/rafa-inventory/src/check/run.test.ts` measures the four check modules against
  * `checkFile` and `checkDirectory` directly, and
  * `src/commands/check-report.test.ts` measures the two commands
  * dispatched in-process over a planted tier. Neither runs the real CLI
@@ -183,7 +183,7 @@ describe('rafa skill check, spawned over a clean tier', () => {
 });
 
 /**
- * Three false positives named in `src/check/references.ts`'s own note,
+ * Three false positives named in `packages/rafa-inventory/src/check/references.ts`'s own note,
  * each held beside a control naming a REAL missing tool or a real
  * foreign path, so a loosening that stops the false positive cannot be
  * mistaken for one that also stopped catching the true one.
@@ -196,7 +196,7 @@ describe('rafa skill check, spawned over a clean tier', () => {
  *
  * - `bash fence holding JavaScript`: RED. The fence is `bash`, so
  *   `const ready = true;` is read as a command line and `const` is
- *   reported `missing-tool`, which is what `src/check/shell-lines.ts`
+ *   reported `missing-tool`, which is what `packages/rafa-inventory/src/check/shell-lines.ts`
  *   and its wiring into this module (this stage's next two tasks) exist
  *   to stop.
  * - `shell function defined and called bare`: GREEN already. `_ok`,

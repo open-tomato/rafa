@@ -38,8 +38,8 @@
  * each hold these thirteen. Their SQL is byte-identical here, so a
  * checksum taken now is the checksum of what those releases ran. This
  * module's test compares the SQL with an excerpt of the 0.24.1 bundle
- * committed under `src/effort/testdata/migrations/`. All thirteen are
- * additive.
+ * committed under `packages/rafa/src/effort/testdata/migrations/`. All
+ * thirteen are additive.
  *
  * ## The legacy gate
  *

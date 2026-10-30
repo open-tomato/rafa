@@ -11,7 +11,7 @@ import { isFixturePath } from './fixture-path.js';
 
 describe('isFixturePath', () => {
   it('accepts a file directly under a testdata folder', () => {
-    expect(isFixturePath('src/triage/testdata/scoring-causes.json')).toBe(true);
+    expect(isFixturePath('packages/rafa-pr/src/triage/testdata/scoring-causes.json')).toBe(true);
     expect(isFixturePath('testdata/top-level.json')).toBe(true);
   });
 
@@ -31,7 +31,7 @@ describe('isFixturePath', () => {
   });
 
   it('refuses a file that is itself named testdata', () => {
-    expect(isFixturePath('src/triage/testdata')).toBe(false);
+    expect(isFixturePath('packages/rafa-pr/src/triage/testdata')).toBe(false);
   });
 
   it('refuses src/tests/ outside fixtures, and a fixtures folder elsewhere', () => {
@@ -41,7 +41,7 @@ describe('isFixturePath', () => {
   });
 
   it('refuses an ordinary source or doc path', () => {
-    expect(isFixturePath('src/triage/triage.ts')).toBe(false);
+    expect(isFixturePath('packages/rafa-pr/src/triage/triage.ts')).toBe(false);
     expect(isFixturePath('AGENTS.md')).toBe(false);
   });
 });

@@ -126,8 +126,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { openNdjsonStore, openSqliteStore } from '@open-tomato/rafa/store';
-
-import { collectEffort } from '../effort/collect.js';
+import { collectEffort } from '@open-tomato/rafa-effort/effort/collect';
 
 import {
   freezeParitySessionLogs,

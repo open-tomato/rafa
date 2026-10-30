@@ -14,12 +14,18 @@
  * ## The features
  *
  * {@link BUNDLED_FEATURES} lists the four features, each imported by
- * name from its package's facade: `board` (the `issue`, `board` and
- * `epic` subjects) from `@open-tomato/rafa-board`, and `pr`, `run` (the
- * `claim` subject) and `release` from `@open-tomato/rafa-pr`,
- * `@open-tomato/rafa-run` and `@open-tomato/rafa-release`, one subject
- * each. The `switch` command comes from run's facade too, under its
- * `command` name.
+ * name from its package's commands entry, and their subjects from the
+ * package's facade: `board` (the `issue`, `board` and `epic` subjects)
+ * from `@open-tomato/rafa-board/commands`, and `pr`, `run` (the `claim`
+ * subject) and `release` from `@open-tomato/rafa-pr/commands`,
+ * `@open-tomato/rafa-run/commands` and
+ * `@open-tomato/rafa-release/commands`, one subject each, each subject
+ * from the package's bare name. The `switch` command comes from run's
+ * facade too, under its `command` name. The feature objects have an
+ * entry of their own because a feature's index holds the loaders of its
+ * lazy command modules: a facade that carried the feature reached those
+ * modules from every library entry that imports the facade, and this
+ * file is the one importer of a commands entry.
  * A feature's commands are `lazyCommand`s over their declarations, so
  * importing this file loads the declaration files and no feature command
  * module: such a module is imported when its command runs.
@@ -44,7 +50,7 @@
  * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status`,
  * `list` and `wait`, which act on a run through its session record and share
  * `loop/loop-sessions.ts`, `wait` following the run's events file through
- * `src/loop/events-file.ts` too, nor `init`, which sets up a project through
+ * `packages/rafa-run/src/loop/events-file.ts` too, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
  * `src/preflight/` and starts no run, nor the nine `issue` actions,
  * six of which act on the tracker the chain resolves while `ready` and
@@ -52,28 +58,29 @@
  * the references of a spec's saved copy, all nine sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `switch`,
- * which moves the checkout's place through `src/board/place.ts` and
+ * which moves the checkout's place through `packages/rafa-board/src/board/place.ts` and
  * `packages/rafa/src/project/position.ts`, nor `board list`, which lists the open
- * boards off the same listing through `src/board/board-body.ts` and
- * `src/board/owner-resolve.ts`, nor `board sync`, which brings the
+ * boards off the same listing through `packages/rafa-board/src/board/board-body.ts` and
+ * `packages/rafa-board/src/board/owner-resolve.ts`, nor `board sync`, which brings the
  * repository's GitHub project in step through
- * `src/board/project/sync.ts`, nor `self-update`, which installs the
- * checkout through `src/runtime/install.ts`, nor `module list` and
+ * `packages/rafa-board/src/board/project/sync.ts`, nor `self-update`, which installs the
+ * checkout through `packages/rafa-run/src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `packages/rafa/src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
- * definitions through `src/agents/roster.ts`, nor `agent list`, which
- * lists the agents `buildInventory` (`src/inventory/`) reads, nor
- * `agent show`, which shows one of them through `src/inventory/show.ts`,
+ * definitions through `packages/rafa-inventory/src/agents/roster.ts`, nor `agent list`, which
+ * lists the agents `buildInventory` (`packages/rafa-inventory/src/inventory/`) reads, nor
+ * `agent show`, which shows one of them through `packages/rafa-inventory/src/inventory/show.ts`,
  * nor `agent search` and `skill search`, which find the items that
- * answer a question through `src/inventory/search/`, the agent one
+ * answer a question through `packages/rafa-inventory/src/inventory/search/`, the agent one
  * built by `skill/search.ts`,
  * nor `skill check` and `instinct check`, which run the five checks
- * through `src/check/run.ts` and share `commands/check-report.ts`, nor
+ * through `packages/rafa-inventory/src/check/run.ts` and share `commands/check-report.ts`, nor
  * `skill list`, which lists the skills `buildInventory`
- * (`src/inventory/`) reads from every source, nor `skill show`, which
- * shows one of them through `src/inventory/show.ts`, nor `skill demote` and
- * `skill backfill`, which run the demotion pass of `src/demote/` and the
- * backfill of `src/backfill/` over one skills directory, nor
+ * (`packages/rafa-inventory/src/inventory/`) reads from every source, nor `skill show`, which
+ * shows one of them through `packages/rafa-inventory/src/inventory/show.ts`, nor `skill demote` and
+ * `skill backfill`, which run the demotion pass of
+ * `packages/rafa-inventory/src/demote/` and the backfill of
+ * `packages/rafa-inventory/src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
  * instinct scopes hold through `schema/scope-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
@@ -82,40 +89,40 @@
  * merge and triage one repository's pull requests through the
  * PullRequests port and share `pr/pr-context.ts`, nor `release status`, `release tag` and `release list`, which
  * read the version file, the changelog and the repository's tags
- * through `src/release/` and share `release/status.ts`'s seams, nor
+ * through `packages/rafa-release/src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
- * worktree of the base through `src/release/settle*.ts`, nor
+ * worktree of the base through `packages/rafa-release/src/release/settle*.ts`, nor
  * `release publish`, which runs `release.publishCommand` in each tagged
- * unit's directory through `./release/tag-units.ts`,
- * `./release/tag-follow-ups.ts` and `src/release/version-tag.ts`, nor
+ * unit's directory through `packages/rafa-release/src/commands/release/tag-units.ts`,
+ * `tag-follow-ups.ts` beside it and `packages/rafa-release/src/release/version-tag.ts`, nor
  * `release workflows`, which reads the ladder's files through
- * `src/release/ladder.ts` and `src/commands/doctor-ladder.ts` and writes
- * the shipped templates through `src/release/templates.ts`, nor
+ * `packages/rafa-release/src/release/ladder.ts` and `packages/rafa-release/src/commands/doctor-ladder.ts` and writes
+ * the shipped templates through `packages/rafa-release/src/release/templates.ts`, nor
  * `release fragment`, which writes one change fragment through
- * `src/release/fragment.ts` and reads the waiting ones through
- * `src/release/fragment-tree.ts`, nor
+ * `packages/rafa/src/release/fragment.ts` and reads the waiting ones through
+ * `packages/rafa-release/src/release/fragment-tree.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
  * `src/cleanup/` and removes the ticked ones through its steps, nor
  * `status`, which reads the six sections through `src/status/`, nor
  * `epic show`, which reads one epic's lines into the same rows as
- * `roadmap` through `src/board/roadmap-rows.ts`, nor `epic new`, which
+ * `roadmap` through `packages/rafa-board/src/board/roadmap-rows.ts`, nor `epic new`, which
  * creates an epic's label, issue and board line through
- * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `packages/rafa-board/src/board/issue-board.ts` and `packages/rafa-board/src/board/epic-checklist.ts`, nor
  * `epic defer` and `epic promote`, which move an epic between horizons
- * over `src/board/epic-horizon.ts` through `./epic/horizon-change.ts`,
+ * over `packages/rafa-board/src/board/epic-horizon.ts` through `./epic/horizon-change.ts`,
  * nor `epic move`, which moves an issue between epics through
- * `src/board/issue-board.ts` and `src/board/epic-checklist.ts`, nor
+ * `packages/rafa-board/src/board/issue-board.ts` and `packages/rafa-board/src/board/epic-checklist.ts`, nor
  * `epic close`, which plans and runs its verification through
- * `src/epic/verify-plan.ts` and `src/epic/verify-run.ts` and closes the
- * epic through `src/board/issue-board.ts`, nor `epic cancel`, which asks
- * about the epic's dependents (`src/board/epic-dependents.ts`), applies
- * each answer through `./epic/move.ts`, `src/board/epic-checklist.ts`
- * and `src/board/issue-board.ts`, and closes the epic through the last,
+ * `packages/rafa-board/src/epic/verify-plan.ts` and `packages/rafa-board/src/epic/verify-run.ts` and closes the
+ * epic through `packages/rafa-board/src/board/issue-board.ts`, nor `epic cancel`, which asks
+ * about the epic's dependents (`packages/rafa-board/src/board/epic-dependents.ts`), applies
+ * each answer through `./epic/move.ts`, `packages/rafa-board/src/board/epic-checklist.ts`
+ * and `packages/rafa-board/src/board/issue-board.ts`, and closes the epic through the last,
  * nor the four `claim` actions, `release`, `hand`, `accept` and `take`,
  * which read an issue's claim branches and push one ownership commit on
- * them through `src/claims/git.ts` and share `claim/release.ts`'s
+ * them through `packages/rafa/src/claims/git.ts` and share `claim/release.ts`'s
  * readers, nor `config set`, which edits the project's config text
  * through `src/config-set.ts`, nor `config show`, which prints the
  * config `loadConfig` resolves, nor `ci status`, which reads a branch's
@@ -127,9 +134,9 @@
  * through `src/config-set.ts`, nor `bug codes`, which lists the cause
  * codes of `src/errors/` beside the project's `errors.codes`, nor
  * `bug recheck`, which reads each bug's `Rerun` through
- * `src/bugs/test-reference.ts` and reruns it through `src/suite/run.ts`
- * in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
- * stale-docs issues through `src/docs/open-lines.ts`.
+ * `src/bugs/test-reference.ts` and reruns it through
+ * `packages/rafa/src/suite/run.ts` in `./bug/recheck-run.ts`, nor `docs plan`, which writes a plan from the open lines of the
+ * stale-docs issues through `packages/rafa-release/src/docs/open-lines.ts`.
  *
  * ## What is registered
  *
@@ -468,15 +475,19 @@
  * feature turned off. `skill index` is in the command tree and is not
  * registered, because nothing dispatches it yet.
  */
-import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
+import type { CommandRegistry, SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { CommandFeature, RafaCommand } from '@open-tomato/rafa/core/command';
 
-import { BOARD_FEATURE, BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
-import { PR_FEATURE, PR_SUBJECT } from '@open-tomato/rafa-pr';
-import { RELEASE_FEATURE, RELEASE_SUBJECT } from '@open-tomato/rafa-release';
-import { CLAIM_SUBJECT, RUN_FEATURE, command as switchCommand } from '@open-tomato/rafa-run';
+import { BOARD_SUBJECT, EPIC_SUBJECT, ISSUE_SUBJECT } from '@open-tomato/rafa-board';
+import { BOARD_FEATURE } from '@open-tomato/rafa-board/commands';
+import { PR_SUBJECT } from '@open-tomato/rafa-pr';
+import { PR_FEATURE } from '@open-tomato/rafa-pr/commands';
+import { RELEASE_SUBJECT } from '@open-tomato/rafa-release';
+import { RELEASE_FEATURE } from '@open-tomato/rafa-release/commands';
+import { CLAIM_SUBJECT, command as switchCommand } from '@open-tomato/rafa-run';
+import { RUN_FEATURE } from '@open-tomato/rafa-run/commands';
 
-import { createCommandRegistry } from '../cli/registry.js';
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 
 import agentList from './agent/list.js';
 import agentSearch from './agent/search.js';

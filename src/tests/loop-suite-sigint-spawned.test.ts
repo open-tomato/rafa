@@ -2,7 +2,7 @@
  * `rafa loop start` sent SIGINT while its suite step runs, spawned as the
  * real `rafa` binary (`src/tests/cli-capture.ts`): the signal that reaches
  * the runner alone, as `rafa loop stop` sends it, while `bun test` is
- * still running. `src/start/suite-step.ts` reads that as a stop and never
+ * still running. `packages/rafa-run/src/start/suite-step.ts` reads that as a stop and never
  * as a red step (`start.ts`'s `interrupted` flag, `isInterrupted`).
  *
  * The project holds two tasks and one test file, which passes at once
@@ -36,9 +36,9 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { createGitRunner } from '../pr/index.js';
 
 import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
 

@@ -6,7 +6,7 @@
  * as `bun src/rafa.ts` under the scratch HOME.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { DescribedInstinctRecord } from '../adapters/learning/local.js';
+import type { DescribedInstinctRecord } from '@open-tomato/rafa-inventory/adapters/learning/local';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,8 +14,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { createLocalLearning, localInstinctsDir } from '../adapters/learning/local.js';
-import { actionHash } from '../learning/index.js';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 

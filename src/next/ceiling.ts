@@ -81,7 +81,7 @@
  * and the flag takes a value — so neither ends with the exit code 1
  * this command's line refusals carry: what is refused is the permission
  * the words ask for, and the spec sets that apart as
- * {@link CEILING_REFUSAL_EXIT}, as `src/pr/provider.ts` does for a
+ * {@link CEILING_REFUSAL_EXIT}, as `packages/rafa/src/pr/provider.ts` does for a
  * repository whose `pr.provider` cannot answer.
  *
  * `ready` is refused rather than quietly dropped because dropping it

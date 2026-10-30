@@ -6,7 +6,7 @@
  * ## What a wrapper hands over
  *
  * The phase 0 commands (`src/plan.ts`, `src/start.ts`,
- * `src/effort/collect.ts` and `src/effort/report.ts`) read their own
+ * `packages/rafa-effort/src/effort/collect.ts` and `packages/rafa-effort/src/effort/report.ts`) read their own
  * command lines. A wrapper hands the function it runs the context's
  * `argv`, the words after the routing words as they were typed, copied
  * into a fresh array. So the function reads the words it read before
@@ -68,7 +68,7 @@ interface FlagWord {
 /**
  * The flag `parseArgs` reads `word` as, `next` being the word after it,
  * or null for a word that is no flag. The rules are those of `readLine`
- * in `src/cli/core/parseArgs.ts`.
+ * in `packages/rafa/src/core/command/parseArgs.ts`.
  */
 function flagWord(word: string, next: string | undefined): FlagWord | null {
   const isLong = word.startsWith('--');

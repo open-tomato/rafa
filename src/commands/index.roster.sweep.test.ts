@@ -2,7 +2,8 @@
  * The roster's identity: each module `src/commands/index.ts` imports by
  * name default-exports the very object `CORE_COMMANDS` holds, as does
  * the one it takes from a feature package's facade under an alias, each
- * feature and each feature subject it imports by name from a facade is
+ * feature it imports by name from a commands entry and each feature
+ * subject it imports by name from a facade is
  * the one `BUNDLED_FEATURES` and `ROSTER_SUBJECTS` hold, and `rafa describe`
  * lists the subjects of `ROSTER_SUBJECTS` in its order and the command
  * names it listed at `origin/stretch/102`, with `docs plan` registered
@@ -29,8 +30,8 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..');
 const DEFAULT_IMPORT = /^import (\w+) from '(\.\/[^']+)\.js';$/gm;
-/** A feature package's facade import, its bindings on one line, as `board`'s features and subjects come (#808). */
-const FACADE_IMPORT = /^import \{ ([\w, ]+) \} from '(@open-tomato\/rafa-[a-z]+)';$/gm;
+/** A feature package's facade or commands-entry import, its bindings on one line, as `board`'s subjects come from its facade and its feature from `/commands` (#808). */
+const FACADE_IMPORT = /^import \{ ([\w, ]+) \} from '(@open-tomato\/rafa-[a-z]+(?:\/commands)?)';$/gm;
 /** One binding of a facade import taken under an alias, as `command as switchCommand` comes from run's facade. */
 const ALIASED_BINDING = /^(\w+) as (\w+)$/;
 
@@ -193,6 +194,7 @@ describe('the commands roster', () => {
     // Assert
     expect(imports.map(({ local }) => local).filter((local) => local.endsWith('_FEATURE'))).toHaveLength(BUNDLED_FEATURES.length);
     expect(imports.map(({ local }) => local).filter((local) => local.endsWith('_SUBJECT'))).toHaveLength(6);
+    expect(imports.filter(({ local, specifier }) => local.endsWith('_FEATURE') !== specifier.endsWith('/commands'))).toEqual([]);
     values.forEach((value, position) => {
       expect(held.includes(value), imports[position]?.local).toBe(true);
     });

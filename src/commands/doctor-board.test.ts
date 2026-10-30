@@ -14,7 +14,7 @@
  * `../board/status.test.ts`); these cases hold
  * only what this module adds.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,8 +22,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { unlabelledRoadmapMessage } from '../board/boards.js';
-import { BOARD_LIST_FIELDS } from '../board/roadmap-board.js';
+import { unlabelledRoadmapMessage } from '@open-tomato/rafa-board/board/boards';
+import { BOARD_LIST_FIELDS } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
 import { boardRunner, readDoctorBoard, renderDoctorBoard } from './doctor-board.js';

@@ -6,14 +6,15 @@ and a SQLite backend, and `selectEffortStore` (`store/index.ts`), which picks
 one from `store` in the project's config, `sqlite` by default.
 
 **One kind of session row is not collected.** The search runner
-(`src/inventory/search/index.ts`) stores the `search` row of its own
+(`packages/rafa-inventory/src/inventory/search/index.ts`) stores the `search` row of its own
 session: Claude Code files that session's log under the scratch copy it
 ran in, never under the project's log directories `effort collect` walks.
-The runner reads the log with `collectSessionRow` and appends it under
-`sessions` with `kind` set to `search`.
+The runner reads the log with the collector its caller passes as
+`collectRow` (`rafa skill search` passes `collectSessionRow`) and appends
+it under `sessions` with `kind` set to `search`.
 
 **`effort collect` reads the main checkout's project folder and every
-worktree project folder of the project** (`src/effort/session-log-dirs.ts`).
+worktree project folder of the project** (`packages/rafa/src/effort/session-log-dirs.ts`).
 Claude Code files a session under its working directory's encoded path,
 so a loop task run in a worktree lands in
 `~/.claude/projects/<main>--rafa-worktrees-<stub>/`, never in the main
@@ -202,13 +203,13 @@ and the merge trail (`merges` and `merge_conflicts` tables).
 **A loop never records to a copy, and says what it does not know.**
 `loop start` refuses while `RAFA_EFFORT_DIR` is set to anything but the
 empty string, right after the detached refusal and before `--runtime`
-hands the run on (`refuseEffortDirRun`, `src/start/run-config.ts`):
-`❌ RAFA_EFFORT_DIR is set (<dir>); a loop records to the project's own
-store. Unset it and run again.` Its preflight then reads the project's
-store through `readSchemaReport`, read-only, and warns once for each
-logged migration this rafa does not know whose `breaks` is empty, in
-the words of `unknownAdditiveWarning` (`schema-report.ts`): `⚠ effort
-store holds migration <id> this rafa does not know (applied by <by>);
+hands the run on (`refuseEffortDirRun`,
+`packages/rafa-run/src/start/run-config.ts`): `❌ RAFA_EFFORT_DIR is set (<dir>);
+a loop records to the project's own store. Unset it and run again.` Its
+preflight then reads the project's store through `readSchemaReport`, read-only,
+and warns once for each logged migration this rafa does not know whose `breaks`
+is empty, in the words of `unknownAdditiveWarning` (`schema-report.ts`): `⚠
+effort store holds migration <id> this rafa does not know (applied by <by>);
 it is additive, so this run reads and writes the store as it is`. A
 refused store gets no warning there, since its first open refuses it;
 one that cannot be read is one warning naming why, and none halts.
@@ -249,20 +250,21 @@ shared with the migration's guard (`migrateStore`, `migrate.ts`), which names no
 session id so it refuses any live loop, including its own if one somehow
 persists.
 
-**`effort.sync` in the project's config selects the sync strategy, one of
-`local`, `file`, `git`, `service`, or `p2p`.** The default is `local`, which
-means no sync: a device keeps its own store. The user scope's config under
-`~/.rafa/` already layers under the project's for every setting
-(`packages/rafa/src/core/config/config.ts`), so the user default needs no reader
-of its own. The user and project scopes share every config key in `config.ts`,
-and a change in one scope's declaration of `effort.sync` takes effect when
-either is read. A deployment of the `service` strategy requires `hub.url` (the
-hub's address), and may name `hub.tokenSecret` (the secret store name where the
-token is held, never the token itself) and `hub.timeout` (how long a request may
-take, `3s` by default, from `1s` to `30s`, as `3s`). `selectSync` hands the
-three to the adapter as `AdapterContext.hub` (`src/config-schema-hub.ts`). A
-module implementing `git`, `service` or `p2p` also names its own settings under
-`modules:`.
+**`effort.sync` in the project's config selects the sync strategy, one
+of `local`, `file`, `git`, `service`, or `p2p`.** The default is
+`local`, which means no sync: a device keeps its own store. The user
+scope's config under `~/.rafa/` already layers under the project's for
+every setting (`packages/rafa/src/core/config/config.ts`), so the user
+default needs no reader of its own. The user and project scopes share
+every config key in `config.ts`, and a change in one scope's
+declaration of `effort.sync` takes effect when either is read. A
+deployment of the `service` strategy requires `hub.url` (the hub's
+address), and may name `hub.tokenSecret` (the secret store name where
+the token is held, never the token itself) and `hub.timeout` (how long
+a request may take, `3s` by default, from `1s` to `30s`, as `3s`).
+`selectSync` hands the three to the adapter as `AdapterContext.hub`
+(`packages/rafa/src/config-schema-hub.ts`). A module implementing
+`git`, `service` or `p2p` also names its own settings under `modules:`.
 
 **Core's two sync adapters are registered in `CORE_ADAPTER_REGISTRY`
 (`packages/rafa/src/core/adapters/registry.ts`) by the composition root
@@ -311,15 +313,15 @@ other-project refusal has nothing to compare. The cursor for the next push
 advances only after a successful push; after a successful pull, the next pull
 starts from the new rows the merge brought in. The codec, `mergeStore` and
 `TRUSTED_PERMISSIONS` (`store/trusted-permissions.ts`, re-exported by
-`src/board/trust.ts`) are exported from the `./store` subpath for the packages
+`packages/rafa-board/src/board/trust.ts`) are exported from the `./store` subpath for the packages
 under `packages/`.
 
 **The `service` strategy makes one contact per command through
-`createHubContact` (`src/effort/sync/contact.ts`), which never throws
-and never sets the exit code.** A contact runs `pushThenPull()` (push then
-pull) or `pull()` alone. `local` and `file` are never contacted: nothing is
-loaded, selected or written. The `service` adapter is selected once per
-contact by `selectSync` through the registry `loadModules` answers, and a
+`createHubContact` (`packages/rafa-effort/src/effort/sync/contact.ts`), which
+never throws and never sets the exit code.** A contact runs `pushThenPull()`
+(push then pull) or `pull()` alone. `local` and `file` are never contacted:
+nothing is loaded, selected or written. The `service` adapter is selected once
+per contact by `selectSync` through the registry `loadModules` answers, and a
 selection that fails (e.g., `SyncModuleMissing`) is written once through
 the caller's `warn`. **When sync runs:** `rafa effort collect` makes one
 contact and pushes then pulls after storing rows and writing its summary;
@@ -328,9 +330,9 @@ the end of each task, whatever its outcome, its pulls naming the run's
 session id as `SyncPullRequest.sessionId` so the merge's live-loop guard
 passes the run's own record; `rafa status`, `rafa next`
 (including `--dry-run`), and `rafa effort report` pull alone before they
-read, through `pullBeforeRead` (`src/effort/collect.ts`, `src/start.ts`,
-querying in the effort module). **The offline rule:** a push or pull that
-rejects with an error whose `name` is `HubUnreachable` (network error,
+read, through `pullBeforeRead` (`packages/rafa-effort/src/effort/collect.ts`,
+`src/start.ts`, querying in the effort module). **The offline rule:** a push or
+pull that rejects with an error whose `name` is `HubUnreachable` (network error,
 timeout, or hub unreachable) writes exactly one line per contact, `effort
 sync: the hub at <url> is unreachable (<first line of why>); this command
 used the local store, and its rows sync on the next contact`. An unreachable
@@ -616,14 +618,14 @@ stripped, so a statement a comment swallowed fails here, and so does a `TEMP`
 table. SQLite also refuses an `ADD COLUMN` whose statement ends in a `--`
 comment before its `;` (`error in table <t> after add column: incomplete
 input`). Last, it reads `migrations.lock.json` as released at v0.33.0, a copy
-committed as `src/effort/testdata/migrations/lock-v0.33.0.json`, and fails a
-line changed or dropped since; a newer release moves that copy and its
-`RELEASED_TAG` forward by hand. A provenance case holds the copy to `git show
-v0.33.0:` and is skipped, its title naming why, when git, the tag or the lock at
-the tag is absent. The 0.24.1 rule and history are read from an excerpt of that
-bundle committed beside it, never from `~/.rafa`. At v0.24.1 the lock is absent,
-since that release predates it. Each rule has a near-miss control, including a
-planted `DROP COLUMN` declared `[]`.
+committed as `packages/rafa/src/effort/testdata/migrations/lock-v0.33.0.json`,
+and fails a line changed or dropped since; a newer release moves that copy and
+its `RELEASED_TAG` forward by hand. A provenance case holds the copy to `git
+show v0.33.0:` and is skipped, its title naming why, when git, the tag or the
+lock at the tag is absent. The 0.24.1 rule and history are read from an excerpt
+of that bundle committed beside it, never from `~/.rafa`. At v0.24.1 the lock is
+absent, since that release predates it. Each rule has a near-miss control,
+including a planted `DROP COLUMN` declared `[]`.
 
 **`planSchema` (`packages/rafa/src/effort/store/schema-plan.ts`) is the
 compatibility decision, and every open asks it through `bringForward`;**
@@ -731,13 +733,13 @@ A mint with the reason `host` or `path` empties the table instead, because that
 file is a copy at a new location that must build its own claim history.
 `readReplacedStoreIds` (`packages/rafa/src/effort/store/store-replaced.ts`)
 answers the ids, earliest first, or none for a store without the table or with
-it empty; `holdsClaim` (`src/claims/device.ts`) is true for the current id and
-each replaced one. The table is absent from a store an older runtime left. The
-three before it, which migration `store-meta` creates, are the store's own
-identity and its merge trail: `store_meta` holds one row (`id = 1`) naming the
-origin the store stamps, its project and the host, path and file identity it was
-minted under; `merges` records each merge and `merge_conflicts` each incoming
-row one could not settle. Migration `store-meta-generation` adds
+it empty; `holdsClaim` (`packages/rafa-run/src/claims/device.ts`) is true for
+the current id and each replaced one. The table is absent from a store an older
+runtime left. The three before it, which migration `store-meta` creates, are the
+store's own identity and its merge trail: `store_meta` holds one row (`id = 1`)
+naming the origin the store stamps, its project and the host, path and file
+identity it was minted under; `merges` records each merge and `merge_conflicts`
+each incoming row one could not settle. Migration `store-meta-generation` adds
 `store_meta.generation`, a nullable non-empty text column; NULL there means a
 runtime that did not know the column wrote the row. `mergeStore`
 (`store/merge-store.ts`) writes one `merges` row per merge into the build it
@@ -814,22 +816,24 @@ effort report`, under the repo root whatever `store` selects, and opens nothing
 when the file is absent; `readPreflightHalts` reads `preflight` back the same
 way, `readSessionBudgets` the `dispatches` rows carrying a budget, and
 `readSessionAgents` those naming an agent, for the `--by=agent` split of `rafa
-effort report --trend`. `readDocOnlyBugs` (`src/effort/report-doc-bugs.ts`)
-reads the `out_of_scope_bugs` rows of scope `rafa` the same way, for the
-report's count of those naming only documentation, and `readBugKinds`
-(`src/effort/report-kinds.ts`) every `bug_routes` row, for its count per plan of
-the entries routed under each kind and the share filed; it answers a `problem`
-in place of a throw when the store cannot be read. `readTaskFinishes`
-(`store/task-finishes.ts`) reads the `done` rows of `task_reports` and
-`report_absences` back the same way, for the rough ETA of `rafa loop status`,
-and `readPlanChanges` (`store/changes.ts`) every `changes` row under one plan
-stub, in `ACROSS_STORES_ORDER` (`store/origins.ts`: `collected_at`, the origin
-pair, then `seq`), for a release step to render, `readStaleDocsForPlan`
-(`store/stale-docs.ts`) every `stale_docs` row under one plan stub in that
-order, and `readBugRoutesForPlan` (`store/bug-routes.ts`) every `bug_routes` row
-under one plan stub in that order too. A reader that answers rows in order over
-a table with `collected_at` sorts by that constant rather than `seq`, since a
-merge gives the other store's rows new local `seq` values after its own.
+effort report --trend`. `readDocOnlyBugs`
+(`packages/rafa-effort/src/effort/report-doc-bugs.ts`) reads the
+`out_of_scope_bugs` rows of scope `rafa` the same way, for the report's count of
+those naming only documentation, and `readBugKinds`
+(`packages/rafa-effort/src/effort/report-kinds.ts`) every `bug_routes` row, for
+its count per plan of the entries routed under each kind and the share filed; it
+answers a `problem` in place of a throw when the store cannot be read.
+`readTaskFinishes` (`store/task-finishes.ts`) reads the `done` rows of
+`task_reports` and `report_absences` back the same way, for the rough ETA of
+`rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every `changes`
+row under one plan stub, in `ACROSS_STORES_ORDER` (`store/origins.ts`:
+`collected_at`, the origin pair, then `seq`), for a release step to render,
+`readStaleDocsForPlan` (`store/stale-docs.ts`) every `stale_docs` row under one
+plan stub in that order, and `readBugRoutesForPlan` (`store/bug-routes.ts`)
+every `bug_routes` row under one plan stub in that order too. A reader that
+answers rows in order over a table with `collected_at` sorts by that constant
+rather than `seq`, since a merge gives the other store's rows new local `seq`
+values after its own.
 
 **A new table has a checklist, and each item lands in the table's own
 commit:**
@@ -881,10 +885,10 @@ by raw SQL takes it out as well, since no open has made it there yet.
 
 ### The fact rows
 
-**`readSkillFacts` (`src/effort/skill-facts.ts`) answers one row per task
-report, joining what `rafa effort report --skills` needs.** It reads rows
-rafa already stores and nothing else: no session transcript is opened.
-It is a TypeScript reader rather than a SQL view, so the schema's table
+**`readSkillFacts` (`packages/rafa-effort/src/effort/skill-facts.ts`) answers
+one row per task report, joining what `rafa effort report --skills` needs.** It
+reads rows rafa already stores and nothing else: no session transcript is
+opened. It is a TypeScript reader rather than a SQL view, so the schema's table
 expectations do not move. Each `SkillFact` holds what `task_reports` says
 (plan, task line, outcome, claimed skills), what `dispatches` holds about
 its resolver and offers, what `skill_invocations` shows it invoked (or
@@ -898,9 +902,9 @@ and a plugin's `plugin:name` is kept. A session with no report (a
 
 ### The recurrence rule
 
-**`findRecurrences` (`src/effort/recurrence.ts`) answers where a failure
-string appears again in rows rafa stores.** A skill's failure strings come
-from its `failure_strings:` in the frontmatter, a lesson's from its
+**`findRecurrences` (`packages/rafa-effort/src/effort/recurrence.ts`) answers
+where a failure string appears again in rows rafa stores.** A skill's failure
+strings come from its `failure_strings:` in the frontmatter, a lesson's from its
 `artifact`. A string recurs when it appears as a case-sensitive literal
 (`String.prototype.includes`, no folding) in any field of the task's own
 or each later task's findings, blockers or out-of-scope bugs (searched
@@ -917,11 +921,11 @@ string. A string given twice is searched once.
 
 ### The signals
 
-**`skillSignals` and `lessonSignals` (`src/effort/skill-signals.ts`) say
-what co-occurred with a failure string's recurrence.** Both are pure
-functions of the fact rows and the recurrence matcher; neither reads a
-path or config. A signal is checked in order, defined once, and never
-claims a cause.
+**`skillSignals` and `lessonSignals`
+(`packages/rafa-effort/src/effort/skill-signals.ts`) say what co-occurred with a
+failure string's recurrence.** Both are pure functions of the fact rows and the
+recurrence matcher; neither reads a path or config. A signal is checked in
+order, defined once, and never claims a cause.
 
 **Skill signals.** A skill is read when a row's `skillsOffered` or its
 known `invoked` names it. A skill some row offered gets exactly one signal
@@ -940,13 +944,13 @@ null artifact and reads as `injected`.
 
 ### The SkillsReport JSON schema
 
-**`buildSkillsReport` (`src/effort/report-skills.ts`) answers the report as
-a pure structure and as JSON.** It reads the store's fact rows (narrowed to
-named plans), each skill's `failure_strings:` from the resolved tiers, and
-each held lesson's `artifact` by id. One `SkillsReportPlan` per plan the
-rows hold, in the order facts list them; a report under no plan is its own
-entry. Within a plan, one `SkillsReportArm` per resolver the rows ran under,
-in order first seen. A plan run under one resolver has one arm.
+**`buildSkillsReport` (`packages/rafa-effort/src/effort/report-skills.ts`)
+answers the report as a pure structure and as JSON.** It reads the store's fact
+rows (narrowed to named plans), each skill's `failure_strings:` from the
+resolved tiers, and each held lesson's `artifact` by id. One `SkillsReportPlan`
+per plan the rows hold, in the order facts list them; a report under no plan is
+its own entry. Within a plan, one `SkillsReportArm` per resolver the rows ran
+under, in order first seen. A plan run under one resolver has one arm.
 
 | Field | Type | Note |
 | --- | --- | --- |
@@ -1039,20 +1043,20 @@ in `store/dispatches.test.ts`: the `COLUMNS` list and the two
 whole-row `toEqual`s.
 
 **`skill_invocations` is written by `effort collect`, not by a task
-report.** Its collector (`src/effort/skill-use.ts`) reads the input of
-`Skill` tool calls — the one exception to the "no tool input" rule — to
-extract and count each skill a session invoked, in its main thread and in
-its sidechains. The skill half of `effort collect` (`src/effort/collect-skills.ts`)
-reads the `Skill` calls of each session the run read into a session row, or
-with `--skills` of every session the port holds whose log is in the
-directory, and skips a session already holding a row. It writes under
-the repo root even when `collectEffort` is handed a store, so the
-parity suites, whose `repoRoot` is the live sibling, pass `skills: null`.
-One session invoked from both sides is two rows, one per side. An
-`unknown` row — one row holding the session and NULL in `name`, `sidechain`
-and `count` — marks a session whose log the collector could not vouch for
-(log version mismatch, unreadable line, or unreadable skill call). A session
-that invoked no skill stores no row at all.
+report.** Its collector (`packages/rafa-effort/src/effort/skill-use.ts`) reads
+the input of `Skill` tool calls — the one exception to the "no tool input" rule
+— to extract and count each skill a session invoked, in its main thread and in
+its sidechains. The skill half of `effort collect`
+(`packages/rafa-effort/src/effort/collect-skills.ts`) reads the `Skill` calls of
+each session the run read into a session row, or with `--skills` of every
+session the port holds whose log is in the directory, and skips a session
+already holding a row. It writes under the repo root even when `collectEffort`
+is handed a store, so the parity suites, whose `repoRoot` is the live sibling,
+pass `skills: null`. One session invoked from both sides is two rows, one per
+side. An `unknown` row — one row holding the session and NULL in `name`,
+`sidechain` and `count` — marks a session whose log the collector could not
+vouch for (log version mismatch, unreadable line, or unreadable skill call). A
+session that invoked no skill stores no row at all.
 
 **Claude Code's own usage record covers only plugin-delivered skills, never a
 project skill, so `skill_invocations` has no CLI-native count to check
@@ -1079,9 +1083,9 @@ count that exists anywhere, and this collector is the sole source
 **The collector's exception to "no tool input".** `session-log.ts`
 and the effort port fold a session's logs into counters and identifiers
 without keeping message content. The skill-use collector in
-`src/effort/skill-use.ts` is the single exception: it reads the `skill`
-field from the input of a `Skill` tool call, mapped to a bare name with
-`bareSkillName`, and no message content otherwise — not the call's
+`packages/rafa-effort/src/effort/skill-use.ts` is the single exception: it reads
+the `skill` field from the input of a `Skill` tool call, mapped to a bare name
+with `bareSkillName`, and no message content otherwise — not the call's
 args, every other tool's input, every prompt, or any tool output. The
 counts it answers can therefore be stored beside the session rows without
 the store becoming a copy of a transcript. The collector vouches for the log
@@ -1099,7 +1103,7 @@ no row. `readPlanCi` reads every row, or one plan's, in append order.
 **Verdict, PR, head commit.** A `pending` verdict (a check still running)
 stores no row, and the table's CHECK admits only `green`, `red` and `none`.
 `verdictOf` (`store/check-rows.ts`, with `CheckRow` and `failingRows`, all
-re-exported by `src/pr/checks.ts`) answers the settled verdict over every
+re-exported by `packages/rafa-pr/src/pr/checks.ts`) answers the settled verdict over every
 check, and the `failing` list is the failing checks' names; a CHECK keeps
 `failing` non-empty exactly when the verdict is `red`. The key is
 `(pr, head_sha, read_at)`: the same head read twice at two times is two
@@ -1224,7 +1228,7 @@ by `rafa effort report --skills`, which reads `invoked` and never
 `store/preflight.ts` writes a run's checks in one transaction, one row
 per check keyed by `(run_id, position)`, since a run can check one item
 twice. A check's type, tier and outcome are core's
-(`store/preflight-check.ts`, re-exported by `src/preflight/run.ts`). No column says the run halted: a run halted when a required check
+(`store/preflight-check.ts`, re-exported by `packages/rafa/src/preflight/run.ts`). No column says the run halted: a run halted when a required check
 did not pass, and `readPreflightHalts` reads that off the rows.
 `loop start` writes it through `start/preflight.ts` before any session,
 and writes nothing for a run with no item to check. `rafa doctor` checks

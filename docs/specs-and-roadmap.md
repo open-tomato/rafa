@@ -753,7 +753,7 @@ members.
 ### State: computed on every read
 
 An epic's state is COMPUTED from one board listing on every read, never
-stored. The `src/board/epics.ts` module's notes hold the exact rules,
+stored. The `packages/rafa-board/src/board/epics.ts` module's notes hold the exact rules,
 but briefly:
 
 - **`empty`** — the epic has no members.

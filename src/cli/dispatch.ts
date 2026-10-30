@@ -244,10 +244,10 @@
  */
 import type { Ending } from './ending.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
-import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
 import type { FailureBoundary } from '../errors/handler.js';
 import type { LoggerResolver } from '@open-tomato/rafa/adapters/logger/active';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { CliContext , RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '@open-tomato/rafa/ports';

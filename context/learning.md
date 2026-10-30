@@ -6,7 +6,7 @@ The local adapter holds lessons in `.rafa/instincts/`, logs every merge
 decision, and the wrap-up writes those lessons into the pages that own their
 subjects.
 
-## The library: `src/learning/`
+## The library: `packages/rafa-inventory/src/learning/`
 
 Pure, self-contained, and published as `@open-tomato/rafa/learning`. No
 filesystem, no clock, no randomness. Imported by the port and by the
@@ -98,7 +98,7 @@ with `source_id` set to the session id.
 
 ## The local adapter
 
-Located at `src/adapters/learning/local.ts`. Runs the library on every push and pull.
+Located at `packages/rafa-inventory/src/adapters/learning/local.ts`. Runs the library on every push and pull.
 
 ### Held set and logs
 
@@ -151,8 +151,8 @@ being asked to read `progress.txt` and decide.
 ### How it works
 
 1. Code computes `promotable` over the adapter's `pullBlessed` bundle
-   (`lessonsToPromote` in `src/start/wrap-up.ts`; `rafa instinct
-   promote` does the same) — lessons that recurred
+   (`lessonsToPromote` in `packages/rafa-run/src/start/wrap-up.ts`; `rafa
+   instinct promote` does the same) — lessons that recurred
    `learning.promote.after` distinct times and meet
    `learning.promote.minConfidence`. The port offers no held set, so a
    lesson tasks may not use is never promotable, and under `local` the
@@ -166,7 +166,7 @@ being asked to read `progress.txt` and decide.
    subject, or says why not, in a `rafa:promoted` block:
    - `id → path/to/context/page.md` — lesson promoted.
    - `id → skipped: <reason>` — lesson not promoted.
-   - Ids come from `lessonId` in `src/report/lessons.ts`: a slug of the
+   - Ids come from `lessonId` in `packages/rafa-inventory/src/report/lessons.ts`: a slug of the
      trigger plus the first 8 hex digits of its action hash, never
      holding whitespace. A second line for an id already answered is
      unreadable, so an example block needs distinct ids.
@@ -175,12 +175,12 @@ being asked to read `progress.txt` and decide.
    - Every listed id must be answered.
    - Every named path must have changed in the working tree.
    - A promoted lesson gets `promoted_to: <path>`, a new optional field.
-     The port has no field-update call: `src/start/promoted-check.ts`
-     pushes the blessed record back with `promoted_to` set, from a
-     source it already holds, so `merge` collapses it as `same-action`
-     with `usage_count` and confidence unchanged. A user-scope lesson
-     has no held member to take a description from, so that push is
-     refused with a warning.
+     The port has no field-update call:
+     `packages/rafa-run/src/start/promoted-check.ts` pushes the blessed
+     record back with `promoted_to` set, from a source it already holds,
+     so `merge` collapses it as `same-action` with `usage_count` and
+     confidence unchanged. A user-scope lesson has no held member to take
+     a description from, so that push is refused with a warning.
    - A promoted lesson leaves every blessed bundle, because the page now
      carries it.
 

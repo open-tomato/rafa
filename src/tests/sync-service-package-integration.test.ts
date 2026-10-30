@@ -1,6 +1,6 @@
 /**
  * `loadModules` (`packages/rafa/src/modules/load.ts`) and `selectSync`
- * (`src/effort/sync/select.ts`) over the REAL
+ * (`packages/rafa-effort/src/effort/sync/select.ts`) over the REAL
  * `packages/rafa-sync-service` package, not the `sync-fixture` stand-in
  * `select.test.ts` drives: a `.rafa/config.yaml` naming `effort.sync:
  * service`, a `modules:` `path:` source at the package's directory, and
@@ -35,8 +35,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
-
-import { SyncModuleMissing, selectSync } from '../effort/sync/select.js';
+import { SyncModuleMissing, selectSync } from '@open-tomato/rafa-effort/effort/sync/select';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-sync-service-package-')));
 

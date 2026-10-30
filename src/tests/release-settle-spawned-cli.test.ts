@@ -1,11 +1,11 @@
 /**
- * `rafa release settle [--dry-run]` (`src/commands/release/settle.ts`)
+ * `rafa release settle [--dry-run]` (`packages/rafa-release/src/commands/release/settle.ts`)
  * spawned as the real `rafa` binary — `runRafa`, `src/tests/cli-capture.ts`
  * — over a bare origin and two clones: one landing fragments on `main` the
  * way a merge would, the other the caller's own checkout, on a feature
  * branch, that every `rafa release settle` in this file runs from.
  *
- * `src/commands/release/settle.test.ts` and `src/release/settle-push.test.ts`
+ * `src/tests/release-coupled/commands/release/settle.test.ts` and `packages/rafa-release/src/release/settle-push.test.ts`
  * already drive the same shape in-process, over `dispatchInProject` and
  * `withSettleWorktree` directly; this file's own question is narrower and
  * disjoint from both — whether the REGISTERED command, spawned as a
@@ -17,7 +17,7 @@
  * that exits 0 and writes nothing more.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { Fragment } from '../release/fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,10 +26,10 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** A temporary directory of this file's own. */

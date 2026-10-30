@@ -30,6 +30,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { DEFAULT_ROUTES, DEFAULT_ROUTING } from '@open-tomato/rafa-inventory/tiers/routing';
 
 import {
   buildPlanPrompt,
@@ -41,10 +43,7 @@ import {
   ROUTING_HEADING,
   stubFromSpecPath,
 } from '../plan.js';
-import { DEFAULT_ROUTES, DEFAULT_ROUTING } from '../tiers/routing.js';
 import { deferUntil, msUntil } from '../utils/schedule.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 describe('msUntil', () => {
   it('computes the delay to a later time today', () => {

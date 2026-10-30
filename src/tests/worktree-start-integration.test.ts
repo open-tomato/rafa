@@ -5,8 +5,8 @@
  * deliberately never reaches, since every one of its cases stops before
  * any session runs.
  *
- * `src/start/worktree.test.ts` already pins `addRunWorktree`'s argv and
- * refusals over a stubbed `GitRunner`, and `src/start/run-checkout.test.ts`
+ * `src/tests/run-coupled/start/worktree.test.ts` already pins `addRunWorktree`'s argv and
+ * refusals over a stubbed `GitRunner`, and `src/tests/run-coupled/start/run-checkout.test.ts`
  * pins that `--as-worktree` settles the checkout to the worktree's path
  * with seams standing in for git. Neither proves the ONE thing this file
  * does: that a real task session, dispatched with the worktree as its
@@ -39,11 +39,12 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 
 import { plantScratchRepo } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

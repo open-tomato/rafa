@@ -190,8 +190,7 @@ import {
 import { sessionSpawnEnv } from '@open-tomato/rafa/core/loop/session-env';
 import { setActiveOutput } from '@open-tomato/rafa/core/output/active';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '@open-tomato/rafa/core/plan';
-
-import { sinkOutput } from '../../../output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 /** No agent definition here declares an effort of its own. */
 const NO_OWN_EFFORT: AgentEffortLookup = () => false;

@@ -1,0 +1,235 @@
+/**
+ * Tests for the merge follow-ups (`merge-followups.ts`): which of the
+ * two applies for each reading, in which order, and what a
+ * `package.json` text is read as.
+ *
+ * Both functions are pure and total, so every case is a literal: no
+ * repository is planted, no home is read, and nothing is spawned. The
+ * gathering is `merge-cleanup.ts`'s, and `merge-cleanup.test.ts`
+ * measures it over a scratch repository.
+ *
+ * The rafa-checkout cases read the package name from
+ * {@link RAFA_PACKAGE_NAME} rather than spelling `@open-tomato/rafa`
+ * again, since that constant is what `self-update`'s own install
+ * refuses over; the control beside them is a literal foreign name,
+ * which holds the check to something it could fail. The settle command
+ * is checked against the name `rafa release settle` registers under,
+ * so the line cannot name a command `rafa` would not route.
+ */
+import type { FollowUpReading } from './merge-followups.js';
+import type { SettleWaiting } from '../../pr/settle-waiting.js';
+import type { ReleaseMove } from '@open-tomato/rafa-release/release/release-move';
+
+import { RAFA_PACKAGE_NAME } from '@open-tomato/rafa/core/runtime';
+import { createReleaseSettleCommand } from '@open-tomato/rafa-release/commands/release/settle';
+import { moveSpelling } from '@open-tomato/rafa-release/release/release-move';
+import { versionTag } from '@open-tomato/rafa-release/release/version-tag';
+import { describe, expect, it } from 'bun:test';
+
+import { afterLoopsPhrase, readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND } from './merge-followups.js';
+
+/** Two fragments waiting on main that fold into 0.5.0. */
+const WAITING: SettleWaiting = { base: 'main', fragments: 2, version: '0.5.0' };
+
+const MOVES: readonly ReleaseMove[] = [
+  { package: null, dir: '.', from: '0.4.0', to: '0.5.0' },
+  { package: '@scope/plugin', dir: 'packages/plugin', from: '0.1.0', to: '0.2.0' },
+];
+
+/** The two moves spelled as `settleWaitingOn` spells them: the root's bare, the package's `<name>@<version>`. */
+const TWO_MOVES: SettleWaiting = { base: 'main', fragments: 2, version: MOVES.map(moveSpelling).join(', ') };
+
+/** A reading of a rafa checkout on a version nothing has installed, with fragments waiting, filled from `over`. */
+function reading(over: Partial<FollowUpReading> = {}): FollowUpReading {
+  return {
+    version: '0.4.0',
+    rafaCheckout: true,
+    runtimeInstalled: false,
+    settle: WAITING,
+    liveLoopBranches: [],
+    ...over,
+  };
+}
+
+/** The ids the follow-ups of `given` carry, in order. */
+function idsOf(given: FollowUpReading): readonly string[] {
+  return readFollowUps(given).map((followUp) => followUp.id);
+}
+
+describe('the tag spelling', () => {
+  it('is the version with a v in front, which is what this repository tags', () => {
+    expect(versionTag('0.4.0')).toBe('v0.4.0');
+  });
+});
+
+describe('which follow-ups apply', () => {
+  it('names both for an uninstalled version with fragments waiting, settle last', () => {
+    const followUps = readFollowUps(reading());
+
+    expect(followUps.map((followUp) => followUp.command)).toEqual(['rafa self-update', 'rafa release settle']);
+    expect(followUps[0]?.why).toBe('0.4.0 is not installed as this machine\'s rafa runtime');
+    expect(followUps[1]?.why).toBe('2 fragments wait on main and fold into 0.5.0');
+  });
+
+  it('names a root move and a package move in the settle why, joined by a comma', () => {
+    const followUps = readFollowUps(reading({ settle: TWO_MOVES }));
+
+    expect(TWO_MOVES.version).toBe('0.5.0, @scope/plugin@0.2.0');
+    expect(followUps.at(-1)?.why).toBe('2 fragments wait on main and fold into 0.5.0, @scope/plugin@0.2.0');
+  });
+
+  it('keeps settle last in every combination that names it', () => {
+    for (const rafaCheckout of [true, false]) {
+      for (const runtimeInstalled of [true, false]) {
+        const ids = idsOf(reading({ rafaCheckout, runtimeInstalled }));
+        expect(ids.at(-1)).toBe('release-settle');
+      }
+    }
+  });
+
+  it('counts one fragment in the singular', () => {
+    const followUps = readFollowUps(reading({ settle: { base: 'trunk', fragments: 1, version: '1.0.1' } }));
+
+    expect(followUps.at(-1)?.why).toBe('1 fragment waits on trunk and folds into 1.0.1');
+  });
+
+  it('names neither when nothing waits and the version is installed, which is the ordinary merge', () => {
+    expect(idsOf(reading({ settle: null, runtimeInstalled: true }))).toEqual([]);
+  });
+
+  it('names settle alone in a project that is no rafa checkout, where self-update would refuse', () => {
+    expect(idsOf(reading({ rafaCheckout: false }))).toEqual(['release-settle']);
+  });
+
+  it('names the update alone where no fragment waits', () => {
+    expect(idsOf(reading({ settle: null }))).toEqual(['self-update']);
+  });
+
+  it('leaves the update out for a version already installed, which rafa self-update would refuse', () => {
+    expect(idsOf(reading({ runtimeInstalled: true }))).toEqual(['release-settle']);
+  });
+
+  it('names settle for a project with no readable package.json version, since the fold reads the version file', () => {
+    expect(idsOf(reading({ version: null }))).toEqual(['release-settle']);
+    expect(idsOf(reading({ version: null, settle: null }))).toEqual([]);
+  });
+
+  it('never names the tag, which settle now owns', () => {
+    const commands = readFollowUps(reading()).map((followUp) => followUp.command);
+
+    expect(commands).not.toContain('rafa release tag');
+  });
+
+  it('answers a frozen list of frozen follow-ups, so a caller cannot change what a later one says', () => {
+    const followUps = readFollowUps(reading());
+
+    expect(Object.isFrozen(followUps)).toBe(true);
+    expect(followUps.every((followUp) => Object.isFrozen(followUp))).toBe(true);
+  });
+
+  it('names no command an operator would have to reach past rafa for', () => {
+    const commands = readFollowUps(reading()).map((followUp) => followUp.command);
+
+    expect(commands.every((command) => command.startsWith('rafa '))).toBe(true);
+  });
+});
+
+describe('the settle command', () => {
+  it('is the name the settle command registers under', () => {
+    expect(RELEASE_SETTLE_COMMAND).toBe(`rafa ${createReleaseSettleCommand().name}`);
+  });
+});
+
+describe('the update beside a live loop', () => {
+  /** The reason the update follow-up of `given` carries. */
+  function updateWhy(given: FollowUpReading): string | undefined {
+    return readFollowUps(given).find((followUp) => followUp.id === 'self-update')?.why;
+  }
+
+  it('says to run it after the loop on that branch finishes while one loop is live', () => {
+    expect(updateWhy(reading({ liveLoopBranches: ['feature/a'] })))
+      .toBe('0.4.0 is not installed as this machine\'s rafa runtime; run it after the loop on feature/a finishes');
+  });
+
+  it('says nothing of a loop while none is live, the control the phrase is measured against', () => {
+    expect(updateWhy(reading())).toBe('0.4.0 is not installed as this machine\'s rafa runtime');
+  });
+
+  it('keeps the command itself bare, so the line still names what an operator types', () => {
+    const update = readFollowUps(reading({ liveLoopBranches: ['feature/a'] })).find((followUp) => followUp.id === 'self-update');
+
+    expect(update?.command).toBe('rafa self-update');
+  });
+
+  it('names every live loop\'s branch in the order given, each once', () => {
+    expect(updateWhy(reading({ liveLoopBranches: ['feature/a', 'feature/b', 'feature/a', 'feature/c'] })))
+      .toEndWith('; run it after the loops on feature/a, feature/b and feature/c finish');
+  });
+
+  it('says a loop record cannot be read, rather than naming the update bare, when the branches are unknown', () => {
+    expect(updateWhy(reading({ liveLoopBranches: null })))
+      .toEndWith('; a loop record under .rafa/runs cannot be read, and rafa self-update refuses until it can');
+  });
+
+  it('leaves the settle follow-up alone, since settle does not wait for a loop', () => {
+    /** The reason the settle follow-up of `given` carries. */
+    function settleWhy(given: FollowUpReading): string | undefined {
+      return readFollowUps(given).find((followUp) => followUp.id === 'release-settle')?.why;
+    }
+
+    expect(settleWhy(reading({ liveLoopBranches: ['feature/a'] }))).toBe(settleWhy(reading()));
+  });
+
+  it('names no update at all for an installed version, a live loop or not', () => {
+    expect(idsOf(reading({ runtimeInstalled: true, liveLoopBranches: ['feature/a'] }))).toEqual(['release-settle']);
+  });
+});
+
+describe('afterLoopsPhrase', () => {
+  it('reads one branch in the singular and two in the plural', () => {
+    expect(afterLoopsPhrase(['feature/a'])).toBe('after the loop on feature/a finishes');
+    expect(afterLoopsPhrase(['feature/a', 'feature/b'])).toBe('after the loops on feature/a and feature/b finish');
+  });
+
+  it('reads one branch named twice as one loop', () => {
+    expect(afterLoopsPhrase(['feature/a', 'feature/a'])).toBe('after the loop on feature/a finishes');
+  });
+});
+
+describe('what a package.json says', () => {
+  it('reads the version and the checkout a package.json naming rafa itself carries', () => {
+    const facts = readPackageFacts(`{"name": "${RAFA_PACKAGE_NAME}", "version": "0.3.0"}`);
+
+    expect(facts).toEqual({ version: '0.3.0', rafaCheckout: true });
+  });
+
+  it('reads a project naming another package as no rafa checkout', () => {
+    expect(readPackageFacts('{"name": "@someone/else", "version": "1.0.0"}'))
+      .toEqual({ version: '1.0.0', rafaCheckout: false });
+  });
+
+  it('reads a package.json with no name at all as no rafa checkout', () => {
+    expect(readPackageFacts('{"version": "1.0.0"}')).toEqual({ version: '1.0.0', rafaCheckout: false });
+  });
+
+  it('reads a blank version, a version that is no string, and a name that is no string as absent', () => {
+    expect(readPackageFacts('{"version": "  "}').version).toBeNull();
+    expect(readPackageFacts('{"version": 3}').version).toBeNull();
+    expect(readPackageFacts('{"name": 3, "version": "1.0.0"}').rafaCheckout).toBe(false);
+  });
+
+  it('reads a text that is no JSON object as neither fact, rather than throwing', () => {
+    expect(readPackageFacts('not json at all')).toEqual({ version: null, rafaCheckout: false });
+    expect(readPackageFacts('[]')).toEqual({ version: null, rafaCheckout: false });
+    expect(readPackageFacts('null')).toEqual({ version: null, rafaCheckout: false });
+    expect(readPackageFacts('')).toEqual({ version: null, rafaCheckout: false });
+  });
+
+  it('trims the version, so a tag is spelled from the version and not from its blanks', () => {
+    expect(readPackageFacts('{"version": " 0.4.0\\n"}').version).toBe('0.4.0');
+  });
+
+  it('trims the name, so a manifest written with blanks around it still reads as the checkout', () => {
+    expect(readPackageFacts(`{"name": " ${RAFA_PACKAGE_NAME}\\n", "version": "1.0.0"}`).rafaCheckout).toBe(true);
+  });
+});

@@ -49,8 +49,7 @@ import type {
   SessionChecklist,
   SessionEta,
 } from '@open-tomato/rafa/core/loop/readings';
-import type { TaskCounts } from '@open-tomato/rafa/core/plan';
-import type { PlanTask } from '@open-tomato/rafa-run';
+import type { PlanTask, TaskCounts } from '@open-tomato/rafa/core/plan';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';

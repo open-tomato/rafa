@@ -1,10 +1,10 @@
 /**
  * The owner gate (`./owner-approval.ts`) exercised over a real scratch
  * repository — a CODEOWNERS file actually read off disk
- * (`readBoardOwnership`, `src/board/board-owns.ts`), and every reading
+ * (`readBoardOwnership`, `packages/rafa-board/src/board/board-owns.ts`), and every reading
  * the gate takes (`changedFiles`, `reviews`, the owner resolution and the
  * team membership lookup) sent to a stand-in `gh`
- * (`createGhRunner`, `src/adapters/tracker/github.ts`) rather than to a
+ * (`createGhRunner`, `packages/rafa-board/src/adapters/tracker/github.ts`) rather than to a
  * literal double, the way `owner-approval.test.ts` drives it.
  *
  * Five boards share one CODEOWNERS file: home (`#10`, `/home/`) and four
@@ -20,8 +20,8 @@
  *  - `#50`, `/approved/`, owned by `@org/web` — bob's `APPROVED` review,
  *    and an active `gh api …/memberships/bob`: `approved`.
  */
-import type { OwnerApprovalRequest, OwnerApprovalSeams } from './owner-approval.js';
-import type { OwnedBoard } from '../board/board-owns.js';
+import type { OwnedBoard } from '@open-tomato/rafa-board/board/board-owns';
+import type { OwnerApprovalRequest, OwnerApprovalSeams } from '@open-tomato/rafa-pr/pr/owner-approval';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,14 +29,14 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGhRunner } from '../adapters/tracker/github.js';
-import { readBoardOwnership } from '../board/board-owns.js';
-import { createOwnerResolver } from '../board/owner-resolve.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
-import { hostToolDirs } from '../tests/stand-in-gh.js';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { createGhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { readBoardOwnership } from '@open-tomato/rafa-board/board/board-owns';
+import { createOwnerResolver } from '@open-tomato/rafa-board/board/owner-resolve';
+import { createGhPullRequests } from '@open-tomato/rafa-pr/pr/gh';
+import { createGhTeamMembership, readOwnerApproval } from '@open-tomato/rafa-pr/pr/owner-approval';
 
-import { createGhPullRequests } from './gh.js';
-import { createGhTeamMembership, readOwnerApproval } from './owner-approval.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-owner-approval-integration-')));

@@ -20,7 +20,7 @@
  *
  * ## Who reads it
  *
- * A bug's `Versions` section (`src/bugs/versions.ts`) names the package
+ * A bug's `Versions` section (`packages/rafa/src/bugs/versions.ts`) names the package
  * of the file the error points at. The run contract's `ctx.packages`
  * (#119), the workspace packages a change reaches, is this over each
  * changed file.

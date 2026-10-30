@@ -2,7 +2,7 @@
  * Tests for the `index.ts` barrel: it exports every name `registry.ts`
  * exports, each once, as the same binding, and no other name, and it
  * loads no adapter, so the barrel, `registry.ts` and
- * `src/effort/sync/select.ts` load whichever comes first.
+ * `packages/rafa-effort/src/effort/sync/select.ts` load whichever comes first.
  *
  * The barrel spells its names, so a name added to `registry.ts` and not
  * to the barrel is a name no file outside `packages/rafa/src/core/` can import.
@@ -25,7 +25,7 @@
  * found, so it imports no adapter.
  *
  * The load cases read `packages/rafa/src/core/adapters/index.ts`, `registry.ts` and
- * `src/effort/sync/select.ts`, the three files of the cycle the barrel's
+ * `packages/rafa-effort/src/effort/sync/select.ts`, the three files of the cycle the barrel's
  * note records as gone, each imported first in a child `bun`, since this
  * file has already imported two of them by the time a case runs. Each
  * child imports the composition root `src/adapter-registry.ts` after
@@ -50,7 +50,7 @@ import type { Adapter } from './registry.js';
 
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import * as registry from './registry.js';
@@ -61,15 +61,20 @@ const ROOT = resolve(import.meta.dir, '../../../../..');
 
 const BARREL = 'packages/rafa/src/core/adapters/index.ts';
 const REGISTRY = 'packages/rafa/src/core/adapters/registry.ts';
-const SELECT = 'src/effort/sync/select.ts';
+const SELECT = 'packages/rafa-effort/src/effort/sync/select.ts';
 const ROOT_MODULE = 'src/adapter-registry.ts';
 
 /** What every member of `CORE_ADAPTER_REGISTRY` throws while nothing is registered. */
 const UNREGISTERED = 'adapter registry: no adapter is registered: call registerCoreAdapters()'
   + ' from src/adapter-registry.ts before reading CORE_ADAPTER_REGISTRY';
 
+/** Every path a case reads the export names of, in the order the cases first name them. */
+const EXPORT_PATHS: readonly string[] = [BARREL, REGISTRY];
+
 /**
- * Every export name of each file, types included, sorted.
+ * Every export name of each file, types included, sorted. Runs once,
+ * from the `beforeAll`, over {@link EXPORT_PATHS}, so no case pays for
+ * the compile inside its own timeout.
  *
  * @param paths - Repository-relative paths of the modules to read.
  * @returns The names by path.
@@ -99,6 +104,19 @@ function readExportNames(paths: readonly string[]): Record<string, string[]> {
   return names;
 }
 
+let exportNames: Record<string, string[]> | null = null;
+
+/**
+ * The export names by path, once `beforeAll` has read them.
+ *
+ * @returns The names by path of every file in {@link EXPORT_PATHS}.
+ * @throws When the `beforeAll` never ran.
+ */
+function storedExportNames(): Record<string, string[]> {
+  if (exportNames === null) throw new Error('the export names were never read');
+  return exportNames;
+}
+
 /**
  * Runs a child `bun` that imports `first` before the other two files,
  * then the composition root unless `withRoot` is false, then resolves
@@ -125,6 +143,10 @@ function loadingFirst(first: string, withRoot = true): { exitCode: number; stdou
 }
 
 describe('the adapters barrel', () => {
+  beforeAll(() => {
+    exportNames = readExportNames(EXPORT_PATHS);
+  }, 30_000);
+
   it('exports the runtime names of registry.ts, each once, and no other', () => {
     const expected = Object.keys(registry).sort();
 
@@ -168,7 +190,7 @@ describe('the adapters barrel', () => {
   });
 
   it('exports the type names of registry.ts with the runtime ones, each once, and no other', () => {
-    const names = readExportNames([BARREL, REGISTRY]);
+    const names = storedExportNames();
 
     expect(names[REGISTRY]).toContain('CORE_ADAPTER_REGISTRY');
     expect(names[REGISTRY]).toContain('AdapterContext');

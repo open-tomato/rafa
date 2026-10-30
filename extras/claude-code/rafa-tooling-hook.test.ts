@@ -4,9 +4,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
-import { describeRegistry } from '../../src/cli/describe';
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
+import { PR_SHOW_JSON_FIELDS } from '@open-tomato/rafa-pr/commands/pr/declarations';
+
 import { CORE_REGISTRY } from '../../src/commands/index';
-import { PR_SHOW_JSON_FIELDS } from '../../src/commands/pr/declarations';
 
 import {
   commandsOf,
@@ -484,7 +485,7 @@ describe('drift from what rafa describe says', () => {
   });
 
   test('every field the hook says pr show answers is read into the detail, the checks or the closes', async () => {
-    const source = await Bun.file(`${import.meta.dir}/../../src/pr/gh.ts`).text();
+    const source = await Bun.file(`${import.meta.dir}/../../packages/rafa-pr/src/pr/gh.ts`).text();
     const detail = /const SUMMARY_FIELDS = '([^']*)'/.exec(source)?.[1].split(',') ?? [];
     const more = /const DETAIL_FIELDS = `[^,]*,([^`]*)`/.exec(source)?.[1].split(',') ?? [];
     const readIn = new Set([...detail, ...more.filter((field) => !field.startsWith('$')), 'statusCheckRollup', 'closingIssuesReferences']);

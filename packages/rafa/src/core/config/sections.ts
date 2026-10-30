@@ -28,11 +28,14 @@
  * through the `naming.branch` template, `branchGlob` and `stubOfBranch`.
  * It imports `config-readers.ts` alone, so it is a leaf as the pair is,
  * and it sits beside `branchFromTemplate`, the writer it reads back.
+ * `DEFAULT_BASE_BRANCH`, the base `pr.base` unset is read as, joined it
+ * from `packages/rafa-run/src/next/sources.ts`, so a reader of the base takes it beside
+ * `DEFAULT_BRANCH_TEMPLATE` without reaching `rafa next`'s composition.
  *
  * `merge-method.ts` joined with the words `pr.mergeMethod` takes, its
- * list and its guard, moved out of `src/pr/types.ts` so the release
+ * list and its guard, moved out of `packages/rafa/src/pr/types.ts` so the release
  * section reads them without reaching the pull request port. It imports
- * nothing, so it is a leaf too, and `src/pr/types.ts` re-exports its
+ * nothing, so it is a leaf too, and `packages/rafa/src/pr/types.ts` re-exports its
  * names from here.
  *
  * ## What it exports
@@ -77,7 +80,7 @@ export type {
 } from './config-sections.js';
 export type { MergeMethod } from './merge-method.js';
 
-export { branchGlob, stubOfBranch } from './branch-template.js';
+export { branchGlob, DEFAULT_BASE_BRANCH, stubOfBranch } from './branch-template.js';
 export {
   BRANCH_STUB,
   branchFromTemplate,

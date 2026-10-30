@@ -1,6 +1,6 @@
 /**
  * The check rows of a pull request and the verdict over them, which the
- * store's plan CI writer (`./plan-ci.ts`) reads and `src/pr/checks.ts`
+ * store's plan CI writer (`./plan-ci.ts`) reads and `packages/rafa-pr/src/pr/checks.ts`
  * re-exports for the poll and the provider that parse and wait on them.
  *
  * They sit in core so the store reads a verdict without importing the

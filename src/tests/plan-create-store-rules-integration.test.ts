@@ -28,12 +28,13 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { findStoreRuleProblems, storeRuleLine } from '@open-tomato/rafa-run/plan/store-rules';
+
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
-import { findStoreRuleProblems, storeRuleLine } from '../plan/store-rules.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig } from './cli-capture.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** `src/`, where the modules the probe imports sit. */
 const SRC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -72,10 +73,10 @@ const PROBE = [
   'registerCoreAdapters();',
   `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+  `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
   `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
-  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-board', 'src', 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',

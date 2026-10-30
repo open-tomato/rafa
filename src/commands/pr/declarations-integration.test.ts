@@ -10,7 +10,6 @@
 import { describe, expect, it } from 'bun:test';
 
 import { DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
-
 import {
   MERGE_DANGEROUS_PHRASES,
   PR_MERGE_DECLARATION,
@@ -18,7 +17,7 @@ import {
   PR_TRIAGE_DECLARATION,
   PR_WAIT_DECLARATION,
   WAIT_TIMEOUT_FLAG,
-} from './declarations.js';
+} from '@open-tomato/rafa-pr/commands/pr/declarations';
 
 describe('the values declarations.ts declares and copies', () => {
   it('declares HINT_FLAG_SPEC itself on pr wait, pr merge and pr triage, and an equal copy would not pass', () => {

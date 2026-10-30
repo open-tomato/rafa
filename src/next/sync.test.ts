@@ -41,7 +41,7 @@
  *  - a merge git refused read as a sync: 11 pass and 1 fail, the merge
  *    failure case alone. Nothing else spawns a merge that fails.
  */
-import type { GitResult, GitRunner } from '../pr/index.js';
+import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -49,7 +49,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/index.js';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 import { fastForwardBase } from './sync.js';
 

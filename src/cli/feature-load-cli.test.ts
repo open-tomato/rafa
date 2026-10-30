@@ -6,8 +6,9 @@
  *
  * `feature-load-probe.ts` is spawned with `bun`. In its roster mode it
  * does what `src/rafa.ts` does before dispatching (registers core's
- * config sections and adapters, builds `createRosterRegistry()`, renders
- * every help level and `describeRegistry`) and prints the modules of
+ * config sections, adapters and services, builds
+ * `createRosterRegistry()`, renders every help level and
+ * `describeRegistry`) and prints the modules of
  * `require.cache` relative to the repository root. The cases hold that:
  *
  *   - none of the modules `src/commands/<subject>/<action>.ts` of a
@@ -31,9 +32,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { configFilePath } from '@open-tomato/rafa/core/config';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 
 import { expectExit } from '../tests/cli-capture.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 /** The repository root: the probe's working directory. */
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -123,8 +124,8 @@ describe('the roster in a fresh process', () => {
     const modules = reading.featureActions.map(modulePath);
     expect(reading.loaded.filter((path) => modules.includes(path))).toEqual([]);
     // Controls: the reading sees the declarations and a core command, so an empty answer is no blind one.
-    expect(reading.loaded).toContain('src/commands/claim/declarations.ts');
-    expect(reading.loaded).toContain('src/commands/pr/declarations.ts');
+    expect(reading.loaded).toContain('packages/rafa-run/src/commands/claim/declarations.ts');
+    expect(reading.loaded).toContain('packages/rafa-pr/src/commands/pr/declarations.ts');
     expect(reading.loaded).toContain('src/commands/plan/list.ts');
   }, RUN_TIMEOUT);
 
@@ -144,7 +145,7 @@ describe('the roster in a fresh process', () => {
     expect(reading.refusal).not.toContain('failed to load');
     const siblings = reading.featureActions.filter((action) => action.feature === RUN_COMMAND.feature && action !== ran);
     expect(siblings.length).toBeGreaterThan(0);
-    expect(reading.loaded).toContain('src/commands/claim/release.ts');
+    expect(reading.loaded).toContain('packages/rafa-run/src/commands/claim/release.ts');
     expect(reading.loaded.filter((path) => siblings.map(modulePath).includes(path))).toEqual([]);
   }, RUN_TIMEOUT);
 

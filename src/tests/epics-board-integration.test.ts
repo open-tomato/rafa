@@ -1,8 +1,8 @@
 /**
  * An integration test over the three pure readers a `gh issue list`
  * answer flows through end to end: `parseBoardListing`
- * (`src/board/roadmap-board.ts`), `readEpics` and `readEpicProblems`
- * (`src/board/epics.ts`, `src/board/epic-problems.ts`).
+ * (`packages/rafa-board/src/board/roadmap-board.ts`), `readEpics` and `readEpicProblems`
+ * (`packages/rafa-board/src/board/epics.ts`, `packages/rafa-board/src/board/epic-problems.ts`).
  *
  * Each of those three has its own unit tests over a literal `BoardIssue`
  * listing built by hand; this file instead plants ONE `gh issue list
@@ -29,9 +29,9 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { readEpicProblems } from '../board/epic-problems.js';
-import { readEpics } from '../board/epics.js';
-import { parseBoardListing } from '../board/roadmap-board.js';
+import { readEpicProblems } from '@open-tomato/rafa-board/board/epic-problems';
+import { readEpics } from '@open-tomato/rafa-board/board/epics';
+import { parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 /** One `gh issue list --json ...` row, labels already named. */
 function ghRow(

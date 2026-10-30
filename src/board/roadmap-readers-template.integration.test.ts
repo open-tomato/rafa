@@ -9,9 +9,9 @@
  * skips the line as taken. Each reading sits beside the control of the
  * same reader with the template left out, which finds no branch.
  */
-import type { SpecIssue } from './issue.js';
-import type { BoardIssue } from './roadmap-board.js';
-import type { RoadmapSeams } from './spec-source-roadmap.js';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
+import type { BoardIssue } from '@open-tomato/rafa-board/board/roadmap-board';
+import type { RoadmapSeams } from '@open-tomato/rafa-board/board/spec-source-roadmap';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,15 +19,14 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { typeOfLabels } from '../adapters/tracker/github.js';
-import { makeOwnershipCommit, pushNewClaimBranch } from '../claims/git.js';
-import { createGitRunner } from '../pr/index.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-
-import { readHorizonChange } from './epic-horizon.js';
-import { claimsOf } from './roadmap-epic-rows.js';
-import { hasText, readLineRows } from './roadmap-rows.js';
-import { pickRoadmapIssue } from './spec-source-roadmap.js';
+import { makeOwnershipCommit, pushNewClaimBranch } from '@open-tomato/rafa/claims/git';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { typeOfLabels } from '@open-tomato/rafa-board/adapters/tracker/github';
+import { readHorizonChange } from '@open-tomato/rafa-board/board/epic-horizon';
+import { claimsOf } from '@open-tomato/rafa-board/board/roadmap-epic-rows';
+import { hasText, readLineRows } from '@open-tomato/rafa-board/board/roadmap-rows';
+import { pickRoadmapIssue } from '@open-tomato/rafa-board/board/spec-source-roadmap';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 
 const TEMPLATE = 'work/{stub}';
 const BRANCH = 'work/rafa-20-x';

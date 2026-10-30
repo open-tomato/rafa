@@ -2,11 +2,11 @@
  * An integration suite over `rafa issue ready` end to end: the command
  * itself, dispatched, and the offer `plan create --issue` and
  * `plan create --next` make with the very same run
- * (`src/commands/issue/ready.ts`, `src/commands/plan/ready-offer.ts`).
+ * (`packages/rafa-board/src/commands/issue/ready.ts`, `src/commands/plan/ready-offer.ts`).
  *
  * `./ready.test.ts` drives the command's own cases and `./ready-offer.test.ts`
  * drives the offer's own wiring, each over a planted `run` or a planted
- * `readIssue`; `src/board/plan-spec.test.ts` drives both `plan create`
+ * `readIssue`; `packages/rafa-board/src/board/plan-spec.test.ts` drives both `plan create`
  * routes over a planted `offerReady` that never calls `issue ready` at
  * all. None of those three reaches what this file is about: that the
  * REAL {@link runIssueReady} — its trust reading, its completeness
@@ -32,10 +32,10 @@
  * origin` with one fixed `origin`, so a trust sentence names the same
  * repository everywhere.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { SpecRouteSeams } from '../commands/plan/spec-route.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -43,21 +43,21 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { BOARD_REFUSAL_EXIT } from '@open-tomato/rafa-board/board/exit-codes';
+import { SPEC_NEEDS_WORK_LABEL } from '@open-tomato/rafa-board/board/gate';
+import { SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { resolvePlanSpec } from '@open-tomato/rafa-board/board/plan-spec';
+import { SPEC_READY_LABEL, specReadyRefusalMessage } from '@open-tomato/rafa-board/board/readiness';
+import { createIssueReadyCommand, readyQuestion } from '@open-tomato/rafa-board/commands/issue/ready';
+import { completeSpecBody } from '@open-tomato/rafa-board/tests/spec-bodies';
 
-import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
-import { SPEC_NEEDS_WORK_LABEL } from '../board/gate.js';
-import { SPEC_LABEL } from '../board/issue.js';
-import { specPath } from '../board/naming.js';
-import { resolvePlanSpec } from '../board/plan-spec.js';
-import { SPEC_READY_LABEL, specReadyRefusalMessage } from '../board/readiness.js';
-import { createIssueReadyCommand, readyQuestion } from '../commands/issue/ready.js';
 import { createPlanReadyOffer } from '../commands/plan/ready-offer.js';
 import { resolveCreateSpec } from '../commands/plan/spec-route.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
-import { sinkOutput } from './output-sinks.js';
-import { completeSpecBody } from './spec-bodies.js';
 
 /** A temporary directory of this file's own, for every project and every repo root it plants. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-issue-ready-integration-')));

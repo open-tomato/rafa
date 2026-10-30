@@ -38,13 +38,12 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
-
-import { SKILL_DELIVERY } from '../tiers/delivery.js';
-import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '../tiers/serve.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { SKILL_DELIVERY } from '@open-tomato/rafa-inventory/tiers/delivery';
+import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '@open-tomato/rafa-inventory/tiers/serve';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
-import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));

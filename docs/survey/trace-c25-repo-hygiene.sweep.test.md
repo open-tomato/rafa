@@ -27,7 +27,7 @@ The test's module note explains the one trap in the extractor: the hook's commen
 
 - Outbound: none by import. It reaches `.githooks/pre-commit` and, through the hook's text, `scripts/control-byte-gate/` and `scripts/control-byte-gate/control-byte-gate.ts` (the control-byte gate, with its own `control-byte-gate.test.ts`); `scripts/` is outside the import graph, which covers `src/` and `packages/*/src/`, so those are not nodes. It spawns `git ls-files` once.
 - Inbound: none by import. Three tracked tests name the file as a literal path: `src/start/task-gate-lines.test.ts` and `src/start/dispatch.test.ts` use its path as a sample always-run sweep in their fixtures, and `src/tests/default-plan-dirs.sweep.test.ts` names it in a comment beside `routing-table-agents.sweep.test.ts`; none imports it.
-- Test reach, from `docs/survey/test-index.json`: index 0, 0 source files reached, no folders; `spawns: true`, through itself (the `git` child), which the index doubles into 0. It is selected by no changed file; it is an always-run sweep by its name (`.sweep.test.ts`, default `tests.alwaysRun` glob `src/**/*.sweep.test.ts` in `src/config-schema-tests.ts`), so every task's scoped run takes it, and its cost is one `git ls-files` and one file read. The survey's own check command runs it beside the spelling and git-identity sweeps.
+- Test reach, from `docs/survey/test-index.json`: index 0, 0 source files reached, no folders; `spawns: true`, through itself (the `git` child), which the index doubles into 0. It is selected by no changed file; it is an always-run sweep by its name (`.sweep.test.ts`, default `tests.alwaysRun` glob `src/**/*.sweep.test.ts` in `packages/rafa/src/config-schema-tests.ts`), so every task's scoped run takes it, and its cost is one `git ls-files` and one file read. The survey's own check command runs it beside the spelling and git-identity sweeps.
 
 ## Entry points
 
@@ -39,7 +39,7 @@ An entry point is a member imported from outside the cluster, or a command regis
 | --- | --- | --- | --- |
 | Commands | **missing** | none | a sweep is not a command |
 | Steps with guards | **missing** | none; the hook (`.githooks/pre-commit`) is a guard on staged content, outside rafa, and this test guards the hook | no registered step and no class; the hook is not a loop step |
-| Config section | **missing** | none | no key read; `tests.alwaysRun` (`src/config-schema-tests.ts`, `c03-config`) is what makes it run and is not read here |
+| Config section | **missing** | none | no key read; `tests.alwaysRun` (`packages/rafa/src/config-schema-tests.ts`, `c03-config`) is what makes it run and is not read here |
 | Flows | **missing** | none | no multi-step path is driven; two scans and one planted control |
 
 ### Commands

@@ -3,7 +3,7 @@
  * at is blocked: the first line under it that is ready, not blocked and
  * not taken, named by number and asked about.
  *
- * `src/board/blocked-line.ts` reads what the line waits on and finds the
+ * `packages/rafa-board/src/board/blocked-line.ts` reads what the line waits on and finds the
  * alternative, and asks nobody anything. This module is the half that
  * does: {@link createPlanBlockedOffer} answers the
  * {@link AlternativeOffer} `resolvePlanSpec` takes, and a run it answers
@@ -16,7 +16,7 @@
  * runs no command and writes nothing to the board: the yes it collects
  * moves the run past ONE roadmap line, and every check the issue it
  * names has to pass is the check a typed `--issue=<n>` would put it
- * through, run after the answer by `src/board/plan-spec.ts`. So a yes
+ * through, run after the answer by `packages/rafa-board/src/board/plan-spec.ts`. So a yes
  * here is not a decision about the issue — it is a decision about the
  * ORDER, which is the only thing a blocked line takes away.
  *
@@ -44,12 +44,12 @@
  * ({@link BlockedOfferSeams}), so every case in `./blocked-offer.test.ts`
  * drives a fake and none of them opens a terminal or waits on an answer.
  */
-import type { AlternativeOffer, AlternativeOfferRequest } from '../../board/blocked-line.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { AlternativeOffer, AlternativeOfferRequest } from '@open-tomato/rafa-board';
+
+import { alternativeQuestion } from '@open-tomato/rafa-board';
 
 import { createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
-
-import { alternativeQuestion } from '../../board/blocked-line.js';
 
 /** How the terminal and the question are reached; each left out is the system's own. */
 export interface BlockedOfferSeams {

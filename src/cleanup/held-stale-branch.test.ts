@@ -19,13 +19,13 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
+import { readCleanup, defaultCleanupSeams } from '@open-tomato/rafa-run/cleanup/index';
+
 import { cleanupGroups, createCleanupCommand } from '../commands/cleanup.js';
-import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, plantProjectConfig } from '../tests/cli-capture.js';
 
 import { createScratchRepository, SCRATCH_NOW } from './scratch-repository.js';
-
-import { readCleanup, defaultCleanupSeams } from './index.js';
 
 const HOLDER = 'wt-stale';
 

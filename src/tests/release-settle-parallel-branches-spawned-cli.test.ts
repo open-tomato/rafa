@@ -1,5 +1,5 @@
 /**
- * `rafa release settle` (`src/commands/release/settle.ts`), spawned as
+ * `rafa release settle` (`packages/rafa-release/src/commands/release/settle.ts`), spawned as
  * the real `rafa` binary — `src/tests/cli-capture.ts` — over two REAL
  * git branches that diverged from the same base commit (the shape a
  * "parallel" wrap-up leaves: two devices, or two plans on one device,
@@ -13,13 +13,13 @@
  * merge order, land without a conflict and fold into the SAME version
  * through one settle, with a receipt naming both fragments. The merge
  * order changes which commit is the first-parent add of which fragment
- * (`src/release/fragment-tree.ts`'s module note: a fast-forwarded branch's
+ * (`packages/rafa-release/src/release/fragment-tree.ts`'s module note: a fast-forwarded branch's
  * own commit is the add, a later branch's is added by the merge commit
  * that brings it in), so the two cases below assert the receipt's order
  * flips with it while the version does not.
  */
 import type { ScratchRepo } from './cli-capture.js';
-import type { Fragment } from '../release/fragment.js';
+import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,10 +27,10 @@ import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { serializeFragment } from '../release/fragment.js';
+import { serializeFragment } from '@open-tomato/rafa/release/fragment';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
 /** A temporary directory of this file's own. */

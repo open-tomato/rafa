@@ -1,7 +1,7 @@
 /**
  * `rafa loop start --create-branch` on a detached HEAD, spawned as
  * `bun src/rafa.ts loop start` through `runRafa` in a scratch git
- * repository. `src/start/run-setup.test.ts` pins the refusal over the
+ * repository. `packages/rafa-run/src/start/run-setup.test.ts` pins the refusal over the
  * functions; this proves the whole command refuses with a non-zero exit,
  * naming the way on, before it creates a branch or opens a session
  * record under `.rafa/runs/`.
@@ -15,8 +15,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { describeRun, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 

@@ -19,11 +19,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { loadInvocationModules } from '@open-tomato/rafa/modules/load';
 
 import { dispatch } from '../../cli/dispatch.js';
-import { createCommandRegistry } from '../../cli/registry.js';
 import { eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { CORE_COMMANDS, CORE_SUBJECTS } from '../index.js';
 

@@ -7,7 +7,7 @@
  * ## Why only those rows
  *
  * A commit's gap is the minutes since the commit before it in time
- * (`assignElapsedMinutes`, `src/effort/commits.ts`), measured with
+ * (`assignElapsedMinutes`, `packages/rafa-effort/src/effort/commits.ts`), measured with
  * {@link minutesBetween}. A commit brought in between two commits here
  * changes exactly two gaps: its own, which the other store measured
  * against its own neighbours, and that of the commit after it, which now

@@ -5,11 +5,11 @@
  * what a command does when it cannot reach the hub.
  *
  * Its push and pull each append their direction, one line per call, to
- * `.rafa/sync-calls.log` under the repository the adapter is made for,
- * so a case counts the contacts a command made, then reject with an
- * error named `HubUnreachable`, as `src/effort/sync/contact.ts` reads
- * one. The error is a plain `Error` so renamed: a module imports no
- * value from core.
+ * `.rafa/sync-calls.log` under the repository the adapter is made for, so a
+ * case counts the contacts a command made, then reject with an error named
+ * `HubUnreachable`, as `packages/rafa-effort/src/effort/sync/contact.ts` reads
+ * one. The error is a plain `Error` so renamed: a module imports no value from
+ * core.
  */
 import type { AdapterContext } from '../../../core/adapters/index.js';
 import type { Sync } from '../../../ports/index.js';

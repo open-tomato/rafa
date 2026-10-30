@@ -68,16 +68,16 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { renderCloseComment } from '../board/epic-trail.js';
-import { BOARD_LIST_FIELDS, BOARD_LISTING_LIMIT } from '../board/roadmap-board.js';
-import { EPIC_CLOSE_REFUSAL_EXIT } from '../commands/epic/close.js';
-import { ACCEPT_UNCHECKED_FLAG } from '../commands/epic/declarations.js';
-import { MEMBERSHIP_NOTE, renderEpicCost } from '../effort/epic-cost.js';
-import { VERIFY_PROMPT_PREFIX } from '../epic/verify-plan.js';
-import { CHECK_PROMPT_PREFIX } from '../epic/verify-run.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { renderCloseComment } from '@open-tomato/rafa-board/board/epic-trail';
+import { BOARD_LIST_FIELDS, BOARD_LISTING_LIMIT } from '@open-tomato/rafa-board/board/roadmap-board';
+import { EPIC_CLOSE_REFUSAL_EXIT } from '@open-tomato/rafa-board/commands/epic/close';
+import { ACCEPT_UNCHECKED_FLAG } from '@open-tomato/rafa-board/commands/epic/declarations';
+import { VERIFY_PROMPT_PREFIX } from '@open-tomato/rafa-board/epic/verify-plan';
+import { CHECK_PROMPT_PREFIX } from '@open-tomato/rafa-board/epic/verify-run';
+import { MEMBERSHIP_NOTE, renderEpicCost } from '@open-tomato/rafa-effort/effort/epic-cost';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-close-spawn-')));

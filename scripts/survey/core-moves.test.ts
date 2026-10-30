@@ -36,10 +36,11 @@ describe('CORE_BARRELS', () => {
     }
   });
 
-  it('lists thirteen barrels, three of them for config, three for loop and two for plan', () => {
+  it('lists fifteen barrels, two of them for command, three for config, three for loop and two for plan', () => {
     expect(barrelPaths()).toEqual([
       'packages/rafa/src/core/adapters/index.ts',
       'packages/rafa/src/core/command/index.ts',
+      'packages/rafa/src/core/command/parseArgs.ts',
       'packages/rafa/src/core/config/index.ts',
       'packages/rafa/src/core/config/load.ts',
       'packages/rafa/src/core/config/sections.ts',
@@ -51,6 +52,7 @@ describe('CORE_BARRELS', () => {
       'packages/rafa/src/core/plan/block-reader.ts',
       'packages/rafa/src/core/plan/index.ts',
       'packages/rafa/src/core/runtime/index.ts',
+      'packages/rafa/src/core/services/index.ts',
     ]);
   });
 
@@ -133,7 +135,7 @@ describe('isCoreRead', () => {
   });
 
   it('refuses a file outside core, another test under src/tests/ and a folder that only shares the parked prefix', () => {
-    expect(isCoreRead('src/board/place.ts')).toBe(false);
+    expect(isCoreRead('packages/rafa-board/src/board/place.ts')).toBe(false);
     expect(isCoreRead('src/tests/core-barrels.sweep.test.ts')).toBe(false);
     expect(isCoreRead('src/tests/core-coupled-notes.ts')).toBe(false);
   });

@@ -17,7 +17,7 @@ import {
   CLAIM_SUBJECT,
   CLAIM_TAKE_DECLARATION,
   CLAIM_TAKE_STALE_FLAG,
-} from './declarations.js';
+} from '@open-tomato/rafa-run/commands/claim/declarations';
 
 describe('the claim declarations', () => {
   it('names the claim subject, frozen', () => {

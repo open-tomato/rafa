@@ -54,9 +54,9 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '@open-tomato/rafa/core/loop';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
 import { expectExit } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 import {
   PLAN_FLAG,
   PLAN_OPEN,

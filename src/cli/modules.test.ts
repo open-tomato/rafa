@@ -24,7 +24,7 @@
  * swallows one, reddened 4, two of them in `dispatch.test.ts`. A relative
  * entry imported reddened 2, and a refused mount swallowed 1.
  */
-import type { CommandRegistry } from './registry.js';
+import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,10 +33,10 @@ import { pathToFileURL } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry, mountKey } from '@open-tomato/rafa/cli/registry';
 import * as load from '@open-tomato/rafa/modules/load';
 
 import { importModuleEntry, loadModuleCommands } from './modules.js';
-import { createCommandRegistry, mountKey } from './registry.js';
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-modules-'));
 

@@ -39,7 +39,7 @@
  * imports this module, so the stretch logic can move into its own
  * package.
  */
-import { shellQuote } from '@open-tomato/rafa-pr';
+import { shellQuote } from '@open-tomato/rafa/utils/shell';
 
 import { tmuxSessionName, tmuxTarget } from './folder.js';
 import { OPERATOR_PREFIX } from './operators.js';

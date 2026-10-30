@@ -33,9 +33,9 @@
  * Every case plants its tracker under this file's own temporary
  * directory; nothing here reads a real plan, the home or a real session.
  */
-import type { TaskSessionRunner } from '../../../start/dispatch.js';
 import type { CommitAttempt, CommitOptions } from '@open-tomato/rafa/core/git';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { TaskSessionRunner } from '@open-tomato/rafa-run/start/dispatch';
 
 import {
   mkdirSync,
@@ -58,14 +58,14 @@ import {
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration, stripTaskDeclaration , planStubFromPrompt , blockerComment, escapeBlockerText, splitBlockerComment } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask, insertTrackerTask, updateTrackerLine, writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
+import { classifyPromptContent } from '@open-tomato/rafa-effort/effort/classify';
+import { commitFinishedTask } from '@open-tomato/rafa-run/start/commit';
+import { BLOCKER_PROMPT_PREFIX, buildTaskPrompt, dispatchTask } from '@open-tomato/rafa-run/start/dispatch';
+import { setActivePlanStub } from '@open-tomato/rafa-run/start/stamp';
 
-import { classifyPromptContent } from '../../../effort/classify.js';
 import { parsePlan } from '../../../plan/index.js';
-import { commitFinishedTask } from '../../../start/commit.js';
-import { BLOCKER_PROMPT_PREFIX, buildTaskPrompt, dispatchTask } from '../../../start/dispatch.js';
-import { setActivePlanStub } from '../../../start/stamp.js';
-import { sinkOutput } from '../../output-sinks.js';
 
 /** The two spaces a tracker line puts before a block or a comment. */
 const GAP = '  ';

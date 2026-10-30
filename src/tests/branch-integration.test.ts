@@ -1,10 +1,10 @@
 /**
  * A scratch-repo integration suite for the branch offer
- * (`src/start/branch.ts` over `src/start/branch-decision.ts`), run end to
+ * (`packages/rafa-run/src/start/branch.ts` over `packages/rafa/src/start/branch-decision.ts`), run end to
  * end against a REAL git.
  *
- * `src/start/branch-decision.test.ts` pins what each reading answers off
- * a literal, and `src/start/branch.test.ts` drives the runner over a
+ * `packages/rafa/src/start/branch-decision.test.ts` pins what each reading answers off
+ * a literal, and `packages/rafa-run/src/start/branch.test.ts` drives the runner over a
  * stubbed `GitRunner` that answers from a scripted table — neither
  * reaches a real repository, by design, so together they pin the ORDER
  * and the ARGV of every effect without ever proving git agrees with any
@@ -35,9 +35,9 @@
  * suite never told git about directly, and the sha the new branch ends
  * on is read back off the real ref rather than asserted from a script.
  */
-import type { GitRunner } from '../pr/index.js';
-import type { BranchOutcome, BranchRequest, BranchSeams } from '../start/branch.js';
 import type { Prompter } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa-pr/pr/index';
+import type { BranchOutcome, BranchRequest, BranchSeams } from '@open-tomato/rafa-run/start/branch';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,11 +47,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { createGitRunner } from '../pr/index.js';
-import { offerRunBranch } from '../start/branch.js';
-
-import { sinkOutput } from './output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
+import { offerRunBranch } from '@open-tomato/rafa-run/start/branch';
 
 /** The plan stub every case runs, and the branch it names. */
 const STUB = 'rafa-49-scratch-branch';

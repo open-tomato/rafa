@@ -74,12 +74,11 @@
  * freely as the canonical one, so the dispatcher writes no deprecation
  * line for it (`dispatch.ts`).
  */
-import type { CommandAlias, CommandRegistry, ModuleMount, SubjectSpec } from './registry.js';
+import type { CommandAlias, CommandRegistry, ModuleMount, SubjectSpec } from '@open-tomato/rafa/cli/registry';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 
+import { HELP_WORD, mountKey } from '@open-tomato/rafa/cli/registry';
 import { commandSpelling } from '@open-tomato/rafa/core/command';
-
-import { HELP_WORD, mountKey } from './registry.js';
 
 /** The refusals a line routes to. */
 export const ROUTE_REFUSALS = [

@@ -5,7 +5,7 @@
  *
  * This is the command half. Reading the scopes — which files in a scope
  * are records, what one file reads as, `readScope` and
- * `readScopes` — is the library half, `src/schema/scope-records.ts`,
+ * `readScopes` — is the library half, `packages/rafa-inventory/src/schema/scope-records.ts`,
  * which the local Learning adapter and the skills report read too; this
  * file re-exports none of it.
  *

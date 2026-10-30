@@ -16,7 +16,7 @@ import {
   RELEASE_SUBJECT,
   RELEASE_TAG_DECLARATION,
   RELEASE_TAG_PUSH_FLAG,
-} from './declarations.js';
+} from '@open-tomato/rafa-release/commands/release/declarations';
 
 describe('the release declarations', () => {
   const declarations = [RELEASE_STATUS_DECLARATION, RELEASE_SETTLE_DECLARATION, RELEASE_TAG_DECLARATION];

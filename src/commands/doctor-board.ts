@@ -26,7 +26,7 @@
  * One row per part of the GitHub board `rafa init --board` makes — the
  * labels, the spec issue template, the Roadmap issue and
  * `roadmap.issue` — each read through `readBoardStatus`
- * (`src/board/status.ts`) as present, missing or, for a reading that
+ * (`packages/rafa-board/src/board/status.ts`) as present, missing or, for a reading that
  * failed, unknown. A run with any row that is not present ends those
  * lines with `rafa init --board` as the fix (`./doctor-render.ts`),
  * which is the one command that would change them.
@@ -57,7 +57,7 @@
  * `labels` mode only. Every issue carrying two `epic:` labels and every `epic:` label no
  * `type:epic` issue carries, named under `Epic labels:`
  * (`./doctor-epics.ts`), read off one board listing and worded by
- * `src/board/epic-problems.ts`, the only reader of either fault.
+ * `packages/rafa-board/src/board/epic-problems.ts`, the only reader of either fault.
  *
  * ## The relationships
  *

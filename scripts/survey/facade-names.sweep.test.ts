@@ -42,8 +42,8 @@ describe('the live rafa-effort reading', () => {
     const byName = new Map(live.names.map((name) => [name.name, name]));
     for (const name of ['collect', 'report']) {
       expect(byName.get(name)).toMatchObject({
-        declaredIn: `src/effort/${name}.ts`,
-        exportedBy: `src/effort/${name}.ts`,
+        declaredIn: `packages/rafa-effort/src/effort/${name}.ts`,
+        exportedBy: `packages/rafa-effort/src/effort/${name}.ts`,
         kind: 'value',
         viaDefault: true,
       });

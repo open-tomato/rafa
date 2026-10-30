@@ -187,14 +187,14 @@ describe('no tracked file outside the test suite still names .plans/ or .specs/'
   it('excludes *.test.ts files, everything under src/tests/, fixture paths, pre-init-dirs.ts and CHANGELOG.md, nothing else', () => {
     expect(isScannedPath('src/tests/default-plan-dirs.sweep.test.ts')).toBe(false);
     expect(isScannedPath('src/tests/loop-session-fixtures.ts')).toBe(false);
-    expect(isScannedPath('src/board/gate.test.ts')).toBe(false);
+    expect(isScannedPath('packages/rafa-board/src/board/gate.test.ts')).toBe(false);
     expect(isScannedPath('src/project/pre-init-dirs.ts')).toBe(false);
     expect(isScannedPath('CHANGELOG.md')).toBe(false);
     expect(isScannedPath('packages/rafa/src/effort/store/testdata/merge/scenario-4/a.json')).toBe(false);
     expect(isScannedPath('src/testdata-old/a.json')).toBe(true);
     expect(isScannedPath('docs/CHANGELOG.md')).toBe(true);
     expect(isScannedPath('AGENTS.md')).toBe(true);
-    expect(isScannedPath('src/board/gate.ts')).toBe(true);
+    expect(isScannedPath('packages/rafa-board/src/board/gate.ts')).toBe(true);
   });
 
   it('finds nothing in the live tree', () => {

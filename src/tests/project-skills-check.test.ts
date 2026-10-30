@@ -46,7 +46,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { checkDirectory } from '../check/run.js';
+import { checkDirectory } from '@open-tomato/rafa-inventory/check/run';
 
 /** This checkout's root, resolved off this file's own URL. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));

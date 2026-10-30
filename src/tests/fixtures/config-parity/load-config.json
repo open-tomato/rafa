@@ -236,6 +236,10 @@
       "value": ".rafa/worktrees",
       "source": "default"
     },
+    "loopWorktreeSetup": {
+      "value": null,
+      "source": "default"
+    },
     "loopWrapUpRetries": {
       "value": 1,
       "source": "default"

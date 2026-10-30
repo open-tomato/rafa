@@ -2,7 +2,7 @@
  * The commit row of the effort store and the gap arithmetic its rows
  * carry.
  *
- * Moved down from `src/effort/commits.ts`, which parses `git log` into
+ * Moved down from `packages/rafa-effort/src/effort/commits.ts`, which parses `git log` into
  * these rows and re-exports both names under the same names: the
  * store's row types (`types.ts`), the merge's gap recompute
  * (`merge-commit-gaps.ts`) and its scenario fixtures

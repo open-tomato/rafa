@@ -45,7 +45,7 @@ flowchart TD
 
 What is coupled here, in one sentence each:
 
-- **Consent is per action, spelled in argv** (`src/next/actions.ts`): `merge` gets `--yes`, `ready` and `unblock` get nothing, so the person answers twice. The chain cannot say "I already asked" in any way the step understands.
+- **Consent is per action, spelled in argv** (`packages/rafa-run/src/next/actions.ts`): `merge` gets `--yes`, `ready` and `unblock` get nothing, so the person answers twice. The chain cannot say "I already asked" in any way the step understands.
 - **The terminal is the chain's** (`src/commands/next.ts:217`): one step out of nine gets it back. Any other step that reads stdin, or spawns something that does, reads nothing.
 - **The chain knows the commands' flags by name.** Add a flag to `pr merge` and the chain's table must learn it; the chain and the command drift in two files.
 
@@ -77,7 +77,7 @@ flowchart TD
 
 Coupled:
 
-- **The branch offer and the branch guard are two units that must agree** (`start/branch-decision.ts` vs. the guard in `start.ts`): the offer stands aside three ways and lets the guard "have the last word". Two places, one decision.
+- **The branch offer and the branch guard are two units that must agree** (`packages/rafa/src/start/branch-decision.ts` vs. the guard in `start.ts`): the offer stands aside three ways and lets the guard "have the last word". Two places, one decision.
 - **`--any-branch` outranks `--create-branch` by code order**, not by declaration. Nothing says which flags are escape hatches.
 - **The step order is the function's line order** (`src/start.ts`, 230 lines). #71 already records this: 23 steps, 17 named, 6 inline, no registry.
 

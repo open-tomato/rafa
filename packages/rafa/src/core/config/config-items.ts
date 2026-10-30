@@ -117,7 +117,7 @@ export type PrerequisiteKind = (typeof PREREQUISITE_KINDS)[number];
 /**
  * Which of a run's dispatches need a plan's item: its tasks, its wrap-up,
  * or both. Read from the `[tasks]` or `[wrap-up]` marker of a
- * PREREQUISITES file (`src/preflight/prerequisites-md.ts`).
+ * PREREQUISITES file (`packages/rafa/src/preflight/prerequisites-md.ts`).
  */
 export type PrerequisiteScope = 'tasks' | 'wrap-up' | 'both';
 

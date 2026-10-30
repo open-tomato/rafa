@@ -45,7 +45,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { syncAddCalls, syncWriteCalls } from '../board/project/sync-fake.js';
+import { syncAddCalls, syncWriteCalls } from '@open-tomato/rafa-board/board/project/sync-fake';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { callsLogged, plantStandInGh } from './project-stand-in-spawn.js';

@@ -5,9 +5,8 @@ import { describe, expect, it } from 'bun:test';
 import { BUG_FIELDS, bugTitle, EMPTY_BUG_RECORD, parseBugRecord, renderBugBody } from '@open-tomato/rafa/bugs/record';
 import { DEFAULT_BUG_TITLE } from '@open-tomato/rafa/bugs/title';
 import { RAFA_CODES } from '@open-tomato/rafa/errors/rafa-codes';
-
-import { causeOf } from '../../../bugs/cause-rule.js';
-import { boundaryValueOf, summaryOf } from '../../../bugs/filed-values.js';
+import { causeOf } from '@open-tomato/rafa-board/bugs/cause-rule';
+import { boundaryValueOf, summaryOf } from '@open-tomato/rafa-pr/bugs/filed-values';
 
 /** The summary cap the composition cuts to. */
 const SUMMARY_MAX = 40;

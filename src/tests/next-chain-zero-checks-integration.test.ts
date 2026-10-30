@@ -1,7 +1,7 @@
 /**
  * A second scratch-repository suite, over a pull request that reports
  * no check at all (verdict `none`) rather than the green one
- * `./next-chain-integration.test.ts` merges. Row 7 of `src/next/state.ts`'s
+ * `./next-chain-integration.test.ts` merges. Row 7 of `packages/rafa-run/src/next/state.ts`'s
  * table proposes `merge-unchecked` for it, which `rafa next` hands over
  * to a real `pr merge <n> --skip-checks` with no `--yes` of its own
  * (`QUESTION_HANDED_OVER` in `src/commands/next.ts`) — so this probe is
@@ -71,15 +71,17 @@ function buildZeroChecksProbe(options: ZeroChecksProbeOptions): string {
   return [
     'import { writeFileSync } from "node:fs";',
     `import { registerCoreAdapters } from ${JSON.stringify(join(SRC_DIR, 'adapter-registry.ts'))};`,
+    `import { registerCoreServices } from ${JSON.stringify(join(SRC_DIR, 'service-registry.ts'))};`,
     `import { registerCoreConfigSections } from ${JSON.stringify(join(SRC_DIR, 'config-registry.ts'))};`,
     'registerCoreConfigSections();',
     'registerCoreAdapters();',
+    'registerCoreServices();',
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
-    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
+    `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,
-    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'pr', 'merge.ts'))};`,
-    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, 'pr', 'index.ts'))};`,
-    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, 'pr', 'pull-requests-double.ts'))};`,
+    `import { createPrMergeCommand } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'commands', 'pr', 'merge.ts'))};`,
+    `import { createGitRunner } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa-pr', 'src', 'pr', 'index.ts'))};`,
+    `import { createPullRequestsDouble } from ${JSON.stringify(join(SRC_DIR, '..', 'packages', 'rafa', 'src', 'pr', 'pull-requests-double.ts'))};`,
     '',
     'const [recordPath, ...nextArgv] = process.argv.slice(2);',
     'const events = [];',

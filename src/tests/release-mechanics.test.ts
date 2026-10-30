@@ -51,10 +51,11 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { name as PACKAGE_NAME, version as PACKAGE_VERSION } from '../../package.json';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own, holding one scratch repository per case. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-mechanics-')));

@@ -5,17 +5,17 @@
  * ever runs:
  *
  *   - beside `--create-branch` (`refuseWorktreeBesideCreateBranch`,
- *     `src/start/run-setup.ts`), the words alone;
+ *     `packages/rafa-run/src/start/run-setup.ts`), the words alone;
  *   - while any of `tracking.specs`, `tracking.plans` or `tracking.all`
  *     is on (`refuseWorktreeWhileTracking`, same module), the words and
  *     the loaded config;
  *   - on a plan branch already checked out in another worktree
- *     (`addRunWorktree`, `src/start/worktree.ts`), which only a real git
+ *     (`addRunWorktree`, `packages/rafa-run/src/start/worktree.ts`), which only a real git
  *     can refuse.
  *
- * `src/start/run-setup.test.ts` already pins the first two refusals'
+ * `packages/rafa-run/src/start/run-setup.test.ts` already pins the first two refusals'
  * wording and ordering over the functions directly, and
- * `src/start/worktree.test.ts` pins the third over a real repository
+ * `src/tests/run-coupled/start/worktree.test.ts` pins the third over a real repository
  * calling `addRunWorktree` alone. What none of them proves is that a
  * spawned `rafa loop start` reaches the same refusal through the whole
  * command — refusing before any preflight check runs, any session is
@@ -33,8 +33,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+
 import { expectExit, plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
-import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 

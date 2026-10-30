@@ -28,9 +28,9 @@
  * which compares two refusals, and 8 more across the roster, help, entry
  * and builder suites.
  */
-import type { DescribeDocument } from '../cli/describe.js';
 import type { DispatchOptions, DispatchOutcome } from '../cli/dispatch.js';
 import type { ModuleImporter } from '../cli/modules.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent } from '@open-tomato/rafa/ports';
@@ -40,7 +40,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { describeRegistry } from '../cli/describe.js';
+import { describeRegistry } from '@open-tomato/rafa/cli/describe';
+
 import { dispatch } from '../cli/dispatch.js';
 
 import describeCommand from './describe.js';

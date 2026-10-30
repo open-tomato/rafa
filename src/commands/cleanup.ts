@@ -11,13 +11,13 @@
  * `src/cleanup/`'s {@link readCleanup}, fetch included, over the
  * config's `pr.base` and `cleanup.*` settings, git run in the directory
  * the command runs from, and the pull request provider
- * `resolvePrProvider` (`src/pr/provider.ts`) resolves for the project
+ * `resolvePrProvider` (`packages/rafa/src/pr/provider.ts`) resolves for the project
  * root: `gh` gives the provider {@link ghPullRequestsIn} makes there,
  * `none` gives none, and the Stale and Not-pushed rows then say
  * `merged state unknown`. The run records are the ones
- * `src/cleanup/runs.ts` lists under the project root's `.rafa/runs/`:
+ * `packages/rafa-run/src/cleanup/runs.ts` lists under the project root's `.rafa/runs/`:
  * every record but a live run's and the newest of each plan's. The
- * sixth group is `src/cleanup/remote-only.ts`'s: the branches `origin`
+ * sixth group is `packages/rafa-run/src/cleanup/remote-only.ts`'s: the branches `origin`
  * holds and this clone does not, not merged into the base and not the
  * head of an open pull request, which the same provider lists. With no
  * provider, or one that cannot be read, the open pull requests are
@@ -56,13 +56,13 @@
  *   2. Each ticked Not-pushed row that would be deleted gets a second
  *      question naming the commits deleting it loses
  *      ({@link notPushedQuestion}); only a yes keeps it in. Which rows
- *      those are is `src/cleanup/steps.ts`'s to say, through
+ *      those are is `packages/rafa-run/src/cleanup/steps.ts`'s to say, through
  *      `deletedNotPushed`: a row a ticked worktree holds (#978), or a
  *      listed worktree that cannot be ticked holds (its `heldBy`,
- *      `src/cleanup/groups.ts`, #860), is never deleted, so it gets no
+ *      `packages/rafa-pr/src/cleanup/groups.ts`, #860), is never deleted, so it gets no
  *      question and is handed on unasked for step 3 to withhold.
  *      `--dry-run` asks the same questions as a real run.
- *   3. The ticked rows become `src/cleanup/steps.ts`'s steps, a
+ *   3. The ticked rows become `packages/rafa-run/src/cleanup/steps.ts`'s steps, a
  *      ticked Only on origin row the one `git push origin --delete
  *      <name>` among them. Every ticked row that is not a step is one
  *      warning, `not removed:` with its reason.
@@ -85,15 +85,15 @@
  * ## Never, and the one remote write
  *
  * Nothing is run with `--force`: the steps and their force guard are
- * `src/cleanup/steps.ts`'s. The one thing deleted on a remote is an
+ * `packages/rafa-run/src/cleanup/steps.ts`'s. The one thing deleted on a remote is an
  * Only on origin row the person ticked and the final question confirmed,
  * by that module's `delete-remote-branch` step; a Stale row's line still
  * only names the `git push origin --delete <b>` the person may run. The
  * current branch, the base branch and every `cleanup.keep` match are
- * never listed (`src/cleanup/branches.ts`), and neither is a branch on
+ * never listed (`packages/rafa-pr/src/cleanup/branches.ts`), and neither is a branch on
  * `origin` that is the base, a `cleanup.keep` match, under `stretch/`,
  * the head of an open pull request or a claim another store holds
- * (`src/cleanup/remote-only.ts`).
+ * (`packages/rafa-run/src/cleanup/remote-only.ts`).
  */
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';

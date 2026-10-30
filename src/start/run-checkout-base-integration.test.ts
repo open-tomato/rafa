@@ -23,12 +23,10 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-
-import { gitIdentityEnv } from '../tests/git-identity.js';
-import { sinkOutput } from '../tests/output-sinks.js';
-
-import { settleRunCheckout } from './run-checkout.js';
-import { addRunWorktree } from './worktree.js';
+import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { settleRunCheckout } from '@open-tomato/rafa-run/start/run-checkout';
+import { addRunWorktree } from '@open-tomato/rafa-run/start/worktree';
 
 const BASE = 'main';
 const WORKTREE_DIR = '.rafa/worktrees';
@@ -123,7 +121,7 @@ afterAll(() => {
 /** Settles the checkout of a run on `project` with `--as-worktree`, recording git. */
 function settle(project: string, stub: string, prBase: string | null, calls: string[][]): ReturnType<typeof settleRunCheckout> {
   return settleRunCheckout(
-    { projectRoot: project, worktreeDir: WORKTREE_DIR, prBase, planStub: stub, args: AS_WORKTREE },
+    { projectRoot: project, worktreeDir: WORKTREE_DIR, worktreeSetup: null, prBase, planStub: stub, args: AS_WORKTREE },
     {
       dirs: () => ({ projectRoot: project, checkout: project }),
       worktree: (request) => addRunWorktree(request, { git: recordingRunner(calls) }),

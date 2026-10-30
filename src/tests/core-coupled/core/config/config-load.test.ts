@@ -101,9 +101,9 @@ import { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/
 import { activeConfigLoadHook, setConfigLoadHook } from '@open-tomato/rafa/core/config/section';
 import { setActiveOutput } from '@open-tomato/rafa/core/output/active';
 import { activeStoreSettings, setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
-import { sinkOutput } from '../../../output-sinks.js';
 
 /** Chmod cannot deny a read to root; see the unreadable-file cases. */
 const isRoot = process.getuid?.() === 0;

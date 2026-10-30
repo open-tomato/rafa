@@ -11,7 +11,7 @@ is whatever the edit happens to be (`Remove ...`, `Rewrite ...`,
 `Split ...`) while the thing it names is reliably a markdown file, so
 the shape discriminates where the verb does not.
 
-<!-- routing-table:start (generated from DEFAULT_ROUTES in src/tiers/routing.ts; do not edit by hand) -->
+<!-- routing-table:start (generated from DEFAULT_ROUTES in packages/rafa/src/core/config/default-routing.ts; do not edit by hand) -->
 | Task shape | Agent | Where it lives |
 |---|---|---|
 | `prose` — an `AGENTS.md` map, a `context/` page, a README, a skill or an agent file | `doc-updater` | `src/bundled/agents/doc-updater.md` |
@@ -23,7 +23,7 @@ the shape discriminates where the verb does not.
 
 **This table is generated from rafa's `routing` defaults**
 (`DEFAULT_ROUTES` in `packages/rafa/src/core/config/default-routing.ts`) by
-`src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
+`packages/rafa-inventory/src/tiers/routing-table.ts`, and `routing-table.test.ts` fails when
 the page and the generator disagree, so change a row there and
 regenerate the table rather than editing it here. A project's own config
 can add, re-point or remove a row under `routing`: its module file
@@ -65,17 +65,17 @@ downgrade: an unresolvable agent exits 1 with NO JSON at all and the
 whole roster on stderr, before any model call. `loop start` no longer
 waits for that: its preflight resolves the roster from the three agent
 tiers, the project's and the home's `.claude/agents` and rafa's own
-`bundled/agents`, through `resolveTiers` (`src/agents/roster.ts`), and
-refuses the run, ahead of every prerequisite probe, when a still-to-run
-task of the plan or the tracker names an agent no loaded tier serves:
-one no tier holds, one `tiers.agents` switches off, one only an unloaded
-tier holds, or one two loaded tiers hold with different contents, whose
-refusal names both paths and the pin line that settles it
-(`src/start/preflight.ts`). The same resolution covers the three skill
-trees, so a `skills=` name of those tasks that two loaded tiers hold
-with different contents refuses the run too, naming both paths and its
-`tiers.skills` pin line, and so does one the resolution resolves to no
-winner, exactly as an agent does: one no tier holds, one `tiers.skills`
+`bundled/agents`, through `resolveTiers`
+(`packages/rafa-inventory/src/agents/roster.ts`), and refuses the run, ahead of
+every prerequisite probe, when a still-to-run task of the plan or the tracker
+names an agent no loaded tier serves: one no tier holds, one `tiers.agents`
+switches off, one only an unloaded tier holds, or one two loaded tiers hold
+with different contents, whose refusal names both paths and the pin line that
+settles it (`packages/rafa-run/src/start/preflight.ts`). The same resolution
+covers the three skill trees, so a `skills=` name of those tasks that two
+loaded tiers hold with different contents refuses the run too, naming both
+paths and its `tiers.skills` pin line, and so does one the resolution resolves
+to no winner, exactly as an agent does: one no tier holds, one `tiers.skills`
 switches off, or one only an unloaded tier holds.
 `rafa plan validate` runs the same check and exits 1 on the same plan. A
 task that edits a bundled agent or skill is no part of that check:
@@ -88,7 +88,7 @@ declaration carrying an agent never passes `--model` or `--tools`: the agent
 file's own frontmatter names its model and tool set, and every tracked file the
 table names carries a `model:`. `effort` is the exception, being the cost lever
 a plan most needs to reach the session: `--effort` joins `--agent` unless the
-definition declares an `effort` of its own. `src/utils/agent-definition.ts`
+definition declares an `effort` of its own. `packages/rafa/src/utils/agent-definition.ts`
 answers that from `.claude/agents/<name>.md` under the repo root, then under the
 home directory when `loop.settingSources` includes `user`, and takes a file only
 when its frontmatter `name` is the name asked for, because the CLI resolves
@@ -120,16 +120,16 @@ which never refuses a plan, so a plan written before the rule still runs
 (`packages/rafa/src/plan/doc-task.ts`).
 
 **What the doc task is handed.** Its prompt gets a section headed
-`## Documentation to repair` (`src/docs/task-reading.ts`, placed by
-`src/start/dispatch.ts`) with two parts. The first is the plan's `sighting`
-rows, one `<where>: <what>` line each, as its sessions reported them under
-`stale_docs`. The second is every file the plan's commits touched since the
-merge base with the run's base branch. A plan whose sessions reported no stale
-line is handed the files alone, under a line saying so. The task's own report
-then splits what it found: a line it could not settle goes into its
-`stale_docs` field and is stored as an `unsettled` row; a line about code goes
-into `out_of_scope_bugs` under its `kind`, and takes the route that kind has
-(`context/triage.md`).
+`## Documentation to repair` (`packages/rafa-pr/src/docs/task-reading.ts`,
+placed by `packages/rafa-run/src/start/dispatch.ts`) with two parts. The first
+is the plan's `sighting` rows, one `<where>: <what>` line each, as its sessions
+reported them under `stale_docs`. The second is every file the plan's commits
+touched since the merge base with the run's base branch. A plan whose sessions
+reported no stale line is handed the files alone, under a line saying so. The
+task's own report then splits what it found: a line it could not settle goes
+into its `stale_docs` field and is stored as an `unsettled` row; a line about
+code goes into `out_of_scope_bugs` under its `kind`, and takes the route that
+kind has (`context/triage.md`).
 
 **The per-release issue.** Each unsettled row becomes one line in the release's
 stale-docs issue: a `chore` issue titled
@@ -204,7 +204,7 @@ gate later anyway.
 
 **Runner recorded steps** run at fixed points in the loop. Each reads one
 check-point entry, `checks.task`, `checks.stage` or `checks.loop`, and runs
-what `resolveChecks` (`src/suite/checks.ts`) answers for it:
+what `resolveChecks` (`packages/rafa-run/src/suite/checks.ts`) answers for it:
 - `baseline` — Full suite once at plan start (first dispatch), taken only when
   one of the three entries names a check; with all three empty, none is taken
 - `task` — After each task's session ends and commits: `resolveChecks` over
@@ -261,21 +261,22 @@ An open task gets a `long-run` note when its sentence says "full suite" or
 "whole suite", in any case, or when a code span in it runs `bun test` with
 no path. `--changed=<base>` narrows the run, so it is not flagged. The note
 names the line and the fix, which is to declare `tests=full` on the task and
-take the run out of its text (`src/plan/risk/long-runs.ts`). It is level
+take the run out of its text (`packages/rafa-inventory/src/plan/risk/long-runs.ts`). It is level
 `note`, so `--strict` still exits 0 on it. A task session's Bash call stops
 at 10 minutes, and a whole-suite run can outlast that, which is why the
 runner runs the suite after the task commits when the task declares
 `tests=full`.
 
 **Config keys choose the checks each step runs, and which tests always run:**
-- `checks.task`, `checks.stage` and `checks.loop` are the check points the
-  runner reads. Each is a list of check names from `affected`, `related`,
-  `unit`, `contract`, `integration` and `full`, each named at most once; a
-  name outside the list is refused, naming the key and the six. Each defaults
-  to an empty list, which runs nothing and blocks nothing at its point.
-  `checks.pullRequest`, `checks.stretch`, `checks.releasePullRequest` and
-  `checks.publish` take the same reader and default empty too, but no step
-  reads them yet (`src/config-schema-checks.ts`)
+- `checks.task`, `checks.stage` and `checks.loop` are the check points
+  the runner reads. Each is a list of check names from `affected`,
+  `related`, `unit`, `contract`, `integration` and `full`, each named at
+  most once; a name outside the list is refused, naming the key and the
+  six. Each defaults to an empty list, which runs nothing and blocks
+  nothing at its point. `checks.pullRequest`, `checks.stretch`,
+  `checks.releasePullRequest` and `checks.publish` take the same reader
+  and default empty too, but no step reads them yet
+  (`packages/rafa/src/config-schema-checks.ts`)
 - `templates` is a list of template names (`src/config/templates.ts`), which
   holds one template, `escalation`. `templates: [escalation]` adopts it: the
   three glob keys below, and the three check points it names:
@@ -321,14 +322,14 @@ always-run files so they still pass the slow-sweep share guard. The step
 captures failures. If any failure is new against the baseline and still red
 when its file is run alone, or green alone after a test file the stage
 changed, the runner inserts a `[BLOCKED]` repair task above the first open
-task (`src/start/suite-blocker.ts`), its blocker the failures, which the
-repair session receives through `BLOCKER_PROMPT_PREFIX` in its prompt, and
-the run stops. A restarted run dispatches that repair first and runs no stage
-step before it, or before any `[BLOCKED]` task, because a due step run there
-would meet the same failures and stop the run again before the repair got its
-session. The stage steps still due run before the first open task after it.
-The blocked task holds until its session completes or a human unblocks it by
-removing the `[BLOCKED]` mark on its line in the tracker.
+task (`packages/rafa-run/src/start/suite-blocker.ts`), its blocker the
+failures, which the repair session receives through `BLOCKER_PROMPT_PREFIX` in
+its prompt, and the run stops. A restarted run dispatches that repair first and
+runs no stage step before it, or before any `[BLOCKED]` task, because a due
+step run there would meet the same failures and stop the run again before the
+repair got its session. The stage steps still due run before the first open
+task after it. The blocked task holds until its session completes or a human
+unblocks it by removing the `[BLOCKED]` mark on its line in the tracker.
 
 **A suite repair line names the task it repairs, and the repair is handed that
 task's stage.** The line carries a `<!-- repairs: <task text> -->` comment
@@ -380,15 +381,15 @@ scopes.
 **Every task's prompt holds a skill index, and at dispatch the session is
 handed both the skills it needs and the lessons it learned from earlier
 work.** The planner reads a compact skill index (`renderSkillIndex` in
-`src/task/skill-index.ts`) that lists every enabled skill a loop session
+`packages/rafa-inventory/src/task/skill-index.ts`) that lists every enabled skill a loop session
 will see, one line per skill with its bare name, tags and either its
 prevents clause or a one-line summary. A plan can name the skills each
 task needs with `skills=` beside its text; a task declaring none gets
-none. At dispatch, one of three resolvers (`src/task/resolve-skills.ts`)
-picks the skills to offer, and (`src/task/select-lessons.ts`) picks up to 5
+none. At dispatch, one of three resolvers (`packages/rafa-inventory/src/task/resolve-skills.ts`)
+picks the skills to offer, and (`packages/rafa-inventory/src/task/select-lessons.ts`) picks up to 5
 blessed lessons from the learning store when they are enabled. Both go into
 the task's prompt as two sections, after the blocker line and before
-`PROMPT.md`, rendered by (`src/task/sections.ts`).
+`PROMPT.md`, rendered by (`packages/rafa-inventory/src/task/sections.ts`).
 
 **The three resolvers are `planner`, `tag` and `none`.** The planner
 resolver uses the task's `skills=` declaration and offers exactly those
@@ -468,9 +469,10 @@ root, and you run the loop where you already are.
 **The base is read one way, by the start and by the wrap-up.** It is
 `pr.base` when the config sets it (`rafa config set pr.base=<branch>`), else
 the branch `origin/HEAD` names, else `main`. `resolveBaseBranch`
-(`src/cleanup/branches.ts`) reads it: the start reads it in the project root
-for the branch it cuts and the worktree it adds, the wrap-up reads it in the
-run's own checkout (`src/start/wrap-up-run.ts`) for the pull request. A
+(`packages/rafa-pr/src/cleanup/branches.ts`) reads it: the start reads it in
+the project root for the branch it cuts and the worktree it adds, the wrap-up
+reads it in the run's own checkout
+(`packages/rafa-run/src/start/wrap-up-run.ts`) for the pull request. A
 repository with no `origin/HEAD` and no `pr.base` gets `main`. To name another
 base, set `pr.base`, or run `git remote set-head origin -a` so that
 `origin/HEAD` names the remote's default branch. The base is an address written
@@ -526,20 +528,21 @@ waives which branch the run is on, not that it is on one. Under
 from the same base, and the detached checkout is left as it was.
 
 **`--as-worktree` adds a plan's worktree in two steps, and retries only the
-upstream.** For a plan whose branch already exists on `origin`, the add is
-`git worktree add --no-track`, and the upstream is a second step:
-`git branch --set-upstream-to=origin/<branch> <branch>`. Git keeps one
-`.git/config` for every worktree of a clone and refuses a second writer while
-its lock is held rather than waiting, so two plans started at once in one
-clone could lose one upstream (issue #960). The second step is tried up to
-`UPSTREAM_TRIES` (5) times, with `UPSTREAM_PAUSE_MS` (200) between tries, and
-only while git reports the config as locked (`src/start/worktree-upstream.ts`).
-A run that gives up removes the worktree it added, keeps the local branch, and
-names the branch and that line. A run started again finds the branch and
-leaves its upstream as it was found, so the line is run by hand first. Any
-other failure leaves the worktree in place and says so. A rafa lock file
-around each add was rejected: git already locks the file, and a lock of
-rafa's own would outlive a run killed while holding it.
+upstream.** For a plan whose branch already exists on `origin`, the add is `git
+worktree add --no-track`, and the upstream is a second step: `git branch
+--set-upstream-to=origin/<branch> <branch>`. Git keeps one `.git/config` for
+every worktree of a clone and refuses a second writer while its lock is held
+rather than waiting on git 2.55 and earlier (git 2.56 and later wait about a
+second first), so two plans started at once in one clone could lose one
+upstream (issue #960). The second step is tried up to `UPSTREAM_TRIES` (5)
+times, with `UPSTREAM_PAUSE_MS` (200) between tries, and only while git reports
+the config as locked (`packages/rafa-run/src/start/worktree-upstream.ts`). A
+run that gives up removes the worktree it added, keeps the local branch, and
+names the branch and that line. A run started again finds the branch and leaves
+its upstream as it was found, so the line is run by hand first. Any other
+failure leaves the worktree in place and says so. A rafa lock file around each
+add was rejected: git already locks the file, and a lock of rafa's own would
+outlive a run killed while holding it.
 
 **A run started from a scratch branch still compares its plan with the
 base.** Started from a session worktree on `scratch/notes`, `--as-worktree`
@@ -556,16 +559,39 @@ base's tip, so a run started later finds a branch cut from a base that has
 moved since. When `--as-worktree` takes a branch that already exists
 (local, remote-only, or held by the worktree an earlier start left), it
 fetches `origin/<base>` (the base, read as above, never the branch) and reads
-the branch's commits past it (`src/start/claim-catch-up.ts`). A branch holding
-only `claim(rafa-<n>): …` commits is merged with `git merge origin/<base>` in
-the run's worktree before the first task, a merge and never a rewrite of the
-pushed branch, and one line names the commits taken and their range. A branch
-holding any other commit is never merged: one warning says how many commits
-behind `origin/<base>` it is, and the run goes on. A branch at or ahead of
-`origin/<base>` prints nothing new. A failed fetch is a warning, the branch
-then read against `origin/<base>` as it stood; a failed merge is aborted and
-refuses the run. `--create-branch` without `--as-worktree` switches to an
+the branch's commits past it (`packages/rafa-run/src/start/claim-catch-up.ts`).
+A branch holding only `claim(rafa-<n>): …` commits is merged with `git merge
+origin/<base>` in the run's worktree before the first task, a merge and never a
+rewrite of the pushed branch, and one line names the commits taken and their
+range. A branch holding any other commit is never merged: one warning says how
+many commits behind `origin/<base>` it is, and the run goes on. A branch at or
+ahead of `origin/<base>` prints nothing new. A failed fetch is a warning, the
+branch then read against `origin/<base>` as it stood; a failed merge is aborted
+and refuses the run. `--create-branch` without `--as-worktree` switches to an
 existing branch as it is, with no catch-up.
+
+**`loop.worktreeSetup` runs one command in the worktree before the first
+session.** Once `addRunWorktree` has added the plan's worktree or reused the
+one an earlier start left, the run runs the command the key names through
+`/bin/sh -c` with the worktree as its `cwd`. It runs after that step and
+before the branch guard, the preflight, the suite baseline and the first
+session (`packages/rafa-run/src/start/run-checkout.ts`,
+`packages/rafa-run/src/start/worktree-setup.ts`). It runs only under
+`--as-worktree`, never without the flag, and the default, `null`, runs nothing.
+Its stdin is closed, so a command that waits for input ends instead of holding
+the run. Its output is printed once it ends, stdout and then stderr, and a
+fixed limit of ten minutes kills its process group. A nonzero exit, or the
+limit, refuses the run: the first line names `loop.worktreeSetup`, the command,
+the worktree and how the command ended, and the last 20 lines of its output
+follow. The worktree stays where it is, so a rerun runs the command again. This
+repository sets `bun install --frozen-lockfile` in `rafa.config.ts`, because a
+worktree with no `node_modules/` resolves `@open-tomato/rafa` to its own
+`packages/rafa/` and the feature packages to the main checkout's, loads core
+twice, and a spawned `rafa` exits 1 with `no config section is registered`
+(#1345). Two edge cases: a cold cache that outlasts the ten-minute limit is
+killed, and the refusal names the limit; a reused worktree runs the command
+again, which `bun install --frozen-lockfile` makes a no-op once the packages
+are installed.
 
 **The loop guard halts the loop if the checkout's branch changes.** Every
 loop watches the checkout's branch and HEAD. If you switch branches in
@@ -624,7 +650,7 @@ loop already running — unless `--no-hint` turns off the hint.
 ### Board relationships: labels and native modes
 
 **Epics and blockers are recorded through the board relationships port**
-(`src/board/relations/port.ts`), which offers two modes selected by the
+(`packages/rafa-board/src/board/relations/port.ts`), which offers two modes selected by the
 `board.relationships` config key. The **default is `labels`**, today's
 system unchanged; setting it to **`native`** uses GitHub's sub-issue and
 blocked-by links. Both modes are read through the same interface, so every
@@ -649,7 +675,7 @@ it with no question, from a script or an agent, and every refusal stays.
 closing issue #24 automatically unblocks any issue naming it in a
 `Blocked by:` line, with no extra commands needed. An `owner/repo#<n>`
 token on the line is kept as written in `BlockedReading.foreign`
-(`src/board/blocked.ts`) and never read as local `#<n>`; a line naming
+(`packages/rafa-board/src/board/blocked.ts`) and never read as local `#<n>`; a line naming
 only such tokens reads as the `no-ids` fault, so `issue unblock` never
 takes a foreign-only line for "every blocker closed" and drops the label.
 
@@ -679,8 +705,8 @@ In `labels` mode an issue belongs to one epic at most, and
 `.github/workflows/epic-guard.yml` can hold that on GitHub as labels
 land: when an issue gains an `epic:` label while it carries another, the
 guard removes the one just added and comments why. It is rafa's
-template (`src/board/templates/epic-guard.yml`, the file
-`rafa init --board --epic-guard` writes) committed unchanged, and
+template (`packages/rafa-board/src/board/templates/epic-guard.yml`, the
+file `rafa init --board --epic-guard` writes) committed unchanged, and
 `src/tests/epic-guard-workflow.test.ts` holds the two identical.
 
 It is installed **disabled**: while only rafa writes epic labels, no
@@ -794,7 +820,7 @@ restores its own text on any failure, commits `chore: release fragment
 <plan id>` over the fragment alone, pushes, and writes the release forecast
 — or the failure sentence — into the PR body, with a level report when the
 plan's declared level is below its notes. Details at `context/release.md`; config in
-`src/release/setting.ts`.
+`packages/rafa-release/src/release/setting.ts`.
 
 ### The wrap-up and pull request
 
@@ -815,26 +841,27 @@ working tree had conflicts), the run ends `stopped` with exit code 1, the
 report naming the step and branch. A pull request a retry or the runner opened
 is then given the release forecast or failure sentence the release step found
 no pull request to write to (`carryReleaseIntoPullRequest`,
-`src/start/release-body.ts`), before the retarget and the CI wait; one the
-release step already wrote to is not written again, and a blocked delivery
-writes nothing. With `pr.provider: none`, no pull request is read or opened:
-the CI gate's `none` path (`src/start/pr-lifecycle.ts`) pushes the branch,
-prints the compare URL when origin names a web host, skips the CI wait, and the
-run ends `done` with the branch pushed and no pull request.
+`packages/rafa-run/src/start/release-body.ts`), before the retarget and the CI
+wait; one the release step already wrote to is not written again, and a blocked
+delivery writes nothing. With `pr.provider: none`, no pull request is read or
+opened: the CI gate's `none` path
+(`packages/rafa-run/src/start/pr-lifecycle.ts`) pushes the branch, prints the
+compare URL when origin names a web host, skips the CI wait, and the run ends
+`done` with the branch pushed and no pull request.
 
 **The wrap-up prompt is written for `pr.provider: none` too.**
-`buildWrapUpPrompt` (`src/start/wrap-up.ts`) takes the provider the run
-resolved, and under `none` it leaves out the four bullets that find the
-plan's issue number, title the pull request and describe it. It writes one
-bullet where the create and edit step would go instead: the run ends with the
-branch pushed and no pull request is opened, so the session is told not to
+`buildWrapUpPrompt` (`packages/rafa-run/src/start/wrap-up.ts`) takes the
+provider the run resolved, and under `none` it leaves out the four bullets that
+find the plan's issue number, title the pull request and describe it. It writes
+one bullet where the create and edit step would go instead: the run ends with
+the branch pushed and no pull request is opened, so the session is told not to
 open, edit or look for one. The rest of the prompt reads as it does under any
 provider, and under every other provider the prompt is unchanged.
 
 **The wrap-up emits `pr` or `no-pr` once, in every output mode.**
-`emitPullRequestEvent` (`src/start/wrap-up-run.ts`) writes the event to
-the run's events file whatever the mode, so `rafa loop wait` ends a text
-run on it as it does a json or events run. Every mode emits it at the
+`emitPullRequestEvent` (`packages/rafa-run/src/start/wrap-up-run.ts`) writes
+the event to the run's events file whatever the mode, so `rafa loop wait` ends
+a text run on it as it does a json or events run. Every mode emits it at the
 delivery's place, after the retries and the runner: over the delivered
 pull request's number with no lookup, and over a lookup made there when
 the delivery holds no number (blocked or interrupted) or when a moved

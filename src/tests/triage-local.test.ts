@@ -1,14 +1,14 @@
 /**
- * Loop-owned triage (`src/triage/triage.ts`) over the real `local`
+ * Loop-owned triage (`packages/rafa-pr/src/triage/triage.ts`) over the real `local`
  * tracker adapter, tying its outward guarantees together in one file: an
  * out-of-scope bug filed once and commented on when it recurs, a security
  * bug kept off the public tracker, a named secret kept off a filed body,
  * and a blocker's text carried through to the prompt of the task's later
  * dispatch.
  *
- * `src/triage/triage.test.ts` already drives `triageReport` through a
+ * `packages/rafa-pr/src/triage/triage.test.ts` already drives `triageReport` through a
  * mutation-testing grid over spied `local` trackers, and
- * `src/start/triage.test.ts` does the same for `createStartTriage`'s
+ * `src/tests/run-coupled/start/triage.test.ts` does the same for `createStartTriage`'s
  * wiring into `loop start`. Neither carries a written blocker on to
  * `buildTaskPrompt` (`start/dispatch.ts`), the function that puts the
  * text in front of a session on the task's next dispatch, so this file
@@ -26,12 +26,12 @@
  * fixture's root. A filed or commented-on body is read back off its
  * issue file on disk, never off what `triageReport` answered.
  */
-import type { TaskSessionRunner } from '../start/dispatch.js';
-import type { NamedSecret } from '../triage/triage.js';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
+import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
 import type { TaskInfo } from '@open-tomato/rafa/utils/tracker';
+import type { TaskSessionRunner } from '@open-tomato/rafa-run/start/dispatch';
 
 import {
   existsSync,
@@ -56,13 +56,11 @@ import {
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { escapeBlockerText } from '@open-tomato/rafa/core/plan';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
-
-import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
-import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '../start/dispatch.js';
-import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
-
-import { sinkOutput } from './output-sinks.js';
+import { createLocalTracker, localIssuesDir } from '@open-tomato/rafa-board/adapters/tracker/local';
+import { createPrivateTriageTracker, privateTriageDir, triageReport } from '@open-tomato/rafa-pr/triage/triage';
+import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '@open-tomato/rafa-run/start/dispatch';
 
 /** The clock every tracker call in this file stamps with. */
 const CLOCK = (): string => '2026-09-15T10:00:00.000Z';
@@ -295,7 +293,7 @@ describe('a machine-scoped bug over the local adapter', () => {
    * #17's artifact: a linker failure against an Xcode Command Line Tools
    * SDK installed on the machine the session ran on, not against rafa.
    * `packages/rafa/src/effort/store/machine-fault.test.ts` and
-   * `src/triage/triage.test.ts` already exercise the reading and its routing over spied trackers;
+   * `packages/rafa-pr/src/triage/triage.test.ts` already exercise the reading and its routing over spied trackers;
    * this case is the same pairing over the real `local` adapter.
    */
   const TOOLCHAIN_ARTIFACT = 'ld: tapi error: malformed file: '

@@ -18,7 +18,7 @@
  */
 import type { SessionEnvReading } from './doctor-deep-env.js';
 import type { DeepReading, ReadDeepSeams } from './doctor-deep.js';
-import type { GhResult, GhRunnerOptions } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunnerOptions } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

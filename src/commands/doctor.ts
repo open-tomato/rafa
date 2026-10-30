@@ -30,15 +30,15 @@
  *      and so no PREREQUISITES file: `--plan` is how a plan's items reach
  *      the report.
  *   3. **The pull request provider's automatic items**
- *      (`pr/preflight-items.ts`): `gh` on `PATH` and `gh auth status`
- *      for `origin`'s host, both REQUIRED, when the provider resolves
- *      to `gh` (`pr/provider.ts`). They go AHEAD of the configured
+ *      (`pr/preflight-items.ts`): `gh` on `PATH` and `gh auth status` for
+ *      `origin`'s host, both REQUIRED, when the provider resolves to `gh`
+ *      (`packages/rafa/src/pr/provider.ts`). They go AHEAD of the configured
  *      required tier, exactly as `runStartPreflight` puts them
- *      (`start/preflight.ts`), because this command answers what
- *      `loop start` would do and would say the wrong thing if it
- *      checked a different set in a different order. A configured
- *      `pr.provider: none` contributes none and reads no remote at
- *      all; every other reading spawns the `origin` probe once.
+ *      (`start/preflight.ts`), because this command answers what `loop start`
+ *      would do and would say the wrong thing if it checked a different set in
+ *      a different order. A configured `pr.provider: none` contributes none and
+ *      reads no remote at all; every other reading spawns the `origin` probe
+ *      once.
  *   4. **The plan's start-only `[start]` items**
  *      (`preflight/prerequisites-md.ts`), between the provider's items
  *      and the configured required tier, exactly where
@@ -181,7 +181,7 @@
  *
  * Every such run then reads the `effort sync` row
  * (`./doctor-effort-sync.ts`, over the reading of
- * `../effort/sync/doctor-reading.ts`, whose note says which registry each
+ * `packages/rafa-effort/src/effort/sync/doctor-reading.ts`, whose note says which registry each
  * kind is selected through): `ok` naming the strategy `effort.sync` names,
  * `local` when it names none, and `fail` when no adapter serves it,
  * naming for `git`, `service` and `p2p` the `modules:` and `allowList:`
@@ -262,20 +262,14 @@ import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
+import type { PreflightItems, PrerequisiteReminder } from '@open-tomato/rafa/preflight/prerequisites-md';
+import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '@open-tomato/rafa/preflight/run';
 import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
 import type { DoctorRefsReading, DoctorRefsSeams } from '@open-tomato/rafa-board';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '@open-tomato/rafa-effort';
 import type { AccountSeams, ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
-import type {
-  PreflightCheck,
-  PreflightItems,
-  PreflightOptions,
-  PreflightReport,
-  PreflightTiers,
-  PrerequisiteReminder,
-} from '@open-tomato/rafa-run';
 
 import { basename, resolve } from 'node:path';
 
@@ -287,23 +281,20 @@ import {
 } from '@open-tomato/rafa-board';
 import { readDoctorEffortSync } from '@open-tomato/rafa-effort';
 import { ghPreflightItems, resolvePrProvider } from '@open-tomato/rafa-pr';
-import {
-  DEFAULT_PLAN_FILE,
-  announceRiskTotal,
-  isFirstDispatch,
-  loadPlanPrerequisites,
-  malformedPrerequisiteLines,
-  mergePlanPrerequisites,
-  prerequisitesPathForPlan,
-  resolvePlanPath,
-  runPreflight,
-} from '@open-tomato/rafa-run';
+import { DEFAULT_PLAN_FILE, announceRiskTotal, isFirstDispatch, resolvePlanPath } from '@open-tomato/rafa-run';
 
 import { CommandExit , versionLine } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { isFile , trackerPathFor } from '@open-tomato/rafa/core/plan';
+import {
+  loadPlanPrerequisites,
+  malformedPrerequisiteLines,
+  mergePlanPrerequisites,
+  prerequisitesPathForPlan,
+} from '@open-tomato/rafa/preflight/prerequisites-md';
+import { runPreflight } from '@open-tomato/rafa/preflight/run';
 
 import { boardRunner, readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';

@@ -15,7 +15,7 @@
  *
  * Between the two, once the config is known to be usable, it pulls the
  * other devices' effort rows through `pullBeforeRead`
- * (`../effort/sync/contact.ts`), so the store it reads holds what the
+ * (`packages/rafa-effort/src/effort/sync/contact.ts`), so the store it reads holds what the
  * project's sync strategy can bring in first. Under `local` and `file`
  * that contacts nothing. A hub that cannot be reached is one `warn` line
  * before the sections, and the sections are read from the local store

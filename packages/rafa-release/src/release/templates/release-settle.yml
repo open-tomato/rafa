@@ -1,0 +1,123 @@
+# The rafa release settle workflow: level 4 of the release ladder.
+#
+# Written into a project's `.github/workflows/` by `writeReleaseWorkflow`
+# (`packages/rafa-release/src/release/templates.ts`) for
+# `release.settle: push` with `release.tag: settle` and
+# `release.publish: ci`. Every push to the base branch checks it out with
+# full history, sets a git identity for the release commit, and runs
+# `rafa release settle`, which folds the waiting fragments into a release
+# commit, pushes it to the base and tags it. A push with no fragment
+# waiting settles nothing and exits 0.
+#
+# The settle job runs on a push to the repository's default branch. When
+# `pr.base` names another branch, write that branch's name in place of
+# `github.event.repository.default_branch` in the job's `if`.
+#
+# A commit or tag pushed with the workflow's GITHUB_TOKEN starts no other
+# workflow run, so the release commit settle pushes does not run this
+# workflow again, and the publish job calls `release-publish.yml` through
+# `workflow_call` with the release commit as `ref` instead of waiting for
+# its `push: tags` trigger. It runs only when settle pushed a release
+# commit and tagged it; the job grants `id-token: write` for npm trusted
+# publishing, and the settle job needs only `contents: write`.
+#
+# The publish job runs only when the repository variable
+# `RAFA_RELEASE_PUBLISH` is `ci`: with it unset or holding anything else,
+# GitHub skips the job, and a skipped job does not fail the run. Set it
+# under Settings, Secrets and variables, Actions, Variables, or with
+# `gh variable set RAFA_RELEASE_PUBLISH --body ci`.
+# Settling and tagging run either way; publishing waits for the switch.
+#
+# rafa needs a config with `release.enabled: true`, and the checkout may
+# hold none: when none of `rafa.config.ts`, `rafa.config.mjs` and
+# `.rafa/config.yaml` is there, the workflow writes `.rafa/config.yaml`
+# with that key. A committed config is left as it is, so a project that
+# needs other release keys in CI commits them.
+#
+# rafa runs from the checkout when the project is rafa itself (its
+# manifest names `@open-tomato/rafa` and git tracks `src/rafa.ts`), and
+# from a global install otherwise, so one file serves both.
+name: Release settle
+
+on:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-settle
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      release: ${{ steps.settle.outputs.release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set git identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Write the CI config
+        shell: bash
+        run: |
+          if [ ! -f rafa.config.ts ] && [ ! -f rafa.config.mjs ] && [ ! -f .rafa/config.yaml ]; then
+            mkdir -p .rafa
+            printf '%s\n' '# Written by the Release settle workflow: the checkout holds no rafa config.' 'release:' '  enabled: true' > .rafa/config.yaml
+          fi
+
+      - name: Settle
+        id: settle
+        shell: bash
+        run: |
+          result="${RUNNER_TEMP:-/tmp}/settle.json"
+          name=$(node -p "require('./package.json').name")
+          if [ "$name" = '@open-tomato/rafa' ] && git ls-files --error-unmatch src/rafa.ts > /dev/null 2>&1; then
+            bun install --frozen-lockfile
+            bun src/rafa.ts release settle --output=json > "$result"
+          else
+            bun install -g @open-tomato/rafa
+            export PATH="${BUN_INSTALL:-$HOME/.bun}/bin:$PATH"
+            rafa release settle --output=json > "$result"
+          fi
+          cat "$result"
+          node -e '
+            const fs = require("fs");
+            const events = fs.readFileSync(process.argv[1], "utf8").split("\n").flatMap((line) => {
+              try { return [JSON.parse(line)]; } catch { return []; }
+            });
+            const data = (events.find((event) => event && event.type === "result") || {}).data || {};
+            const pushed = data.delivered && data.delivered.outcome && data.delivered.outcome.outcome === "pushed";
+            const tagged = data.tag && data.tag.outcome === "tagged" && data.tag.tags.length > 0;
+            const release = pushed && tagged
+              ? data.tag.commit
+              : "";
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `release=${release}\n`);
+          ' "$result"
+
+  publish:
+    needs: settle
+    if: needs.settle.outputs.release != '' && vars.RAFA_RELEASE_PUBLISH == 'ci'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/release-publish.yml
+    with:
+      ref: ${{ needs.settle.outputs.release }}
+    secrets: inherit

@@ -9,12 +9,12 @@
  * bundle is pulled through a registered stub adapter, and the row is read
  * back from the SQLite store with a raw query.
  */
-import type { InstinctRecord } from '../learning/index.js';
-import type { TaskSessionRunner } from '../start/dispatch.js';
-import type { TaskHandout } from '../start/handout.js';
-import type { SessionServing } from '../start/serving.js';
 import type { TierPin } from '@open-tomato/rafa/core/config/sections';
 import type { Learning } from '@open-tomato/rafa/ports';
+import type { InstinctRecord } from '@open-tomato/rafa-inventory/learning/index';
+import type { SessionServing } from '@open-tomato/rafa-inventory/start/serving';
+import type { TaskSessionRunner } from '@open-tomato/rafa-run/start/dispatch';
+import type { TaskHandout } from '@open-tomato/rafa-run/start/handout';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,10 +26,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
-
-import { dispatchTask, storeTaskReport } from '../start/dispatch.js';
-
-import { sinkOutput } from './output-sinks.js';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { dispatchTask, storeTaskReport } from '@open-tomato/rafa-run/start/dispatch';
 
 const FENCE = '```';
 const REPORTED = [

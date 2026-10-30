@@ -24,8 +24,8 @@
  * home — and dispatches through it, so no case reads another's config and
  * nothing here touches the real home.
  */
-import type { DescribeDocument } from '../cli/describe.js';
 import type { ModuleListing } from '../commands/module/list.js';
+import type { DescribeDocument } from '@open-tomato/rafa/cli/describe';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { CliEvent, CliEventLog, CliEventResult } from '@open-tomato/rafa/ports';
 

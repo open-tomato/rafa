@@ -1,0 +1,445 @@
+/**
+ * Tests for the recorded answer shapes (`packages/rafa-pr/src/pr/gh-fake-shapes.ts`).
+ *
+ * The fake proves what a `src/pr/` case claims only as far as it answers
+ * as `gh` does, so every reading the module note lists is held here as it
+ * was recorded on 2026-09-18 off `gh` 2.100.0. A shape that drifts from
+ * its recording reddens a case in this file rather than passing quietly
+ * and taking the adapter built on it with it.
+ *
+ * The command surface over these shapes — which commands exist, what each
+ * accepts, and what the repository does — is `./gh-fake.test.ts`, whose
+ * note records the twelve-mutation drive both files were held to on
+ * 2026-09-18. Two of those twelve reddened a case here and none there: a
+ * bot author written with `id` and `name`, which reddens the author case,
+ * and the `--json` fields left unsorted, which reddens both the pull
+ * request and the check row.
+ */
+import type { FakePrCheck, FakePrComment, FakePullRequest } from './gh-fake-shapes.js';
+
+import { describe, expect, it } from 'bun:test';
+
+import {
+  fillSeed,
+  httpFailure,
+  logFailedText,
+  missingPull,
+  missingRun,
+  noChecksReported,
+  notFound,
+  renderCheckRow,
+  renderPermission,
+  renderPull,
+  renderRestComment,
+  renderWorkflows,
+  WORKFLOWS_PAGE,
+  workflowsFailure,
+} from './gh-fake-shapes.js';
+
+/** The repository every case here renders against. */
+const REPO = 'open-tomato/rafa';
+
+/** A check row, with whatever it is not the default of. */
+function check(over: Partial<FakePrCheck> = {}): FakePrCheck {
+  return { name: 'lint', state: 'SUCCESS', link: 'https://example.test/1', ...over };
+}
+
+/** A comment, with whatever it is not the default of. */
+function comment(over: Partial<FakePrComment> = {}): FakePrComment {
+  return {
+    id: 5000000001,
+    author: { login: 'octo', isBot: false, name: 'Octo Cat' },
+    body: 'a comment',
+    createdAt: '2026-09-18T11:00:00Z',
+    updatedAt: '2026-09-18T11:00:00Z',
+    ...over,
+  };
+}
+
+/** A pull request, with whatever it is not the default of. */
+function pull(over: Partial<FakePullRequest> = {}): FakePullRequest {
+  return { ...fillSeed({ number: 7 }), ...over };
+}
+
+describe('the pull request a --json read answers', () => {
+  it('writes exactly the fields asked for, with mergeStateStatus ahead of mergeable', () => {
+    const rendered = renderPull(pull(), ['url', 'mergeable', 'number', 'mergeStateStatus'], REPO);
+
+    expect(Object.keys(rendered)).toEqual(['mergeStateStatus', 'mergeable', 'number', 'url']);
+    expect(rendered).toEqual({
+      mergeStateStatus: 'CLEAN',
+      mergeable: 'MERGEABLE',
+      number: 7,
+      url: 'https://github.com/open-tomato/rafa/pull/7',
+    });
+  });
+
+  it('writes the merged-list fields in the recorded order, mergedAt null for a pull request not merged', () => {
+    const fields = ['number', 'mergedAt', 'headRefOid', 'headRefName'];
+    const merged = renderPull(pull({ state: 'MERGED', mergedAt: '2026-09-23T16:38:29Z' }), fields, REPO);
+
+    expect(Object.keys(merged)).toEqual(['headRefName', 'headRefOid', 'mergedAt', 'number']);
+    expect(merged).toEqual({
+      headRefName: 'feat/pr-7',
+      headRefOid: '0000000000000000000000000000000000000007',
+      mergedAt: '2026-09-23T16:38:29Z',
+      number: 7,
+    });
+    expect(renderPull(pull(), ['mergedAt'], REPO)).toEqual({ mergedAt: null });
+  });
+
+  it('writes the head as the one commit of the list, in the recorded key order, under its own oid', () => {
+    const rendered = renderPull(pull({ headCommittedAt: '2026-09-26T04:46:04Z' }), ['commits', 'headRefOid'], REPO);
+    const commits = rendered['commits'] as Record<string, unknown>[];
+
+    expect(commits).toHaveLength(1);
+    expect(Object.keys(commits[0] ?? {})).toEqual([
+      'authoredDate',
+      'authors',
+      'committedDate',
+      'messageBody',
+      'messageHeadline',
+      'oid',
+    ]);
+    expect(commits[0]).toMatchObject({
+      committedDate: '2026-09-26T04:46:04Z',
+      oid: rendered['headRefOid'],
+      authors: [{ email: 'octo@users.noreply.github.com', login: 'octo', name: 'Octo Cat' }],
+    });
+  });
+
+  it('writes no commit for a head whose date is null', () => {
+    expect(renderPull(pull({ headCommittedAt: null }), ['commits'], REPO)).toEqual({ commits: [] });
+  });
+
+  it('writes a person as id, is_bot, login and name, and a bot as is_bot and login alone', () => {
+    const person = renderPull(pull(), ['author'], REPO)['author'];
+    const bot = renderPull(
+      pull({ author: { login: 'app/dependabot', isBot: true } }),
+      ['author'],
+      REPO,
+    )['author'];
+
+    expect(Object.keys(person as object)).toEqual(['id', 'is_bot', 'login', 'name']);
+    expect(person).toMatchObject({ is_bot: false, login: 'octo', name: 'Octo Cat' });
+    expect(Object.keys(bot as object)).toEqual(['is_bot', 'login']);
+    expect(bot).toEqual({ is_bot: true, login: 'app/dependabot' });
+  });
+
+  it('writes a label as id, name, description and color, in that order', () => {
+    const labels = renderPull(pull({ labels: ['dependencies'] }), ['labels'], REPO)['labels'];
+    const [first] = labels as Record<string, unknown>[];
+
+    expect(Object.keys(first ?? {})).toEqual(['id', 'name', 'description', 'color']);
+    expect(first).toMatchObject({ name: 'dependencies', description: '', color: 'ededed' });
+  });
+
+  it('writes no closing reference for a pull request that closes nothing, as cli/cli#14354 answered', () => {
+    expect(renderPull(pull(), ['closingIssuesReferences'], REPO)).toEqual({ closingIssuesReferences: [] });
+  });
+
+  it('writes a closing reference as id, number, repository and url, under its own repository', () => {
+    const references = renderPull(
+      pull({ closes: [{ number: 20 }, { number: 765, repository: 'ptone/scion' }] }),
+      ['closingIssuesReferences'],
+      REPO,
+    )['closingIssuesReferences'];
+    const [own, other] = references as Record<string, unknown>[];
+
+    expect(Object.keys(own ?? {})).toEqual(['id', 'number', 'repository', 'url']);
+    expect(Object.keys((own?.['repository'] ?? {}) as object)).toEqual(['id', 'name', 'owner']);
+    expect(own).toMatchObject({
+      number: 20,
+      repository: { name: 'rafa', owner: { login: 'open-tomato' } },
+      url: 'https://github.com/open-tomato/rafa/issues/20',
+    });
+    expect(other).toMatchObject({
+      number: 765,
+      repository: { name: 'scion', owner: { login: 'ptone' } },
+      url: 'https://github.com/ptone/scion/issues/765',
+    });
+  });
+
+  it('writes a finished CheckRun with its conclusion and a completed status', () => {
+    const rollup = renderPull(
+      pull({ checks: [check({ state: 'FAILURE', workflowName: 'gates' })] }),
+      ['statusCheckRollup'],
+      REPO,
+    )['statusCheckRollup'];
+    const [entry] = rollup as Record<string, unknown>[];
+
+    expect(Object.keys(entry ?? {})).toEqual([
+      '__typename',
+      'completedAt',
+      'conclusion',
+      'detailsUrl',
+      'name',
+      'startedAt',
+      'status',
+      'workflowName',
+    ]);
+    expect(entry).toMatchObject({
+      __typename: 'CheckRun',
+      completedAt: '2026-09-18T11:00:00Z',
+      conclusion: 'FAILURE',
+      status: 'COMPLETED',
+      workflowName: 'gates',
+    });
+  });
+
+  it('writes a running CheckRun with an empty conclusion and the year-zero completedAt', () => {
+    const rollup = renderPull(
+      pull({ checks: [check({ state: 'IN_PROGRESS' })] }),
+      ['statusCheckRollup'],
+      REPO,
+    )['statusCheckRollup'];
+
+    expect((rollup as Record<string, unknown>[])[0]).toMatchObject({
+      __typename: 'CheckRun',
+      completedAt: '0001-01-01T00:00:00Z',
+      conclusion: '',
+      status: 'IN_PROGRESS',
+    });
+  });
+
+  it('writes a StatusContext with context, state and targetUrl, and no name or conclusion', () => {
+    const rollup = renderPull(
+      pull({ checks: [check({ name: 'buildkite/bun', state: 'PENDING', kind: 'status-context' })] }),
+      ['statusCheckRollup'],
+      REPO,
+    )['statusCheckRollup'];
+    const [entry] = rollup as Record<string, unknown>[];
+
+    expect(Object.keys(entry ?? {})).toEqual(['__typename', 'context', 'startedAt', 'state', 'targetUrl']);
+    expect(entry).toMatchObject({
+      __typename: 'StatusContext',
+      context: 'buildkite/bun',
+      state: 'PENDING',
+      targetUrl: 'https://example.test/1',
+    });
+    expect(entry).not.toHaveProperty('name');
+    expect(entry).not.toHaveProperty('conclusion');
+  });
+
+  it('writes an embedded comment with createdAt, no updatedAt, and a login-only author', () => {
+    const comments = renderPull(pull({ comments: [comment()] }), ['comments'], REPO)['comments'];
+    const [entry] = comments as Record<string, unknown>[];
+
+    expect(entry).toMatchObject({
+      author: { login: 'octo' },
+      authorAssociation: 'MEMBER',
+      body: 'a comment',
+      createdAt: '2026-09-18T11:00:00Z',
+      url: 'https://github.com/open-tomato/rafa/pull/7#issuecomment-5000000001',
+    });
+    expect(entry).not.toHaveProperty('updatedAt');
+  });
+});
+
+describe('the check row a gh pr checks read answers', () => {
+  it('writes the fields asked for in link, name, state order', () => {
+    const row = renderCheckRow(check({ state: 'FAILURE' }), ['state', 'name', 'link']);
+
+    expect(Object.keys(row)).toEqual(['link', 'name', 'state']);
+    expect(row).toEqual({ link: 'https://example.test/1', name: 'lint', state: 'FAILURE' });
+  });
+});
+
+describe('the payloads gh api answers', () => {
+  it('writes a comment with its REST id, its html_url and a User type', () => {
+    const rendered = renderRestComment(comment(), pull(), REPO);
+
+    expect(rendered).toMatchObject({
+      url: 'https://api.github.com/repos/open-tomato/rafa/issues/comments/5000000001',
+      html_url: 'https://github.com/open-tomato/rafa/pull/7#issuecomment-5000000001',
+      issue_url: 'https://api.github.com/repos/open-tomato/rafa/issues/7',
+      id: 5000000001,
+      user: { login: 'octo', type: 'User' },
+      created_at: '2026-09-18T11:00:00Z',
+      updated_at: '2026-09-18T11:00:00Z',
+      author_association: 'MEMBER',
+      body: 'a comment',
+    });
+  });
+
+  it('writes a bot comment author as type Bot', () => {
+    const rendered = renderRestComment(
+      comment({ author: { login: 'app/dependabot', isBot: true } }),
+      pull(),
+      REPO,
+    );
+
+    expect(rendered['user']).toEqual({ login: 'app/dependabot', type: 'Bot' });
+  });
+
+  it('writes a permission as permission, role_name and user', () => {
+    expect(renderPermission('octo', 'admin')).toEqual({
+      permission: 'admin',
+      role_name: 'admin',
+      user: { login: 'octo', type: 'User' },
+    });
+  });
+
+  it('writes a 404 body to stdout and the gh line to stderr', () => {
+    const result = notFound('octo is not a user', 'https://docs.github.com/x');
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toBe('gh: octo is not a user (HTTP 404)\n');
+    expect(JSON.parse(result.stdout)).toEqual({
+      message: 'octo is not a user',
+      documentation_url: 'https://docs.github.com/x',
+      status: '404',
+    });
+  });
+});
+
+describe('the workflows payload gh api answers', () => {
+  it('writes a repository with no workflow byte for byte as open-tomato/rafa answered it', () => {
+    expect(JSON.stringify(renderWorkflows([], REPO))).toBe('{"total_count":0,"workflows":[]}');
+  });
+
+  it('writes total_count first and each workflow in the recorded key order', () => {
+    const payload = renderWorkflows([{ name: 'Unit and Integration Tests' }, { name: 'Lint', state: 'disabled_manually' }], REPO);
+    const listed = payload['workflows'] as readonly Record<string, unknown>[];
+
+    expect(Object.keys(payload)).toEqual(['total_count', 'workflows']);
+    expect(payload['total_count']).toBe(2);
+    expect(listed.map((workflow) => Object.keys(workflow))).toEqual(Array(2).fill([
+      'id',
+      'node_id',
+      'name',
+      'path',
+      'state',
+      'created_at',
+      'updated_at',
+      'url',
+      'html_url',
+      'badge_url',
+    ]));
+    expect(listed.map((workflow) => [workflow['name'], workflow['state']]))
+      .toEqual([['Unit and Integration Tests', 'active'], ['Lint', 'disabled_manually']]);
+    expect(listed[1]).toMatchObject({
+      path: '.github/workflows/lint.yml',
+      url: `https://api.github.com/repos/${REPO}/actions/workflows/${String(listed[1]?.['id'])}`,
+    });
+  });
+
+  it('counts every workflow in total_count and lists the first page of 30 alone, as github/docs answered 119 beside 30', () => {
+    const many = Array.from({ length: 119 }, (_, index) => ({ name: `workflow ${index}` }));
+
+    const payload = renderWorkflows(many, REPO);
+
+    expect(WORKFLOWS_PAGE).toBe(30);
+    expect(payload['total_count']).toBe(119);
+    expect(payload['workflows']).toHaveLength(30);
+  });
+});
+
+describe('the failures gh writes', () => {
+  it('writes a 403 in the 404 envelope with its own status', () => {
+    const result = httpFailure(403, 'no', 'https://docs.github.com/x');
+
+    expect(result).toEqual({
+      ok: false,
+      stdout: '{"message":"no","documentation_url":"https://docs.github.com/x","status":"403"}',
+      stderr: 'gh: no (HTTP 403)\n',
+    });
+  });
+
+  it('answers the recorded 404 on the workflows path', () => {
+    expect(workflowsFailure(404)).toEqual({
+      ok: false,
+      stdout: '{"message":"Not Found","documentation_url":"https://docs.github.com/rest/actions/workflows#list-repository-workflows","status":"404"}',
+      stderr: 'gh: Not Found (HTTP 404)\n',
+    });
+  });
+
+  it('answers the recorded actions 403 on the workflows path', () => {
+    const result = workflowsFailure(403);
+    const message = 'You must have repository read permissions or have the repository Actions policies fine-grained permission.';
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toBe(`gh: ${message} (HTTP 403)\n`);
+    expect(JSON.parse(result.stdout)).toEqual({
+      message,
+      documentation_url: 'https://docs.github.com/rest/actions/workflows#list-repository-workflows',
+      status: '403',
+    });
+  });
+
+  it('names a pull request that does not exist the way GraphQL does', () => {
+    expect(missingPull('999999')).toEqual({
+      ok: false,
+      stdout: '',
+      stderr: 'GraphQL: Could not resolve to a PullRequest with the number of 999999. (repository.pullRequest)\n',
+    });
+  });
+
+  it('names the branch when a pull request has no checks at all', () => {
+    expect(noChecksReported('gh-pr')).toEqual({
+      ok: false,
+      stdout: '',
+      stderr: 'no checks reported on the \'gh-pr\' branch\n',
+    });
+  });
+
+  it('names the api url when a run does not exist', () => {
+    expect(missingRun(REPO, '1').stderr).toBe(
+      'failed to get run: HTTP 404: Not Found (https://api.github.com/repos/open-tomato/rafa/actions/runs/1?exclude_pull_requests=true)\n',
+    );
+  });
+});
+
+describe('the log a failed run answers', () => {
+  it('writes one tab-separated line per log line, with UNKNOWN STEP as the step', () => {
+    const text = logFailedText('lint', ['error: one', 'error: two'], '2026-09-18T11:30:00Z');
+
+    expect(text.split('\n').filter((line) => line !== '')).toEqual([
+      'lint\tUNKNOWN STEP\t2026-09-18T11:30:00Z error: one',
+      'lint\tUNKNOWN STEP\t2026-09-18T11:30:00Z error: two',
+    ]);
+  });
+});
+
+describe('the pull request a seed fills out', () => {
+  it('keeps what the seed names and defaults the rest', () => {
+    expect(fillSeed({ number: 21, title: 'rafa-20: pr commands', state: 'MERGED' })).toEqual({
+      number: 21,
+      title: 'rafa-20: pr commands',
+      body: '',
+      author: { login: 'octo', isBot: false, name: 'Octo Cat' },
+      headRefName: 'feat/pr-21',
+      headRefOid: '0000000000000000000000000000000000000021',
+      headCommittedAt: '2026-09-18T11:00:00Z',
+      baseRefName: 'main',
+      isCrossRepository: false,
+      state: 'MERGED',
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      labels: [],
+      closes: [],
+      updatedAt: '2026-09-18T11:00:00Z',
+      mergedAt: '2026-09-18T11:00:00Z',
+      checks: [],
+      comments: [],
+    });
+  });
+
+  it('merges a MERGED seed at its own updatedAt, and any other state at null', () => {
+    expect(fillSeed({ number: 3, state: 'MERGED', updatedAt: '2026-09-20T08:00:00Z' }).mergedAt)
+      .toBe('2026-09-20T08:00:00Z');
+    expect(fillSeed({ number: 3 }).mergedAt).toBeNull();
+    expect(fillSeed({ number: 3, state: 'CLOSED' }).mergedAt).toBeNull();
+  });
+
+  it('commits the head at the seed\'s updatedAt, and at the instant a seed names instead', () => {
+    expect(fillSeed({ number: 3, updatedAt: '2026-09-20T09:00:00Z' }).headCommittedAt).toBe('2026-09-20T09:00:00Z');
+    expect(fillSeed({ number: 3, headCommittedAt: '2026-10-12T11:59:59Z' }).headCommittedAt).toBe('2026-10-12T11:59:59Z');
+    expect(fillSeed({ number: 3, headCommittedAt: null }).headCommittedAt).toBeNull();
+  });
+
+  it('keeps a mergedAt the seed names over the one its state would give', () => {
+    expect(fillSeed({ number: 3, state: 'MERGED', mergedAt: '2026-09-19T09:00:00Z' }).mergedAt)
+      .toBe('2026-09-19T09:00:00Z');
+  });
+});

@@ -19,7 +19,7 @@
  * (`.rafa/specs/rafa-20-pr-commands.md`). So the runner answers
  * {@link GitResult} for every outcome, including a git it could not
  * spawn, and the caller decides which of them is a refusal. This is the
- * shape `GhRunner` already has (`src/adapters/tracker/github.ts`).
+ * shape `GhRunner` already has (`packages/rafa-board/src/adapters/tracker/github.ts`).
  *
  * ## Why it is synchronous
  *
@@ -48,6 +48,18 @@
  * `LC_ALL=C` is set for the same reason `./none.ts` sets it: what git
  * says is read by a person out of a report and matched by tests, and a
  * localised git would write both in another language.
+ *
+ * ## What the working tree reader keeps verbatim
+ *
+ * A {@link WorkingTreeStatus} entry, and a tracked one, is the porcelain
+ * line as git wrote it, quoting included: `git status --porcelain`
+ * answered `A  "src/a b.ts"` for a staged path with a space on git
+ * 2.50.1 (Apple Git-155). A refusal that prints those lines prints what
+ * `git status` would say. An untracked entry is also kept as a PATH with
+ * git's quoting undone ({@link unquoteGitPath}), because it is compared
+ * with the paths `git ls-tree` prints, which quotes differently. Both
+ * readers moved here from `packages/rafa-pr/src/pr/merge.ts`, which still holds the merge
+ * refusal that reads them.
  */
 import { spawnSync } from 'node:child_process';
 
@@ -94,4 +106,92 @@ export function gitSaid(result: GitResult): string {
     .map((stream) => stream.trim())
     .filter((stream) => stream !== '')
     .join('\n');
+}
+
+/** A checkout's working tree, as `git status --porcelain` reported it. */
+export interface WorkingTreeStatus {
+  /** True when git reported nothing at all. */
+  readonly clean: boolean;
+  /** Every porcelain line, as git wrote it; see the module note. */
+  readonly entries: readonly string[];
+  /** The porcelain lines naming a tracked path, as git wrote them. */
+  readonly tracked: readonly string[];
+  /**
+   * The untracked paths, unquoted ({@link unquoteGitPath}). A directory
+   * git folded into one line keeps its trailing `/`.
+   */
+  readonly untracked: readonly string[];
+}
+
+/** How `git status --porcelain` opens an untracked line. */
+const UNTRACKED_PREFIX = '?? ';
+
+/**
+ * Parses `git status --porcelain` into a status.
+ *
+ * Every non-blank line lands in {@link WorkingTreeStatus.entries}, and
+ * each one in exactly one of the two halves: a `?? ` line is untracked
+ * and its path is unquoted, every other line is tracked and kept as git
+ * wrote it; see the module note. Which half refuses a merge is
+ * `readMergeRefusal`'s, in `packages/rafa-pr/src/pr/merge.ts`.
+ */
+export function parseWorkingTree(stdout: string): WorkingTreeStatus {
+  const entries = stdout.split('\n')
+    .map((line) => line.replace(/\r$/, ''))
+    .filter((line) => line.trim() !== '');
+  const tracked = entries.filter((line) => !line.startsWith(UNTRACKED_PREFIX));
+  const untracked = entries.filter((line) => line.startsWith(UNTRACKED_PREFIX))
+    .map((line) => unquoteGitPath(line.slice(UNTRACKED_PREFIX.length)));
+  return {
+    clean: entries.length === 0,
+    entries: Object.freeze(entries),
+    tracked: Object.freeze(tracked),
+    untracked: Object.freeze(untracked),
+  };
+}
+
+/** The one-letter escapes git's path quoting writes, and the byte each stands for. */
+const C_ESCAPES: Readonly<Record<string, number>> = {
+  'a': 0x07, 'b': 0x08, 'f': 0x0c, 'n': 0x0a, 'r': 0x0d, 't': 0x09, 'v': 0x0b,
+  '\\': 0x5c, '"': 0x22,
+};
+
+/** An octal escape: three digits after the backslash, one byte. */
+const OCTAL_ESCAPE = /^[0-7]{3}$/;
+
+/**
+ * A path as git printed it, with git's quoting undone. git wraps a path
+ * in double quotes when it holds a character it will not print bare —
+ * `git status --porcelain` for a space, `git ls-tree` for a non-ASCII
+ * byte, which it writes as octal escapes under `core.quotePath` — and
+ * leaves every other path as it is. Measured on git 2.53.0: an
+ * untracked `a b.txt` read `?? "a b.txt"` in porcelain and `a b.txt` in
+ * `ls-tree -r --name-only`, and `é.txt` read `"\303\251.txt"` in both.
+ */
+export function unquoteGitPath(raw: string): string {
+  if (raw.length < 2 || !raw.startsWith('"') || !raw.endsWith('"')) return raw;
+  const body = raw.slice(1, -1);
+  const bytes: number[] = [];
+  const encoder = new TextEncoder();
+  for (let at = 0; at < body.length; at += 1) {
+    const char = body.charAt(at);
+    if (char !== '\\') {
+      bytes.push(...encoder.encode(char));
+      continue;
+    }
+    const octal = body.slice(at + 1, at + 4);
+    if (OCTAL_ESCAPE.test(octal)) {
+      bytes.push(Number.parseInt(octal, 8));
+      at += 3;
+      continue;
+    }
+    const escaped = C_ESCAPES[body.charAt(at + 1)];
+    if (escaped === undefined) {
+      bytes.push(...encoder.encode(char));
+      continue;
+    }
+    bytes.push(escaped);
+    at += 1;
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
 }

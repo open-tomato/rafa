@@ -33,12 +33,12 @@
  * cases; the full-listing guard dropped, so an orphan is reported on a
  * board read only in part, reddened 1.
  */
-import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
 
-import { readEpicProblems } from '../board/epic-problems.js';
-import { BOARD_LIST_FIELDS, BOARD_LISTING_LIMIT, parseBoardListing } from '../board/roadmap-board.js';
+import { readEpicProblems } from '@open-tomato/rafa-board/board/epic-problems';
+import { BOARD_LIST_FIELDS, BOARD_LISTING_LIMIT, parseBoardListing } from '@open-tomato/rafa-board/board/roadmap-board';
 
 import { DOCTOR_EPIC_KINDS, EPICS_HEADING, readDoctorEpics, renderDoctorEpics } from './doctor-epics.js';
 

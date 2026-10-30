@@ -13,8 +13,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
 import { expectExit, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-scratch-')));
 

@@ -7,7 +7,7 @@
  * what it wrote. What it no longer carries is this: the usage refusal a
  * line naming no source gets, the candidate rule `--spec` looks a file
  * up with, and the call that turns `--issue` or `--next` into one spec
- * path. The board side of that call is `src/board/plan-spec.ts`, which
+ * path. The board side of that call is `packages/rafa-board/src/board/plan-spec.ts`, which
  * builds the `gh` and `git` runners and runs the cheap checks; this
  * module is what `plan create` hands it.
  *
@@ -87,19 +87,27 @@
  * {@link createPlanRefreshOffer} read
  * `process.stdin.isTTY` and open a prompter only to ask.
  */
-import type { AlternativeOffer } from '../../board/blocked-line.js';
-import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '../../board/plan-spec.js';
-import type { RefreshConfig } from '../../board/project/refresh.js';
-import type { RefreshOffer } from '../../board/snapshot-settle.js';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
+import type {
+  AlternativeOffer,
+  PlanSpecOptions,
+  PlanSpecResolution,
+  ReadyOffer,
+  RefreshConfig,
+  RefreshOffer,
+} from '@open-tomato/rafa-board';
 
 import fs from 'fs';
 import path from 'path';
 
-import { CommandExit } from '@open-tomato/rafa/core/command';
+import {
+  SOURCE_REFUSAL_EXIT,
+  noSourceMessage,
+  readSpecSourceFlags,
+  resolvePlanSpec,
+} from '@open-tomato/rafa-board';
 
-import { resolvePlanSpec } from '../../board/plan-spec.js';
-import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from '../../board/spec-source.js';
+import { CommandExit } from '@open-tomato/rafa/core/command';
 
 import { createPlanBlockedOffer } from './blocked-offer.js';
 import { createPlanReadyOffer } from './ready-offer.js';

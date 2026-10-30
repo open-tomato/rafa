@@ -29,7 +29,7 @@
  * place would satisfy exactly one of the four. Each expected reading is
  * `parseSpecReview` over the same output, so these cases measure what
  * the planner CARRIES and never re-measure the parser, whose own cases
- * are in `src/board/spec-review.test.ts`.
+ * are in `packages/rafa-board/src/board/spec-review.test.ts`.
  *
  * Two cases pin where the reading comes from. The prompt case hands the
  * planner a builder that quotes a READY block into the prompt while the
@@ -121,8 +121,8 @@
  *     frozen case.
  */
 import type { ClaudePlannerOptions } from './claude.js';
-import type { SpecReviewReading } from '../../board/spec-review.js';
 import type { CapturingSpawner } from '@open-tomato/rafa/core/loop';
+import type { SpecReviewReading } from '@open-tomato/rafa-board/board/spec-review';
 
 import {
   existsSync,
@@ -139,7 +139,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { MISSING_REVIEW_GAP, parseSpecReview } from '../../board/spec-review.js';
+import { MISSING_REVIEW_GAP, parseSpecReview } from '@open-tomato/rafa-board/board/spec-review';
 
 import { ClaudePlannerError, createClaudePlanner, planFilePath } from './claude.js';
 

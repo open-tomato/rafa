@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 
 import { commandProblem, commandSpelling } from '@open-tomato/rafa/core/command';
-
 import {
   PR_CLOSE_DECLARATION,
   PR_CURRENT_DECLARATION,
@@ -28,11 +27,13 @@ import {
   PR_TRIAGE_DECLARATION,
   PR_VIEW_DECLARATION,
   PR_WAIT_DECLARATION,
-} from './declarations.js';
-
-import { PR_FEATURE } from './index.js';
+} from '@open-tomato/rafa-pr/commands/pr/declarations';
+import { PR_FEATURE } from '@open-tomato/rafa-pr/commands/pr/index';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** The command modules' folder: they live in the pr package since pass 4e, this file at the root. */
+const MOVED_DIR = join(HERE, '..', '..', '..', 'packages', 'rafa-pr', 'src', 'commands', 'pr');
 
 /** Each declaration in roster order, beside the module its command is the default export of. */
 const DECLARED: readonly (readonly [string, CommandDeclaration])[] = [
@@ -90,14 +91,14 @@ describe('PR_FEATURE', () => {
   });
 
   it.each(DECLARED)('loads from %s the command its declaration spells, that declaration under a run', async (path, declaration) => {
-    const loaded = await import(join(HERE, path)) as { default: RafaCommand };
+    const loaded = await import(join(MOVED_DIR, path)) as { default: RafaCommand };
 
     expect(commandSpelling(loaded.default)).toBe(commandSpelling(declaration));
     expect(lessRun(loaded.default)).toEqual(declaration);
   });
 
   it.each(DECLARED)('loads from %s the command its declaration spells, that declaration under a run', async (path, declaration) => {
-    const loaded = await import(join(HERE, path)) as { default: RafaCommand };
+    const loaded = await import(join(MOVED_DIR, path)) as { default: RafaCommand };
 
     expect(commandSpelling(loaded.default)).toBe(commandSpelling(declaration));
     expect(lessRun(loaded.default)).toEqual(declaration);

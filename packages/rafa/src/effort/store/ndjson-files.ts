@@ -41,7 +41,7 @@
  * keeps that refusal from leaving a half-written append behind.
  *
  * The read is a whole-file one, deliberately, where
- * `src/effort/session-log.ts` has to stream. The asymmetry is the row
+ * `packages/rafa/src/effort/session-log.ts` has to stream. The asymmetry is the row
  * count: that module reads one line per RECORD across roughly a
  * gigabyte of logs, while this one holds one row per SESSION — a few
  * hundred rows, well under a megabyte.

@@ -9,7 +9,7 @@
  *
  *   - **Where.** {@link bundledOperatorsDirectory} is `bundled/operators`
  *     beside the running entry with its links resolved, found the way
- *     `bundledAgentsDirectory` (`src/inventory/trees.ts`) finds
+ *     `bundledAgentsDirectory` (`packages/rafa-inventory/src/inventory/trees.ts`) finds
  *     `bundled/agents`. An installed package runs `dist/cli.js`, so that
  *     is `dist/bundled/operators`, which the build copies from
  *     `src/bundled/`.

@@ -19,7 +19,8 @@
  * no terminal to be asked on.
  *
  * Before the first turn it pulls the other devices' effort rows once,
- * through `pullBeforeRead` (`../effort/sync/contact.ts`), `--dry-run`
+ * through `pullBeforeRead`
+ * (`packages/rafa-effort/src/effort/sync/contact.ts`), `--dry-run`
  * included; a hub that cannot be reached is one `warn` line, and the
  * chain reads the local store as it would have.
  *
@@ -46,7 +47,7 @@
  *
  * The words after the command are the ones that RUN, `--yes` included:
  * `rafa next` has already asked, so `pr merge`'s own question would be
- * the same decision asked twice (`src/next/actions.ts`). The line is
+ * the same decision asked twice (`packages/rafa-run/src/next/actions.ts`). The line is
  * what happened, not a line to retype.
  *
  * ## The one question handed over
@@ -161,11 +162,11 @@
  * fast-forwarding the base is no command, and `sync` runs through the
  * git seam (`src/next/sync.ts`), while `hop` and `home`, which only the
  * hop rows propose, write the hop record and the position in-process
- * and move through the registered `switch` (`src/next/hop-action.ts`).
+ * and move through the registered `switch` (`packages/rafa-run/src/next/hop-action.ts`).
  * So each action keeps its own refusals, and {@link NextCommandSeams} is
  * the whole of what a test replaces.
  *
- * An action writes through {@link actionOutput} (`src/next/ending.ts`),
+ * An action writes through {@link actionOutput} (`packages/rafa-run/src/next/ending.ts`),
  * which is the caller's output with its `result` taken: an invocation
  * gives ONE result, and the chain's is the report.
  *
@@ -173,7 +174,7 @@
  *
  * A chain that ends at `nothing-left` because the walk ran dry inside an
  * epic — every line done or taken, the epic not done — ends with the
- * lines `src/next/epic-end.ts` renders, after its own and after any stop
+ * lines `packages/rafa-release/src/next/epic-end.ts` renders, after its own and after any stop
  * line: `rafa epic close <n>` as the next step, `rafa roadmap` to list
  * the board's epics, and `rafa release tag` where a version the
  * changelog calls released carries no tag. Each is printed, never run.
@@ -190,10 +191,10 @@
  * it was without it:
  *
  *  - the sources are opened with `roadmap` (`openNextSources`), so the
- *    table reads its hop rows (`src/next/hop-rows.ts`) and the board its
+ *    table reads its hop rows (`packages/rafa-run/src/next/hop-rows.ts`) and the board its
  *    hop reading, and nothing else sends a command more;
  *  - `plan`, `start` and `resume` carry `--roadmap` among the words they
- *    run with (`src/next/actions.ts`), and the proposal line prints it;
+ *    run with (`packages/rafa-run/src/next/actions.ts`), and the proposal line prints it;
  *  - once a loop action has run, {@link NextChainRoadmap.afterLoop} reads
  *    the board again and, while a hop is away, answers the `home` step,
  *    which is put as one more turn — two lines, the question or the
@@ -213,14 +214,14 @@
  *
  * `--claim-ahead` rides on it and on nothing else: the `plan` action
  * carries it after `--roadmap`, so `plan create` also claims the line
- * after its pick (`src/claims/ahead.ts`), and no other action's words
+ * after its pick (`packages/rafa-board/src/claims/ahead.ts`), and no other action's words
  * change. A line giving it without `--roadmap` is refused with exit code
  * 1 before any source is opened (`readClaimAhead`).
  *
  * ## The relationships mode
  *
  * Before the first turn, {@link runNext} reads the mode
- * `board.relationships` names (`src/next/relations-mode.ts`) and opens
+ * `board.relationships` names (`packages/rafa-run/src/next/relations-mode.ts`) and opens
  * the sources with what it answers, so every turn's board reads epics
  * and blockers through that adapter. In `labels`, the default, that
  * sends nothing and the sources are opened as before; in `native` it
@@ -231,7 +232,7 @@
  *
  * Once a `merge` or `merge-unchecked` action has run,
  * {@link NextChainOptions.afterMerge} reads the fragments waiting on the
- * base (`src/next/settle-step.ts`, over the settle dry run `pr merge`'s
+ * base (`packages/rafa-run/src/next/settle-step.ts`, over the settle dry run `pr merge`'s
  * own follow-up is decided by) and, while they fold into a version,
  * puts the `settle` step as one more turn — two lines, then the question
  * or the ceiling, then `rafa release settle`. It is asked like `merge`:
@@ -259,7 +260,6 @@ import type { NextCeiling } from '../next/ceiling.js';
 import type { NextDryRun, NextStop } from '../next/lines.js';
 import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { PullBeforeReadInput } from '@open-tomato/rafa-effort';
-import type { NextSourceSeams, OpenedNextSources } from '@open-tomato/rafa-pr';
 import type {
   DryEpic,
   NextActionId,
@@ -267,32 +267,32 @@ import type {
   NextAnswerId,
   NextHopStep,
   NextInvocation,
+  NextSourceSeams,
   NextSources,
   NextState,
+  OpenedNextSources,
 } from '@open-tomato/rafa-run';
 
 import { pullBeforeRead } from '@open-tomato/rafa-effort';
-import {
-  followsMerge,
-  openNextRelations,
-  openNextSources,
-  readSettleAfterMerge,
-} from '@open-tomato/rafa-pr';
 import { epicEndLines, watchDryEpic } from '@open-tomato/rafa-release';
 import {
-  REMOTE,
   actionInvocation,
   actionOutput,
   commandWords,
+  followsMerge,
   nextQuestion,
+  openNextRelations,
+  openNextSources,
   readHomeAfterLoop,
   readNextState,
+  readSettleAfterMerge,
   runAction,
 } from '@open-tomato/rafa-run';
 
 import { expectNoArgument } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit , createLinePrompter, lazyPrompter } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { REMOTE } from '@open-tomato/rafa/start/branch-decision';
 
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import {
@@ -364,7 +364,7 @@ export interface NextChainRoadmap {
   readonly claimAhead?: boolean;
 }
 
-/** What the actions' words carry under `roadmap`, as `src/next/actions.ts` reads it. */
+/** What the actions' words carry under `roadmap`, as `packages/rafa-run/src/next/actions.ts` reads it. */
 function passedOptions(roadmap: NextChainRoadmap | undefined): NextActionOptions {
   return { roadmap: roadmap !== undefined, claimAhead: roadmap?.claimAhead === true };
 }

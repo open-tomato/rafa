@@ -84,13 +84,12 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { claudeArgs, spawnClaude } from '@open-tomato/rafa/core/loop';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 
 import { dispatch } from '../cli/dispatch.js';
-import { createCommandRegistry } from '../cli/registry.js';
-
-import { sinkOutput } from './output-sinks.js';
 
 /** The setting sources every planted command's session spawns with. */
 const DEFAULT_SOURCES = ['project', 'local'] as const;
