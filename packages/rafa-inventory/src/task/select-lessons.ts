@@ -37,7 +37,7 @@
  * One shared word is not enough. Task texts are full of ordinary words
  * (`add`, `tests`, `refresh`) that triggers carry too, so a floor of one
  * matched word handed lessons to tasks naming nothing a lesson knows:
- * the lesson-door golden set (`lesson-door.golden.test.ts`) measured
+ * the lesson-door golden set (`addons/dyno`) measured
  * four lessons on its two abstention tasks, and ten extra lessons on
  * its eight answerable tasks. Every expected lesson there matches two
  * words or more, so a floor of two keeps all eight and hands the

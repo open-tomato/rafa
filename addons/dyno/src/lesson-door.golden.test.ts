@@ -72,16 +72,14 @@
  * Spike for the lesson-door golden set; the findings are in the commit
  * that adds this file.
  */
-import type { TaskInput } from './resolve-skills.js';
-import type { BlessedBundle, InstinctRecord, MergeResult } from '../learning/index.js';
+import type { BlessedBundle, InstinctRecord, MergeResult } from '@open-tomato/rafa-inventory/learning/index';
+import type { TaskInput } from '@open-tomato/rafa-inventory/task/resolve-skills';
 
+import { questionWords, wordsMatch } from '@open-tomato/rafa-inventory/inventory/search/rank';
+import { actionHash, bless, merge, triggerKey } from '@open-tomato/rafa-inventory/learning/index';
+import { LESSONS_HEADING, renderLessonsSection } from '@open-tomato/rafa-inventory/task/sections';
+import { LESSON_LIMIT, selectLessons } from '@open-tomato/rafa-inventory/task/select-lessons';
 import { afterAll, describe, expect, it } from 'bun:test';
-
-import { questionWords, wordsMatch } from '../inventory/search/rank.js';
-import { actionHash, bless, merge, triggerKey } from '../learning/index.js';
-
-import { LESSONS_HEADING, renderLessonsSection } from './sections.js';
-import { LESSON_LIMIT, selectLessons } from './select-lessons.js';
 
 /** The blessing floor, `learning.bless.minConfidence`'s default. */
 const MIN_CONFIDENCE = 0.5;

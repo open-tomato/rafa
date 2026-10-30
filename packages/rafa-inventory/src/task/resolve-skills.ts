@@ -42,7 +42,7 @@
  * one field, which is what `rankCandidates` itself keeps. It is a named
  * constant so a later measurement can raise it in one place. The
  * `selectLessons` trigger floor is its own, `TRIGGER_WORD_FLOOR`, a count
- * of matched words measured by the lesson-door golden set.
+ * of matched words measured by the golden set in `addons/dyno`.
  *
  * ## Reading the files
  *
