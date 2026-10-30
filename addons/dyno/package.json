@@ -1,0 +1,12 @@
+{
+  "name": "@open-tomato/dyno",
+  "version": "0.0.0",
+  "description": "Proof of concept, not shipped: a deterministic benchmark for the lesson door, the lessons text a dispatched task is handed. Not a workspace member yet, so it resolves @open-tomato/rafa-inventory through the root node_modules.",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "bun test"
+  }
+}

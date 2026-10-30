@@ -40,8 +40,9 @@
  * {@link RANK_FLOOR} is the score a ranked item has to beat. It is zero:
  * a score above it means at least one question word matched at least
  * one field, which is what `rankCandidates` itself keeps. It is a named
- * constant so this resolver and `selectLessons` read one number, and a
- * later measurement can raise it in one place.
+ * constant so a later measurement can raise it in one place. The
+ * `selectLessons` trigger floor is its own, `TRIGGER_WORD_FLOOR`, a count
+ * of matched words measured by the golden set in `addons/dyno`.
  *
  * ## Reading the files
  *
@@ -71,8 +72,8 @@ import { rankCandidates, readRankCandidate } from '../inventory/search/rank.js';
 import { indexedSkills } from './skill-index.js';
 
 /**
- * The score a ranked skill or lesson trigger has to beat to be kept:
- * above zero, so at least one word matched. See "The floor".
+ * The score a ranked skill has to beat to be kept: above zero, so at
+ * least one word matched. See "The floor".
  */
 export const RANK_FLOOR = 0;
 
