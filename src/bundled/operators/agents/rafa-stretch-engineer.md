@@ -120,9 +120,9 @@ approval, close the duplicate groups as the skill says.
 One loop at a time; never two at once inside a stretch.
 
 Run `rafa stretch item <issue> --wait`. It starts the loop as a detached child, logs
-its output to `.rafa/stretch/<n>/loop-<issue>.log`, waits on it, merges its pull
-request into `stretch/<n>` with checks skipped, and polls the run until it ends. Then
-move to the pit stop.
+its output to `.rafa/stretch/<n>/loop-<issue>.log`, waits on it, waits for its pull
+request's checks and merges it into `stretch/<n>`, and polls the run until it ends.
+Then move to the pit stop.
 
 ### 3. Pit stop
 

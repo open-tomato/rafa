@@ -46,7 +46,8 @@
  *      written no record yet, and exits 0 with the log's path: the child
  *      is still running;
  *   4. with `--wait`, `rafa loop wait --session-id=<id>` on this
- *      terminal, then `./item-merge.ts`'s half: the merge, the CI wait,
+ *      terminal, then `./item-merge.ts`'s half: the waits for the pull
+ *      request's mergeability and checks, the merge, the CI wait,
  *      the ledger line and the pit-stop readings once the loop opened a
  *      pull request, else the reason it opened none and `loop wait`'s
  *      exit code, so a caller reads the same reason codes `loop wait`
@@ -515,9 +516,9 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
       + ' detached with `RAFA_OUTPUT=events`, its output appended to `.rafa/stretch/<n>/loop-<issue>.log`.'
       + ' It waits for the loop\'s session record and prints its id. With `--wait` it then runs'
       + ' `rafa loop wait --session-id=<id>`; once the loop has opened a pull request it refuses one whose base'
-      + ' is not a `stretch/*` branch, runs `rafa pr merge <pr> --skip-checks --yes`, waits for the run on the'
-      + ' merge commit to end, appends the item to `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop'
-      + ' readings. A loop that opened no pull request has its reason printed, merges nothing and exits with'
+      + ' is not a `stretch/*` branch, waits for GitHub to compute its mergeability and for its checks to pass,'
+      + ' runs `rafa pr merge <pr> --yes`, waits for the run on the merge commit to end, appends the item to'
+      + ' `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop readings. A loop that opened no pull request has its reason printed, merges nothing and exits with'
       + ' `loop wait`\'s code. `--dry-run` prints every step in order and runs none. Exit code 1 for a refusal,'
       + ' 2 for a step that failed, and the code of `plan create`, `loop wait` or `pr merge` when it fails.',
     args: [
@@ -526,15 +527,15 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
     flags: [
       {
         name: 'wait',
-        description: 'Wait on the loop through `rafa loop wait`, then merge its pull request into the integration branch'
-          + ' with checks skipped, wait for CI and print the pit-stop readings.',
+        description: 'Wait on the loop through `rafa loop wait`, then wait for its pull request\'s checks, merge it into'
+          + ' the integration branch, wait for CI and print the pit-stop readings.',
         type: 'boolean',
       },
       { name: 'dry-run', description: 'Print every step in order, and run none of them.', type: 'boolean' },
     ],
     examples: [
       { cmd: 'rafa stretch item 812 --dry-run', note: 'Prints the plan create line and the detached loop line.' },
-      { cmd: 'rafa stretch item 812 --wait', note: 'Plans #812, starts its loop, waits on it and merges its pull request.' },
+      { cmd: 'rafa stretch item 812 --wait', note: 'Plans #812, starts its loop, waits on it and on its pull request\'s checks, and merges it.' },
     ],
     outputs: ['text'],
     spends: { when: 'unless', flag: '--dry-run', what: 'one planning session and the loop it starts' },

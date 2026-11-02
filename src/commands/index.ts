@@ -410,11 +410,12 @@
  *     with `--as-worktree --no-ci-wait`, its events output appended to
  *     `.rafa/stretch/<n>/loop-<issue>.log`; `--wait` then runs
  *     `loop wait` on its session and, once the loop has a pull request,
- *     merges it with `pr merge --skip-checks --yes` into a `stretch/*`
- *     base only, waits for the run on the merge commit, appends the
- *     item to `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop
- *     readings (`./stretch/item-merge.ts`). Refused with exit code 1
- *     when `pr.base` names no `stretch/<n>` branch. It spends unless
+ *     waits for its mergeability and its checks, merges it with
+ *     `pr merge --yes` into a `stretch/*` base only, waits for the run
+ *     on the merge commit, appends the item to
+ *     `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop readings
+ *     (`./stretch/item-merge.ts`). Refused with exit code 1 when
+ *     `pr.base` names no `stretch/<n>` branch. It spends unless
  *     `--dry-run`.
  *   - `stretch end [--dry-run]`: the stretch `pr.base` names opened from
  *     `stretch/<n>` into the default branch through the `pr open` logic,

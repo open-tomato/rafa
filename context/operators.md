@@ -93,7 +93,8 @@ loop start to its pit-stop readings. It takes the integration branch from
 `rafa plan create --issue`, and starts the loop detached with
 `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`.
 With `--wait`, it waits on the loop through `rafa loop wait`. Once the loop
-has a pull request, `item` merges it with `--skip-checks` into the
+has a pull request, `item` waits for GitHub to compute its mergeability and
+for its checks to pass, merges it with `rafa pr merge <pr> --yes` into the
 integration branch, frees the worktree, and waits for the run on the merge
 commit. It asks for that run by commit (`--commit`), so a newer push to the
 branch that has a run of its own does not make the wait read that run. The
