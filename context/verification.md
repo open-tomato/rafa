@@ -894,8 +894,9 @@ all failure output lands in one place a reader can find: the test itself
 names the assertion that failed, and the error message names the scratch
 directory, the exit code, and the streams the child wrote.
 `src/tests/spawned-exit-code.sweep.test.ts` holds the rule: it fails on
-any test file under `src/` asserting a spawned rafa run's exit code with
-a bare `expect(run.exitCode).toBe(n)`. It reads each asserted value back
+any tracked test file under a root of `src/tests/source-roots.ts` (the
+root's `src/`, core's and the six feature packages' `src/`) asserting a
+spawned rafa run's exit code with a bare `expect(run.exitCode).toBe(n)`. It reads each asserted value back
 to its declaration, so an in-process result asserted bare still passes.
 
 ### Fixture scrub, guard, and path rules
