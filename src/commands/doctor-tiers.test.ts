@@ -32,7 +32,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
+import { SKILL_USE_FIXTURE_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
 import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
 import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
 
@@ -284,9 +284,9 @@ describe('the SERVE_CLI_VERSION pin', () => {
   });
 });
 
-describe('the SKILL_USE_CLI_VERSION pin', () => {
+describe('the SKILL_USE_FIXTURE_VERSION pin', () => {
   it('gives no row when the installed version is the pin', () => {
-    expect(skillUseVersionRows(SKILL_USE_CLI_VERSION)).toEqual([]);
+    expect(skillUseVersionRows(SKILL_USE_FIXTURE_VERSION)).toEqual([]);
   });
 
   it('gives one warning naming both versions when they differ', () => {
@@ -315,7 +315,7 @@ describe('the SKILL_USE_CLI_VERSION pin', () => {
 
   it('gives no pin row over the planted world when the installed version matches both pins', () => {
     // Guards the default arguments: rowsOf passes SERVE_CLI_VERSION, so this holds only while the pins agree.
-    expect(SKILL_USE_CLI_VERSION).toBe(SERVE_CLI_VERSION);
+    expect(SKILL_USE_FIXTURE_VERSION).toBe(SERVE_CLI_VERSION);
     expect(rowsOf(WITHOUT_USER).some((row) => row.kind === 'cli-version' || row.kind === 'skill-use-version')).toBe(false);
   });
 });
