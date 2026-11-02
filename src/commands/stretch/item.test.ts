@@ -451,12 +451,12 @@ describe('the real launch', () => {
 });
 
 describe('the registered command', () => {
-  it('spends unless --dry-run, and takes the issue and two switches', () => {
+  it('spends unless --dry-run, and takes the issue and three switches', () => {
     const command = createStretchItemCommand(plant().seams);
 
     expect(command.name).toBe('stretch item');
     expect(command.spends).toEqual({ when: 'unless', flag: '--dry-run', what: 'one planning session and the loop it starts' });
     expect(command.args.map((arg) => arg.name)).toEqual(['issue']);
-    expect(command.flags.map((flag) => flag.name)).toEqual(['wait', 'dry-run']);
+    expect(command.flags.map((flag) => flag.name)).toEqual(['wait', 'resume', 'dry-run']);
   });
 });

@@ -307,7 +307,7 @@ export function mergeDryRunLines(rafa: readonly string[], root: string, n: numbe
 }
 
 /** The `startedAt` of the stretch's `stretch.json`, or null when there is none to read. */
-function stretchStartedAt(root: string, n: number): Date | null {
+export function stretchStartedAt(root: string, n: number): Date | null {
   let record: unknown;
   try {
     record = JSON.parse(readFileSync(stretchRecordPath(root, n), 'utf8')) as unknown;

@@ -87,9 +87,9 @@ the copies, since no new stretch reads them and one started with them may.
 Whether the tmux session stays is open: #598 rejected a tmux session on
 the host, read with capture-pane.
 
-`rafa stretch item <issue> [--wait] [--dry-run]` handles one item from
-loop start to its pit-stop readings. It takes the integration branch from
-`pr.base` (which must name a `stretch/<n>` branch), runs
+`rafa stretch item <issue> [--wait | --resume] [--dry-run]` handles one
+item from loop start to its pit-stop readings. It takes the integration
+branch from `pr.base` (which must name a `stretch/<n>` branch), runs
 `rafa plan create --issue`, and starts the loop detached with
 `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`.
 With `--wait`, it waits on the loop through `rafa loop wait`. Once the loop
@@ -105,6 +105,13 @@ on <branch> at <sha> had not ended within 90 minutes`. Then it appends the
 ledger line and prints the pit-stop readings: the failed cases by file and
 case, the open-bug count, and the bugs filed since the last item. It decides
 nothing; the pit stop does.
+
+`--resume` finishes an item whose loop has ended, as after an item that
+ended on a refused merge: it starts no plan and no loop, reads the pull
+request from the last `rafa· pr #<n> opened` line of the item's log, and
+runs the same merge half on it. A pull request merged already has its merge
+skipped. It refuses an issue the ledger already holds, and is refused
+beside `--wait`.
 
 The filed-since line reads `Filed since <time>: <n>.`, where the time is the
 last ledger line's, or the stretch's start when the ledger holds none. Then one
