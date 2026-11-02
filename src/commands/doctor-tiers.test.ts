@@ -32,7 +32,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
+import { SKILL_USE_CLI_FLOOR, SKILL_USE_FIXTURE_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
 import { buildInventory } from '@open-tomato/rafa-inventory/inventory/index';
 import { SERVE_CLI_VERSION } from '@open-tomato/rafa-inventory/tiers/delivery';
 
@@ -267,8 +267,19 @@ describe('the SERVE_CLI_VERSION pin', () => {
     ]);
   });
 
-  it('places both pin warnings after the unreviewed rows and before the notes', () => {
+  it('places the skill-use note after the cli-version warning and before the copy notes', () => {
     const rows = doctorTierRows(buildInventory(seams(WITHOUT_USER)), '9.9.9');
+
+    expect(heads(rows).slice(2, 6)).toEqual([
+      'unreviewed warn agent borrowed',
+      'cli-version warn Claude Code',
+      'skill-use-version note Claude Code',
+      'copy note skill documentation',
+    ]);
+  });
+
+  it('places both warnings after the unreviewed rows and before the notes for a version below the floor', () => {
+    const rows = doctorTierRows(buildInventory(seams(WITHOUT_USER)), '2.1.279');
 
     expect(heads(rows).slice(2, 6)).toEqual([
       'unreviewed warn agent borrowed',
@@ -284,38 +295,62 @@ describe('the SERVE_CLI_VERSION pin', () => {
   });
 });
 
-describe('the SKILL_USE_CLI_VERSION pin', () => {
-  it('gives no row when the installed version is the pin', () => {
-    expect(skillUseVersionRows(SKILL_USE_CLI_VERSION)).toEqual([]);
-  });
+describe('the SKILL_USE_CLI_FLOOR floor and the SKILL_USE_FIXTURE_VERSION fixture', () => {
+  const source = 'packages/rafa-effort/src/effort/skill-use.ts';
 
-  it('gives one warning naming both versions when they differ', () => {
-    expect(skillUseVersionRows('2.1.999', '2.1.280')).toEqual([{
+  it('warns below the floor, naming the installed version and the floor', () => {
+    expect(skillUseVersionRows('2.1.279', '2.1.280', '2.1.280')).toEqual([{
       kind: 'skill-use-version',
       status: 'warn',
       name: 'Claude Code',
-      detail: '2.1.999 is installed, and the skill-use collector reads logs of 2.1.280, '
-        + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
-      fix: 'record the skill-use fixture again under the installed version (packages/rafa-effort/src/effort/skill-use.ts) '
-        + 'before moving SKILL_USE_CLI_VERSION',
+      detail: '2.1.279 is installed, and the skill-use collector stores the skill counts of sessions logged below 2.1.280 as unknown',
+      fix: `read a log of 2.1.279 and lower SKILL_USE_CLI_FLOOR (${source}) when its Skill call shape is the fixture's`,
     }]);
   });
 
+  it('gives a note above the fixture\'s version, naming the version the fixture was recorded under', () => {
+    expect(skillUseVersionRows('2.1.316', '2.1.280', '2.1.280')).toEqual([{
+      kind: 'skill-use-version',
+      status: 'note',
+      name: 'Claude Code',
+      detail: '2.1.316 is installed, and the skill-use collector reads its logs by skill name as unvouched: '
+        + 'its fixture was recorded under 2.1.280',
+      fix: `record the skill-use fixture again under 2.1.316 (${source}) and move SKILL_USE_FIXTURE_VERSION`,
+    }]);
+  });
+
+  it('gives no row at the fixture\'s version', () => {
+    expect(skillUseVersionRows('2.1.280', '2.1.280', '2.1.280')).toEqual([]);
+    expect(skillUseVersionRows(SKILL_USE_FIXTURE_VERSION)).toEqual([]);
+  });
+
   it('gives no second row when no version could be read, the cli-version note standing for both', () => {
-    expect(skillUseVersionRows(null, '2.1.280')).toEqual([]);
+    expect(skillUseVersionRows(null, '2.1.280', '2.1.280')).toEqual([]);
     // Control: the unread version is still reported, once, by the delivery pin.
     expect(cliVersionRows(null, '2.1.280').map((row) => `${row.kind} ${row.status}`)).toEqual(['cli-version note']);
   });
 
-  it('warns for the skill-use pin alone when only that pin differs from the installed version', () => {
-    const rows = [...cliVersionRows('2.1.300', '2.1.300'), ...skillUseVersionRows('2.1.300', '2.1.280')];
-
-    expect(rows.map((row) => row.kind)).toEqual(['skill-use-version']);
+  it('compares the floor field by field, so 2.1.10 is above a floor of 2.1.9', () => {
+    expect(skillUseVersionRows('2.1.10', '2.1.9', '2.1.9').map((row) => row.status)).toEqual(['note']);
+    // Control: the same versions as text would sort 2.1.10 below 2.1.9 and warn.
+    expect(skillUseVersionRows('2.1.8', '2.1.9', '2.1.9').map((row) => row.status)).toEqual(['warn']);
   });
 
-  it('gives no pin row over the planted world when the installed version matches both pins', () => {
-    // Guards the default arguments: rowsOf passes SERVE_CLI_VERSION, so this holds only while the pins agree.
-    expect(SKILL_USE_CLI_VERSION).toBe(SERVE_CLI_VERSION);
+  it('reads the defaults off the reader\'s constants', () => {
+    expect(SKILL_USE_CLI_FLOOR).toBe('2.1.280');
+    expect(skillUseVersionRows('2.1.279').map((row) => row.status)).toEqual(['warn']);
+    expect(skillUseVersionRows('2.1.316').map((row) => row.status)).toEqual(['note']);
+  });
+
+  it('gives the skill-use row alone when only the skill-use fixture differs from the installed version', () => {
+    const rows = [...cliVersionRows('2.1.300', '2.1.300'), ...skillUseVersionRows('2.1.300', '2.1.280', '2.1.280')];
+
+    expect(rows.map((row) => `${row.kind} ${row.status}`)).toEqual(['skill-use-version note']);
+  });
+
+  it('gives no version row over the planted world when the installed version matches both pins', () => {
+    // Guards the default arguments: rowsOf passes SERVE_CLI_VERSION, so this holds only while the two agree.
+    expect(SKILL_USE_FIXTURE_VERSION).toBe(SERVE_CLI_VERSION);
     expect(rowsOf(WITHOUT_USER).some((row) => row.kind === 'cli-version' || row.kind === 'skill-use-version')).toBe(false);
   });
 });

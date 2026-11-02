@@ -11,7 +11,7 @@
  * | Class | Matched on stderr |
  * |---|---|
  * | never retried | a rate-limit refusal (`RATE_LIMITED`, `rate limit`), a missing scope (`INSUFFICIENT_SCOPES`, `not been granted the required scopes`, `needs the "<scope>" scope`), a GraphQL error GitHub gave on purpose (`NOT_FOUND`, `Could not resolve to`) |
- * | retried | a timeout (`operation timed out`, `i/o timeout`, `TLS handshake timeout`), a reset or closed connection (`connection reset`, `EOF`), an HTTP 502, 503 or 504 (`HTTP 502` and so on) |
+ * | retried | a timeout (`operation timed out`, `i/o timeout`, `TLS handshake timeout`), a reset or closed connection (`connection reset`, `EOF`), a reply body that ended early (`unexpected end of JSON input`), an HTTP 502, 503 or 504 (`HTTP 502` and so on) |
  * | never retried | anything else: an unknown error counts as permanent |
  *
  * The never-retried words are read first, so an answer GitHub gave on
@@ -21,7 +21,12 @@
  *
  * Only `read: operation timed out` is a reading: it is what `gh` wrote
  * on the POST to `api.github.com/graphql` for issue #725 in the first
- * live run on 2026-10-07. The other retried words are the spec's list,
+ * live run on 2026-10-07. `unexpected end of JSON input` is a reading
+ * too: `gh` wrote it on two of three back-to-back `rafa board sync` runs
+ * on 2026-10-30 (issue #1398), after 20 of 383 and 180 of 343 field
+ * writes. Those writes are safe to send again: each sets a field to a
+ * value, and adding an item already on the project answers the
+ * existing item. The other retried words are the spec's list,
  * NOT readings: no run met them. The never-retried words are the ones
  * `./refresh-warnings.ts` and `./writes.ts` already match, from GitHub's
  * documentation. The runner's own deadline (`GhRunnerOptions.timeoutMs`)
@@ -71,6 +76,7 @@ const NEVER_RETRIED: readonly RegExp[] = Object.freeze([
 const RETRIED: readonly RegExp[] = Object.freeze([
   /operation timed out|i\/o timeout|TLS handshake timeout/u,
   /connection reset|\bEOF\b/u,
+  /unexpected end of JSON input/u,
   /\bHTTP 50[234]\b/u,
 ]);
 

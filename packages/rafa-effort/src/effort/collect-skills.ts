@@ -26,8 +26,15 @@
  * `skill_invocations` is one of the SQLite-only tables, so this half
  * writes `effort.sqlite` under the repo root whichever backend `store`
  * selects, beside the NDJSON files a `store: ndjson` run writes. A
- * session whose log is not of `SKILL_USE_CLI_VERSION` is stored as an
- * `unknown` row, never as 0, and counted here under `unknown`.
+ * session with a record logged below `SKILL_USE_CLI_FLOOR` (2.1.280) is
+ * stored as an `unknown` row, never as 0, and counted here under
+ * `unknown` alone. A session read by skill name whose records do not all
+ * carry `SKILL_USE_FIXTURE_VERSION` (2.1.280), the version its recorded
+ * fixture was logged under, is stored by name like a vouched one and
+ * counted here under `unvouched` too, so a run says how many of its
+ * counts rest on a log shape no fixture has pinned. Under `--verbose`
+ * each read names the session's versions and which of the three it is,
+ * as in `skills: read <id> (2.1.316, unvouched)`.
  *
  * ## Failures
  *
@@ -36,7 +43,7 @@
  * half counts its own. The write itself is not caught: every value it
  * refuses comes from code, so a refusal is a fault, not a reading.
  */
-import type { SkillUseReading } from '@open-tomato/rafa/store/skill-invocations';
+import type { SkillUseOutcome } from './skill-use.js';
 
 import { readSkillInvocations, UNKNOWN_SKILL_COUNT, writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
 
@@ -65,6 +72,8 @@ export interface SkillCollectSummary {
   alreadyCounted: number;
   /** Logs read without error. */
   read: number;
+  /** Of the logs read, the ones stored by skill name whose reading is not vouched for. */
+  unvouched: number;
   /** Of the logs read, the ones whose count is unknown. */
   unknown: number;
   /** Logs that threw while being read; counted, never swallowed. */
@@ -96,6 +105,22 @@ function messageOf(error: unknown): string {
     : String(error);
 }
 
+/**
+ * What `--verbose` says of one reading: its versions, and whether it is
+ * vouched for, unvouched, or unknown.
+ */
+function readingNote(reading: SkillUseOutcome): string {
+  const versions = reading.versions.length === 0
+    ? 'no version'
+    : reading.versions.join(', ');
+  const standing = reading.uses === UNKNOWN_SKILL_COUNT
+    ? 'unknown'
+    : reading.vouched
+      ? 'vouched'
+      : 'unvouched';
+  return `skills: read ${reading.sessionId} (${versions}, ${standing})`;
+}
+
 /** The sessions that already hold a `skill_invocations` row. */
 function countedSessions(repoRoot: string): Set<string> {
   return new Set(readSkillInvocations(repoRoot).map((row) => row.sessionId));
@@ -111,12 +136,13 @@ export async function collectSkillHalf(input: SkillHalfInput): Promise<SkillColl
     : countedSessions(input.repoRoot);
   const pending = input.logs.filter((log) => !counted.has(log.sessionId));
 
-  const readings: SkillUseReading[] = [];
+  const readings: SkillUseOutcome[] = [];
   let failed = 0;
   for (const log of pending) {
     try {
-      readings.push(await readSkillUse(log.path));
-      input.note(`skills: read ${log.sessionId}`);
+      const reading = await readSkillUse(log.path);
+      readings.push(reading);
+      input.note(readingNote(reading));
     } catch (error) {
       failed += 1;
       input.log(`skills: FAILED ${log.path}: ${messageOf(error)}`);
@@ -130,6 +156,7 @@ export async function collectSkillHalf(input: SkillHalfInput): Promise<SkillColl
     candidates: input.logs.length,
     alreadyCounted: input.logs.length - pending.length,
     read: readings.length,
+    unvouched: readings.filter((reading) => reading.uses !== UNKNOWN_SKILL_COUNT && !reading.vouched).length,
     unknown: readings.filter((reading) => reading.uses === UNKNOWN_SKILL_COUNT).length,
     failed,
     appended: written.appended,
@@ -146,6 +173,7 @@ export function formatSkillSummary(skills: SkillCollectSummary | null): string {
   return `  skills    ${skills.candidates} ${scope} sessions`
     + `, ${skills.alreadyCounted} already counted`
     + `, ${skills.read} read`
+    + `, ${skills.unvouched} unvouched`
     + `, ${skills.unknown} unknown`
     + `, ${skills.failed} failed`
     + `, +${skills.appended} rows`;

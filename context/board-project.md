@@ -187,7 +187,8 @@ itself.
 The project's `GhRunner` seam retries a call that failed on a network error
 before it counts as failed. Retried errors are a timeout (`operation timed
 out`, `i/o timeout`, `TLS handshake timeout`), a reset or closed connection
-(`connection reset`, `EOF`), and an HTTP 502, 503 or 504 from GitHub.
+(`connection reset`, `EOF`), a reply body that ended early (`unexpected end
+of JSON input`), and an HTTP 502, 503 or 504 from GitHub.
 
 Never retried are answers GitHub gave on purpose: a GraphQL error (`NOT_FOUND`,
 a bad id), a missing scope, or a rate-limit refusal, which keeps its own

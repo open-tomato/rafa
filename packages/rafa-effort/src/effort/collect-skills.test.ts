@@ -28,8 +28,9 @@ import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { parseCollectArgs } from './collect-args.js';
-import { formatSkillSummary } from './collect-skills.js';
+import { collectSkillHalf, formatSkillSummary } from './collect-skills.js';
 import { collectEffort, collectSessionRow, formatCollectSummary, listSessionLogs } from './collect.js';
+import { SKILL_USE_FIXTURE_VERSION } from './skill-use.js';
 
 /** The recorded session's id. */
 const FIXTURE_ID = 'ac7aeff1-84f2-46c9-bb9c-b9ceb994599f';
@@ -46,6 +47,12 @@ const FIXTURE_ROWS = [
 
 /** A second session, with no versioned record, so its count is unknown. */
 const PLAIN_ID = 'plain-session';
+
+/** A third session, the fixture's log relogged under a version above the floor and the fixture's. */
+const NEWER_ID = 'newer-session';
+
+/** The version `NEWER_ID` is logged under, the newest the plan's measurement read. */
+const NEWER_VERSION = '2.1.316';
 
 /** Running as root defeats a permission-denied plant. */
 const isRoot = process.getuid?.() === 0;
@@ -72,6 +79,13 @@ function fixtureTree(): { root: string; logDir: string } {
 /** Plants a log with no versioned record beside the fixture. */
 function plantPlainLog(logDir: string): void {
   writeFileSync(join(logDir, `${PLAIN_ID}.jsonl`), `${JSON.stringify({ type: 'assistant', message: { content: [] } })}\n`);
+}
+
+/** Plants the fixture's main log beside it as `NEWER_ID`, every record moved to `NEWER_VERSION`. */
+function plantNewerLog(logDir: string): void {
+  const fixture = readFileSync(join(logDir, `${FIXTURE_ID}.jsonl`), 'utf8');
+  const relogged = fixture.replaceAll(`"version":"${SKILL_USE_FIXTURE_VERSION}"`, `"version":"${NEWER_VERSION}"`);
+  writeFileSync(join(logDir, `${NEWER_ID}.jsonl`), relogged);
 }
 
 /** A quiet run over the tree with the store passed, reading no commit. */
@@ -131,6 +145,7 @@ describe('the skill half over the sessions a run appends', () => {
       candidates: 1,
       alreadyCounted: 0,
       read: 1,
+      unvouched: 0,
       unknown: 0,
       failed: 0,
       appended: 3,
@@ -194,6 +209,59 @@ describe('the skill half over the sessions a run appends', () => {
     expect(result.skills?.unknown).toBe(1);
     expect(readSkillInvocations(tree.root).filter((row) => row.sessionId === PLAIN_ID)).toEqual([
       { sessionId: PLAIN_ID, name: null, sidechain: null, count: 'unknown' },
+    ]);
+  });
+});
+
+describe('the skill half over a session logged above the fixture\'s version', () => {
+  it('stores it by name and counts it unvouched, and not unknown', async () => {
+    const tree = fixtureTree();
+    plantNewerLog(tree.logDir);
+
+    const result = await collectEffort(options(tree, openNdjsonStore(tree.root)));
+
+    expect(result.skills).toMatchObject({ read: 2, unvouched: 1, unknown: 0 });
+    expect(readSkillInvocations(tree.root).filter((row) => row.sessionId === NEWER_ID)).toEqual([
+      { sessionId: NEWER_ID, name: 'fixture-alpha', sidechain: false, count: 1 },
+      { sessionId: NEWER_ID, name: 'fixture-beta', sidechain: false, count: 1 },
+    ]);
+  });
+
+  it('counts none unvouched without it, the control that the count can be 0', async () => {
+    const tree = fixtureTree();
+
+    const result = await collectEffort(options(tree, openNdjsonStore(tree.root)));
+
+    expect(result.skills).toMatchObject({ read: 1, unvouched: 0, unknown: 0 });
+  });
+
+  it('counts an unknown reading under unknown alone, never under unvouched', async () => {
+    const tree = fixtureTree();
+    plantPlainLog(tree.logDir);
+
+    const result = await collectEffort(options(tree, openNdjsonStore(tree.root)));
+
+    expect(result.skills).toMatchObject({ read: 2, unvouched: 0, unknown: 1 });
+  });
+
+  it('names each read session\'s versions and standing under --verbose', async () => {
+    const tree = fixtureTree();
+    plantNewerLog(tree.logDir);
+    plantPlainLog(tree.logDir);
+    const notes: string[] = [];
+
+    await collectSkillHalf({
+      repoRoot: tree.root,
+      scope: 'appended',
+      logs: [FIXTURE_ID, NEWER_ID, PLAIN_ID].map((sessionId) => ({ sessionId, path: join(tree.logDir, `${sessionId}.jsonl`) })),
+      log: () => undefined,
+      note: (line) => notes.push(line),
+    });
+
+    expect(notes).toEqual([
+      `skills: read ${FIXTURE_ID} (2.1.280, vouched)`,
+      `skills: read ${NEWER_ID} (2.1.316, unvouched)`,
+      `skills: read ${PLAIN_ID} (no version, unknown)`,
     ]);
   });
 });
@@ -268,6 +336,7 @@ describe('the skill summary line', () => {
       candidates: 4,
       alreadyCounted: 1,
       read: 3,
+      unvouched: 1,
       unknown: 1,
       failed: 0,
       appended: 5,
@@ -275,7 +344,7 @@ describe('the skill summary line', () => {
     };
 
     expect(formatSkillSummary(summary))
-      .toBe('  skills    4 stored sessions, 1 already counted, 3 read, 1 unknown, 0 failed, +5 rows');
+      .toBe('  skills    4 stored sessions, 1 already counted, 3 read, 1 unvouched, 1 unknown, 0 failed, +5 rows');
     expect(formatSkillSummary({ ...summary, scope: 'appended' })).toStartWith('  skills    4 appended sessions');
   });
 
@@ -284,7 +353,7 @@ describe('the skill summary line', () => {
     const result = await collectEffort(options(tree, openNdjsonStore(tree.root)));
 
     expect(formatCollectSummary(result).at(-1))
-      .toBe('  skills    1 appended sessions, 0 already counted, 1 read, 0 unknown, 0 failed, +3 rows');
+      .toBe('  skills    1 appended sessions, 0 already counted, 1 read, 0 unvouched, 0 unknown, 0 failed, +3 rows');
   });
 });
 

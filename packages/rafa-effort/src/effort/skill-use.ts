@@ -38,36 +38,60 @@
  * This module reads `message.content` only, so a record carrying both is
  * one call, not two.
  *
- * ## The version it vouches for
+ * ## The floor and the fixture
  *
- * {@link SKILL_USE_CLI_VERSION} is the Claude Code version whose log format
- * this module was written and tested against, the `version` of every
- * record in `testdata/skill-use/`. That fixture was recorded from a real
- * `claude -p` session under 2.1.280 that invoked two project skills in its
- * main thread and one in a subagent, stripped to the records carrying a
- * tool call, with the `Agent` call's prompt and description replaced.
+ * {@link SKILL_USE_FIXTURE_VERSION} is the Claude Code version whose log
+ * format this module was written and tested against, the `version` of
+ * every record in `testdata/skill-use/`. That fixture was recorded from a
+ * real `claude -p` session under 2.1.280 that invoked two project skills
+ * in its main thread and one in a subagent, stripped to the records
+ * carrying a tool call, with the `Agent` call's prompt and description
+ * replaced.
  *
- * The `wireToolInputs` reading shows the format moves between versions,
- * so a reading is only vouched for when every record of the session that
- * carries a `version`, in its main log and in each subagent log, carries
- * this one. Otherwise the reading is `unknown`, which the
- * `skill_invocations` table stores as an unknown count and never as 0.
- * The same holds for a session with no versioned record at all, one with
- * a line that is not a JSON object (a half-written last line could hold a
- * call; none of the 3,710 logs held one), and one with a `Skill` call
- * whose `skill` input is not a non-blank string. Records without a
- * `version`, such as `queue-operation` and `last-prompt`, are read past.
+ * {@link SKILL_USE_CLI_FLOOR} is the oldest version whose `Skill` call
+ * shape the reader is known to read. It is the fixture's version, since no
+ * older log has been read. Measured on 2026-11-02 over the 769 loose loop
+ * logs of this project on the measuring machine, of 2.1.296, 2.1.299,
+ * 2.1.300, 2.1.301, 2.1.302, 2.1.304 and 2.1.316: all 49 `Skill` blocks
+ * are `tool_use` blocks in the `message.content` of an `assistant`
+ * record with a non-blank string `skill` input, the fixture's shape, so a
+ * version above the floor is read the fixture's way. There is no ceiling;
+ * lowering the floor means reading a log of the older version first.
  *
- * The pin names the one version the collector is known to hold for, as
- * `SERVE_CLI_VERSION` does in `tiers/delivery.ts`. It is not a floor: a new
- * version means recording the fixture again before moving it.
+ * A version is compared as `X.Y.Z`, three whole numbers, field by field
+ * ({@link compareCliVersions}); a `version` of any other shape, such as
+ * `2.1`, `2.1.316-beta` or the number 2, counts as below the floor. A
+ * session is read by skill name when every record of it that carries a
+ * `version`, in its main log and in each subagent log, is at or above the
+ * floor. The reading is vouched for only when every one of them carries
+ * the fixture's version: a reading above it answers `vouched` false with
+ * the versions seen, and the skill half (`collect-skills.ts`) counts it
+ * apart from a vouched one.
+ *
+ * Otherwise the reading is `unknown`, which the `skill_invocations` table
+ * stores as an unknown count and never as 0: when any versioned record is
+ * below the floor, when no record carries a `version`, when a line is not
+ * a JSON object (a half-written last line could hold a call; none of the
+ * 3,710 logs held one), and when a `Skill` call's `skill` input is not a
+ * non-blank string. Records without a `version`, such as `queue-operation`
+ * and `last-prompt`, are read past.
+ *
+ * The sidechain half is not vouched for above the fixture. The same
+ * measurement found no `<session>/subagents/` folder beside any of the
+ * 769 logs, no record flagged `isSidechain: true` and no `tool_use` block
+ * named `Agent`; `Agent` appears only in the tool lists a request offers.
+ * No loop session of those versions started a subagent, so the sidechain
+ * half of their readings counts nothing, and where a subagent of 2.1.296
+ * or later writes its log has not been read.
  *
  * ## The reading
  *
- * {@link readSkillUse} answers the `SkillUseReading` that
- * `writeSkillInvocations` (`store/skill-invocations.ts`) takes: one use per
- * skill and side with its count, sorted by name with the main thread
- * first, `[]` for a session that invoked none. Logs are read line by line
+ * {@link readSkillUse} answers a {@link SkillUseOutcome}: the
+ * `SkillUseReading` that `writeSkillInvocations`
+ * (`store/skill-invocations.ts`) takes, one use per skill and side with
+ * its count, sorted by name with the main thread first, `[]` for a session
+ * that invoked none, plus whether the reading is vouched for and the
+ * versions it read. Logs are read line by line
  * through `readLines`, so memory is bounded by the number of distinct
  * skills, never by the length of a log. {@link collectSkillUse} is the
  * same fold over line sources a caller supplies, so a test drives it
@@ -82,8 +106,14 @@ import { readLines, sessionIdFromPath } from '@open-tomato/rafa/effort/session-l
 import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
 import { bareSkillName } from '@open-tomato/rafa-inventory';
 
-/** The Claude Code version whose log format this collector was written against. */
-export const SKILL_USE_CLI_VERSION = '2.1.280';
+/** The oldest Claude Code version whose logs are read by skill name. */
+export const SKILL_USE_CLI_FLOOR = '2.1.280';
+
+/** The `version` of every record in `testdata/skill-use/`, the one version a reading is vouched for. */
+export const SKILL_USE_FIXTURE_VERSION = '2.1.280';
+
+/** A Claude Code version as the reader compares it: three whole numbers. */
+const CLI_VERSION_SHAPE = /^(\d+)\.(\d+)\.(\d+)$/u;
 
 /** The tool whose calls are counted. */
 const SKILL_TOOL = 'Skill';
@@ -99,6 +129,14 @@ export interface SkillUseSource {
   readonly subagent: boolean;
 }
 
+/** A session's reading, with what the fold knows of the versions behind it. */
+export interface SkillUseOutcome extends SkillUseReading {
+  /** True when every versioned record carries {@link SKILL_USE_FIXTURE_VERSION}; false for an `unknown` reading. */
+  readonly vouched: boolean;
+  /** The distinct `version` values read, as text, in ascending order. */
+  readonly versions: readonly string[];
+}
+
 type JsonObject = Record<string, unknown>;
 
 /**
@@ -108,10 +146,12 @@ type JsonObject = Record<string, unknown>;
 interface Tally {
   /** Calls per `JSON.stringify([bareName, sidechain])`. */
   readonly counts: Map<string, number>;
-  /** Records carrying a `version` other than the pin. */
-  mismatched: number;
-  /** Records carrying the pin. */
-  pinned: number;
+  /** Records carrying a `version` below the floor, or of a shape other than `X.Y.Z`. */
+  belowFloor: number;
+  /** Records carrying a `version` at or above the floor. */
+  atOrAbove: number;
+  /** The distinct `version` values read, as text. */
+  readonly versions: Set<string>;
   /** Lines that were not a JSON object, and `Skill` calls with no usable `skill`. */
   unreadable: number;
 }
@@ -146,12 +186,52 @@ export function subagentLogPaths(sessionLogPath: string): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
-/** Records the record's `version`, if it carries one, against `cliVersion`. */
-function applyVersion(tally: Tally, record: JsonObject, cliVersion: string): void {
+/** The three numbers of an `X.Y.Z` version, or null for any other value. */
+function versionFields(version: unknown): readonly number[] | null {
+  if (typeof version !== 'string') return null;
+  const match = CLI_VERSION_SHAPE.exec(version);
+  return match === null
+    ? null
+    : match.slice(1).map(Number);
+}
+
+/**
+ * Orders two versions: negative when `a` is below `b`, 0 when equal,
+ * positive when above. Each `X.Y.Z` is compared as three whole numbers,
+ * field by field, so 2.1.9 is below 2.1.10. Text of any other shape sorts
+ * below every `X.Y.Z` version, and among itself by text.
+ */
+export function compareCliVersions(a: string, b: string): number {
+  const left = versionFields(a);
+  const right = versionFields(b);
+  if (left === null || right === null) {
+    if (left !== right) {
+      return left === null
+        ? -1
+        : 1;
+    }
+    return a.localeCompare(b);
+  }
+  const differing = left.findIndex((field, index) => field !== right[index]);
+  return differing === -1
+    ? 0
+    : (left[differing] ?? 0) - (right[differing] ?? 0);
+}
+
+/**
+ * Records the record's `version`, if it carries one, against `floor`, an
+ * `X.Y.Z` version: a version of another shape sorts below it.
+ */
+function applyVersion(tally: Tally, record: JsonObject, floor: string): void {
   const version = record['version'];
   if (version === undefined) return;
-  if (version === cliVersion) tally.pinned += 1;
-  else tally.mismatched += 1;
+  const text = String(version);
+  tally.versions.add(text);
+  if (typeof version === 'string' && compareCliVersions(version, floor) >= 0) {
+    tally.atOrAbove += 1;
+  } else {
+    tally.belowFloor += 1;
+  }
 }
 
 /** Counts each `Skill` block in an assistant record's `message.content`. */
@@ -174,7 +254,7 @@ function applyCalls(tally: Tally, record: JsonObject, sidechain: boolean): void 
 }
 
 /** Folds one log's lines into the tally. */
-async function applySource(tally: Tally, source: SkillUseSource, cliVersion: string): Promise<void> {
+async function applySource(tally: Tally, source: SkillUseSource, floor: string): Promise<void> {
   for await (const rawLine of source.lines) {
     const line = rawLine.trim();
     if (line.length === 0) continue;
@@ -184,7 +264,7 @@ async function applySource(tally: Tally, source: SkillUseSource, cliVersion: str
       tally.unreadable += 1;
       continue;
     }
-    applyVersion(tally, record, cliVersion);
+    applyVersion(tally, record, floor);
     applyCalls(tally, record, source.subagent || record['isSidechain'] === true);
   }
 }
@@ -199,9 +279,11 @@ function usesOf(counts: ReadonlyMap<string, number>): SkillUse[] {
 }
 
 /**
- * Folds a session's logs into one reading: its uses, or `unknown` when the
- * logs are not all of `cliVersion`, hold no versioned record, or hold a
- * line or call the fold cannot read. See the module note.
+ * Folds a session's logs into one outcome: its uses, read by name when
+ * every versioned record is at or above `floor`, or `unknown` when one is
+ * below it, none carries a version, or a line or call cannot be read. The
+ * reading is vouched for only when every versioned record carries
+ * {@link SKILL_USE_FIXTURE_VERSION}. See the module note.
  *
  * Each source is consumed once, in order, and never collected into an
  * array.
@@ -209,15 +291,19 @@ function usesOf(counts: ReadonlyMap<string, number>): SkillUse[] {
 export async function collectSkillUse(
   sessionId: string,
   sources: readonly SkillUseSource[],
-  cliVersion: string = SKILL_USE_CLI_VERSION,
-): Promise<SkillUseReading> {
-  const tally: Tally = { counts: new Map(), mismatched: 0, pinned: 0, unreadable: 0 };
-  for (const source of sources) await applySource(tally, source, cliVersion);
+  floor: string = SKILL_USE_CLI_FLOOR,
+): Promise<SkillUseOutcome> {
+  if (versionFields(floor) === null) throw new TypeError(`skill-use floor ${JSON.stringify(floor)} is not an X.Y.Z version`);
 
-  if (tally.mismatched > 0 || tally.pinned === 0 || tally.unreadable > 0) {
-    return { sessionId, uses: UNKNOWN_SKILL_COUNT };
+  const tally: Tally = { counts: new Map(), belowFloor: 0, atOrAbove: 0, versions: new Set(), unreadable: 0 };
+  for (const source of sources) await applySource(tally, source, floor);
+
+  const versions = [...tally.versions].sort(compareCliVersions);
+  if (tally.belowFloor > 0 || tally.atOrAbove === 0 || tally.unreadable > 0) {
+    return { sessionId, uses: UNKNOWN_SKILL_COUNT, vouched: false, versions };
   }
-  return { sessionId, uses: usesOf(tally.counts) };
+  const vouched = versions.length === 1 && versions[0] === SKILL_USE_FIXTURE_VERSION;
+  return { sessionId, uses: usesOf(tally.counts), vouched, versions };
 }
 
 /**
@@ -225,15 +311,16 @@ export async function collectSkillUse(
  * over that log and every log {@link subagentLogPaths} lists for it. The
  * session id is the main log's basename, as on the session row.
  *
- * Throws when the main log cannot be read.
+ * Throws when the main log cannot be read, or when `floor` is not an
+ * `X.Y.Z` version.
  */
 export async function readSkillUse(
   sessionLogPath: string,
-  cliVersion: string = SKILL_USE_CLI_VERSION,
-): Promise<SkillUseReading> {
+  floor: string = SKILL_USE_CLI_FLOOR,
+): Promise<SkillUseOutcome> {
   const sources: SkillUseSource[] = [
     { lines: readLines(sessionLogPath), subagent: false },
     ...subagentLogPaths(sessionLogPath).map((path) => ({ lines: readLines(path), subagent: true })),
   ];
-  return collectSkillUse(sessionIdFromPath(sessionLogPath), sources, cliVersion);
+  return collectSkillUse(sessionIdFromPath(sessionLogPath), sources, floor);
 }
