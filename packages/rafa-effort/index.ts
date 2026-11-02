@@ -31,7 +31,6 @@ export { parseReportArgs } from './src/effort/report-args.js';
 
 export { default as report } from './src/effort/report.js';
 
-export type { SkillUseOutcome } from './src/effort/skill-use.js';
 export {
   SKILL_USE_CLI_FLOOR,
   SKILL_USE_FIXTURE_VERSION,
