@@ -382,7 +382,7 @@ naming what it reaches above core. A feature package's parked tests wait in
 `src/tests/inventory-coupled/`, and effort's twelve after them, under
 `src/tests/effort-coupled/`, and board's forty-seven after those, under
 `src/tests/board-coupled/`, and release's twenty-two after them, under
-`src/tests/release-coupled/`, and pr's thirty after those, under
+`src/tests/release-coupled/`, and pr's twenty-nine after those, under
 `src/tests/pr-coupled/`, and run's thirty-three after them, under
 `src/tests/run-coupled/`. A file that joins the folder takes its row in the same
 commit. The folder held 63 test files before rafa-1333 and holds 63 after it,

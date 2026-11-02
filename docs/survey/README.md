@@ -319,13 +319,14 @@ not drifted from the current repository.
   `--map=<file>`, `--map=<file>` alone, and `--dry-run` beside any mode but `--rekey=<record>`. The four modes are the
   survey (no flags), `--baseline`, `--against=<record>` (the guard) and `--rekey=<record>`, the re-key, which takes
   `--dry-run` beside it. The record was taken at 9f07f3d on the table at `f4efecfaec13…` and re-keyed once after the
-  moves, at `1ffd2877`, the commit its `rekeyed` names; the merge task then removed the two entries of the declarations
-  halves by hand. It holds 1228 test files (1073 unit, 154 use-case, 1 contract; 443 spawning a process): 226 meet their
-  kind's rule, 1002 are on `unsorted`, none are unindexed. Before the re-key, read at 9f07f3d against itself, it printed
-  0 risen, 1002 unsorted and 228 held, then 0 gone, 0 not read, 0 unindexed and 0 unplaced, and exits 0. The record is
-  not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space indent, keys `unit`,
-  `map`, `commit`, `rekeyed` (after `commit`: the commit the next re-key reads its renames from, `1ffd2877` for now, see
-  the re-key below), `binReach` (the bin's reach, eleven units), `tests` keyed by path, `unsorted`, `unindexed`.
+  moves, at `1ffd2877`; the merge task then removed the two entries of the declarations halves by hand. It was re-keyed
+  again after the #1381 move of pr's parked test, reading renames from `1ffd2877` to `58f65e2e`, the commit its
+  `rekeyed` names now. It holds 1228 test files (1073 unit, 154 use-case, 1 contract; 443 spawning a process): 226
+  meet their kind's rule, 1002 are on `unsorted`, none are unindexed. Before the re-key, read at 9f07f3d against itself,
+  it printed 0 risen, 1002 unsorted and 228 held, then 0 gone, 0 not read, 0 unindexed and 0 unplaced, and exits 0.
+  The record is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space indent, keys
+  `unit`, `map`, `commit`, `rekeyed` (after `commit`: the commit the next re-key reads its renames from, `58f65e2e` for
+  now, see the re-key below), `binReach` (the bin's reach, eleven units), `tests` keyed by path, `unsorted`, `unindexed`.
 
   The index counts the units a test reaches, except through a type-only import of core, doubled when it spawns, so the
   cut moves it three ways. Lightest first:

@@ -56,5 +56,4 @@ package once its coupling is gone, or into the module it really tests.
 | `commands/pr/wait-grace-driven.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/pr/wait.test.ts` | `src/tests/cli-capture.ts`, `src/tests/ending-probe.ts` |
 | `pr/conflict-sentence.sweep.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `packages/rafa-run/src/start/wrap-up.ts`, `src/tests/sweep-timeout.ts` |
-| `pr/preflight-items.test.ts` | nothing since `run.ts` moved into core as `packages/rafa/src/preflight/run.ts` (#808, pass 4f) |
 | `triage/leftover-repair.test.ts` | `packages/rafa-run/src/start/suite-blocker.ts` |
