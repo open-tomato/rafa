@@ -205,7 +205,42 @@ describe('renderRecordJson', () => {
   it('writes the same bytes twice', () => {
     expect(renderRecordJson(plantedIndex(), HEADER)).toBe(renderRecordJson(plantedIndex(), HEADER));
   });
+
+  it('writes a header with no rekeyed to the bytes written before the field existed', () => {
+    const index = { tests: new Map<string, TestRecord>(), unindexed: ['src/run/unread.test.ts'] };
+    const header = { binReach: ['rafa-run'], commit: 'c'.repeat(40), map: { path: 'docs/survey/cut-table.json', sha256: 's'.repeat(64) } };
+    const written = [
+      '{',
+      '  "unit": "packages",',
+      '  "map": {',
+      '    "path": "docs/survey/cut-table.json",',
+      `    "sha256": "${'s'.repeat(64)}"`,
+      '  },',
+      `  "commit": "${'c'.repeat(40)}",`,
+      '  "binReach": [',
+      '    "rafa-run"',
+      '  ],',
+      '  "tests": {},',
+      '  "unsorted": [],',
+      '  "unindexed": [',
+      '    "src/run/unread.test.ts"',
+      '  ]',
+      '}',
+      '',
+    ].join('\n');
+    expect(renderRecordJson(index, header)).toBe(written);
+    expect(renderRecordJson(index, { ...header, rekeyed: undefined })).toBe(written);
+  });
+
+  it('writes rekeyed after commit and before binReach when the header holds it', () => {
+    const text = renderRecordJson(plantedIndex(), { ...HEADER, rekeyed: REKEYED });
+    expect(Object.keys(JSON.parse(text))).toEqual(['unit', 'map', 'commit', 'rekeyed', 'binReach', 'tests', 'unsorted', 'unindexed']);
+    expect(text).toContain(`  "commit": "${HEADER.commit}",\n  "rekeyed": "${REKEYED}",\n  "binReach": [`);
+  });
 });
+
+/** The head a re-key moved the planted record to. */
+const REKEYED = 'b'.repeat(40);
 
 /** A copy of `object` less `keys`. */
 function without(object: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
@@ -228,6 +263,26 @@ describe('parseRecord', () => {
     expect(read.tests).toEqual(index.tests);
     expect(read.unsorted).toEqual(['src/run/loop.test.ts']);
     expect(read.unindexed).toEqual(index.unindexed);
+  });
+
+  it('reads an absent rekeyed as undefined, and writes the record back to the bytes it was read from', () => {
+    const text = renderRecordJson(plantedIndex(), HEADER);
+    const read = parseRecord(text);
+    expect(read.rekeyed).toBeUndefined();
+    expect(renderRecordJson(read, read)).toBe(text);
+  });
+
+  it('reads back a rekeyed renderRecordJson wrote, and writes it back to the same bytes', () => {
+    const text = renderRecordJson(plantedIndex(), { ...HEADER, rekeyed: REKEYED });
+    const read = parseRecord(text);
+    expect(read.rekeyed).toBe(REKEYED);
+    expect(read.commit).toBe(HEADER.commit);
+    expect(renderRecordJson(read, read)).toBe(text);
+  });
+
+  it('refuses a rekeyed that is not a string, naming it', () => {
+    const text = JSON.stringify({ ...plantedObject(), rekeyed: 7 });
+    expect(() => parseRecord(text)).toThrow('not a test-index record: its `rekeyed` is not a string');
   });
 
   it('reads a record in another unit as written, for the guard to refuse', () => {
