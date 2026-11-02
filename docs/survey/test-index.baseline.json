@@ -9271,18 +9271,6 @@
         "src/tests/cli-capture.ts"
       ]
     },
-    "src/commands/claim/declarations-integration.test.ts": {
-      "deep": [],
-      "kind": "use-case",
-      "meets": true,
-      "package": "rafa-run",
-      "packages": [
-        "@open-tomato/rafa-core",
-        "rafa-run"
-      ],
-      "spawns": false,
-      "spawnsVia": []
-    },
     "src/commands/claim/index-integration.test.ts": {
       "deep": [],
       "kind": "use-case",
@@ -11392,18 +11380,6 @@
         "src/commands/pr/version-collision-incident-spawn.test.ts",
         "src/tests/cli-capture.ts"
       ]
-    },
-    "src/commands/release/declarations-integration.test.ts": {
-      "deep": [],
-      "kind": "use-case",
-      "meets": true,
-      "package": "rafa-release",
-      "packages": [
-        "@open-tomato/rafa-core",
-        "rafa-release"
-      ],
-      "spawns": false,
-      "spawnsVia": []
     },
     "src/commands/release/index-integration.test.ts": {
       "deep": [],
