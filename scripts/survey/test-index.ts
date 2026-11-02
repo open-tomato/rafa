@@ -730,6 +730,8 @@ if (import.meta.main) {
       for (const path of await main(process.cwd(), mode)) {
         console.log(`wrote ${path}`);
       }
+    } else if ('rekey' in mode) {
+      throw new Error('--rekey=<record> is read but not yet dispatched: test-index-rekey.ts holds the driver');
     } else {
       const reading = await guard(process.cwd(), mode);
       console.log(renderGuardReading(reading, mode.against));

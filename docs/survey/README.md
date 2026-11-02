@@ -312,10 +312,11 @@ not drifted from the current repository.
   `scripts/survey/test-index-guard.ts`, which writes nothing and exits 1 when the record's unit is not `packages` or its
   map's sha256 is not the handed map's, when a test that does not meet its kind's rule is not on `unsorted` (a unit or
   contract test reaching a unit beyond its own, a use-case test entering another unit through no public entry), when a
-  test the record holds has no imports read now, or when the map holds no unit for a file. The three flags are read by
-  `scripts/survey/test-index-args.ts`, which refuses any other argument with the usage text, either mode without
-  `--map=<file>`, and `--map=<file>` alone. The record holds 1230 test files (1073 unit, 156 use-case, 1 contract;
-  443 spawning a process): 228 meet their kind's rule, 1002 are on `unsorted`, none are unindexed. Read at 9f07f3d
+  test the record holds has no imports read now, or when the map holds no unit for a file. The flags are read by
+  `scripts/survey/test-index-args.ts`, which refuses any other argument with the usage text, a mode without
+  `--map=<file>`, `--map=<file>` alone, and `--dry-run` beside any mode but `--rekey=<record>`. The record
+  holds 1230 test files (1073 unit, 156 use-case, 1 contract; 443 spawning a process): 228 meet their kind's rule,
+  1002 are on `unsorted`, none are unindexed. Read at 9f07f3d
   against itself it prints 0 risen, 1002 unsorted and 228 held, then 0 gone, 0 not read, 0 unindexed and 0 unplaced, and
   exits 0. The record is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space
   indent, keys `unit`, `map`, `commit`, `binReach` (the bin's reach, eleven units), `tests` keyed by path, `unsorted`,
