@@ -5,7 +5,7 @@
     "sha256": "f4efecfaec13bf08ee8800816444f975cfc8882d940ca9bf72a27185ba261505"
   },
   "commit": "9f07f3d908c26b55a07c4d8f8545c149ca950eed",
-  "rekeyed": "1ffd2877cba491fa5b86c0b165b6aab8a62ff7ba",
+  "rekeyed": "58f65e2ebe9b22ef06e34f080862c9827f50afc3",
   "binReach": [
     "@open-tomato/rafa",
     "@open-tomato/rafa-core",
@@ -3581,6 +3581,22 @@
         "rafa-board",
         "rafa-pr",
         "rafa-release"
+      ],
+      "spawns": false,
+      "spawnsVia": []
+    },
+    "packages/rafa-pr/src/pr/preflight-items.test.ts": {
+      "deep": [
+        "../preflight/run.js"
+      ],
+      "kind": "unit",
+      "meets": false,
+      "package": "rafa-pr",
+      "packages": [
+        "@open-tomato/rafa",
+        "@open-tomato/rafa-core",
+        "rafa-pr",
+        "rafa-run"
       ],
       "spawns": false,
       "spawnsVia": []
@@ -20009,22 +20025,6 @@
       "spawns": false,
       "spawnsVia": []
     },
-    "src/tests/pr-coupled/pr/preflight-items.test.ts": {
-      "deep": [
-        "../preflight/run.js"
-      ],
-      "kind": "unit",
-      "meets": false,
-      "package": "@open-tomato/rafa",
-      "packages": [
-        "@open-tomato/rafa",
-        "@open-tomato/rafa-core",
-        "rafa-pr",
-        "rafa-run"
-      ],
-      "spawns": false,
-      "spawnsVia": []
-    },
     "src/tests/pr-coupled/triage/leftover-repair.test.ts": {
       "deep": [
         "../start/suite-blocker.js"
@@ -23471,6 +23471,7 @@
     "packages/rafa-pr/src/pr/owner-approval.test.ts",
     "packages/rafa-pr/src/pr/plans/budget.test.ts",
     "packages/rafa-pr/src/pr/plans/load.test.ts",
+    "packages/rafa-pr/src/pr/preflight-items.test.ts",
     "packages/rafa-pr/src/pr/settle-waiting.test.ts",
     "packages/rafa-pr/src/pr/triage/attempts.test.ts",
     "packages/rafa-pr/src/pr/triage/classes.test.ts",
@@ -24145,7 +24146,6 @@
     "src/tests/pr-coupled/commands/pr/wait-grace-driven.test.ts",
     "src/tests/pr-coupled/commands/pr/wait.test.ts",
     "src/tests/pr-coupled/pr/conflict-sentence.sweep.test.ts",
-    "src/tests/pr-coupled/pr/preflight-items.test.ts",
     "src/tests/pr-coupled/triage/leftover-repair.test.ts",
     "src/tests/pr-event-text-mode-integration.test.ts",
     "src/tests/pr-show-closes-integration.test.ts",
