@@ -1,6 +1,6 @@
 /**
  * The survey's test index: per test file, the epic's index, and per
- * source file, the test files that reach it. The script has three modes,
+ * source file, the test files that reach it. The script has four modes,
  * each run from the repository root:
  *
  *   - `bun scripts/survey/test-index.ts` (the survey) writes
@@ -25,10 +25,21 @@
  *     `compareToRecord` (`test-index-guard.ts`), prints `renderGuard` and
  *     then each unplaced file, and exits 1 when `holdsRecord` is `false`
  *     (a refusal, a risen test or an unread one) or a file is unplaced.
+ *   - `--rekey=<record> --map=<file>` (the re-key, `--dry-run` beside it
+ *     to write nothing) moves the record's paths along the test files git
+ *     renamed and reads each entry's unit again from the map, walking
+ *     nothing (`test-index-rekey.ts`). It reads the commit (`readCommit`)
+ *     first, refusing a tree in scope that differs from `HEAD` as the
+ *     record mode does, since the renames are read to `HEAD` and the
+ *     record's `rekeyed` then names it; hands that head to `rekey`, prints
+ *     its lines, and exits 1 writing nothing when a rename's new path is
+ *     placed in no unit.
  *
- * Either flag is refused without `--map=<file>`, and `--map=<file>` is
- * refused alone; the modes, the flags and `parseMode`, which reads them,
- * lie in `test-index-args.ts`. The map is the cut table,
+ * `--baseline`, `--against` and `--rekey` are each refused without
+ * `--map=<file>`, `--map=<file>` is refused alone, and `--dry-run` beside
+ * any mode but the re-key, alone included; the modes, the flags and
+ * `parseMode`, which reads them, lie in `test-index-args.ts`. The map is
+ * the cut table,
  * `docs/survey/cut-table.json` as `scripts/survey/cut-table.ts` writes it,
  * read by `cut-map.ts`: a file's unit is the `name` of the `packages[]`
  * row whose `files` list it, or the `folder` of the `unassigned[]` entry
@@ -124,9 +135,10 @@
 import type { CutMap } from './cut-map';
 import type { FileKind, TrackedFiles } from './files';
 import type { ImportEdge, ImportGraph } from './import-graph';
-import type { AgainstMode, WritingMode } from './test-index-args';
+import type { AgainstMode, RekeyMode, WritingMode } from './test-index-args';
 import type { RecordComparison } from './test-index-guard';
 import type { RecordInput, TestRecord } from './test-index-record';
+import type { RekeyReading } from './test-index-rekey';
 import type { TestWalk } from './test-index-walk';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -148,6 +160,7 @@ import { parseMode } from './test-index-args';
 import { checkHeader, compareToRecord, holdsRecord, renderGuard } from './test-index-guard';
 import { renderTestIndexMarkdown } from './test-index-markdown';
 import { parseRecord, recordEntry, renderRecordJson } from './test-index-record';
+import { rekey } from './test-index-rekey';
 import { spawnApis } from './test-index-spawn';
 import { importTargets, reach, walkTest } from './test-index-walk';
 import { readTestKindGlobs } from './test-kinds';
@@ -700,6 +713,20 @@ export function renderGuardReading(reading: GuardReading, recordPath: string): s
 }
 
 /**
+ * The re-key mode: names the commit read (`readCommit`), then re-keys the
+ * record to it through `rekey` (`test-index-rekey.ts`).
+ *
+ * @param root - The repository root.
+ * @param mode - The record's and the map's paths, and whether this is a dry run.
+ * @returns What `rekey` read: its lines, whether it wrote, and whether a rename was unplaced.
+ * @throws When `readCommit` cannot name the commit, or as `rekey` refuses;
+ *   the record is then left as it was.
+ */
+export function rekeyTree(root: string, mode: RekeyMode): RekeyReading {
+  return rekey(root, mode, readCommit(root));
+}
+
+/**
  * Reads the repository at `root` and writes the survey's two outputs under
  * `docs/survey/`, or the record alone in the record mode.
  *
@@ -729,6 +756,12 @@ if (import.meta.main) {
     if (mode === 'survey' || 'baseline' in mode) {
       for (const path of await main(process.cwd(), mode)) {
         console.log(`wrote ${path}`);
+      }
+    } else if ('rekey' in mode) {
+      const reading = rekeyTree(process.cwd(), mode);
+      console.log(reading.lines.join('\n'));
+      if (reading.refused) {
+        process.exit(1);
       }
     } else {
       const reading = await guard(process.cwd(), mode);
