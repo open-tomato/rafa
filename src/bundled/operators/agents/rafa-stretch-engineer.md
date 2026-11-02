@@ -122,6 +122,8 @@ One loop at a time; never two at once inside a stretch.
 Run `rafa stretch item <issue> --wait`. It starts the loop as a detached child, logs
 its output to `.rafa/stretch/<n>/loop-<issue>.log`, waits on it, waits for its pull
 request's checks and merges it into `stretch/<n>`, and polls the run until it ends.
+If the item's loop ended on a refused merge, run `rafa stretch item <issue> --resume`
+instead: it starts no plan and no loop, and reads the pull request from the item's log.
 Then move to the pit stop.
 
 ### 3. Pit stop
