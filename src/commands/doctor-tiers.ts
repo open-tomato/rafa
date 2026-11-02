@@ -124,7 +124,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
 import { createGhRunner } from '@open-tomato/rafa-board';
-import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort';
+import { SKILL_USE_FIXTURE_VERSION as SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort';
 import {
   PROVENANCE_FIELD,
   SERVE_CLI_VERSION,
