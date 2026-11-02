@@ -319,7 +319,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'config show': [[], ['resolved', 'sources']],
   'ci status': [[], ['branch', 'workflow']],
   'stretch start': [[], ['n', 'remote-control', 'role', 'dry-run']],
-  'stretch item': [['issue'], ['wait', 'dry-run']],
+  'stretch item': [['issue'], ['wait', 'resume', 'dry-run']],
   'stretch end': [[], ['dry-run']],
   'bug codes': [[], ['suggest', 'proposals', 'family', 'check']],
   'bug recheck': [['n'], ['all', 'comment']],

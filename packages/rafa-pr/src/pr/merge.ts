@@ -145,6 +145,24 @@
  * pull writes no history, and it stops on its own when that worktree's
  * changes are in the way, which reports as any failed step does.
  *
+ * ## The pull that tries once more
+ *
+ * The `pull-base` step, in either shape of the base above, carries a
+ * {@link MergeStep.retry}: after a merge that went through, `pull-base`
+ * once failed with `fatal: Cannot fast-forward to multiple branches`,
+ * and the same pull by hand passed a minute later
+ * (`open-tomato/rafa#1171`). The cause is not known; a fetch by another
+ * process filling `FETCH_HEAD` with several heads at that moment would
+ * fit. So on that text alone ({@link MULTIPLE_BRANCHES_TEXT}) the step
+ * runs `git fetch origin <base>` — with `-C <path>` where another
+ * worktree holds the base, so it fetches where the pull runs — and
+ * pulls once more. No other step carries a retry. Running it is the
+ * runner's (`runCleanUp` in
+ * `packages/rafa-pr/src/commands/pr/merge-cleanup.ts`); here it is data.
+ * {@link remainingFrom} and {@link commandLine} do not read it: a
+ * retried step that still fails is the step that failed, and what is
+ * left to paste is the same tail.
+ *
  * ## What is kept verbatim
  *
  * A {@link WorkingTreeStatus} entry, and a tracked one, is the porcelain
@@ -176,7 +194,10 @@ const REFUSAL_PREFIX = 'rafa pr merge refuses';
 /** How many porcelain lines a dirty-tree refusal lists before eliding. */
 const MAX_LISTED_CHANGES = 10;
 
-/** The remote the clean-up pushes a branch delete to when none is named. */
+/**
+ * The remote the clean-up pushes a branch delete to when none is named,
+ * and the one `pull-base`'s retry fetches the base from.
+ */
 const DEFAULT_REMOTE = 'origin';
 
 /** What a worktree listing prefixes a branch with. */
@@ -187,6 +208,13 @@ const INDENT = '   ';
 
 /** How `git status --porcelain` opens an untracked line. */
 const UNTRACKED_PREFIX = '?? ';
+
+/**
+ * What git says when a pull cannot fast-forward because `FETCH_HEAD`
+ * holds several heads: the text on which `pull-base` is tried once
+ * more. See the module note.
+ */
+export const MULTIPLE_BRANCHES_TEXT = 'Cannot fast-forward to multiple branches';
 
 /**
  * Parses `git ls-tree -r --name-only <tree>` into the paths the tree
@@ -559,6 +587,21 @@ export interface MergeStep {
    * place of spawning `argv`. Absent for a step that runs.
    */
   readonly skip?: string;
+  /**
+   * The second try a failed step earns, when it has one: `when` is the
+   * text git must have said for it to run, and `before` the whole
+   * command run ahead of the second try of `argv`. Absent for a step
+   * that is never tried again; see the module note.
+   */
+  readonly retry?: MergeStepRetry;
+}
+
+/** When a failed step is tried once more, and what runs before it. */
+export interface MergeStepRetry {
+  /** Text that must appear in what git said on the first try. */
+  readonly when: string;
+  /** The whole command, `git` included, run before the second try. */
+  readonly before: readonly string[];
 }
 
 /** What the clean-up after a merge is built from. */
@@ -593,6 +636,18 @@ export interface CleanUpPlan {
 }
 
 /**
+ * The retry `pull-base` carries: on {@link MULTIPLE_BRANCHES_TEXT},
+ * fetch `base` from origin with the same `git` prefix the pull runs
+ * with, then pull again. See the module note.
+ */
+function pullRetry(git: readonly string[], base: string): MergeStepRetry {
+  return Object.freeze({
+    when: MULTIPLE_BRANCHES_TEXT,
+    before: Object.freeze([...git, 'fetch', DEFAULT_REMOTE, base]),
+  });
+}
+
+/**
  * The two steps that bring this checkout onto the pulled base: switch
  * and pull here, or, where another worktree holds the base, pull there
  * and detach here. See the module note.
@@ -601,14 +656,21 @@ function baseSteps(base: string, heldAt: string | null): MergeStep[] {
   if (heldAt === null) {
     return [
       { id: 'switch-base', label: `switch to ${base}`, argv: ['git', 'switch', base] },
-      { id: 'pull-base', label: `pull ${base}, fast-forward only`, argv: ['git', 'pull', '--ff-only'] },
+      {
+        id: 'pull-base',
+        label: `pull ${base}, fast-forward only`,
+        argv: ['git', 'pull', '--ff-only'],
+        retry: pullRetry(['git'], base),
+      },
     ];
   }
+  const git = ['git', '-C', heldAt];
   return [
     {
       id: 'pull-base',
       label: `pull ${base} in ${heldAt}, fast-forward only`,
-      argv: ['git', '-C', heldAt, 'pull', '--ff-only'],
+      argv: [...git, 'pull', '--ff-only'],
+      retry: pullRetry(git, base),
     },
     { id: 'switch-base', label: `detach this checkout at ${base}`, argv: ['git', 'switch', '--detach', base] },
   ];
@@ -619,7 +681,8 @@ function baseSteps(base: string, heldAt: string | null): MergeStep[] {
  * pull it fast-forward only, delete the local branch (skipped when there
  * is none), delete the remote branch when it is still there, prune. A
  * kept branch has neither delete, and a base another worktree holds is
- * pulled there before this checkout detaches at it. Frozen, and the
+ * pulled there before this checkout detaches at it. The pull alone
+ * carries a retry, fetching the base first. Frozen, and the
  * same array the runner walks and a failure prints the tail of.
  */
 export function cleanUpSteps(plan: CleanUpPlan): readonly MergeStep[] {

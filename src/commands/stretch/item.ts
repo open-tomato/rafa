@@ -1,12 +1,13 @@
 /**
- * `rafa stretch item <issue> [--wait] [--dry-run]`: takes one item of a
+ * `rafa stretch item <issue> [--wait | --resume] [--dry-run]`: takes one item of a
  * stretch from planning to a running loop (#816). It replaces the hand
  * steps the engineer operator took per item: `rafa plan create --issue`,
  * then a `setsid nohup` loop start with its events output redirected into
  * the stretch folder. What happens once `loop wait` has ended, the merge
  * of the loop's pull request into the integration branch, the wait for
  * CI on it, the ledger line and the pit-stop readings, is
- * `./item-merge.ts`'s.
+ * `./item-merge.ts`'s. Finishing an item whose loop has ended, with
+ * `--resume`, is `./item-resume.ts`'s.
  *
  * `stretch item` decides nothing: it runs the steps and prints what they
  * read. The pit-stop skill decides what to do with them.
@@ -16,6 +17,7 @@
  * Before any step runs it refuses, with exit code 1, each of:
  *
  *   - a line naming no issue, or a word that is no issue number;
+ *   - `--resume` beside `--wait`: a resume waits on no loop;
  *   - a config `loadConfig` refuses;
  *   - a `pr.base` that names no `stretch/<n>` branch, the default branch
  *     and no `pr.base` at all included ({@link stretchOfBase}): an item
@@ -46,11 +48,21 @@
  *      written no record yet, and exits 0 with the log's path: the child
  *      is still running;
  *   4. with `--wait`, `rafa loop wait --session-id=<id>` on this
- *      terminal, then `./item-merge.ts`'s half: the merge, the CI wait,
+ *      terminal, then `./item-merge.ts`'s half: the waits for the pull
+ *      request's mergeability and checks, the merge, the CI wait,
  *      the ledger line and the pit-stop readings once the loop opened a
  *      pull request, else the reason it opened none and `loop wait`'s
  *      exit code, so a caller reads the same reason codes `loop wait`
  *      documents.
+ *
+ * ## `--resume`
+ *
+ * Once the stretch base is read, `--resume` runs `resumeItem` of
+ * `./item-resume.ts` instead of the steps above: no plan create, no loop
+ * line, no running-loop refusal and no `loop wait`. It reads the pull
+ * request from the last `rafa· pr #<n> opened` line of the item's log
+ * and runs the merge half on it, skipping the merge of one merged
+ * already. The refusals it adds are that module's.
  *
  * ## `--dry-run`
  *
@@ -61,7 +73,9 @@
  * records. With no plan of the issue yet, the loop line names the plan
  * as `PLAN-rafa-<issue>-<slug>.md`, the slug being the issue title's,
  * which only the planning step reads. It starts no session, so `spends`
- * is declared `unless --dry-run`.
+ * is declared `unless --dry-run`. With `--resume` the lines are
+ * `resumeDryRunLines`: the read of the log and the merge half's lines,
+ * and none of the steps above.
  *
  * ## Exit codes
  *
@@ -99,13 +113,14 @@ import { stretchFolder } from '../../stretch/folder.js';
 import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
 
 import { afterLoopWait, mergeDryRunLines } from './item-merge.js';
+import { resumeDryRunLines, resumeItem } from './item-resume.js';
 import { PR_BASE_KEY, STRETCH_BRANCH_PREFIX } from './start.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa stretch item';
 
 /** The usage line a refusal ends with. */
-export const STRETCH_ITEM_USAGE = 'rafa stretch item <issue> [--wait] [--dry-run]';
+export const STRETCH_ITEM_USAGE = 'rafa stretch item <issue> [--wait | --resume] [--dry-run]';
 
 /** The flags the loop is started with: its own worktree, and no wait on CI, which the stretch reads itself. */
 export const LOOP_FLAGS: readonly string[] = Object.freeze(['--as-worktree', '--no-ci-wait']);
@@ -153,6 +168,8 @@ export interface StretchItemSeams extends ItemMergeSeams {
 export interface ItemLine {
   readonly issue: number;
   readonly wait: boolean;
+  /** Whether to finish an item whose loop has ended, from the pull request its log names. */
+  readonly resume: boolean;
   readonly dryRun: boolean;
 }
 
@@ -188,11 +205,17 @@ export function readItemLine(context: RafaContext): ItemLine {
     throw new CommandExit(REFUSED_EXIT, `❌ "${word}" is no issue number, expected a whole number from 1\nUsage: ${STRETCH_ITEM_USAGE}`);
   }
   const hint = `Usage: ${STRETCH_ITEM_USAGE}`;
-  return {
+  const line = {
     issue: Number(word),
     wait: readSwitch('wait', context.flags['wait'], hint),
+    resume: readSwitch('resume', context.flags['resume'], hint),
     dryRun: readSwitch('dry-run', context.flags['dry-run'], hint),
   };
+  if (line.wait && line.resume) {
+    throw new CommandExit(REFUSED_EXIT, '❌ --resume finishes an item whose loop has ended, and --wait waits on a loop it'
+      + ` starts: pass one of them.\n${hint}`);
+  }
+  return line;
 }
 
 /** The stretch `pr.base` names; a refusal for one naming no `stretch/<n>` branch. */
@@ -402,6 +425,39 @@ async function waitStep(context: RafaContext, wait: WaitInput, seams: StretchIte
   }, exitCode, seams);
 }
 
+/** What the resume step needs of the item. */
+interface ResumeStepInput {
+  readonly root: string;
+  readonly n: number;
+  readonly issue: number;
+  readonly plans: PlansDir;
+  readonly dryRun: boolean;
+}
+
+/** `--resume`: the merge half on the pull request the item's log names, or its lines under `--dry-run`; see the module note. */
+async function resumeStep(context: RafaContext, step: ResumeStepInput, seams: StretchItemSeams): Promise<void> {
+  const info = (text: string): void => context.output.info(text);
+  const { root, n, issue } = step;
+  const log = itemLogPath(root, n, issue);
+  info(`stretch item #${String(issue)}: stretch ${String(n)} (${PR_BASE_KEY} ${STRETCH_BRANCH_PREFIX}${String(n)}), resumed${step.dryRun
+    ? ', dry run: each step is printed and none is run'
+    : ''}`);
+  if (step.dryRun) {
+    for (const text of resumeDryRunLines(seams.rafa, root, n, log)) info(text);
+    info(`dry run: would resume #${String(issue)} for ${STRETCH_BRANCH_PREFIX}${String(n)}; nothing was run`);
+    return;
+  }
+  await resumeItem(context, {
+    root,
+    n,
+    issue,
+    plans: issuePlans(step.plans, issue),
+    plansLabel: step.plans.label,
+    log,
+    env: childEnv(context),
+  }, seams);
+}
+
 /** Runs the line; see the module note. */
 export async function runStretchItem(context: RafaContext, seams: StretchItemSeams): Promise<void> {
   const line = readItemLine(context);
@@ -411,6 +467,10 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
   const config = await resolveProjectConfig(project, COMMAND_NAME, warn);
   const n = requireStretchBase(config.prBase);
   const plans = plansDirAt(root, config.planDir);
+  if (line.resume) {
+    await resumeStep(context, { root, n, plans, dryRun: line.dryRun, issue: line.issue }, seams);
+    return;
+  }
   const kept = existingPlan(plans, line.issue);
   const keptStub = kept === null
     ? null
@@ -515,10 +575,13 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
       + ' detached with `RAFA_OUTPUT=events`, its output appended to `.rafa/stretch/<n>/loop-<issue>.log`.'
       + ' It waits for the loop\'s session record and prints its id. With `--wait` it then runs'
       + ' `rafa loop wait --session-id=<id>`; once the loop has opened a pull request it refuses one whose base'
-      + ' is not a `stretch/*` branch, runs `rafa pr merge <pr> --skip-checks --yes`, waits for the run on the'
-      + ' merge commit to end, appends the item to `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop'
-      + ' readings. A loop that opened no pull request has its reason printed, merges nothing and exits with'
-      + ' `loop wait`\'s code. `--dry-run` prints every step in order and runs none. Exit code 1 for a refusal,'
+      + ' is not a `stretch/*` branch, waits for GitHub to compute its mergeability and for its checks to pass,'
+      + ' runs `rafa pr merge <pr> --yes`, waits for the run on the merge commit to end, appends the item to'
+      + ' `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop readings. A loop that opened no pull request has its reason printed, merges nothing and exits with'
+      + ' `loop wait`\'s code. With `--resume` instead of `--wait` it starts no planning session and no loop: it'
+      + ' finishes an item whose loop has ended from the last `rafa· pr #<n> opened` line of its log, skipping'
+      + ' the merge of a pull request merged already, and refuses an issue the ledger holds.'
+      + ' `--dry-run` prints every step in order and runs none. Exit code 1 for a refusal,'
       + ' 2 for a step that failed, and the code of `plan create`, `loop wait` or `pr merge` when it fails.',
     args: [
       { name: 'issue', description: 'The number of the `type:spec` issue to plan and run.', type: 'string', required: true },
@@ -526,15 +589,22 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
     flags: [
       {
         name: 'wait',
-        description: 'Wait on the loop through `rafa loop wait`, then merge its pull request into the integration branch'
-          + ' with checks skipped, wait for CI and print the pit-stop readings.',
+        description: 'Wait on the loop through `rafa loop wait`, then wait for its pull request\'s checks, merge it into'
+          + ' the integration branch, wait for CI and print the pit-stop readings.',
+        type: 'boolean',
+      },
+      {
+        name: 'resume',
+        description: 'Finish an item whose loop has ended: read its pull request from the item\'s log, merge it unless it is'
+          + ' merged already, wait for CI, append the ledger line and print the pit-stop readings. Refused beside `--wait`.',
         type: 'boolean',
       },
       { name: 'dry-run', description: 'Print every step in order, and run none of them.', type: 'boolean' },
     ],
     examples: [
       { cmd: 'rafa stretch item 812 --dry-run', note: 'Prints the plan create line and the detached loop line.' },
-      { cmd: 'rafa stretch item 812 --wait', note: 'Plans #812, starts its loop, waits on it and merges its pull request.' },
+      { cmd: 'rafa stretch item 812 --wait', note: 'Plans #812, starts its loop, waits on it and on its pull request\'s checks, and merges it.' },
+      { cmd: 'rafa stretch item 812 --resume', note: 'Finishes #812 once its loop has ended, from the pull request its log names.' },
     ],
     outputs: ['text'],
     spends: { when: 'unless', flag: '--dry-run', what: 'one planning session and the loop it starts' },

@@ -3,8 +3,10 @@
  * driven through `rafa stretch item 812 --wait` in planted projects with
  * a plan of the issue already there, so the only rafa lines run are
  * `loop wait` and `pr merge`, both fakes. `gh` is one stand-in: `pr view`
- * answers the pull request the case plants, open until the fake merge
- * runs and merged at {@link MERGE_SHA} after it; `run list` is the
+ * answers the pull request the case plants, open and `MERGEABLE` until
+ * the fake merge runs and merged at {@link MERGE_SHA} after it, or open
+ * for as many reads after it as the case says; `pr checks` answers one
+ * passed `fragment` row, as every pull request reports; `run list` is the
  * recorded fake of `src/ci/runs-fake.ts`, one list of runs per read so a
  * case can move the run from in progress to completed; `run view
  * --log-failed` answers the captured log of `src/ci/testdata/`. Each
@@ -13,9 +15,11 @@
  * real files.
  *
  * Controls: every refusal and every loop without a pull request reads
- * the ledger as absent beside a full run that finds it written, and the
+ * the ledger as absent beside a full run that finds it written, the
  * cut-off cases list a bug filed after the cut-off beside one filed
- * before it, so the filter is seen to drop as well as keep.
+ * before it, so the filter is seen to drop as well as keep, and a
+ * `pr merge` that ended 1 is read merged beside one read open, so the
+ * exit code is seen to end the item as well as not.
  */
 import type { StretchItemSeams } from './item.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
@@ -41,13 +45,13 @@ import {
   CI_POLL_MS,
   CI_READ_TRIES,
   CI_WAIT_MS,
+  MERGED_POLL_MS,
+  MERGED_READ_TRIES,
   mergeDryRunLines,
   noPullRequestLine,
-  PR_VIEW_FIELDS,
-  prViewArgs,
   readLoopEnding,
-  viewPull,
 } from './item-merge.js';
+import { prViewArgs } from './item-pull.js';
 import { createStretchItemCommand, itemLogPath } from './item.js';
 import { stretchRecordPath } from './start.js';
 
@@ -103,6 +107,8 @@ interface CaseOptions {
   readonly mergeExit?: number;
   /** Whether the fake merge merges; true when left out. */
   readonly merges?: boolean;
+  /** How many reads after the merge still answer the pull request open; none when left out. */
+  readonly openReadsAfterMerge?: number;
   readonly base?: string;
   readonly state?: string;
   /** The runs `run list` answers on each read, the last list kept for every read past it. */
@@ -121,6 +127,8 @@ interface Case {
   readonly rafaCalls: string[][];
   readonly ghCalls: string[][];
   readonly sleeps: number[];
+  /** How many times `pr view` was read after the merge ran. */
+  readonly viewsAfterMerge: () => number;
   readonly seams: StretchItemSeams;
 }
 
@@ -143,6 +151,8 @@ function plant(options: CaseOptions = {}): Case {
   const sleeps: number[] = [];
   let clock = START;
   let merged = false;
+  let mergeRan = false;
+  let viewsAfterMerge = 0;
   let listReads = 0;
   const runLists = options.runs ?? [[verifyRun()]];
 
@@ -150,19 +160,27 @@ function plant(options: CaseOptions = {}): Case {
     ghCalls.push([...args]);
     const answer = (result: GhResult): Promise<GhResult> => Promise.resolve(result);
     if (args[0] === 'pr' && args[1] === 'view') {
+      if (mergeRan) viewsAfterMerge += 1;
+      const readMerged = merged && viewsAfterMerge > (options.openReadsAfterMerge ?? 0);
       const row = {
         baseRefName: options.base ?? BRANCH,
         body: BODY,
         headRefName: 'feat/rafa-812-pit-readings',
-        mergeCommit: merged
+        mergeCommit: readMerged
           ? { oid: MERGE_SHA }
           : null,
+        mergeable: readMerged
+          ? 'UNKNOWN'
+          : 'MERGEABLE',
         number: Number(args[2]),
-        state: merged
+        state: readMerged
           ? 'MERGED'
           : options.state ?? 'OPEN',
       };
       return answer({ ok: true, stdout: `${JSON.stringify(row)}\n`, stderr: '' });
+    }
+    if (args[0] === 'pr' && args[1] === 'checks') {
+      return answer({ ok: true, stdout: `${JSON.stringify([{ name: 'fragment', state: 'SKIPPED', link: '' }])}\n`, stderr: '' });
     }
     if (args[0] === 'run' && args[1] === 'list') {
       listReads += 1;
@@ -178,6 +196,7 @@ function plant(options: CaseOptions = {}): Case {
     runRafa: async (argv) => {
       rafaCalls.push([...argv]);
       if (argv[1] === 'pr') {
+        mergeRan = true;
         if (options.merges ?? true) merged = true;
         return Promise.resolve(options.mergeExit ?? 0);
       }
@@ -215,7 +234,7 @@ function plant(options: CaseOptions = {}): Case {
     now: () => new Date(clock),
     rafa: ['rafa'],
   };
-  return { project, rafaCalls, ghCalls, sleeps, seams };
+  return { project, rafaCalls, ghCalls, sleeps, viewsAfterMerge: () => viewsAfterMerge, seams };
 }
 
 async function run(planted: Case, words: readonly string[] = ['812', '--wait']): Promise<CapturedRun> {
@@ -234,10 +253,10 @@ function expectInOrder(stdout: string, lines: readonly string[]): void {
 }
 
 const WAIT_LINE = ['rafa', 'loop', 'wait', `--session-id=${SESSION_ID}`];
-const MERGE_LINE = ['rafa', 'pr', 'merge', String(PR), '--skip-checks', '--yes'];
+const MERGE_LINE = ['rafa', 'pr', 'merge', String(PR), '--yes'];
 
 describe('rafa stretch item --wait, a loop that opened a pull request', () => {
-  it('merges it with checks skipped, waits for the run on the merge commit, appends the ledger and prints the readings', async () => {
+  it('waits for its checks, merges it, waits for the run on the merge commit, appends the ledger and prints the readings', async () => {
     const planted = plant({
       runs: [
         [verifyRun({ headSha: OLD_SHA, createdAt: '2026-10-07T08:00:00Z' })],
@@ -266,7 +285,9 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     }]);
     expectInOrder(outcome.stdout, [
       `rafa loop wait --session-id=${SESSION_ID}`,
-      `rafa pr merge ${String(PR)} --skip-checks --yes`,
+      `#${String(PR)} mergeability: MERGEABLE`,
+      `waiting for the checks of #${String(PR)}`,
+      `rafa pr merge ${String(PR)} --yes`,
       `merged #${String(PR)} into ${BRANCH} at c4da2c4`,
       `waiting for the run on ${BRANCH} at c4da2c4 to end`,
       `run 37190089292 (verify) on ${BRANCH} at c4da2c4 ended: failure`,
@@ -278,6 +299,31 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
       '   #870 filed during the item',
     ]);
     expect(outcome.stdout).not.toContain('#700 filed long ago');
+    expect(outcome.stdout).not.toContain('warn:');
+  });
+
+  it('records the merge as rafa pr merge <pr> --yes, run after the mergeability and checks reads', async () => {
+    const planted = plant();
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rafaCalls[1]).toEqual(['rafa', 'pr', 'merge', String(PR), '--yes']);
+    expect(planted.ghCalls.slice(0, 3).map((args) => args.slice(0, 2).join(' '))).toEqual(['pr view', 'pr view', 'pr checks']);
+    expect(planted.viewsAfterMerge()).toBe(1);
+    expect(`${outcome.stdout}${outcome.stderr}`).not.toContain('--skip-checks');
+  });
+
+  it('reads the pull request again until it reads merged, and goes on', async () => {
+    const planted = plant({ openReadsAfterMerge: 1 });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.viewsAfterMerge()).toBe(2);
+    expect(planted.sleeps[0]).toBe(MERGED_POLL_MS);
+    expect(outcome.stdout).toContain(`merged #${String(PR)} into ${BRANCH} at c4da2c4`);
+    expect(readItems(planted.project.root, 4).items).toHaveLength(1);
   });
 
   it('counts new bugs from the last ledger line written before this one, not from its own', async () => {
@@ -477,25 +523,46 @@ describe('rafa stretch item --wait, refusals before the merge', () => {
   });
 });
 
+describe('rafa stretch item --wait, a merge that ended non-zero', () => {
+  it('goes on when the pull request reads merged, warning that the clean-up is what failed', async () => {
+    const planted = plant({ mergeExit: 1 });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain(`warn: rafa pr merge ${String(PR)} --yes ended with exit code 1, and #${String(PR)} is merged:`
+      + ' the clean-up after the merge is what failed; finish it with rafa cleanup.');
+    expect(planted.viewsAfterMerge()).toBe(1);
+    expect(readItems(planted.project.root, 4).items.map((item) => item.mergeCommit)).toEqual([MERGE_SHA]);
+  });
+});
+
 describe('rafa stretch item --wait, a merge that did not go through', () => {
-  it('ends with pr merge\'s own code and runs nothing after it', async () => {
+  it('ends with pr merge\'s own code after the reads, and runs nothing after it', async () => {
     const planted = plant({ mergeExit: 1, merges: false });
 
     const outcome = await run(planted);
 
     expect(outcome.exitCode).toBe(1);
-    expect(outcome.stderr).toContain(`rafa pr merge ${String(PR)} --skip-checks --yes ended with exit code 1`);
+    expect(outcome.stderr).toContain(`rafa pr merge ${String(PR)} --yes ended with exit code 1, and #${String(PR)} reads OPEN`
+      + ` with no merge commit after ${String(MERGED_READ_TRIES)} reads`);
+    expect(outcome.stdout).not.toContain('warn:');
+    expect(planted.viewsAfterMerge()).toBe(MERGED_READ_TRIES);
     expect(planted.ghCalls.some((args) => args[1] === 'list')).toBe(false);
     expect(existsSync(itemsPath(planted.project.root, 4))).toBe(false);
   });
 
-  it('ends 2 when pr merge ends 0 and the pull request is not merged', async () => {
+  it('ends 2 when pr merge ends 0 and the pull request never reads merged', async () => {
     const planted = plant({ merges: false });
 
     const outcome = await run(planted);
 
     expect(outcome.exitCode).toBe(2);
-    expect(outcome.stderr).toContain(`rafa pr merge ended 0, and #${String(PR)} reads OPEN with no merge commit.`);
+    expect(outcome.stderr).toContain(`rafa pr merge ${String(PR)} --yes ended 0, and #${String(PR)} reads OPEN with no merge commit`
+      + ` after ${String(MERGED_READ_TRIES)} reads.`);
+    expect(planted.viewsAfterMerge()).toBe(MERGED_READ_TRIES);
+    expect(planted.sleeps).toEqual(Array.from({ length: MERGED_READ_TRIES - 1 }, () => MERGED_POLL_MS));
+    expect(planted.ghCalls.some((args) => args[1] === 'list')).toBe(false);
     expect(existsSync(itemsPath(planted.project.root, 4))).toBe(false);
   });
 });
@@ -572,39 +639,6 @@ describe('readLoopEnding', () => {
   });
 });
 
-describe('viewPull', () => {
-  function answering(stdout: string, ok = true): GhRunner {
-    return async () => Promise.resolve({ ok, stdout, stderr: ok
-      ? ''
-      : 'no pull requests found' });
-  }
-
-  it('asks for the fields it reads', () => {
-    expect(prViewArgs(5)).toEqual(['pr', 'view', '5', '--json', PR_VIEW_FIELDS.join(',')]);
-  });
-
-  it('reads a merged pull request as gh 2.102.0 wrote one', async () => {
-    const recorded = JSON.stringify({ baseRefName: 'main', body: '', headRefName: 'feat/x', mergeCommit: { oid: OLD_SHA }, number: 881, state: 'MERGED' });
-
-    expect(await viewPull(answering(`${recorded}\n`), 881)).toEqual({
-      number: 881, state: 'MERGED', base: 'main', head: 'feat/x', body: '', mergeCommit: OLD_SHA,
-    });
-  });
-
-  it.each([
-    ['a gh failure', answering('', false), 'failed: no pull requests found'],
-    ['output that is not JSON', answering('<html>'), 'wrote output that is not JSON'],
-    ['another pull request', answering(JSON.stringify({ number: 6 })), 'answered number 6'],
-    ['a merge commit with no sha', answering(JSON.stringify({ number: 5, state: 'MERGED', baseRefName: 'b', headRefName: 'h', body: '', mergeCommit: { oid: 'abc' } })), 'answered mergeCommit'],
-    ['a missing field', answering(JSON.stringify({ number: 5, state: 'OPEN' })), 'answered baseRefName'],
-  ])('fails with exit 2 on %s', async (_name, gh, said) => {
-    const read = viewPull(gh, 5);
-
-    expect(read).rejects.toMatchObject({ exitCode: 2 });
-    await expect(read).rejects.toThrow(said);
-  });
-});
-
 describe('the dry run', () => {
   it('prints the merge half\'s lines after the loop wait line, and runs none of them', async () => {
     const planted = plant();
@@ -615,8 +649,10 @@ describe('the dry run', () => {
     expect(planted.rafaCalls).toEqual([]);
     expect(planted.ghCalls).toEqual([]);
     const lines = mergeDryRunLines(['rafa'], planted.project.root, 4);
-    expect(lines[0]).toBe('rafa pr merge <pr> --skip-checks --yes');
-    expect(lines[1]).toStartWith(`gh run list --branch ${BRANCH} --commit <merge-commit> --limit 1 --json`);
+    expect(lines[0]).toBe('wait for GitHub to compute the mergeability of <pr>  (again every 5s while it reads UNKNOWN, up to 2 minutes)');
+    expect(lines[1]).toBe('wait for the checks of <pr> to pass  (again every 20s, up to 20 minutes)');
+    expect(lines[2]).toBe('rafa pr merge <pr> --yes');
+    expect(lines[3]).toStartWith(`gh run list --branch ${BRANCH} --commit <merge-commit> --limit 1 --json`);
     expectInOrder(outcome.stdout, ['rafa loop wait --session-id=<session id>', ...lines, 'dry run: would start the loop']);
     expect(existsSync(itemsPath(planted.project.root, 4))).toBe(false);
   });

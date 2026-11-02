@@ -292,8 +292,9 @@ and `AGENTS.md` at 80 lines. `src/tests/turbo-config.sweep.test.ts` holds the
 key. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` and `affected` checks (merge with
-`rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
-check (merge with `rafa pr merge <n> --skip-checks`). One more gate runs
+`rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports
+the `fragment` check (merge with `rafa pr merge <n>`; `--skip-checks` is refused
+there). One more gate runs
 at `git commit`: `.githooks/pre-commit`
 runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
 refusing a commit whose staged blobs carry a raw control byte or an

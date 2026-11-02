@@ -353,14 +353,16 @@ describe('rafa stretch item --dry-run, spawned', () => {
       `keep .rafa/plans/PLAN-${stub}.md, written by an earlier plan create`,
       `RAFA_OUTPUT=events rafa loop start --plan=.rafa/plans/PLAN-${stub}.md --as-worktree --no-ci-wait`,
       'rafa loop wait --session-id=<session id>',
-      'rafa pr merge <pr> ',
-      '--skip-checks',
+      'wait for GitHub to compute the mergeability of <pr>',
+      'wait for the checks of <pr> to pass',
+      'rafa pr merge <pr> --yes',
       'gh run list',
       `append the item to ${items}`,
       'print the pit-stop readings of stretch/7',
       `dry run: would start the loop of #${ISSUE} for stretch/7; nothing was run`,
     ]);
     expect(said(run)).not.toContain('rafa plan create');
+    expect(said(run)).not.toContain('--skip-checks');
 
     expect(snapshot(world)).toEqual(before);
     expect(calls(world.ghLog)).toEqual([]);

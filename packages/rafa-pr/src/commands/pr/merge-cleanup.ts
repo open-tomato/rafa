@@ -19,6 +19,20 @@
  * re-pushes: the pull request IS merged by then, and the clean-up is
  * housekeeping the operator can finish by hand.
  *
+ * ## The one step tried twice
+ *
+ * A step carrying a `retry` (`pull-base` alone, `cleanUpSteps`' module
+ * note) whose first try failed with the retry's `when` text in what git
+ * said is tried once more: {@link runCleanUp} prints `<label>: retrying
+ * after <fetch command>`, runs the retry's `before` argv, and runs the
+ * step's argv again (`open-tomato/rafa#1171`). The step is reported
+ * once, with the second try's `ok` and `retried: true`; every other
+ * step reports `retried: false`. A `before` that fails is the step's
+ * failure, quoting what the fetch said, and a second try that fails is
+ * the step's failure too: either refuses as any failed step does, the
+ * merge left alone and the tail from that step listed. A first failure
+ * with any other text is not retried.
+ *
  * ## The remote branch, and which remote
  *
  * Whether the remote branch is still there is read AFTER the merge, by
@@ -112,7 +126,7 @@
  * the home and the pid probe the other follow-up reads.
  */
 import type { FollowUp } from './merge-followups.js';
-import type { GitResult, GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
+import type { GitResult, GitRunner, MergeStep, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { SettleWaitingPlace } from '../../pr/settle-waiting.js';
 import type { PidProbe } from '@open-tomato/rafa/core/loop';
 
@@ -157,6 +171,8 @@ export interface MergeStepReport {
   readonly ok: boolean;
   /** True when the step was reported as skipped rather than run. */
   readonly skipped: boolean;
+  /** True when the first try failed with the step's `retry.when` and it was tried once more; see the module note. */
+  readonly retried: boolean;
 }
 
 /** Which of the two branches the clean-up found to delete. */
@@ -295,6 +311,29 @@ export interface CleanUpShape {
   readonly baseHeldAt?: string | null;
 }
 
+/** What one step's run answered: the last result git gave, and whether the step was tried twice. */
+interface StepRun {
+  readonly result: GitResult;
+  readonly retried: boolean;
+}
+
+/**
+ * Runs one step, and runs its retry when the first try failed with the
+ * retry's text: the `before` argv, then the step once more. A `before`
+ * that fails answers its own result. See the module note.
+ */
+function runStep(git: GitRunner, step: MergeStep, info: Report): StepRun {
+  const first = git(step.argv.slice(1));
+  const retry = step.retry;
+  if (first.ok || retry === undefined || !gitSaid(first).includes(retry.when)) {
+    return { result: first, retried: false };
+  }
+  info(`${step.label}: retrying after ${retry.before.join(' ')}`);
+  const before = git(retry.before.slice(1));
+  if (!before.ok) return { result: before, retried: true };
+  return { result: git(step.argv.slice(1)), retried: true };
+}
+
 /** Runs the clean-up, reporting each step, and refuses at the first that failed; see the module note. */
 export function runCleanUp(
   git: GitRunner,
@@ -314,12 +353,12 @@ export function runCleanUp(
   const reports: MergeStepReport[] = [];
   for (const step of steps) {
     if (step.skip !== undefined) {
-      reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: true, skipped: true });
+      reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: true, skipped: true, retried: false });
       info(`${step.label}: skipped — ${step.skip}`);
       continue;
     }
-    const result = git(step.argv.slice(1));
-    reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: result.ok, skipped: false });
+    const { result, retried } = runStep(git, step, info);
+    reports.push({ id: step.id, label: step.label, command: commandLine(step), ok: result.ok, skipped: false, retried });
     if (result.ok) {
       info(`${step.label}: done`);
       continue;
