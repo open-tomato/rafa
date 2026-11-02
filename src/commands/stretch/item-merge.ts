@@ -22,7 +22,8 @@
  *
  * ## The steps, in order
  *
- *   1. `gh pr view <pr> --json ...` reads the pull request. Its base must
+ *   1. `gh pr view <pr> --json ...` reads the pull request (`viewPull`,
+ *      `./item-pull.ts`). Its base must
  *      be a `stretch/*` branch: checks are skipped only on an integration
  *      branch, never on the default branch or any other base, so another
  *      base is refused with exit 1 and nothing merged. A pull request
@@ -75,6 +76,7 @@
  * Every process goes through {@link ItemMergeSeams}, so no test runs
  * `rafa`, reaches GitHub or sleeps.
  */
+import type { ViewedPull } from './item-pull.js';
 import type { BranchRun } from '../../ci/runs.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { Tracker } from '@open-tomato/rafa/ports';
@@ -93,6 +95,7 @@ import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
 import { readPitReadings, renderPitReadings } from '../../stretch/pit-readings.js';
 
+import { viewPull } from './item-pull.js';
 import { STRETCH_BRANCH_PREFIX, stretchRecordPath } from './start.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -110,9 +113,6 @@ export const CI_READ_TRIES = 3;
 /** The flags the merge runs with: no checks to wait on, and no question. */
 export const MERGE_FLAGS: readonly string[] = Object.freeze(['--skip-checks', '--yes']);
 
-/** The `--json` fields the pull request is read with. */
-export const PR_VIEW_FIELDS = ['number', 'state', 'baseRefName', 'headRefName', 'body', 'mergeCommit'] as const;
-
 /** The events that end a loop's wait for its pull request, as `loop wait` reads them. */
 const ENDING_EVENTS = ['pr', 'no-pr', 'halt', 'error'] as const;
 
@@ -124,9 +124,6 @@ const FAILED_EXIT = 2;
 
 /** How many characters of a commit a line shows. */
 const SHORT_SHA = 7;
-
-/** A full commit sha. */
-const SHA = /^[0-9a-f]{40}$/;
 
 /** What a dry run's line shows where the merge commit will be. */
 const MERGE_COMMIT_PLACEHOLDER = '<merge-commit>';
@@ -175,18 +172,6 @@ export type LoopEnding =
   | { readonly kind: 'pr'; readonly number: number }
   | { readonly kind: 'no-pr' | 'halt' | 'error'; readonly reason: string }
   | { readonly kind: 'none'; readonly reason: string };
-
-/** The pull request, as `gh pr view` answers it. */
-export interface ViewedPull {
-  readonly number: number;
-  /** `OPEN`, `MERGED` or `CLOSED`, as `gh` writes it. */
-  readonly state: string;
-  readonly base: string;
-  readonly head: string;
-  readonly body: string;
-  /** The merge commit's sha, or null before it merged. */
-  readonly mergeCommit: string | null;
-}
 
 /** A refusal with exit code 1 naming `why`. */
 function refusal(why: string): CommandExit {
@@ -241,57 +226,6 @@ export function noPullRequestLine(issue: number, ending: Exclude<LoopEnding, { k
     ? 'ended without a pull request'
     : `ended on ${ending.kind}`;
   return `the loop of #${String(issue)} ${how}: ${ending.reason}`;
-}
-
-/** The arguments after `gh` that read pull request `number`. */
-export function prViewArgs(number: number): string[] {
-  return ['pr', 'view', String(number), '--json', PR_VIEW_FIELDS.join(',')];
-}
-
-/** The text `field` of `row` holds, or a failure naming it. */
-function textField(row: Readonly<Record<string, unknown>>, field: string, command: string): string {
-  const value = row[field];
-  if (typeof value !== 'string') throw failure(`${command} answered ${field} ${describeValue(value)}, expected a string`);
-  return value;
-}
-
-/** The merge commit `gh` wrote, null for none, or a failure. */
-function mergeCommitOf(value: unknown, command: string): string | null {
-  if (value === null || value === undefined) return null;
-  const oid = isMapping(value)
-    ? value['oid']
-    : undefined;
-  if (typeof oid !== 'string' || !SHA.test(oid)) {
-    throw failure(`${command} answered mergeCommit ${describeValue(value)}, expected null or an object holding a 40-character oid`);
-  }
-  return oid;
-}
-
-/** Pull request `number`, read through `gh pr view`; a failure when `gh` fails or answers something else. */
-export async function viewPull(gh: GhRunner, number: number): Promise<ViewedPull> {
-  const args = prViewArgs(number);
-  const command = `gh ${args.join(' ')}`;
-  const result = await gh(args);
-  if (!result.ok) {
-    const said = result.stderr.trim() || result.stdout.trim() || 'it exited non-zero and wrote nothing';
-    throw failure(`${command} failed: ${said}`);
-  }
-  let row: unknown;
-  try {
-    row = JSON.parse(result.stdout) as unknown;
-  } catch (error) {
-    throw failure(`${command} wrote output that is not JSON: ${messageOf(error)}`);
-  }
-  if (!isMapping(row)) throw failure(`${command} answered ${describeValue(row)}, expected an object`);
-  if (row['number'] !== number) throw failure(`${command} answered number ${describeValue(row['number'])}`);
-  return {
-    number,
-    state: textField(row, 'state', command),
-    base: textField(row, 'baseRefName', command),
-    head: textField(row, 'headRefName', command),
-    body: textField(row, 'body', command),
-    mergeCommit: mergeCommitOf(row['mergeCommit'], command),
-  };
 }
 
 /** Refuses a pull request that is not open or whose base is not a `stretch/*` branch. */

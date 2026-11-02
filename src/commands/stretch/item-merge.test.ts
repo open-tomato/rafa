@@ -43,11 +43,9 @@ import {
   CI_WAIT_MS,
   mergeDryRunLines,
   noPullRequestLine,
-  PR_VIEW_FIELDS,
-  prViewArgs,
   readLoopEnding,
-  viewPull,
 } from './item-merge.js';
+import { prViewArgs } from './item-pull.js';
 import { createStretchItemCommand, itemLogPath } from './item.js';
 import { stretchRecordPath } from './start.js';
 
@@ -157,6 +155,9 @@ function plant(options: CaseOptions = {}): Case {
         mergeCommit: merged
           ? { oid: MERGE_SHA }
           : null,
+        mergeable: merged
+          ? 'UNKNOWN'
+          : 'MERGEABLE',
         number: Number(args[2]),
         state: merged
           ? 'MERGED'
@@ -569,39 +570,6 @@ describe('readLoopEnding', () => {
 
   it('names the reason in the line it is reported by', () => {
     expect(noPullRequestLine(812, { kind: 'halt', reason: 'tests red' })).toBe('the loop of #812 ended on halt: tests red');
-  });
-});
-
-describe('viewPull', () => {
-  function answering(stdout: string, ok = true): GhRunner {
-    return async () => Promise.resolve({ ok, stdout, stderr: ok
-      ? ''
-      : 'no pull requests found' });
-  }
-
-  it('asks for the fields it reads', () => {
-    expect(prViewArgs(5)).toEqual(['pr', 'view', '5', '--json', PR_VIEW_FIELDS.join(',')]);
-  });
-
-  it('reads a merged pull request as gh 2.102.0 wrote one', async () => {
-    const recorded = JSON.stringify({ baseRefName: 'main', body: '', headRefName: 'feat/x', mergeCommit: { oid: OLD_SHA }, number: 881, state: 'MERGED' });
-
-    expect(await viewPull(answering(`${recorded}\n`), 881)).toEqual({
-      number: 881, state: 'MERGED', base: 'main', head: 'feat/x', body: '', mergeCommit: OLD_SHA,
-    });
-  });
-
-  it.each([
-    ['a gh failure', answering('', false), 'failed: no pull requests found'],
-    ['output that is not JSON', answering('<html>'), 'wrote output that is not JSON'],
-    ['another pull request', answering(JSON.stringify({ number: 6 })), 'answered number 6'],
-    ['a merge commit with no sha', answering(JSON.stringify({ number: 5, state: 'MERGED', baseRefName: 'b', headRefName: 'h', body: '', mergeCommit: { oid: 'abc' } })), 'answered mergeCommit'],
-    ['a missing field', answering(JSON.stringify({ number: 5, state: 'OPEN' })), 'answered baseRefName'],
-  ])('fails with exit 2 on %s', async (_name, gh, said) => {
-    const read = viewPull(gh, 5);
-
-    expect(read).rejects.toMatchObject({ exitCode: 2 });
-    await expect(read).rejects.toThrow(said);
   });
 });
 
