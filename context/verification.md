@@ -802,7 +802,9 @@ or `CASE_TIMEOUT_MS` constant, or a `{ timeout }` literal):
   `src/tests/sweep-timeout.ts`. Each sweep file sets it for its own cases
   with `setDefaultTimeout(SWEEP_TIMEOUT)` at module level, before its first
   `describe`. That call reaches no other file of the run, so a sweep's
-  limit does not lift a unit test beside it;
+  limit does not lift a unit test beside it. The roots a content sweep
+  reads are the eight of `SOURCE_ROOTS` in `src/tests/source-roots.ts`, the
+  one list every such sweep walks;
 - a spawned case should pass `RUN_TIMEOUT` (`{ timeout: 60_000 }`, from
   `src/tests/loop-scratch.ts`) as its middle argument, `it(name,
   RUN_TIMEOUT, fn)`, which gives the child process a minute. A file with
@@ -896,7 +898,8 @@ directory, the exit code, and the streams the child wrote.
 `src/tests/spawned-exit-code.sweep.test.ts` holds the rule: it fails on
 any tracked test file under a root of `src/tests/source-roots.ts` (the
 root's `src/`, core's and the six feature packages' `src/`) asserting a
-spawned rafa run's exit code with a bare `expect(run.exitCode).toBe(n)`. It reads each asserted value back
+spawned rafa run's exit code with a bare
+`expect(run.exitCode).toBe(n)`. It reads each asserted value back
 to its declaration, so an in-process result asserted bare still passes.
 
 ### Fixture scrub, guard, and path rules
