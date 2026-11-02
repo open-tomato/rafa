@@ -9,8 +9,9 @@
  * and the byte-identical copies, `provenanceBlock` (`tiers/serve.ts`)
  * gives the unreviewed items, and `SERVE_CLI_VERSION`
  * (`tiers/delivery.ts`) gives the pin. A sixth row,
- * from `SKILL_USE_CLI_VERSION` (`effort/skill-use.ts`), holds the same
- * installed version against the log format the skill-use collector reads. The module lives beside
+ * from `SKILL_USE_CLI_FLOOR` and `SKILL_USE_FIXTURE_VERSION`
+ * (`effort/skill-use.ts`), holds the same installed version against the
+ * log format the skill-use collector reads. The module lives beside
  * `./doctor.ts`, not inside it, because that file is near the 800-line
  * cap (`context/source.md`). `rafa doctor` calls {@link checkDoctorTiers}
  * on every run, `--deep` or not, after the references row and before the
@@ -33,11 +34,15 @@
  * | `unreviewed` | `warn` | rafa-tier or add-on row whose `provenance` `provenanceBlock` refuses |
  * | `cli-version` | `warn` | reading, when the installed Claude Code is not `SERVE_CLI_VERSION` |
  * | `cli-version` | `note` | reading, when no installed version could be read |
- * | `skill-use-version` | `warn` | reading, when the installed Claude Code is not `SKILL_USE_CLI_VERSION` |
+ * | `skill-use-version` | `warn` | reading, when the installed Claude Code is below `SKILL_USE_CLI_FLOOR` |
+ * | `skill-use-version` | `note` | reading, when the installed Claude Code is at or above the floor and not `SKILL_USE_FIXTURE_VERSION` |
  * | `copy` | `note` | byte-identical copy a person can delete, with the deletion as the fix |
  * | `no-provenance` | `note` | user-tier row with no `provenance`, when the user tier is loaded |
  *
- * Rows come in that order, so the warnings are first. Every collision is
+ * Rows come in that order, so the warnings are first, with one
+ * exception: the `skill-use-version` row keeps its place after the
+ * `cli-version` rows whatever its status, so its `note` can sit after a
+ * `cli-version` warning and before the `copy` notes. Every collision is
  * listed in the same reading, so one config edit can settle all of
  * them. No row is a preflight item, and no row changes the doctor's exit
  * code. The refusal belongs to `loop start` and `plan validate`.
@@ -92,17 +97,25 @@
  * version that cannot be read gets a note, so a missing reading is never
  * mistaken for a match.
  *
- * ## The skill-use pin
+ * ## The skill-use floor
  *
- * `SKILL_USE_CLI_VERSION` is a second pin on the same reading: the
- * Claude Code whose log format the skill-use collector was written
- * against. A session logged under any other version is stored in
- * `skill_invocations` as an unknown count, so an installed version that
- * differs gets one warning of its own, telling a person that the skill
- * counts of the sessions it writes will read as unknown. The two pins
- * are separate constants that can move apart, so each has its row. A
- * version that cannot be read gets no second row: the `cli-version`
- * note already says so, and one missing reading is one note.
+ * The skill-use collector reads a session by skill name when every
+ * versioned record of it is at or above `SKILL_USE_CLI_FLOOR`, the
+ * oldest Claude Code whose `Skill` call shape it is known to read, and
+ * stores a session with a record below it in `skill_invocations` as an
+ * unknown count. It vouches for a reading only under
+ * `SKILL_USE_FIXTURE_VERSION`, the version its fixture was recorded
+ * under. Versions are compared as `X.Y.Z` by `compareCliVersions`, the
+ * reader's own comparison, so the doctor and the reader cannot disagree.
+ * An installed version below the floor gets a warning, telling a person
+ * that the skill counts of the sessions it writes will read as unknown.
+ * One at or above the floor and not the fixture's gets a note: its
+ * sessions are read by name, as unvouched, until the fixture is recorded
+ * again under it. The fixture's version gets no row. This row and the
+ * `cli-version` row hold separate constants that can move apart, so each
+ * has its row. A version that cannot be read gets no second row: the
+ * `cli-version` note already says so, and one missing reading is one
+ * note.
  *
  * Nothing here writes. The files are read through
  * {@link TierFileReaders}, and Claude Code through
@@ -124,7 +137,11 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
 import { createGhRunner } from '@open-tomato/rafa-board';
-import { SKILL_USE_FIXTURE_VERSION as SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort';
+import {
+  SKILL_USE_CLI_FLOOR,
+  SKILL_USE_FIXTURE_VERSION,
+  compareCliVersions,
+} from '@open-tomato/rafa-effort';
 import {
   PROVENANCE_FIELD,
   SERVE_CLI_VERSION,
@@ -355,18 +372,32 @@ export function cliVersionRows(installed: string | null, pinned: string = SERVE_
 }
 
 /**
- * The skill-use pin's row: a warning when `installed` is read and is not
- * `pinned`, nothing on a match or when unread. See "The skill-use pin".
+ * The skill-use floor's row: a warning when `installed` is below `floor`,
+ * a note when it is at or above `floor` and not `fixture`, nothing when it
+ * is `fixture` or unread. See "The skill-use floor".
  */
-export function skillUseVersionRows(installed: string | null, pinned: string = SKILL_USE_CLI_VERSION): readonly TierDoctorRow[] {
-  if (installed === null || installed === pinned) return [];
+export function skillUseVersionRows(
+  installed: string | null,
+  floor: string = SKILL_USE_CLI_FLOOR,
+  fixture: string = SKILL_USE_FIXTURE_VERSION,
+): readonly TierDoctorRow[] {
+  if (installed === null || installed === fixture) return [];
+  const source = 'packages/rafa-effort/src/effort/skill-use.ts';
+  if (compareCliVersions(installed, floor) < 0) {
+    return [row(
+      'skill-use-version',
+      'warn',
+      'Claude Code',
+      `${installed} is installed, and the skill-use collector stores the skill counts of sessions logged below ${floor} as unknown`,
+      `read a log of ${installed} and lower SKILL_USE_CLI_FLOOR (${source}) when its Skill call shape is the fixture's`,
+    )];
+  }
   return [row(
     'skill-use-version',
-    'warn',
+    'note',
     'Claude Code',
-    `${installed} is installed, and the skill-use collector reads logs of ${pinned}, `
-      + 'so skill_invocations stores the skill counts of the sessions it logs as unknown',
-    'record the skill-use fixture again under the installed version (packages/rafa-effort/src/effort/skill-use.ts) before moving SKILL_USE_CLI_VERSION',
+    `${installed} is installed, and the skill-use collector reads its logs by skill name as unvouched: its fixture was recorded under ${fixture}`,
+    `record the skill-use fixture again under ${installed} (${source}) and move SKILL_USE_FIXTURE_VERSION`,
   )];
 }
 

@@ -35,6 +35,7 @@ export type { SkillUseOutcome } from './src/effort/skill-use.js';
 export {
   SKILL_USE_CLI_FLOOR,
   SKILL_USE_FIXTURE_VERSION,
+  compareCliVersions,
 } from './src/effort/skill-use.js';
 
 export type { PullBeforeReadInput } from './src/effort/sync/contact.js';
