@@ -1056,7 +1056,13 @@ pass `skills: null`. One session invoked from both sides is two rows, one per
 side. An `unknown` row — one row holding the session and NULL in `name`,
 `sidechain` and `count` — marks a session whose log the collector could not
 read (a log version below the floor, unreadable line, or unreadable skill
-call). A session that invoked no skill stores no row at all.
+call), and the skill half counts it under `unknown` alone. A session read by
+skill name whose records do not all carry `SKILL_USE_FIXTURE_VERSION`, the
+version its recorded fixture was logged under, is stored by name and counted
+under `unvouched` on the `skills` line of the collect summary, beside
+`unknown`; `--verbose` names each read session's versions and standing, as in
+`skills: read <id> (2.1.316, unvouched)`. A session that invoked no skill
+stores no row at all.
 
 **Claude Code's own usage record covers only plugin-delivered skills, never a
 project skill, so `skill_invocations` has no CLI-native count to check

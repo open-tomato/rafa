@@ -417,7 +417,7 @@ describe('a fixture plan run under the stand-in claude, collected, then reported
     const collected = run(scratch, ['effort', 'collect']);
     expectExit(collected, 0, { ...scratch });
     expect(collected.stdout).toContain('sessions  1 logs, 0 outside window, 0 already stored, 1 read, 0 failed, +1 rows');
-    expect(collected.stdout).toContain('skills    1 appended sessions, 0 already counted, 1 read, 0 unknown, 0 failed, +3 rows');
+    expect(collected.stdout).toContain('skills    1 appended sessions, 0 already counted, 1 read, 0 unvouched, 0 unknown, 0 failed, +3 rows');
 
     plantLessonRow(scratch.repo);
 
