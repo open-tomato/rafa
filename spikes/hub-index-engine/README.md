@@ -62,6 +62,7 @@ restart in between shows which pages the queries pull into memory).
 | `engine-sqlite.ts` | Engine 1. Probes extension loading in two child processes (plain, then under `setCustomSQLite`), then measures the FTS5 rebuild, the vec0 insert, and FTS-only, KNN and reciprocal-rank-fusion queries. |
 | `engine-lance.ts` | Engine 2. Builds a LanceDB table with its FTS index (and `ivfPq` at and above 50k rows), then measures FTS-only, KNN and hybrid search through the first-party RRF reranker. |
 | `rss-sqlite.ts` | The SQLite engine's own memory: opens a database `engine-sqlite.ts` built, in a process that loaded only what it needs, and reports what the queries add. |
+| `embed-model-bench.ts` | Times one real embedding model through an OpenAI-compatible `/v1/embeddings` route, such as LM Studio's local server: 200 short queries, 200 documents, and batches of 16. The texts are paragraphs of this repo's public context pages. |
 | `engine-postgres.ts` | Engine 3, the mid tier. Loads the rows over the wire with `Bun.sql`, builds a `pg_search` BM25 index and a `pgvector` HNSW index, then measures the same three query shapes with the fusion written as a CTE. |
 
 ## Reading the numbers
