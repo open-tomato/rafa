@@ -47,10 +47,11 @@ above 50,000 rows, for a comparison against an engine that has no vector index
 at all. `engine-postgres.ts` takes the same `--no-vector-index`, which skips the
 HNSW build, plus `--dims=<n>` (the vector width, 384 by default, from
 `createEmbedder` in `embed.ts`), `--url=<postgres url>` (or `PGURL`),
-`--no-collapse`, `--halfvec` (the column and index in 2-byte floats) and
+`--no-collapse`, `--halfvec` (the column and index in 2-byte floats),
 `--reuse` (measure queries against tables an earlier run built, so a server
-restart in between shows which pages the queries pull into memory).
-`engine-sqlite.ts` takes `--dims=<n>` too.
+restart in between shows which pages the queries pull into memory) and
+`--maintenance-work-mem=<size>` (the HNSW build's memory, 1GB by default; a
+small container wants it lower). `engine-sqlite.ts` takes `--dims=<n>` too.
 
 ## What each file is
 
@@ -63,6 +64,7 @@ restart in between shows which pages the queries pull into memory).
 | `engine-lance.ts` | Engine 2. Builds a LanceDB table with its FTS index (and `ivfPq` at and above 50k rows), then measures FTS-only, KNN and hybrid search through the first-party RRF reranker. |
 | `rss-sqlite.ts` | The SQLite engine's own memory: opens a database `engine-sqlite.ts` built, in a process that loaded only what it needs, and reports what the queries add. |
 | `embed-model-bench.ts` | Times one real embedding model through an OpenAI-compatible `/v1/embeddings` route, such as LM Studio's local server: 200 short queries, 200 documents, and batches of 16. The texts are paragraphs of this repo's public context pages. |
+| `rss-floor.ts` | The absolute memory of a SQLite client: a bare Bun process, then one that opened a replica and answered hybrid queries, with no extract loaded. |
 | `engine-postgres.ts` | Engine 3, the mid tier. Loads the rows over the wire with `Bun.sql`, builds a `pg_search` BM25 index and a `pgvector` HNSW index, then measures the same three query shapes with the fusion written as a CTE. |
 
 ## Reading the numbers
