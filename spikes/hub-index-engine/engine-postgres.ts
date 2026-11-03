@@ -33,7 +33,8 @@ const RRF_K = 60;
 const VECTOR_TYPE = process.argv.includes('--halfvec') ? 'halfvec' : 'vector';
 const TOP_K = 10;
 const INSERT_BATCH = 400;
-const MAINTENANCE_WORK_MEM = '1GB';
+/** The HNSW build's memory unless `--maintenance-work-mem` says otherwise. */
+const DEFAULT_MAINTENANCE_WORK_MEM = '1GB';
 
 /** The columns one row contributes to an insert, in placeholder order. */
 const COLUMNS = ['rowid', 'id', 'tbl', 'kind', 'derived', 'ts', 'text', 'embedding'] as const;
@@ -228,7 +229,7 @@ const flagValue = (name: string): string | undefined => {
 const extractPath = positional[0];
 if (extractPath === undefined) {
   console.error(
-    'usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--terms=<n>] [--url=<postgres url>] [--dims=<n>] [--halfvec] [--reuse] [--no-vector-index] [--no-collapse]',
+    'usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--terms=<n>] [--url=<postgres url>] [--dims=<n>] [--halfvec] [--reuse] [--maintenance-work-mem=<size>] [--no-vector-index] [--no-collapse]',
   );
   process.exit(2);
 }
@@ -241,7 +242,8 @@ const outPath = flagValue('out');
 const withVectorIndex = !flags.includes('--no-vector-index');
 
 const sql = new SQL(url, { max: 1 });
-await sql.unsafe(`set maintenance_work_mem = '${MAINTENANCE_WORK_MEM}'`);
+const maintenanceWorkMem = flagValue('maintenance-work-mem') ?? DEFAULT_MAINTENANCE_WORK_MEM;
+await sql.unsafe(`set maintenance_work_mem = '${maintenanceWorkMem}'`);
 const versions = (await sql.unsafe(
   `select current_setting('server_version') as pg,
           (select extversion from pg_extension where extname = 'pg_search') as pg_search,
@@ -281,7 +283,7 @@ const report: Record<string, unknown> = {
   bun: Bun.version,
   platform: `${process.platform}-${process.arch}`,
   versions: versions[0],
-  settings: { maintenance_work_mem: MAINTENANCE_WORK_MEM, insertBatch: INSERT_BATCH },
+  settings: { maintenance_work_mem: maintenanceWorkMem, insertBatch: INSERT_BATCH },
   dims: embedder.dims,
   embeddings: `deterministic hashed bag of words, ${embedder.dims} dims, no model call`,
   queryNote: 'every query is a loopback round trip, unlike the in-process SQLite engines',
