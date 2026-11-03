@@ -3,7 +3,7 @@
  * `pgvector` for the vectors, fused by reciprocal rank in SQL.
  *
  * Usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=200]
- *                               [--terms=5] [--url=<postgres url>]
+ *                               [--terms=5] [--url=<postgres url>] [--dims=384]
  *                               [--no-vector-index] [--no-collapse]
  *
  * The same extract, the same deterministic pseudo-embeddings and the same
@@ -17,7 +17,7 @@
  */
 import { SQL } from 'bun';
 
-import { DIMS, embed } from './embed.js';
+import { DIMS, type Embedder, createEmbedder } from './embed.js';
 import {
   type ExtractRow,
   collapseDuplicates,
@@ -75,6 +75,7 @@ async function rebuild(
   table: string,
   rows: readonly ExtractRow[],
   withVectorIndex: boolean,
+  embedder: Embedder,
 ): Promise<RebuildCost> {
   await sql.unsafe(`drop table if exists ${table} cascade`);
   await sql.unsafe(`create table ${table} (
@@ -85,7 +86,7 @@ async function rebuild(
       derived text not null,
       ts text not null,
       text text not null,
-      embedding vector(${DIMS}) not null
+      embedding vector(${embedder.dims}) not null
     )`);
 
   const insert = await timed(async () => {
@@ -101,7 +102,7 @@ async function rebuild(
           row.derived,
           row.ts,
           row.text,
-          vectorLiteral(embed(row.text)),
+          vectorLiteral(embedder.embed(row.text)),
         );
       });
       await sql.unsafe(
@@ -225,12 +226,13 @@ const flagValue = (name: string): string | undefined => {
 const extractPath = positional[0];
 if (extractPath === undefined) {
   console.error(
-    'usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--terms=<n>] [--url=<postgres url>] [--no-vector-index] [--no-collapse]',
+    'usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--terms=<n>] [--url=<postgres url>] [--dims=<n>] [--no-vector-index] [--no-collapse]',
   );
   process.exit(2);
 }
 
 const url = flagValue('url') ?? process.env.PGURL ?? 'postgres://postgres:spike@127.0.0.1:55432/spike';
+const embedder = createEmbedder(Number(flagValue('dims') ?? DIMS));
 const queryCount = Number(flagValue('queries') ?? 200);
 const terms = Number(flagValue('terms') ?? 5);
 const outPath = flagValue('out');
@@ -245,11 +247,11 @@ const versions = (await sql.unsafe(
 )) as Array<{ pg: string; pg_search: string; vector: string }>;
 
 const rows = await readExtract(extractPath);
-const built = await rebuild(sql, 'records', rows, withVectorIndex);
+const built = await rebuild(sql, 'records', rows, withVectorIndex, embedder);
 const reportedSizes = await sizes(sql, 'records', withVectorIndex);
 const query = queriesFor(sql, 'records');
 
-const queries = sampleQueries(rows, queryCount, 11, terms);
+const queries = sampleQueries(rows, queryCount, 11, terms, embedder.embed);
 const ftsMs: number[] = [];
 const knnMs: number[] = [];
 const hybridMs: number[] = [];
@@ -273,8 +275,8 @@ const report: Record<string, unknown> = {
   platform: `${process.platform}-${process.arch}`,
   versions: versions[0],
   settings: { maintenance_work_mem: MAINTENANCE_WORK_MEM, insertBatch: INSERT_BATCH },
-  dims: DIMS,
-  embeddings: 'deterministic hashed bag of words, 384 dims, no model call',
+  dims: embedder.dims,
+  embeddings: `deterministic hashed bag of words, ${embedder.dims} dims, no model call`,
   queryNote: 'every query is a loopback round trip, unlike the in-process SQLite engines',
   vectorIndex: withVectorIndex ? 'hnsw (vector_cosine_ops)' : 'none: --no-vector-index, so KNN is a sequential scan',
   rows: rows.length,
@@ -291,7 +293,7 @@ const report: Record<string, unknown> = {
 
 if (!flags.includes('--no-collapse')) {
   const collapsed = collapseDuplicates(rows);
-  await rebuild(sql, 'records_collapsed', collapsed.rows, withVectorIndex);
+  await rebuild(sql, 'records_collapsed', collapsed.rows, withVectorIndex, embedder);
   const collapsedQuery = queriesFor(sql, 'records_collapsed');
   const collapsedLists: string[][] = [];
   for (const sample of queries.slice(0, 100)) {

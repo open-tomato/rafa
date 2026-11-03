@@ -56,8 +56,18 @@ export interface SampleQuery {
   vector: Float32Array;
 }
 
-/** Draws `count` queries from the rows, each a run of `terms` tokens of one row. */
-export function sampleQueries(rows: readonly ExtractRow[], count: number, seed: number, terms = 5): SampleQuery[] {
+/**
+ * Draws `count` queries from the rows, each a run of `terms` tokens of one row.
+ * `embedWith` picks the width: the 384-dimension default, or an embedder of
+ * another width from `createEmbedder`.
+ */
+export function sampleQueries(
+  rows: readonly ExtractRow[],
+  count: number,
+  seed: number,
+  terms = 5,
+  embedWith: (text: string) => Float32Array = embed,
+): SampleQuery[] {
   const rand = mulberry32(seed);
   const out: SampleQuery[] = [];
   let guard = 0;
@@ -68,7 +78,7 @@ export function sampleQueries(rows: readonly ExtractRow[], count: number, seed: 
     if (tokens.length < terms) continue;
     const start = Math.floor(rand() * (tokens.length - terms + 1));
     const text = tokens.slice(start, start + terms).join(' ');
-    out.push({ text, vector: embed(text) });
+    out.push({ text, vector: embedWith(text) });
   }
   return out;
 }
