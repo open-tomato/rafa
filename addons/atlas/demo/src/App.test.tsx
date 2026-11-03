@@ -92,7 +92,7 @@ describe('App', () => {
     renderApp(() => new Promise<LensResult>(() => undefined));
     await settle();
 
-    expect(screen.getAllByText('Loading')).toHaveLength(4);
+    expect(screen.getAllByRole('region', { name: 'Loading' })).toHaveLength(4);
   });
 
   it('asks the source again on a range switch and shows the new result set', async () => {

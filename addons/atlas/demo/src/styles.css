@@ -20,30 +20,6 @@
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* The indeterminate progress sweep (atlas-ui's Progress): the SVG fill's x. */
-  --animate-indeterminate: indeterminate 1.25s ease-out infinite;
-
-  @keyframes indeterminate {
-    from { x: -40%; }
-    to { x: 100%; }
-  }
-
-  /* The loading shimmer across a Skeleton. */
-  --animate-shimmer: shimmer 1.4s linear infinite;
-
-  @keyframes shimmer {
-    from { background-position: -400px 0; }
-    to { background-position: 400px 0; }
-  }
-
-  /* The live ring around an IconTile with `pulse`. */
-  --animate-pulse-ring: pulse-ring 2s ease-out infinite;
-
-  @keyframes pulse-ring {
-    from { transform: scale(1); opacity: 0.6; }
-    to { transform: scale(1.4); opacity: 0; }
-  }
-
   --color-surface: #fcfcfb;
   --color-plane: #f9f9f7;
   --color-ink: #0b0b0b;
@@ -84,6 +60,37 @@
   --color-pole-fail-core: #c0262a;
   --color-pole-base: #86b7f2;
   --color-pole-base-core: #3a3fb5;
+}
+
+/*
+ * Motion tokens for @open-tomato/atlas-ui, in a block of their own so the
+ * token block above stays flat: the indeterminate progress sweep, the
+ * skeleton shimmer and the live ring around an IconTile.
+ */
+@theme {
+  /* The indeterminate progress sweep (atlas-ui's Progress): the SVG fill's x. */
+  --animate-indeterminate: indeterminate 1.25s ease-out infinite;
+
+  @keyframes indeterminate {
+    from { x: -40%; }
+    to { x: 100%; }
+  }
+
+  /* The loading shimmer across a Skeleton. */
+  --animate-shimmer: shimmer 1.4s linear infinite;
+
+  @keyframes shimmer {
+    from { background-position: -400px 0; }
+    to { background-position: 400px 0; }
+  }
+
+  /* The live ring around an IconTile with `pulse`. */
+  --animate-pulse-ring: pulse-ring 2s ease-out infinite;
+
+  @keyframes pulse-ring {
+    from { transform: scale(1); opacity: 0.6; }
+    to { transform: scale(1.4); opacity: 0; }
+  }
 }
 
 :root[data-theme="dark"] {
