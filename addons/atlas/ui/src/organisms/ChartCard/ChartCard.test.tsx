@@ -112,6 +112,21 @@ describe('ChartCard', () => {
     expect(inDialog('table')).toBe(1);
   });
 
+  it('opens the maximise entry as the config says: large, the legend always on, the table behind a toggle that starts on', () => {
+    const table = { columns: ['Kind', 'Tokens'], rows: [['input', 120], ['output', 40]] };
+    const config = { ...CONFIG, maximise: { size: 'large' as const, legend: 'always' as const, table: 'toggle-on' as const } };
+    render(<ChartCard config={config} data={DATA} legend={LEGEND} table={table}>{chart}</ChartCard>);
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Maximise' }));
+    const dialog = screen.getByRole('dialog', { name: 'Tokens' });
+
+    expect(screen.getByRole('radio', { name: 'Large' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByRole('button', { name: 'Legend' })).toBeNull();
+    expect([...dialog.querySelectorAll('ul')].length).toBe(1);
+    expect(screen.getByRole('button', { name: 'Table' }).getAttribute('aria-pressed')).toBe('true');
+    expect([...dialog.querySelectorAll('table')].length).toBe(1);
+  });
+
   it('offers no Table toggle when the card has no table', () => {
     render(<ChartCard config={CONFIG} data={DATA} legend={LEGEND}>{chart}</ChartCard>);
     openMenu();

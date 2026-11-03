@@ -201,6 +201,7 @@ function ChartCardBody<T>({
       modals={registry}
       maximisable={offered('maximise')}
       maximiseExtras={maximiseExtras}
+      maximiseOptions={config.maximise}
       error={error}
       onRetry={refresh}
       span={config.span}

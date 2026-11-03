@@ -1,9 +1,13 @@
-export { DEFAULT_MAXIMISE_STRETCH, MAXIMISE_STRETCH_OPTIONS, MaximiseView } from './MaximiseView.js';
+export {
+  DEFAULT_MAXIMISE_EXTRA_MODE,
+  DEFAULT_MAXIMISE_SIZE,
+  MAXIMISE_SIZE_OPTIONS,
+  MaximiseView,
+} from './MaximiseView.js';
 export type {
   MaximiseContent,
   MaximiseContentView,
   MaximiseExtras,
-  MaximiseStretch,
   MaximiseViewProps,
 } from './MaximiseView.js';
 export {
@@ -12,3 +16,4 @@ export {
   maximiseExtrasVariants,
   maximiseViewVariants,
 } from './MaximiseView.variants.js';
+export type { MaximiseSizeVariantProps } from './MaximiseView.variants.js';

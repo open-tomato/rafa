@@ -77,6 +77,32 @@ export const modalKeySchema: z.ZodEnum<{
 }> = z.enum(MODAL_KEYS);
 export type ModalKey = z.infer<typeof modalKeySchema>;
 
+/** The maximise box sizes; `small` is the card itself, so it is not one of them. */
+export const MAXIMISE_SIZES = ['medium', 'large'] as const;
+
+/** A maximise box size: `medium` is 70% of the viewport's smaller side, `large` 90%. */
+export const maximiseSizeSchema: z.ZodEnum<{ medium: 'medium'; large: 'large' }> = z.enum(MAXIMISE_SIZES);
+export type MaximiseSize = z.infer<typeof maximiseSizeSchema>;
+
+/** How a maximise extra shows: always, behind a toggle that starts off, or behind one that starts on. */
+export const MAXIMISE_EXTRA_MODES = ['always', 'toggle', 'toggle-on'] as const;
+
+/** A maximise extra's mode. */
+export const maximiseExtraModeSchema: z.ZodEnum<{ 'always': 'always'; 'toggle': 'toggle'; 'toggle-on': 'toggle-on' }> = z.enum(MAXIMISE_EXTRA_MODES);
+export type MaximiseExtraMode = z.infer<typeof maximiseExtraModeSchema>;
+
+/** The maximise entry's setup: the box size it opens at, and how the legend and the table show. */
+export const maximiseConfigSchema: z.ZodObject<{
+  size: z.ZodOptional<typeof maximiseSizeSchema>;
+  legend: z.ZodOptional<typeof maximiseExtraModeSchema>;
+  table: z.ZodOptional<typeof maximiseExtraModeSchema>;
+}, z.core.$strip> = z.object({
+  size: maximiseSizeSchema.optional(),
+  legend: maximiseExtraModeSchema.optional(),
+  table: maximiseExtraModeSchema.optional(),
+});
+export type MaximiseConfig = z.infer<typeof maximiseConfigSchema>;
+
 /** How a legend draws its marks, and whether its entries hide series. */
 export const legendConfigSchema: z.ZodObject<{
   mark: z.ZodOptional<z.ZodEnum<{ rect: 'rect'; line: 'line' }>>;
@@ -92,7 +118,8 @@ export type LegendConfig = z.infer<typeof legendConfigSchema>;
  * chart, mode and range, plus what the card's chrome shows. `modals`
  * lists the built-in entries the menu offers (all that apply when
  * absent; `errors` is offered whenever the boundary caught); `menu`
- * relabels entries by key.
+ * relabels entries by key; `maximise` sets the box size the maximise
+ * entry opens at (medium when absent) and how its extras show.
  */
 export const cardSpecSchema: z.ZodObject<{
   id: z.ZodString;
@@ -109,6 +136,7 @@ export const cardSpecSchema: z.ZodObject<{
   animate: z.ZodOptional<z.ZodBoolean>;
   modals: z.ZodOptional<z.ZodArray<typeof modalKeySchema>>;
   menu: z.ZodOptional<z.ZodArray<typeof menuItemSchema>>;
+  maximise: z.ZodOptional<typeof maximiseConfigSchema>;
 }, z.core.$strip> = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -124,6 +152,7 @@ export const cardSpecSchema: z.ZodObject<{
   animate: z.boolean().optional(),
   modals: z.array(modalKeySchema).optional(),
   menu: z.array(menuItemSchema).optional(),
+  maximise: maximiseConfigSchema.optional(),
 });
 export type CardSpec = z.infer<typeof cardSpecSchema>;
 

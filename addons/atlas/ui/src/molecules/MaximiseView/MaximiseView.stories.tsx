@@ -47,16 +47,12 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Picks a combo in the header, once the dialog has opened. */
-async function pick(canvasElement: HTMLElement, combo: string): Promise<void> {
-  await userEvent.click(await within(canvasElement).findByRole('radio', { name: combo }));
-}
-
-/** The default combo, 80/20, with both toggles off. */
+/** The default size, medium, with both toggles off. */
 export const Default: Story = {};
-export const Combo70: Story = { play: async ({ canvasElement }) => pick(canvasElement, '70/30') };
-export const Combo80: Story = { play: async ({ canvasElement }) => pick(canvasElement, '80/20') };
-export const Combo90: Story = { play: async ({ canvasElement }) => pick(canvasElement, '90/10') };
+/** The card asked for the large box. */
+export const Large: Story = { args: { options: { size: 'large' } } };
+/** The card shows its legend always and its table behind a toggle that starts on. */
+export const AlwaysAndToggleOn: Story = { args: { options: { legend: 'always', table: 'toggle-on' } } };
 export const LegendAndTableOn: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

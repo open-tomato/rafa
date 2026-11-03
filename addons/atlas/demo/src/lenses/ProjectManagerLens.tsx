@@ -57,6 +57,7 @@ const PILE = cardSpec({
   primitive: 'Sunburst',
   span: 'two',
   note: 'the outer ring is age: the older the slice, the more drag it adds; open bugs over four weeks are the ones to look at first.',
+  maximise: { size: 'large', legend: 'always' },
 });
 
 const PLANNED_LEGEND: readonly LegendItem[] = [

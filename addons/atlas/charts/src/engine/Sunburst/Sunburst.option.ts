@@ -25,8 +25,24 @@ const INNER_RING: [number, number] = [0.25, 0.55];
 const OUTER_RING: [number, number] = [0.57, 0.9];
 /** Room left at each end of a radial label inside its ring. */
 const LABEL_PADDING = 4;
-/** Arcs under ~5% of the circle (18 degrees) carry no label; the tooltip still names them. */
-const LABEL_MIN_ANGLE = 18;
+/** The across-the-arc room a radial label needs: its line height plus a hair each side. */
+const LABEL_HEIGHT = TICK_FONT_SIZE * 1.2 + 2;
+/** No ring asks for less than this opening, however large the chart draws. */
+const LABEL_MIN_ANGLE_FLOOR = 3;
+const DEGREES_PER_RADIAN = 180 / Math.PI;
+
+/**
+ * The opening, in degrees, under which an arc of a ring carries no label
+ * (the tooltip still names it): the arc at the ring's inner edge must be as
+ * wide as the label is tall. A ring's inner edge is `inner` of the view
+ * radius, so the threshold falls as the chart grows: the slice that reads
+ * as a bare wedge in a card gets its label in the maximised view.
+ */
+export function labelMinAngle(inner: number, viewRadius: number): number {
+  const innerRadius = inner * viewRadius;
+  if (innerRadius <= 0) return LABEL_MIN_ANGLE_FLOOR;
+  return Math.max(LABEL_MIN_ANGLE_FLOOR, (LABEL_HEIGHT / innerRadius) * DEGREES_PER_RADIAN);
+}
 const PATH_SEPARATOR = ' › ';
 
 /** The ids from the root to every node, so a click can report its path. */
@@ -105,7 +121,7 @@ export function buildOption(props: SunburstProps, tokens: ResolvedTokens, width 
     label: {
       rotate: 'radial' as const,
       fontSize: TICK_FONT_SIZE,
-      minAngle: LABEL_MIN_ANGLE,
+      minAngle: labelMinAngle(inner, viewRadius),
       width: Math.max(0, (outer - inner) * viewRadius - 2 * LABEL_PADDING),
       overflow: 'truncate' as const,
     },

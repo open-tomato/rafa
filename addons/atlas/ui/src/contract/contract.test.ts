@@ -101,6 +101,15 @@ suite('the descriptor the Config modal edits', () => {
     expect(cardSpecSchema.safeParse({ ...VALID_CARD, modals: ['zoom'] }).success).toBe(false);
   });
 
+  it('parses the maximise setup and refuses a size or mode outside the lists', () => {
+    const card = { ...VALID_CARD, maximise: { size: 'large', legend: 'always', table: 'toggle-on' } };
+
+    expect(cardSpecSchema.parse(card)).toEqual(card);
+    expect(cardSpecSchema.parse({ ...VALID_CARD, maximise: {} })).toEqual({ ...VALID_CARD, maximise: {} });
+    expect(cardSpecSchema.safeParse({ ...VALID_CARD, maximise: { size: 'small' } }).success).toBe(false);
+    expect(cardSpecSchema.safeParse({ ...VALID_CARD, maximise: { legend: 'off' } }).success).toBe(false);
+  });
+
   it('lists the five built-in modal keys', () => {
     expect(modalKeySchema.options).toEqual([...MODAL_KEYS]);
   });

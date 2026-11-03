@@ -98,17 +98,25 @@ export function EChart({ option, ariaLabel, height, className, cursor, onEvents,
     // The observer reports once on `observe`, at the size `init` just read. A
     // resize then is not a change, and it would restart a running layout
     // (a force graph), so only a different size is passed on.
+    // The resize itself waits for the next frame: a layout change inside the
+    // observer's own callback is what the browser reports as a ResizeObserver
+    // loop, and a box a fraction of a pixel off can bounce that way for ever.
     let width = chart.getWidth();
     let height = chart.getHeight();
+    let frame = 0;
     const observer = new ResizeObserver(() => {
-      const next = { width: host.clientWidth, height: host.clientHeight };
-      if (next.width === width && next.height === height) return;
-      width = next.width;
-      height = next.height;
-      chart.resize();
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const next = { width: host.clientWidth, height: host.clientHeight };
+        if (next.width === width && next.height === height) return;
+        width = next.width;
+        height = next.height;
+        chart.resize();
+      });
     });
     observer.observe(host);
     return () => {
+      cancelAnimationFrame(frame);
       observer.disconnect();
       chart.dispose();
       chartRef.current = null;

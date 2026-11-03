@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { FIXED_TOKENS, seriesOf, SUNBURST_NODES, SUNBURST_TONES } from '../fixtures.js';
 
-import { buildOption, pathsById } from './Sunburst.option.js';
+import { buildOption, labelMinAngle, pathsById } from './Sunburst.option.js';
 
 const base: SunburstProps = { ariaLabel: 'Composition', nodes: SUNBURST_NODES, groupTones: SUNBURST_TONES, unit: 'lines', height: 300 };
 
@@ -29,7 +29,25 @@ describe('Sunburst option', () => {
     // The view radius is half the smaller of width and height: 150px.
     expect(inner?.label?.width).toBeCloseTo((0.55 - 0.25) * 150 - 8, 10);
     expect(outer?.label?.width).toBeCloseTo((0.9 - 0.57) * 150 - 8, 10);
-    expect(inner?.label).toMatchObject({ rotate: 'radial', minAngle: 18 });
+    expect(inner?.label).toMatchObject({ rotate: 'radial', minAngle: labelMinAngle(0.25, 150) });
+  });
+
+  it('asks a thinner opening of the outer ring than of the inner, and less of both as the chart grows', () => {
+    const [small] = seriesOf(buildOption(base, FIXED_TOKENS, 300));
+    const [large] = seriesOf(buildOption({ ...base, height: 'fill' }, FIXED_TOKENS, 700, 700));
+    const [, smallInner, smallOuter] = small?.levels as Level[];
+    const [, largeInner, largeOuter] = large?.levels as Level[];
+
+    // Inner edges at 150px: 37.5px and 85.5px; a 15.2px label needs 23.2 and 10.2 degrees.
+    expect(smallInner?.label?.minAngle).toBeCloseTo(23.2, 0);
+    expect(smallOuter?.label?.minAngle).toBeCloseTo(10.2, 0);
+    expect(largeInner?.label?.minAngle ?? 0).toBeLessThan(smallInner?.label?.minAngle ?? 0);
+    expect(largeOuter?.label?.minAngle ?? 0).toBeLessThan(smallOuter?.label?.minAngle ?? 0);
+  });
+
+  it('never asks less than the floor, nor more of an unmeasured ring than the floor', () => {
+    expect(labelMinAngle(0.57, 10_000)).toBe(3);
+    expect(labelMinAngle(0.25, 0)).toBe(3);
   });
 
   it('never gives a label a negative width before the canvas is measured', () => {

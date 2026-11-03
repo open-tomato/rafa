@@ -23,4 +23,4 @@ type Story = StoryObj<typeof meta>;
 
 export const Contained: Story = { args: { placement: 'contained' } };
 export const Page: Story = { args: { placement: 'page' } };
-export const PageFit: Story = { args: { placement: 'page', size: 'fit-80' } };
+export const PageFit: Story = { args: { placement: 'page', size: 'fit-70' } };

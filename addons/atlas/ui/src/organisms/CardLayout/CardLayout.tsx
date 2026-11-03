@@ -1,5 +1,5 @@
 import type { CardSurface } from '../../atoms/Card/Card.variants.js';
-import type { CardSpan } from '../../contract/schemas.js';
+import type { CardSpan, MaximiseConfig } from '../../contract/schemas.js';
 
 import { DEFAULT_CHART_HEIGHT, type ChartHeight } from '@open-tomato/charts';
 import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from 'react';
@@ -52,8 +52,10 @@ export interface CardLayoutProps {
   readonly modals?: Readonly<Record<string, ModalEntry>>;
   /** Adds the `maximise` entry: the content re-rendered to fill a square page dialog (`MaximiseView`). */
   readonly maximisable?: boolean;
-  /** What the maximise entry offers under the chart, each behind a toggle: the legend, the source table. */
+  /** What the maximise entry offers beside the chart: the legend, the source table. */
   readonly maximiseExtras?: MaximiseExtras;
+  /** The card's maximise setup: the box size it opens at and how each extra shows. */
+  readonly maximiseOptions?: MaximiseConfig;
   /** An error from outside the boundary (the data layer); it lists the Errors entry too. */
   readonly error?: Error | null;
   /** Told when the reader picks Try again, after the layout cleared what its boundary caught. */
@@ -102,8 +104,8 @@ function OpenModal({ modal, card }: { readonly modal: ResolvedModal; readonly ca
  * gains the `errors` entry, whose Try again clears the error and renders
  * the content again. `maximisable` adds the `maximise` entry: a
  * `MaximiseView` titled by the card, the content filling its square box,
- * and `maximiseExtras` behind its toggles. The menu lists every entry with
- * its label and lucide icon.
+ * `maximiseExtras` beside it as `maximiseOptions` says. The menu lists
+ * every entry with its label and lucide icon.
  */
 export function CardLayout({
   title,
@@ -114,6 +116,7 @@ export function CardLayout({
   modals,
   maximisable = false,
   maximiseExtras,
+  maximiseOptions,
   error = null,
   onRetry,
   onError,
@@ -145,7 +148,7 @@ export function CardLayout({
         maximise: {
           chrome: false,
           render: ({ close, card }) => (
-            <MaximiseView title={card.title} onClose={close} legend={maximiseExtras?.legend} table={maximiseExtras?.table}>
+            <MaximiseView title={card.title} onClose={close} legend={maximiseExtras?.legend} table={maximiseExtras?.table} options={maximiseOptions}>
               {({ height }) => (
                 <CardBoundary onError={onCaught} resetKey={attempt}>
                   <ContentSlot content={content} view={{ maximised: true, height }} />
@@ -160,7 +163,7 @@ export function CardLayout({
       ? {}
       : { errors: ownErrors ?? <ErrorsView error={shownError} onRetry={retry} /> };
     return resolveModals({ ...rest, ...maximise, ...errors }, title);
-  }, [modals, maximisable, maximiseExtras, shownError, title, retry, onCaught, attempt, content]);
+  }, [modals, maximisable, maximiseExtras, maximiseOptions, shownError, title, retry, onCaught, attempt, content]);
 
   const card: CardHandle = {
     title,

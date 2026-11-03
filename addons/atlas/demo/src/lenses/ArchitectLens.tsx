@@ -48,6 +48,7 @@ const DONUT = cardSpec({
   title: 'Minutes by change kind',
   subtitle: 'last 12 weeks, with the previous 12 on the inner ring',
   primitive: 'Donut',
+  maximise: { table: 'toggle-on' },
 });
 
 const QUANTILES = cardSpec({

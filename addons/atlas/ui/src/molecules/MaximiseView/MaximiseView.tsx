@@ -1,4 +1,5 @@
 import type { DialogFitSize } from '../../atoms/Dialog/Dialog.variants.js';
+import type { MaximiseConfig, MaximiseExtraMode, MaximiseSize } from '../../contract/schemas.js';
 import type { ChartHeight } from '@open-tomato/charts';
 
 import { useState, type ReactElement, type ReactNode } from 'react';
@@ -14,21 +15,20 @@ import {
   maximiseViewVariants,
 } from './MaximiseView.variants.js';
 
-/** How much of the viewport's smaller side the box takes, in percent; the rest is the clearance. */
-export type MaximiseStretch = '70' | '80' | '90';
+/** The box size the view opens at when the card names none: medium. */
+export const DEFAULT_MAXIMISE_SIZE: MaximiseSize = 'medium';
 
-/** The box size the view opens at: 80/20. */
-export const DEFAULT_MAXIMISE_STRETCH: MaximiseStretch = '80';
+/** How an extra shows when the card names no mode: behind a toggle that starts off. */
+export const DEFAULT_MAXIMISE_EXTRA_MODE: MaximiseExtraMode = 'toggle';
 
-/** The three combos, labelled stretch/clearance. */
-export const MAXIMISE_STRETCH_OPTIONS: readonly SegmentedOption<MaximiseStretch>[] = [
-  { value: '70', label: '70/30' },
-  { value: '80', label: '80/20' },
-  { value: '90', label: '90/10' },
+/** The two box sizes in the header's picker; the card itself is the small one. */
+export const MAXIMISE_SIZE_OPTIONS: readonly SegmentedOption<MaximiseSize>[] = [
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
 ];
 
-/** The dialog size for a stretch. */
-const FIT_SIZE: Readonly<Record<MaximiseStretch, DialogFitSize>> = { 70: 'fit-70', 80: 'fit-80', 90: 'fit-90' };
+/** The dialog size for a box size: medium keeps 30% of the smaller side clear, large 10%. */
+const FIT_SIZE: Readonly<Record<MaximiseSize, DialogFitSize>> = { medium: 'fit-70', large: 'fit-90' };
 
 /** What the view tells the content it renders: fill the box. */
 export interface MaximiseContentView {
@@ -38,7 +38,7 @@ export interface MaximiseContentView {
 /** The view's content: a node, or a function of the view (the chart, told to fill the box). */
 export type MaximiseContent = ReactNode | ((view: MaximiseContentView) => ReactNode);
 
-/** What a card offers under the maximised chart, each behind a toggle; absent leaves the toggle out. */
+/** What a card offers beside the maximised chart; absent leaves the extra and its toggle out. */
 export interface MaximiseExtras {
   /** The card's legend. */
   readonly legend?: ReactNode;
@@ -46,56 +46,71 @@ export interface MaximiseExtras {
   readonly table?: ReactNode;
 }
 
-/** A maximise view's props: the card's title, the close handler, the content and its extras. */
+/** A maximise view's props: the card's title, the close handler, the content, its extras and the card's setup. */
 export interface MaximiseViewProps extends MaximiseExtras {
   /** The dialog's title: the card's title. */
   readonly title: string;
   /** Called on Close and on Escape. */
   readonly onClose: () => void;
   readonly children: MaximiseContent;
+  /** The card's maximise setup: the size it opens at and how each extra shows; every field defaults. */
+  readonly options?: MaximiseConfig;
   /** Layout context from the parent; never colour or size. */
   readonly className?: string;
 }
 
 const FILL: MaximiseContentView = { height: 'fill' };
 
+/** True when an extra was given. */
+function given(extra: ReactNode): boolean {
+  return extra !== undefined && extra !== null && extra !== false;
+}
+
+/** One extra's state from its mode: shown at first, and whether a toggle is offered. */
+function useExtra(extra: ReactNode, mode: MaximiseExtraMode): { shown: boolean; toggle: (() => void) | null } {
+  const [on, setOn] = useState(mode === 'toggle-on');
+  if (!given(extra)) return { shown: false, toggle: null };
+  if (mode === 'always') return { shown: true, toggle: null };
+  return { shown: on, toggle: () => setOn((current) => !current) };
+}
+
 /**
- * A card at full size: a square page dialog of 70, 80 or 90 percent of the
- * viewport's smaller side (80 by default, picked in the header), with the
- * content filling the box under the header. The Legend and Table toggles
- * beside the picker, off by default, add the card's legend and source
- * table under the chart; the box then scrolls. A toggle is left out when
- * the card has nothing for it. Escape and Close call `onClose`.
+ * A card at full size: a page dialog whose chart box is a square of the
+ * viewport's smaller side, medium (70%) or large (90%), opening at the
+ * size the card's setup names (medium when it names none) and switched in
+ * the header. The content fills the box. The card's legend and source
+ * table show beside the box on a landscape viewport and under it on a
+ * portrait one, each as its mode says: always, behind a toggle that
+ * starts off (the default), or behind one that starts on; the dialog grows
+ * that way up to the clearance, then that pane scrolls. An extra the card
+ * does not have is left out with its toggle. Escape and Close call
+ * `onClose`.
  */
-export function MaximiseView({ title, onClose, children, legend, table, className }: MaximiseViewProps): ReactElement {
-  const [stretch, setStretch] = useState<MaximiseStretch>(DEFAULT_MAXIMISE_STRETCH);
-  const [legendShown, setLegendShown] = useState(false);
-  const [tableShown, setTableShown] = useState(false);
-  const hasLegend = legend !== undefined && legend !== null && legend !== false;
-  const hasTable = table !== undefined && table !== null && table !== false;
-  const showLegend = hasLegend && legendShown;
-  const showTable = hasTable && tableShown;
+export function MaximiseView({ title, onClose, children, legend, table, options, className }: MaximiseViewProps): ReactElement {
+  const [size, setSize] = useState<MaximiseSize>(options?.size ?? DEFAULT_MAXIMISE_SIZE);
+  const legendState = useExtra(legend, options?.legend ?? DEFAULT_MAXIMISE_EXTRA_MODE);
+  const tableState = useExtra(table, options?.table ?? DEFAULT_MAXIMISE_EXTRA_MODE);
 
   const controls = (
     <div className={maximiseControlsVariants()}>
-      <Segmented value={stretch} options={MAXIMISE_STRETCH_OPTIONS} onChange={setStretch} label="Box size: stretch and clearance" size="sm" />
-      {hasLegend && <Button variant="text" aria-pressed={legendShown} onClick={() => setLegendShown((shown) => !shown)}>Legend</Button>}
-      {hasTable && <Button variant="text" aria-pressed={tableShown} onClick={() => setTableShown((shown) => !shown)}>Table</Button>}
+      <Segmented value={size} options={MAXIMISE_SIZE_OPTIONS} onChange={setSize} label="Box size" size="sm" />
+      {legendState.toggle && <Button variant="text" aria-pressed={legendState.shown} onClick={legendState.toggle}>Legend</Button>}
+      {tableState.toggle && <Button variant="text" aria-pressed={tableState.shown} onClick={tableState.toggle}>Table</Button>}
     </div>
   );
 
   return (
-    <CardModal title={title} onClose={onClose} placement="page" size={FIT_SIZE[stretch]} actions={controls} className={className}>
+    <CardModal title={title} onClose={onClose} placement="page" size={FIT_SIZE[size]} actions={controls} className={className}>
       <div className={maximiseViewVariants()}>
-        <div className={maximiseChartVariants()}>
+        <div className={maximiseChartVariants({ size })}>
           {typeof children === 'function'
             ? children(FILL)
             : children}
         </div>
-        {(showLegend || showTable) && (
-          <div className={maximiseExtrasVariants()}>
-            {showLegend && legend}
-            {showTable && table}
+        {(legendState.shown || tableState.shown) && (
+          <div className={maximiseExtrasVariants({ size })}>
+            {legendState.shown && legend}
+            {tableState.shown && table}
           </div>
         )}
       </div>

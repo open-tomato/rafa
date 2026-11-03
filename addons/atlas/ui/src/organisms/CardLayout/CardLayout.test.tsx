@@ -168,13 +168,13 @@ describe('CardLayout', () => {
     expect(screen.getByText('small chart')).toBeDefined();
   });
 
-  it('opens the maximise entry as an 80/20 square with the extras behind toggles', () => {
+  it('opens the maximise entry at the medium size with the extras behind toggles', () => {
     render(<CardLayout title="Tokens" maximisable maximiseExtras={{ table: <p>the table</p> }} content={({ height }) => <p>{`height=${String(height)}`}</p>} />);
     openMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Maximise' }));
     const dialog = screen.getByRole('dialog', { name: 'Tokens' });
 
-    expect(dialog.className).toContain('w-[80vmin]');
+    expect(dialog.className).toContain('max-w-[calc(100vw-30vmin)]');
     expect(dialog.textContent).toContain('height=fill');
     expect(screen.getByText('height=220')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Legend' })).toBeNull();

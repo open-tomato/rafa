@@ -19,6 +19,12 @@ describe('Gauge option', () => {
     expect(series[0]).toMatchObject({ min: 0, max: 12 });
   });
 
+  it('centres the drawn arc, not the full circle: the centre sits 15% of the height below the middle', () => {
+    const [main] = seriesOf(buildOption(base, FIXED_TOKENS));
+
+    expect((main as { center?: [string, string] }).center).toEqual(['50%', '65.1%']);
+  });
+
   it('fills in the first series tone below the thresholds', () => {
     expect(fillOf({ ...base, thresholds: { warning: 0.7, critical: 0.9 } })).toBe(FIXED_TOKENS['series-1']);
   });

@@ -34,7 +34,7 @@ describe('CardModal', () => {
     render(<CardModal title="Full size" placement="page" size="fit-70" actions={<button type="button">Legend</button>} onClose={() => undefined}>chart</CardModal>);
     const dialog = screen.getByRole('dialog', { name: 'Full size' });
 
-    expect(dialog.className).toContain('w-[70vmin]');
+    expect(dialog.className).toContain('max-w-[calc(100vw-30vmin)]');
     expect(screen.getByRole('button', { name: 'Legend' })).toBeDefined();
   });
 });

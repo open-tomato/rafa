@@ -65,15 +65,19 @@ needs its own menu label. Built-in keys: `info`, `source`, `config`, `errors`
 `WidgetCard`, `DashboardCard`, `ReportCard`) are compositions of the same
 layers; a snapshot renders with `renderToStaticMarkup` and has no menu.
 
-The `maximise` entry renders the `MaximiseView` molecule: a square page
-dialog (`Dialog` size `fit-70`, `fit-80` or `fit-90`, a square of that
-share of the viewport's smaller side) picked in its header, 80/20 by
-default. The content fills the box: `ChartCard`'s child receives
-`{ data, hidden, animate, maximised, height }`, with `height` set to
-`'fill'` there and to the charts' default 220px in the card, which a child
-with a base height of its own ignores. Beside the picker, the Legend and
-Table toggles (off by default, left out when the card has none) add the
-card's legend and its source table under the chart, and the box scrolls.
+The `maximise` entry renders the `MaximiseView` molecule: a page dialog
+whose chart box is a square of the viewport's smaller side, medium (70%,
+`Dialog` size `fit-70`) or large (90%, `fit-90`), switched in its header;
+the card itself is the small size. The box opens at the size the spec's
+`maximise.size` names, medium when absent. The content fills the box:
+`ChartCard`'s child receives `{ data, hidden, animate, maximised, height }`,
+with `height` set to `'fill'` there and to the charts' default 220px in the
+card, which a child with a base height of its own ignores. The card's
+legend and source table (left out when the card has none) stand beside
+the box on a landscape viewport and under it on a portrait one, each as
+`maximise.legend` and `maximise.table` say: `always`, `toggle` (a header
+toggle, off at first; the default) or `toggle-on`. The dialog grows for
+them up to its clearance, then that pane scrolls.
 
 The spec layer is `CardSpecProvider` over the contract's `CardSpec` type,
 read with `useCardSpec()`; `DashboardData` and `CardData` keep their

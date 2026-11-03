@@ -12,8 +12,19 @@ import {
 /** A 220 degree arc, open at the bottom. */
 const START_ANGLE = 200;
 const END_ANGLE = -20;
-const CENTER: [string, string] = ['50%', '58%'];
-const RADIUS = '92%';
+/** The arc's radius as a share of the canvas's smaller side, halved. */
+const RADIUS_SHARE = 0.92;
+const RADIUS = `${RADIUS_SHARE * 100}%`;
+/**
+ * The arc's centre sits below the canvas's middle so the drawn arc, not
+ * the full circle, is centred: the arc reaches one radius up and only
+ * sin(20°) of a radius down, so its middle is (1 - sin 20°) / 2 of a radius
+ * above its centre, 0.329 r; with r = 0.46 of the height that is 15.1% of
+ * the height when the canvas is as wide as it is tall or wider (a card, the
+ * maximised box).
+ */
+const CENTER_Y_SHARE = 0.5 + (RADIUS_SHARE / 2) * (1 - Math.sin((20 * Math.PI) / 180)) / 2;
+const CENTER: [string, string] = ['50%', `${Math.round(CENTER_Y_SHARE * 1000) / 10}%`];
 const ARC_WIDTH = 12;
 /** The compare reading: a thin arc inside the main one, clear of the centre text. */
 const COMPARE_RADIUS = '76%';

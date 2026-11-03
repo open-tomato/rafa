@@ -11,30 +11,55 @@ function box(): HTMLElement {
   return screen.getByRole('dialog', { name: 'Tokens' });
 }
 
+/** The chart's box: the element around the content. */
+function chartBox(): HTMLElement {
+  const content = screen.getByText(/^chart/);
+  const parent = content.parentElement;
+  if (parent === null) throw new Error('the content has no box');
+  return parent;
+}
+
 describe('MaximiseView', () => {
-  it('opens an 80/20 square titled by the card, the content told to fill it', () => {
+  it('opens medium: a square chart box of 70% of the viewport\'s smaller side less the chrome, the content told to fill it', () => {
     render(<MaximiseView title="Tokens" onClose={() => undefined}>{({ height }) => <p>chart height={height}</p>}</MaximiseView>);
 
     expect(box().tagName).toBe('DIALOG');
-    expect(box().className).toContain('w-[80vmin]');
-    expect(screen.getByRole('radio', { name: '80/20' }).getAttribute('aria-checked')).toBe('true');
+    expect(box().className).toContain('max-w-[calc(100vw-30vmin)]');
+    expect(chartBox().className).toContain('size-[calc(70vmin-5rem)]');
+    expect(chartBox().className).toContain('overflow-hidden');
+    expect(screen.getByRole('radio', { name: 'Medium' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByText('chart height=fill')).toBeDefined();
   });
 
-  it('resizes the box when another combo is picked', () => {
-    render(<MaximiseView title="Tokens" onClose={() => undefined}>chart</MaximiseView>);
-    fireEvent.click(screen.getByRole('radio', { name: '70/30' }));
+  it('opens at the size the card names, and switches from the picker', () => {
+    render(<MaximiseView title="Tokens" onClose={() => undefined} options={{ size: 'large' }}><p>chart</p></MaximiseView>);
 
-    expect(box().className).toContain('h-[70vmin]');
-    expect(box().className).not.toContain('80vmin');
-    fireEvent.click(screen.getByRole('radio', { name: '90/10' }));
-    expect(box().className).toContain('w-[90vmin]');
+    expect(chartBox().className).toContain('size-[calc(90vmin-5rem)]');
+    expect(box().className).toContain('max-h-[calc(100vh-10vmin)]');
+    fireEvent.click(screen.getByRole('radio', { name: 'Medium' }));
+    expect(chartBox().className).toContain('size-[calc(70vmin-5rem)]');
+    expect(chartBox().className).not.toContain('90vmin');
+    expect(box().className).toContain('max-w-[calc(100vw-30vmin)]');
   });
 
-  it('names the combo control for assistive technology', () => {
+  it('stands the extras beside the box on a landscape viewport, as tall as the box, and under it on a portrait one', () => {
+    render(<MaximiseView title="Tokens" onClose={() => undefined} legend={LEGEND} table={TABLE}><p>chart</p></MaximiseView>);
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    const extras = screen.getByRole('table', { name: 'Tokens' }).parentElement;
+    const view = chartBox().parentElement;
+
+    expect(view?.className).toContain('landscape:flex-row');
+    expect(view?.className).toContain('flex-col');
+    expect(extras?.className).toContain('landscape:h-[calc(70vmin-5rem)]');
+    expect(extras?.className).toContain('landscape:overflow-auto');
+    expect(extras?.className).toContain('landscape:shrink');
+    expect(extras?.className).toContain('[scrollbar-width:thin]');
+  });
+
+  it('names the size control for assistive technology', () => {
     render(<MaximiseView title="Tokens" onClose={() => undefined}>chart</MaximiseView>);
 
-    expect(screen.getByRole('radiogroup', { name: 'Box size: stretch and clearance' })).toBeDefined();
+    expect(screen.getByRole('radiogroup', { name: 'Box size' })).toBeDefined();
   });
 
   it('shows and hides the legend and the table from their toggles, both off at first', () => {
@@ -57,11 +82,24 @@ describe('MaximiseView', () => {
     expect(screen.getByRole('table', { name: 'Tokens' })).toBeDefined();
   });
 
-  it('leaves out the toggle of an extra the card does not have', () => {
-    render(<MaximiseView title="Tokens" onClose={() => undefined} legend={LEGEND}>chart</MaximiseView>);
+  it('shows an always extra without a toggle, and starts a toggle-on extra shown', () => {
+    render(<MaximiseView title="Tokens" onClose={() => undefined} legend={LEGEND} table={TABLE} options={{ legend: 'always', table: 'toggle-on' }}>chart</MaximiseView>);
+
+    expect(screen.queryByRole('button', { name: 'Legend' })).toBeNull();
+    expect(screen.getByRole('list', { name: 'Legend' })).toBeDefined();
+    const tableToggle = screen.getByRole('button', { name: 'Table' });
+    expect(tableToggle.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('table', { name: 'Tokens' })).toBeDefined();
+    fireEvent.click(tableToggle);
+    expect(screen.queryByRole('table', { name: 'Tokens' })).toBeNull();
+  });
+
+  it('leaves out an extra the card does not have, whatever its mode', () => {
+    render(<MaximiseView title="Tokens" onClose={() => undefined} legend={LEGEND} options={{ table: 'always' }}>chart</MaximiseView>);
 
     expect(screen.getByRole('button', { name: 'Legend' })).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Table' })).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('calls onClose from Close', () => {

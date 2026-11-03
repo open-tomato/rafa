@@ -27,14 +27,21 @@ describe('Dialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('draws a fit size as a square of the viewport\'s smaller side, with no cap', () => {
-    render(<Dialog open title="Indices" size="fit-80" onClose={() => undefined} />);
+  it('sizes a fit dialog by its content, capped at the clearance on both sides', () => {
+    render(<Dialog open title="Indices" size="fit-70" onClose={() => undefined} />);
     const dialog = screen.getByRole('dialog', { name: 'Indices' });
 
-    expect(dialog.className).toContain('w-[80vmin]');
-    expect(dialog.className).toContain('h-[80vmin]');
-    expect(dialog.className).toContain('max-w-none');
-    expect(dialog.className).not.toContain('max-h-[calc');
+    expect(dialog.className).toContain('w-fit');
+    expect(dialog.className).toContain('max-w-[calc(100vw-30vmin)]');
+    expect(dialog.className).toContain('max-h-[calc(100vh-30vmin)]');
+    expect(dialog.className).not.toContain('vmin]');
+  });
+
+  it('scrolls its body on a thin scrollbar in the baseline tone', () => {
+    render(<Dialog open title="Indices" onClose={() => undefined}><p>body</p></Dialog>);
+
+    expect(screen.getByText('body').parentElement?.className).toContain('[scrollbar-width:thin]');
+    expect(screen.getByText('body').parentElement?.className).toContain('var(--color-baseline)');
   });
 
   it('puts its actions in the header, before Close', () => {
