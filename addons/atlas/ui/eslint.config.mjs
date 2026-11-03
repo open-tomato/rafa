@@ -17,6 +17,11 @@ export default [
   ...baseConfig,
   ...reactConfig,
   {
+    // Story fixtures are story code: a layout class on a demo tile is the point.
+    files: ['src/stories/**'],
+    rules: { 'ot/cva-only-classname': 'off' },
+  },
+  {
     // `@open-tomato/charts` exports its built dist/, and this package reads
     // its source through tsconfig `paths`, which the import resolver does
     // not follow. `tsc --build` holds those imports; the lint skips them.

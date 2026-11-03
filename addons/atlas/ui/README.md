@@ -95,7 +95,10 @@ form over the spec's descriptor.
   `cn(xVariants({ tone, size }), className)`, with `cn` from
   `@open-tomato/charts` (clsx plus tailwind-merge, so the later class wins
   a conflict).
-- No inline `style`, and no class string written on an element. The lint
+- No inline `style`, and no class string written on an element. The one
+  exception is a measured number the browser hands back or a column's
+  own width (a tip's coordinates, a `<col>` track, a body height cap, a
+  clamp's line count), set at the site with a comment saying so. The lint
   rule `ot/cva-only-classname` (in `@open-tomato/rafa-eslint-config/react`)
   allows a `className` value only as a variants call, a `cn(...)` over
   variants calls and the passthrough, or the passthrough alone. Files under
