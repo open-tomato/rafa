@@ -3,7 +3,7 @@
  * `pgvector` for the vectors, fused by reciprocal rank in SQL.
  *
  * Usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=200]
- *                               [--terms=5] [--url=<postgres url>] [--dims=384]
+ *                               [--terms=5] [--url=<postgres url>] [--dims=384] [--halfvec]
  *                               [--no-vector-index] [--no-collapse]
  *
  * The same extract, the same deterministic pseudo-embeddings and the same
@@ -29,6 +29,8 @@ import {
 } from './common.js';
 
 const RRF_K = 60;
+/** The column type: `halfvec` stores 2 bytes a dimension instead of 4. */
+const VECTOR_TYPE = process.argv.includes('--halfvec') ? 'halfvec' : 'vector';
 const TOP_K = 10;
 const INSERT_BATCH = 400;
 const MAINTENANCE_WORK_MEM = '1GB';
@@ -63,7 +65,7 @@ function placeholders(count: number): string {
   for (let row = 0; row < count; row++) {
     const base = row * COLUMNS.length;
     const slots = COLUMNS.map((_, column) => `$${base + column + 1}`);
-    slots[COLUMNS.length - 1] = `${slots[COLUMNS.length - 1]}::vector`;
+    slots[COLUMNS.length - 1] = `${slots[COLUMNS.length - 1]}::${VECTOR_TYPE}`;
     tuples.push(`(${slots.join(', ')})`);
   }
   return tuples.join(', ');
@@ -86,7 +88,7 @@ async function rebuild(
       derived text not null,
       ts text not null,
       text text not null,
-      embedding vector(${embedder.dims}) not null
+      embedding ${VECTOR_TYPE}(${embedder.dims}) not null
     )`);
 
   const insert = await timed(async () => {
@@ -122,7 +124,7 @@ async function rebuild(
   let hnswMs: number | null = null;
   if (withVectorIndex) {
     const hnsw = await timed(() =>
-      sql.unsafe(`create index ${table}_hnsw on ${table} using hnsw (embedding vector_cosine_ops)`),
+      sql.unsafe(`create index ${table}_hnsw on ${table} using hnsw (embedding ${VECTOR_TYPE}_cosine_ops)`),
     );
     hnswMs = hnsw.ms;
   }
@@ -184,7 +186,7 @@ function queriesFor(sql: SQL, table: string): Queries {
     knn: async (vector) =>
       ids(
         await sql.unsafe(
-          `select id from ${table} order by embedding <=> $1::vector limit ${TOP_K}`,
+          `select id from ${table} order by embedding <=> $1::${VECTOR_TYPE} limit ${TOP_K}`,
           [vector],
         ),
       ),
@@ -198,7 +200,7 @@ function queriesFor(sql: SQL, table: string): Queries {
                ) ranked
              ), vec_matches as (
                select rowid, row_number() over () as rank from (
-                 select rowid from ${table} order by embedding <=> $2::vector limit ${TOP_K * 4}
+                 select rowid from ${table} order by embedding <=> $2::${VECTOR_TYPE} limit ${TOP_K * 4}
                ) ranked
              ), fused as (
                select rowid, sum(score) as score from (
@@ -226,7 +228,7 @@ const flagValue = (name: string): string | undefined => {
 const extractPath = positional[0];
 if (extractPath === undefined) {
   console.error(
-    'usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--terms=<n>] [--url=<postgres url>] [--dims=<n>] [--no-vector-index] [--no-collapse]',
+    'usage: bun engine-postgres.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--terms=<n>] [--url=<postgres url>] [--dims=<n>] [--halfvec] [--reuse] [--no-vector-index] [--no-collapse]',
   );
   process.exit(2);
 }
@@ -247,7 +249,12 @@ const versions = (await sql.unsafe(
 )) as Array<{ pg: string; pg_search: string; vector: string }>;
 
 const rows = await readExtract(extractPath);
-const built = await rebuild(sql, 'records', rows, withVectorIndex, embedder);
+// --reuse measures queries against tables an earlier run built, so a restart of
+// the server in between shows which pages the queries alone pull into memory.
+const reuse = flags.includes('--reuse');
+const built: RebuildCost = reuse
+  ? { totalMs: 0, insertMs: 0, bm25Ms: 0, hnswMs: null }
+  : await rebuild(sql, 'records', rows, withVectorIndex, embedder);
 const reportedSizes = await sizes(sql, 'records', withVectorIndex);
 const query = queriesFor(sql, 'records');
 
@@ -278,7 +285,8 @@ const report: Record<string, unknown> = {
   dims: embedder.dims,
   embeddings: `deterministic hashed bag of words, ${embedder.dims} dims, no model call`,
   queryNote: 'every query is a loopback round trip, unlike the in-process SQLite engines',
-  vectorIndex: withVectorIndex ? 'hnsw (vector_cosine_ops)' : 'none: --no-vector-index, so KNN is a sequential scan',
+  vectorType: VECTOR_TYPE,
+  vectorIndex: withVectorIndex ? `hnsw (${VECTOR_TYPE}_cosine_ops)` : 'none: --no-vector-index, so KNN is a sequential scan',
   rows: rows.length,
   queryTerms: terms,
   rebuild: built,
@@ -291,7 +299,7 @@ const report: Record<string, unknown> = {
   },
 };
 
-if (!flags.includes('--no-collapse')) {
+if (!flags.includes('--no-collapse') && !reuse) {
   const collapsed = collapseDuplicates(rows);
   await rebuild(sql, 'records_collapsed', collapsed.rows, withVectorIndex, embedder);
   const collapsedQuery = queriesFor(sql, 'records_collapsed');

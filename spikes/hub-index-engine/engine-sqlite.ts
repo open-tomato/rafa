@@ -22,7 +22,7 @@ import { statSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DIMS, embed } from './embed.js';
+import { DIMS, createEmbedder } from './embed.js';
 import {
   type ExtractRow,
   collapseDuplicates,
@@ -157,7 +157,7 @@ async function rebuild(
       text text not null
     );`);
 
-  const vectors = rows.map((row) => embed(row.text));
+  const vectors = rows.map((row) => embedder.embed(row.text));
 
   const insert = db.prepare('insert into records (rowid, id, tbl, kind, derived, ts, text) values (?, ?, ?, ?, ?, ?, ?)');
   const insertAll = db.transaction((batch: readonly ExtractRow[]) => {
@@ -175,7 +175,7 @@ async function rebuild(
   let vecMs: number | null = null;
   if (withVectors) {
     const vec = await timed(() => {
-      db.exec(`create virtual table records_vec using vec0(rowid integer primary key, embedding float[${DIMS}]);`);
+      db.exec(`create virtual table records_vec using vec0(rowid integer primary key, embedding float[${embedder.dims}]);`);
       const insertVec = db.prepare('insert into records_vec (rowid, embedding) values (?, ?)');
       const insertVectors = db.transaction(() => {
         vectors.forEach((vector, index) => {
@@ -207,6 +207,8 @@ const flagValue = (name: string): string | undefined => {
   return hit?.slice(name.length + 3);
 };
 const customSqlite = flagValue('custom-sqlite');
+/** The vector width, 384 unless `--dims` says otherwise. */
+const embedder = createEmbedder(Number(flagValue('dims') ?? DIMS));
 
 // The child process of one probe mode: one attempt, as JSON, nothing else.
 const mode = flagValue('mode');
@@ -218,7 +220,7 @@ if (mode === 'plain' || mode === 'custom') {
 const extractPath = positional[0];
 const probeOnly = flags.includes('--probe-only') || positional[0] === 'probe';
 if (extractPath === undefined && !probeOnly) {
-  console.error('usage: bun engine-sqlite.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--custom-sqlite=<path>] [--probe-only]');
+  console.error('usage: bun engine-sqlite.ts <extract.jsonl> [--out=<json>] [--queries=<n>] [--dims=<n>] [--custom-sqlite=<path>] [--probe-only]');
   process.exit(2);
 }
 const queryCount = Number(flagValue('queries') ?? 200);
@@ -235,8 +237,8 @@ const report: Record<string, unknown> = {
   bun: Bun.version,
   platform: `${process.platform}-${process.arch}`,
   extension: { vectorsWork, needsCustomSqlite: needsCustom, attempts },
-  dims: DIMS,
-  embeddings: 'deterministic hashed bag of words, 384 dims, no model call',
+  dims: embedder.dims,
+  embeddings: `deterministic hashed bag of words, ${embedder.dims} dims, no model call`,
 };
 
 if (probeOnly || extractPath === undefined) {
@@ -252,7 +254,7 @@ const dbPath = join(tmpdir(), `spike-sqlite-${rows.length}.db`);
 const built = await rebuild(dbPath, rows, vectorsWork, vecSqlite);
 const { db } = built;
 
-const queries = sampleQueries(rows, queryCount, 11, terms);
+const queries = sampleQueries(rows, queryCount, 11, terms, embedder.embed);
 
 /** Top-k row ids by bm25. */
 const ftsTop = db.prepare<{ id: string }, [string]>(
@@ -375,6 +377,7 @@ report.query = {
   hybrid: vectorsWork ? percentiles(hybridMs) : 'not measured: extension did not load',
 };
 report.sizeBytes = { total: totalBytes, db: sizeOf(''), wal: sizeOf('-wal') };
+report.rssMb = Math.round(process.memoryUsage().rss / 1048576);
 report.hubness = {
   before: hubness(hubLists),
   afterCollapse: hubness(collapsedLists),
