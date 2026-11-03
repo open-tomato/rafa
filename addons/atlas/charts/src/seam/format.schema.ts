@@ -37,11 +37,13 @@ export const valueFormatSchema: z.ZodType<ValueFormat> = z.discriminatedUnion('k
   z.object({ kind: z.literal('raw'), digits }),
   z.object({ kind: z.literal('number'), digits, grouping: z.boolean().optional() }),
   z.object({ kind: z.literal('compact') }),
-  z.object({ kind: z.literal('percent'), digits, of: z.enum(PERCENT_BASES).optional() }),
-  z.object({ kind: z.literal('money'), currency: currency.optional(), digits }),
+  z.object({ kind: z.literal('percent'), digits, of: z.enum(PERCENT_BASES).optional(), signed: z.boolean().optional() }),
+  z.object({ kind: z.literal('money'), currency: currency.optional(), digits, compact: z.boolean().optional() }),
   z.object({ kind: z.literal('unit'), unit: z.string().min(1), position: z.enum(UNIT_POSITIONS).optional() }),
   z.object({ kind: z.literal('duration'), from: z.enum(DURATION_UNITS) }),
+  z.object({ kind: z.literal('elapsed'), from: z.enum(DURATION_UNITS) }),
   z.object({ kind: z.literal('date'), pattern: z.enum(DATE_PATTERNS) }),
+  z.object({ kind: z.literal('relative') }),
   z.object({ kind: z.literal('custom'), id: z.string().min(1) }),
 ]);
 
@@ -55,4 +57,5 @@ export const formatContextSchema: z.ZodType<FormatContext> = z.object({
     z.string(),
     z.custom<ValueFormatter>((value) => typeof value === 'function', 'a custom formatter is a function'),
   ).optional(),
+  now: z.number().optional(),
 });

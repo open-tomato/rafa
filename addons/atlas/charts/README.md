@@ -94,8 +94,10 @@ track and text. `renderToSvg` takes an explicit size, so a headless
 
 Every primitive takes `valueFormat`, a `(value: number) => string`. A
 `ValueFormat` is the same choice as data, which a spec or a data point can
-carry: `raw`, `number`, `compact`, `percent`, `money`, `unit`, `duration`,
-`date` or `custom`. `formatterFor(format, context)` turns one into the
+carry: `raw`, `number`, `compact`, `percent` (`signed` for "+12%"),
+`money` (`compact` for "$1.2K"), `unit`, `duration` ("1.5 h"), `elapsed`
+("1h 3m 10s"), `date`, `relative` ("2 days ago", against the context's
+`now` or the clock) or `custom`. `formatterFor(format, context)` turns one into the
 function, over a `FormatContext` of locale, currency and custom formatters
 (defaults `en-GB`, `USD`, `UTC`). A `custom` format names a formatter the
 context registers by id, and an id the context lacks throws when the
@@ -119,6 +121,10 @@ return <LineChart ariaLabel="Spend per day" series={series} valueFormat={valueFo
   the spec's, and the context fills what both leave out. A `unit` follows
   a bare number (`raw`, `number`, `compact`); the other kinds write their
   own unit and drop it.
+- `formatElapsed(seconds)` writes a count of seconds as "1h 3m 10s", zero
+  units left out; `formatRelative(value, now, locale)` climbs a ladder
+  from a clock time on the same UTC day through "6 hours ago",
+  "yesterday", "last week" and "2 months ago", mirrored for the future.
 - Dates are UTC everywhere: `formatDay`, `formatWeek`, `formatDate` and
   the `date` kind read UTC, and every option sets ECharts' `useUTC`, so a
   time-axis tick sits at midnight UTC where its label names the day.

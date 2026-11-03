@@ -11,7 +11,7 @@ import {
   formatWeek,
   resolveFormatContext,
   type ValueFormat,
-} from './format.js';
+  formatElapsed, formatRelative } from './format.js';
 
 /** 23:30 UTC on 1 Nov 2026: the next day east of UTC+0:30. */
 const LATE = new Date(Date.UTC(2026, 10, 1, 23, 30));
@@ -106,6 +106,40 @@ function write(spec: ValueFormat, value: number, locale = 'en-GB'): string {
   return formatterFor(spec, { locale })(value);
 }
 
+describe('formatElapsed', () => {
+  it('writes days, hours, minutes and seconds, leaving zero units out', () => {
+    expect(formatElapsed(3670)).toBe('1h 1m 10s');
+    expect(formatElapsed(3610)).toBe('1h 10s');
+    expect(formatElapsed(90_061)).toBe('1d 1h 1m 1s');
+  });
+
+  it('writes "0s" for nothing, a fraction, or a negative count', () => {
+    expect(formatElapsed(0)).toBe('0s');
+    expect(formatElapsed(0.9)).toBe('0s');
+    expect(formatElapsed(-5)).toBe('0s');
+  });
+});
+
+describe('formatRelative', () => {
+  const now = Date.UTC(2026, 6, 22, 15, 0, 0);
+
+  it('reads the clock on the same UTC day, then climbs the ladder', () => {
+    expect(formatRelative(Date.UTC(2026, 6, 22, 12, 4), now)).toBe('12:04');
+    expect(formatRelative(Date.UTC(2026, 6, 21, 20, 0), now)).toBe('19 hours ago');
+    expect(formatRelative(Date.UTC(2026, 6, 20, 15, 0), now)).toBe('2 days ago');
+    expect(formatRelative(Date.UTC(2026, 6, 14, 15, 0), now)).toBe('last week');
+    expect(formatRelative(Date.UTC(2026, 6, 1, 15, 0), now)).toBe('3 weeks ago');
+    expect(formatRelative(Date.UTC(2026, 3, 22, 15, 0), now)).toBe('2 months ago');
+    expect(formatRelative(Date.UTC(2025, 6, 21, 15, 0), now)).toBe('last year');
+    expect(formatRelative(Date.UTC(2023, 6, 22, 15, 0), now)).toBe('3 years ago');
+  });
+
+  it('mirrors the ladder for an instant ahead, and reads the locale', () => {
+    expect(formatRelative(Date.UTC(2026, 6, 25, 15, 0), now)).toBe('in 3 days');
+    expect(formatRelative(Date.UTC(2026, 6, 20, 15, 0), now, 'de-DE')).toBe('vorgestern');
+  });
+});
+
 describe('formatterFor', () => {
   it('raw: String(value), or fixed digits', () => {
     expect(write({ kind: 'raw' }, 1234.5)).toBe('1234.5');
@@ -122,6 +156,29 @@ describe('formatterFor', () => {
   it('compact: formatCompact, "K" for thousands in every locale', () => {
     expect(write({ kind: 'compact' }, 1000)).toBe('1K');
     expect(write({ kind: 'compact' }, 1_200_000, 'de-DE')).toBe('1.2M');
+  });
+
+  it('percent: signed writes the sign on anything but zero', () => {
+    expect(write({ kind: 'percent', signed: true }, 0.12)).toBe('+12%');
+    expect(write({ kind: 'percent', signed: true }, -0.3)).toBe('-30%');
+    expect(write({ kind: 'percent', signed: true }, 0)).toBe('0%');
+  });
+
+  it('money: compact writes "$1.2K"', () => {
+    expect(write({ kind: 'money', compact: true }, 1234, 'en-US')).toBe('$1.2K');
+  });
+
+  it('elapsed: seconds, minutes or ms through formatElapsed', () => {
+    expect(write({ kind: 'elapsed', from: 'seconds' }, 3670)).toBe('1h 1m 10s');
+    expect(write({ kind: 'elapsed', from: 'minutes' }, 61)).toBe('1h 1m');
+    expect(write({ kind: 'elapsed', from: 'ms' }, 2500)).toBe('2s');
+  });
+
+  it('relative: against the context now, else the clock', () => {
+    const now = Date.UTC(2026, 6, 22, 15, 0, 0);
+
+    expect(formatterFor({ kind: 'relative' }, { now })(Date.UTC(2026, 6, 20, 15, 0))).toBe('2 days ago');
+    expect(formatterFor({ kind: 'relative' })(Date.now() - 2 * 86_400_000)).toBe('2 days ago');
   });
 
   it('percent: a fraction by default, or a value already in percent', () => {

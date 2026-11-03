@@ -40,6 +40,69 @@ export function formatWeek(date: Date): string {
   return formatDate(date, 'week');
 }
 
+/** The seconds in each elapsed unit, largest first. */
+const ELAPSED_UNITS: readonly (readonly [string, number])[] = [['d', 86_400], ['h', 3_600], ['m', 60], ['s', 1]];
+
+/**
+ * A count of seconds as "1h 3m 10s": zero units left out ("1h 10s"),
+ * "0s" for nothing, sub-second precision dropped, a negative count
+ * clamped to "0s".
+ */
+export function formatElapsed(seconds: number): string {
+  let rest = Math.max(0, Math.floor(seconds));
+  const parts: string[] = [];
+  for (const [unit, size] of ELAPSED_UNITS) {
+    const count = Math.floor(rest / size);
+    rest -= count * size;
+    if (count > 0) parts.push(`${count}${unit}`);
+  }
+  return parts.length > 0
+    ? parts.join(' ')
+    : '0s';
+}
+
+const MS_PER_HOUR = 3_600_000;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+const AVERAGE_DAYS_PER_MONTH = 30.44;
+const AVERAGE_DAYS_PER_YEAR = 365.25;
+
+/** Whether two instants fall on the same UTC day. */
+function sameUtcDay(a: Date, b: Date): boolean {
+  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
+}
+
+/**
+ * An instant relative to `now`, on a ladder: the same UTC day reads as a
+ * clock time ("23:30"); then "6 hours ago", "yesterday", "3 days ago",
+ * "last week", "2 weeks ago", "last month", "4 months ago", "last year",
+ * "2 years ago". Months and years use average lengths. An instant after
+ * `now` mirrors the ladder ("tomorrow", "in 3 days").
+ */
+export function formatRelative(value: Date | number, now: Date | number, locale: string = DEFAULT_FORMAT_CONTEXT.locale): string {
+  const date = typeof value === 'number'
+    ? new Date(value)
+    : value;
+  const reference = typeof now === 'number'
+    ? new Date(now)
+    : now;
+  if (sameUtcDay(date, reference)) return formatDate(date, 'time', locale);
+  const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  const diff = date.getTime() - reference.getTime();
+  const sign = diff < 0
+    ? -1
+    : 1;
+  const hours = Math.abs(diff) / MS_PER_HOUR;
+  if (hours < HOURS_PER_DAY) return relative.format(sign * Math.max(1, Math.floor(hours)), 'hour');
+  const days = Math.floor(hours / HOURS_PER_DAY);
+  if (days < DAYS_PER_WEEK) return relative.format(sign * days, 'day');
+  const months = Math.floor(days / AVERAGE_DAYS_PER_MONTH);
+  if (months < 1) return relative.format(sign * Math.floor(days / DAYS_PER_WEEK), 'week');
+  const years = Math.floor(days / AVERAGE_DAYS_PER_YEAR);
+  if (years < 1) return relative.format(sign * months, 'month');
+  return relative.format(sign * years, 'year');
+}
+
 function trimZero(text: string): string {
   return text.replace(/\.0$/, '');
 }
@@ -47,7 +110,7 @@ function trimZero(text: string): string {
 /* ---------- the declarative spec ---------- */
 
 /** The kinds a {@link ValueFormat} can name. */
-export const VALUE_FORMAT_KINDS = ['raw', 'number', 'compact', 'percent', 'money', 'unit', 'duration', 'date', 'custom'] as const;
+export const VALUE_FORMAT_KINDS = ['raw', 'number', 'compact', 'percent', 'money', 'unit', 'duration', 'elapsed', 'date', 'relative', 'custom'] as const;
 
 /** How a `date` format writes its value: "1 Nov", "w/c 1 Nov", "23:30", "1 Nov, 23:30", "Nov 2026". */
 export const DATE_PATTERNS = ['day', 'week', 'time', 'datetime', 'month'] as const;
@@ -79,16 +142,20 @@ export type ValueFormat =
   | { readonly kind: 'number'; readonly digits?: number; readonly grouping?: boolean }
   /** `formatCompact`: 1,000 → "1K", 1,200,000 → "1.2M", in every locale. */
   | { readonly kind: 'compact' }
-  /** 0.78 → "78%" (`of: 'fraction'`, the default), or 78 → "78%" (`of: 'percent'`). */
-  | { readonly kind: 'percent'; readonly digits?: number; readonly of?: PercentBase }
-  /** A currency amount; the currency is the context's when the format names none. */
-  | { readonly kind: 'money'; readonly currency?: string; readonly digits?: number }
+  /** 0.78 → "78%" (`of: 'fraction'`, the default), or 78 → "78%" (`of: 'percent'`); `signed` writes "+12%" and "-30%". */
+  | { readonly kind: 'percent'; readonly digits?: number; readonly of?: PercentBase; readonly signed?: boolean }
+  /** A currency amount; the currency is the context's when the format names none. `compact` writes "$1.2K". */
+  | { readonly kind: 'money'; readonly currency?: string; readonly digits?: number; readonly compact?: boolean }
   /** "45 min" (`after`, the default, with a space) or "£45" (`before`, no space). */
   | { readonly kind: 'unit'; readonly unit: string; readonly position?: UnitPosition }
   /** A duration read in `from`, written by `formatMinutes`: "45 min", "1.5 h". */
   | { readonly kind: 'duration'; readonly from: DurationUnit }
+  /** A duration read in `from`, written by `formatElapsed`: "1h 3m 10s". */
+  | { readonly kind: 'elapsed'; readonly from: DurationUnit }
   /** An epoch in ms, written in UTC by `pattern`. */
   | { readonly kind: 'date'; readonly pattern: DatePattern }
+  /** An epoch in ms, written by `formatRelative` against the context's `now`, or the wall clock. */
+  | { readonly kind: 'relative' }
   /** A formatter the context registers under `id` in `customFormatters`. */
   | { readonly kind: 'custom'; readonly id: string };
 
@@ -105,14 +172,17 @@ export interface FormatContext {
   readonly timeZone?: 'UTC';
   /** Formatters a `custom` format names by id, registered by the hub or an app. */
   readonly customFormatters?: Readonly<Record<string, ValueFormatter>>;
+  /** The instant a `relative` format counts from, as an epoch in ms; the wall clock when absent. */
+  readonly now?: number;
 }
 
-/** A {@link FormatContext} with every default filled in. */
+/** A {@link FormatContext} with every default filled in; `now` stays open, so a relative value reads the clock when it is written. */
 export interface ResolvedFormatContext {
   readonly locale: string;
   readonly currency: string;
   readonly timeZone: 'UTC';
   readonly customFormatters: Readonly<Record<string, ValueFormatter>>;
+  readonly now?: number;
 }
 
 /** The defaults: `en-GB`, `USD`, `UTC`, no custom formatters. */
@@ -130,6 +200,9 @@ export function resolveFormatContext(context: FormatContext = {}): ResolvedForma
     currency: context.currency ?? DEFAULT_FORMAT_CONTEXT.currency,
     timeZone: 'UTC',
     customFormatters: context.customFormatters ?? DEFAULT_FORMAT_CONTEXT.customFormatters,
+    ...(context.now === undefined
+      ? {}
+      : { now: context.now }),
   };
 }
 
@@ -170,6 +243,9 @@ function fractionDigits(digits: number | undefined): Intl.NumberFormatOptions {
 /** The value in minutes, from each duration unit. */
 const TO_MINUTES: Readonly<Record<DurationUnit, number>> = { minutes: 1, seconds: 1 / 60, ms: 1 / 60_000 };
 
+/** The value in seconds, from each duration unit. */
+const TO_SECONDS: Readonly<Record<DurationUnit, number>> = { minutes: 60, seconds: 1, ms: 1 / 1000 };
+
 type Builder<K extends ValueFormatKind> = (spec: Extract<ValueFormat, { kind: K }>, context: ResolvedFormatContext) => ValueFormatter;
 
 /** One builder per kind; each makes its `Intl` formatter once, so a bad locale or currency throws at build time. */
@@ -182,15 +258,27 @@ const BUILDERS: { readonly [K in ValueFormatKind]: Builder<K> } = {
     return (value) => intl.format(value);
   },
   compact: () => formatCompact,
-  percent: ({ digits, of }, { locale }) => {
-    const intl = new Intl.NumberFormat(locale, { style: 'percent', ...fractionDigits(digits ?? 0) });
+  percent: ({ digits, of, signed }, { locale }) => {
+    const intl = new Intl.NumberFormat(locale, {
+      style: 'percent',
+      ...fractionDigits(digits ?? 0),
+      signDisplay: signed === true
+        ? 'exceptZero'
+        : 'auto',
+    });
     const scale = of === 'percent'
       ? 1 / 100
       : 1;
     return (value) => intl.format(value * scale);
   },
-  money: ({ currency, digits }, context) => {
-    const intl = new Intl.NumberFormat(context.locale, { style: 'currency', currency: currency ?? context.currency, ...fractionDigits(digits) });
+  money: ({ currency, digits, compact }, context) => {
+    const intl = new Intl.NumberFormat(context.locale, {
+      style: 'currency',
+      currency: currency ?? context.currency,
+      ...(compact === true
+        ? { notation: 'compact', maximumFractionDigits: digits ?? 1 }
+        : fractionDigits(digits)),
+    });
     return (value) => intl.format(value);
   },
   unit: ({ unit, position }, { locale }) => {
@@ -200,7 +288,9 @@ const BUILDERS: { readonly [K in ValueFormatKind]: Builder<K> } = {
       : (value) => `${intl.format(value)} ${unit}`;
   },
   duration: ({ from }) => (value) => formatMinutes(value * TO_MINUTES[from]),
+  elapsed: ({ from }) => (value) => formatElapsed(value * TO_SECONDS[from]),
   date: ({ pattern }, { locale }) => (value) => formatDate(value, pattern, locale),
+  relative: (_spec, { locale, now }) => (value) => formatRelative(value, now ?? Date.now(), locale),
   custom: ({ id }, { customFormatters }) => {
     const registered = Object.hasOwn(customFormatters, id)
       ? customFormatters[id]
@@ -247,7 +337,7 @@ const UNITLESS_KINDS: ReadonlySet<ValueFormatKind> = new Set(['raw', 'number', '
  * `specFormat`, else a `number` in the context's locale; the context fills
  * whatever the format leaves out. The point's `unit` follows a bare number
  * ("45 min"); a format with a unit of its own (percent, money, unit,
- * duration, date, custom) keeps it alone.
+ * duration, elapsed, date, relative, custom) keeps it alone.
  */
 export function formatMeasured(measured: Measured, context: FormatContext = {}, specFormat?: ValueFormat): string {
   const { value, unit } = measured;
