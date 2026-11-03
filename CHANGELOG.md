@@ -9,6 +9,16 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.50.0 — 2026-11-03, selectLessons keeps a trigger lesson only on two matched words; Three causes of a stopped stretch item, and a way to finish one; Two readings that throw away good data
+<!-- rafa:fragments rafa-1395-lesson-trigger-floor rafa-1391-spec-test-index-record rafa-1400-bug-sweep-37 rafa-1401-bug-sweep-38 rafa-1402-bug-sweep-39 rafa-1418-bug-sweep-40 -->
+
+- lessons: a lesson reaches a task by its trigger only when two words of the task match it, so tasks naming nothing a lesson knows are handed none
+- pr: `rafa pr merge` fetches the base and pulls it once more when its clean-up pull fails with `Cannot fast-forward to multiple branches`, and each step of its json result now carries `retried`.
+- stretch: `rafa stretch item --wait` waits for the pull request's mergeability and checks and merges with `rafa pr merge <pr> --yes` instead of `--skip-checks`, goes on to the CI wait, the ledger line and the pit-stop readings whenever the pull request reads merged even if the clean-up failed (warning to run `rafa cleanup`), and the new `rafa stretch item <issue> --resume` finishes an item whose loop has ended from the pull request its log names, skipping the merge of one already merged; `--resume` beside `--wait` is refused.
+- effort: the skill-use collector now reads a Claude Code session log by skill name whenever every record is at or above the floor of 2.1.280, instead of storing every version other than 2.1.280 as unknown; sessions logged above the recorded fixture's version are counted as unvouched beside read and unknown on the skills line of `rafa effort collect`, and `--verbose` names each session's versions
+- doctor: `rafa doctor` warns only when the installed Claude Code is below the skill-use floor, and prints a note when it is newer than the version the skill-use fixture was recorded under
+- board: `rafa board sync` sends a `gh` call again when it fails with `unexpected end of JSON input`, as it already does on an HTTP 502, instead of stopping
+
 ## 0.49.0 — 2026-10-30, rafa pr merge keeps a trunk head branch on both sides; rafa pr merge cleans up when another worktree holds the base
 <!-- rafa:fragments rafa-1266 rafa-1266-base-worktree -->
 
