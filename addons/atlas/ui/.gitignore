@@ -7,3 +7,4 @@ visual/__image_snapshots__/
 visual/__diff_output__/
 playwright-report/
 test-results/
+visual/__compare_output__/

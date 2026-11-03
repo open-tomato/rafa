@@ -22,8 +22,8 @@ layer adds its line there.
 
 | Folder | Holds |
 |---|---|
-| `atoms/` | engine-free building blocks |
-| `molecules/` | small compositions of atoms |
+| `atoms/` | engine-free building blocks, the layout set (`Grid`, `GridItem`, `Content`, `Divider`) among them |
+| `molecules/` | small compositions of atoms; `SectionCard` is the section and chart shell |
 | `organisms/` | `CardLayout` (slots and the modal registry), `ChartCard` |
 | `templates/` | page-level grids of cards |
 | `context/` | `CardData`, `CardSpec`, `DashboardData`: a context and a hook each |
@@ -164,6 +164,16 @@ every story in light and in dark against this machine's untracked
 baselines in `visual/__image_snapshots__/`. `bun run test:visual:update`
 writes them, `bun run test:visual` compares. It serves the built
 Storybook on port 6017, so it can run beside the charts suite on 6016.
+
+## Layout comparison
+
+`bun visual/compare-layout.ts <otherStaticDir> [id[=otherId]...]` compares
+this package's built stories with the same stories in another built
+Storybook, colour-blind: every text-bearing element's box relative to the
+story root, matched by text, with the largest offset and size difference
+per story and a `MOVED` flag past 6px. Both screenshots land in
+`visual/__compare_output__/`. It is the check a ported component's layout
+is held to; the other build's path is an argument, never written here.
 
 ## Gate order
 

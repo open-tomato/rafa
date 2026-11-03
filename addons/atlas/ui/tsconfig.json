@@ -20,6 +20,6 @@
     }
   },
   "include": ["src"],
-  "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "src/stories"],
   "references": [{ "path": "../charts" }]
 }

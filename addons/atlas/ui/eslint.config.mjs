@@ -11,6 +11,7 @@ export default [
       'storybook-static/**',
       'visual/__image_snapshots__/**',
       'visual/__diff_output__/**',
+      'visual/__compare_output__/**',
     ],
   },
   ...baseConfig,
