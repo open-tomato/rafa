@@ -7,6 +7,8 @@ export * from './ConfigView/index.js';
 export * from './ErrorsView/index.js';
 export * from './InfoView/index.js';
 export * from './MaximiseView/index.js';
+export * from './Progress/index.js';
 export * from './RangeSelector/index.js';
 export * from './SectionCard/index.js';
+export * from './SmallStatCard/index.js';
 export * from './SourceView/index.js';

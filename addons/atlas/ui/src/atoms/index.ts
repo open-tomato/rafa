@@ -12,3 +12,4 @@ export * from './Segmented/index.js';
 export * from './Sparkline/index.js';
 export * from './StatTile/index.js';
 export * from './Swatch/index.js';
+export * from './TrendIndicator/index.js';

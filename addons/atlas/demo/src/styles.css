@@ -20,6 +20,14 @@
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 
+  /* The indeterminate progress sweep (atlas-ui's Progress): the SVG fill's x. */
+  --animate-indeterminate: indeterminate 1.25s ease-out infinite;
+
+  @keyframes indeterminate {
+    from { x: -40%; }
+    to { x: 100%; }
+  }
+
   --color-surface: #fcfcfb;
   --color-plane: #f9f9f7;
   --color-ink: #0b0b0b;
