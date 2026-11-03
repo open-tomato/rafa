@@ -45,7 +45,9 @@ match set from the cost of the index itself. `engine-lance.ts` also takes
 `--no-vector-index`, which skips the `ivfPq` build it would otherwise do at and
 above 50,000 rows, for a comparison against an engine that has no vector index
 at all. `engine-postgres.ts` takes the same `--no-vector-index`, which skips the
-HNSW build, plus `--url=<postgres url>` (or `PGURL`) and `--no-collapse`.
+HNSW build, plus `--dims=<n>` (the vector width, 384 by default, from
+`createEmbedder` in `embed.ts`), `--url=<postgres url>` (or `PGURL`) and
+`--no-collapse`.
 
 ## What each file is
 
