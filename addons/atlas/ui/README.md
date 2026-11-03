@@ -79,6 +79,12 @@ the box on a landscape viewport and under it on a portrait one, each as
 toggle, off at first; the default) or `toggle-on`. The dialog grows for
 them up to its clearance, then that pane scrolls.
 
+While the data loads, the card shows a `ChartSkeleton` in the chart's
+box: the outline of the chart's family (bars, line, ring, rows, tile),
+built from `Skeleton` atoms, so nothing jumps when the chart arrives.
+The spec's `skeleton` names the shape; absent, `skeletonFor` reads it
+off the chart primitive's name. The error state stays a `CardStatus`.
+
 The spec layer is `CardSpecProvider` over the contract's `CardSpec` type,
 read with `useCardSpec()`; `DashboardData` and `CardData` keep their
 names. The modal key `config` and the `ConfigView` molecule keep theirs:

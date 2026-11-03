@@ -15,6 +15,7 @@ import { CardSpecProvider, useCardSpec } from '../../context/CardSpec.js';
 import { applyDescriptor, descriptorOf, type CardSpec, type ModalKey } from '../../contract/schemas.js';
 import { CardHeader } from '../../molecules/CardHeader/CardHeader.js';
 import { CardStatus } from '../../molecules/CardStatus/CardStatus.js';
+import { ChartSkeleton } from '../../molecules/ChartSkeleton/ChartSkeleton.js';
 import { ConfigView } from '../../molecules/ConfigView/ConfigView.js';
 import { InfoView } from '../../molecules/InfoView/InfoView.js';
 import { SourceView } from '../../molecules/SourceView/SourceView.js';
@@ -22,6 +23,7 @@ import { CardLayout } from '../CardLayout/CardLayout.js';
 
 import { chartCardBodyVariants } from './ChartCard.variants.js';
 import { NO_HIDDEN, relabelAll } from './entries.js';
+import { skeletonFor } from './skeleton.js';
 
 /** What the chart child receives. */
 export interface ChartRenderArgs<T> {
@@ -177,15 +179,11 @@ function ChartCardBody<T>({
   const content = ({ maximised, height }: ContentView): ReactNode => (
     <div className={chartCardBodyVariants({ maximised })}>
       {!maximised && legendNode}
-      {data === undefined
-        ? <CardStatus kind={status === 'error'
-          ? 'error'
-          : 'loading'} detail={status === 'error'
-          ? 'The details are under the card menu\'s Errors item.'
-          : undefined} />
-        : children({ data, hidden: toggleable
-          ? hidden
-          : NO_HIDDEN, animate, maximised, height })}
+      {data === undefined && status === 'error' && <CardStatus kind="error" detail="The details are under the card menu's Errors item." />}
+      {data === undefined && status !== 'error' && <ChartSkeleton kind={config.skeleton ?? skeletonFor(config.chart.primitive)} height={height} />}
+      {data !== undefined && children({ data, hidden: toggleable
+        ? hidden
+        : NO_HIDDEN, animate, maximised, height })}
     </div>
   );
 
@@ -218,7 +216,9 @@ function ChartCardBody<T>({
  * failed, Errors; `config.modals` narrows the built-ins and `config.menu`
  * relabels them. The child receives `{ data, hidden, animate, maximised,
  * height }`; maximised, `height` is `'fill'` and the legend and the source
- * table move under the Maximise view's toggles.
+ * table move under the Maximise view's toggles. While the data loads the
+ * card shows a `ChartSkeleton` in the chart's box: the shape the spec's
+ * `skeleton` names, else the one the chart's primitive name implies.
  */
 export function ChartCard<T>({ config, onConfigChange, ...body }: ChartCardProps<T>): ReactElement {
   const guarded = (

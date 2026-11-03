@@ -63,6 +63,7 @@ const OPTIONS: readonly DescribeEntry[] = [
   { name: 'modals', summary: 'The built-in modal keys the menu offers; all that apply when absent.' },
   { name: 'menu', summary: 'Labels and icons for menu entries, by modal key.' },
   { name: 'maximise', summary: 'The box size the maximise entry opens at (medium or large), and whether its legend and table show always, behind a toggle, or behind a toggle that starts on.' },
+  { name: 'skeleton', summary: 'The loading shape the card shows in the chart\'s box (bars, line, ring, rows or tile); the chart\'s family decides when absent.' },
 ];
 
 /** Roster lines for `names`, in order, from `summaries`. */

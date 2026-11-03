@@ -3,6 +3,7 @@ export * from './CardHeader/index.js';
 export * from './CardMenu/index.js';
 export * from './CardModal/index.js';
 export * from './CardStatus/index.js';
+export * from './ChartSkeleton/index.js';
 export * from './ConfigView/index.js';
 export * from './ErrorsView/index.js';
 export * from './InfoView/index.js';

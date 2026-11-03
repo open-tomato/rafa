@@ -113,13 +113,27 @@ export const legendConfigSchema: z.ZodObject<{
 });
 export type LegendConfig = z.infer<typeof legendConfigSchema>;
 
+/** The loading shapes a card may name; the chart's family is inferred when it names none. */
+export const SKELETON_KINDS = ['bars', 'line', 'ring', 'rows', 'tile'] as const;
+
+/** A card's loading shape. */
+export const skeletonKindSchema: z.ZodEnum<{
+  bars: 'bars';
+  line: 'line';
+  ring: 'ring';
+  rows: 'rows';
+  tile: 'tile';
+}> = z.enum(SKELETON_KINDS);
+export type SkeletonKind = z.infer<typeof skeletonKindSchema>;
+
 /**
  * The static descriptor `CardSpecProvider` provides: identity, title,
  * chart, mode and range, plus what the card's chrome shows. `modals`
  * lists the built-in entries the menu offers (all that apply when
  * absent; `errors` is offered whenever the boundary caught); `menu`
  * relabels entries by key; `maximise` sets the box size the maximise
- * entry opens at (medium when absent) and how its extras show.
+ * entry opens at (medium when absent) and how its extras show;
+ * `skeleton` names the loading shape, else the chart's family decides.
  */
 export const cardSpecSchema: z.ZodObject<{
   id: z.ZodString;
@@ -137,6 +151,7 @@ export const cardSpecSchema: z.ZodObject<{
   modals: z.ZodOptional<z.ZodArray<typeof modalKeySchema>>;
   menu: z.ZodOptional<z.ZodArray<typeof menuItemSchema>>;
   maximise: z.ZodOptional<typeof maximiseConfigSchema>;
+  skeleton: z.ZodOptional<typeof skeletonKindSchema>;
 }, z.core.$strip> = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -153,6 +168,7 @@ export const cardSpecSchema: z.ZodObject<{
   modals: z.array(modalKeySchema).optional(),
   menu: z.array(menuItemSchema).optional(),
   maximise: maximiseConfigSchema.optional(),
+  skeleton: skeletonKindSchema.optional(),
 });
 export type CardSpec = z.infer<typeof cardSpecSchema>;
 

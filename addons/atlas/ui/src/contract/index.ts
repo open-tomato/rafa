@@ -5,6 +5,7 @@ export {
   MAXIMISE_EXTRA_MODES,
   MAXIMISE_SIZES,
   MODAL_KEYS,
+  SKELETON_KINDS,
   TIME_RANGES,
   applyDescriptor,
   cardSpecSchema,
@@ -19,6 +20,7 @@ export {
   maximiseSizeSchema,
   menuItemSchema,
   modalKeySchema,
+  skeletonKindSchema,
   timeRangeSchema,
 } from './schemas.js';
 export type {
@@ -33,6 +35,7 @@ export type {
   MaximiseSize,
   MenuItem,
   ModalKey,
+  SkeletonKind,
   TimeRange,
 } from './schemas.js';
 export { DESCRIBE_SCHEMA_VERSION, describe } from './describe.js';

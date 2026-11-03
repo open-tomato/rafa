@@ -28,6 +28,14 @@
     to { x: 100%; }
   }
 
+  /* The loading shimmer across a Skeleton. */
+  --animate-shimmer: shimmer 1.4s linear infinite;
+
+  @keyframes shimmer {
+    from { background-position: -400px 0; }
+    to { background-position: 400px 0; }
+  }
+
   /* The live ring around an IconTile with `pulse`. */
   --animate-pulse-ring: pulse-ring 2s ease-out infinite;
 

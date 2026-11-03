@@ -12,6 +12,7 @@ export * from './GridItem/index.js';
 export * from './IconTile/index.js';
 export * from './Legend/index.js';
 export * from './Segmented/index.js';
+export * from './Skeleton/index.js';
 export * from './Sparkline/index.js';
 export * from './StatTile/index.js';
 export * from './Swatch/index.js';

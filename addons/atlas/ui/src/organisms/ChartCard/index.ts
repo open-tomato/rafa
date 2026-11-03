@@ -3,3 +3,4 @@ export type { ChartCardProps, ChartRender, ChartRenderArgs } from './ChartCard.j
 export { chartCardBodyVariants } from './ChartCard.variants.js';
 export type { ChartCardBodyVariantProps } from './ChartCard.variants.js';
 export { NO_HIDDEN, relabel, relabelAll } from './entries.js';
+export { skeletonFor } from './skeleton.js';
