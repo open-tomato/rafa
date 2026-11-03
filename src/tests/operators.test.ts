@@ -148,7 +148,7 @@ describe('the bundled operators', () => {
       const section = runOneItem();
 
       expect(section).toContain('`rafa stretch item <issue> --wait`');
-      expect(section).toContain('merges its pull request into `stretch/<n>` with checks skipped');
+      expect(section).toContain('waits for its pull request\'s checks and merges it into `stretch/<n>`');
     });
 
     it('keeps the hand merge and the hand loop start out of "Run one item"', () => {

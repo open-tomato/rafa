@@ -30,9 +30,13 @@
  * {@link renderRecordJson} writes the file with its header first, in the
  * order `unit`, `map`, `commit`, `binReach`, then `tests`, `unsorted`
  * (the tests whose `meets` is false) and `unindexed`, each value through
- * `stableJson`. {@link parseRecord} reads it back, refusing a text with
- * no `unit`, no `map` hash or an entry short of a field, and naming what
- * is missing. It accepts any unit: refusing a unit other than `packages`
+ * `stableJson`. The optional `rekeyed`, the head a re-key last moved the
+ * record to, is written after `commit` only when the header holds it, so
+ * a record without it is written byte for byte as before the field
+ * existed. {@link parseRecord} reads it back, refusing a text with no
+ * `unit`, no `map` hash, a `rekeyed` that is not a string or an entry
+ * short of a field, and naming what is missing; an absent `rekeyed`
+ * reads as `undefined`. It accepts any unit: refusing a unit other than `packages`
  * is the guard's, which names both sides.
  */
 
@@ -92,6 +96,11 @@ export interface RecordHeader {
   readonly map: { readonly path: string; readonly sha256: string };
   /** The full hash of the commit whose tree the record was read from. */
   readonly commit: string;
+  /**
+   * The full hash of the head a re-key last moved the record's paths and
+   * units to, or `undefined` for a record no re-key has written.
+   */
+  readonly rekeyed?: string | undefined;
   /** The units the bin loads, sorted. */
   readonly binReach: readonly string[];
 }
@@ -188,11 +197,11 @@ export function recordEntry(entry: TestIndexEntry, input: RecordInput): TestReco
 
 /**
  * Writes the record file: the header first, in the order `unit`, `map`,
- * `commit`, `binReach`, then `tests`, `unsorted` and `unindexed`, each
- * value through `stableJson`.
+ * `commit`, `rekeyed` (only when the header holds it), `binReach`, then
+ * `tests`, `unsorted` and `unindexed`, each value through `stableJson`.
  *
  * @param index - Each test's record and the tests with no index.
- * @param header - The map, the commit and the bin's reach.
+ * @param header - The map, the commit, the re-keyed head when there is one, and the bin's reach.
  * @returns The file's text, closing with a newline.
  */
 export function renderRecordJson(index: RecordIndex, header: RecordHeader): string {
@@ -204,6 +213,7 @@ export function renderRecordJson(index: RecordIndex, header: RecordHeader): stri
     ['unit', RECORD_UNIT],
     ['map', header.map],
     ['commit', header.commit],
+    ...rekeyedField(header.rekeyed),
     ['binReach', header.binReach],
     ['tests', Object.fromEntries(index.tests)],
     ['unsorted', unsorted],
@@ -211,6 +221,13 @@ export function renderRecordJson(index: RecordIndex, header: RecordHeader): stri
   ];
   const lines = fields.map(([key, value]) => `  ${JSON.stringify(key)}: ${indented(stableJson(value))}`);
   return `{\n${lines.join(',\n')}\n}\n`;
+}
+
+/** The `rekeyed` field to write, or none when the header holds no re-keyed head. */
+function rekeyedField(rekeyed: string | undefined): [string, unknown][] {
+  return rekeyed === undefined
+    ? []
+    : [['rekeyed', rekeyed]];
 }
 
 /** `stableJson`'s text less its closing newline, every further line indented one level. */
@@ -312,11 +329,11 @@ function parsedMap(value: unknown): RecordHeader['map'] {
  * Reads back what {@link renderRecordJson} wrote.
  *
  * @param text - The record file's text.
- * @returns The record, with its unit as written.
+ * @returns The record, with its unit as written and `rekeyed` `undefined` when the text holds none.
  * @throws When the text is not JSON, holds no string `unit`, no `map`
  *   with its `sha256` and `path`, no `commit`, `binReach`, `tests`,
- *   `unsorted` or `unindexed`, or an entry short of one of its fields;
- *   the message names what is missing.
+ *   `unsorted` or `unindexed`, a `rekeyed` that is not a string, or an
+ *   entry short of one of its fields; the message names what is missing.
  */
 export function parseRecord(text: string): TestIndexRecord {
   let parsed: unknown;
@@ -337,6 +354,10 @@ export function parseRecord(text: string): TestIndexRecord {
   if (typeof parsed['commit'] !== 'string') {
     throw refusal('it holds no `commit`');
   }
+  const rekeyed = stringValue(parsed['rekeyed']);
+  if (rekeyed === undefined && parsed['rekeyed'] !== undefined) {
+    throw refusal('its `rekeyed` is not a string');
+  }
   const lists = {
     binReach: stringList(parsed['binReach']),
     unindexed: stringList(parsed['unindexed']),
@@ -352,5 +373,5 @@ export function parseRecord(text: string): TestIndexRecord {
     throw refusal('it holds no `tests` keyed by path');
   }
   const tests = new Map(Object.entries(parsed['tests']).map(([test, value]) => [test, parsedEntry(test, value)]));
-  return { binReach, commit: parsed['commit'], map, tests, unindexed, unit: parsed['unit'], unsorted };
+  return { binReach, commit: parsed['commit'], map, rekeyed, tests, unindexed, unit: parsed['unit'], unsorted };
 }

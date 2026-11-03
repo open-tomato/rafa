@@ -9,7 +9,7 @@
  * reader that matched nothing could not pass for the real file.
  *
  * The cases over the declarations' values are in
- * `declarations-integration.test.ts` beside this file.
+ * `src/commands/issue/declarations-integration.test.ts` at the root.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';

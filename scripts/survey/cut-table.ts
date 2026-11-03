@@ -327,10 +327,11 @@ export const CUT_RULES: CutRules = {
     {
       // #1380: pass 4f moved run's files into `packages/rafa-run/` and
       // emptied `src/claims/` and `src/preflight/`, so they leave the
-      // list. `src/commands/claim/` stays for the claim declaration tests
-      // `declarations-integration.test.ts` and
-      // `index-integration.test.ts`, `src/start/` for its 28 integration
-      // tests and `src/suite/` for `run-baseline-integration.test.ts` and
+      // list. `src/commands/claim/` stays for the claim test
+      // `index-integration.test.ts` (#1391 merged the declaration cases
+      // into run's `declarations.test.ts`), `src/start/` for its 28
+      // integration tests and `src/suite/` for
+      // `run-baseline-integration.test.ts` and
       // `run-recheck-integration.test.ts`, at the root until #913, as
       // `src/tiers/` stays for inventory's; `src/start/` also holds
       // `base-prompts.sweep.test.ts`, which stems no listed file and
@@ -342,7 +343,7 @@ export const CUT_RULES: CutRules = {
     {
       // #1366: pass 4d moved release's files into
       // `packages/rafa-release/`. `src/commands/release/` stays for its
-      // three integration tests, at the root until #913, as `src/tiers/`
+      // two integration tests, at the root until #913, as `src/tiers/`
       // stays for inventory's; `src/release/` stays for
       // `fold-spawned.test.ts`, which stems no listed file and waits on
       // #1360's rule for the move tool.

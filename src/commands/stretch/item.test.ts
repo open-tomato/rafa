@@ -130,7 +130,7 @@ function plant(options: CaseOptions = {}): Case {
     gh: () => async (args) => {
       ghCalls.push([...args]);
       // A pull request into the default branch, so the merge half refuses it before it merges; its cases are item-merge.test.ts's.
-      const row = { baseRefName: 'main', body: '', headRefName: 'feat/rafa-812-pit-readings', mergeCommit: null, number: Number(args[2]), state: 'OPEN' };
+      const row = { baseRefName: 'main', body: '', headRefName: 'feat/rafa-812-pit-readings', mergeCommit: null, mergeable: 'MERGEABLE', number: Number(args[2]), state: 'OPEN' };
       return Promise.resolve({ ok: true, stdout: JSON.stringify(row), stderr: '' });
     },
     tracker: () => ({ openIssues: async () => Promise.resolve([]), filedIssues: async () => Promise.resolve([]) }),
@@ -451,12 +451,12 @@ describe('the real launch', () => {
 });
 
 describe('the registered command', () => {
-  it('spends unless --dry-run, and takes the issue and two switches', () => {
+  it('spends unless --dry-run, and takes the issue and three switches', () => {
     const command = createStretchItemCommand(plant().seams);
 
     expect(command.name).toBe('stretch item');
     expect(command.spends).toEqual({ when: 'unless', flag: '--dry-run', what: 'one planning session and the loop it starts' });
     expect(command.args.map((arg) => arg.name)).toEqual(['issue']);
-    expect(command.flags.map((flag) => flag.name)).toEqual(['wait', 'dry-run']);
+    expect(command.flags.map((flag) => flag.name)).toEqual(['wait', 'resume', 'dry-run']);
   });
 });

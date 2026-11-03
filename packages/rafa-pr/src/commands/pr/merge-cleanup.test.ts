@@ -10,7 +10,7 @@
  * `merge.test.ts` and `merge-driven.test.ts` run the same functions
  * through `rafa pr merge` itself.
  */
-import type { FollowUpPlace, KeepSettings } from './merge-cleanup.js';
+import type { CleanUpShape, FollowUpPlace, KeepSettings } from './merge-cleanup.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import type { MergeGuardSettings } from '@open-tomato/rafa-release/release/guard-merge';
@@ -171,7 +171,7 @@ describe('runCleanUp', () => {
       'push origin --delete feat/x',
       'fetch --prune',
     ]);
-    expect(reports.every((report) => report.ok && !report.skipped)).toBe(true);
+    expect(reports.every((report) => report.ok && !report.skipped && !report.retried)).toBe(true);
     expect(info.lines).toEqual([
       'switch to main: done',
       'pull main, fast-forward only: done',
@@ -186,7 +186,7 @@ describe('runCleanUp', () => {
     const info = collector();
     const reports = runCleanUp(git, MERGED, { local: false, remote: false }, info.report);
     expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch --prune']);
-    expect(reports.find((report) => report.id === 'delete-local')).toMatchObject({ ok: true, skipped: true });
+    expect(reports.find((report) => report.id === 'delete-local')).toMatchObject({ ok: true, skipped: true, retried: false });
     expect(info.lines).toContain('delete the local branch feat/x: skipped — no local branch feat/x; nothing to delete');
   });
 
@@ -211,6 +211,113 @@ describe('runCleanUp', () => {
       '   git fetch --prune',
     ]);
     expect(calls).toEqual(['switch main', 'pull --ff-only']);
+  });
+});
+
+/** What git said in #1171, after a merge that went through. */
+const MULTIPLE_BRANCHES: GitResult = { ok: false, stdout: '', stderr: 'fatal: Cannot fast-forward to multiple branches.' };
+
+/** Runs the clean-up and answers what it threw, or null when it threw nothing. */
+function cleanUpThrown(git: GitRunner, info = collector(), shape: CleanUpShape = {}): unknown {
+  try {
+    runCleanUp(git, MERGED, { local: true, remote: true }, info.report, shape);
+  } catch (error) {
+    return error;
+  }
+  return null;
+}
+
+/** A runner whose `git pull --ff-only` answers each of `pulls` in turn, OK once they run out. */
+function pullsInTurn(
+  pulls: readonly GitResult[],
+  answers: Readonly<Record<string, GitResult>> = {},
+): { git: GitRunner; calls: string[] } {
+  const left = [...pulls];
+  const inner = fakeGit(answers);
+  const git: GitRunner = (args) => {
+    const answer = inner.git(args);
+    return args.join(' ') === 'pull --ff-only'
+      ? left.shift() ?? OK
+      : answer;
+  };
+  return { git, calls: inner.calls };
+}
+
+describe('runCleanUp, the pull tried once more', () => {
+  it('fetches and pulls again after the multiple-branches text, reporting the step once as retried', () => {
+    const { git, calls } = pullsInTurn([MULTIPLE_BRANCHES]);
+    const info = collector();
+    const reports = runCleanUp(git, MERGED, { local: true, remote: true }, info.report);
+    expect(calls).toEqual([
+      'switch main',
+      'pull --ff-only',
+      'fetch origin main',
+      'pull --ff-only',
+      'branch -D feat/x',
+      'push origin --delete feat/x',
+      'fetch --prune',
+    ]);
+    expect(reports.map((report) => [report.id, report.ok, report.retried])).toEqual([
+      ['switch-base', true, false],
+      ['pull-base', true, true],
+      ['delete-local', true, false],
+      ['delete-remote', true, false],
+      ['prune-remotes', true, false],
+    ]);
+    expect(info.lines.slice(0, 3)).toEqual([
+      'switch to main: done',
+      'pull main, fast-forward only: retrying after git fetch origin main',
+      'pull main, fast-forward only: done',
+    ]);
+  });
+
+  it('reports a second pull that fails as a clean-up failure, the merge done', () => {
+    const second: GitResult = { ok: false, stdout: '', stderr: 'fatal: Not possible to fast-forward' };
+    const { git, calls } = pullsInTurn([MULTIPLE_BRANCHES, second]);
+    const thrown = cleanUpThrown(git);
+    expect(thrown).toBeInstanceOf(CommandExit);
+    expect((thrown as CommandExit).exitCode).toBe(1);
+    expect((thrown as CommandExit).message.split('\n')).toEqual([
+      '❌ pull main, fast-forward only: failed',
+      '   fatal: Not possible to fast-forward',
+      '#41 is merged, and the merge is left alone. Run the rest yourself:',
+      '   git pull --ff-only',
+      '   git branch -D feat/x',
+      '   git push origin --delete feat/x',
+      '   git fetch --prune',
+    ]);
+    expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch origin main', 'pull --ff-only']);
+  });
+
+  it('does not retry a pull that failed with another text', () => {
+    const { git, calls } = pullsInTurn([{ ok: false, stdout: '', stderr: 'fatal: Not possible to fast-forward' }]);
+    const info = collector();
+    expect(cleanUpThrown(git, info)).toBeInstanceOf(CommandExit);
+    expect(calls).toEqual(['switch main', 'pull --ff-only']);
+    expect(info.lines.some((line) => line.includes('retrying'))).toBe(false);
+  });
+
+  it('reports a fetch that fails as the step\'s failure, quoting the fetch, with no second pull', () => {
+    const { git, calls } = pullsInTurn([MULTIPLE_BRANCHES], {
+      'fetch origin main': { ok: false, stdout: '', stderr: 'fatal: unable to access origin' },
+    });
+    const thrown = cleanUpThrown(git);
+    expect(thrown).toBeInstanceOf(CommandExit);
+    expect((thrown as CommandExit).exitCode).toBe(1);
+    const lines = (thrown as CommandExit).message.split('\n');
+    expect(lines.slice(0, 3)).toEqual([
+      '❌ pull main, fast-forward only: failed',
+      '   fatal: unable to access origin',
+      '#41 is merged, and the merge is left alone. Run the rest yourself:',
+    ]);
+    expect(lines[3]).toBe('   git pull --ff-only');
+    expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch origin main']);
+  });
+
+  it('fetches in the worktree that holds the base, as the pull runs there', () => {
+    const { git, calls } = fakeGit({ '-C /repo pull --ff-only': MULTIPLE_BRANCHES });
+    expect(cleanUpThrown(git, collector(), { baseHeldAt: '/repo' })).toBeInstanceOf(CommandExit);
+    expect(calls.slice(0, 3)).toEqual(['-C /repo pull --ff-only', '-C /repo fetch origin main', '-C /repo pull --ff-only']);
   });
 });
 

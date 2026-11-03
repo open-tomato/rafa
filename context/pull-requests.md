@@ -265,6 +265,15 @@ sentence replaces nothing.
    worktree, then `git switch --detach <base>` here, and the ready line says
    `<base> is pulled in <path> and this checkout is detached at it`. The
    holder is read from `git worktree list --porcelain` after the merge.
+   A pull that fails with `Cannot fast-forward to multiple branches` is
+   tried once more (#1171): `<label>: retrying after git fetch origin
+   <base>` (with `-C <path>` where the pull runs in another worktree),
+   the fetch, then the pull again. The step is reported once, with the
+   second try's outcome, and its json `steps` entry carries
+   `retried: true`; every other step carries `retried: false`. A fetch
+   that fails, a second pull that fails, or a pull that fails with any
+   other text is a clean-up failure as any failed step is: exit code 1,
+   the merge left alone, the tail from the pull listed to paste.
 5. Tick the roadmap and print what is ready.
 6. Run the unblock reading over every open issue labelled `spec:blocked` whose
    `Blocked by:` line names an issue this PR closes, asking `#<n> was blocked by
