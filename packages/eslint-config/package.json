@@ -10,10 +10,12 @@
   "type": "module",
   "exports": {
     ".": "./base.mjs",
-    "./base": "./base.mjs"
+    "./base": "./base.mjs",
+    "./react": "./react.mjs"
   },
   "files": [
     "base.mjs",
+    "react.mjs",
     "sharedRules.mjs",
     "rules"
   ],
@@ -30,6 +32,9 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsonc": "^3.4.2",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.12.0",
     "jsonc-eslint-parser": "^3.1.0",
     "typescript-eslint": "^8.69.0"

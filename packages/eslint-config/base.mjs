@@ -28,7 +28,7 @@ export default defineConfig([
   importPlugin.flatConfigs.recommended,
   importPlugin.flatConfigs.typescript,
   {
-    files: ['**/*.js', '**/*.mjs', '**/*.ts', '**/*.mts', '**/*.cts'],
+    files: ['**/*.js', '**/*.mjs', '**/*.ts', '**/*.mts', '**/*.cts', '**/*.tsx'],
     extends: [
       eslint.configs.recommended,
       tsLintConfig.recommended,
@@ -58,7 +58,7 @@ export default defineConfig([
     },
     settings: {
       'import/parsers': {
-        '@typescript-eslint/parser': ['.ts', '.d.ts'],
+        '@typescript-eslint/parser': ['.ts', '.tsx', '.d.ts'],
       },
       'import/resolver': {
         typescript: {
@@ -68,6 +68,7 @@ export default defineConfig([
           project: [
             './tsconfig.json',
             './packages/*/tsconfig.json',
+            './addons/atlas/*/tsconfig.json',
             // './services/*/tsconfig.json',
             // './apps/*/tsconfig.json',
           ],

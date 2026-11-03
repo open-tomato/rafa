@@ -1,0 +1,29 @@
+{
+  "name": "@open-tomato/atlas-transport",
+  "version": "0.0.0",
+  "description": "Atlas layer 3: a pure request handler over the Atlas contracts, thin fetch and Express adapters for the server side, and a typed client whose HTTP mechanism is a replaceable Transport (fetch by default).",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./server": "./src/server/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --build",
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@open-tomato/atlas-data": "workspace:*"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  }
+}

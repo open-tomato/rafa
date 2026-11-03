@@ -25,14 +25,14 @@ setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-/** The folder the root manifest's one `workspaces` glob, `packages/*`, names. */
-const PACKAGES_DIR = join(REPO_ROOT, 'packages');
+/** The folders the root manifest's two `workspaces` globs, `packages/*` and `addons/atlas/*`, name. */
+const MEMBER_DIRS: readonly string[] = ['packages', 'addons/atlas'];
 
-/** The folders under `packages/` that hold a manifest, as the check spells a member. */
+/** The folders under the member dirs that hold a manifest, as the check spells a member. */
 function manifestFolders(): string[] {
-  return readdirSync(PACKAGES_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && existsSync(join(PACKAGES_DIR, entry.name, 'package.json')))
-    .map((entry) => `packages/${entry.name}`)
+  return MEMBER_DIRS.flatMap((dir) => readdirSync(join(REPO_ROOT, dir), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && existsSync(join(REPO_ROOT, dir, entry.name, 'package.json')))
+    .map((entry) => `${dir}/${entry.name}`))
     .sort();
 }
 
@@ -47,7 +47,7 @@ describe('the workspace graph of the live tree', () => {
     expect(lines).toHaveLength(manifestFolders().length);
   });
 
-  test('control: the check read every folder under packages/ that holds a manifest', () => {
+  test('control: the check read every folder under packages/ and addons/atlas/ that holds a manifest', () => {
     const report = checkGraph(REPO_ROOT);
 
     expect(report.root).toEqual([]);
