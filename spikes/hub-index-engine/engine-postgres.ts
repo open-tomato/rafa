@@ -132,12 +132,16 @@ async function rebuild(
 /** The sizes Postgres reports once the table has been analysed. */
 async function sizes(sql: SQL, table: string, withVectorIndex: boolean): Promise<IndexSizes> {
   await sql.unsafe(`analyze ${table}`);
+  // The HNSW term has to leave the query when there is no such index: a
+  // `case` does not save it, because resolving the name to a regclass
+  // fails while the parameter binds, before any branch is taken.
+  const hnswTerm = withVectorIndex ? `pg_relation_size('${table}_hnsw')` : '0';
   const rows = (await sql.unsafe(
     `select pg_relation_size($1) as tbl,
             pg_relation_size($2) as bm25,
-            case when $4 then pg_relation_size($3) else 0 end as hnsw,
+            ${hnswTerm} as hnsw,
             pg_total_relation_size($1) as total`,
-    [table, `${table}_bm25`, `${table}_hnsw`, withVectorIndex],
+    [table, `${table}_bm25`],
   )) as Array<{ tbl: string; bm25: string; hnsw: string; total: string }>;
   const row = rows[0]!;
   return {
