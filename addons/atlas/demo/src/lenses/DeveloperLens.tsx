@@ -1,6 +1,6 @@
 import type { LensResult } from '../data/source.js';
 
-import { DashboardCard, StatTile, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { DashboardCard, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
@@ -8,6 +8,7 @@ import { BRANCH_TYPES, RED_CI_SHARE, RED_CI_THRESHOLD, WIP_LIMIT, WIP_NOW, WORK_
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { BalanceCard } from './balance/BalanceCard.js';
+import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { cardSpec, plotHeight } from './spec.js';
 
@@ -65,12 +66,12 @@ function DeveloperTiles({ mock }: { readonly mock: MockData }): ReactElement {
   const doneLastWeek = totals.at(-1) ?? 0;
   return (
     <>
-      <StatTile hero label="Tasks done this week" value={String(doneLastWeek)} trend={totals} delta={{ text: `vs ${TASKS_AVERAGE} four-week average`, direction: doneLastWeek > TASKS_AVERAGE
+      <LensStat hero label="Tasks done this week" value={String(doneLastWeek)} trend={totals} delta={{ text: `vs ${TASKS_AVERAGE} four-week average`, direction: doneLastWeek > TASKS_AVERAGE
         ? 'up'
         : 'down' }} />
-      <StatTile label="Plans completed per week" value={String(mock.plansPerWeek.at(-1)?.completed ?? 0)} trend={mock.plansPerWeek.map((week) => week.completed)} />
-      <StatTile label="Releases this week" value={String(mock.deploysPerWeek.at(-1) ?? 0)} trend={mock.deploysPerWeek} note="release tags and merged PRs from the git log" />
-      <StatTile label="Work in progress" value={`${WIP_NOW} of ${WIP_LIMIT}`} note="running loops and claimed issues" />
+      <LensStat label="Plans completed per week" value={String(mock.plansPerWeek.at(-1)?.completed ?? 0)} trend={mock.plansPerWeek.map((week) => week.completed)} />
+      <LensStat label="Releases this week" value={String(mock.deploysPerWeek.at(-1) ?? 0)} trend={mock.deploysPerWeek} note="release tags and merged PRs from the git log" />
+      <LensStat label="Work in progress" value={WIP_NOW} goal={WIP_LIMIT} note="running loops and claimed issues" />
     </>
   );
 }

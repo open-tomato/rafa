@@ -1,12 +1,13 @@
 import type { LensResult } from '../data/source.js';
 
-import { DashboardCard, DataTable, StatTile, useDashboard } from '@open-tomato/atlas-ui';
+import { DashboardCard, DataTable, useDashboard } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
 import { BUG_KINDS, DEFECT_DENSITY, OPEN_BUGS, ROUTES, WEEK_DATES, type MockData } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
+import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { cardSpec, plotHeight } from './spec.js';
 
@@ -44,12 +45,12 @@ function QaTiles({ mock }: { readonly mock: MockData }): ReactElement {
   const bugsLastWeek = totals.at(-1) ?? 0;
   return (
     <>
-      <StatTile hero label="Bugs recorded this week" value={String(bugsLastWeek)} trend={totals} delta={{ text: `vs ${BUGS_AVERAGE} four-week average`, direction: bugsLastWeek > BUGS_AVERAGE
+      <LensStat hero label="Bugs recorded this week" value={String(bugsLastWeek)} trend={totals} delta={{ text: `vs ${BUGS_AVERAGE} four-week average`, direction: bugsLastWeek > BUGS_AVERAGE
         ? 'up'
         : 'down', upIsGood: false }} />
-      <StatTile label="Regressions (own-fallout) this week" value={String(mock.bugsByKindPerWeek.at(-1)?.['own-fallout'] ?? 0)} trend={mock.regressionsPerWeek.map((point) => point.y)} />
-      <StatTile label="Open bug issues" value={String(OPEN_BUGS)} />
-      <StatTile label="Defect density" value={`${DEFECT_DENSITY} / kLOC`} note="bugs attributed to modules by the paths their text names" />
+      <LensStat label="Regressions (own-fallout) this week" value={String(mock.bugsByKindPerWeek.at(-1)?.['own-fallout'] ?? 0)} trend={mock.regressionsPerWeek.map((point) => point.y)} />
+      <LensStat label="Open bug issues" value={String(OPEN_BUGS)} />
+      <LensStat label="Defect density" value={`${DEFECT_DENSITY} / kLOC`} note="bugs attributed to modules by the paths their text names" />
     </>
   );
 }

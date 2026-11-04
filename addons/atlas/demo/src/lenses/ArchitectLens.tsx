@@ -1,6 +1,6 @@
 import type { LensResult } from '../data/source.js';
 
-import { Button, DashboardCard, DataTable, Dialog, SourceView, StatTile, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { Button, DashboardCard, DataTable, Dialog, SourceView, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatCompact, formatDay, formatPercent, useChartEngine, type HeatmapCell } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
@@ -21,6 +21,7 @@ import {
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { lensActionsVariants, lensInfoVariants, lensNoteVariants } from './ArchitectLens.variants.js';
+import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { MEASURED_SOURCE, cardSpec, plotHeight } from './spec.js';
 
@@ -135,10 +136,10 @@ function ArchitectTiles({ result }: { readonly result: LensResult }): ReactEleme
   const totalHalts = mock.preflightHalts.flat().reduce((sum, value) => sum + value, 0);
   return (
     <>
-      <StatTile hero label="Debt ratio (fix + refactor + chore minutes)" value={`${gradeOf(mock.debtRatio)} · ${formatPercent(mock.debtRatio)}`} note="proxy: no remediation estimate exists" />
-      <StatTile label="Task minutes p90, this week" value={`${p90} min`} trend={mock.taskMinutesQuantiles.map((week) => week.p90)} delta={{ text: `vs ${P90_AVERAGE} min four-week average`, direction: 'down', upIsGood: false }} />
-      <StatTile label="Preflight halts, 12 weeks" value={String(totalHalts)} />
-      <StatTile label="Workspace members" value={String(workspace.members.length)} note={`${workspace.edges.length} internal dependency edges`} />
+      <LensStat hero label="Debt ratio (fix + refactor + chore minutes)" value={`${gradeOf(mock.debtRatio)} · ${formatPercent(mock.debtRatio)}`} note="proxy: no remediation estimate exists" />
+      <LensStat label="Task minutes p90, this week" value={`${p90} min`} trend={mock.taskMinutesQuantiles.map((week) => week.p90)} delta={{ text: `vs ${P90_AVERAGE} min four-week average`, direction: 'down', upIsGood: false }} />
+      <LensStat label="Preflight halts, 12 weeks" value={String(totalHalts)} />
+      <LensStat label="Workspace members" value={String(workspace.members.length)} note={`${workspace.edges.length} internal dependency edges`} />
     </>
   );
 }

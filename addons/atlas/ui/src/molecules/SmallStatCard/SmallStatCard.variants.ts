@@ -37,9 +37,9 @@ export const smallStatCardRowVariants: (props?: Record<string, never>) => string
 /** The number column: the value and its suffix on one baseline. */
 export const smallStatCardValueVariants: (props?: Record<string, never>) => string = cva('flex min-w-0 items-baseline gap-1.5');
 
-/** The number itself, bold and tight. */
+/** The number itself, bold and tight; never broken across lines. */
 export const smallStatCardNumberVariants: (props?: SmallStatCardVariantProps) => string = cva(
-  'font-bold leading-none tracking-[-0.02em] text-ink',
+  'whitespace-nowrap font-bold leading-none tracking-[-0.02em] text-ink',
   {
     variants: {
       size: {
@@ -52,7 +52,7 @@ export const smallStatCardNumberVariants: (props?: SmallStatCardVariantProps) =>
 );
 
 /** The `/ goal` and unit suffix: small mono, greyed. */
-export const smallStatCardSuffixVariants: (props?: Record<string, never>) => string = cva('font-mono text-[13px] text-muted');
+export const smallStatCardSuffixVariants: (props?: Record<string, never>) => string = cva('whitespace-nowrap font-mono text-[13px] text-muted');
 
 /** The aside column beside the value: a graphic that keeps its size. */
 export const smallStatCardAsideVariants: (props?: Record<string, never>) => string = cva('shrink-0');

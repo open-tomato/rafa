@@ -1,12 +1,13 @@
 import type { LensResult } from '../data/source.js';
 
-import { DashboardCard, StatTile, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { DashboardCard, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatCompact, formatDay, formatMinutes, formatPercent, useChartEngine, type LineSeries } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
 import { DAYS, PILE_KINDS, PILE_TONES, WEEKLY_TOKEN_BUDGET_TIGHT, WIP_LIMIT_MINUTES, ACTIVE_BLOCKERS, ON_TIME_SHARE, type MockData } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
+import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { zoomFooterVariants } from './ProjectManagerLens.variants.js';
 import { cardSpec, plotHeight } from './spec.js';
@@ -85,18 +86,19 @@ function ProjectTiles({ mock }: { readonly mock: MockData }): ReactElement {
   const completion = lastWeek.completed / lastWeek.started;
   return (
     <>
-      <StatTile
+      <LensStat
         hero
         label="Plans completed this week"
-        value={`${lastWeek.completed} of ${lastWeek.started}`}
+        value={lastWeek.completed}
+        goal={lastWeek.started}
         delta={{ text: `${formatPercent(completion)} completion, vs 71% four-week average`, direction: completion > COMPLETION_AVERAGE
           ? 'up'
           : 'down' }}
         trend={mock.plansPerWeek.map((week) => week.completed / week.started)}
       />
-      <StatTile label="Active blockers" value={String(ACTIVE_BLOCKERS)} delta={{ text: '1 fewer than last week', direction: 'down', upIsGood: false }} />
-      <StatTile label="Out-of-scope entries this week" value={String(mock.scopeCreepPerWeek.at(-1) ?? 0)} trend={mock.scopeCreepPerWeek} delta={{ text: `vs ${SCOPE_CREEP_AVERAGE} a week average`, direction: 'up', upIsGood: false }} />
-      <StatTile label="Plans landed on their CI-green week" value={formatPercent(ON_TIME_SHARE)} note="proxy for on-time delivery: no due dates exist" />
+      <LensStat label="Active blockers" value={String(ACTIVE_BLOCKERS)} delta={{ text: '1 fewer than last week', direction: 'down', upIsGood: false }} />
+      <LensStat label="Out-of-scope entries this week" value={String(mock.scopeCreepPerWeek.at(-1) ?? 0)} trend={mock.scopeCreepPerWeek} delta={{ text: `vs ${SCOPE_CREEP_AVERAGE} a week average`, direction: 'up', upIsGood: false }} />
+      <LensStat label="Plans landed on their CI-green week" value={formatPercent(ON_TIME_SHARE)} note="proxy for on-time delivery: no due dates exist" />
     </>
   );
 }
