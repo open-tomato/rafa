@@ -21,8 +21,12 @@ export interface LegendItem {
 /** One table cell: text, or a number sorted numerically. */
 export type TableCell = string | number;
 
-/** The data behind a chart as a table: column headings and rows of cells. */
+/** The data behind a chart as a table: column headings, rows of cells, and how the Source entry shows them. */
 export interface TableData {
   readonly columns: readonly string[];
   readonly rows: readonly (readonly TableCell[])[];
+  /** How many rows the Source entry shows before "n more"; the table's own default otherwise. */
+  readonly limit?: number;
+  /** Whether the Source entry's headers sort; true unless set. */
+  readonly sortable?: boolean;
 }

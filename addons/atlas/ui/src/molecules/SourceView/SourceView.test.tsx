@@ -11,4 +11,18 @@ describe('SourceView', () => {
     expect(screen.getByRole('table', { name: 'Tokens' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'B' })).toBeDefined();
   });
+
+  it('caps and un-sorts the table as the table data says', () => {
+    render(<SourceView caption="Links" table={{ columns: ['From', 'To'], rows: [['a', 'b'], ['b', 'c'], ['c', 'd']], limit: 2, sortable: false }} />);
+
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByText('1 more row not shown')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'To' })).toBeNull();
+  });
+
+  it('lets its own props override the table data', () => {
+    render(<SourceView caption="Links" limit={3} table={{ columns: ['From', 'To'], rows: [['a', 'b'], ['b', 'c'], ['c', 'd']], limit: 2 }} />);
+
+    expect(screen.getAllByRole('row')).toHaveLength(4);
+  });
 });

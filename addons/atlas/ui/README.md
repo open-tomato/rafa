@@ -77,7 +77,9 @@ legend and source table (left out when the card has none) stand beside
 the box on a landscape viewport and under it on a portrait one, each as
 `maximise.legend` and `maximise.table` say: `always`, `toggle` (a header
 toggle, off at first; the default) or `toggle-on`. The dialog grows for
-them up to its clearance, then that pane scrolls.
+them up to its clearance, then that pane scrolls. A `TableData` may carry
+`limit` and `sortable`, so a card with a long table caps the Source entry
+(and the maximise table) without overriding the registry entry.
 
 While the data loads, the card shows a `ChartSkeleton` in the chart's
 box: the outline of the chart's family (bars, line, ring, rows, tile),

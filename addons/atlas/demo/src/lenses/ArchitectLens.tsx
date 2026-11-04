@@ -1,6 +1,6 @@
 import type { LensResult } from '../data/source.js';
 
-import { Button, DashboardCard, DataTable, Dialog, SourceView, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { Button, DashboardCard, DataTable, Dialog, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatCompact, formatDay, formatPercent, useChartEngine, type HeatmapCell } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
@@ -175,8 +175,8 @@ export function ArchitectLens(): ReactElement {
     ? HALTS
     : { ...HALTS, title: `Preflight halts, week of ${formatDay(WEEK_DATES[zoomWeek] ?? LAST_DAY)}`, subtitle: 'per weekday and four-hour slot; click a cell for the checks behind it' };
   const flowTable = data === undefined
-    ? null
-    : { columns: ['From', 'To'], rows: data.workspace.sankeyLinks.map((link) => [link.source, link.target]) };
+    ? undefined
+    : { columns: ['From', 'To'], rows: data.workspace.sankeyLinks.map((link) => [link.source, link.target]), limit: SANKEY_TABLE_LIMIT };
 
   return (
     <LensGrid
@@ -322,7 +322,7 @@ export function ArchitectLens(): ReactElement {
             select={(result: LensResult) => result.workspace}
             info={FLOW_INFO}
             legend={LAYER_LEGEND}
-            modals={{ source: flowTable !== null && <SourceView table={flowTable} caption={FLOW.title} source={FLOW.source} limit={SANKEY_TABLE_LIMIT} /> }}
+            table={flowTable}
           >
             {({ data: workspace, animate, height }) => (
               <Sankey
