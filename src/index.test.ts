@@ -1026,6 +1026,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-render.js', ['renderDoctor']],
     ['./doctor-stretch.js', ['writeDoctorStretch']],
     ['./doctor-tiers.js', ['checkDoctorTiers', 'renderDoctorTiers']],
+    ['./doctor-tsc.js', ['writeDoctorTsc']],
   ]],
   ['./commands/cleanup.js', [
     ['@open-tomato/rafa-pr', ['ghPullRequestsIn', 'resolvePrProvider']],
