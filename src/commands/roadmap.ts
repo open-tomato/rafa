@@ -19,11 +19,13 @@
  * relationships mode"). The flags are `ISSUE_LIST_FLAGS`, the same objects, less the two
  * this command has no use for: `--roadmap`, which it always sets, and
  * `--state`, which `issue list` refuses beside `--roadmap` whatever its
- * value. Typed anyway, `--state` is refused here with that same message,
- * and `--roadmap` changes nothing.
+ * value. Typed anyway, either is a flag this command does not declare,
+ * which the dispatcher refuses with exit code 2 before `run` is called
+ * (`src/cli/flag-refusal.ts`, #1267), so no reading of `--state` is
+ * left here and none reaches the shared run.
  *
- * A refusal names `issue list`'s usage line, since it is that command's
- * reading of the line that refuses.
+ * Any other refusal names `issue list`'s usage line, since it is that
+ * command's reading of the line that refuses.
  *
  * It starts no session, so it declares no `spends`.
  */
@@ -32,7 +34,7 @@ import type { IssueSeams } from '@open-tomato/rafa-board';
 
 import { DEFAULT_ISSUE_SEAMS, ISSUE_LIST_FLAGS } from '@open-tomato/rafa-board';
 
-/** The `issue list` flags `rafa roadmap` leaves undeclared: the one it sets, and the one refused beside it. */
+/** The `issue list` flags `rafa roadmap` leaves undeclared, so the dispatcher refuses them: the one it sets, and the one refused beside it. */
 const NOT_DECLARED: readonly string[] = ['roadmap', 'state'];
 
 /** The flags `rafa roadmap` declares: `issue list`'s own, in its order, less {@link NOT_DECLARED}. */

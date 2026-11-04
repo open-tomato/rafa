@@ -32,6 +32,11 @@
  *
  *   unknown flags "--dry-run", "--bogus" for "rafa release tag"; its flags are --push, --force
  *   hint: run rafa release tag --help for its flags
+ *
+ * Both name the command by its canonical spelling, unless the caller
+ * hands the spelling its line was routed by: a module command mounted
+ * under `module exec` is reached as `rafa module exec <module> <action>`,
+ * its own subject routing nothing, and the dispatcher hands that.
  */
 import type { RafaCommand, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 
@@ -121,11 +126,14 @@ function quoted(words: readonly string[]): string {
 
 /**
  * The refusal's message: each undeclared flag word as typed, then the
- * command's declared flags as `--<name>`; see the module note.
+ * command's declared flags as `--<name>`, naming the command as
+ * `spelling`, its canonical spelling unless handed one; see the module
+ * note.
  */
 export function unknownFlagMessage(
   command: Pick<RafaCommand, 'subject' | 'action' | 'flags'>,
   undeclared: readonly string[],
+  spelling: string = commandSpelling(command),
 ): string {
   const noun = undeclared.length === 1
     ? 'flag'
@@ -133,10 +141,16 @@ export function unknownFlagMessage(
   const declared = command.flags.length === 0
     ? 'it declares no flags'
     : `its flags are ${command.flags.map((flag) => `--${flag.name}`).join(', ')}`;
-  return `unknown ${noun} ${quoted(undeclared)} for "rafa ${commandSpelling(command)}"; ${declared}`;
+  return `unknown ${noun} ${quoted(undeclared)} for "rafa ${spelling}"; ${declared}`;
 }
 
-/** The refusal's hint, pointing at the command's help. */
-export function unknownFlagHint(command: Pick<RafaCommand, 'subject' | 'action'>): string {
-  return `run rafa ${commandSpelling(command)} --help for its flags`;
+/**
+ * The refusal's hint, pointing at the command's help, spelled as
+ * `spelling`, its canonical spelling unless handed one.
+ */
+export function unknownFlagHint(
+  command: Pick<RafaCommand, 'subject' | 'action'>,
+  spelling: string = commandSpelling(command),
+): string {
+  return `run rafa ${spelling} --help for its flags`;
 }

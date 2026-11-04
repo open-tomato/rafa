@@ -2142,9 +2142,9 @@ New; it replaces no earlier text. What a row or an action added to
   presence, whatever its value. `rafa roadmap` (`src/commands/roadmap.ts`)
   is a top-level command that runs `issue list --roadmap` and is not an
   alias, so help, `describe` and the spends reading name one place
-  rather than two. It leaves `--state` undeclared and still refuses it:
-  `parseArgs` reads an undeclared `--flag` into the context rather than
-  refusing it, so the shared run sees it. Its text output is the same
+  rather than two. It leaves `--state` and `--roadmap` undeclared, so the
+  dispatcher refuses either typed as `unknown_flag` with exit 2 (see
+  "One invocation") before the shared run sees it. Its text output is the same
   bytes as `issue list --roadmap`; in json mode only the result events
   match, since the start event names the command as typed.
 - **`issue list --roadmap` and `rafa roadmap` print the epics a Roadmap
@@ -3019,9 +3019,37 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   `hint` is written where it has one, and its `module` and `action` are the
   command's subject and action unless the error names its own. In text mode that
   line ends with the bracket and the hint line follows, as for any coded
-  failure. A help request, a routing refusal, `invalid_spec` and a command
-  declaring `needsProject: false` read neither the working directory nor the
-  home.
+  failure. A help request, a routing refusal, `invalid_spec`, `unknown_flag`
+  and a command declaring `needsProject: false` read neither the working
+  directory nor the home.
+
+- **A command refuses a flag it does not declare** (#1267;
+  `src/cli/flag-refusal.ts`). A flag word on the line is accepted when
+  `parseArgs` reads its name as a declared flag, an alias of one, the
+  `--no-<name>` form of a declared boolean or of its alias, or one of the
+  global names `output`, `verbose`, `v` and `version` (`GLOBAL_FLAG_NAMES`,
+  read off `GLOBAL_FLAGS`). Every other flag word is the `unknown_flag`
+  refusal, `--no-output` among them since `output` is no boolean; the words
+  after the first `--` are positional and never read. The line is read
+  after its deprecated flags are rewritten, once the spec is read
+  (`invalid_spec` is told first) and before the project is resolved, so the
+  command never runs. It ends with exit code 2, the one refusal not ending
+  with 1. Its message names each undeclared flag as typed, then the
+  command's declared flags, and it is coded: its `cause` is
+  `cli:unknown-flag`, its `hint` points at the command's help, and its
+  `module` and `action` are the command's. The command is named by the
+  route's label, so a mounted module command reads
+  `rafa module exec <module> <action>`. In text mode:
+
+  ```text
+  $ rafa release tag --dry-run
+  rafa: unknown flag "--dry-run" for "rafa release tag"; its flags are --push [cli:unknown-flag]
+    hint: run rafa release tag --help for its flags
+  ```
+
+  A help request beside an undeclared flag, `rafa release tag --dry-run
+  --help`, is routed as help before any of this is read, and prints the help
+  with exit 0.
 
 - **json mode writes one `start` event first and one terminal `result` last**,
   every line NDJSON. Text mode writes neither event. `writeEnding` in
@@ -3132,7 +3160,8 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   and `commandProblem` refuses one naming no `use`.
 - **The result error codes** are the five route refusals, `unknown_subject`,
   `missing_action`, `unknown_action`, `unknown_module` and `unexpected_version`,
-  and five more: `invalid_spec` (a spec `parseArgs` refuses), `no_project` (a
+  and six more: `invalid_spec` (a spec `parseArgs` refuses), `unknown_flag` (a
+  flag the command does not declare, exit 2), `no_project` (a
   command run outside a project), `command_exit` (a command that set its own
   exit code), `command_error` (a command that threw, or an error past it) and
   `result_unwritable` (an event JSON refuses to write). Beside `code` and
@@ -3143,7 +3172,7 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   `hint` when a coded error has one; and `module` and `action` for a coded
   failure or for a command that ran, the coded error's, else the command's
   subject and action. A refusal made before any command ran carries them only
-  from a coded error; an uncoded failure of a command that ran carries the
+  from a coded error, `unknown_flag` the command's it refused; an uncoded failure of a command that ran carries the
   command's own (`CliEventResult`, `packages/rafa/src/ports/index.ts`).
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.

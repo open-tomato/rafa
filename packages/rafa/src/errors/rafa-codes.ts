@@ -60,6 +60,7 @@ export const RAFA_CODES: readonly ErrorCodeEntry[] = defineErrorCodes([
   { code: 'cli:unknown-module', description: 'a module command names a module that is not mounted', hint: 'run rafa module list for the modules that are mounted', level: 'error', since: SEED, legacy: 'unknown_module' },
   { code: 'cli:unexpected-version', description: '--version is typed beside a command, where it is read alone', hint: 'run rafa --version alone, with no command beside it', level: 'error', since: SEED, legacy: 'unexpected_version' },
   { code: 'cli:invalid-spec', description: 'a command declares a shape the dispatcher refuses', hint: 'fix the command declaration the message names', level: 'error', since: SEED, legacy: 'invalid_spec' },
+  { code: 'cli:unknown-flag', description: 'a command line types a flag the command does not declare', hint: 'run rafa <command> --help for its flags', level: 'error', since: '#1267', legacy: 'unknown_flag' },
   { code: 'cli:no-project', description: 'a command that needs a project ran outside one', hint: 'run it inside a project, or run rafa init', level: 'error', since: SEED, legacy: 'no_project' },
   { code: 'cli:command-exit', description: 'a command refused and set its own exit code', hint: 'read the message above it', level: 'error', since: SEED, legacy: 'command_exit' },
   { code: 'cli:command-error', description: 'a command threw an error it did not handle', hint: 'file a bug with the stack', level: 'error', since: SEED, legacy: 'command_error' },

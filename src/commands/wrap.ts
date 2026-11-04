@@ -19,7 +19,9 @@
  * refuse the spelling the command tree gives json mode. Every word
  * `parseArgs` reads as that flag ahead of a `--` is dropped, by
  * `parseArgs`'s own rules: `--output=json`, `-output=json` and
- * `--no-output` alone, and `--output json` with its value. So
+ * `--no-output` alone, and `--output json` with its value. The
+ * dispatcher refuses `--no-output` before any command runs
+ * (`src/cli/flag-refusal.ts`), so a wrapper it runs never sees that one. So
  * `rafa effort report --output=json --kind=task` hands `report`
  * `['--kind=task']`. The words from a `--` on are handed over whole.
  *

@@ -106,11 +106,21 @@ describe('unknownFlagMessage', () => {
       'unknown flag "--bogus" for "rafa status"; it declares no flags',
     );
   });
+
+  it('names the command by the spelling it is handed, as a mounted module command is routed', () => {
+    expect(unknownFlagMessage(COMMAND, ['--bogus'], 'module exec linear tag')).toBe(
+      'unknown flag "--bogus" for "rafa module exec linear tag"; its flags are --push, --plan',
+    );
+  });
 });
 
 describe('unknownFlagHint', () => {
   it('points at the command help', () => {
     expect(unknownFlagHint(COMMAND)).toBe('run rafa release tag --help for its flags');
     expect(unknownFlagHint({ subject: 'status', action: 'status' })).toBe('run rafa status --help for its flags');
+  });
+
+  it('spells the command as it is handed', () => {
+    expect(unknownFlagHint(COMMAND, 'module exec linear tag')).toBe('run rafa module exec linear tag --help for its flags');
   });
 });

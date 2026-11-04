@@ -257,9 +257,11 @@ function twelveQuestion(): string {
 }
 
 /**
- * Typed by every case here, so that no case composes the real sources
- * for the ending hint and spawns `git` and `gh` in the scratch project
- * it planted. The ending itself is driven in the command's own suite.
+ * Typed by every `pr merge` case here, so that no case composes the real
+ * sources for the ending hint and spawns `git` and `gh` in the scratch
+ * project it planted. The ending itself is driven in the command's own
+ * suite. `issue unblock` ends with no hint and declares no `--no-hint`,
+ * so the dispatcher would refuse it there (#1267).
  */
 const NO_HINT = '--no-hint';
 
@@ -424,7 +426,7 @@ describe('a blocker past the state listing, read through one view on either door
   async function unblockDoor(reading: BoardReading): Promise<{ gh: ReturnType<typeof fakeGh>; stdout: string; exitCode: number | null }> {
     const gh = fakeGh(sharedBoard(true), reading);
     const command = createIssueUnblockCommand({ openGh: () => gh.run, isTerminal: () => true, openPrompter: scriptedPrompter([]).open });
-    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes', NO_HINT], SUBJECTS, [command], freshProject());
+    const outcome = await dispatchInProject(['issue', 'unblock', '12', '--yes'], SUBJECTS, [command], freshProject());
     return { gh, stdout: outcome.stdout, exitCode: outcome.exitCode };
   }
 

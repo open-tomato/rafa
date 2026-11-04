@@ -32,6 +32,12 @@
  * reddened the five cases dropping it, and keeping the value of
  * `--output json` the case typing it as two words.
  *
+ * Since #1267 the dispatcher refuses a flag the command does not declare
+ * before the wrapper runs, so the cases typing a flag they are not about
+ * wrap a declaration declaring it (`declaring`), and `--no-output`, the
+ * negation of a global name that is no boolean, is refused with exit
+ * code 2 and never reaches the command.
+ *
  * The root cases came with the wrapper handing on the root of the project
  * the dispatcher resolved, and every case dispatches in a project planted
  * in this file's temporary directory. Two mutations of `wrap.ts` were
@@ -43,7 +49,7 @@
  */
 import type { CommandDeclaration, PhaseZeroCommand } from './wrap.js';
 import type { DispatchOutcome } from '../cli/dispatch.js';
-import type { RafaCommand } from '@open-tomato/rafa/core/command';
+import type { RafaCommand, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -89,6 +95,11 @@ const DECLARATION: CommandDeclaration = {
   aliases: ['start'],
   outputs: ['text'],
 };
+
+/** {@link DECLARATION} declaring `extra` beside its own flags, for a case typing flags it is not about. */
+function declaring(...extra: RafaFlagSpec[]): CommandDeclaration {
+  return { ...DECLARATION, flags: [...DECLARATION.flags, ...extra] };
+}
 
 /** A stand-in phase 0 command, and every argument list and project root it was handed. */
 interface StandIn {
@@ -151,7 +162,9 @@ describe('what a wrapped command is handed', () => {
   it('hands the words after its action as typed, and nothing of the line before them', async () => {
     const { command, calls } = standIn();
 
-    const run = await dispatchOver(wrapPhaseZeroCommand(DECLARATION, command), [
+    const ciWait: RafaFlagSpec = { name: 'ci-wait', description: 'Waits for CI.', type: 'boolean' };
+
+    const run = await dispatchOver(wrapPhaseZeroCommand(declaring(ciWait), command), [
       '-v',
       'loop',
       'start',
@@ -169,7 +182,6 @@ describe('what a wrapped command is handed', () => {
     ['--output=json', ['--output=json', '--plan=a.md'], true],
     ['--output json, its value the next word', ['--output', 'json', '--plan=a.md'], true],
     ['-output=json', ['-output=json', '--plan=a.md'], true],
-    ['--no-output', ['--no-output', '--plan=a.md'], false],
     ['a bare --output ahead of a flag', ['--output', '--plan=a.md'], false],
   ])('hands no word of %s, the output flag the dispatcher reads', async (_title, words, json) => {
     const { command, calls } = standIn();
@@ -181,10 +193,22 @@ describe('what a wrapped command is handed', () => {
     expect(run.outcome.exitCode).toBe(0);
   });
 
-  it('hands a flag spelled only like --output, and every word from a --, as typed', async () => {
+  it('never calls the command for --no-output, which the dispatcher refuses, output being no boolean', async () => {
     const { command, calls } = standIn();
 
-    await dispatchOver(wrapPhaseZeroCommand(DECLARATION, command), [
+    const run = await dispatchOver(wrapPhaseZeroCommand(DECLARATION, command), ['loop', 'start', '--no-output', '--plan=a.md']);
+
+    expect(calls).toEqual([]);
+    expect(run.outcome.exitCode).toBe(2);
+    expect(run.outcome.result).toMatchObject({ ok: false, error: { code: 'unknown_flag', cause: 'cli:unknown-flag' } });
+  });
+
+  it('hands a flag spelled only like --output, and every word from a --, as typed', async () => {
+    const { command, calls } = standIn();
+    const outputs: RafaFlagSpec = { name: 'outputs', description: 'Spelled like --output.', type: 'string' };
+    const outputFile: RafaFlagSpec = { name: 'output-file', description: 'Spelled like --output.', type: 'string' };
+
+    await dispatchOver(wrapPhaseZeroCommand(declaring(outputs, outputFile), command), [
       'loop',
       'start',
       '--outputs=json',
