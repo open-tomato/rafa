@@ -11,6 +11,11 @@
  * the runner's own PATH, which starts tsc and reads `ok`, so the
  * failure is the PATH and not the link.
  *
+ * The text env prints for the missing node (`MISSING`) is measured, not
+ * written in: a control spawn of `/usr/bin/env node` under the same kind
+ * of PATH must exit 127, and its first non-blank line is what the
+ * real-spawn cases compare against.
+ *
  * Every other exit is scripted through the row's `runTscVersion` seam,
  * each beside the reading it is told apart from.
  */
@@ -39,9 +44,6 @@ const CHECKOUT_TSC = fileURLToPath(new URL('../../node_modules/.bin/tsc', import
 
 /** The system directories a PATH with no node keeps when no node sits in them. */
 const SYSTEM_DIRS: readonly string[] = ['/usr/bin', '/bin'];
-
-/** What env prints for a node it cannot find, measured on this machine. */
-const MISSING = 'env: \'node\': No such file or directory';
 
 /** A scratch directory under the temporary one. */
 function scratch(prefix: string): string {
@@ -78,6 +80,31 @@ function pathWithNoNode(): string {
     ? `${dir}:${system}`
     : dir;
 }
+
+/** The exit code env answers for a program it cannot find on the PATH. */
+const ENV_NOT_FOUND = 127;
+
+/**
+ * What env prints for a node it cannot find, measured by a control spawn
+ * of `/usr/bin/env node` under {@link pathWithNoNode} rather than written
+ * in: GNU coreutils prints `env: 'node': No such file or directory`, and
+ * another env words it otherwise. The control must exit 127 and print a
+ * line, or no case below could tell a refused node from any other exit.
+ */
+function measureMissing(): string {
+  const control = Bun.spawnSync(['/usr/bin/env', 'node'], { env: { PATH: pathWithNoNode() }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  if (control.exitCode !== ENV_NOT_FOUND) {
+    throw new Error(`control: /usr/bin/env node exited ${String(control.exitCode)} under a PATH with no node, not ${String(ENV_NOT_FOUND)}`);
+  }
+  const line = control.stderr.toString().split('\n')
+    .map((text) => text.trim())
+    .find((text) => text !== '');
+  if (line === undefined) throw new Error('control: /usr/bin/env node printed nothing under a PATH with no node');
+  return line;
+}
+
+/** The first non-blank line env printed for the control spawn. */
+const MISSING = measureMissing();
 
 /** A runner answering `run`, recording what it was asked to spawn. */
 function scripted(run: TscVersionRun | Error): { runTscVersion: (options: TscVersionOptions) => Promise<TscVersionRun>; seen: TscVersionOptions[] } {
