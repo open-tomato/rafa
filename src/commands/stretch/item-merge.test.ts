@@ -36,7 +36,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { beginSession } from '@open-tomato/rafa/core/loop';
 import { eventsFilePath } from '@open-tomato/rafa-run/start/loop-events';
 
-import { createFakeRunsGh } from '../../ci/runs-fake.js';
+import { createFakeRunsGh, RECORDED_STRETCH_111 } from '../../ci/runs-fake.js';
 import { headRunsArgs, runListArgs } from '../../ci/runs.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
@@ -462,6 +462,23 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
       '   ✅ verify run 37190099999 is success.',
     ]);
     expect(outcome.stdout).not.toContain('warn:');
+  });
+
+  it('prints the red CI line for the planted 90471b00 pair on the merge commit, a skipped run newest above two failed ones', async () => {
+    const pair = RECORDED_STRETCH_111
+      .filter((held) => held.headSha.startsWith('90471b00'))
+      .map((held) => ({ ...held, headBranch: BRANCH, headSha: MERGE_SHA }));
+    const planted = plant({ runs: [pair] });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expectInOrder(outcome.stdout, [
+      `CI: ❌ ${BRANCH}: red on c4da2c4, 2 workflows.`,
+      '   ✅ Release bot fragment run 41456634201 is skipped.',
+      '   ❌ verify run 41456633215 is failure.',
+    ]);
+    expect(outcome.stdout).not.toContain('run 41456159309');
   });
 
   it('says the run it found had not ended when the merge commit\'s run is still going at the wait\'s bound', async () => {

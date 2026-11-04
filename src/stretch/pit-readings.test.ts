@@ -34,7 +34,7 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 
 import { describe, expect, it } from 'bun:test';
 
-import { createFakeRunsGh } from '../ci/runs-fake.js';
+import { createFakeRunsGh, RECORDED_STRETCH_111 } from '../ci/runs-fake.js';
 import { headRunsArgs, runListArgs } from '../ci/runs.js';
 
 import { FIRST_LINE_MAX, NO_FILED_ISSUES, NO_OPEN_ISSUES, readPitReadings, renderPitReadings } from './pit-readings.js';
@@ -182,6 +182,19 @@ describe('the CI reading', () => {
     expect(reading.ci.value.verdict).toBe('green');
     expect(reading.ci.value.workflows.map((line) => line.run.id)).toEqual([37190099002]);
     expect(ci.calls().some((args) => args[1] === 'view')).toBe(false);
+  });
+
+  it('holds the red verdict and exit 1 on the planted 90471b00 pair, a skipped run newest above two failed ones', async () => {
+    const pair = RECORDED_STRETCH_111.filter((run) => run.headSha.startsWith('90471b00'));
+    const ci = caseGh(pair);
+
+    const reading = await readPitReadings(seams(ci.gh, []), { branch: 'stretch/111', since: SINCE });
+
+    if (!reading.ci.ok) throw new Error(reading.ci.reason);
+    expect(reading.ci.value.verdict).toBe('red');
+    expect(reading.ci.value.exitCode).toBe(1);
+    expect(reading.ci.value.workflows.map((line) => [line.workflow, line.verdict, line.run.id]))
+      .toEqual([[FRAGMENT, 'green', 41456634201], [WORKFLOW, 'red', 41456633215]]);
   });
 
   it('reads running while one workflow of the head commit has not finished beside a green one', async () => {

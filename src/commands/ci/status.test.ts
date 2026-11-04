@@ -127,6 +127,9 @@ function readingOf(events: readonly CliEvent[]): CiBranchReading {
 /** The fragment workflow, whose runs a skip makes green. */
 const FRAGMENT = 'Release bot fragment';
 
+/** The `90471b00` rows of the recorded `stretch/111`: a skipped fragment run newest, two failed `verify` runs. */
+const PLANTED_PAIR = RECORDED_STRETCH_111.filter((run) => run.headSha.startsWith('90471b00'));
+
 /** The `run list` calls `gh` got, as their flags. */
 function listCalls(calls: readonly (readonly string[])[]): (readonly string[])[] {
   return calls.filter((call) => call[1] === 'list');
@@ -202,6 +205,21 @@ describe('rafa ci status over the recorded gh', () => {
       `   ✅ ${FRAGMENT} run 41462566369 is skipped.`,
     ]);
     expect(gh.calls().filter((call) => call[1] === 'view')).toEqual([]);
+  });
+
+  it('holds the red verdict and exit 1 on the planted 90471b00 pair, a skipped run newest above two failed ones', async () => {
+    const gh = caseGh(PLANTED_PAIR);
+
+    const run = await ran(gh.seams, ['--branch=stretch/111']);
+    const control = await ran(caseGh(PLANTED_PAIR).seams, ['--branch=stretch/111', `--workflow=${FRAGMENT}`]);
+
+    expect(run.exitCode).toBe(1);
+    expect(linesOf(run).slice(0, 3)).toEqual([
+      '❌ stretch/111: red on 90471b0, 2 workflows.',
+      `   ✅ ${FRAGMENT} run 41456634201 is skipped.`,
+      '   ❌ verify run 41456633215 is failure.',
+    ]);
+    expect(control.exitCode).toBe(0);
   });
 
   it('exits 3 while one workflow is running beside a green one, and 1 once another is red beside it', async () => {
