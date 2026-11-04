@@ -40,6 +40,8 @@ export interface ModalDefinition {
   /** Wraps the entry in the default chrome; true unless `render` is a component. */
   readonly chrome?: boolean;
   readonly tone?: ButtonTone;
+  /** Lists the entry in the card menu; false for one only the chart or the header opens. */
+  readonly menu?: boolean;
   readonly render: ReactNode | ModalComponent;
 }
 
@@ -60,6 +62,7 @@ export interface ResolvedModal {
   readonly placement: ModalPlacement;
   readonly chrome: boolean;
   readonly tone: ButtonTone;
+  readonly menu: boolean;
   readonly render: ReactNode | ModalComponent;
 }
 
@@ -128,6 +131,7 @@ export function resolveModal(key: string, entry: ModalEntry, cardTitle: string):
     placement: definition.placement ?? builtIn?.placement ?? 'contained',
     chrome: definition.chrome ?? true,
     tone: definition.tone ?? builtIn?.tone ?? 'default',
+    menu: definition.menu ?? true,
     render: definition.render,
   };
 }

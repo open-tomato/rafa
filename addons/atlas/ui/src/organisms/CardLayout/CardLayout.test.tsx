@@ -100,6 +100,27 @@ describe('CardLayout', () => {
     expect(screen.queryByRole('button', { name: 'Close picker of Tokens' })).toBeNull();
   });
 
+  it('lets the content and the header open an entry kept out of the menu', () => {
+    render(
+      <CardLayout
+        title="Tokens"
+        header={(card) => <button type="button" onClick={() => card.open('cell')}>inspect</button>}
+        content={({ card }) => <button type="button" onClick={() => card.open('cell')}>the chart</button>}
+        modals={{ info: <p>how to read</p>, cell: { menu: false, title: 'One cell', render: <p>the cell</p> } }}
+      />,
+    );
+    openMenu();
+
+    expect(menuLabels()).toEqual(['Info']);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'the chart' }));
+    expect(screen.getByRole('dialog', { name: 'One cell' }).textContent).toContain('the cell');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'inspect' }));
+    expect(screen.getByRole('dialog', { name: 'One cell' })).toBeDefined();
+  });
+
   it('keeps a component entry\'s state across the layout\'s re-renders', () => {
     function Counter(): ReactElement {
       const [count, setCount] = useState(0);

@@ -1,6 +1,6 @@
 import type { LensResult } from '../data/source.js';
 
-import { Button, DashboardCard, DataTable, Dialog, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { Button, DashboardCard, DataTable, useDashboard, type LegendItem, type ModalEntry } from '@open-tomato/atlas-ui';
 import { formatCompact, formatDay, formatPercent, useChartEngine, type HeatmapCell } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
@@ -174,6 +174,32 @@ export function ArchitectLens(): ReactElement {
   const haltsSpec = zoomWeek === null
     ? HALTS
     : { ...HALTS, title: `Preflight halts, week of ${formatDay(WEEK_DATES[zoomWeek] ?? LAST_DAY)}`, subtitle: 'per weekday and four-hour slot; click a cell for the checks behind it' };
+  /** The checks behind the picked cell: a registry entry the chart opens, kept out of the menu. */
+  const cellModal: Readonly<Record<string, ModalEntry>> = {
+    cell: cell !== null && {
+      menu: false,
+      title: `${WEEKDAYS[cell.row] ?? ''} ${formatDay(WEEK_DATES[cell.col] ?? LAST_DAY)}: ${cell.value} halts`,
+      render: ({ close }) => (
+        <>
+          {details.length > 0
+            ? <DataTable caption="Halts by check" columns={['Check', 'Halts']} rows={details.map((row) => [row.check, row.halts])} sortable />
+            : <p className={lensNoteVariants()}>No halt that day.</p>}
+          <div className={lensActionsVariants()}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setZoomWeek(cell.col);
+                setCell(null);
+                close();
+              }}
+            >
+              Zoom into this week
+            </Button>
+          </div>
+        </>
+      ),
+    },
+  };
   const flowTable = data === undefined
     ? undefined
     : { columns: ['From', 'To'], rows: data.workspace.sankeyLinks.map((link) => [link.source, link.target]), limit: SANKEY_TABLE_LIMIT };
@@ -243,11 +269,12 @@ export function ArchitectLens(): ReactElement {
               ? result.mock.preflightHalts
               : preflightHaltsByHour(result.mock.preflightHalts, zoomWeek))}
             table={(grid) => haltsTable(grid, zoomWeek !== null)}
+            modals={cellModal}
             actions={zoomWeek !== null && (
               <Button variant="text" onClick={() => setZoomWeek(null)}>← 12 weeks</Button>
             )}
           >
-            {({ data: grid, animate, height }) => (
+            {({ data: grid, animate, height, open }) => (
               <HeatmapGrid
                 ariaLabel={zoomWeek === null
                   ? 'Preflight halts per weekday and week'
@@ -262,7 +289,10 @@ export function ArchitectLens(): ReactElement {
                   : 1}
                 unit="halts"
                 onCellClick={zoomWeek === null
-                  ? setCell
+                  ? (picked) => {
+                    setCell(picked);
+                    open('cell');
+                  }
                   : undefined}
                 selected={cell === null
                   ? null
@@ -272,28 +302,6 @@ export function ArchitectLens(): ReactElement {
               />
             )}
           </DashboardCard>
-          <Dialog
-            open={cell !== null}
-            title={cell === null
-              ? ''
-              : `${WEEKDAYS[cell.row] ?? ''} ${formatDay(WEEK_DATES[cell.col] ?? LAST_DAY)}: ${cell.value} halts`}
-            onClose={() => setCell(null)}
-          >
-            {details.length > 0
-              ? <DataTable caption="Halts by check" columns={['Check', 'Halts']} rows={details.map((row) => [row.check, row.halts])} sortable />
-              : <p className={lensNoteVariants()}>No halt that day.</p>}
-            <div className={lensActionsVariants()}>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  if (cell !== null) setZoomWeek(cell.col);
-                  setCell(null);
-                }}
-              >
-                Zoom into this week
-              </Button>
-            </div>
-          </Dialog>
           <DashboardCard
             config={ROSE}
             select={(result: LensResult) => result.workspace.sizeRose}

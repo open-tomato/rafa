@@ -60,6 +60,28 @@ describe('ChartCard', () => {
     expect(screen.getByText('input=120,output=40|animate=true|max=false')).toBeDefined();
   });
 
+  it('opens a consumer entry from the chart and from a header action', () => {
+    render(
+      <ChartCard
+        config={CONFIG}
+        data={DATA}
+        actions={(card) => <button type="button" onClick={() => card.open('cell')}>inspect</button>}
+        modals={{ cell: { menu: false, title: 'One cell', render: <p>the cell</p> } }}
+      >
+        {({ open }) => <button type="button" onClick={() => open('cell')}>the chart</button>}
+      </ChartCard>,
+    );
+    openMenu();
+
+    expect(menuLabels()).toEqual(['Info', 'Maximise']);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'the chart' }));
+    expect(screen.getByRole('dialog', { name: 'One cell' }).textContent).toContain('the cell');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'inspect' }));
+    expect(screen.getByRole('dialog', { name: 'One cell' })).toBeDefined();
+  });
+
   it('hides a series from the legend toggle', () => {
     render(<ChartCard config={CONFIG} data={DATA} legend={LEGEND}>{chart}</ChartCard>);
     fireEvent.click(screen.getByRole('button', { name: 'Output' }));

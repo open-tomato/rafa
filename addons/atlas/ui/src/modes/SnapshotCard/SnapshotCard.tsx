@@ -13,6 +13,9 @@ import { NO_HIDDEN } from '../../organisms/ChartCard/entries.js';
 
 import { snapshotCardVariants } from './SnapshotCard.variants.js';
 
+/** A snapshot has no modals, so a chart's `open` does nothing. */
+const noModal = (): void => undefined;
+
 /** A snapshot's props: static config, static data, the legend and the chart. */
 export interface SnapshotCardProps<T> {
   readonly config: CardSpec;
@@ -47,7 +50,7 @@ export function SnapshotCard<T>({ config, data, legend, className, children }: S
       content={(
         <div className={chartCardBodyVariants()}>
           <Legend items={items} mark={config.legend?.mark} />
-          {children({ data, hidden: NO_HIDDEN, animate: false, maximised: false, height: DEFAULT_CHART_HEIGHT })}
+          {children({ data, hidden: NO_HIDDEN, animate: false, maximised: false, open: noModal, height: DEFAULT_CHART_HEIGHT })}
         </div>
       )}
     />

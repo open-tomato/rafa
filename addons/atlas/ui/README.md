@@ -58,8 +58,13 @@ layer above through its hook; a chart is a pure component under them:
 `ChartCard` (organisms) composes them and adds an outer `CardBoundary` for
 the frame. The modal registry takes three entry shapes: content (default
 chrome), a component `({ close, card }) => ReactNode`, or a `ModalDefinition`
-(`{ label, icon, title, placement, chrome, tone, render }`) when the entry
-needs its own menu label. Built-in keys: `info`, `source`, `config`, `errors`
+(`{ label, icon, title, placement, chrome, tone, menu, render }`) when the
+entry needs its own menu label, or `menu: false` to stay out of the menu.
+The content slot and the header slot may be functions of the card's handle
+(`{ title, error, maximised, open, close, retry }`), so a chart opens the
+entry behind a cell or a node and a header action opens one too;
+`ChartCard` hands its child `open` and a function `actions` the handle.
+Built-in keys: `info`, `source`, `config`, `errors`
 (present once the boundary caught, or an `error` prop is passed), `maximise`
 (on `maximisable` cards). The four modes in `modes/` (`SnapshotCard`,
 `WidgetCard`, `DashboardCard`, `ReportCard`) are compositions of the same

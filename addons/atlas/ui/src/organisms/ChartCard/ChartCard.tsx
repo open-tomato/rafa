@@ -2,7 +2,7 @@ import type { LegendLayout } from '../../atoms/Legend/Legend.variants.js';
 import type { LegendItem, TableData } from '../../context/types.js';
 import type { DataStatus } from '../../context/useSourced.js';
 import type { ContentView } from '../CardLayout/CardLayout.js';
-import type { ModalEntry } from '../CardLayout/registry.js';
+import type { CardHandle, ModalEntry } from '../CardLayout/registry.js';
 import type { ChartHeight } from '@open-tomato/charts';
 
 import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
@@ -35,6 +35,8 @@ export interface ChartRenderArgs<T> {
   readonly animate: boolean;
   /** True when rendered inside the maximise modal. */
   readonly maximised: boolean;
+  /** Opens a registry entry by key: a detail the chart leads to (a cell, a node), the consumer's or a built-in. */
+  readonly open: (key: string) => void;
   /**
    * The height to hand the chart: `'fill'` inside the maximise modal, so it
    * fills the box; the charts' default px (220) in the card, which a chart
@@ -63,8 +65,8 @@ export interface ChartCardProps<T> {
   readonly table?: TableData | ((data: T) => TableData);
   /** Richer content for the Info entry than the config's description. */
   readonly info?: ReactNode;
-  /** Controls in the header beside the title. */
-  readonly actions?: ReactNode;
+  /** Controls in the header beside the title; a function receives the card's handle, to open an entry. */
+  readonly actions?: ReactNode | ((card: CardHandle) => ReactNode);
   readonly footer?: ReactNode;
   /** The consumer's own registry entries, added to the built-in ones. */
   readonly modals?: Readonly<Record<string, ModalEntry>>;
@@ -179,21 +181,30 @@ function ChartCardBody<T>({
   };
 
   // The maximise view offers the legend under a toggle, so the maximised content is the chart alone.
-  const content = ({ maximised, height }: ContentView): ReactNode => (
+  const content = ({ card, maximised, height }: ContentView): ReactNode => (
     <div className={chartCardBodyVariants({ maximised })}>
       {!maximised && legendNode}
       {data === undefined && status === 'error' && <CardStatus kind="error" detail="The details are under the card menu's Errors item." />}
       {data === undefined && status !== 'error' && <ChartSkeleton kind={config.skeleton ?? skeletonFor(config.chart.primitive)} height={height} />}
       {data !== undefined && children({ data, hidden: toggleable
         ? hidden
-        : NO_HIDDEN, animate, maximised, height })}
+        : NO_HIDDEN, animate, maximised, open: card.open, height })}
     </div>
+  );
+  const header = (card: CardHandle): ReactNode => (
+    <CardHeader
+      title={config.title}
+      subtitle={config.subtitle}
+      actions={typeof actions === 'function'
+        ? actions(card)
+        : actions}
+    />
   );
 
   return (
     <CardLayout
       title={config.title}
-      header={<CardHeader title={config.title} subtitle={config.subtitle} actions={actions} />}
+      header={header}
       menu={interactive
         ? undefined
         : null}
@@ -219,7 +230,9 @@ function ChartCardBody<T>({
  * failed, Errors; `config.modals` narrows the built-ins and `config.menu`
  * relabels them. The child receives `{ data, hidden, animate, maximised,
  * height }`; maximised, `height` is `'fill'` and the legend and the source
- * table move under the Maximise view's toggles. While the data loads the
+ * table move under the Maximise view's toggles; `open` opens a registry
+ * entry from the chart, and `actions` as a function gets the same handle
+ * for the header. While the data loads the
  * card shows a `ChartSkeleton` in the chart's box: the shape the spec's
  * `skeleton` names, else the one the chart's primitive name implies.
  */

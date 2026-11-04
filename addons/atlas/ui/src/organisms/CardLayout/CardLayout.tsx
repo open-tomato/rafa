@@ -22,6 +22,8 @@ import { resolveModals, type CardHandle, type ModalComponent, type ModalEntry, t
 
 /** What the content slot is told when it renders. */
 export interface ContentView {
+  /** The card's handle: opens a registry entry (a detail the chart leads to), closes it, retries. */
+  readonly card: CardHandle;
   /** True inside the maximise modal, where the content has the whole box. */
   readonly maximised: boolean;
   /**
@@ -32,9 +34,6 @@ export interface ContentView {
   readonly height: ChartHeight;
 }
 
-/** The card's view of the content slot. */
-const IN_CARD: ContentView = { maximised: false, height: DEFAULT_CHART_HEIGHT };
-
 /** The content slot: a node, or a function of where it renders (the card, or the maximise modal). */
 export type CardContent = ReactNode | ((view: ContentView) => ReactNode);
 
@@ -42,8 +41,8 @@ export type CardContent = ReactNode | ((view: ContentView) => ReactNode);
 export interface CardLayoutProps {
   /** Names the card: its region, its default header, its menu and its info and maximise modals. */
   readonly title: string;
-  /** The header slot; a `CardHeader` over `title` by default, `null` for none. */
-  readonly header?: ReactNode;
+  /** The header slot; a `CardHeader` over `title` by default, `null` for none, or a function of the card's handle (an action that opens an entry). */
+  readonly header?: ReactNode | ((card: CardHandle) => ReactNode);
   /** The menu slot; a `CardMenu` over the registry by default, `false` for none. */
   readonly menu?: ReactNode;
   readonly content: CardContent;
@@ -151,7 +150,7 @@ export function CardLayout({
             <MaximiseView title={card.title} onClose={close} legend={maximiseExtras?.legend} table={maximiseExtras?.table} options={maximiseOptions}>
               {({ height }) => (
                 <CardBoundary onError={onCaught} resetKey={attempt}>
-                  <ContentSlot content={content} view={{ maximised: true, height }} />
+                  <ContentSlot content={content} view={{ card, maximised: true, height }} />
                 </CardBoundary>
               )}
             </MaximiseView>
@@ -173,13 +172,16 @@ export function CardLayout({
     close,
     retry,
   };
-  const items: readonly CardMenuItem[] = resolved.map((modal) => ({
+  const items: readonly CardMenuItem[] = resolved.filter((modal) => modal.menu).map((modal) => ({
     key: modal.key,
     label: modal.label,
     icon: modal.icon,
     tone: modal.tone,
     onSelect: () => setOpenKey(modal.key),
   }));
+  const headerSlot = typeof header === 'function'
+    ? header(card)
+    : header;
   const open = resolved.find((modal) => modal.key === openKey);
   const menuSlot = menu === undefined
     ? items.length > 0 && <CardMenu items={items} label={`Options for ${title}`} />
@@ -189,14 +191,14 @@ export function CardLayout({
     <Card label={title} span={span} surface={surface} className={className}>
       <div className={cardLayoutTopVariants()}>
         <div className={cardLayoutHeaderVariants()}>
-          {header === undefined
+          {headerSlot === undefined
             ? <CardHeader title={title} />
-            : header}
+            : headerSlot}
         </div>
         {menuSlot}
       </div>
       <div className={cardLayoutContentVariants()}>
-        <CardBoundary onError={onCaught} resetKey={attempt}><ContentSlot content={content} view={IN_CARD} /></CardBoundary>
+        <CardBoundary onError={onCaught} resetKey={attempt}><ContentSlot content={content} view={{ card, maximised: false, height: DEFAULT_CHART_HEIGHT }} /></CardBoundary>
       </div>
       {footer !== undefined && footer !== null && <div className={cardLayoutFooterVariants()}>{footer}</div>}
       {open && <OpenModal key={open.key} modal={open} card={card} />}
