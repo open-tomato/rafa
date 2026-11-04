@@ -470,6 +470,32 @@ and merges whatever `pr.versionCollision` says; `rafa pr triage` gives it no
 released or collides with reads as any branch does, fix included, and an
 ordinary branch stamping a version still reads `stale`.
 
+### The stale-docs chore
+
+The documentation lines a doc task could not settle go to one `chore` issue per
+release, titled `Release <version>: update stale docs` and opening with the
+marker `<!-- rafa:stale-docs -->`, so a person's issue of the same title is
+never taken for it. Each line is one unticked item, `- [ ] <where>: <what>`.
+The version is the settle forecast's when it names one, else the patch bump of
+the version file, and `next` when release is off or no version can be named.
+
+The newest root release tag decides which open chores may take a line. A chore
+titled for `next` or for a version above that tag is unreleased and may; a
+chore titled for a version at or below it is released and is never touched; a
+chore titled for no version is a person's and is left alone. Of those that may
+take it, the one titled for the current version wins, else the oldest, and an
+unreleased chore the forecast moved off is retitled to the new version as it
+takes the line. A line the body already holds, ticked or not, is not added
+twice. With no tag readable, the issue is found by its exact title alone.
+
+Only when no chore may take the line is one created. Two runs listing within
+seconds of each other can both create (#1412 and #1413), so a create is
+followed by a second listing: when an older open chore may take the line, the
+line goes there, and the new one is commented `Duplicate of #<older>` and moved
+to `cancelled`. Of two racing creates the older stays. A tracker that cannot
+both list and edit issues cannot hold the chore, so the line is kept for the
+print after the last task.
+
 ### Readers: status, list, and doctor
 
 **`rafa release status`** reads the base branch (fetching nothing, reading as
