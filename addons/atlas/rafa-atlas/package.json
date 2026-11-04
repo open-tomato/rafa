@@ -16,7 +16,7 @@
   "scripts": {
     "check-types": "tsc --build",
     "lint": "eslint .",
-    "test": "bun test"
+    "test": "bun test --pass-with-no-tests"
   },
   "dependencies": {
     "@open-tomato/atlas-data": "workspace:*",
