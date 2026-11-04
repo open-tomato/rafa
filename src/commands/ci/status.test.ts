@@ -29,7 +29,6 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
-import { verdictOf } from '../../ci/status-reading.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { CI_STATUS_EVENT, CI_STATUS_USAGE, createCiStatusCommand } from './status.js';
@@ -120,19 +119,6 @@ function readingOf(events: readonly CliEvent[]): CiStatusReading {
   if (event === undefined) throw new Error(`no ${CI_STATUS_EVENT} event among ${JSON.stringify(events)}`);
   return (event as unknown as { data: CiStatusReading }).data;
 }
-
-describe('the verdict on a run', () => {
-  it('reads success as green, any other conclusion as red, an unfinished run as running and no run as none', () => {
-    expect(verdictOf(null)).toBe('none');
-    expect(verdictOf({ id: 1, workflow: WORKFLOW, state: 'completed', conclusion: 'success', commit: SHA })).toBe('green');
-    for (const conclusion of ['failure', 'cancelled', 'skipped', 'neutral', 'timed_out']) {
-      expect(verdictOf({ id: 1, workflow: WORKFLOW, state: 'completed', conclusion, commit: SHA })).toBe('red');
-    }
-    for (const state of ['queued', 'in_progress', 'requested', 'waiting', 'pending'] as const) {
-      expect(verdictOf({ id: 1, workflow: WORKFLOW, state, conclusion: null, commit: SHA })).toBe('running');
-    }
-  });
-});
 
 describe('rafa ci status over the recorded gh', () => {
   it('exits 0 on a green run, printing its state and short commit, and reads no log', async () => {

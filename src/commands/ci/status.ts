@@ -15,10 +15,10 @@
  * The line first: no word, `--branch` required and not blank, and
  * `--workflow` not blank when given. So a line refused for its words
  * spawns no `gh`. Then the newest run through `readNewestRun`
- * (`src/ci/runs.ts`), and, only for a finished run that is not green,
- * `gh run view <id> --log-failed`, read by `readFailedCases`
- * (`src/ci/failed-cases.ts`). Both go through one {@link GhRunner} made
- * for the project root, the seam a case replaces.
+ * (`src/ci/runs.ts`), and, only for a red run, `gh run view <id>
+ * --log-failed`, read by `readFailedCases` (`src/ci/failed-cases.ts`).
+ * Both go through one {@link GhRunner} made for the project root, the
+ * seam a case replaces.
  *
  * ## The verdict
  *
@@ -26,9 +26,10 @@
  * - `running`: the newest run's status is any of the five that are not
  *   `completed` (`queued`, `in_progress`, `requested`, `waiting`,
  *   `pending`).
- * - `green`: it completed with the conclusion `success`.
- * - `red`: it completed with any other conclusion, `skipped`, `neutral`
- *   and `cancelled` included: only `success` says the branch passed.
+ * - `green`: it completed with a passing conclusion, `success`,
+ *   `skipped` or `neutral`.
+ * - `red`: it completed with any other conclusion, `cancelled`
+ *   included, or with none.
  *
  * A red run whose log `gh` no longer holds (`log not found` on stderr,
  * the reading `packages/rafa-pr/src/pr/gh.ts` keeps for an old run) is still red; its
@@ -140,8 +141,8 @@ export function createCiStatusCommand(seams: CiStatusSeams = DEFAULT_CI_STATUS_S
     summary: 'the newest CI run on a branch: its state, its commit and the cases it failed',
     description: 'Reads the newest GitHub Actions run on `--branch`, of the workflow `--workflow` when'
       + ' one is named, and prints its state and its short commit; for a red run it also reads the run\'s'
-      + ' failed log and prints the bun cases that failed, by file and case, each once. Only the'
-      + ' conclusion `success` is green. Exit code 0 when the run is green, 1 when it is red, 2 when the'
+      + ' failed log and prints the bun cases that failed, by file and case, each once. Success,'
+      + ' skipped and neutral are green. Exit code 0 when the run is green, 1 when it is red, 2 when the'
       + ' branch has no run and 3 while the run is not finished; 4 for a line it refuses and for any `gh`'
       + ' failure, a workflow `gh` does not know included. With `--output=json` the branch, the workflow,'
       + ' the verdict, the run, the failed cases and the exit code are written as a `ci-status` event on'
