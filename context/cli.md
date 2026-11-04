@@ -2409,7 +2409,10 @@ New; it replaces no earlier text. What a row or an action added to
   (`packages/rafa/src/triage/doc-only.ts`) files no bug: `close-docs.ts` stores
   one `unsettled` stale-docs row with no plan stub and adds one line to the
   release's stale-docs issue on that tracker through `addStaleDocLine`,
-  the version read once (`EpicCloseSeams.staleDocsVersion`). A failed
+  the version read once (`EpicCloseSeams.staleDocsVersion`) and the newest
+  root release tag read by the service `src/service-registry.ts` registers
+  (`addStaleDocLineWithRelease`, `git tag --list` in the working
+  directory). A failed
   check, and a check whose session answered nothing, which files
   nothing, each refuse the close. Otherwise one `IssueBoard.closeIssue`
   closes the epic as `completed` with `renderCloseComment`

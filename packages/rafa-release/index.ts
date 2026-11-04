@@ -151,6 +151,7 @@ export {
 export {
   changelogVersions,
   compareVersions,
+  newestRootRelease,
   readTags,
 } from './src/release/status-readings.js';
 

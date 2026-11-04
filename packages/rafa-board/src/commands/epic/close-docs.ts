@@ -22,7 +22,9 @@
  *      dispatch would have been.
  *   2. One line through `activeServices().addStaleDocLine`, core's
  *      service registry, which the root `src/service-registry.ts` fills
- *      with pr's function, on the release's stale-docs issue, on the
+ *      with release's function behind `addStaleDocLineWithRelease`, which
+ *      reads the newest root release tag this module cannot, on the
+ *      release's stale-docs issue, on the
  *      tracker the close resolved for its bugs. A tracker that cannot
  *      list and edit answers `kept`, and the line is printed then, since
  *      the close has no "after the last task" to keep it for. While no

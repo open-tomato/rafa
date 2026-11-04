@@ -38,28 +38,69 @@
  * is, registering nothing: the set held, core's or a test's stubs, stays
  * the active one.
  *
+ * ## The release reading `rafa epic close` cannot take
+ *
+ * Board imports no release, so `close-docs.ts` hands `addStaleDocLine`
+ * no `newestRelease`. The key's function is therefore release's
+ * `addStaleDocLine` behind {@link addStaleDocLineWithRelease}: when the
+ * caller left `newestRelease` out, it reads the newest root release tag
+ * through release's `newestRootRelease`, `git tag --list` in the
+ * process's working directory, which a command runs in its project (the
+ * tags are the repository's, from any directory of it), and hands it on.
+ * A listing that fails, or a reader that throws, hands nothing, and the
+ * issue is found by its exact title as before; a caller that read the
+ * tags itself, as the wrap-up does, has its reading passed on untouched,
+ * null included.
+ *
  * ## The whole set
  *
  * {@link CORE_SERVICES} `satisfies RafaServices`, so a key left out, or
  * a real function that drifts from its key's type, fails `tsc` here.
  */
-import type { RafaServices } from '@open-tomato/rafa/core/services';
+import type { AddStaleDocLineService, RafaServices } from '@open-tomato/rafa/core/services';
 
 import { ghPullRequestsIn, triageReport } from '@open-tomato/rafa-pr';
-import { addStaleDocLine } from '@open-tomato/rafa-release';
+import { addStaleDocLine, newestRootRelease } from '@open-tomato/rafa-release';
 import { endWithNextStep, readStaleDocsVersion } from '@open-tomato/rafa-run';
 
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeServices, registerServices, restoreServices } from '@open-tomato/rafa/core/services';
+
+/** The newest root release tag of the repository the process runs in; see the module note. */
+function newestReleaseHere(): string | null | undefined {
+  return newestRootRelease(createGitRunner(process.cwd()));
+}
+
+/**
+ * release's `addStaleDocLine`, handed the newest root release tag
+ * `readNewestRelease` answers whenever the caller left `newestRelease`
+ * out; see the module note. Never rejects, as `addStaleDocLine` does not.
+ */
+export function addStaleDocLineWithRelease(
+  readNewestRelease: () => string | null | undefined = newestReleaseHere,
+): AddStaleDocLineService {
+  return (options) => {
+    if (options.newestRelease !== undefined) return addStaleDocLine(options);
+    let newestRelease: string | null | undefined;
+    try {
+      newestRelease = readNewestRelease();
+    } catch {
+      newestRelease = undefined;
+    }
+    return addStaleDocLine({ ...options, newestRelease });
+  };
+}
 
 /**
  * The services core registers, keys sorted as `SERVICE_REASONS` sorts
- * them: release's `addStaleDocLine`, run's `endWithNextStep`, pr's
+ * them: release's `addStaleDocLine` behind
+ * {@link addStaleDocLineWithRelease}, run's `endWithNextStep`, pr's
  * `ghPullRequestsIn` as `pullRequestsIn`, run's `readStaleDocsVersion`
  * and pr's `triageReport`.
  * {@link registerCoreServices} hands them to core.
  */
 export const CORE_SERVICES: RafaServices = Object.freeze({
-  addStaleDocLine,
+  addStaleDocLine: addStaleDocLineWithRelease(),
   endWithNextStep,
   pullRequestsIn: ghPullRequestsIn,
   readStaleDocsVersion,
