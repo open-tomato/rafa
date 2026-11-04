@@ -66,4 +66,10 @@ describe('Legend', () => {
 
     expect(onToggle).toHaveBeenCalledWith('b');
   });
+
+  it('stacks its entries beside a maximised chart with the side layout', () => {
+    render(<Legend items={ITEMS} layout="side" />);
+
+    expect(screen.getByRole('list', { name: 'Legend' }).className).toContain('landscape:flex-col');
+  });
 });

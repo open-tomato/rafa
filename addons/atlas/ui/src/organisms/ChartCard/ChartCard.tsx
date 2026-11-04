@@ -1,3 +1,4 @@
+import type { LegendLayout } from '../../atoms/Legend/Legend.variants.js';
 import type { LegendItem, TableData } from '../../context/types.js';
 import type { DataStatus } from '../../context/useSourced.js';
 import type { ContentView } from '../CardLayout/CardLayout.js';
@@ -154,10 +155,11 @@ function ChartCardBody<T>({
     ? modals
     : {}) }, config.menu);
 
-  const legendNode = (
+  const legendOf = (layout: LegendLayout): ReactNode => (
     <Legend
       items={legendItems}
       mark={config.legend?.mark}
+      layout={layout}
       hidden={toggleable
         ? hidden
         : undefined}
@@ -166,9 +168,10 @@ function ChartCardBody<T>({
         : undefined}
     />
   );
+  const legendNode = legendOf('row');
   const maximiseExtras = {
     legend: legendItems.length >= MIN_LEGEND_ITEMS
-      ? legendNode
+      ? legendOf('side')
       : undefined,
     table: tableData === undefined
       ? undefined

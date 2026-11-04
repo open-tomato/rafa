@@ -23,6 +23,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Rect: Story = { args: { mark: 'rect' } };
 export const Line: Story = { args: { mark: 'line' } };
+export const Side: Story = { args: { layout: 'side' } };
 export const Toggleable: Story = { args: { hidden: new Set(['sonnet']), onToggle: () => undefined } };
 export const StatusTones: Story = {
   args: {

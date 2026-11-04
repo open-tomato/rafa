@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 
 import { cn } from '@open-tomato/charts';
 
-import { legendEntryVariants, legendMarkVariants, legendVariants } from './Legend.variants.js';
+import { legendEntryVariants, legendMarkVariants, legendVariants, type LegendLayout } from './Legend.variants.js';
 
 /** A legend's props: the series, the mark shape, and the hidden set with its toggle when interactive. */
 export interface LegendProps {
@@ -16,6 +16,8 @@ export interface LegendProps {
   readonly onToggle?: (id: string) => void;
   /** The list's accessible name. */
   readonly label?: string;
+  /** `side` stacks the entries beside a maximised chart; `row` wraps them under one. */
+  readonly layout?: LegendLayout;
   /** Layout context from the parent (margin, alignment); never colour or size. */
   readonly className?: string;
 }
@@ -26,11 +28,11 @@ export interface LegendProps {
  * `onToggle`, each entry is a button whose `aria-pressed` says whether its
  * series is shown.
  */
-export function Legend({ items, mark = 'rect', hidden, onToggle, label = 'Legend', className }: LegendProps): ReactElement | null {
+export function Legend({ items, mark = 'rect', hidden, onToggle, label = 'Legend', layout, className }: LegendProps): ReactElement | null {
   if (items.length < 2) return null;
   const interactive = onToggle !== undefined;
   return (
-    <ul aria-label={label} className={cn(legendVariants(), className)}>
+    <ul aria-label={label} className={cn(legendVariants({ layout }), className)}>
       {items.map((item) => {
         const isHidden = interactive && (hidden?.has(item.id) ?? false);
         const swatch = <span aria-hidden="true" className={legendMarkVariants({ mark, tone: item.tone, hidden: isHidden })} />;

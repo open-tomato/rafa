@@ -4,6 +4,7 @@ export { legendEntryVariants, legendMarkVariants, legendVariants } from './Legen
 export type {
   LegendEntryVariantProps,
   LegendEntryVariants,
+  LegendLayout,
   LegendMarkVariantProps,
   LegendMarkVariants,
   LegendVariantProps,

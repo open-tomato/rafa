@@ -2,13 +2,32 @@ import type { CardTone, LegendMark } from '../../context/types.js';
 
 import { cva, type VariantProps } from 'class-variance-authority';
 
-/** The legend's list: wrapped items in small secondary ink. */
+/**
+ * The legend's list in small secondary ink: a wrapping row under a
+ * chart; `side`, in the maximise view's side column, stacks the entries
+ * one per line where the column is beside the chart (landscape) and
+ * keeps the row where it sits under it (portrait).
+ */
 export const legendVariants: (props?: LegendVariantProps) => string = cva(
   'flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2',
+  {
+    variants: {
+      layout: {
+        row: '',
+        side: 'landscape:flex-col landscape:gap-y-1.5',
+      },
+    },
+    defaultVariants: { layout: 'row' },
+  },
 );
 
-/** The variant props `legendVariants` takes (none yet). */
-export type LegendVariantProps = Record<string, never>;
+/** Where a legend lays its entries. */
+export type LegendLayout = 'row' | 'side';
+
+/** The variant props `legendVariants` takes. */
+export interface LegendVariantProps {
+  readonly layout?: LegendLayout | null;
+}
 
 /** One legend entry: static text, or a toggle button that strikes through a hidden series. */
 export const legendEntryVariants: (props?: LegendEntryVariantProps) => string = cva(
