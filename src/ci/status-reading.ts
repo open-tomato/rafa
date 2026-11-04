@@ -56,13 +56,6 @@
  * 0 green, 1 red, 2 no run, 3 running. The exit code of a refusal and of
  * a `gh` failure belongs to the command half.
  *
- * ## The single-run reading
- *
- * {@link CiStatusReading} and {@link renderCiStatus} read the newest run
- * alone, under the same pass rule; the pit stop still prints through
- * them, and leaves them once it reads per workflow. `rafa ci status`
- * reads per workflow.
- *
  * Nothing here spawns a process: `gh` arrives as a {@link GhRunner}, the
  * seam a case replaces.
  */
@@ -130,23 +123,6 @@ export interface CiBranchReading {
   readonly verdict: CiVerdict;
   /** One line per workflow, in the order of their newest runs, newest first. */
   readonly workflows: readonly CiWorkflowReading[];
-  /** The exit code the verdict ends with. */
-  readonly exitCode: number;
-}
-
-/** What one line read through the newest run alone; see the module note. */
-export interface CiStatusReading {
-  readonly branch: string;
-  /** The workflow the line named, or null for any. */
-  readonly workflow: string | null;
-  readonly verdict: CiVerdict;
-  /** The newest run, or null when the branch has none. */
-  readonly run: BranchRun | null;
-  /**
-   * The failed cases of a red run by file; null for a run that is not
-   * red and for a red run whose log `gh` no longer holds.
-   */
-  readonly failed: readonly FailedCaseFile[] | null;
   /** The exit code the verdict ends with. */
   readonly exitCode: number;
 }
@@ -269,21 +245,4 @@ export function renderCiBranch(reading: CiBranchReading): string[] {
     : 'workflows';
   const headline = `${MARK[reading.verdict]} ${where}: ${reading.verdict} on ${commit}, ${String(count)} ${noun}.`;
   return [headline, ...reading.workflows.flatMap(workflowLines)];
-}
-
-/** The headline of a single-run reading. */
-function headline(reading: CiStatusReading): string {
-  const { run } = reading;
-  const where = whereOf(reading.branch, reading.workflow);
-  if (run === null) return `${MARK.none} No run on ${where}.`;
-  const commit = run.commit.slice(0, SHORT_COMMIT_LENGTH);
-  return `${MARK[reading.verdict]} ${where}: ${run.workflow} run ${String(run.id)} is ${stateWord(run)} on ${commit}.`;
-}
-
-/** Every line text mode prints for a single-run reading. */
-export function renderCiStatus(reading: CiStatusReading): string[] {
-  const head = headline(reading);
-  return reading.verdict === 'red'
-    ? [head, ...failedLines(reading.failed, WORKFLOW_INDENT)]
-    : [head];
 }

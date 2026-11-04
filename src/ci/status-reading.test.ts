@@ -21,7 +21,7 @@
  */
 import type { FakeRun } from './runs-fake.js';
 import type { BranchRun } from './runs.js';
-import type { CiStatusReading, CiVerdict, CiWorkflowReading } from './status-reading.js';
+import type { CiVerdict, CiWorkflowReading } from './status-reading.js';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
 import { describe, expect, it } from 'bun:test';
@@ -35,7 +35,6 @@ import {
   readFailedLog,
   readWorkflowReadings,
   renderCiBranch,
-  renderCiStatus,
   SHORT_COMMIT_LENGTH,
   verdictOf,
   VERDICTS_WORST_FIRST,
@@ -79,12 +78,6 @@ function branchRunOf(row: FakeRun): BranchRun {
 
 /** The planted runs, newest first, as `readHeadRuns` answers them. */
 const PLANTED: readonly BranchRun[] = RECORDED_STRETCH_111.filter((row) => row.headSha === PLANTED_SHA).map(branchRunOf);
-
-/** A single-run reading of `run` on `stretch/9` with `fields` over what its verdict gives. */
-function readingOf(run: BranchRun | null, fields: Partial<CiStatusReading> = {}): CiStatusReading {
-  const verdict = verdictOf(run);
-  return { branch: 'stretch/9', workflow: null, verdict, run, failed: null, exitCode: CI_STATUS_EXIT[verdict], ...fields };
-}
 
 /** A workflow line of `run` with `fields` over what its verdict gives. */
 function lineOf(run: BranchRun, fields: Partial<CiWorkflowReading> = {}): CiWorkflowReading {
@@ -302,47 +295,5 @@ describe('renderCiBranch', () => {
       '     No bun test case failed: the run went red outside the tests.',
       '   ✅ docs run 41 is success.',
     ]);
-  });
-});
-
-describe('renderCiStatus', () => {
-  it('prints one line for no run, naming the workflow when the reading holds one', () => {
-    expect(renderCiStatus(readingOf(null))).toEqual(['⚪ No run on stretch/9.']);
-    expect(renderCiStatus(readingOf(null, { workflow: 'verify' }))).toEqual(['⚪ No run on stretch/9 (verify).']);
-  });
-
-  it('prints the conclusion of a finished run and the status of an unfinished one, on the short commit', () => {
-    const short = SHA.slice(0, SHORT_COMMIT_LENGTH);
-
-    expect(short).toBe('c4da2c4');
-    expect(renderCiStatus(readingOf(runWith()))).toEqual([`✅ stretch/9: verify run 41 is success on ${short}.`]);
-    expect(renderCiStatus(readingOf(runWith({ conclusion: 'skipped' })))).toEqual([`✅ stretch/9: verify run 41 is skipped on ${short}.`]);
-    expect(renderCiStatus(readingOf(runWith({ state: 'in_progress', conclusion: null }))))
-      .toEqual([`⏳ stretch/9: verify run 41 is in_progress on ${short}.`]);
-    expect(renderCiStatus(readingOf(runWith({ conclusion: null }))))
-      .toEqual([`❌ stretch/9: verify run 41 is completed on ${short}.`, '   The run\'s log is no longer on GitHub, so its failed cases cannot be read.']);
-  });
-
-  it('prints a red run\'s failed cases by file, and none of them for a reading that is not red', () => {
-    const failed = [
-      { file: 'src/a.test.ts', cases: ['first', 'second'] },
-      { file: null, cases: ['third'] },
-    ];
-    const red = readingOf(runWith({ conclusion: 'failure' }), { failed });
-
-    expect(renderCiStatus(red).slice(1)).toEqual([
-      '   src/a.test.ts',
-      '     - first',
-      '     - second',
-      '   (no file named)',
-      '     - third',
-    ]);
-    expect(renderCiStatus(readingOf(runWith(), { failed }))).toHaveLength(1);
-  });
-
-  it('says a red run with no failed case went red outside the tests', () => {
-    const red = readingOf(runWith({ conclusion: 'failure' }), { failed: [] });
-
-    expect(renderCiStatus(red).slice(1)).toEqual(['   No bun test case failed: the run went red outside the tests.']);
   });
 });

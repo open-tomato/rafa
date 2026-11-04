@@ -37,7 +37,7 @@ import { beginSession } from '@open-tomato/rafa/core/loop';
 import { eventsFilePath } from '@open-tomato/rafa-run/start/loop-events';
 
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
-import { runListArgs } from '../../ci/runs.js';
+import { headRunsArgs, runListArgs } from '../../ci/runs.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
@@ -271,7 +271,7 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(outcome.exitCode).toBe(0);
     expect(planted.rafaCalls).toEqual([WAIT_LINE, MERGE_LINE]);
     expect(planted.ghCalls[0]).toEqual(prViewArgs(PR));
-    expect(planted.ghCalls.filter((args) => args[1] === 'list')).toHaveLength(4);
+    expect(planted.ghCalls.filter((args) => args[1] === 'list')).toHaveLength(5);
     expect(planted.sleeps).toEqual([CI_POLL_MS, CI_POLL_MS]);
     const { items, malformed } = readItems(planted.project.root, 4);
     expect(malformed).toEqual([]);
@@ -292,8 +292,9 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
       `waiting for the run on ${BRANCH} at c4da2c4 to end`,
       `run 37190089292 (verify) on ${BRANCH} at c4da2c4 ended: failure`,
       `ledger: #812 appended to ${itemsPath(planted.project.root, 4)}, Closes #812, Closes #604`,
-      `CI: ❌ ${BRANCH}: verify run 37190089292`,
-      `   ${GATE_FILE}`,
+      `CI: ❌ ${BRANCH}: red on c4da2c4, 1 workflow.`,
+      '   ❌ verify run 37190089292 is failure.',
+      `     ${GATE_FILE}`,
       'Bugs: 2 open.',
       `Filed since ${new Date(START).toISOString()}: 1.`,
       '   #870 filed during the item',
@@ -452,11 +453,13 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(planted.ghCalls.filter((args) => args[1] === 'list')).toEqual([
       runListArgs({ branch: BRANCH, commit: MERGE_SHA }),
       runListArgs({ branch: BRANCH }),
+      headRunsArgs(BRANCH, NEWER_SHA),
     ]);
     expectInOrder(outcome.stdout, [
       `waiting for the run on ${BRANCH} at c4da2c4 to end`,
       `run 37190089292 (verify) on ${BRANCH} at c4da2c4 ended: failure`,
-      `CI: ✅ ${BRANCH}: verify run 37190099999 is success on ${NEWER_SHA.slice(0, 7)}.`,
+      `CI: ✅ ${BRANCH}: green on ${NEWER_SHA.slice(0, 7)}, 1 workflow.`,
+      '   ✅ verify run 37190099999 is success.',
     ]);
     expect(outcome.stdout).not.toContain('warn:');
   });

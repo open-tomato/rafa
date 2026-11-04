@@ -62,8 +62,8 @@
  *      its ledger line is written either way. The {@link CI_WAIT_MS}
  *      warning says which of two things the last read that answered
  *      found: no run on the commit, or a run on it that had not ended.
- *      Step 6 still reads the newest run of the base, which after such
- *      a push is not the run this step waited on.
+ *      Step 6 still reads every workflow on the head commit of the base,
+ *      which after such a push is not the commit this step waited on.
  *   5. One line appended to the item ledger, `.rafa/stretch/<n>/items.ndjson`
  *      (`src/stretch/items.ts`): the issue, the plan stub, the pull
  *      request, the merge commit, a `Closes #<n>` line per issue the body

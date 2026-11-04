@@ -7,14 +7,18 @@
  *
  * ## What each reading reads
  *
- * - **CI**: the newest run on the branch, of one workflow when one is
- *   named, through `readNewestRun` (`../ci/runs.ts`), and for a red run
- *   its `--log-failed` text through the reader `rafa ci status` uses
+ * - **CI**: every workflow on the head commit of the branch, the head
+ *   commit being the `headSha` of its newest run, read through
+ *   `readHeadRuns` (`../ci/runs.ts`); with a workflow named, that
+ *   workflow's newest run on the branch alone, through `readNewestRun`.
+ *   Each workflow's line is its newest run among those, and for each red
+ *   one its `--log-failed` text is read through `readWorkflowReadings`
  *   (`../ci/status-reading.ts`), whose cases `readFailedCases`
- *   (`../ci/failed-cases.ts`) groups by file. The reading is a
- *   {@link CiStatusReading}, rendered by `renderCiStatus`: the newest
- *   run alone, where `rafa ci status --branch` reads every workflow on
- *   the head commit.
+ *   (`../ci/failed-cases.ts`) groups by file. The reading is the
+ *   {@link CiBranchReading} `rafa ci status --branch` reads, its verdict
+ *   the worst of its workflows', rendered by `renderCiBranch`: so a
+ *   skipped run of one workflow, newer than a failed run of another on
+ *   the same commit, no longer reads the branch green.
  * - **Open bugs**: the length of the tracker port's
  *   `openIssues('bug')`. A tracker without that optional member reads as
  *   not read, never as zero.
@@ -68,15 +72,15 @@
  * none, and a failure is never shown as a green run, a zero count or
  * none filed.
  */
-import type { CiStatusReading } from '../ci/status-reading.js';
+import type { BranchRun } from '../ci/runs.js';
+import type { CiBranchReading } from '../ci/status-reading.js';
 import type { FiledIssue, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { readFailedCases } from '../ci/failed-cases.js';
-import { readNewestRun } from '../ci/runs.js';
-import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../ci/status-reading.js';
+import { readHeadRuns, readNewestRun } from '../ci/runs.js';
+import { branchReading, readWorkflowReadings, renderCiBranch } from '../ci/status-reading.js';
 
 /** Where the readings come from. */
 export interface PitSeams {
@@ -90,7 +94,7 @@ export interface PitSeams {
 export interface PitQuery {
   /** The integration branch, `stretch/<n>`. */
   readonly branch: string;
-  /** The workflow whose runs count, as `gh run list --workflow` takes it. Left out, any. */
+  /** The one workflow read, as `gh run list --workflow` takes it. Left out, every workflow on the head commit. */
   readonly workflow?: string;
   /** Bugs filed after this time are listed as new. */
   readonly since: Date;
@@ -118,7 +122,7 @@ export interface FiledBug {
 
 /** Every pit-stop reading. */
 export interface PitReadings {
-  readonly ci: Reading<CiStatusReading>;
+  readonly ci: Reading<CiBranchReading>;
   readonly openBugs: Reading<number>;
   /** The cut-off, ISO 8601, and the bugs filed after it, oldest first. */
   readonly filedSince: Reading<{ readonly since: string; readonly bugs: readonly FiledBug[] }>;
@@ -146,25 +150,19 @@ export async function readPitReadings(seams: PitSeams, query: PitQuery): Promise
   return { ci, openBugs, filedSince: await readFiledSince(seams.tracker, query.since) };
 }
 
-/** The CI reading, in the shape `rafa ci status` reads. */
-async function readCi(gh: GhRunner, query: PitQuery): Promise<CiStatusReading> {
-  const run = await readNewestRun(gh, query.workflow === undefined
-    ? { branch: query.branch }
-    : { branch: query.branch, workflow: query.workflow });
-  const verdict = verdictOf(run);
-  const log = run !== null && verdict === 'red'
-    ? await readFailedLog(gh, run.id)
-    : null;
-  return {
-    branch: query.branch,
-    workflow: query.workflow ?? null,
-    verdict,
-    run,
-    failed: log === null
-      ? null
-      : readFailedCases(log),
-    exitCode: CI_STATUS_EXIT[verdict],
-  };
+/** The runs the CI lines are read from, newest first: the head commit's, or one workflow's newest. */
+async function readCiRuns(gh: GhRunner, query: PitQuery): Promise<readonly BranchRun[]> {
+  if (query.workflow === undefined) return (await readHeadRuns(gh, query.branch))?.runs ?? [];
+  const run = await readNewestRun(gh, { branch: query.branch, workflow: query.workflow });
+  return run === null
+    ? []
+    : [run];
+}
+
+/** The CI reading, one line per workflow, in the shape `rafa ci status --branch` reads. */
+async function readCi(gh: GhRunner, query: PitQuery): Promise<CiBranchReading> {
+  const lines = await readWorkflowReadings(gh, await readCiRuns(gh, query));
+  return branchReading(query.branch, query.workflow ?? null, lines);
 }
 
 /** The open bugs, through the port. */
@@ -227,7 +225,7 @@ export function renderPitReadings(readings: PitReadings): string[] {
 
 function ciLines(ci: PitReadings['ci']): string[] {
   if (!ci.ok) return [`CI: not read: ${ci.reason}`];
-  const [head = '', ...rest] = renderCiStatus(ci.value);
+  const [head = '', ...rest] = renderCiBranch(ci.value);
   return [`CI: ${head}`, ...rest];
 }
 

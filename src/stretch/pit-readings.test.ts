@@ -6,9 +6,16 @@
  * `filedIssues('bug', since)`, each reading's failure held apart from
  * the others, and the lines rendered from them.
  *
+ * The CI reading is the per-workflow one `rafa ci status --branch`
+ * reads: every workflow on the head commit, or one named workflow's
+ * newest run, the verdict the worst of the lines'.
+ *
  * No case spawns `gh`: `run list` is answered by `src/ci/runs-fake.ts`
  * and `run view --log-failed` by a stand-in handing back the capture
- * under `src/ci/testdata/`. Controls: the green case reads the call log
+ * under `src/ci/testdata/`. Controls: the newer skipped run of another
+ * workflow is read alone beside the case where it sits over a failed
+ * one, so the red is seen to come from the failed workflow; the green
+ * case reads the call log
  * beside the red case, so its missing `run view` is read against a run
  * that sends one; the cut-off case lists a bug filed after it beside one
  * filed at it, which the GitHub adapter can answer since it writes the
@@ -28,12 +35,17 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import { describe, expect, it } from 'bun:test';
 
 import { createFakeRunsGh } from '../ci/runs-fake.js';
+import { headRunsArgs, runListArgs } from '../ci/runs.js';
 
 import { FIRST_LINE_MAX, NO_FILED_ISSUES, NO_OPEN_ISSUES, readPitReadings, renderPitReadings } from './pit-readings.js';
 
 const BRANCH = 'stretch/9';
 const WORKFLOW = 'verify';
 const SHA = 'c4da2c4c63b2e9d585d3a76ffbda1c49e3ce60d1';
+/** A commit older than {@link SHA} on the same branch. */
+const OLDER_SHA = '7ade9b90aa11bb22cc33dd44ee55ff6677889900';
+/** A second workflow, as its runs carry it. */
+const FRAGMENT = 'Release bot fragment';
 
 /** The captured failed log of run 37190089292: three cases in one file. */
 const THREE_CASES = await Bun.file(new URL('../ci/testdata/three-cases.log-failed.txt', import.meta.url)).text();
@@ -134,8 +146,51 @@ describe('the CI reading', () => {
     expect(red.calls()).toContainEqual(['run', 'view', '37190089292', '--log-failed']);
     if (!redReading.ci.ok) throw new Error(redReading.ci.reason);
     expect(redReading.ci.value.verdict).toBe('red');
-    expect(redReading.ci.value.failed?.map((file) => file.file)).toEqual([GATE_FILE]);
-    expect(redReading.ci.value.failed?.[0]?.cases).toHaveLength(3);
+    expect(redReading.ci.value.exitCode).toBe(1);
+    const [line] = redReading.ci.value.workflows;
+    expect(line?.failed?.map((file) => file.file)).toEqual([GATE_FILE]);
+    expect(line?.failed?.[0]?.cases).toHaveLength(3);
+  });
+
+  it('reads red when a failed workflow sits under a newer skipped run of another on the head commit', async () => {
+    const skipped = plantedRun({ databaseId: 37190099001, workflowName: FRAGMENT, conclusion: 'skipped', createdAt: '2026-10-07T04:00:00Z' });
+    const failed = plantedRun({ conclusion: 'failure' });
+    const both = caseGh([skipped, failed]);
+    const alone = caseGh([skipped]);
+
+    const reading = await readPitReadings(seams(both.gh, []), { branch: BRANCH, since: SINCE });
+    const control = await readPitReadings(seams(alone.gh, []), { branch: BRANCH, since: SINCE });
+
+    if (!reading.ci.ok) throw new Error(reading.ci.reason);
+    expect(reading.ci.value.verdict).toBe('red');
+    expect(reading.ci.value.exitCode).toBe(1);
+    expect(reading.ci.value.commit).toBe(SHA);
+    expect(reading.ci.value.workflows.map((line) => [line.workflow, line.verdict])).toEqual([[FRAGMENT, 'green'], [WORKFLOW, 'red']]);
+    expect(both.calls()).toContainEqual(['run', 'view', '37190089292', '--log-failed']);
+    expect(both.calls()).not.toContainEqual(['run', 'view', '37190099001', '--log-failed']);
+    expect(control.ci.ok && control.ci.value.verdict).toBe('green');
+  });
+
+  it('reads the head commit\'s workflows alone, not an older commit\'s red run', async () => {
+    const head = plantedRun({ databaseId: 37190099002, conclusion: 'success', createdAt: '2026-10-07T04:00:00Z' });
+    const older = plantedRun({ databaseId: 37190011111, headSha: OLDER_SHA, conclusion: 'failure', createdAt: '2026-10-06T04:00:00Z' });
+    const ci = caseGh([head, older]);
+
+    const reading = await readPitReadings(seams(ci.gh, []), { branch: BRANCH, since: SINCE });
+
+    if (!reading.ci.ok) throw new Error(reading.ci.reason);
+    expect(reading.ci.value.verdict).toBe('green');
+    expect(reading.ci.value.workflows.map((line) => line.run.id)).toEqual([37190099002]);
+    expect(ci.calls().some((args) => args[1] === 'view')).toBe(false);
+  });
+
+  it('reads running while one workflow of the head commit has not finished beside a green one', async () => {
+    const running = plantedRun({ databaseId: 37190099003, workflowName: FRAGMENT, status: 'in_progress', conclusion: '', createdAt: '2026-10-07T04:00:00Z' });
+    const ci = caseGh([running, plantedRun()]);
+
+    const reading = await readPitReadings(seams(ci.gh, []), { branch: BRANCH, since: SINCE });
+
+    expect(reading.ci.ok && [reading.ci.value.verdict, reading.ci.value.exitCode]).toEqual(['running', 3]);
   });
 
   it('sends --workflow only when one is named', async () => {
@@ -143,22 +198,20 @@ describe('the CI reading', () => {
 
     await readPitReadings(seams(any.gh, []), { branch: BRANCH, since: SINCE });
 
-    expect(any.calls()[0]).not.toContain('--workflow');
+    expect(any.calls().filter((args) => args[1] === 'list').length).toBeGreaterThan(0);
+    for (const args of any.calls()) expect(args).not.toContain('--workflow');
   });
 
-  it('asks for the branch\'s newest run, with no --commit, whether or not a workflow is named', async () => {
+  it('reads one workflow\'s newest run when one is named, and the head commit\'s runs when none is', async () => {
     const named = caseGh([plantedRun()]);
     const unnamed = caseGh([plantedRun()]);
 
     await readPitReadings(seams(named.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE });
     await readPitReadings(seams(unnamed.gh, []), { branch: BRANCH, since: SINCE });
 
-    const listCalls = [...named.calls(), ...unnamed.calls()].filter((args) => args[0] === 'run' && args[1] === 'list');
-    expect(listCalls).toHaveLength(2);
-    for (const args of listCalls) {
-      expect(args).toContain('--branch');
-      expect(args).not.toContain('--commit');
-    }
+    const lists = (calls: readonly (readonly string[])[]): (readonly string[])[] => calls.filter((args) => args[0] === 'run' && args[1] === 'list');
+    expect(lists(named.calls())).toEqual([runListArgs({ branch: BRANCH, workflow: WORKFLOW })]);
+    expect(lists(unnamed.calls())).toEqual([runListArgs({ branch: BRANCH }), headRunsArgs(BRANCH, SHA)]);
   });
 
   it('holds a gh failure as not read, and still reads the bugs', async () => {
@@ -354,8 +407,11 @@ describe('the rendered lines', () => {
 
     const lines = renderPitReadings(await readPitReadings(seams(red.gh, [OLD, NEW_A]), { branch: BRANCH, workflow: WORKFLOW, since: SINCE }));
 
-    expect(lines[0]).toBe(`CI: ❌ ${BRANCH} (${WORKFLOW}): ${WORKFLOW} run 37190089292 is failure on c4da2c4.`);
-    expect(lines[1]).toBe(`   ${GATE_FILE}`);
+    expect(lines.slice(0, 3)).toEqual([
+      `CI: ❌ ${BRANCH} (${WORKFLOW}): red on c4da2c4, 1 workflow.`,
+      `   ❌ ${WORKFLOW} run 37190089292 is failure.`,
+      `     ${GATE_FILE}`,
+    ]);
     expect(lines.slice(-3)).toEqual([
       'Bugs: 2 open.',
       `Filed since ${SINCE.toISOString()}: 1.`,
