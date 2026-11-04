@@ -139,7 +139,8 @@
  * registered command's own seams are read: `process.env`, the real probe
  * runner and its timeout.
  */
-import type { DoctorResult, DoctorSeams } from './doctor.js';
+import type { DoctorResult } from './doctor-readings.js';
+import type { DoctorSeams } from './doctor.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { ProbeOptions, ProbeRun } from '@open-tomato/rafa/preflight/run';
