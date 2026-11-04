@@ -8,6 +8,8 @@ import { TrendIndicator } from '../../atoms/TrendIndicator/TrendIndicator.js';
 
 import {
   smallStatCardAsideVariants,
+  smallStatCardBodyVariants,
+  smallStatCardBottomVariants,
   smallStatCardDeltaVariants,
   smallStatCardFooterVariants,
   smallStatCardHeadVariants,
@@ -72,24 +74,30 @@ export function SmallStatCard({ title, trend, decoration, value, unit, goal, asi
           ? decoration
           : <TrendIndicator trend={trend} showValue />}
       </div>
-      <div className={smallStatCardRowVariants()}>
-        <div className={smallStatCardValueVariants()}>
-          <span className={smallStatCardNumberVariants({ size })}>
-            {typeof value === 'number'
-              ? formatCompact(value)
-              : value}
-          </span>
-          {suffix !== '' && <span className={smallStatCardSuffixVariants()}>{suffix}</span>}
+      <div className={smallStatCardBodyVariants()}>
+        <div className={smallStatCardRowVariants()}>
+          <div className={smallStatCardValueVariants()}>
+            <span className={smallStatCardNumberVariants({ size })}>
+              {typeof value === 'number'
+                ? formatCompact(value)
+                : value}
+            </span>
+            {suffix !== '' && <span className={smallStatCardSuffixVariants()}>{suffix}</span>}
+          </div>
+          {aside !== undefined && <div className={smallStatCardAsideVariants()}>{aside}</div>}
         </div>
-        {aside !== undefined && <div className={smallStatCardAsideVariants()}>{aside}</div>}
       </div>
-      {delta && (
-        <p className={smallStatCardDeltaVariants({ reading: readDelta(delta) })}>
-          <DeltaIcon delta={delta} />
-          {delta.text}
-        </p>
+      {(delta !== undefined || footer !== undefined) && (
+        <div className={smallStatCardBottomVariants()}>
+          {delta && (
+            <p className={smallStatCardDeltaVariants({ reading: readDelta(delta) })}>
+              <DeltaIcon delta={delta} />
+              {delta.text}
+            </p>
+          )}
+          {footer !== undefined && <div className={smallStatCardFooterVariants()}>{footer}</div>}
+        </div>
       )}
-      {footer !== undefined && <div className={smallStatCardFooterVariants()}>{footer}</div>}
     </section>
   );
 }

@@ -19,7 +19,7 @@ describe('SmallStatCard', () => {
     expect(screen.queryByText('dot')).toBeNull();
   });
 
-  it('lays the aside beside the value and the delta line under them, inked by its reading', () => {
+  it('lays the aside beside the value, and the delta line and footer in a bottom block pinned to the floor', () => {
     render(
       <SmallStatCard
         title="Plans completed this week"
@@ -30,11 +30,15 @@ describe('SmallStatCard', () => {
       />,
     );
     const row = screen.getByTestId('spark').parentElement?.parentElement;
+    const body = row?.parentElement;
     const delta = screen.getByText('90% completion, vs 71% four-week average');
+    const bottom = delta.parentElement;
 
     expect(row?.textContent).toBe('9 of 10');
-    expect(row?.nextElementSibling).toBe(delta);
+    expect(body?.className).toContain('flex-1');
+    expect(body?.nextElementSibling).toBe(bottom);
+    expect(bottom?.className).toContain('mt-auto');
     expect(delta.className).toContain('text-delta-up');
-    expect(screen.getByText('proxy').className).toContain('mt-auto');
+    expect(delta.nextElementSibling).toBe(screen.getByText('proxy'));
   });
 });

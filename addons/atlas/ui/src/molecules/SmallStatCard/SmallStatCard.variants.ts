@@ -8,9 +8,11 @@ import { cva, type VariantProps } from 'class-variance-authority';
  * decoration on the right; the value row, where the big number and its
  * suffix sit in one column and the `aside` graphic (a sparkline) in the
  * other, so a long delta line under them keeps the whole width and never
- * breaks; the delta line; and a footer pinned to the bottom (a progress
- * bar, a link, a note) so tiles in a row align. 18px padding, 8px gap,
- * 130px minimum height at `md`; `sm` keeps no footer room.
+ * breaks; and a bottom block, the delta line and the footer (a progress
+ * bar, a link, a note), pinned to the card's floor. The value row takes
+ * the slack between the head and the bottom block, so tiles in a row keep
+ * their text at the same heights. 18px padding, 8px gap, 130px minimum
+ * height at `md`; `sm` sets none.
  */
 export const smallStatCardVariants: (props?: SmallStatCardVariantProps) => string = cva(
   'relative flex flex-col gap-2 overflow-hidden rounded-lg border border-grid bg-surface p-[18px] text-ink',
@@ -30,6 +32,9 @@ export const smallStatCardHeadVariants: (props?: Record<string, never>) => strin
 
 /** The title: small uppercase mono. */
 export const smallStatCardTitleVariants: (props?: Record<string, never>) => string = cva('font-mono text-[10px] uppercase tracking-[0.1em] text-muted');
+
+/** The body between the head and the bottom block: it takes the slack, so the bottom block sits on the card's floor whatever the row's height. */
+export const smallStatCardBodyVariants: (props?: Record<string, never>) => string = cva('flex-1');
 
 /** The value row: the number column and the aside column, bottoms aligned. */
 export const smallStatCardRowVariants: (props?: Record<string, never>) => string = cva('flex items-end justify-between gap-3');
@@ -68,8 +73,11 @@ export const smallStatCardDeltaVariants: (props?: SmallStatCardDeltaVariantProps
   },
 );
 
-/** The footer line, pinned to the bottom of the tile. */
-export const smallStatCardFooterVariants: (props?: Record<string, never>) => string = cva('mt-auto text-xs text-muted');
+/** The bottom block: the delta line and the footer, pinned to the card's floor. */
+export const smallStatCardBottomVariants: (props?: Record<string, never>) => string = cva('mt-auto flex flex-col gap-1');
+
+/** The footer line: a progress bar, a link, a note. */
+export const smallStatCardFooterVariants: (props?: Record<string, never>) => string = cva('text-xs text-muted');
 
 /** The tile's scale. */
 export type SmallStatCardSize = 'md' | 'sm';
