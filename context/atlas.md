@@ -56,7 +56,14 @@ CVA variants with the `ot/cva-only-classname` rule, the token names
 gate order, the publish shape and the privacy sweep, which lives in
 `charts` and sweeps all of `addons/atlas/`.
 `addons/atlas/ui/README.md` adds what is `ui`'s own: the atomic layers,
-`context`, `modes` and `contract`, and the card cascade. Both libraries
+`context`, `modes` and `contract`, and the card cascade. The formatting
+layer is `charts`' (`src/seam/format.ts`): one `ValueFormat` per axis,
+tooltip or stat (`raw`, `number`, `compact`, `percent`, `money`, `unit`,
+`duration`, `elapsed`, `relative`, `date`, `custom`), resolved against a
+`FormatContext` (locale, currency, time zone, `now`, custom formatters)
+by `formatterFor` or the `useFormatter` hook under `FormatProvider`, so a
+dashboard sets its locale once and every card writes the same way; the
+README's formatting section lists the kinds. Both libraries
 are publishable and depend on no private member. The root `bun test`
 skips `charts`, `ui` and `demo` (`pathIgnorePatterns` in the root
 `bunfig.toml`): each runs its own tests from its folder, and CI's `atlas`
