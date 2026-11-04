@@ -18,6 +18,21 @@ describe('Swatch', () => {
     expect(swatch.className).toContain('size-5');
   });
 
+  it('draws a pole tone as a circle', () => {
+    render(<Swatch label="Shipping" tone="pole-ship-core" shape="circle" />);
+    const swatch = screen.getByRole('img', { name: 'Shipping' });
+
+    expect(swatch.className).toContain('bg-pole-ship-core');
+    expect(swatch.className).toContain('rounded-full');
+  });
+
+  it('is decorative without a label', () => {
+    const { container } = render(<Swatch tone="good" />);
+
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(container.firstElementChild?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('merges the passthrough class last', () => {
     render(<Swatch label="Layout" className="ml-2" />);
 

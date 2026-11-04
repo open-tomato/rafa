@@ -12,17 +12,6 @@ export const balancePoleRowVariants: (props?: Record<string, never>) => string =
 /** A pole's dot and name. */
 export const balancePoleNameVariants: (props?: Record<string, never>) => string = cva('flex items-center gap-1.5 text-ink');
 
-/** The dot in the pole's core colour. */
-export const balancePoleDotVariants: (props?: BalancePoleDotVariantProps) => string = cva('inline-block size-2.5 shrink-0 rounded-full', {
-  variants: {
-    tone: {
-      'pole-ship-core': 'bg-pole-ship-core',
-      'pole-fail-core': 'bg-pole-fail-core',
-      'pole-base-core': 'bg-pole-base-core',
-    },
-  },
-});
-
 /** The pole's mean. */
 export const balancePoleValueVariants: (props?: Record<string, never>) => string = cva('tabular-nums text-ink-2');
 
@@ -57,14 +46,6 @@ export const balanceLegendTermVariants: (props?: Record<string, never>) => strin
 
 /** The closing line on the history. */
 export const balanceHistoryVariants: (props?: Record<string, never>) => string = cva('leading-snug text-muted');
-
-/** The pole tones a dot can take. */
-export type BalancePoleDotTone = 'pole-ship-core' | 'pole-fail-core' | 'pole-base-core';
-
-/** The variant props `balancePoleDotVariants` takes. */
-export interface BalancePoleDotVariantProps {
-  readonly tone?: BalancePoleDotTone | null;
-}
 
 /** The variant props `balanceLevelVariants` takes. */
 export interface BalanceLevelVariantProps {

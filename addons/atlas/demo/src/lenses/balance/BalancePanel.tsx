@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
 
+import { Swatch, type SwatchTone } from '@open-tomato/atlas-ui';
+
 import { LEVEL_LEGEND, type BalanceReading, type Level } from '../../data/balance-readings.js';
 import { BALANCE_POLES, type PoleId } from '../../data/balance.js';
 
@@ -11,7 +13,6 @@ import {
   balanceLevelVariants,
   balanceNotesVariants,
   balancePanelVariants,
-  balancePoleDotVariants,
   balancePoleListVariants,
   balancePoleNameVariants,
   balancePoleRowVariants,
@@ -19,7 +20,6 @@ import {
   balanceReadingNameVariants,
   balanceReadingTextVariants,
   balanceReadingVariants,
-  type BalancePoleDotTone,
 } from './BalancePanel.variants.js';
 
 /** The balance panel's props: the reading and the weeks of history behind it. */
@@ -33,7 +33,7 @@ const LEVEL_WORD: Readonly<Record<Level, string>> = { low: 'low', mid: 'usual', 
 const LEVELS: readonly Level[] = ['low', 'mid', 'high'];
 
 /** The core tone of each pole, as the dot draws it. */
-const POLE_DOT: Readonly<Record<PoleId, BalancePoleDotTone>> = {
+const POLE_DOT: Readonly<Record<PoleId, SwatchTone>> = {
   shipping: 'pole-ship-core',
   failing: 'pole-fail-core',
   foundation: 'pole-base-core',
@@ -50,7 +50,7 @@ export function BalancePanel({ reading, history }: BalancePanelProps): ReactElem
           return (
             <li key={pole.id} className={balancePoleRowVariants()}>
               <span className={balancePoleNameVariants()}>
-                <span aria-hidden="true" className={balancePoleDotVariants({ tone: POLE_DOT[id] })} />
+                <Swatch tone={POLE_DOT[id]} shape="circle" size="sm" />
                 {pole.icon} {pole.label}
               </span>
               <span className={balancePoleValueVariants()}>
