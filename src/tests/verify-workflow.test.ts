@@ -5,11 +5,13 @@
  * is the file's only gate. Pull requests into `stretch/**` report no
  * check, which keeps `rafa pr merge <pr> --skip-checks` working there.
  *
- * The workflow holds two jobs under the same triggers, permissions and
- * timeout: `verify` (ring 0) runs the whole suite, lint and types, and
+ * The workflow holds three jobs under the same triggers, permissions and
+ * timeout: `verify` (ring 0) runs the whole suite, lint and types,
  * `affected` (ring 1) runs `turbo` over the packages a change reaches,
  * the type references and the workspace graph check, against the base
- * `TURBO_SCM_BASE` names.
+ * `TURBO_SCM_BASE` names, and `atlas` runs each publishable Atlas
+ * library's own gates from its folder, one matrix leg per package, since
+ * the root `bun test` skips them.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -92,7 +94,17 @@ function stepsOf(job: string): readonly Step[] {
   return WORKFLOW.jobs[job]?.steps ?? [];
 }
 
-/** The two jobs, each with its gates, for the cases both must hold. */
+/** The six gate steps of the job `atlas`, by name, with the command each runs from the package folder. */
+const ATLAS_GATES: ReadonlyArray<readonly [string, string]> = [
+  ['Types', 'bun run check-types'],
+  ['Lint', 'bun run lint'],
+  ['Test', 'bun run test'],
+  ['Build', 'bun run build'],
+  ['Build Storybook', 'bun run build:storybook'],
+  ['Stories', 'bun run check:stories'],
+];
+
+/** The two ring jobs, each with its gates, for the cases both must hold. */
 const JOBS: ReadonlyArray<readonly [string, ReadonlyArray<readonly [string, string]>]> = [
   ['verify', VERIFY_GATES],
   ['affected', AFFECTED_GATES],
@@ -135,8 +147,8 @@ describe('the verify workflow', () => {
     expect(branchesOf(WORKFLOW, 'push')).toEqual(['stretch/**']);
   });
 
-  it('holds two jobs, verify and affected', () => {
-    expect(Object.keys(WORKFLOW.jobs)).toEqual(['verify', 'affected']);
+  it('holds three jobs, verify, affected and atlas', () => {
+    expect(Object.keys(WORKFLOW.jobs)).toEqual(['verify', 'affected', 'atlas']);
   });
 
   it('reads contents and nothing more', () => {
@@ -229,5 +241,24 @@ describe('the job affected, ring 1', () => {
     const checkout = shallow.jobs['affected']?.steps.find((step) => step.uses === 'actions/checkout@v7');
 
     expect(checkout?.with?.['fetch-depth']).toBe(1);
+  });
+});
+
+describe('the job atlas, the libraries\' own gates', () => {
+  it('runs one leg per publishable Atlas library, from that folder', () => {
+    const job = WORKFLOW.jobs['atlas'] as (Job & { readonly strategy?: { readonly matrix?: { readonly package?: readonly string[] } }; readonly defaults?: { readonly run?: { readonly 'working-directory'?: string } } }) | undefined;
+
+    expect(job?.strategy?.matrix?.package).toEqual(['addons/atlas/charts', 'addons/atlas/ui']);
+    expect(job?.defaults?.run?.['working-directory']).toBe('${{ matrix.package }}');
+  });
+
+  it('installs from the root, then runs its six gates last, each under the not-cancelled guard', () => {
+    const all = stepsOf('atlas');
+    const install = all.find((step) => step.run === INSTALL) as (Step & { readonly 'working-directory'?: string }) | undefined;
+
+    expect(install?.['working-directory']).toBe('.');
+    expect(all.slice(-ATLAS_GATES.length).map((step) => [step.name, step.run, step.if])).toEqual(
+      ATLAS_GATES.map(([name, command]) => [name, command, GUARD]),
+    );
   });
 });

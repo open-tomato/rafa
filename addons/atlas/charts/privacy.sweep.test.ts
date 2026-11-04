@@ -19,7 +19,11 @@
  */
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from '../../../src/tests/sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 /** sha256 of each banned lowercase term, with a label that does not spell it. */
 const BANNED: ReadonlyMap<string, string> = new Map([

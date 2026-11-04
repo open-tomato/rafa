@@ -15,14 +15,17 @@
   "sideEffects": false,
   "exports": {
     ".": {
+      "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./theme": {
+      "source": "./src/theme/index.ts",
       "types": "./dist/theme/index.d.ts",
       "import": "./dist/theme/index.js"
     },
     "./engine": {
+      "source": "./src/engine/headless/index.ts",
       "types": "./dist/engine/headless/index.d.ts",
       "import": "./dist/engine/headless/index.js"
     },

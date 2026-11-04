@@ -15,10 +15,12 @@
   "sideEffects": false,
   "exports": {
     ".": {
+      "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./contract": {
+      "source": "./src/contract/index.ts",
       "types": "./dist/contract/index.d.ts",
       "import": "./dist/contract/index.js"
     },

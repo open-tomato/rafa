@@ -274,13 +274,15 @@ describe('publishableOf and packageNamed', () => {
   });
 });
 
+/** The folders the root manifest's two `workspaces` globs, `packages/*` and `addons/atlas/*`, name. */
+const MEMBER_DIRS: readonly string[] = ['packages', 'addons/atlas'];
+
 describe('readWorkspacePackages over this repository', () => {
-  it('reads exactly the folders under packages/ that hold a manifest, the members the workspace-graph sweep lists', () => {
+  it('reads exactly the folders under packages/ and addons/atlas/ that hold a manifest, the members the workspace-graph sweep lists', () => {
     const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
-    const packagesDir = join(repoRoot, 'packages');
-    const folders = readdirSync(packagesDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && existsSync(join(packagesDir, entry.name, 'package.json')))
-      .map((entry) => `packages/${entry.name}`)
+    const folders = MEMBER_DIRS.flatMap((dir) => readdirSync(join(repoRoot, dir), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && existsSync(join(repoRoot, dir, entry.name, 'package.json')))
+      .map((entry) => `${dir}/${entry.name}`))
       .sort();
 
     const members = packagesOf(readWorkspacePackages(repoRoot));

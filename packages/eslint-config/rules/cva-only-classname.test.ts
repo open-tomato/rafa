@@ -13,7 +13,8 @@ import { cvaOnlyClassName } from './cva-only-classname.mjs';
 
 RuleTester.describe = describe;
 RuleTester.it = it;
-RuleTester.itOnly = it.only;
+// No `itOnly`: bun's `it.only` throws on access under CI, and ESLint reads
+// it only for a case marked `only`, which none here is.
 
 const tester = new RuleTester({
   languageOptions: {
