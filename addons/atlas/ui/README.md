@@ -63,7 +63,11 @@ needs its own menu label. Built-in keys: `info`, `source`, `config`, `errors`
 (present once the boundary caught, or an `error` prop is passed), `maximise`
 (on `maximisable` cards). The four modes in `modes/` (`SnapshotCard`,
 `WidgetCard`, `DashboardCard`, `ReportCard`) are compositions of the same
-layers; a snapshot renders with `renderToStaticMarkup` and has no menu.
+layers; a snapshot renders with `renderToStaticMarkup` and has no menu. A
+new `config` object follows into a mounted card's chrome (the uncontrolled
+`CardSpecProvider` reseeds from it), so a page changes a title or a note
+without a new `key`; `DashboardCard` also takes `onConfigChange` and an
+`onRefresh` that replaces the page refresh behind Try again.
 
 The `maximise` entry renders the `MaximiseView` molecule: a page dialog
 whose chart box is a square of the viewport's smaller side, medium (70%,

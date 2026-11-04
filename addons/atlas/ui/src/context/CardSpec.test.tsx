@@ -21,6 +21,14 @@ describe('CardSpecProvider', () => {
     expect(screen.getByRole('button', { name: 'Renamed' })).toBeDefined();
   });
 
+  it('reseeds from a new value when uncontrolled, dropping the edit', () => {
+    const { rerender } = render(<CardSpecProvider value={CONFIG}><Title /></CardSpecProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Tokens' }));
+    rerender(<CardSpecProvider value={{ ...CONFIG, title: 'Tokens, this week' }}><Title /></CardSpecProvider>);
+
+    expect(screen.getByRole('button', { name: 'Tokens, this week' })).toBeDefined();
+  });
+
   it('hands an edit to onChange and shows the value it is given when controlled', () => {
     const onChange = mock<(next: CardSpec) => void>(() => undefined);
     render(<CardSpecProvider value={CONFIG} onChange={onChange}><Title /></CardSpecProvider>);

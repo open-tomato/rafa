@@ -238,7 +238,6 @@ export function ArchitectLens(): ReactElement {
             )}
           </DashboardCard>
           <DashboardCard
-            key={zoomWeek ?? 'weeks'}
             config={haltsSpec}
             select={(result: LensResult) => (zoomWeek === null
               ? result.mock.preflightHalts

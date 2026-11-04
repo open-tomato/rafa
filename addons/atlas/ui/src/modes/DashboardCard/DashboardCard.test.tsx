@@ -78,4 +78,43 @@ describe('DashboardCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'refresh tokens' }));
     expect(screen.getByText('hidden none')).toBeDefined();
   });
+
+  it('follows a new config into its title', () => {
+    const { rerender } = render(
+      <DashboardData data={{ tokens: 5, runs: 1 }}>
+        <DashboardCard config={TOKENS} select={(result: PageResult) => result.tokens}>{({ data }) => `tokens ${data}`}</DashboardCard>
+      </DashboardData>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Tokens' })).toBeDefined();
+    rerender(
+      <DashboardData data={{ tokens: 5, runs: 1 }}>
+        <DashboardCard config={{ ...TOKENS, title: 'Tokens, this week' }} select={(result: PageResult) => result.tokens}>{({ data }) => `tokens ${data}`}</DashboardCard>
+      </DashboardData>,
+    );
+    expect(screen.getByRole('heading', { name: 'Tokens, this week' })).toBeDefined();
+  });
+
+  it('hands Try again to its own onRefresh instead of the page refresh', async () => {
+    let pageAsked = 0;
+    let cardAsked = 0;
+    const source = async (): Promise<PageResult> => {
+      pageAsked += 1;
+      throw new Error('the page source failed');
+    };
+    render(
+      <DashboardData source={source}>
+        <DashboardCard config={TOKENS} select={(result: PageResult) => result.tokens} onRefresh={() => { cardAsked += 1; }}>
+          {({ data }) => `tokens ${data}`}
+        </DashboardCard>
+      </DashboardData>,
+    );
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Tokens' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Errors' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(pageAsked).toBe(1);
+    expect(cardAsked).toBe(1);
+  });
 });

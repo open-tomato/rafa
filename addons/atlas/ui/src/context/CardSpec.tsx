@@ -23,11 +23,17 @@ export interface CardSpecProviderProps {
 /**
  * The spec concern of the cascade: the card's static descriptor (title,
  * chart, options, menu) for every layer below, through `useCardSpec()`.
- * Uncontrolled, it keeps edits in its own state, seeded once from
- * `value`; give it a new `key` to start from a new value.
+ * Uncontrolled, it keeps edits in its own state, seeded from `value`
+ * and reseeded whenever the owner hands it a new `value`, so a page can
+ * change a card's title or note after mount without a new `key`.
  */
 export function CardSpecProvider({ value, onChange, children }: CardSpecProviderProps): ReactElement {
   const [own, setOwn] = useState(value);
+  const [seed, setSeed] = useState(value);
+  if (value !== seed) {
+    setSeed(value);
+    setOwn(value);
+  }
   const config = onChange === undefined
     ? own
     : value;
