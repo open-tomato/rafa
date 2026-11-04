@@ -188,10 +188,19 @@
  * lines that load a module providing it. Its line follows the effort
  * store schema row on every run, a halt's included.
  *
+ * ## The tsc row
+ *
+ * A project root holding a `tsconfig.json` then gets the `tsc` row
+ * (`./doctor-tsc.ts`, whose note holds the outcomes): it runs
+ * `node_modules/.bin/tsc --version` under the invocation's environment,
+ * `ok` naming the version, and `fail` on an exit of 126 or 127, the
+ * type step's `cannot start`, naming the interpreter to put on the PATH.
+ * Its line follows the effort sync row, a halt's included.
+ *
  * ## The exit code
  *
- * 0 when no required item failed and neither the effort store schema
- * row nor the effort sync row failed, whatever failed among the
+ * 0 when no required item failed and none of the effort store schema
+ * row, the effort sync row and the `tsc` row failed, whatever failed among the
  * optional ones and whatever was warned. 1 when a required item failed or timed out,
  * which is when `loop start` would halt before any session: the refusal
  * opens with the runner's halt, which names each such item, its probe,
@@ -200,7 +209,9 @@
  * refuses it and its next safe step, after a halt's text when both
  * happen. 1 when the effort sync row fails, its refusal naming the
  * strategy and why no adapter serves it, after the halt's and the
- * schema row's text when those happen. 1 as well, each
+ * schema row's text when those happen. 1 when the `tsc` row fails, its
+ * refusal naming tsc's exit and the interpreter, after the other
+ * refusals. 1 as well, each
  * ending `Nothing was checked.`, for a positional word, a `--plan` with
  * no file, a `--deep` holding a value, a plan named that is no file, a plan path that cannot be
  * checked, such as one under a file (`stat` answers `ENOTDIR`, measured
@@ -224,13 +235,14 @@
  * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the
  * stretch row (`./doctor-stretch.ts`), when `pr.base` names a `stretch/*` branch; then the `Skill tiers` rows
  * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then the
- * effort sync row; then, under `--deep`,
+ * effort sync row; then the `tsc` row, when there is a `tsconfig.json`; then, under `--deep`,
  * `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
  * the terminal result's `data` is a `DoctorResult` (`./doctor-readings.ts`), every path
  * absolute, for a preflight that did not halt and an effort store schema
- * row and an effort sync row that did not fail. A halt gives no `data`,
+ * row, an effort sync row and a `tsc` row that did not fail; the `tsc`
+ * row is not part of it. A halt gives no `data`,
  * nor does a failing row: the terminal event is the `command_exit`
  * error, whose message is the halt naming every failed required item,
  * then each failing row's refusal, the schema row's with its next safe
@@ -256,6 +268,7 @@ import type { InstallReadings } from './doctor-install.js';
 import type { BoardReadings, DoctorPreflight, DoctorResult, DoctorStartTier } from './doctor-readings.js';
 import type { DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersRunSeams } from './doctor-tiers.js';
+import type { DoctorTscSeams } from './doctor-tsc.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
@@ -304,6 +317,7 @@ import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
 import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
+import { writeDoctorTsc } from './doctor-tsc.js';
 
 /**
  * How the checks run; see the module note. Each left out is the
@@ -312,7 +326,7 @@ import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
 export interface DoctorSeams extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorEffortSyncSeams,
-  DoctorRefsSeams, DoctorReleaseSeams, DoctorTiersRunSeams {
+  DoctorRefsSeams, DoctorReleaseSeams, DoctorTiersRunSeams, DoctorTscSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -504,8 +518,8 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
 }
 
 /**
- * The refusal for a halt, a failing `effort store schema` or
- * `effort sync` row, or any of them together: the runner's own text and
+ * The refusal for a halt, a failing `effort store schema`, `effort sync`
+ * or `tsc` row, or any of them together: the runner's own text and
  * what `loop start` would do, then each failing row's refusal in that
  * order; null for none.
  */
@@ -622,11 +636,12 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     writeText(context, renderDoctorTiers(readings.tiers));
     writeDoctorEffortSchema(context, effortSchema);
     writeText(context, renderDoctorEffortSync(effortSync));
+    const tsc = await writeDoctorTsc(context, project.root, seams);
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
       ? []
       : renderDeep(deep));
-    const refusal = doctorRefusal(preflight.report.halt, [effortSchemaRefusal(effortSchema), effortSyncRefusal(effortSync)]);
+    const refusal = doctorRefusal(preflight.report.halt, [effortSchemaRefusal(effortSchema), effortSyncRefusal(effortSync), tsc]);
     if (refusal !== null) throw refusal;
     if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings, deep));
   } finally {
