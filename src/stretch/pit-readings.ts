@@ -12,8 +12,9 @@
  *   its `--log-failed` text through the reader `rafa ci status` uses
  *   (`../ci/status-reading.ts`), whose cases `readFailedCases`
  *   (`../ci/failed-cases.ts`) groups by file. The reading is a
- *   {@link CiStatusReading}, rendered by `renderCiStatus`, so a pit stop
- *   and `rafa ci status --branch` print one run the same way.
+ *   {@link CiStatusReading}, rendered by `renderCiStatus`: the newest
+ *   run alone, where `rafa ci status --branch` reads every workflow on
+ *   the head commit.
  * - **Open bugs**: the length of the tracker port's
  *   `openIssues('bug')`. A tracker without that optional member reads as
  *   not read, never as zero.

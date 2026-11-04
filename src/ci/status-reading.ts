@@ -7,8 +7,7 @@
  * This is the library half of `rafa ci status`; its command half,
  * `src/commands/ci/status.ts`, holds the line the command reads (its
  * flags and refusals), the `gh` seam, the json event and the command
- * itself. `src/stretch/pit-readings.ts` reads through this file too, so a
- * pit stop and `rafa ci status --branch` print one reading the same way.
+ * itself. `src/stretch/pit-readings.ts` reads through this file too.
  * Nothing here imports a file under `src/commands/`.
  *
  * ## The reading, one line per workflow
@@ -60,8 +59,9 @@
  * ## The single-run reading
  *
  * {@link CiStatusReading} and {@link renderCiStatus} read the newest run
- * alone, under the same pass rule; `rafa ci status` and the pit stop
- * still print through them, and leave them once they read per workflow.
+ * alone, under the same pass rule; the pit stop still prints through
+ * them, and leaves them once it reads per workflow. `rafa ci status`
+ * reads per workflow.
  *
  * Nothing here spawns a process: `gh` arrives as a {@link GhRunner}, the
  * seam a case replaces.

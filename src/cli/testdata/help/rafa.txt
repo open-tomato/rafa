@@ -68,8 +68,8 @@ Subjects:
              development
   config     show every setting and where it came from; set one key in the
              project's config, keeping every comment
-  ci         read the newest CI run on a branch: its state, its commit and the
-             cases it failed
+  ci         read every CI workflow on a branch's head commit: its state, the
+             commit and the cases it failed
   stretch    open a stretch: its integration branch, pr.base pointed at it, and
              the operators in tmux 🪙
   bug        list the cause codes a bug can carry, rank the closest to a cause

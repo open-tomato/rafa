@@ -871,9 +871,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/commands/plan/plan-files', ['requireProject']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../ci/failed-cases.js', ['readFailedCases']],
-    ['../../ci/runs.js', ['readNewestRun']],
-    ['../../ci/status-reading.js', ['CI_STATUS_EXIT', 'readFailedLog', 'renderCiStatus', 'verdictOf']],
+    ['../../ci/runs.js', ['readHeadRuns', 'readNewestRun']],
+    ['../../ci/status-reading.js', ['branchReading', 'readWorkflowReadings', 'renderCiBranch']],
   ]],
   ['./commands/stretch/start.js', [
     ['@open-tomato/rafa-board', ['lineRefusal', 'readChoiceFlag', 'readTextFlag']],
