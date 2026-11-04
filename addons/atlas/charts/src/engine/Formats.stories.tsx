@@ -17,12 +17,14 @@ interface FormatPreviewProps {
   context: FormatContext;
   /** How the time axis writes a date; `day` when absent. */
   dates?: ValueFormat;
+  /** Pins the time axis's ticks to a step, so a weekly pattern lands on week starts. */
+  xStep?: 'week';
   /** The series multiplied by this, for a kind that reads another scale (a fraction for `percent`). */
   scale?: number;
 }
 
 /** The chart under the provider, so `useFormatter` reads the context. */
-function Chart({ format, dates, scale }: Omit<FormatPreviewProps, 'context'>): ReactElement {
+function Chart({ format, dates, xStep, scale }: Omit<FormatPreviewProps, 'context'>): ReactElement {
   const valueFormat = useFormatter(format);
   const dateFormat = useFormatter(dates);
   const series: readonly LineSeries[] = AREA_SERIES.map((line) => ({
@@ -37,6 +39,7 @@ function Chart({ format, dates, scale }: Omit<FormatPreviewProps, 'context'>): R
       height={260}
       animate={false}
       valueFormat={valueFormat}
+      xStep={xStep}
       xFormat={dateFormat === undefined
         ? undefined
         : (date) => dateFormat(date.getTime())}
@@ -81,6 +84,6 @@ export const Money: Story = { args: { format: { kind: 'money', digits: 0 } } };
 export const MoneyInGermany: Story = { args: { format: { kind: 'money', digits: 0 }, context: { locale: 'de-DE', currency: 'EUR', timeZone: 'UTC' } } };
 export const Unit: Story = { args: { format: { kind: 'unit', unit: 'tok' } } };
 export const Duration: Story = { args: { format: { kind: 'duration', from: 'seconds' } } };
-export const DateWeek: Story = { args: { dates: { kind: 'date', pattern: 'week' } } };
+export const DateWeek: Story = { args: { dates: { kind: 'date', pattern: 'week' }, xStep: 'week' } };
 export const DateMonth: Story = { args: { dates: { kind: 'date', pattern: 'month' } } };
 export const Custom: Story = { args: { format: { kind: 'custom', id: 'tokens' }, context: CUSTOM } };

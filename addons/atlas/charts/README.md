@@ -128,6 +128,11 @@ return <LineChart ariaLabel="Spend per day" series={series} valueFormat={valueFo
 - Dates are UTC everywhere: `formatDay`, `formatWeek`, `formatDate` and
   the `date` kind read UTC, and every option sets ECharts' `useUTC`, so a
   time-axis tick sits at midnight UTC where its label names the day.
+- A weekly `xFormat` goes with `xStep: 'week'` on `LineChart`: the axis
+  starts on the Monday of its first point and its labels sit on the
+  Mondays of the span (`axisLabel.customValues`), because the time
+  scale's own interval ignores a forced `interval` and lands "w/c" labels
+  on days that start no week.
 - `valueFormatSchema` and `formatContextSchema` (zod v4) validate a format
   and a context that arrive as data. A context's `customFormatters` are
   functions, so they validate in code only.

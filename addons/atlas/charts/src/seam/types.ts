@@ -74,6 +74,8 @@ export interface LineChartProps extends ChartCommonProps {
   /** A horizontal reference (an average, a target). */
   baseline?: { value: number; label: string };
   xFormat?: (date: Date) => string;
+  /** Pins the time axis's ticks to a step: `week` starts on a Monday and ticks every seven days, for a weekly `xFormat`. */
+  xStep?: 'week';
   /** A range selector under the plot (a brush or data zoom); the plot shows the selected range. */
   zoom?: boolean;
   /** Fires when the selected range changes; null when the whole range is back. */

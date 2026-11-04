@@ -104,14 +104,59 @@ export function categoryAxis(tokens: ResolvedTokens, data: readonly string[], ex
   };
 }
 
-/** A time axis: the axis line in `baseline`, labels through `xFormat`, spread so they never overlap. */
-export function timeAxis(tokens: ResolvedTokens, xFormat: (date: Date) => string): PlotAxis {
-  return {
-    type: 'time',
+/** One day and one week, in ms. */
+const DAY_MS = 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
+
+/** Days from Monday to the given UTC weekday (Sunday is 0). */
+const DAYS_SINCE_MONDAY = [6, 0, 1, 2, 3, 4, 5] as const;
+
+/** The tick step a time axis may be pinned to; the axis picks its own otherwise. */
+export type TimeStep = 'week';
+
+/** How a time axis's ticks are pinned: the step and the span of the data, in epoch ms. */
+export interface TimeTicks {
+  readonly step: TimeStep;
+  readonly from: number;
+  readonly to: number;
+}
+
+/** The Monday 00:00 UTC on or before the epoch `ms`. */
+export function startOfWeekUtc(ms: number): number {
+  const date = new Date(ms);
+  const dayStart = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return dayStart - (DAYS_SINCE_MONDAY[date.getUTCDay()] ?? 0) * DAY_MS;
+}
+
+/** Every Monday 00:00 UTC from the week of `from` to `to`, inclusive. */
+export function weekStartsUtc(from: number, to: number): number[] {
+  const starts: number[] = [];
+  for (let monday = startOfWeekUtc(from); monday <= to; monday += WEEK_MS) starts.push(monday);
+  return starts;
+}
+
+/**
+ * A time axis: the axis line in `baseline`, labels through `xFormat`,
+ * spread so they never overlap. With `ticks` of step `week` the axis
+ * starts on the Monday of its first point and its labels sit on the
+ * Mondays of the span (ECharts' `customValues`), so a weekly label
+ * ("w/c 3 Nov") lands on a week's first day rather than wherever the
+ * time scale's own interval falls.
+ */
+export function timeAxis(tokens: ResolvedTokens, xFormat: (date: Date) => string, ticks?: TimeTicks): PlotAxis {
+  const formatter = (value: number): string => xFormat(new Date(value));
+  const label = { ...tickLabel(tokens), formatter, hideOverlap: true };
+  const chrome = {
     axisLine: { show: true, lineStyle: { color: paint(tokens, 'baseline'), width: 1 } },
     axisTick: { show: false },
     splitLine: { show: false },
-    axisLabel: { ...tickLabel(tokens), formatter: (value: number) => xFormat(new Date(value)), hideOverlap: true },
+  };
+  if (ticks === undefined) return { type: 'time', ...chrome, axisLabel: label };
+  return {
+    type: 'time',
+    min: startOfWeekUtc(ticks.from),
+    ...chrome,
+    axisLabel: { ...label, customValues: weekStartsUtc(ticks.from, ticks.to) },
   };
 }
 

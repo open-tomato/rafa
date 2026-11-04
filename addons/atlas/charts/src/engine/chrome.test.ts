@@ -7,7 +7,9 @@ import {
   plotGrid,
   referenceLabelRoom,
   referenceLine,
+  startOfWeekUtc,
   timeAxis,
+  weekStartsUtc,
   tooltipNode,
   valueAxis,
   type TooltipParams,
@@ -68,6 +70,23 @@ describe('the plot chrome', () => {
     const axis = timeAxis(FIXED_TOKENS, (date) => `d${date.getUTCDate()}`) as { axisLabel: { formatter: (value: number) => string } };
 
     expect(axis.axisLabel.formatter(Date.UTC(2026, 10, 1))).toBe('d1');
+  });
+
+  it('pins a weekly time axis to the Mondays of its span', () => {
+    const wednesday = Date.UTC(2026, 10, 4, 15);
+    const axis = timeAxis(FIXED_TOKENS, (date) => `d${date.getUTCDate()}`, { step: 'week', from: wednesday, to: Date.UTC(2026, 10, 20) }) as { min: number; axisLabel: { customValues: number[] } };
+
+    expect(axis.min).toBe(Date.UTC(2026, 10, 2));
+    expect(axis.axisLabel.customValues).toEqual([Date.UTC(2026, 10, 2), Date.UTC(2026, 10, 9), Date.UTC(2026, 10, 16)]);
+    expect(startOfWeekUtc(Date.UTC(2026, 10, 1))).toBe(Date.UTC(2026, 9, 26));
+    expect(weekStartsUtc(Date.UTC(2026, 10, 2), Date.UTC(2026, 10, 2))).toEqual([Date.UTC(2026, 10, 2)]);
+  });
+
+  it('leaves a free time axis without a pinned start or tick positions', () => {
+    const axis = timeAxis(FIXED_TOKENS, (date) => `d${date.getUTCDate()}`) as { min?: number; axisLabel: { customValues?: number[] } };
+
+    expect(axis.min).toBeUndefined();
+    expect(axis.axisLabel.customValues).toBeUndefined();
   });
 
   it('draws a reference line 1px in ink-2 with its label', () => {

@@ -11,6 +11,7 @@ import {
   referenceLabelRoom,
   referenceLine,
   timeAxis,
+  type TimeTicks,
   tooltipChrome,
   tooltipNode,
   type TooltipParams,
@@ -72,6 +73,14 @@ function zoomOption(tokens: ResolvedTokens): DataZoomComponentOption[] {
       moveOnMouseMove: true,
     },
   ];
+}
+
+/** The pinned ticks for `xStep`, over the span of every series' points; none without a step or a point. */
+function timeTicksOf(props: LineChartProps): TimeTicks | undefined {
+  if (props.xStep === undefined) return undefined;
+  const times = props.series.flatMap((entry) => entry.points.map((point) => point.x.getTime()));
+  if (times.length === 0) return undefined;
+  return { step: props.xStep, from: Math.min(...times), to: Math.max(...times) };
 }
 
 /** The ECharts option for the props over the resolved tokens; pure, so it is tested without a canvas. */
@@ -136,7 +145,7 @@ export function buildOption(props: LineChartProps, tokens: ResolvedTokens): Char
     dataZoom: props.zoom
       ? zoomOption(tokens)
       : undefined,
-    xAxis: timeAxis(tokens, xFormat),
+    xAxis: timeAxis(tokens, xFormat, timeTicksOf(props)),
     yAxis: valueAxis(tokens, format, { min: 0, max: ceiling }),
     tooltip: { ...tooltipChrome('axis'), axisPointer: crosshair(tokens), formatter: tooltipFormatter },
     series,
