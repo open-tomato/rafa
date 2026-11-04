@@ -282,7 +282,7 @@ export {
   runStartFailures,
 } from './src/start/triage.js';
 
-export { readTypeCheckRecipe } from './src/start/type-step.js';
+export { CANNOT_START_CODES, readTypeCheckRecipe, scriptInterpreter } from './src/start/type-step.js';
 
 export { runWrapUp } from './src/start/wrap-up-run.js';
 

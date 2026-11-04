@@ -9,15 +9,18 @@
  * lint, then the type step, run after a test run that was not a stop,
  * nothing runs after one that was, and no type step runs after a lint
  * that was. Each "nothing ran" case is paired with the same input,
- * changed in one thing, that runs the check.
+ * changed in one thing, that runs the check. `isCheckUnstartable` is
+ * held on its own and through `settleStep` over a tracker on disk: a
+ * check that could not start leaves the tracker as it was, and the same
+ * step with a red type step in its place inserts the repair.
  */
 import type { LintRunner } from './lint-step.js';
-import type { SuiteStepContext, TaskStepInput } from './suite-step.js';
-import type { TypeRunner } from './type-step.js';
+import type { Settling, SuiteStepContext, TaskStepInput } from './suite-step.js';
+import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -25,8 +28,8 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { seamsOf, SIGINT_EXIT_CODE } from './suite-step.js';
-import { lintTask, taskDiffChecks, typeCheckTask } from './task-step-checks.js';
+import { seamsOf, settleStep, SIGINT_EXIT_CODE } from './suite-step.js';
+import { isCheckUnstartable, lintTask, taskDiffChecks, typeCheckTask } from './task-step-checks.js';
 
 const BASE = 'base0000';
 const DIFF_KEY = `diff --name-only -z --no-renames --diff-filter=d ${BASE} HEAD`;
@@ -55,6 +58,7 @@ afterEach(() => {
 const GIT_ANSWERS: Readonly<Record<string, string>> = {
   [DIFF_KEY]: 'src/a.ts\0src/a.test.ts\0',
   [TYPE_DIFF_KEY]: 'M\0src/a.ts\0A\0src/a.test.ts\0',
+  'rev-parse --verify HEAD^{commit}': 'head1111\n',
 };
 
 /** A git whose filtered diffs from {@link BASE} name `src/a.ts` and `src/a.test.ts`, the test file added. */
@@ -135,7 +139,7 @@ describe('typeCheckTask', () => {
     const context = contextWith(0);
     const outcome = await typeCheckTask(context, seamsOf(context), INPUT);
     expect(typeCalls).toBe(1);
-    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, cannotStart: false, blocker: null });
   });
 
   it('reads a tsc run ended by SIGINT as a stop, not red', async () => {
@@ -179,5 +183,70 @@ describe('taskDiffChecks', () => {
     expect(lintCalls).toBe(0);
     expect(typeCalls).toBe(0);
     expect(checks).toEqual({});
+  });
+});
+
+/** A type step that could not start: tsc exited 127, its blocker naming node. */
+const CANNOT_START: TypeOutcome = { ran: false, red: false, interrupted: false, cannotStart: true, blocker: 'The type step could not start tsc: put node on the PATH the loop runs under.' };
+
+/** A red type step: a type error the task added. */
+const RED_TYPES: TypeOutcome = { ran: true, red: true, interrupted: false, cannotStart: false, blocker: 'The type step found 1 new type error.' };
+
+/** The tracker {@link settled} plants: one open task the repair would go above. */
+const TRACKER = '# Plan\n\n- [ ] Add a file\n';
+
+/** A green task step that recorded no run, carrying `types` as its type step. */
+function settlingWith(types: TypeOutcome): Settling {
+  return {
+    kind: 'task',
+    scope: 'none',
+    label: 'task step for "Add a file"',
+    result: testRun(),
+    baseline: null,
+    repair: { kind: 'task', task: INPUT.task },
+    recorded: null,
+    lint: { ran: true, red: false, interrupted: false, blocker: null },
+    types,
+  };
+}
+
+describe('isCheckUnstartable', () => {
+  it('answers true for a type step that could not start', () => {
+    expect(isCheckUnstartable({ types: CANNOT_START })).toBe(true);
+  });
+
+  it('answers false for a red type step, a green one, a lint alone and no check', () => {
+    expect(isCheckUnstartable({ types: RED_TYPES })).toBe(false);
+    expect(isCheckUnstartable({ types: { ...RED_TYPES, red: false, blocker: null } })).toBe(false);
+    expect(isCheckUnstartable({ lint: { ran: true, red: true, interrupted: false, blocker: 'lint' } })).toBe(false);
+    expect(isCheckUnstartable({})).toBe(false);
+  });
+});
+
+describe('settleStep on a check that could not start', () => {
+  /** Settles `types` over a planted tracker, answering the outcome and the tracker after it. */
+  function settled(types: TypeOutcome): { outcome: ReturnType<typeof settleStep>; tracker: string } {
+    const context = contextWith(0);
+    writeFileSync(context.trackerPath, TRACKER, 'utf8');
+    const outcome = settleStep(context, seamsOf(context), settlingWith(types));
+    return { outcome, tracker: readFileSync(context.trackerPath, 'utf8') };
+  }
+
+  it('is red on the blocker naming node and writes no repair task', () => {
+    const { outcome, tracker } = settled(CANNOT_START);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain('node');
+    expect(outcome.blockedLine).toBeNull();
+    expect(outcome.repairInserted).toBe(false);
+    expect(tracker).toBe(TRACKER);
+  });
+
+  it('inserts the repair for the same step with a red type step in its place', () => {
+    const { outcome, tracker } = settled(RED_TYPES);
+    expect(outcome.red).toBe(true);
+    expect(outcome.repairInserted).toBe(true);
+    expect(outcome.blockedLine).not.toBeNull();
+    expect(tracker).not.toBe(TRACKER);
+    expect(tracker).toContain('The type step found 1 new type error.');
   });
 });

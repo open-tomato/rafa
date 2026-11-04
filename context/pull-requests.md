@@ -200,6 +200,22 @@ Providers reading of `rafa doctor --deep` does) wraps `fake.run` in a
 runner that answers the `auth` forms itself and hands the rest on. This
 sentence replaces nothing.
 
+### CI status on the head commit
+
+`rafa ci status --branch=<branch>` prints one line per workflow that ran on the
+branch's head commit, each the workflow's newest run on that commit, under a
+headline with the worst of them: `red` beats `running`, which beats `green`,
+which beats `none`. A `skipped` or `neutral` run reads green, so a workflow
+that ran nothing holds nothing red. A red run's failed cases come from its
+`gh run view --log-failed` text.
+
+The planted case is the runs of `90471b00` on `stretch/111`: the fragment
+workflow's run 41456634201 `skipped` is the newest run of the commit, above two
+`verify` runs, 41456633215 and 41456159309, both `failure`. The reading holds
+two lines, the fragment green and `verify` red on its newer run, and the branch
+reads red. Reading the newest run of the commit alone would have read the skip
+and passed.
+
 ### The merge flow
 
 1. Refuse on a tracked change in the working tree, or on an untracked path the

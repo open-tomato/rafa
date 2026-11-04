@@ -7,9 +7,11 @@
  *
  * `tracker.openIssues('chore')`, kept to the issues whose body holds
  * {@link STALE_DOCS_MARKER}, whatever their title: a release forecast
- * that shifts between two runs opens a second issue under a new version
- * (`release-issue.ts`), so every marked issue is read, not only the one
- * the current version names. Issues come in the order the tracker lists
+ * that shifts between two runs retitles the open issue when the caller
+ * read the release tags, and opens a second issue under a new version
+ * when it did not (`release-issue.ts`), and a released issue left open
+ * keeps its lines, so every marked issue is read, not only the one the
+ * current version names. Issues come in the order the tracker lists
  * them, and lines in the order each body holds them.
  *
  * A line is an unticked checklist item, `- [ ] <text>`, its text trimmed;

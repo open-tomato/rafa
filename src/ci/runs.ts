@@ -1,7 +1,9 @@
 /**
  * The branch run reader: the newest GitHub Actions run on a branch, or
  * of one commit on it, read through `gh run list --branch <b> [--commit
- * <sha>] [--workflow <w>] --limit 1 --json`.
+ * <sha>] [--workflow <w>] --limit 1 --json`; and every run of the
+ * branch's head commit, read by {@link readHeadRuns} through `gh run list
+ * --branch <b> --commit <sha> --limit 100 --json`.
  *
  * Its own seam, apart from the pull-request port in `packages/rafa-pr/src/pr/gh.ts`, so
  * that file (near the 800-line cap) and its fake do not grow. The seam is
@@ -52,11 +54,32 @@
  *     `pull_request` run of `verify`). So `--limit 1` beside `--commit`
  *     answers the newest run of that commit.
  *
+ * The head-commit read was read off `gh` 2.103.3 on 2026-11-04 against
+ * `open-tomato/rafa`, read-only, with `--repo`, on `stretch/111`:
+ *
+ *   - `--branch stretch/111 --commit 90471b00... --limit 100` answered the
+ *     three runs of that commit, newest first, of two workflows: the
+ *     `Release bot fragment` run 41456634201 `skipped`, then `verify`
+ *     41456633215 and 41456159309, both `failure`. A newer run of another
+ *     workflow sits above a red one, so reading only the newest run of
+ *     the commit reads the skip and never the red.
+ *   - With `--limit 2` the same command answered the first two of the
+ *     three: `--limit` cuts the list, so a list as long as the limit may
+ *     be missing runs. `--limit 150` without `--branch` answered 150
+ *     rows, so `gh` pages past 100 and the limit is the reader's choice.
+ *   - The head commit is the `headSha` of the branch's newest run:
+ *     `--branch stretch/111 --limit 1` answered `verify` 41462572168 on
+ *     `af33ef17`, and `--commit af33ef17...` its three runs, that one
+ *     first.
+ *
  * ## Strict
  *
  * A row whose fields are missing or of the wrong type, or whose `status`
  * is not one of the six run statuses GitHub documents, throws rather than
- * reading as a run. The conclusion is kept as `gh` wrote it, since the
+ * reading as a run. A head-commit list that is empty, that holds a run
+ * of another commit, or that fills {@link HEAD_RUN_LIMIT} throws too:
+ * each is a list that cannot be every run of the head commit. The
+ * conclusion is kept as `gh` wrote it, since the
  * set of conclusions is wider and what each one means is the caller's
  * decision.
  */
@@ -72,6 +95,12 @@ const FULL_SHA = /^[0-9a-f]{40}$/;
 
 /** The `--json` fields the reader asks for, in the order it sends them. */
 export const RUN_LIST_FIELDS = ['databaseId', 'workflowName', 'status', 'conclusion', 'headSha'] as const;
+
+/**
+ * How many runs {@link readHeadRuns} asks for. A head commit holding as
+ * many is refused, since the list may have been cut.
+ */
+export const HEAD_RUN_LIMIT = 100;
 
 /** A run's status, as `gh` writes it. Every one but `completed` is a run not yet finished. */
 export const RUN_STATES = ['queued', 'in_progress', 'completed', 'requested', 'waiting', 'pending'] as const;
@@ -107,6 +136,14 @@ export interface BranchRun {
   readonly commit: string;
 }
 
+/** Every run of a branch's head commit, the `headSha` of its newest run. */
+export interface HeadRuns {
+  /** The full sha of the head commit. */
+  readonly commit: string;
+  /** Every run of the head commit on the branch, newest first, of any workflow. Never empty. */
+  readonly runs: readonly BranchRun[];
+}
+
 /**
  * The arguments after `gh` that read the newest run for `query`. Throws
  * a `TypeError` on an empty branch or workflow, and on a commit that is
@@ -131,16 +168,50 @@ export function runListArgs(query: RunQuery): string[] {
  * anything when the query is one {@link runListArgs} refuses.
  */
 export async function readNewestRun(gh: GhRunner, query: RunQuery): Promise<BranchRun | null> {
-  const args = runListArgs(query);
+  const [first] = await listRuns(gh, runListArgs(query));
+  return first ?? null;
+}
+
+/**
+ * The arguments after `gh` that read every run of `commit` on `branch`,
+ * up to {@link HEAD_RUN_LIMIT}. Throws a `TypeError` as {@link runListArgs}
+ * does.
+ */
+export function headRunsArgs(branch: string, commit: string): string[] {
+  const name = textArgument(branch, 'branch');
+  const sha = shaArgument(commit);
+  return ['run', 'list', '--branch', name, '--commit', sha, '--limit', String(HEAD_RUN_LIMIT), '--json', RUN_LIST_FIELDS.join(',')];
+}
+
+/**
+ * Every run of the head commit on `branch`, newest first, or null when
+ * the branch has no run. The head commit is the `headSha` of the
+ * branch's newest run, read by {@link readNewestRun}; its runs are then
+ * read through {@link headRunsArgs}. Throws as {@link readNewestRun}
+ * does, and when the second list is empty, holds a run of another
+ * commit, or fills {@link HEAD_RUN_LIMIT}.
+ */
+export async function readHeadRuns(gh: GhRunner, branch: string): Promise<HeadRuns | null> {
+  const newest = await readNewestRun(gh, { branch });
+  if (newest === null) return null;
+  const args = headRunsArgs(branch, newest.commit);
+  const command = `gh ${args.join(' ')}`;
+  const runs = await listRuns(gh, args);
+  if (runs.length === 0) refuse(command, `no run, although the newest run on the branch, ${newest.id}, is of that commit`);
+  const stray = runs.find((run) => run.commit !== newest.commit);
+  if (stray !== undefined) refuse(command, `run ${stray.id} of commit ${stray.commit}, expected only runs of ${newest.commit}`);
+  if (runs.length >= HEAD_RUN_LIMIT) refuse(command, `${runs.length} runs, as many as the limit, so the list may be cut`);
+  return { commit: newest.commit, runs };
+}
+
+/** The runs `gh` answers to `args`, in its order. Throws as {@link readNewestRun} does. */
+async function listRuns(gh: GhRunner, args: string[]): Promise<BranchRun[]> {
   const command = `gh ${args.join(' ')}`;
   const result = await gh(args);
   if (!result.ok) throw new Error(`${PREFIX}: ${command} failed: ${detailOf(result)}`);
   const rows = parseJson(result.stdout, command);
   if (!Array.isArray(rows)) refuse(command, `${describeValue(rows)}, expected a list`);
-  const [first] = rows as unknown[];
-  return first === undefined
-    ? null
-    : readRun(first, command);
+  return (rows as unknown[]).map((row) => readRun(row, command));
 }
 
 /** One row of the list, as a {@link BranchRun}, or a refusal. */

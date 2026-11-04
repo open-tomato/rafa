@@ -100,7 +100,8 @@ describe('routeDocsOnlyFailure', () => {
   it('keeps the line with a warning when the tracker cannot list and edit, calling nothing, and still stores the row', async () => {
     const root = freshRoot();
     const calls: string[] = [];
-    const tracker = { create: () => { calls.push('create'); return Promise.reject(new Error('not called')); } };
+    const refuse = (member: string) => () => { calls.push(member); return Promise.reject(new Error('not called')); };
+    const tracker = { create: refuse('create'), comment: refuse('comment'), transition: refuse('transition') };
 
     const lines = await routeDocsOnlyFailure({
       repoRoot: root, epic: 46, criterion: PAGE_ONLY, sessionId: 's', tracker,

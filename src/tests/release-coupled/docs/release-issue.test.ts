@@ -27,12 +27,15 @@ import {
   bodyHoldsLine,
   DOC_UPDATE_TASK_PREFIX,
   docUpdateLineText,
+  isUnreleasedVersion,
   NEXT_VERSION,
   NO_EDITABLE_TRACKER,
+  olderFirst,
   STALE_DOCS_MARKER,
   staleDocLine,
   staleDocsBody,
   staleDocsTitle,
+  staleDocsTitleVersion,
   staleDocsVersion,
   tickStaleDocLine,
 } from '@open-tomato/rafa-release/docs/release-issue';
@@ -61,25 +64,59 @@ const OTHER = { where: 'README.md', what: 'shows the old flag' };
 
 const REF: IssueRef = { opt: 0, kind: 'fake', externalId: '7', url: null };
 
-/** A fake whose calls are counted, answering `open` to the listing. */
-function countingTracker(open: readonly OpenIssue[]): {
-  tracker: StaleDocsTracker;
+/** The `comment` and `transition` a fake answers when the case reads neither. */
+const CLOSING: Pick<StaleDocsTracker, 'comment' | 'transition'> = {
+  comment: async () => undefined,
+  transition: async () => ({}),
+};
+
+/** What a counting fake was asked to write: each edit's issue id beside it, `<id>: <body>` and `<id> <state>`. */
+interface Calls {
   created: IssueDraft[];
   edits: IssueEdit[];
+  edited: string[];
+  comments: string[];
+  transitions: string[];
+}
+
+/**
+ * A fake whose calls are counted, answering each listing with the next of
+ * `listings` (the last again once they run out) and each create with
+ * `createdRef`.
+ */
+function stagedTracker(listings: readonly (readonly OpenIssue[])[], createdRef: IssueRef = REF): Calls & {
+  tracker: StaleDocsTracker;
 } {
-  const created: IssueDraft[] = [];
-  const edits: IssueEdit[] = [];
+  const calls: Calls = { created: [], edits: [], edited: [], comments: [], transitions: [] };
+  let listed = 0;
   const tracker: StaleDocsTracker = {
-    openIssues: async () => [...open],
-    create: async (draft) => {
-      created.push(draft);
-      return REF;
+    openIssues: async () => {
+      const open = listings[Math.min(listed, listings.length - 1)] ?? [];
+      listed += 1;
+      return [...open];
     },
-    edit: async (_ref, change) => {
-      edits.push(change);
+    create: async (draft) => {
+      calls.created.push(draft);
+      return createdRef;
+    },
+    edit: async (ref, change) => {
+      calls.edits.push(change);
+      calls.edited.push(ref.externalId);
+    },
+    comment: async (ref, body) => {
+      calls.comments.push(`${ref.externalId}: ${body}`);
+    },
+    transition: async (ref, state) => {
+      calls.transitions.push(`${ref.externalId} ${state}`);
+      return {};
     },
   };
-  return { tracker, created, edits };
+  return { tracker, ...calls };
+}
+
+/** A fake whose calls are counted, answering `open` to every listing. */
+function countingTracker(open: readonly OpenIssue[]): Calls & { tracker: StaleDocsTracker } {
+  return stagedTracker([open]);
 }
 
 describe('the builders', () => {
@@ -242,10 +279,10 @@ describe('addStaleDocLine with no tracker to hold the issue', () => {
     const fail = (member: string) => async (): Promise<never> => {
       throw new Error(`the tracker's ${member} was called`);
     };
-    const create = fail('create');
+    const members = { create: fail('create'), comment: fail('comment'), transition: fail('transition') };
     return omit === 'edit'
-      ? { create, openIssues: fail('openIssues') }
-      : { create, edit: fail('edit') };
+      ? { ...members, openIssues: fail('openIssues') }
+      : { ...members, edit: fail('edit') };
   }
 
   it('keeps the line and calls nothing on a tracker with no edit', async () => {
@@ -303,12 +340,12 @@ describe('addStaleDocLine when a call rejects', () => {
     const marked: OpenIssue = { ref: REF, title: staleDocsTitle('1.0.0'), body: STALE_DOCS_MARKER, createdAt: null };
 
     const created = await addStaleDocLine({
-      tracker: { openIssues: async () => [], create: reject, edit: reject },
+      tracker: { ...CLOSING, openIssues: async () => [], create: reject, edit: reject },
       version: '1.0.0',
       entry: PAGE,
     });
     const edited = await addStaleDocLine({
-      tracker: { openIssues: async () => [marked], create: reject, edit: reject },
+      tracker: { ...CLOSING, openIssues: async () => [marked], create: reject, edit: reject },
       version: '1.0.0',
       entry: PAGE,
     });
@@ -317,6 +354,324 @@ describe('addStaleDocLine when a call rejects', () => {
     expect(edited.action === 'failed' && edited.problem).toBe('editing the stale-docs issue failed: refused');
   });
 });
+
+/** A marked open issue of `version`, id `id`, created at `createdAt`, holding `entry`'s line. */
+function chore(id: string, version: string, createdAt: string | null, entry = PAGE): OpenIssue {
+  return {
+    ref: { ...REF, externalId: id },
+    title: staleDocsTitle(version),
+    body: staleDocsBody(staleDocLine(entry)),
+    createdAt,
+  };
+}
+
+describe('the release reading', () => {
+  it('reads the version back off a stale-docs title, and none off another shape', () => {
+    expect(staleDocsTitleVersion(staleDocsTitle('0.50.1'))).toBe('0.50.1');
+    expect(staleDocsTitleVersion(staleDocsTitle(NEXT_VERSION))).toBe(NEXT_VERSION);
+    expect(staleDocsTitleVersion('Release 0.50.1: update stale docs (old)')).toBeNull();
+    expect(staleDocsTitleVersion('Docs to fix')).toBeNull();
+  });
+
+  it('reads a version above the newest tag, and next, as unreleased, and one at or below it as released', () => {
+    expect(isUnreleasedVersion('0.50.1', '0.50.0')).toBe(true);
+    expect(isUnreleasedVersion('0.50.0-rc.1', '0.49.1')).toBe(true);
+    expect(isUnreleasedVersion(NEXT_VERSION, '0.50.0')).toBe(true);
+    expect(isUnreleasedVersion('0.50.0', '0.50.0')).toBe(false);
+    expect(isUnreleasedVersion('0.49.1', '0.50.0')).toBe(false);
+    expect(isUnreleasedVersion('0.50.0-rc.1', '0.50.0')).toBe(false);
+  });
+
+  it('reads every version as unreleased with no tag, and none but next against a tag that is no version', () => {
+    expect(isUnreleasedVersion('0.0.1', null)).toBe(true);
+    expect(isUnreleasedVersion('soon', null)).toBe(false);
+    expect(isUnreleasedVersion('9.0.0', 'garbage')).toBe(false);
+    expect(isUnreleasedVersion(NEXT_VERSION, 'garbage')).toBe(true);
+  });
+
+  it('orders the earlier creation first, then the lower issue number', () => {
+    const early = chore('13', '0.50.0', '2026-11-02T13:40:05Z');
+    const late = chore('12', '0.50.0', '2026-11-02T13:40:08Z');
+    expect(olderFirst(early, late)).toBeLessThan(0);
+    expect(olderFirst(late, early)).toBeGreaterThan(0);
+    expect(olderFirst({ ...late, createdAt: early.createdAt }, early)).toBeLessThan(0);
+    expect(olderFirst({ ...early, createdAt: null }, { ...late, ref: { ...REF, externalId: '9' } })).toBeGreaterThan(0);
+  });
+});
+
+describe('addStaleDocLine with a release reading', () => {
+  it('appends to the open chore of the same title, though an older unreleased one is open', async () => {
+    const older = chore('3', '0.50.1', '2026-11-01T00:00:00Z');
+    const same = chore('5', '0.51.0', '2026-11-02T00:00:00Z');
+    const fake = countingTracker([older, same]);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.51.0', entry: OTHER, newestRelease: '0.50.0' });
+
+    expect(result).toEqual({ action: 'appended', title: staleDocsTitle('0.51.0'), ref: same.ref });
+    expect(fake.edited).toEqual(['5']);
+    expect(fake.edits).toEqual([{ body: `${same.body}${staleDocLine(OTHER)}\n` }]);
+    expect(fake.created).toHaveLength(0);
+  });
+
+  it('retitles the open chore of a moved forecast in the edit that appends the line', async () => {
+    const moved = chore('3', '0.50.1', '2026-11-01T00:00:00Z');
+    const fake = countingTracker([moved]);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.51.0', entry: OTHER, newestRelease: '0.50.0' });
+
+    expect(result).toEqual({
+      action: 'appended',
+      title: staleDocsTitle('0.51.0'),
+      ref: moved.ref,
+      retitledFrom: staleDocsTitle('0.50.1'),
+    });
+    expect(fake.edits).toEqual([{ title: staleDocsTitle('0.51.0'), body: `${moved.body}${staleDocLine(OTHER)}\n` }]);
+    expect(fake.created).toHaveLength(0);
+  });
+
+  it('opens a second issue for the moved forecast with no release reading, the control for the retitle', async () => {
+    const moved = chore('3', '0.50.1', '2026-11-01T00:00:00Z');
+    const fake = countingTracker([moved]);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.51.0', entry: OTHER });
+
+    expect(result.action).toBe('created');
+    expect(fake.edits).toHaveLength(0);
+  });
+
+  it('retitles alone a moved chore that already holds the line', async () => {
+    const moved = chore('3', NEXT_VERSION, null);
+    const fake = countingTracker([moved]);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.51.0', entry: PAGE, newestRelease: null });
+
+    expect(result).toEqual({
+      action: 'held',
+      title: staleDocsTitle('0.51.0'),
+      ref: moved.ref,
+      retitledFrom: staleDocsTitle(NEXT_VERSION),
+    });
+    expect(fake.edits).toEqual([{ title: staleDocsTitle('0.51.0') }]);
+  });
+
+  it('takes the oldest of the unreleased chores when none has the title', async () => {
+    const younger = chore('8', '0.50.2', '2026-11-03T00:00:00Z');
+    const oldest = chore('9', '0.50.1', '2026-11-01T00:00:00Z');
+    const fake = countingTracker([younger, oldest]);
+
+    await addStaleDocLine({ tracker: fake.tracker, version: '0.51.0', entry: OTHER, newestRelease: '0.50.0' });
+
+    expect(fake.edited).toEqual(['9']);
+  });
+
+  it('leaves a released chore alone and creates, its own exact title included', async () => {
+    const released = chore('3', '0.50.0', '2026-11-01T00:00:00Z');
+    const below = chore('2', '0.49.1', '2026-10-01T00:00:00Z');
+    const fake = countingTracker([released, below]);
+
+    const moved = await addStaleDocLine({ tracker: fake.tracker, version: '0.50.1', entry: OTHER, newestRelease: '0.50.0' });
+    const same = await addStaleDocLine({ tracker: fake.tracker, version: '0.50.0', entry: OTHER, newestRelease: '0.50.0' });
+
+    expect([moved.action, same.action]).toEqual(['created', 'created']);
+    expect(fake.edits).toHaveLength(0);
+    expect(fake.transitions).toHaveLength(0);
+  });
+
+  it('retitles that chore once the newest tag is below its version, the control for the released case', async () => {
+    const fake = countingTracker([chore('3', '0.50.0', '2026-11-01T00:00:00Z')]);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.50.1', entry: OTHER, newestRelease: '0.49.1' });
+
+    expect(result.action === 'appended' && result.retitledFrom).toBe(staleDocsTitle('0.50.0'));
+    expect(fake.created).toHaveLength(0);
+  });
+
+  it('leaves a marked issue of a person\'s title alone', async () => {
+    const person = { ...chore('3', '0.50.1', null), title: 'Docs to fix before 0.51.0' };
+    const fake = countingTracker([person]);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.51.0', entry: OTHER, newestRelease: '0.50.0' });
+
+    expect(result.action).toBe('created');
+    expect(fake.edits).toHaveLength(0);
+  });
+
+  it('reads a newest tag that is no version as no reading, keeping the exact title', async () => {
+    const moved = chore('3', '0.50.1', null);
+    const same = chore('4', '0.51.0', null);
+
+    const shifted = await addStaleDocLine({
+      tracker: countingTracker([moved]).tracker,
+      version: '0.51.0',
+      entry: OTHER,
+      newestRelease: 'garbage',
+    });
+    const exact = countingTracker([moved, same]);
+    const kept = await addStaleDocLine({ tracker: exact.tracker, version: '0.51.0', entry: OTHER, newestRelease: 'garbage' });
+
+    expect(shifted.action).toBe('created');
+    expect(kept).toEqual({ action: 'appended', title: staleDocsTitle('0.51.0'), ref: same.ref });
+  });
+
+  it('retitles the issue on the local tracker, which then holds one issue of the new title', async () => {
+    const tracker = localTracker();
+    await addStaleDocLine({ tracker, version: '0.50.1', entry: PAGE, newestRelease: '0.50.0' });
+
+    const result = await addStaleDocLine({ tracker, version: '0.51.0', entry: OTHER, newestRelease: '0.50.0' });
+
+    expect(result.action).toBe('appended');
+    const issues = await markedIssues(tracker);
+    expect(issues.map((issue) => issue.title)).toEqual([staleDocsTitle('0.51.0')]);
+    expect(issues[0]?.body).toContain(`${staleDocLine(PAGE)}\n${staleDocLine(OTHER)}\n`);
+  });
+});
+
+describe('addStaleDocLine converging after a create', () => {
+  const OWN: IssueRef = { ...REF, externalId: '13' };
+  const own = { ...chore('13', '0.50.0', '2026-11-02T13:40:08Z', OTHER), ref: OWN };
+  const sibling = chore('12', '0.50.0', '2026-11-02T13:40:05Z');
+
+  it('moves the line to the older sibling, then comments on and closes the new issue', async () => {
+    const fake = stagedTracker([[], [own, sibling]], OWN);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.50.0', entry: OTHER, newestRelease: '0.49.1' });
+
+    expect(result).toEqual({ action: 'appended', title: staleDocsTitle('0.50.0'), ref: sibling.ref, duplicate: OWN });
+    expect(fake.created).toHaveLength(1);
+    expect(fake.edited).toEqual(['12']);
+    expect(fake.edits).toEqual([{ body: `${sibling.body}${staleDocLine(OTHER)}\n` }]);
+    expect(fake.comments).toEqual(['13: Duplicate of #12']);
+    expect(fake.transitions).toEqual(['13 cancelled']);
+  });
+
+  it('keeps the new issue when the sibling is younger, the control for the close', async () => {
+    const younger = chore('14', '0.50.0', '2026-11-02T13:40:11Z');
+    const fake = stagedTracker([[], [own, younger]], OWN);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.50.0', entry: OTHER, newestRelease: '0.49.1' });
+
+    expect(result).toEqual({ action: 'created', title: staleDocsTitle('0.50.0'), ref: OWN });
+    expect(fake.edits).toHaveLength(0);
+    expect(fake.comments).toHaveLength(0);
+    expect(fake.transitions).toHaveLength(0);
+  });
+
+  it('converges on a same-title sibling with no release reading, and on no other title', async () => {
+    const sameTitle = stagedTracker([[], [own, sibling]], OWN);
+    const otherTitle = stagedTracker([[], [own, chore('12', '0.49.2', '2026-11-02T13:40:05Z')]], OWN);
+
+    const same = await addStaleDocLine({ tracker: sameTitle.tracker, version: '0.50.0', entry: OTHER });
+    const other = await addStaleDocLine({ tracker: otherTitle.tracker, version: '0.50.0', entry: OTHER });
+
+    expect(same.action === 'appended' && same.duplicate).toEqual(OWN);
+    expect(other.action).toBe('created');
+    expect(otherTitle.transitions).toHaveLength(0);
+  });
+
+  it('closes the new issue without an edit when the sibling already holds the line', async () => {
+    const holding = chore('12', '0.50.0', '2026-11-02T13:40:05Z', OTHER);
+    const fake = stagedTracker([[], [own, holding]], OWN);
+
+    const result = await addStaleDocLine({ tracker: fake.tracker, version: '0.50.0', entry: OTHER, newestRelease: '0.49.1' });
+
+    expect(result).toEqual({ action: 'held', title: staleDocsTitle('0.50.0'), ref: holding.ref, duplicate: OWN });
+    expect(fake.edits).toHaveLength(0);
+    expect(fake.transitions).toEqual(['13 cancelled']);
+  });
+
+  it('leaves two racing wrap-ups one open issue holding both lines', async () => {
+    const tracker = racingTracker();
+    const [first, second] = await Promise.all([
+      addStaleDocLine({ tracker, version: '0.50.0', entry: PAGE, newestRelease: '0.49.1' }),
+      addStaleDocLine({ tracker, version: '0.50.0', entry: OTHER, newestRelease: '0.49.1' }),
+    ]);
+
+    expect(tracker.creates()).toBe(2);
+    const open = await tracker.openIssues('chore');
+    expect(open.map((issue) => issue.ref.externalId)).toEqual(['1']);
+    expect([PAGE, OTHER].filter((entry) => open[0]?.body.includes(staleDocLine(entry)))).toEqual([PAGE, OTHER]);
+    expect([first.action, second.action].sort()).toEqual(['appended', 'created']);
+    expect(tracker.comments()).toEqual(['2: Duplicate of #1']);
+  });
+
+  it('answers each failed step after the create, naming the issue created', async () => {
+    const reject = (said: string) => async (): Promise<never> => {
+      throw new Error(said);
+    };
+    const staged = (): StaleDocsTracker => stagedTracker([[], [own, sibling]], OWN).tracker;
+    let listings = 0;
+    const relist: StaleDocsTracker = {
+      ...stagedTracker([[]], OWN).tracker,
+      openIssues: async () => {
+        listings += 1;
+        if (listings > 1) throw new Error('gh: HTTP 502');
+        return [];
+      },
+    };
+
+    const answers = await Promise.all([
+      relist,
+      { ...staged(), edit: reject('edit refused') },
+      { ...staged(), comment: reject('comment refused') },
+      { ...staged(), transition: reject('close refused') },
+    ].map((tracker) => addStaleDocLine({ tracker, version: '0.50.0', entry: OTHER, newestRelease: '0.49.1' })));
+
+    expect(answers.map((answer) => answer.action === 'failed' && answer.problem)).toEqual([
+      'listing the open chore issues after creating issue 13 failed: gh: HTTP 502',
+      'editing the stale-docs issue failed: edit refused',
+      'commenting on the duplicate issue 13 failed: comment refused',
+      'closing the duplicate issue 13 failed: close refused',
+    ]);
+  });
+});
+
+/**
+ * An in-memory tracker whose first two listings each wait until both
+ * have started, so two callers list before either creates, as two
+ * wrap-ups of parallel stretch loops did (#1412 and #1413).
+ */
+function racingTracker(): StaleDocsTracker & {
+  openIssues: NonNullable<StaleDocsTracker['openIssues']>;
+  creates: () => number;
+  comments: () => string[];
+} {
+  const issues: { ref: IssueRef; title: string; body: string; createdAt: string; open: boolean }[] = [];
+  const comments: string[] = [];
+  let listings = 0;
+  let bothListed: () => void = () => undefined;
+  const barrier = new Promise<void>((resolve) => (bothListed = resolve));
+  const byId = (ref: IssueRef) => {
+    const found = issues.find((issue) => issue.ref.externalId === ref.externalId);
+    if (found === undefined) throw new Error(`no issue ${ref.externalId}`);
+    return found;
+  };
+  return {
+    openIssues: async () => {
+      listings += 1;
+      if (listings === 2) bothListed();
+      if (listings <= 2) await barrier;
+      return issues.filter((issue) => issue.open).map(({ ref, title, body, createdAt }) => ({ ref, title, body, createdAt }));
+    },
+    create: async (draft) => {
+      const number = issues.length + 1;
+      const ref: IssueRef = { ...REF, externalId: String(number) };
+      issues.push({ ref, title: draft.title, body: draft.body, createdAt: `2026-11-02T13:40:0${String(number)}Z`, open: true });
+      return ref;
+    },
+    edit: async (ref, change) => {
+      Object.assign(byId(ref), change);
+    },
+    comment: async (ref, body) => {
+      comments.push(`${byId(ref).ref.externalId}: ${body}`);
+    },
+    transition: async (ref, state) => {
+      byId(ref).open = state !== 'cancelled' && state !== 'done';
+      return {};
+    },
+    creates: () => issues.length,
+    comments: () => [...comments],
+  };
+}
 
 describe('docUpdateLineText', () => {
   it('reads the escaped line back off a doc-update task, as its issue holds it', () => {
@@ -406,6 +761,7 @@ describe('tickStaleDocLine over a counting fake', () => {
   it('calls nothing on a tracker with no edit, or when none resolved', async () => {
     const calls: string[] = [];
     const tracker: StaleDocsTracker = {
+      ...CLOSING,
       openIssues: async () => {
         calls.push('openIssues');
         return [open];
@@ -425,6 +781,7 @@ describe('tickStaleDocLine over a counting fake', () => {
 
   it('answers a failed listing or edit on one line rather than throwing', async () => {
     const listing: StaleDocsTracker = {
+      ...CLOSING,
       openIssues: () => Promise.reject(new Error('gh: rate\nlimited')),
       create: async () => REF,
       edit: async () => undefined,

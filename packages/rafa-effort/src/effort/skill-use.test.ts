@@ -1,16 +1,18 @@
 /**
  * Tests for the skill-use collector.
  *
- * The fixture under `testdata/skill-use/` is a real Claude Code session,
- * stripped to its tool-call records: two main-thread `Skill` calls, one
- * `Agent` call, and one `Skill` call in the subagent's own log. Every other
- * case runs the fold over in-memory lines, each beside the variant the
- * collector counts, so a collector that answered `unknown` for everything
- * reddens.
+ * The two fixtures under `testdata/skill-use/` are real Claude Code
+ * sessions, stripped to their tool-call records. The 2.1.280 one holds two
+ * main-thread `Skill` calls, one `Agent` call, and one `Skill` call in the
+ * subagent's own log. The 2.1.318 one holds one `Agent` call in its main
+ * log and one `Skill` call in its subagent's, with the subagent's
+ * `agent-*.meta.json` beside that log. Every other case runs the fold over
+ * in-memory lines, each beside the variant the collector counts, so a
+ * collector that answered `unknown` for everything reddens.
  */
 import type { SkillUseSource } from './skill-use.js';
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +40,21 @@ const FIXTURE_AGENT_LOG = fileURLToPath(new URL(
   `./testdata/skill-use/${FIXTURE_ID}/subagents/agent-a7651caa35e8b5c69.jsonl`,
   import.meta.url,
 ));
+
+/** The 2.1.318 session's id, its main log's basename and its folder's name. */
+const RECORDED_318_ID = '28eea32a-3a3f-4b3e-99a8-20e057775d5e';
+
+/** The 2.1.318 session's subagents folder. */
+const RECORDED_318_SUBAGENTS = fileURLToPath(new URL(`./testdata/skill-use/${RECORDED_318_ID}/subagents/`, import.meta.url));
+
+/** The 2.1.318 session's main log. */
+const RECORDED_318_LOG = fileURLToPath(new URL(`./testdata/skill-use/${RECORDED_318_ID}.jsonl`, import.meta.url));
+
+/** The 2.1.318 subagent's log. */
+const RECORDED_318_AGENT_LOG = join(RECORDED_318_SUBAGENTS, 'agent-ae979d95edbcd4293.jsonl');
+
+/** The metadata file 2.1.318 writes beside the subagent's log. */
+const RECORDED_318_AGENT_META = join(RECORDED_318_SUBAGENTS, 'agent-ae979d95edbcd4293.meta.json');
 
 /** What the recorded session invoked, spelled from the probe's prompt. */
 const FIXTURE_USES = [
@@ -147,6 +164,52 @@ describe('the recorded fixture', () => {
     expect(agentInputs).toEqual([
       { subagent_type: 'general-purpose', description: '<replaced>', prompt: '<replaced>' },
     ]);
+  });
+});
+
+describe('the recorded 2.1.318 fixture', () => {
+  it('counts the subagent\'s one call as a sidechain call, unvouched', async () => {
+    const reading = await readSkillUse(RECORDED_318_LOG);
+
+    expect(reading).toEqual({
+      sessionId: RECORDED_318_ID,
+      uses: [{ name: 'fixture-gamma', sidechain: true, count: 1 }],
+      vouched: false,
+      versions: ['2.1.318'],
+    });
+  });
+
+  it('reads no call from the main log alone', async () => {
+    const reading = await collectSkillUse(RECORDED_318_ID, [
+      { lines: linesOf(readFileSync(RECORDED_318_LOG, 'utf8').split('\n')), subagent: false },
+    ]);
+
+    expect(reading.uses).toEqual([]);
+  });
+
+  it('lists the subagent\'s log and not the agent-*.meta.json beside it', () => {
+    expect(existsSync(RECORDED_318_AGENT_META)).toBe(true);
+    expect(subagentLogPaths(RECORDED_318_LOG)).toEqual([RECORDED_318_AGENT_LOG]);
+  });
+
+  it('holds tool calls only, under one session id, with the Agent call\'s prompt replaced', () => {
+    const records = [...recordsOf(RECORDED_318_LOG), ...recordsOf(RECORDED_318_AGENT_LOG)];
+    const blocks = records.flatMap((record) => (record['message'] as { content: Record<string, unknown>[] }).content);
+    const meta = JSON.parse(readFileSync(RECORDED_318_AGENT_META, 'utf8')) as Record<string, unknown>;
+
+    expect(records.map((record) => [record['isSidechain'], record['sessionId'], record['version']])).toEqual([
+      [false, RECORDED_318_ID, '2.1.318'],
+      [true, RECORDED_318_ID, '2.1.318'],
+    ]);
+    expect(blocks.map((block) => [block['type'], block['name']])).toEqual([['tool_use', 'Agent'], ['tool_use', 'Skill']]);
+    expect(blocks[0]?.['input']).toEqual({
+      description: '<replaced>',
+      subagent_type: 'general-purpose',
+      prompt: '<replaced>',
+      run_in_background: false,
+    });
+    expect(meta['toolUseId']).toBe(blocks[0]?.['id']);
+    expect(meta['description']).toBe('<replaced>');
   });
 });
 

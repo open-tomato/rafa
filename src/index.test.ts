@@ -871,9 +871,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/commands/plan/plan-files', ['requireProject']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
-    ['../../ci/failed-cases.js', ['readFailedCases']],
-    ['../../ci/runs.js', ['readNewestRun']],
-    ['../../ci/status-reading.js', ['CI_STATUS_EXIT', 'readFailedLog', 'renderCiStatus', 'verdictOf']],
+    ['../../ci/runs.js', ['readHeadRuns', 'readNewestRun']],
+    ['../../ci/status-reading.js', ['branchReading', 'readWorkflowReadings', 'renderCiBranch']],
   ]],
   ['./commands/stretch/start.js', [
     ['@open-tomato/rafa-board', ['lineRefusal', 'readChoiceFlag', 'readTextFlag']],
@@ -1027,6 +1026,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-render.js', ['renderDoctor']],
     ['./doctor-stretch.js', ['writeDoctorStretch']],
     ['./doctor-tiers.js', ['checkDoctorTiers', 'renderDoctorTiers']],
+    ['./doctor-tsc.js', ['writeDoctorTsc']],
   ]],
   ['./commands/cleanup.js', [
     ['@open-tomato/rafa-pr', ['ghPullRequestsIn', 'resolvePrProvider']],

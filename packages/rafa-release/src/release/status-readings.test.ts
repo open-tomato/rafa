@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { latestTagOf, readTags, readUntagged, releaseTagsOf, rootTags } from './status-readings.js';
+import { latestTagOf, newestRootRelease, readTags, readUntagged, releaseTagsOf, rootTags } from './status-readings.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-status-readings-'));
@@ -94,6 +94,23 @@ describe('a unit\'s tags picked out of a reading', () => {
 
   it('answers null for a package no tag names', () => {
     expect(latestTagOf(reading, '@scope/other')).toBeNull();
+  });
+});
+
+describe('the newest root release handed to the stale-docs issue', () => {
+  it('answers the highest root tag\'s version with its v off, package tags beside it left out', () => {
+    expect(newestRootRelease(tagGit(MIXED))).toBe('0.5.0');
+  });
+
+  it('answers null for a repository holding no root tag', () => {
+    expect(newestRootRelease(tagGit('@scope/plugin@0.2.0\nnightly\n'))).toBeNull();
+    expect(newestRootRelease(tagGit(''))).toBeNull();
+  });
+
+  it('answers undefined, not null, for a listing that failed', () => {
+    const failing: GitRunner = () => ({ ok: false, stdout: '', stderr: 'fatal: not a git repository' });
+
+    expect(newestRootRelease(failing)).toBeUndefined();
   });
 });
 

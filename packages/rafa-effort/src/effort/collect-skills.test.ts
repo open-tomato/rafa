@@ -3,9 +3,10 @@
  * its `--skills` flag (`collect-args.ts`) and how `collectEffort` hands it
  * sessions.
  *
- * The session logs are copies of the recorded fixture under
+ * The session logs are copies of the recorded 2.1.280 fixture under
  * `testdata/skill-use/`, a real session with two main-thread `Skill` calls
- * and one in a subagent, so a count here is the collector's reading of a
+ * and one in a subagent, copied alone so the 2.1.318 session beside it
+ * adds no session here. A count here is the collector's reading of a
  * real log rather than of lines this file wrote. Each case that expects
  * nothing to be read sits beside a control over the same tree that reads
  * it, so a half that read nothing at all would redden the pair.
@@ -35,7 +36,7 @@ import { SKILL_USE_FIXTURE_VERSION } from './skill-use.js';
 /** The recorded session's id. */
 const FIXTURE_ID = 'ac7aeff1-84f2-46c9-bb9c-b9ceb994599f';
 
-/** The recorded session's directory: its main log and its subagent logs. */
+/** The directory holding the recorded session's main log and its folder of subagent logs. */
 const FIXTURE_DIR = fileURLToPath(new URL('./testdata/skill-use/', import.meta.url));
 
 /** What the recorded session invoked, as `readSkillInvocations` answers it. */
@@ -66,12 +67,14 @@ afterEach(() => {
   }
 });
 
-/** A scratch repo root whose `logs/` holds the fixture session. */
+/** A scratch repo root whose `logs/` holds the fixture session and no other. */
 function fixtureTree(): { root: string; logDir: string } {
   const root = mkdtempSync(join(tmpdir(), 'rafa-collect-skills-'));
   scratch.push(root);
   const logDir = join(root, 'logs');
-  cpSync(FIXTURE_DIR, logDir, { recursive: true });
+  for (const entry of [`${FIXTURE_ID}.jsonl`, FIXTURE_ID]) {
+    cpSync(join(FIXTURE_DIR, entry), join(logDir, entry), { recursive: true });
+  }
   mkdirSync(join(root, 'plans'));
   return { root, logDir };
 }

@@ -741,6 +741,16 @@ step's line in the task session output reports the held error count from
 the base, allowing later sweeps to compare against this baseline and measure
 progress on the backlog.
 
+**A tsc that cannot start is not a red step.** A type step whose `tsc` exits
+126 or 127 never ran its checks. 127 means the interpreter the tsc script's
+first line names (`#!/usr/bin/env node`, so `node`) is not on the PATH; 126
+means the file was found but cannot be executed. The step reads either exit as
+neither red nor a type error, and no change to the task's files fixes it. The
+blocker names the interpreter, so the fix is to put that interpreter on the
+PATH the loop runs under. `rafa doctor` reads the same exits on its `tsc` row,
+where it exits 1 with the same reading, so a missing `node` shows there before
+a run starts.
+
 Widening an exported interface reaches every `*.test.ts` literal with no
 gate saying so: grep the type name across the test files and fix each
 literal by hand. Adding `blocking` to `SpecReviewGap` reddened a `toEqual`
