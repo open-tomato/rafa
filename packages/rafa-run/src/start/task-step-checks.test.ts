@@ -135,7 +135,7 @@ describe('typeCheckTask', () => {
     const context = contextWith(0);
     const outcome = await typeCheckTask(context, seamsOf(context), INPUT);
     expect(typeCalls).toBe(1);
-    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, cannotStart: false, blocker: null });
   });
 
   it('reads a tsc run ended by SIGINT as a stop, not red', async () => {
