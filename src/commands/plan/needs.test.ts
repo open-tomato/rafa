@@ -23,15 +23,19 @@
  */
 import type { RafaCommand } from '@open-tomato/rafa/core/command';
 import type { CliEvent } from '@open-tomato/rafa/ports';
+import type { SpecIssue } from '@open-tomato/rafa-board/board/issue';
 import type { PlanSpecOptions, PlanSpecResolution } from '@open-tomato/rafa-board/board/plan-spec';
 
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { RULES_REMOVED_LINE, snapshotText, SPEC_LABEL } from '@open-tomato/rafa-board/board/issue';
+import { resolveSpecSource } from '@open-tomato/rafa-board/board/spec-source';
 
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
@@ -399,6 +403,67 @@ describe('rafa plan needs --issue, reading the stretch rules plan create reads',
     expect(run.exitCode).toBe(0);
     expect(expected).toEqual({ path: RULES_PATH, text: '- one rule\n- another rule\n' });
     expect(route.handed.map((options) => options.rules)).toEqual([expected]);
+  });
+});
+
+describe('rafa plan needs --issue, over a saved snapshot written with stretch rules', () => {
+  const RULES_PATH = '.rafa/stretch/9/rules.md';
+  const RULES_TEXT = '- one rule\n- another rule\n';
+  const SPECS_DIR = '.rafa/specs';
+
+  /** The planted issue the reader answers. */
+  const ISSUE: SpecIssue = Object.freeze({
+    number: 42,
+    title: 'Needs over rules',
+    body: 'Uses user-reviewer.\n',
+    state: 'OPEN',
+    labels: [SPEC_LABEL],
+    author: 'octocat',
+  });
+
+  /** A command whose route is the board's own resolution over the planted issue reader. */
+  function snapshotCommand(): RafaCommand {
+    return createPlanNeedsCommand({
+      entry: () => ENTRY,
+      modules: {},
+      route: {
+        resolve: async (options): Promise<PlanSpecResolution> => {
+          const resolution = await resolveSpecSource({
+            request: options.request,
+            refresh: false,
+            dryRun: options.dryRun,
+            repoRoot: options.repoRoot,
+            specsDir: SPECS_DIR,
+            findSpec: () => 'never',
+            issues: () => Promise.resolve(ISSUE),
+            ...options.rules === undefined || options.rules === null
+              ? {}
+              : { rules: options.rules },
+          });
+          if (resolution.outcome !== 'spec') throw new Error('expected a spec');
+          return { outcome: 'spec', spec: resolution.spec, gate: null };
+        },
+      },
+    });
+  }
+
+  it('reads the rules as removed with the value unset, then reads the same saved snapshot unchanged under the planted file', async () => {
+    const saved = specPath(SPECS_DIR, ISSUE.number, ISSUE.title);
+    const savedText = snapshotText(ISSUE.body, null, RULES_TEXT);
+    const project = plantNeedsProject([[RULES_PATH, RULES_TEXT], [saved, savedText]]);
+
+    const unset = await needsIn(project, ['--issue=42'], snapshotCommand());
+    // The unset run rebuilt the copy without the rules; put the saved snapshot back for the planted run.
+    write(join(project.root, saved), savedText);
+    const planted = await needsIn(project, ['--issue=42'], snapshotCommand(), { [STRETCH_RULES_ENV]: RULES_PATH });
+
+    expect(unset.stdout).toContain(RULES_REMOVED_LINE);
+    expect(unset.stdout).toContain('local notes changed; rebuilt');
+    expect([planted.exitCode, planted.stderr]).toEqual([0, '']);
+    expect(planted.stdout).not.toContain(RULES_REMOVED_LINE);
+    expect(planted.stdout).not.toContain('rebuilt');
+    expect(rowOf(planted.stdout, 'user-reviewer')).toContain('mentioned line 1');
+    expect(readFileSync(join(project.root, saved), 'utf8')).toBe(savedText);
   });
 });
 
