@@ -11,7 +11,7 @@
  *
  * The project refresh after the create is a recorded seam too: each
  * blocked case shows it is never asked, the control to the opened case
- * that asks it for the issue the body closes. {@link refreshClosedIssues}
+ * that asks it for every issue the body closes. {@link refreshClosedIssues}
  * is driven with a stand-in refresh and a runner opener that counts its
  * calls, so no case reaches `gh`.
  *
@@ -36,6 +36,7 @@ import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
+  closedIssues,
   fragmentNotesIn,
   openRunnerPullRequest,
   refreshClosedIssues,
@@ -53,6 +54,7 @@ const INPUT: RunnerPrInput = {
   branch: BRANCH,
   base: 'main',
   issue: 579,
+  closes: [],
   planTitle: 'A loop run ends delivered — eight loop bugs fixed',
   notes: NOTES,
 };
@@ -147,7 +149,7 @@ describe('openRunnerPullRequest', () => {
 
     const body = drafts()[0]?.body ?? '';
     expect(body.split('\n')[0]).toBe('Closes #579');
-    expect(body).toBe(runnerPullRequestBody(579, NOTES));
+    expect(body).toBe(runnerPullRequestBody(579, [], NOTES));
   });
 
   test('answers the pull request the provider opened', async () => {
@@ -237,6 +239,29 @@ describe('the project refresh after the runner opens the pull request', () => {
 
     expect(outcome.kind).toBe('opened');
     expect(refreshed()).toEqual([[1, 579]]);
+  });
+
+  test('refreshes every issue the body closes in one call, the plan\'s first, each once', async () => {
+    const { seams, refreshed, drafts } = seamsWith();
+
+    const outcome = await openRunnerPullRequest({ ...INPUT, closes: [1444, 579, 1479, 1444] }, seams);
+
+    expect(outcome.kind).toBe('opened');
+    expect(refreshed()).toEqual([[1, 579, 1444, 1479]]);
+    expect(drafts()[0]?.body).toBe(runnerPullRequestBody(579, [1444, 1479], NOTES));
+  });
+
+  test('names the plan\'s own issue in the failed line when the refresh of several rejects', async () => {
+    const { seams } = seamsWith({ refresh: () => Promise.reject(new Error('repo view refused')) });
+
+    const outcome = await openRunnerPullRequest({ ...INPUT, closes: [1444] }, seams);
+
+    expect(outcome.kind === 'opened'
+      ? outcome.warnings
+      : []).toHaveLength(1);
+    expect(outcome.kind === 'opened'
+      ? outcome.warnings[0]
+      : '').toContain('The project was not updated for #579: repo view refused.');
   });
 
   test('answers an opened pull request with no warning when the refresh answers none', async () => {
@@ -331,9 +356,19 @@ describe('refreshClosedIssues', () => {
   });
 });
 
+describe('closedIssues', () => {
+  test('answers the plan\'s issue alone for no closes', () => {
+    expect(closedIssues(579, [])).toEqual([579]);
+  });
+
+  test('answers the issue first, then each entry once, dropping the issue named again', () => {
+    expect(closedIssues(11, [12, 11, 13, 12])).toEqual([11, 12, 13]);
+  });
+});
+
 describe('runnerPullRequestBody', () => {
   test('opens Closes #<n>, then the notes under their heading, then the unfinished line last', () => {
-    const body = runnerPullRequestBody(579, NOTES);
+    const body = runnerPullRequestBody(579, [], NOTES);
 
     expect(body).toBe([
       'Closes #579',
@@ -347,10 +382,28 @@ describe('runnerPullRequestBody', () => {
   });
 
   test('gives no notes heading when the fragment has no notes', () => {
-    const body = runnerPullRequestBody(579, []);
+    const body = runnerPullRequestBody(579, [], []);
 
     expect(body).toBe(['Closes #579', '', UNFINISHED_WRAP_UP_LINE].join('\n'));
     expect(body).not.toContain(RELEASE_NOTES_HEADING);
+  });
+
+  test('writes one Closes line for the plan\'s issue alone when closes is empty', () => {
+    const body = runnerPullRequestBody(579, [], []);
+
+    expect(body.split('\n').filter((line) => line.startsWith('Closes #'))).toEqual(['Closes #579']);
+  });
+
+  test('writes the plan\'s issue first, then one Closes line for each closes entry in its order', () => {
+    const body = runnerPullRequestBody(1484, [1444, 1479], NOTES);
+
+    expect(body.startsWith(['Closes #1484', 'Closes #1444', 'Closes #1479', '', RELEASE_NOTES_HEADING].join('\n'))).toBe(true);
+  });
+
+  test('writes the plan\'s own issue and a repeated entry once each', () => {
+    const body = runnerPullRequestBody(1484, [1444, 1484, 1444, 1479], []);
+
+    expect(body).toBe(['Closes #1484', 'Closes #1444', 'Closes #1479', '', UNFINISHED_WRAP_UP_LINE].join('\n'));
   });
 
   test('says the wrap-up did not finish', () => {
