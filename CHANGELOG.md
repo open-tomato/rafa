@@ -9,6 +9,22 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.51.0 — 2026-11-05, Bug sweep 41 — four readings of a state that is not there; Bug sweep 42 — two release lines that act on something other than what was asked; Bug sweep 43 — the stretch's own lines, and the 0.50.0 doc lines
+<!-- rafa:fragments rafa-1439-bug-sweep-41 rafa-1440-bug-sweep-42 rafa-1441-bug-sweep-43 rafa-1446-bug-sweep-44 -->
+
+- ci: `rafa ci status --branch` reads every workflow on the branch's head commit and takes the worst as the verdict, so a newer skipped run no longer hides a failed one; `skipped` and `neutral` pass, and `--output=json` now writes the commit with one entry per workflow in place of a single run.
+- stretch: the pit stop after a stretch item reads every CI workflow on the branch's head commit, so a skipped run no longer hides a failed one.
+- stretch: `rafa stretch item` hands the stretch's `rules.md` to `plan create` and prints the file it appends, also under `--dry-run` and on a kept plan; `rafa stretch end` run again refreshes the open stretch pull request's body when the report or ledger changed, printing `body updated` or `body unchanged`.
+- release: one stale-docs chore per release — the wrap-up and `rafa epic close` read the newest release tag, retitle an open unreleased chore when the forecast version moves, leave a released chore alone, and fold a racing second create into the older chore, closing the new one as a duplicate.
+- release: `rafa release fragment` run in a linked worktree now writes the fragment into that worktree rather than the main checkout, and prints its absolute path.
+- run: the type step reads a `tsc` that cannot start (exit 126 or 127) as cannot start rather than a type error, with a blocker saying to put `node` on the PATH the loop runs under.
+- loop: a task step whose `tsc` cannot start halts on its blocker without inserting a repair task.
+- doctor: `rafa doctor` prints a `tsc` row in projects with a `tsconfig.json` and exits 1 when `tsc` cannot start, naming the interpreter to put on the PATH.
+- CLI: Every command now refuses a flag it does not declare, before it runs, with exit code 2 and the cause `cli:unknown-flag`, naming the stray flags and the command's own; `rafa release tag --dry-run` no longer writes the tag, `rafa roadmap --state` and `--roadmap` are refused this way (exit 2, formerly exit 1 from the command), and scripts that passed stray flags must drop them.
+- plan: `plan create --issue` and `--next` append the stretch rules file named by `RAFA_STRETCH_RULES` to the planner snapshot under `## Stretch rules`, after the local notes, name it on the snapshot and `--dry-run` lines, and rebuild the snapshot as a notes change when the rules change.
+- docs: The stretch operators page documents `rules.md` and the body refresh of a second `rafa stretch end`.
+- cli: `rafa stretch end`'s help says it prints `body updated` or `body unchanged`.
+
 ## 0.50.0 — 2026-11-03, selectLessons keeps a trigger lesson only on two matched words; Three causes of a stopped stretch item, and a way to finish one; Two readings that throw away good data
 <!-- rafa:fragments rafa-1395-lesson-trigger-floor rafa-1391-spec-test-index-record rafa-1400-bug-sweep-37 rafa-1401-bug-sweep-38 rafa-1402-bug-sweep-39 rafa-1418-bug-sweep-40 -->
 
