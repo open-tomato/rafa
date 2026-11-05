@@ -42,7 +42,7 @@ module's note is the long form.
 | `packages/rafa-release/src/commands/release/list.ts` | `rafa release list`, one row per unit that releases on its own, the root first and then each publishable workspace package, with its version, the fragments waiting for it on `origin/<pr.base>` as last fetched and its newest tag (`v<version>` for the root, `<name>@<version>` for a package, `untagged` for none), read through `release status`'s readers (`readVersionFile`, `readWaiting`, `readPackages` and `readTags`) so the two commands print a package the same way; a reading that failed leaves its column `?` with the reason on a line under the rows, and the command still exits 0; `--output=json` carries the rows and the rendered lines in the terminal result event; the refusals left are a stray word and a config `loadConfig` refuses, both exit 1; writing nothing |
 | `packages/rafa-release/src/commands/release/publish.ts` | `rafa release publish [--tag=<tag>] [--dry-run]`: runs `release.publishCommand` through the shell in the directory of each release unit whose tag points at HEAD (`git tag --points-at HEAD`, each read by `parseReleaseTag` in `packages/rafa-release/src/release/version-tag.ts`), the root from the project root and a package from its own folder, every unit read through `./release/tag-units.ts` before anything runs; `--tag=<tag>` names one unit and is refused with exit 1 when it parses as no release tag or is not on HEAD, and no release tag on HEAD is refused with exit 1 too. Before a unit publishes, `npm view <name>@<version> version --registry=<registry>` runs through the `PublishRunner` seam (`./release/tag-follow-ups.ts`): a version the registry holds is skipped with a `Skipped` line, an `E404` or an answer without the version is read as absent, and any other failure stops the run with exit 1. A manifest with no name or `"private": true` is skipped with its own line. The first command that exits other than 0 stops the run with its code, naming the tags published before it; `--dry-run` prints one line per unit and runs nothing; `--output=json` gives `ReleasePublishResult`, the child's stdout going to stderr |
 | `packages/rafa-release/src/commands/release/workflows.ts` | `rafa release workflows [--write]`: one row per entry of `LADDER_WORKFLOWS` (`packages/rafa-release/src/release/ladder.ts`) with the levels it serves, whether the level the config's `release.settle`, `release.tag` and `release.publish` read as needs it (`ladderWorkflowNeeded`, which reads `.github/dependabot.yml` for the bot fragment workflow), and its state against the shipped template (`readReleaseTemplate`, `packages/rafa-release/src/release/templates.ts`): `present` when the bytes match, `differs` when a regular file holds other bytes, `missing` when nothing is at the path or a non-file is (`found: not-a-file`); a present file the build ships no template for reads `present` with its bytes not compared. `--write` writes each needed missing one through `writeReleaseWorkflow`, which leaves an existing file byte for byte and refuses a directory at the path; a present, differing or unneeded file is left alone and named. The command exits 0 in every case, and the warning is left to `rafa doctor`'s ladder row (`packages/rafa-release/src/commands/doctor-ladder.ts`), whose `readLadderFiles` it also reads through. `--output=json` gives `ReleaseWorkflowsResult`: the level, the rows and the writes |
-| `packages/rafa-release/src/commands/release/fragment.ts` | `rafa release fragment --plan=<id> --level=<level> --title=<text> [--note=<area>: <summary>]... [--package=<name>]`: writes one change fragment under `release.fragments` for a branch with no wrap-up to write it, such as a bot's pull request, in `serializeFragment`'s format (`packages/rafa/src/release/fragment.ts`), and prints the path written relative to the repository root as its last line. `--plan` must match `FRAGMENT_PLAN_ID_PATTERN`, `--level` is one of `patch`, `minor`, `major` and `none`, each `--note` is a `- <area>: <summary>` line, and `--package` is refused unless the checkout's workspace holds that member and it is not `private`. A level other than `none` given no note takes the title as its one note, with a warning. The name is `<plan>.md`, or `-2`, `-3` and on, free of the fragments `readFragmentTree` (`packages/rafa-release/src/release/fragment-tree.ts`) reads on `origin/<pr.base>` after a `git fetch` (a failed fetch is a warning); a file already at that path in the working tree or in `HEAD` is refused, and the write opens with `wx`. Every refusal exits 1 before anything is written; `--output=json` gives `ReleaseFragmentResult` |
+| `packages/rafa-release/src/commands/release/fragment.ts` | `rafa release fragment --plan=<id> --level=<level> --title=<text> [--note=<area>: <summary>]... [--package=<name>]`: writes one change fragment under `release.fragments` for a branch with no wrap-up to write it, such as a bot's pull request, in `serializeFragment`'s format (`packages/rafa/src/release/fragment.ts`), and prints the path written as its last line, relative when the worktree it wrote under is the project root and absolute when not. `--plan` must match `FRAGMENT_PLAN_ID_PATTERN`, `--level` is one of `patch`, `minor`, `major` and `none`, each `--note` is a `- <area>: <summary>` line, and `--package` is refused unless the checkout's workspace holds that member and it is not `private`. A level other than `none` given no note takes the title as its one note, with a warning. The name is `<plan>.md`, or `-2`, `-3` and on, free of the fragments `readFragmentTree` (`packages/rafa-release/src/release/fragment-tree.ts`) reads on `origin/<pr.base>` after a `git fetch` (a failed fetch is a warning); a file already at that path in the working tree or in `HEAD` is refused, and the write opens with `wx`. Every refusal exits 1 before anything is written; `--output=json` gives `ReleaseFragmentResult` |
 | `packages/rafa-board/src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing; `board sync [--dry-run] [--output=json]`, every item of the repository's GitHub project refreshed (over `packages/rafa-board/src/board/project/refresh.ts`) and every open issue missing from it added (no refresh with `board.project.number` unset), reading nothing and starting no session so it declares no `spends`. `--dry-run` prints each change without writing; `--output=json` prints the changes as the result's data. Each run warns about failures (the `project` scope missing, a rate-limit refusal, an unknown field) and names the fix; a missing `project` scope, a number naming no project and a rate-limit refusal exit 2 (`BOARD_SYNC_REFUSAL_EXIT`, `packages/rafa-board/src/commands/board/sync.ts`), and an unknown field keeps the exit code at 0. No auto-add rule is set, and with `board.project.number` unset the command refuses with exit 1 naming `rafa init --board --project` |
 | `packages/rafa-board/src/commands/board/declarations.ts` | the two `board` commands as `CommandDeclaration`s, each command less its `run`, which `createBoardListCommand` and `createBoardSyncCommand` spread under their own; `BOARD_SUBJECT`, the subject's routing word and roster line; and `BOARD_SYNC_DRY_RUN_FLAG`, the flag `board sync` declares and `sync.ts` reads. It imports types from `@open-tomato/rafa/core/command` alone and no module under `src/` |
 | `packages/rafa-board/src/commands/board/index.ts` | `BOARD_FEATURE`, the `CommandFeature` named `board`: `ISSUE_SUBJECT`, `BOARD_SUBJECT` and `EPIC_SUBJECT` and their eighteen commands in roster order, each made by `lazyCommand` over its declaration (from the `issue`, `board` and `epic` declaration files) and a dynamic import of its module, so importing it loads no command module; `index.test.ts` (the unit half) reads each `lazyCommand` call off the source and holds its loader to its declaration's module, and `index-integration.test.ts` holds each command's spelling and loaded module to its declaration. The roster registers it (`BUNDLED_FEATURES`, `src/commands/index.ts`) unless `features.board` is `false`, and `src/commands/index.test.ts` holds its three subjects and the very commands it declares to be the registry's |
@@ -2142,10 +2142,10 @@ New; it replaces no earlier text. What a row or an action added to
   presence, whatever its value. `rafa roadmap` (`src/commands/roadmap.ts`)
   is a top-level command that runs `issue list --roadmap` and is not an
   alias, so help, `describe` and the spends reading name one place
-  rather than two. It leaves `--state` undeclared and still refuses it:
-  `parseArgs` reads an undeclared `--flag` into the context rather than
-  refusing it, so the shared run sees it. Its text output is the same
-  bytes as `issue list --roadmap`; in json mode only the result events
+  rather than two. It leaves `--state` and `--roadmap` undeclared, so the
+  dispatcher refuses either typed as `unknown_flag` with exit 2 (see
+  "One invocation") before the shared run sees it. Its text output is the
+  same bytes as `issue list --roadmap`; in json mode only the result events
   match, since the start event names the command as typed.
 - **`issue list --roadmap` and `rafa roadmap` print the epics a Roadmap
   names** (`packages/rafa-board/src/board/roadmap-epic-rows.ts`,
@@ -3019,9 +3019,37 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   `hint` is written where it has one, and its `module` and `action` are the
   command's subject and action unless the error names its own. In text mode that
   line ends with the bracket and the hint line follows, as for any coded
-  failure. A help request, a routing refusal, `invalid_spec` and a command
-  declaring `needsProject: false` read neither the working directory nor the
-  home.
+  failure. A help request, a routing refusal, `invalid_spec`, `unknown_flag`
+  and a command declaring `needsProject: false` read neither the working
+  directory nor the home.
+
+- **A command refuses a flag it does not declare** (#1267;
+  `src/cli/flag-refusal.ts`). A flag word on the line is accepted when
+  `parseArgs` reads its name as a declared flag, an alias of one, the
+  `--no-<name>` form of a declared boolean or of its alias, or one of the
+  global names `output`, `verbose`, `v` and `version` (`GLOBAL_FLAG_NAMES`,
+  read off `GLOBAL_FLAGS`). Every other flag word is the `unknown_flag`
+  refusal, `--no-output` among them since `output` is no boolean; the words
+  after the first `--` are positional and never read. The line is read
+  after its deprecated flags are rewritten, once the spec is read
+  (`invalid_spec` is told first) and before the project is resolved, so the
+  command never runs. It ends with exit code 2, the one refusal not ending
+  with 1. Its message names each undeclared flag as typed, then the
+  command's declared flags, and it is coded: its `cause` is
+  `cli:unknown-flag`, its `hint` points at the command's help, and its
+  `module` and `action` are the command's. The command is named by the
+  route's label, so a mounted module command reads
+  `rafa module exec <module> <action>`. In text mode:
+
+  ```text
+  $ rafa release tag --dry-run
+  rafa: unknown flag "--dry-run" for "rafa release tag"; its flags are --push [cli:unknown-flag]
+    hint: run rafa release tag --help for its flags
+  ```
+
+  A help request beside an undeclared flag, `rafa release tag --dry-run
+  --help`, is routed as help before any of this is read, and prints the help
+  with exit 0.
 
 - **json mode writes one `start` event first and one terminal `result` last**,
   every line NDJSON. Text mode writes neither event. `writeEnding` in
@@ -3132,7 +3160,8 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   and `commandProblem` refuses one naming no `use`.
 - **The result error codes** are the five route refusals, `unknown_subject`,
   `missing_action`, `unknown_action`, `unknown_module` and `unexpected_version`,
-  and five more: `invalid_spec` (a spec `parseArgs` refuses), `no_project` (a
+  and six more: `invalid_spec` (a spec `parseArgs` refuses), `unknown_flag` (a
+  flag the command does not declare, exit 2), `no_project` (a
   command run outside a project), `command_exit` (a command that set its own
   exit code), `command_error` (a command that threw, or an error past it) and
   `result_unwritable` (an event JSON refuses to write). Beside `code` and
@@ -3143,8 +3172,9 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   `hint` when a coded error has one; and `module` and `action` for a coded
   failure or for a command that ran, the coded error's, else the command's
   subject and action. A refusal made before any command ran carries them only
-  from a coded error; an uncoded failure of a command that ran carries the
-  command's own (`CliEventResult`, `packages/rafa/src/ports/index.ts`).
+  from a coded error (`unknown_flag` is one, and carries the command it
+  refused); an uncoded failure of a command that ran carries the command's own
+  (`CliEventResult`, `packages/rafa/src/ports/index.ts`).
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
 - **So is the version.** A version route writes `rafa <version>`

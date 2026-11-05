@@ -172,7 +172,13 @@ public member of the checkout's workspace. A shipping level given no `--note`
 takes the title as its one note, with a warning. The name is `<plan>.md`, or
 `-2`, `-3` and on when that name already waits on `origin/<pr.base>`. A file
 already at the path, in the working tree or in `HEAD`, is refused, so a second
-run never duplicates the first.
+run never duplicates the first. The fragment is written under the git worktree
+of the directory the command runs in (`git rev-parse --show-toplevel`), not
+under the project root a linked worktree with no `.rafa/` resolves to, while
+`release.fragments` and `pr.base` are still read from the project's config.
+Outside any repository it falls back to the project root. The printed path
+(and the json `path`) is relative when that worktree root is the project root,
+and absolute when it is not.
 
 The bot fragment workflow, `release-bot-fragment.yml`, writes that fragment for
 a Dependabot pull request. It runs on `pull_request_target` for

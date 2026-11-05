@@ -154,6 +154,7 @@ describe('causeOfDispatchCode', () => {
     unknown_module: 'cli:unknown-module',
     unexpected_version: 'cli:unexpected-version',
     invalid_spec: 'cli:invalid-spec',
+    unknown_flag: 'cli:unknown-flag',
     no_project: 'cli:no-project',
     command_exit: 'cli:command-exit',
     command_error: 'unknown:new-context',
