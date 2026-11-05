@@ -20,7 +20,7 @@
  * command is READ-ONLY — the only provider members it reaches are
  * `findOpen`, for the branch that names no number, `get`, and `checks`.
  * A test reads that off the double's own call log rather than trusting
- * the sentence (`wait.test.ts`).
+ * the sentence (`src/tests/pr-coupled/commands/pr/wait.test.ts`).
  *
  * ## The grace a young head gets, which that gate does not
  *
@@ -138,9 +138,9 @@
  *
  * {@link PrWaitSeams} carries `clock` and `sleep` beside the provider
  * seams, and hands them to `waitForChecks`, so every case in
- * `wait.test.ts` — a pending poll that turns green, a deadline that
- * passes, a grace waited out — runs with no timer and no real second
- * spent. The grace is measured by the same `clock`, so a case decides
+ * `src/tests/pr-coupled/commands/pr/wait.test.ts` — a pending poll that
+ * turns green, a deadline that passes, a grace waited out — runs with no
+ * timer and no real second spent. The grace is measured by the same `clock`, so a case decides
  * how old a head is by where it starts that clock. The seams are
  * spelled as `pr triage --resolve`'s are, for the same reason.
  *

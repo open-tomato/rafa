@@ -649,7 +649,9 @@ default; `--yes` allows others unasked and `--dry-run` prints without
 running. A session can be started, resumed mid-plan, or moved to the
 next issue when the roadmap advances. After every action, `next` names
 the step that follows — the merge to run, the loop to resume, or the
-loop already running — unless `--no-hint` turns off the hint.
+loop already running. `rafa next` declares no `--no-hint`, so it refuses
+the flag with `cli:unknown-flag`; the six commands that end with a hint
+take it.
 
 ### Board relationships: labels and native modes
 
