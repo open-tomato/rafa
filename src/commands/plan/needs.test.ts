@@ -2,6 +2,7 @@
  * Tests for `rafa plan needs` (`needs.ts`): the reading printed in both
  * modes, `--missing` over a plan with unmet needs and over one with
  * none, `--source`, a spec named by `--spec` and by `--issue`, the
+ * stretch rules `RAFA_STRETCH_RULES` hands the `--issue` route, the
  * default plan, the stack row, and the refusals.
  *
  * Each case dispatches in-process in a project of its own, beside a home
@@ -45,6 +46,7 @@ import {
   specRouteWords,
   UNMET_MARK,
 } from './needs.js';
+import { missingRulesMessage, STRETCH_RULES_ENV, stretchRulesReader } from './stretch-rules.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-needs-command-')));
@@ -135,13 +137,14 @@ const NEEDY_FILES = [
   ['.rafa/plans/PREREQUISITES-demo.md', NEEDY_PREREQUISITES],
 ] as const;
 
-/** Dispatches `plan needs` with `words` in `project` through `command`. */
+/** Dispatches `plan needs` with `words` in `project` through `command`, `env` added to the `PATH` every case runs under. */
 async function needsIn(
   project: { root: string; home: string },
   words: readonly string[],
   command: RafaCommand = createPlanNeedsCommand({ entry: () => ENTRY, modules: {} }),
+  env: Readonly<Record<string, string>> = {},
 ): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
-  return dispatchInProject(['plan', 'needs', ...words], SUBJECTS, [command], project, { PATH: BIN_DIR });
+  return dispatchInProject(['plan', 'needs', ...words], SUBJECTS, [command], project, { ...env, PATH: BIN_DIR });
 }
 
 /** The row of `name` in a text listing, failing the case when there is none. */
@@ -328,6 +331,74 @@ describe('rafa plan needs, over a spec', () => {
       [{ kind: 'issue', issue: 42 }, false, null, null],
     ]);
     expect(rowOf(run.stdout, 'user-reviewer')).toContain('mentioned line 1');
+  });
+});
+
+describe('rafa plan needs --issue, reading the stretch rules plan create reads', () => {
+  /** The rules file a case plants, relative to the project root. */
+  const RULES_PATH = '.rafa/stretch/9/rules.md';
+
+  /** The issue spec the planted route answers with. */
+  const ISSUE_SPEC = ['.rafa/specs/issue-42.md', 'Uses user-reviewer.\n'] as const;
+
+  /** A command whose route records the options it was handed and answers the issue spec. */
+  function recordingCommand(): { command: RafaCommand; handed: PlanSpecOptions[] } {
+    const handed: PlanSpecOptions[] = [];
+    const command = createPlanNeedsCommand({
+      entry: () => ENTRY,
+      modules: {},
+      route: {
+        resolve: (options): Promise<PlanSpecResolution> => {
+          handed.push(options);
+          return Promise.resolve({
+            outcome: 'spec',
+            spec: { path: ISSUE_SPEC[0], kind: 'issue', source: '#42', issue: 42, read: null, snapshot: null },
+            gate: null,
+          });
+        },
+      },
+    });
+    return { command, handed };
+  }
+
+  it('hands the route no rules when the value is unset', async () => {
+    const project = plantNeedsProject([ISSUE_SPEC]);
+    const route = recordingCommand();
+    const run = await needsIn(project, ['--issue=42'], route.command);
+
+    expect(run.exitCode).toBe(0);
+    expect(route.handed).toHaveLength(1);
+    expect(Object.keys(route.handed[0] ?? {})).not.toContain('rules');
+  });
+
+  it('refuses a value naming no file with exit 1 and the reader\'s refusal, before the route is reached', async () => {
+    const project = plantNeedsProject([ISSUE_SPEC]);
+    const route = recordingCommand();
+    const run = await needsIn(project, ['--issue=42'], route.command, { [STRETCH_RULES_ENV]: RULES_PATH });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(missingRulesMessage(RULES_PATH));
+    expect(route.handed).toHaveLength(0);
+  });
+
+  it('never reads the value for --spec, where the case above refuses the same value on --issue', async () => {
+    const project = plantNeedsProject([['.rafa/specs/feature.md', '# Feature\n\nHand the diff to project-reviewer.\n']]);
+    const run = await needsIn(project, ['--spec=feature.md'], undefined, { [STRETCH_RULES_ENV]: RULES_PATH });
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(rowOf(run.stdout, 'project-reviewer')).toContain('mentioned line 3');
+  });
+
+  it('hands the route the rules plan create\'s reader yields for the same env and root', async () => {
+    const project = plantNeedsProject([ISSUE_SPEC, [RULES_PATH, '- one rule\n- another rule\n']]);
+    const env = { [STRETCH_RULES_ENV]: RULES_PATH };
+    const route = recordingCommand();
+    const run = await needsIn(project, ['--issue=42'], route.command, env);
+    const expected = stretchRulesReader(env, project.root)();
+
+    expect(run.exitCode).toBe(0);
+    expect(expected).toEqual({ path: RULES_PATH, text: '- one rule\n- another rule\n' });
+    expect(route.handed.map((options) => options.rules)).toEqual([expected]);
   });
 });
 

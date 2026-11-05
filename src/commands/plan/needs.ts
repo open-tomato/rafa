@@ -23,6 +23,15 @@
  * the same code. The route is handed no offer — no `issue ready` label
  * swap, no changed-body question — since a reading writes no label; a
  * refusal an offer would have turned into a question stays a refusal.
+ * The route is handed `plan create`'s rules reader too
+ * (`./stretch-rules.ts`, `stretchRulesReader`), over `RAFA_STRETCH_RULES`
+ * from `RafaContext.env` and the project root, so an issue's snapshot
+ * holds the stretch rules `plan create` would append to it: unset or
+ * blank reads no rules, and a value naming no file, or something that is
+ * not a file, is refused with exit code 1 as `plan create` refuses it.
+ * `--spec=<file>` writes no snapshot, so it reads neither the value nor
+ * the file.
+ *
  * The spec is read by `readSpecNeeds`: every inventory name its text
  * mentions as a whole word.
  *
@@ -97,6 +106,7 @@ import { isUnmet, readPlanNeeds, readSpecNeeds } from '../../plan/needs.js';
 import { isSourceShape } from '../skill/list.js';
 
 import { resolveCreateSpec } from './spec-route.js';
+import { stretchRulesReader } from './stretch-rules.js';
 
 /** The command as a refusal names it. */
 const COMMAND = 'rafa plan needs';
@@ -377,6 +387,7 @@ async function readMachine(
 async function routedSpec(
   words: readonly string[],
   project: ProjectFound,
+  context: RafaContext,
   config: Awaited<ReturnType<typeof readMachine>>['config'],
   seams: PlanNeedsSeams,
 ): Promise<string> {
@@ -386,6 +397,7 @@ async function routedSpec(
     specsDir: config.specsDir,
     roadmapIssue: config.roadmapIssue,
     trustedAuthors: config.boardTrustedAuthors,
+    readRules: stretchRulesReader(context.env, project.root),
   }, {
     makeReadyOffer: () => null,
     makeAlternativeOffer: () => null,
@@ -415,7 +427,7 @@ async function runNeeds(context: RafaContext, seams: PlanNeedsSeams): Promise<vo
     : 'spec';
   const path = words === null
     ? needsPlanPath(project.root, config.planDir, typed)
-    : await routedSpec(words, project, config, seams);
+    : await routedSpec(words, project, context, config, seams);
   const target: NeedsTarget = { kind, path, label: labelOf(project.root, path) };
   const reading = kind === 'plan'
     ? await readPlanNeeds(path, needs)
