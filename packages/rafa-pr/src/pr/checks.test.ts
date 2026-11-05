@@ -17,6 +17,7 @@
  */
 
 import type { CheckRow } from './checks.js';
+import type { PullRequestDetail } from '@open-tomato/rafa/pr/types';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -25,6 +26,7 @@ import {
   failingRows,
   FIRST_CHECK_GRACE_MS,
   formatRows,
+  headTimeOf,
   parseChecks,
   verdictOf,
   waitForChecks,
@@ -425,5 +427,46 @@ describe('waitForChecks on a head whose first check may not have registered', ()
     });
 
     expect(seen).toEqual(['pending 0', 'pending 0', 'none 0']);
+  });
+});
+
+describe('headTimeOf', () => {
+  const COMMITTED_AT = '2026-11-05T10:00:00Z';
+
+  function detailWith(headCommittedAt: string | null): PullRequestDetail {
+    return {
+      number: 7,
+      title: 'a pull request',
+      url: 'https://github.com/o/r/pull/7',
+      state: 'open',
+      headRefName: 'feature',
+      baseRefName: 'main',
+      author: { login: 'someone', isBot: false },
+      isCrossRepository: false,
+      updatedAt: COMMITTED_AT,
+      body: '',
+      headRefOid: 'abc123',
+      headCommittedAt,
+      mergeable: 'mergeable',
+      mergeStateStatus: 'CLEAN',
+      labels: [],
+      closes: [],
+    };
+  }
+
+  it('answers null for a pull request the read did not find', () => {
+    expect(headTimeOf(null)).toBeNull();
+  });
+
+  it('answers null for a provider that answers no date', () => {
+    expect(headTimeOf(detailWith(null))).toBeNull();
+  });
+
+  it('answers null for a date that is no time', () => {
+    expect(headTimeOf(detailWith('not a date'))).toBeNull();
+  });
+
+  it('answers the milliseconds of a date that parses', () => {
+    expect(headTimeOf(detailWith(COMMITTED_AT))).toBe(Date.UTC(2026, 10, 5, 10, 0, 0));
   });
 });

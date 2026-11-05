@@ -158,7 +158,7 @@ import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/comm
 import { activeServices } from '@open-tomato/rafa/core/services';
 import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 
-import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
+import { failingRows, formatRows, headTimeOf, waitForChecks } from '../../pr/index.js';
 
 import { SEPARATOR } from './current.js';
 import { PR_WAIT_DECLARATION, WAIT_TIMEOUT_FLAG } from './declarations.js';
@@ -329,22 +329,6 @@ export function renderWait(reading: PrWaitReading): string {
       ? []
       : [next],
   ].join('\n');
-}
-
-/**
- * When the head of `detail` was committed, in the clock's milliseconds,
- * or null where there is no time to give the grace: a pull request the
- * read did not find, a provider that answers no date, a date that is no
- * time.
- */
-function headTimeOf(detail: PullRequestDetail | null): number | null {
-  const committedAt = detail?.headCommittedAt ?? null;
-  const ms = committedAt === null
-    ? Number.NaN
-    : Date.parse(committedAt);
-  return Number.isNaN(ms)
-    ? null
-    : ms;
 }
 
 /**
