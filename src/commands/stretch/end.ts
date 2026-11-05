@@ -438,8 +438,9 @@ export function createStretchEndCommand(seams?: StretchEndSeams): RafaCommand {
       + ' `Closes` line of the item ledger appended to `.rafa/stretch/<n>/pr-body.md` and opens `stretch/<n>` into'
       + ' the default branch through the `pr open` logic, printing the pull request already open from it instead'
       + ' when there is one and updating that pull request\'s body when it differs from `pr-body.md`, line endings'
-      + ' and the trailing newline left out. Run once that pull request has merged, it sets `pr.base` back to what'
-      + ' `.rafa/stretch/<n>/stretch.json` recorded, with every comment kept. `--dry-run` prints every step in'
+      + ' and the trailing newline left out, printing `body updated` or `body unchanged`. Run once that pull request'
+      + ' has merged, it sets `pr.base` back to what `.rafa/stretch/<n>/stretch.json` recorded, with every comment'
+      + ' kept. `--dry-run` prints every step in'
       + ' order and runs none, reading no open pull request\'s body. Exit code 1 for a refusal and for a body that'
       + ' could not be read or updated, 2 for a provider that is not `gh` or a file that could'
       + ' not be written. Starts no session.',
