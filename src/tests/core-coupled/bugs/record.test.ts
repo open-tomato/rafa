@@ -86,7 +86,7 @@ describe('the check of a bug record', () => {
 
   it.each(['unknown', '  ', 'Unknown'])('refuses a reproduce of %p, which is never unknown', (reproduce) => {
     expect(problemsOf({ reproduce })).toEqual([
-      'reproduce is missing: pass --reproduce=<the steps, or the condition that revealed it>; it is never unknown',
+      'reproduce is missing: pass --reproduce=<one command run from the checkout root that shows it, or the condition when no command can>; it is never unknown',
     ]);
   });
 

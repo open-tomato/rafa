@@ -441,7 +441,7 @@ describe('a bug line refused', () => {
     expect(outcome.exitCode).toBe(1);
     expect(outcome.stderr).toContain([
       'the bug record is not complete:',
-      '  reproduce is missing: pass --reproduce=<the steps, or the condition that revealed it>; it is never unknown',
+      '  reproduce is missing: pass --reproduce=<one command run from the checkout root that shows it, or the condition when no command can>; it is never unknown',
       '  cause is missing: pass --cause=<family>:<leaf> from rafa bug codes, or <family>:new-context',
       '  module is missing: pass --module=<name>, or --module=unknown',
       '  action is missing: pass --action=<name>, or --action=unknown',

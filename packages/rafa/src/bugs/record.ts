@@ -13,8 +13,10 @@
  *     `environment`, `versions`, `errorLine`, `artifact`, and the cause
  *     (`cause`, `proposed`, `suspected`).
  *
- * `reproduce` and `rerun` stand beside them: the steps, or the condition
- * that revealed the bug, and the one command that shows it again.
+ * `reproduce` and `rerun` stand beside them. `reproduce` is one shell
+ * command, run from the checkout root, whose output or exit code shows
+ * the bug; prose only when no command can show it, and then it names the
+ * condition. `rerun` is the one command that shows it again.
  *
  * ## The body
  *
@@ -374,7 +376,7 @@ function summaryProblems(summary: string | null, max: number): readonly string[]
 function reproduceProblems(reproduce: string | null): readonly string[] {
   return hasText(reproduce) && reproduce.trim().toLowerCase() !== UNKNOWN_VALUE
     ? []
-    : ['reproduce is missing: pass --reproduce=<the steps, or the condition that revealed it>; it is never unknown'];
+    : ['reproduce is missing: pass --reproduce=<one command run from the checkout root that shows it, or the condition when no command can>; it is never unknown'];
 }
 
 /** What is wrong with a proposal, beside a cause that passed. */
