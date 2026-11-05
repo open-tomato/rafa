@@ -178,7 +178,7 @@ module's note is the long form.
 | `src/rafa.ts` | the entry: core's config sections, adapters and services registered through the three roots (`src/config-registry.ts`, `src/adapter-registry.ts`, `src/service-registry.ts`), then `process.argv` dispatched through `createRosterRegistry({ off: modules.disabledFeatures })`, built after `loadInvocationModules`, with `renderHelp`, and the exit code set |
 | `packages/rafa-run/src/suite/checks.ts` | `resolveChecks`, the pure resolver of one check-point entry (`checks.task`, `checks.stage`, `checks.loop`) over the six check names into one `CheckRun`: an empty entry runs no check, and a `full` or a trigger widens the run |
 | `src/config/templates.ts` | `CONFIG_TEMPLATES`, `TEMPLATE_NAMES` and `templateEntry`: the `escalation` template a file adopts with `templates:`, reached by core only through the hook `src/config-registry.ts` sets |
-| `packages/rafa-run/src/start/suite-task-step.ts` | `runTaskStep`, the suite step the runner takes after each task commits, with `checkRunsOf` for the pre-wrap-up step; `start/suite-step.ts` re-exports both names |
+| `packages/rafa-run/src/start/suite-task-step.ts` | `runTaskStep`, the suite step the runner takes after each task commits, with `checkRunsOf` for the pre-wrap-up step; `start/suite-step.ts` re-exports `runTaskStep` only and imports `checkRunsOf` from here for its own use |
 
 ### Project scope and configuration discovery
 
