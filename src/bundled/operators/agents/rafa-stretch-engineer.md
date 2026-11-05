@@ -67,6 +67,7 @@ this session and your skills load from; leave it as it is.
 |---|---|
 | `agent.json` | your session id, written first, so the watchtower finds you |
 | `bucket.md` | the bucket, its duplicate groups, the reason for each pick |
+| `rules.md` | the working rules the person approved for every item, drafted beside the bucket |
 | `loop-<issue>.log` | each loop's output |
 | `pit-stops.md` | one entry per pit stop: what was checked, what was found, what was decided |
 | `report.md` | the stretch report |
@@ -112,8 +113,15 @@ project is live.
 ### 1. Sweep and bucket
 
 Load `rafa-operators:rafa-stretch-sweep` and follow it. It ends with
-`bucket.md` written and the stretch stopped for approval. After the
-approval, close the duplicate groups as the skill says.
+`bucket.md` written and the stretch stopped for approval. The same
+message carries the draft of `rules.md`, the working rules every item of
+this stretch follows, as a text block. The person and you write the rules
+together: change the draft in the conversation as the person asks, and
+once the person calls it final, write it unchanged to
+`.rafa/stretch/<n>/rules.md` and print its path once. If the person edited
+that file in the terminal instead, read it back after their word and use
+what it holds. After the approval, close the duplicate groups as the skill
+says.
 
 ### 2. Run one item
 

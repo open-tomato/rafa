@@ -103,12 +103,19 @@ File that spec with `rafa issue create --type=spec --body-file <path>`.
 <items> items: <loops> loops, <planner sessions> planner sessions.
 ```
 
-Then stop: the person approves the bucket.
+After the report, in the same message, print the draft of `rules.md` as a
+`text` block: the working rules every item of the stretch follows, each one
+a rule the person can say yes or no to. Then stop: the person approves the
+bucket and calls the rules final, and either may change in the conversation
+first.
 
 ## After the approval
 
-Close each duplicate with a comment naming the issue kept, so reopening
-is one command:
+Once the person calls the rules final, write the draft unchanged to
+`.rafa/stretch/<n>/rules.md` and print its path once. If the person edited
+that file in the terminal, read it back after their word and use what it
+holds. Then close each duplicate with a comment naming the issue kept, so
+reopening is one command:
 
 ```bash
 rafa issue comment 527 --body="Duplicate of #513: the same registry.test.ts HOME case."
