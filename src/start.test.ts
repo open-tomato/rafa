@@ -317,6 +317,16 @@ describe('the two directories start.ts points each call at', () => {
     expect(firstArgument('dispatchTask')).toMatch(/^\s*base,$/m);
   });
 
+  it('dispatches each task naming the tracker by the path the guard marks', () => {
+    // The prompt names the tracker a worktree checkout holds no copy of
+    // (`start/tracker-line.ts`); the guard's own field does not count.
+    expect(START).toContain('const trackerPath = trackerPathFor(planPath);');
+    expect(firstArgument('dispatchTask')).toMatch(/^\s*trackerPath,$/m);
+    // The control: the guard alone names it inside its object, never on a line of its own.
+    const planted = everyCall('async function run() {\n  await dispatchTask({\n    taskInfo,\n    guard: { expected, trackerPath },\n  });\n}');
+    expect(callTo(planted, 'dispatchTask').args[0]).not.toMatch(/^\s*trackerPath,$/m);
+  });
+
   it('reads a dispatch handed no base as handed none', () => {
     // The control for the case above: a literal without the field reads without it.
     const planted = everyCall('async function run() {\n  await dispatchTask({\n    taskInfo,\n    repoRoot,\n  });\n}');

@@ -24,10 +24,15 @@
  *
  * The task prompt's first line carries the `task` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
- * its drift guard reads that prefix from. Its third line, when the task's
+ * its drift guard reads that prefix from. Its third line, when the
+ * dispatch names {@link TaskDispatchOptions.trackerPath}, hands the
+ * session the tracker holding its task's line by absolute path, and where
+ * its close-out notes go in it (`tracker-line.ts`): a worktree checkout
+ * holds no copy of the tracker. The line after that (or the third, with
+ * no tracker path), when the task's
  * tracker line trails a blocker comment (`utils/tracker.ts`), hands the
  * session the text the task was blocked on. The line after that (or
- * after the second, with no blocker), when the loop names the task's base
+ * after the tracker line, or the second, with neither), when the loop names the task's base
  * commit, hands the session that commit as the `bun test --changed=<base>`
  * it runs for its scoped test gate. The line after the base line, when
  * the run's `tests.alwaysRun` resolved to any tracked file, tells the
@@ -39,8 +44,8 @@
  * Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
- * when there are any. Between the always-run line (or the base line, or
- * the blocker line, or the second line, with none of them) and `PROMPT.md` go the task's `## Skills for this task` and
+ * when there are any. Between the always-run line (or the base line, the
+ * blocker line, the tracker line, or the second line, with none of them) and `PROMPT.md` go the task's `## Skills for this task` and
  * `## Lessons from earlier tasks` sections (`task/sections.ts`), each
  * followed by a blank line, in that order, and each absent when it
  * rendered empty; with both absent the prompt is the one built before
@@ -138,6 +143,7 @@ import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
 import { withStamp } from './stamp.js';
 import { alwaysRunLines, baseLines, typeCheckLines } from './task-gate-lines.js';
+import { trackerLines } from './tracker-line.js';
 
 /**
  * How one task's Claude session is spawned: `prompt` on stdin, the
@@ -317,6 +323,14 @@ export interface TaskDispatchOptions {
    */
   base: string | null;
   /**
+   * The absolute path of the tracker holding the task's line, which the
+   * prompt names with where close-out notes go (`tracker-line.ts`): the
+   * session may run in a worktree that holds no copy of it. A relative
+   * path throws. None when left out or null, which leaves the prompt as
+   * it was; `start()` always names it.
+   */
+  trackerPath?: string | null;
+  /**
    * The loop guard run immediately before the spawn; see the module
    * note. Left out, or null, nothing is guarded there, which a test
    * driving the `run` seam with no checkout of its own names.
@@ -440,9 +454,20 @@ function sectionLines(sections: TaskPromptSections & { readonly inherited: strin
  * appends to the whole (`start/preflight.ts`). With none, the default,
  * the prompt is the one built before the preflight existed.
  *
+ * `trackerPath` is {@link TaskDispatchOptions.trackerPath}. With one, a
+ * line opening `TRACKER_PROMPT_PREFIX` (`tracker-line.ts`) directly
+ * follows the scoped-task lines, naming the tracker by its absolute path
+ * and saying the session's close-out notes go indented below its task's
+ * line, never as a `- [ ]` line and never above it. A relative path
+ * throws: the session may run in a worktree it does not resolve against.
+ * The line is no stamp, so the first stamp in the prompt stays the plan's.
+ * With none, the default, the prompt is the one built before the line
+ * existed.
+ *
  * `blocker` is the text a blocked task's tracker line trails, as
  * `findNextTask` answered it on `TaskInfo.blocker`. With one, a line
- * opening {@link BLOCKER_PROMPT_PREFIX} follows the second, so a session
+ * opening {@link BLOCKER_PROMPT_PREFIX} follows the tracker line, or the
+ * second line with no tracker path, so a session
  * dispatched on a blocked task reads what blocked it. The text goes in
  * as the comment holds it (`escapeBlockerText` in `utils/tracker.ts`),
  * which keeps it on that one line: a session wrote it, and raw it could
@@ -454,7 +479,8 @@ function sectionLines(sections: TaskPromptSections & { readonly inherited: strin
  *
  * `base` is the task's base commit, {@link TaskDispatchOptions.base}.
  * With one, a line opening `BASE_PROMPT_PREFIX` (`task-gate-lines.ts`)
- * follows the blocker line (or the second line, with no blocker), naming
+ * follows the blocker line (or the tracker line, or the second line, with
+ * neither), naming
  * the commit and the `bun test --changed=<base>` the session's scoped
  * test gate is. A base
  * that is not a commit name throws: the line puts it in a shell command.
@@ -475,7 +501,7 @@ function sectionLines(sections: TaskPromptSections & { readonly inherited: strin
  *
  * `sections` is the task's rendered skills and lessons sections. Each
  * non-blank one goes after the blank line that closes the head (the
- * always-run line, the base line, the blocker line, or the second line without any) and before
+ * always-run line, the base line, the blocker line, the tracker line, or the second line without any) and before
  * `promptContent`, skills first, each followed by a blank line of its
  * own, so the head keeps its lines and the scoped-task line stays
  * first. A section is placed as it was rendered: which resolver chose
@@ -499,10 +525,12 @@ export function buildTaskPrompt(
   inherited: readonly SuiteFailure[] = [],
   alwaysRun: readonly string[] = [],
   typeCheck: TypeCheckRecipe | null = null,
+  trackerPath: string | null = null,
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
     'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
+    ...trackerLines(trackerPath),
     ...blockerLines(blocker),
     ...baseLines(base),
     ...alwaysRunLines(alwaysRun),
@@ -644,6 +672,7 @@ export async function dispatchTask(
     options.inherited,
     options.alwaysRun,
     options.typeCheck ?? null,
+    options.trackerPath ?? null,
   ));
 
   const served = serveForSession(options.serving, resolution);
