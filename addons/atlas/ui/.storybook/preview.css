@@ -1,0 +1,6 @@
+/* The canvas paints the plane and ink tokens, so a dark story sits on a dark page. */
+body {
+  background: var(--color-plane);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}

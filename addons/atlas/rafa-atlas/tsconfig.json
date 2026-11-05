@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.packages.json",
+  // Composite; references every workspace package it declares, so their
+  // declarations are built first.
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": ".tsbuild",
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
+  },
+  "include": ["index.ts", "src"],
+  "exclude": ["**/*.test.ts"],
+  "references": [
+    { "path": "../data" },
+    { "path": "../transport" },
+    { "path": "../../../packages/rafa" },
+    { "path": "../../../packages/rafa-effort" },
+    { "path": "../../../packages/rafa-board" }
+  ]
+}

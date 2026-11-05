@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+/*
+ * The theme VALUES for @open-tomato/charts, which ships the token names
+ * only (src/theme/ there), and for @open-tomato/atlas-ui, which paints with
+ * them. Both libraries' classes live in their source, outside this
+ * package, so Tailwind is told to scan both.
+ */
+@source "../../charts/src";
+@source "../../ui/src";
+
+/* The viewer's toggle wins: data-theme on <html>. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Tokens from the dataviz reference palette (light values). Every mark paints
+ * with currentColor through the chartTone variants, so the engines never see a
+ * hex; the dark block below re-steps the same roles.
+ */
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-surface: #fcfcfb;
+  --color-plane: #f9f9f7;
+  --color-ink: #0b0b0b;
+  --color-ink-2: #52514e;
+  --color-muted: #898781;
+  --color-grid: #e1e0d9;
+  --color-baseline: #c3c2b7;
+  --color-ring: rgba(11, 11, 11, 0.1);
+  --color-delta-up: #006300;
+
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #008300;
+  --color-series-7: #6250d6;
+  --color-series-8: #e34948;
+
+  --color-good: #0ca30c;
+  --color-warning: #fab219;
+  --color-serious: #ec835a;
+  --color-critical: #d03b3b;
+
+  --color-seq-100: #cde2fb;
+  --color-seq-200: #9ec5f4;
+  --color-seq-300: #6da7ec;
+  --color-seq-400: #3987e5;
+  --color-seq-500: #256abf;
+  --color-seq-600: #184f95;
+  --color-seq-700: #0d366b;
+  --color-diverge-mid: #f0efec;
+
+  /* The balance poles: the edge colour at the rim, the core colour at the centre. */
+  --color-pole-ship: #86d39a;
+  --color-pole-ship-core: #146b36;
+  --color-pole-fail: #f7a04a;
+  --color-pole-fail-core: #c0262a;
+  --color-pole-base: #86b7f2;
+  --color-pole-base-core: #3a3fb5;
+}
+
+/*
+ * Motion tokens for @open-tomato/atlas-ui, in a block of their own so the
+ * token block above stays flat: the indeterminate progress sweep, the
+ * skeleton shimmer and the live ring around an IconTile.
+ */
+@theme {
+  /* The indeterminate progress sweep (atlas-ui's Progress): the SVG fill's x. */
+  --animate-indeterminate: indeterminate 1.25s ease-out infinite;
+
+  @keyframes indeterminate {
+    from { x: -40%; }
+    to { x: 100%; }
+  }
+
+  /* The loading shimmer across a Skeleton. */
+  --animate-shimmer: shimmer 1.4s linear infinite;
+
+  @keyframes shimmer {
+    from { background-position: -400px 0; }
+    to { background-position: 400px 0; }
+  }
+
+  /* The live ring around an IconTile with `pulse`. */
+  --animate-pulse-ring: pulse-ring 2s ease-out infinite;
+
+  @keyframes pulse-ring {
+    from { transform: scale(1); opacity: 0.6; }
+    to { transform: scale(1.4); opacity: 0; }
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-surface: #1a1a19;
+  --color-plane: #0d0d0d;
+  --color-ink: #f0efec;
+  --color-ink-2: #c3c2b7;
+  --color-muted: #898781;
+  --color-grid: #2c2c2a;
+  --color-baseline: #383835;
+  --color-ring: rgba(255, 255, 255, 0.1);
+  --color-delta-up: #0ca30c;
+
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
+  --color-series-4: #c98500;
+  --color-series-5: #d55181;
+  --color-series-6: #008300;
+  --color-series-7: #9085e9;
+  --color-series-8: #e66767;
+
+  --color-diverge-mid: #383835;
+
+  --color-pole-ship: #4f9f66;
+  --color-pole-ship-core: #2a9d55;
+  --color-pole-fail: #d98a3f;
+  --color-pole-fail-core: #d8403a;
+  --color-pole-base: #5f93d6;
+  --color-pole-base-core: #5a5fd6;
+}
+
+html, body, #root { min-height: 100%; }

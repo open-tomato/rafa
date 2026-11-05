@@ -1,0 +1,5 @@
+# `bun test` from this folder: a DOM for component tests. The root's
+# `bun test` skips this package (the root bunfig's pathIgnorePatterns),
+# so its tests run from here, locally and in CI.
+[test]
+preload = ["./test/happy-dom.ts"]

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.packages.json",
+  // Composite; the client calls fetch, so the DOM lib joins ES2022.
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": ".tsbuild",
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo",
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["index.ts", "src"],
+  "exclude": ["**/*.test.ts"],
+  "references": [{ "path": "../data" }]
+}

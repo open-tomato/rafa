@@ -1,0 +1,10 @@
+# Build output: the library (dist/ is ignored at the root too) and Storybook.
+dist/
+storybook-static/
+debug-storybook.log
+# Visual baselines are per machine and untracked; the diffs are scratch.
+visual/__image_snapshots__/
+visual/__diff_output__/
+playwright-report/
+test-results/
+visual/__compare_output__/

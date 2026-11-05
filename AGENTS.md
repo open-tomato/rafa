@@ -1,10 +1,9 @@
 # rafa
 
-The agent task loop for ralph, packaged and ready to ship. A single-package
-implementation of the loop from `agentic-research`, with all the pieces
-running under bun and ready for publishing to npm as `@open-tomato/rafa`.
-Core, the hub, the two config packages and the six feature packages are bun
-workspaces in `packages/`.
+The agent task loop for ralph, packaged and ready to ship: a single-package
+implementation of the loop from `agentic-research`, under bun, published to
+npm as `@open-tomato/rafa`. Core, the hub, the two config packages and the six
+feature packages are bun workspaces in `packages/`; Atlas's in `addons/atlas/`.
 
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
 before running or suggesting any `gh`, `rafa` or branch-cleanup command.
@@ -71,6 +70,7 @@ back into every turn and the split would save nothing.
   are shown, how they are dismissed, and what a test's HOME must hold.
 - `context/operators.md` — the alpha operators under `bundled/operators/`:
   why no loop sees them, the stretch folder, and the events output.
+- `context/atlas.md` — Atlas add-ons: layers, packages, replica, commands.
 
 ## This file is capped
 

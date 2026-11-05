@@ -1,0 +1,43 @@
+{
+  "name": "@open-tomato/atlas-demo",
+  "version": "0.0.0",
+  "description": "Bun.serve demo, not shipped: the four lens dashboards over a local Atlas replica, the fetch adapter mounted under /api/atlas, configured by atlas.config.json to point at a rafa project.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --build",
+    "lint": "eslint .",
+    "test": "bun test",
+    "dev": "bun --hot src/server.ts",
+    "start": "bun src/server.ts"
+  },
+  "dependencies": {
+    "@open-tomato/atlas-data": "workspace:*",
+    "@open-tomato/atlas-transport": "workspace:*",
+    "@open-tomato/atlas-ui": "workspace:*",
+    "@open-tomato/charts": "workspace:*",
+    "@open-tomato/rafa-atlas": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "lucide-react": "^1.67.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^21.0.4",
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/bun": "^1.4.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "bun-plugin-tailwind": "^0.1.2",
+    "eslint": "^9.39.4",
+    "happy-dom": "^21.0.4",
+    "tailwindcss": "^4.3.4",
+    "typescript": "^5.9.3"
+  }
+}

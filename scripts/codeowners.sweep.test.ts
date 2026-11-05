@@ -161,7 +161,11 @@ describe('this repository', () => {
 
   test('every manifest the patterns name declares the maintainers team', () => {
     const projects = collectOwnedProjects(repoRoot);
-    const manifests = ['package.json', ...new Bun.Glob('packages/*/package.json').scanSync({ cwd: repoRoot })];
+    const manifests = [
+      'package.json',
+      ...new Bun.Glob('packages/*/package.json').scanSync({ cwd: repoRoot }),
+      ...new Bun.Glob('addons/atlas/*/package.json').scanSync({ cwd: repoRoot }),
+    ];
     expect(projects.length).toBe(manifests.length);
     expect(projects.every((project) => project.team === TEAM)).toBe(true);
   });

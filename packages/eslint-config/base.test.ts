@@ -139,12 +139,25 @@ describe('base.mjs', () => {
 });
 
 describe('package.json', () => {
-  it('exports base.mjs as . and ./base', async () => {
+  it('exports base.mjs as . and ./base, and react.mjs as ./react', async () => {
     const manifest = (await Bun.file(join(PACKAGE_DIR, 'package.json')).json()) as Record<string, unknown>;
 
     expect(manifest['name']).toBe('@open-tomato/rafa-eslint-config');
     expect(manifest['private']).toBe(true);
-    expect(manifest['exports']).toEqual({ '.': './base.mjs', './base': './base.mjs' });
+    expect(manifest['exports']).toEqual({ '.': './base.mjs', './base': './base.mjs', './react': './react.mjs' });
+  });
+
+  it('declares every package react.mjs imports in its dependencies', async () => {
+    const manifest = (await Bun.file(join(PACKAGE_DIR, 'package.json')).json()) as Record<string, unknown>;
+    const dependencies = Object.keys(manifest['dependencies'] as Record<string, string>);
+    const source = await Bun.file(join(PACKAGE_DIR, 'react.mjs')).text();
+    const specifiers = [...source.matchAll(/^import .* from '([^']+)';$/gm)].map((match) => match[1] ?? '');
+    const packages = specifiers
+      .filter((specifier) => !specifier.startsWith('.'))
+      .map(packageName);
+
+    expect(packages).toEqual(expect.arrayContaining(['eslint-plugin-react', 'eslint-plugin-react-hooks', 'eslint-plugin-jsx-a11y']));
+    expect(dependencies).toEqual(expect.arrayContaining(packages));
   });
 
   it('declares every package base.mjs imports in its dependencies', async () => {

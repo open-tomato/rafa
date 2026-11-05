@@ -32,7 +32,7 @@ export const CODEOWNERS_FILE = '.github/CODEOWNERS';
  * The manifests that may declare an owner, relative to the root: the root
  * manifest and each member under the one `workspaces` glob, `packages/*`.
  */
-export const MANIFEST_PATTERNS: readonly string[] = ['package.json', 'packages/*/package.json'];
+export const MANIFEST_PATTERNS: readonly string[] = ['package.json', 'packages/*/package.json', 'addons/atlas/*/package.json'];
 
 /** One project and the team that owns it. */
 export interface OwnedProject {

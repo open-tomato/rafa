@@ -71,3 +71,60 @@ jobs:
       - name: Graph
         if: ${{ !cancelled() }}
         run: bun scripts/workspace/graph-check.ts
+
+  atlas:
+    # The publishable Atlas libraries' own gates, one leg per package, from
+    # its folder: the root `bun test` skips them (each bunfig preloads a
+    # DOM). No visual snapshot step: baselines are per machine and have no
+    # durable store yet.
+    name: atlas (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - addons/atlas/charts
+          - addons/atlas/ui
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install
+        working-directory: .
+        run: bun install --frozen-lockfile
+
+      - name: Browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Types
+        if: ${{ !cancelled() }}
+        run: bun run check-types
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: bun run lint
+
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: bun run test
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: bun run build
+
+      - name: Build Storybook
+        if: ${{ !cancelled() }}
+        run: bun run build:storybook
+
+      - name: Stories
+        if: ${{ !cancelled() }}
+        run: bun run check:stories
