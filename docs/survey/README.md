@@ -623,13 +623,13 @@ Every script task recorded its work in the effort store. To see the cost and tim
 inventory, run:
 
 ``` bash
-rafa effort report --format json | jq '.[] | select(.phase == "working") | .name'
+rafa effort report --json | jq '.[] | select(.phase == "working") | .name'
 ```
 
 Then drill into each task with:
 
 ``` bash
-rafa effort report <task-id> --format json | jq '.[] | .cost'
+rafa effort report <task-id> --json | jq '.[] | .cost'
 ```
 
 The hand-written traces (cluster contract traces and guidelines) have no separate cost entry because they were written
