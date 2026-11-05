@@ -54,18 +54,36 @@
  * The write itself opens the file with `wx`, so a file appearing between
  * the check and the write is not overwritten either.
  *
+ * ## The root
+ *
+ * The fragment belongs to the branch the command runs on, so it is
+ * written under the git worktree of the directory the command runs in
+ * ({@link FragmentSeams.cwd}), read as `git rev-parse --show-toplevel`
+ * by `gitToplevel` (`packages/rafa/src/project/roots.ts`, behind
+ * {@link FragmentSeams.toplevel}). A linked worktree holding no `.rafa/`
+ * resolves its project to the main checkout, and writing there put the
+ * fragment on the wrong branch (#1268). The config (`release.fragments`,
+ * `pr.base`) is still read from the project the dispatcher found; the
+ * git runner, the `HEAD` check, the package check and the write all use
+ * the worktree root. Outside any repository the probe answers null and
+ * the root is the project root; a probe that cannot answer at all is
+ * refused.
+ *
  * ## Refusals, output and json
  *
  * Every refusal exits 1 before anything is written. A run that wrote
- * prints its warnings, each a `warn:` line, then the path relative to
- * the repository root as the last line, so a script reads the path off
- * the last line. With `--output=json` the terminal
- * result's data is {@link ReleaseFragmentResult}: the path, the fragment
- * and the warnings.
+ * prints its warnings, each a `warn:` line, then the path written as the
+ * last line, so a script reads the path off the last line. The path is
+ * relative to the root when the root is the project root, and absolute
+ * when it is not, so a path printed from a linked worktree never reads
+ * as one under the main checkout. With `--output=json` the terminal
+ * result's data is {@link ReleaseFragmentResult}: the path, spelled the
+ * same way, the fragment and the warnings.
  */
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
+import type { GitToplevelProbe } from '@open-tomato/rafa/project/roots';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -76,6 +94,7 @@ import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
+import { gitToplevel } from '@open-tomato/rafa/project/roots';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { readFragmentTree } from '../../release/fragment-tree.js';
@@ -117,7 +136,10 @@ const HOLDS_WHITESPACE = /\s/;
 
 /** What json mode gives as the terminal result's `data`. */
 export interface ReleaseFragmentResult {
-  /** The path written, relative to the repository root, `/`-separated. */
+  /**
+   * The path written: relative to the root, `/`-separated, when the root
+   * is the project root, and absolute when it is not.
+   */
   readonly path: string;
   /** The fragment as written. */
   readonly fragment: Fragment;
@@ -129,6 +151,10 @@ export interface ReleaseFragmentResult {
 export interface FragmentSeams {
   /** Makes the git runner the base is fetched and read through. */
   readonly git?: (root: string) => GitRunner;
+  /** The git toplevel above a directory, null outside any repository. `gitToplevel` when absent. */
+  readonly toplevel?: GitToplevelProbe;
+  /** The directory the command runs in. `process.cwd()` when absent. */
+  readonly cwd?: () => string;
 }
 
 /** The flags of the line, read and checked, before anything touches the repository. */
@@ -253,6 +279,20 @@ function checkPackage(root: string, name: string | null): void {
   if (member.isPrivate) throw refusal(`${name} (${member.dir}) is private, so it never releases and settle would refuse its fragment`);
 }
 
+/**
+ * The root the fragment is written under: the git worktree of the
+ * directory the command runs in, or `projectRoot` outside any
+ * repository; see the module note.
+ */
+function fragmentRoot(projectRoot: string, seams: FragmentSeams): string {
+  const cwd = (seams.cwd ?? ((): string => process.cwd()))();
+  try {
+    return (seams.toplevel ?? gitToplevel)(cwd) ?? projectRoot;
+  } catch (error) {
+    throw new CommandExit(1, `❌ the git worktree of ${cwd} could not be read, so no fragment was written: ${messageOf(error)}`);
+  }
+}
+
 /** The file names waiting on the base after a fetch of it, and the warning a failed fetch leaves. */
 function waitingNames(
   git: GitRunner,
@@ -301,15 +341,19 @@ export async function runFragment(context: RafaContext, seams: FragmentSeams = {
   const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
-  checkPackage(project.root, request.package);
+  const root = fragmentRoot(project.root, seams);
+  checkPackage(root, request.package);
 
-  const git = (seams.git ?? createGitRunner)(project.root);
+  const git = (seams.git ?? createGitRunner)(root);
   const base = waitingNames(git, config.prBase ?? RELEASE_BASE_BRANCH, config.releaseFragments);
   const name = allocateFragmentName(request.plan, base.names);
   const path = posix.join(config.releaseFragments.replace(/\\/g, '/'), name);
-  const resolved = join(project.root, path);
+  const resolved = join(root, path);
+  const shown = root === project.root
+    ? path
+    : resolved;
   if (existsSync(resolved) || inHead(git, path)) {
-    throw refusal(`${path} is already on this branch, so the fragment is not written twice`);
+    throw refusal(`${shown} is already on this branch, so the fragment is not written twice`);
   }
 
   const lines = fragmentNotes(request);
@@ -320,14 +364,14 @@ export async function runFragment(context: RafaContext, seams: FragmentSeams = {
     package: request.package,
     notes: lines.notes,
   };
-  writeNew(path, resolved, serializeFragment(fragment));
+  writeNew(shown, resolved, serializeFragment(fragment));
   const problems = lines.problem === null
     ? base.problems
     : [...base.problems, lines.problem];
-  return { path, fragment, problems };
+  return { path: shown, fragment, problems };
 }
 
-/** The command, reaching git through `seams`; see the module note. */
+/** The command, reaching git and its working directory through `seams`; see the module note. */
 export function createReleaseFragmentCommand(seams: FragmentSeams = {}): RafaCommand {
   const command: RafaCommand = {
     ...RELEASE_FRAGMENT_DECLARATION,
