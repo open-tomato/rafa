@@ -30,7 +30,9 @@ import {
   issuePlans,
   itemLogPath,
   RECORD_WAIT_MS,
+  rulesFilePath,
   stretchOfBase,
+  stretchRulesFile,
 } from './item.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-stretch-item-')));
@@ -366,6 +368,126 @@ describe('rafa stretch item --dry-run', () => {
     expect(planted.launches).toEqual([]);
     expect(outcome.stdout).toContain(`rafa loop start --plan=${PLAN} --as-worktree --no-ci-wait`);
     expect(outcome.stdout).not.toContain('rafa loop wait');
+  });
+});
+
+/** Plants `.rafa/stretch/4/rules.md` in the case's project and answers its absolute path. */
+function plantRules(planted: Case): string {
+  mkdirSync(folder(planted, 4), { recursive: true });
+  const path = join(folder(planted, 4), 'rules.md');
+  writeFileSync(path, '- Measure first.\n');
+  return path;
+}
+
+describe('rafa stretch item, the stretch rules', () => {
+  it('reads the rules file of the stretch folder, and none for a missing file or a directory of its name', () => {
+    const planted = plant();
+    const path = rulesFilePath(planted.project.root, 4);
+
+    expect(path).toBe(join(folder(planted, 4), 'rules.md'));
+    expect(stretchRulesFile(planted.project.root, 4)).toBeNull();
+    mkdirSync(path, { recursive: true });
+    expect(stretchRulesFile(planted.project.root, 4)).toBeNull();
+    rmSync(path, { recursive: true });
+    expect(plantRules(planted)).toBe(path);
+    expect(stretchRulesFile(planted.project.root, 4)).toBe(path);
+  });
+
+  it('runs plan create with RAFA_STRETCH_RULES naming rules.md, and prints the file it appends', async () => {
+    const planted = plant();
+    const rules = plantRules(planted);
+
+    const outcome = await run(planted, ['812']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rafaCalls.map((call) => call.argv)).toEqual([['rafa', 'plan', 'create', '--issue=812']]);
+    expect(planted.rafaCalls[0]?.env['RAFA_STRETCH_RULES']).toBe(rules);
+    expect(planted.rafaCalls[0]?.env['PATH']).toBe('/fake/bin');
+    expect(planted.launches[0]?.env['RAFA_STRETCH_RULES']).toBeUndefined();
+    expect(rising(positions(outcome.stdout, [
+      `RAFA_STRETCH_RULES=${rules} rafa plan create --issue=812`,
+      `stretch rules: appends ${rules} to the snapshot`,
+      `loop running: session ${SESSION_ID}`,
+    ]))).toBe(true);
+  });
+
+  it('leaves RAFA_STRETCH_RULES unset and the line bare with no rules.md', async () => {
+    const planted = plant();
+    mkdirSync(folder(planted, 4), { recursive: true });
+
+    const outcome = await run(planted, ['812']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rafaCalls[0]?.env['RAFA_STRETCH_RULES']).toBeUndefined();
+    expect(outcome.stdout).not.toContain('RAFA_STRETCH_RULES');
+    expect(outcome.stdout).not.toContain('stretch rules:');
+  });
+
+  it('reads a directory named rules.md as no rules', async () => {
+    const planted = plant();
+    mkdirSync(rulesFilePath(planted.project.root, 4), { recursive: true });
+
+    const outcome = await run(planted, ['812']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rafaCalls[0]?.env['RAFA_STRETCH_RULES']).toBeUndefined();
+    expect(outcome.stdout).not.toContain('stretch rules:');
+  });
+
+  it('under --dry-run, prints the line with RAFA_STRETCH_RULES and the file it would append, and runs nothing', async () => {
+    const planted = plant();
+    const rules = plantRules(planted);
+
+    const outcome = await run(planted, ['812', '--dry-run']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rafaCalls).toEqual([]);
+    expect(planted.launches).toEqual([]);
+    expect(rising(positions(outcome.stdout, [
+      `RAFA_STRETCH_RULES=${rules} rafa plan create --issue=812`,
+      `stretch rules: would append ${rules} to the snapshot`,
+      'rafa loop start --plan=.rafa/plans/PLAN-rafa-812-<slug>.md',
+    ]))).toBe(true);
+  });
+
+  it('under --dry-run with no rules.md, prints the bare line', async () => {
+    const planted = plant();
+
+    const outcome = await run(planted, ['812', '--dry-run']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('rafa plan create --issue=812');
+    expect(outcome.stdout).not.toContain('RAFA_STRETCH_RULES');
+    expect(outcome.stdout).not.toContain('stretch rules:');
+  });
+
+  it.each([
+    ['a run', []],
+    ['a dry run', ['--dry-run']],
+  ])('on a kept plan in %s, names the rules file as not appended and runs no plan create', async (_name, words) => {
+    const planted = plant();
+    const rules = plantRules(planted);
+    writePlan(planted.project.root, PLAN);
+
+    const outcome = await run(planted, ['812', ...words]);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rafaCalls).toEqual([]);
+    expect(rising(positions(outcome.stdout, [
+      `keep ${PLAN}, written by an earlier plan create`,
+      `stretch rules: ${rules} is not appended, as no plan create runs for a kept plan`,
+    ]))).toBe(true);
+    expect(outcome.stdout).not.toContain('RAFA_STRETCH_RULES');
+  });
+
+  it('on a kept plan with no rules.md, prints no rules line', async () => {
+    const planted = plant();
+    writePlan(planted.project.root, PLAN);
+
+    const outcome = await run(planted, ['812', '--dry-run']);
+
+    expect(outcome.stdout).toContain(`keep ${PLAN}`);
+    expect(outcome.stdout).not.toContain('stretch rules:');
   });
 });
 

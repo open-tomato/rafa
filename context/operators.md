@@ -90,7 +90,9 @@ the host, read with capture-pane.
 `rafa stretch item <issue> [--wait | --resume] [--dry-run]` handles one
 item from loop start to its pit-stop readings. It takes the integration
 branch from `pr.base` (which must name a `stretch/<n>` branch), runs
-`rafa plan create --issue`, and starts the loop detached with
+`rafa plan create --issue`, with `RAFA_STRETCH_RULES` naming
+`.rafa/stretch/<n>/rules.md` when that file exists so the stretch's rules
+land in the snapshot, and starts the loop detached with
 `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`.
 With `--wait`, it waits on the loop through `rafa loop wait`. Once the loop
 has a pull request, `item` waits for GitHub to compute its mergeability and
