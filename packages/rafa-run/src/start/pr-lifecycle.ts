@@ -10,7 +10,14 @@
  * port (`pr/index.ts`), the branch through `readCheckedOutBranch`
  * (`utils/git.ts`), a repair session through `runClaude`, and the
  * poll's clock and wait through `waitForChecks`. So a test drives each verdict with no network, no
- * session and no 20-second wait. Every repair session loads settings
+ * session and no 20-second wait.
+ *
+ * Each poll of the checks starts with one read of the PR (`pulls.get`),
+ * whose head commit time goes to `waitForChecks` as `headCommittedAtMs`:
+ * zero rows on a head committed less than `FIRST_CHECK_GRACE_MS` ago are
+ * polled again, since GitHub registers a push's runs some seconds after
+ * it. A PR read as null, or one with no readable head time, gets no
+ * grace, and its first empty poll ends `none` as before. Every repair session loads settings
  * from the sources `start()` hands over, the run's
  * `loop.settingSources`.
  *
@@ -141,6 +148,7 @@ import {
   formatRows,
   ghAuthOkIn,
   ghPullRequestsIn,
+  headTimeOf,
   pushBranch,
   resolvePrProvider,
   waitForChecks,
@@ -499,14 +507,25 @@ async function verifyAttempt(
     : handleRedChecks(io, branch, prNumber, result.rows);
 }
 
-/** Polls one PR's checks until they settle or the deadline passes. */
-function pollChecks(
+/**
+ * Polls one PR's checks until they settle or the deadline passes.
+ *
+ * Before the first poll it reads the PR through `io.pulls.get` and hands
+ * its head commit's time ({@link headTimeOf}) to `waitForChecks` as
+ * `headCommittedAtMs`, so zero rows on a head younger than
+ * `FIRST_CHECK_GRACE_MS` are polled again rather than read as `none`.
+ * When the reader answers null (no such PR, no head time, a date that
+ * does not parse) the option is left out and the first empty poll ends
+ * `none`, as it did before the grace.
+ */
+async function pollChecks(
   io: AttemptSeams,
   prNumber: number,
   timeoutMs: number,
 ): Promise<WaitResult> {
   io.phases.ciStarted();
   activeOutput().info(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
+  const headCommittedAtMs = headTimeOf(await io.pulls.get(prNumber));
 
   return waitForChecks({
     probe: async () => (await io.pulls.checks(prNumber)).rows,
@@ -514,6 +533,9 @@ function pollChecks(
     intervalMs: CI_POLL_INTERVAL_MS,
     now: io.now,
     sleep: io.sleep,
+    ...headCommittedAtMs === null
+      ? {}
+      : { headCommittedAtMs },
     onPoll: (rows, verdict, elapsedMs) => {
       const secs = Math.round(elapsedMs / 1000);
       activeOutput().info(`   [${secs}s] ${verdict} — ${rows.length} check(s)`);

@@ -34,6 +34,7 @@ describe('the pull request barrel', () => {
     expect(barrel.classifyState).toBe(checks.classifyState);
     expect(barrel.failingRows).toBe(checks.failingRows);
     expect(barrel.formatRows).toBe(checks.formatRows);
+    expect(barrel.headTimeOf).toBe(checks.headTimeOf);
     expect(barrel.parseChecks).toBe(checks.parseChecks);
     expect(barrel.verdictOf).toBe(checks.verdictOf);
     expect(barrel.waitForChecks).toBe(checks.waitForChecks);

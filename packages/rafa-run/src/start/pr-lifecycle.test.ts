@@ -93,6 +93,13 @@
  * its prompt. The sources the cases hand over are not the default, so a
  * gate that bound the default in their place reddens.
  *
+ * Each poll starts with a read of the PR for its head commit time, which
+ * the stub records as `pr head <n>` apart from the merge-state read's
+ * `pr view <n>`, and answers null unless a case plans `heads`. So every
+ * case here runs with no first-check grace, as the gate did before it
+ * read the head. Dropping that read, restored sha256-identical after,
+ * reddened 14 of 52 cases on 2026-11-05.
+ *
  * Bun runs every test file in one process and the plan stub is module
  * state, so the one case that sets a stub is followed by a reset to null.
  */
@@ -290,6 +297,12 @@ interface Script {
   readonly prNumber?: number | null;
   readonly probes?: readonly string[];
   readonly merges?: readonly MergeState[];
+  /**
+   * What the read of the PR before each poll answers, the one the gate
+   * takes the head's commit time from, in order. Absent, every such read
+   * answers null, so no case here is handed the first-check grace.
+   */
+  readonly heads?: readonly MergeState[];
   readonly exits?: readonly number[];
 }
 
@@ -321,12 +334,20 @@ function stub(script: Script): Stubbed {
   const sources: (readonly ClaudeSettingSource[])[] = [];
   const nextProbe = answer(script.probes ?? [], 'poll');
   const nextMerge = answer(script.merges ?? [], 'merge-state read');
+  const nextHead = script.heads === undefined
+    ? (): MergeState => null
+    : answer(script.heads, 'head read');
+  // The gate reads the PR once before each poll for its head time, and
+  // again after a poll for its merge state: the read after a lookup is
+  // the head read, recorded under its own name so the two stay apart.
+  let headNext = false;
   const nextExit = answer(script.exits ?? [], 'repair session');
   let clock = 0;
 
   const { pulls } = createPullRequestsDouble({
     findOpen: (branch: string): Promise<PullRequestSummary | null> => {
       calls.push(`pr list ${branch}`);
+      headNext = true;
       const number = script.prNumber === undefined
         ? PR
         : script.prNumber;
@@ -335,6 +356,11 @@ function stub(script: Script): Stubbed {
         : { ...SUMMARY, number, headRefName: branch });
     },
     get: (prNumber: number): Promise<PullRequestDetail | null> => {
+      if (headNext) {
+        headNext = false;
+        calls.push(`pr head ${prNumber}`);
+        return Promise.resolve(nextHead());
+      }
       calls.push(`pr view ${prNumber}`);
       return Promise.resolve(nextMerge());
     },
@@ -381,7 +407,7 @@ function stub(script: Script): Stubbed {
 }
 
 /** The effects every attempt that finds the PR starts with. */
-const POLL = [`pr list ${BRANCH}`, `pr checks ${PR}`];
+const POLL = [`pr list ${BRANCH}`, `pr head ${PR}`, `pr checks ${PR}`];
 
 /** The effects every `gh`-provider case opens with, before its first poll. */
 const OPENING = ['read provider', 'gh auth status'];
@@ -765,12 +791,14 @@ describe('verifyPullRequest, writing the phase to the run record', () => {
       ...OPENING,
       `pr list ${BRANCH}`,
       'phase ci',
+      `pr head ${PR}`,
       `pr checks ${PR}`,
       `pr view ${PR}`,
       'phase repair',
       'repair',
       `pr list ${BRANCH}`,
       'phase ci',
+      `pr head ${PR}`,
       `pr checks ${PR}`,
     ]);
   });
@@ -780,7 +808,7 @@ describe('verifyPullRequest, writing the phase to the run record', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams, phasesInto(run.calls));
 
-    expect(run.calls).toEqual([...OPENING, `pr list ${BRANCH}`, 'phase ci', `pr checks ${PR}`, `pr view ${PR}`, 'phase repair', 'repair']);
+    expect(run.calls).toEqual([...OPENING, `pr list ${BRANCH}`, 'phase ci', `pr head ${PR}`, `pr checks ${PR}`, `pr view ${PR}`, 'phase repair', 'repair']);
   });
 
   it('writes ci once for a poll that waits between its probes', async () => {

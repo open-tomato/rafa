@@ -86,6 +86,7 @@ export {
   failingRows,
   FIRST_CHECK_GRACE_MS,
   formatRows,
+  headTimeOf,
   parseChecks,
   verdictOf,
   waitForChecks,
