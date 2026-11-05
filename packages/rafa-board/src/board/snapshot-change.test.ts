@@ -3,10 +3,12 @@
  * differs (`packages/rafa-board/src/board/snapshot-change.ts`):
  * {@link snapshotText}, {@link readSnapshotChange} and
  * {@link changedHeadings}. Every case is a pure call over texts: none
- * writes a file, spawns or reads the environment. The cases moved here
- * from `./issue.test.ts` with the module, unedited, and the cases of
- * `./issue.test.ts` that write a snapshot still read these functions
- * through `./issue.ts`'s re-export.
+ * writes a file, spawns or reads the environment. The cases up to the
+ * stretch rules moved here from `./issue.test.ts` with the module,
+ * unedited, and the cases of `./issue.test.ts` that write a snapshot
+ * still read these functions through `./issue.ts`'s re-export. The two
+ * `with the stretch rules` blocks are the rules section's own; the
+ * write's rules cases are in `./issue-rules.test.ts`.
  *
  * ## Mutations driven
  *
@@ -42,8 +44,25 @@
  *  - `readSnapshotChange` comparing the copy with its block left in:
  *    5 fail, the three block readings, the unchanged copy left alone and
  *    the notes rebuild, which the unstripped block turns into a refusal.
+ *
+ * Five mutations of the rules section were driven on 2026-11-05 over
+ * `env -u CLAUDECODE bun test` of this file, `./issue-rules.test.ts`,
+ * `./issue.test.ts` and `./snapshot-settle.test.ts`, 88 cases, each
+ * module restored from a scratch copy and verified by `sha256sum`
+ * after each:
+ *
+ *  - `snapshotText` dropping the rules: 10 fail, every case that writes
+ *    or reads a rules section.
+ *  - the rules heading written for empty rules: 21 fail, the
+ *    byte-for-byte cases of both files and every base case of the write.
+ *  - a tail opening at the rules separator not read as the same body:
+ *    2 fail, the rules-only change and the rules removed with no notes.
+ *  - the rules clause spelled as the notes clause: 5 fail, every case
+ *    naming the rules file or the removed clause.
+ *  - the write deciding its action without the rules: 2 fail, the
+ *    rules added to a notes-free copy and the copy whose rules match.
  */
-import type { SnapshotChange } from './snapshot-change.js';
+import type { SnapshotChange, StretchRules } from './snapshot-change.js';
 import type { RefStamp } from '../refs/stamp.js';
 
 import { notesPath } from '@open-tomato/rafa/board/naming';
@@ -51,7 +70,14 @@ import { describe, expect, it } from 'bun:test';
 
 import { blobFingerprint, REFS_BLOCK_OPEN, RefsBlockError, writeRefsBlock } from '../refs/stamp.js';
 
-import { changedHeadings, LOCAL_NOTES_HEADING, readSnapshotChange, snapshotText } from './snapshot-change.js';
+import {
+  changedHeadings,
+  LOCAL_NOTES_HEADING,
+  readSnapshotChange,
+  RULES_REMOVED_LINE,
+  snapshotText,
+  STRETCH_RULES_HEADING,
+} from './snapshot-change.js';
 
 /** Where `specs.dir` points, as `./issue.test.ts` configures it: the notes line names a path under it. */
 const SPECS_DIR = '.rafa/specs';
@@ -215,5 +241,100 @@ describe('changedHeadings', () => {
 
     expect(changedHeadings(before, after)).toEqual(['Added', 'Design', 'Gone']);
     expect(changedHeadings(before, before)).toEqual([]);
+  });
+});
+
+describe('snapshotText with the stretch rules', () => {
+  it('appends the rules under the Stretch rules heading, after the notes', () => {
+    expect(snapshotText('# Spec\n', 'A note.\n', 'Measure first.\n'))
+      .toBe(`# Spec\n\n${LOCAL_NOTES_HEADING}\n\nA note.\n\n${STRETCH_RULES_HEADING}\n\nMeasure first.\n`);
+    expect(snapshotText('# Spec\n', null, '\r\nMeasure first.\r\n\r\n'))
+      .toBe(`# Spec\n\n${STRETCH_RULES_HEADING}\n\nMeasure first.\n`);
+  });
+
+  it('writes no heading for rules holding nothing but whitespace', () => {
+    expect(snapshotText('# Spec\n', 'A note.', ' \n\n')).toBe(snapshotText('# Spec\n', 'A note.'));
+  });
+
+  it('writes the text the body and notes alone write when no rules are handed in', () => {
+    // Literals, not a second call: a rules section written for null would
+    // match a two-argument call that wrote it too.
+    expect(snapshotText('# Spec\n', 'A note.', null)).toBe(`# Spec\n\n${LOCAL_NOTES_HEADING}\n\nA note.\n`);
+    expect(snapshotText('# Spec\n\n\n', null, null)).toBe('# Spec\n');
+  });
+});
+
+describe('readSnapshotChange with the stretch rules', () => {
+  const NOTES = notesPath(SPECS_DIR, 20);
+  const NOTES_LINE = `local notes: ${NOTES} changed since the saved copy`;
+  const RULES: StretchRules = { path: '/repo/.rafa/stretch/112/rules.md', text: 'Measure first.\n' };
+  const RULES_LINE = `stretch rules: ${RULES.path} changed since the saved copy`;
+  const BODY = '# Spec\n\n## Design\n\nThe text.\n';
+
+  /** The reading of `saved` against `BODY` or `body`, `notes` and `rules`. */
+  const read = (saved: string, notes: string | null, rules: StretchRules | null, body = BODY): SnapshotChange => readSnapshotChange({
+    saved,
+    body,
+    notes,
+    notesPath: NOTES,
+    rules,
+  });
+
+  it('answers unchanged for a copy whose rules match', () => {
+    expect(read(snapshotText(BODY, 'A note.', RULES.text), 'A note.\n', RULES))
+      .toEqual({ kind: 'unchanged', bodyLine: null, notesLine: null });
+    expect(read(snapshotText(BODY, null, RULES.text), null, RULES).kind).toBe('unchanged');
+  });
+
+  it('answers notes, naming the rules file, when only the rules changed', () => {
+    const edited = { ...RULES, text: 'Measure first, then plan.\n' };
+
+    expect(read(snapshotText(BODY, 'A note.', RULES.text), 'A note.', edited))
+      .toEqual({ kind: 'notes', bodyLine: null, notesLine: RULES_LINE });
+    expect(read(snapshotText(BODY, null, RULES.text), null, edited))
+      .toEqual({ kind: 'notes', bodyLine: null, notesLine: RULES_LINE });
+  });
+
+  it('answers notes, naming the rules file, when a rules file was added to a copy with no notes', () => {
+    const saved = snapshotText(BODY, null);
+
+    expect(saved).toBe(BODY);
+    expect(read(saved, null, RULES)).toEqual({ kind: 'notes', bodyLine: null, notesLine: RULES_LINE });
+  });
+
+  it('answers notes, with the removed clause, when the rules file was removed', () => {
+    expect(read(snapshotText(BODY, 'A note.', RULES.text), 'A note.', null))
+      .toEqual({ kind: 'notes', bodyLine: null, notesLine: RULES_REMOVED_LINE });
+    expect(read(snapshotText(BODY, null, RULES.text), null, null))
+      .toEqual({ kind: 'notes', bodyLine: null, notesLine: RULES_REMOVED_LINE });
+  });
+
+  it('names both local parts when the notes and the rules changed', () => {
+    const edited = { ...RULES, text: 'Another rule.' };
+
+    expect(read(snapshotText(BODY, 'The first note.', RULES.text), 'A second note.', edited))
+      .toEqual({ kind: 'notes', bodyLine: null, notesLine: `${NOTES_LINE}; ${RULES_LINE}` });
+  });
+
+  it('names the notes alone when only the notes changed under rules that match', () => {
+    expect(read(snapshotText(BODY, 'The first note.', RULES.text), 'A second note.', RULES))
+      .toEqual({ kind: 'notes', bodyLine: null, notesLine: NOTES_LINE });
+  });
+
+  it('answers both when the body and the rules changed, and body when only the body did', () => {
+    const now = '# Spec\n\n## Design\n\nThe new text.\n';
+    const edited = { ...RULES, text: 'Another rule.' };
+    const saved = snapshotText(BODY, 'A note.', RULES.text);
+
+    expect(read(saved, 'A note.', edited, now)).toEqual({
+      kind: 'both',
+      bodyLine: 'issue body: +1 -1 lines; headings changed: Design',
+      notesLine: RULES_LINE,
+    });
+    expect(read(saved, 'A note.', RULES, now)).toEqual({
+      kind: 'body',
+      bodyLine: 'issue body: +1 -1 lines; headings changed: Design',
+      notesLine: null,
+    });
   });
 });

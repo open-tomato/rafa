@@ -4,7 +4,8 @@
  * issue, the snapshot of its body written under `specs.dir` with the
  * local notes appended, and — re-exported from `./snapshot-change.ts` —
  * the reading of how a snapshot already there differs from the one this
- * run would write.
+ * run would write. A stretch's rules, when the caller hands them in, are
+ * appended after the notes.
  *
  * `plan create --issue=<n>` plans from an issue, and the planner reads a
  * FILE (`.rafa/specs/rafa-20-pr-commands.md`). This module is what turns one
@@ -159,6 +160,19 @@
  * heading is not written for it, so an empty file left behind does not
  * change what the planner reads.
  *
+ * ## The stretch rules
+ *
+ * A stretch's `rules.md` is appended after the notes, under
+ * {@link STRETCH_RULES_HEADING}, when the caller hands it in as
+ * {@link SpecSnapshotOptions.rules}; this module reads no stretch folder
+ * and no environment value, and a write handed no rules writes what it
+ * wrote before rules existed. The rules are a local part like the
+ * notes: a copy whose rules alone changed, or gained or lost a rules
+ * file, is rebuilt without asking (`notes-rebuilt`), and the leak
+ * refusal never reads them, since it runs over the issue body.
+ * `./snapshot-change.ts`'s module note holds how the rules are told
+ * apart from the notes in a saved copy.
+ *
  * One collision is refused rather than papered over. The notes file is
  * named from the id alone and the snapshot from the id and the slug, so
  * an issue titled "Notes" spells both names the same
@@ -177,6 +191,7 @@
  * old copy carried, and the copy moved to `previous/` keeps its own. A
  * block the codec will not read throws before anything is moved.
  */
+import type { SnapshotChangeOptions, StretchRules } from './snapshot-change.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -190,7 +205,14 @@ import { carryRefsBlock } from '../refs/stamp.js';
 
 import { REFRESH_FLAG } from './flags.js';
 import { movePreviousCopy } from './previous-copy.js';
-import { changedHeadings, LOCAL_NOTES_HEADING, readSnapshotChange, snapshotText } from './snapshot-change.js';
+import {
+  changedHeadings,
+  LOCAL_NOTES_HEADING,
+  readSnapshotChange,
+  RULES_REMOVED_LINE,
+  snapshotText,
+  STRETCH_RULES_HEADING,
+} from './snapshot-change.js';
 
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board issue';
@@ -220,9 +242,11 @@ export {
   changedHeadings,
   LOCAL_NOTES_HEADING,
   readSnapshotChange,
+  RULES_REMOVED_LINE,
   snapshotText,
+  STRETCH_RULES_HEADING,
 };
-export type { SnapshotChange, SnapshotChangeKind, SnapshotChangeOptions } from './snapshot-change.js';
+export type { SnapshotChange, SnapshotChangeKind, SnapshotChangeOptions, StretchRules } from './snapshot-change.js';
 
 /** An issue as this module reads it: the six fields and nothing else. */
 export interface SpecIssue {
@@ -443,6 +467,12 @@ export interface SpecSnapshotOptions {
   readonly issue: SpecIssue;
   /** True under `--refresh`: a snapshot whose issue body differs is rewritten, not refused. */
   readonly refresh: boolean;
+  /**
+   * The stretch's rules file, read by the caller, appended after the
+   * notes; null or left out when there is none, and the snapshot is then
+   * the one the body and the notes alone write.
+   */
+  readonly rules?: StretchRules | null;
 }
 
 /** The snapshot a write left behind. */
@@ -455,6 +485,8 @@ export interface SpecSnapshot {
   readonly action: SnapshotAction;
   /** The local notes file appended, as a path, or null when there was none. */
   readonly notes: string | null;
+  /** The stretch's rules file appended, as the path it was handed with, or null when it was handed none. */
+  readonly rules: string | null;
   /**
    * Where the saved copy this write replaced was moved, under
    * `specs.dir` as configured, or null when nothing was replaced.
@@ -466,12 +498,13 @@ export interface SpecSnapshot {
 
 /**
  * Writes issue `options.issue` to `<specs.dir>/rafa-<n>-<slug>.md`,
- * with its local notes appended, and answers where it went and what the
- * write did.
+ * with its local notes and then `options.rules` appended, and answers
+ * where it went and what the write did.
  *
  * A saved copy that matches, its refs block aside, is left alone
  * (`unchanged`), and every rewrite keeps the block it carried. One whose
- * local notes alone differ is rebuilt (`notes-rebuilt`), and one whose
+ * local notes or stretch rules alone differ is rebuilt
+ * (`notes-rebuilt`), and one whose
  * issue body differs is rebuilt only under `options.refresh`
  * (`refreshed`); before either rewrite the saved copy is moved to
  * `previous/` by `movePreviousCopy`, and {@link SpecSnapshot.previous}
@@ -485,6 +518,7 @@ export interface SpecSnapshot {
  */
 export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
   const { repoRoot, specsDir, issue, refresh } = options;
+  const rules = options.rules ?? null;
   const path = specPath(specsDir, issue.number, issue.title);
   const notes = notesPath(specsDir, issue.number);
   if (path === notes) {
@@ -494,7 +528,7 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
   const local = readLocalNotes(repoRoot, specsDir, issue.number);
   const absolute = resolve(repoRoot, path);
   const existing = readIfFile(absolute, 'the spec snapshot');
-  const text = carryRefsBlock(existing, snapshotText(issue.body, local));
+  const text = carryRefsBlock(existing, snapshotText(issue.body, local, rules?.text ?? null));
   const written: SpecSnapshot = {
     path,
     absolute,
@@ -502,11 +536,12 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
     notes: local === null
       ? null
       : notes,
+    rules: rules?.path ?? null,
     previous: null,
     text,
   };
 
-  const action = rewriteAction(existing, issue.body, local, notes, refresh);
+  const action = rewriteAction(existing, { body: issue.body, notes: local, notesPath: notes, rules }, refresh);
   if (action === 'unchanged') return { ...written, action, text: existing ?? text };
   if (action === null) {
     throw new CommandExit(ISSUE_REFUSAL_EXIT, snapshotDiffersMessage(path, issue.number));
@@ -528,18 +563,16 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
 /**
  * What a write over the saved copy `existing` is to do: `created` when
  * there is none, `unchanged` when it matches, `notes-rebuilt` when only
- * the local notes differ, `refreshed` when the issue body differs under
- * `--refresh`, and null for the refusal.
+ * the local notes or the stretch rules differ, `refreshed` when the
+ * issue body differs under `--refresh`, and null for the refusal.
  */
 function rewriteAction(
   existing: string | null,
-  body: string,
-  notes: string | null,
-  notesFile: string,
+  now: Omit<SnapshotChangeOptions, 'saved'>,
   refresh: boolean,
 ): SnapshotAction | null {
   if (existing === null) return 'created';
-  const { kind } = readSnapshotChange({ saved: existing, body, notes, notesPath: notesFile });
+  const { kind } = readSnapshotChange({ ...now, saved: existing });
   if (kind === 'unchanged') return 'unchanged';
   if (kind === 'notes') return 'notes-rebuilt';
   return refresh
