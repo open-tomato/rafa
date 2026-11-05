@@ -899,6 +899,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/plan', ['plansDirAt', 'stubOfPlanFile']],
     ['../../stretch/folder.js', ['stretchFolder']],
     ['../../stretch/launch.js', ['DEFAULT_RAFA_COMMAND', 'lineText']],
+    ['../plan/stretch-rules.js', ['STRETCH_RULES_ENV']],
     ['./item-merge.js', ['afterLoopWait', 'mergeDryRunLines']],
     ['./item-resume.js', ['resumeDryRunLines', 'resumeItem']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX']],

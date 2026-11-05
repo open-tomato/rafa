@@ -46,7 +46,16 @@
  *     `rafa pr open --head=stretch/<n> --base=<default>
  *     --title="Stretch <n>" --body-file=<pr-body.md>`, which is printed
  *     first. So a pull request already open from `stretch/<n>` is printed
- *     and none is opened, and a second run before the merge is a reading.
+ *     and none is opened. Its body is then refreshed: read with
+ *     `PullRequests.get`, compared with the body just written, and
+ *     replaced with `PullRequests.editBody` only when the two differ
+ *     ({@link sameBody}), the line after the open one reading
+ *     `body updated` or `body unchanged`. The comparison leaves out line
+ *     endings and the trailing newline, as GitHub stores a body without
+ *     the file's final newline. So a second run before the merge carries
+ *     a ledger line added since the first into the body, and a run with
+ *     nothing new edits nothing. A pull request this run opened was made
+ *     with the body, so it is not read back.
  *   - **A merged one.** The `pr.base` recorded in `stretch.json` is set
  *     through `withConfigSetting` (`src/config-set.ts`), every comment
  *     kept, and printed as the `rafa config set pr.base=<value>` line. A
@@ -70,14 +79,17 @@
  * The steps are printed in the same order and none is run: no body file,
  * no pull request and no config edit. The readings that decide which
  * steps there are still run: the config, the report, the ledger,
- * `stretch.json`, `origin/HEAD` and the provider's recent merges.
+ * `stretch.json`, `origin/HEAD` and the provider's recent merges. No
+ * open pull request is looked up and no body is read: the dry run says
+ * it would compare and update the body of one already open.
  *
  * ## Exit codes
  *
  * 0 for a pull request opened, one already open, `pr.base` put back or
  * already back, and a dry run. 1 for each refusal above, for a provider
  * call that rejected and for a `pr.base` edit `src/config-set.ts`
- * refuses. 2 for a provider that is not `gh`, and for a body file or
+ * refuses. A rejected read or edit of the open pull request's body is
+ * 1 with that pull request named, `pr-body.md` already written. 2 for a provider that is not `gh`, and for a body file or
  * config file that could not be written.
  *
  * It starts no Claude session, so it declares no `spends`. Every effect
@@ -88,7 +100,7 @@ import type { StretchRecord } from './start.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
-import type { MergedPullRequest } from '@open-tomato/rafa/pr/types';
+import type { MergedPullRequest, PullRequests, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 import type { PrSeams } from '@open-tomato/rafa-pr';
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -173,6 +185,16 @@ export function closesLines(items: readonly StretchItem[]): string[] {
 export function endBody(report: string, closes: readonly string[]): string {
   if (closes.length === 0) return report;
   return `${report.trimEnd()}\n\n${closes.join('\n')}\n`;
+}
+
+/** `body` with its line endings as `\n` and no trailing newline, as GitHub stores one. */
+function normalBody(body: string): string {
+  return body.replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+}
+
+/** Whether two bodies read the same once line endings and the trailing newline are left out. */
+export function sameBody(stored: string, written: string): boolean {
+  return normalBody(stored) === normalBody(written);
 }
 
 /** A refusal with exit code 1 naming `why`. */
@@ -312,8 +334,37 @@ function putBack(context: RafaContext, input: EndInput, merged: MergedPullReques
   info(`${PR_BASE_KEY}: ${branch} → ${value}; stretch ${String(input.n)} is ended`);
 }
 
+/** `#<n> (<url>), the pull request already open from <head>`, as a refusal names it. */
+function openNamed(pull: PullRequestSummary, head: string): string {
+  return `#${String(pull.number)} (${pull.url}), the pull request already open from ${head}`;
+}
+
+/** The open pull request's body brought to `body` when it differs; see the module note. */
+async function refreshBody(context: RafaContext, pulls: PullRequests, pull: PullRequestSummary, input: EndInput, body: string): Promise<void> {
+  const path = bodyPath(input.root, input.n);
+  const named = openNamed(pull, stretchBranch(input.n));
+  let stored: string;
+  try {
+    const detail = await pulls.get(pull.number);
+    if (detail === null) throw new Error('the provider answered no such pull request');
+    stored = detail.body;
+  } catch (error) {
+    throw refusal(`the body of ${named}, could not be read: ${messageOf(error)}. ${path} was written and the body was not updated.`);
+  }
+  if (sameBody(stored, body)) {
+    context.output.info(`body unchanged: #${String(pull.number)} already holds ${path}`);
+    return;
+  }
+  try {
+    await pulls.editBody(pull.number, body);
+  } catch (error) {
+    throw refusal(`the body of ${named}, could not be updated: ${messageOf(error)}. ${path} was written and the body was not updated.`);
+  }
+  context.output.info(`body updated: #${String(pull.number)} now holds ${path}`);
+}
+
 /** The first run: the body written and the `pr open` logic run over it; see the module note. */
-async function openEnd(context: RafaContext, input: EndInput, body: string, seams: StretchEndSeams): Promise<void> {
+async function openEnd(context: RafaContext, input: EndInput, body: string, seams: StretchEndSeams, pulls: PullRequests): Promise<void> {
   const info = (text: string): void => context.output.info(text);
   const path = bodyPath(input.root, input.n);
   const flags = {
@@ -325,7 +376,8 @@ async function openEnd(context: RafaContext, input: EndInput, body: string, seam
   info(`write ${path}: ${REPORT_FILE} with the ledger's Closes lines`);
   info(lineText(['rafa', 'pr', 'open', ...Object.entries(flags).map(([name, value]) => `--${name}=${value}`)]));
   if (input.dryRun) {
-    info(`dry run: would open ${flags.head} into ${flags.base}, or print the pull request already open from it; nothing was run`);
+    info(`dry run: would open ${flags.head} into ${flags.base}, or print the pull request already open from it and compare`
+      + ` its body with ${BODY_FILE}, updating it when they differ; nothing was run`);
     return;
   }
   try {
@@ -338,6 +390,7 @@ async function openEnd(context: RafaContext, input: EndInput, body: string, seam
   const warning = baseWarning(result);
   if (warning !== null) context.output.warn(warning);
   info(renderOpen(result));
+  if (!result.opened) await refreshBody(context, pulls, result.pull, input, body);
   info(`once #${String(result.pull.number)} has merged, run rafa stretch end again to put ${PR_BASE_KEY} back`);
 }
 
@@ -365,7 +418,7 @@ export async function runStretchEnd(context: RafaContext, seams: StretchEndSeams
     putBack(context, input, merged);
     return;
   }
-  await openEnd(context, input, endBody(report, closes), seams);
+  await openEnd(context, input, endBody(report, closes), seams, pr.pulls);
 }
 
 /** The real provider and git. */
@@ -384,9 +437,12 @@ export function createStretchEndCommand(seams?: StretchEndSeams): RafaCommand {
       + ' a stretch with no `.rafa/stretch/<n>/report.md`. Run before the merge, it writes the report with every'
       + ' `Closes` line of the item ledger appended to `.rafa/stretch/<n>/pr-body.md` and opens `stretch/<n>` into'
       + ' the default branch through the `pr open` logic, printing the pull request already open from it instead'
-      + ' when there is one. Run once that pull request has merged, it sets `pr.base` back to what'
-      + ' `.rafa/stretch/<n>/stretch.json` recorded, with every comment kept. `--dry-run` prints every step in'
-      + ' order and runs none. Exit code 1 for a refusal, 2 for a provider that is not `gh` or a file that could'
+      + ' when there is one and updating that pull request\'s body when it differs from `pr-body.md`, line endings'
+      + ' and the trailing newline left out, printing `body updated` or `body unchanged`. Run once that pull request'
+      + ' has merged, it sets `pr.base` back to what `.rafa/stretch/<n>/stretch.json` recorded, with every comment'
+      + ' kept. `--dry-run` prints every step in'
+      + ' order and runs none, reading no open pull request\'s body. Exit code 1 for a refusal and for a body that'
+      + ' could not be read or updated, 2 for a provider that is not `gh` or a file that could'
       + ' not be written. Starts no session.',
     args: [],
     flags: [

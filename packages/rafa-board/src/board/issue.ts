@@ -2,8 +2,10 @@
  * The issue a plan is written from: the one `gh` command that reads it,
  * the two refusals that keep a plan from being written off the wrong
  * issue, the snapshot of its body written under `specs.dir` with the
- * local notes appended, and the reading of how a snapshot already there
- * differs from the one this run would write.
+ * local notes appended, and — re-exported from `./snapshot-change.ts` —
+ * the reading of how a snapshot already there differs from the one this
+ * run would write. A stretch's rules, when the caller hands them in, are
+ * appended after the notes.
  *
  * `plan create --issue=<n>` plans from an issue, and the planner reads a
  * FILE (`.rafa/specs/rafa-20-pr-commands.md`). This module is what turns one
@@ -135,40 +137,10 @@
  *
  * {@link readSnapshotChange} says WHICH part of a snapshot differs —
  * the body, the notes, or both — and sums each changed part up in one
- * line. It reads texts and touches no file, so the caller that holds
- * the saved copy and the notes decides what the answer leads to.
- *
- * A snapshot joins the two parts, so telling them apart is a reading
- * of that join. The body is the SAME exactly when the saved copy is
- * the normalised body and a newline, or starts with the normalised body
- * followed by the blank line, {@link LOCAL_NOTES_HEADING} and the blank
- * line {@link snapshotText} writes. That is a prefix test against the
- * body as it reads now, so it stays right when the body itself holds a
- * `## Local notes` heading. With the body the same, whatever else
- * differs is the notes.
- *
- * With the body changed there is no prefix to lean on, and the old
- * notes are read as what follows the LAST such separator, trimmed as
- * the notes are written; the old body is what comes before it. That
- * reading can be fooled one way: a body holding its own `## Local
- * notes` section, snapshotted with no notes file, reads as a body cut
- * short with notes after it, so the body line counts against that
- * shorter body and a notes line may be named for a notes file nobody
- * touched. The kind still says the body changed, which is the part a
- * caller acts on.
- *
- * The body line is `issue body: +<a> -<r> lines; headings changed:
- * <h1>, <h2>`. The added and removed counts are the lines of each body
- * outside their longest common subsequence, so a line moved counts
- * once each way and a line edited counts as one of each. A heading is
- * a markdown heading line — one to six `#` and a space — outside a
- * fenced code block, since a shell comment in a fence is not one; it
- * is named, without its `#` marks, when the text under it up to the
- * next heading of any level differs, or when one body has it and the
- * other does not. With none named the clause reads `no heading
- * changed`, which is also what a change above the first heading reads.
- *
- * The notes line is `local notes: <path> changed since the saved copy`.
+ * line. It and {@link snapshotText} live in `./snapshot-change.ts`,
+ * whose module note holds how the two parts are told apart in a copy
+ * that holds them joined, where that reading can be fooled, and what
+ * the body and notes lines read; this module re-exports both.
  *
  * ## The local notes
  *
@@ -188,6 +160,19 @@
  * heading is not written for it, so an empty file left behind does not
  * change what the planner reads.
  *
+ * ## The stretch rules
+ *
+ * A stretch's `rules.md` is appended after the notes, under
+ * {@link STRETCH_RULES_HEADING}, when the caller hands it in as
+ * {@link SpecSnapshotOptions.rules}; this module reads no stretch folder
+ * and no environment value, and a write handed no rules writes what it
+ * wrote before rules existed. The rules are a local part like the
+ * notes: a copy whose rules alone changed, or gained or lost a rules
+ * file, is rebuilt without asking (`notes-rebuilt`), and the leak
+ * refusal never reads them, since it runs over the issue body.
+ * `./snapshot-change.ts`'s module note holds how the rules are told
+ * apart from the notes in a saved copy.
+ *
  * One collision is refused rather than papered over. The notes file is
  * named from the id alone and the snapshot from the id and the slug, so
  * an issue titled "Notes" spells both names the same
@@ -206,6 +191,7 @@
  * old copy carried, and the copy moved to `previous/` keeps its own. A
  * block the codec will not read throws before anything is moved.
  */
+import type { SnapshotChangeOptions, StretchRules } from './snapshot-change.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -215,10 +201,18 @@ import { notesPath, specPath } from '@open-tomato/rafa/board/naming';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/config/sections';
 
-import { carryRefsBlock, readRefsBlock } from '../refs/stamp.js';
+import { carryRefsBlock } from '../refs/stamp.js';
 
 import { REFRESH_FLAG } from './flags.js';
 import { movePreviousCopy } from './previous-copy.js';
+import {
+  changedHeadings,
+  LOCAL_NOTES_HEADING,
+  readSnapshotChange,
+  RULES_REMOVED_LINE,
+  snapshotText,
+  STRETCH_RULES_HEADING,
+} from './snapshot-change.js';
 
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board issue';
@@ -239,8 +233,20 @@ export const ISSUE_REFUSAL_EXIT = 2;
  */
 export { REFRESH_FLAG };
 
-/** The heading the local notes are appended under. */
-export const LOCAL_NOTES_HEADING = '## Local notes';
+/**
+ * The snapshot text and the reading of how a saved copy differs,
+ * re-exported from `./snapshot-change.ts`, which holds them and their
+ * module note, so every importer of this module loads unchanged.
+ */
+export {
+  changedHeadings,
+  LOCAL_NOTES_HEADING,
+  readSnapshotChange,
+  RULES_REMOVED_LINE,
+  snapshotText,
+  STRETCH_RULES_HEADING,
+};
+export type { SnapshotChange, SnapshotChangeKind, SnapshotChangeOptions, StretchRules } from './snapshot-change.js';
 
 /** An issue as this module reads it: the six fields and nothing else. */
 export interface SpecIssue {
@@ -412,189 +418,6 @@ export function requireSpecIssue(issue: SpecIssue): void {
   }
 }
 
-/** `text` with LF line endings and no trailing blank line; see the module note. */
-function normalise(text: string): string {
-  return text.replace(/\r\n?/gu, '\n').replace(/\n+$/u, '');
-}
-
-/**
- * The snapshot for a body, with `notes` appended under
- * {@link LOCAL_NOTES_HEADING} when they hold anything but whitespace.
- * Always ends with exactly one newline.
- */
-export function snapshotText(body: string, notes: string | null): string {
-  const local = notes === null
-    ? ''
-    : normalise(notes).trim();
-  const sections = [
-    normalise(body),
-    local === ''
-      ? ''
-      : `${LOCAL_NOTES_HEADING}\n\n${local}`,
-  ].filter((section) => section !== '');
-  return `${sections.join('\n\n')}\n`;
-}
-
-/** What differs between a saved copy and the text this run would write. */
-export type SnapshotChangeKind = 'unchanged' | 'notes' | 'body' | 'both';
-
-/** What {@link readSnapshotChange} compares. */
-export interface SnapshotChangeOptions {
-  /** The saved copy, byte for byte as it was read. */
-  readonly saved: string;
-  /** The issue body as it reads now, before any normalisation. */
-  readonly body: string;
-  /** The local notes as they read now, or null when there is no notes file. */
-  readonly notes: string | null;
-  /** The notes file's path, as the notes line names it. */
-  readonly notesPath: string;
-}
-
-/** How a saved copy differs, and the one line each changed part is summed up in. */
-export interface SnapshotChange {
-  /** Which parts differ. */
-  readonly kind: SnapshotChangeKind;
-  /**
-   * `issue body: +<a> -<r> lines; headings changed: <h1>, <h2>`, or
-   * `...; no heading changed`; null when the body is unchanged.
-   */
-  readonly bodyLine: string | null;
-  /** `local notes: <path> changed since the saved copy`, or null when they did not. */
-  readonly notesLine: string | null;
-}
-
-/** What separates the body from the notes in a saved copy; {@link snapshotText}'s own join. */
-const NOTES_SEPARATOR = `\n\n${LOCAL_NOTES_HEADING}\n\n`;
-
-/** A markdown ATX heading line: one to six `#` and a space, or nothing, after them. */
-const HEADING = /^#{1,6}(?:[ \t]|$)/u;
-
-/** A line that opens or closes a fenced code block, whose `#` lines are not headings. */
-const FENCE = /^ {0,3}(?:`{3,}|~{3,})/u;
-
-/** The number of lines `before` and `after` share in order: their longest common subsequence. */
-function commonLines(before: readonly string[], after: readonly string[]): number {
-  let previous = new Uint32Array(after.length + 1);
-  for (const line of before) {
-    const row = new Uint32Array(after.length + 1);
-    after.forEach((other, index) => {
-      row[index + 1] = line === other
-        ? (previous[index] ?? 0) + 1
-        : Math.max(previous[index + 1] ?? 0, row[index] ?? 0);
-    });
-    previous = row;
-  }
-  return previous[after.length] ?? 0;
-}
-
-/** A heading as the summary names it: its text without the `#` marks, or the line when that is empty. */
-function headingName(line: string): string {
-  const text = line
-    .replace(/^#+/u, '')
-    .replace(/[ \t]+#+[ \t]*$/u, '')
-    .trim();
-  return text === ''
-    ? line.trim()
-    : text;
-}
-
-/**
- * The text under each heading of `lines`, keyed by the heading line and
- * in the order the headings appear, a heading written twice keeping
- * both. Lines inside a fenced code block are text, not headings, and
- * the text before the first heading belongs to none.
- */
-function headingSections(lines: readonly string[]): Map<string, string[]> {
-  const sections = new Map<string, string[]>();
-  let fenced = false;
-  let current: { key: string; lines: string[] } | null = null;
-  const close = (): void => {
-    if (current === null) return;
-    sections.set(current.key, [...(sections.get(current.key) ?? []), current.lines.join('\n')]);
-  };
-  for (const line of lines) {
-    if (FENCE.test(line)) fenced = !fenced;
-    if (fenced || !HEADING.test(line)) {
-      current?.lines.push(line);
-      continue;
-    }
-    close();
-    current = { key: line.trim(), lines: [] };
-  }
-  close();
-  return sections;
-}
-
-/**
- * The names of the headings whose text differs between the lines of two
- * bodies, or that one has and the other does not: the new body's order
- * first. The module note holds what a heading is.
- */
-export function changedHeadings(before: readonly string[], after: readonly string[]): readonly string[] {
-  const old = headingSections(before);
-  const now = headingSections(after);
-  const keys = [...now.keys(), ...[...old.keys()].filter((key) => !now.has(key))];
-  const changed = keys.filter((key) => JSON.stringify(old.get(key) ?? []) !== JSON.stringify(now.get(key) ?? []));
-  return [...new Set(changed.map(headingName))];
-}
-
-/** The body line for an old and a new body, both normalised. */
-function bodyChangeLine(before: string, after: string): string {
-  const old = before.split('\n');
-  const now = after.split('\n');
-  const common = commonLines(old, now);
-  const headings = changedHeadings(old, now);
-  const clause = headings.length === 0
-    ? 'no heading changed'
-    : `headings changed: ${headings.join(', ')}`;
-  return `issue body: +${String(now.length - common)} -${String(old.length - common)} lines; ${clause}`;
-}
-
-/** The notes line for the notes file at `path`. */
-function notesChangeLine(path: string): string {
-  return `local notes: ${path} changed since the saved copy`;
-}
-
-/**
- * Reads how the saved copy `options.saved` differs from the text
- * {@link snapshotText} writes for `options.body` and `options.notes`,
- * answering which parts changed and one line for each that did.
- *
- * `unchanged` is the saved copy less its refs block equal to that text,
- * byte for byte, which is what {@link writeSpecSnapshot} leaves alone.
- * `notes` is the body the same
- * and the notes not, `body` the reverse, and `both` both; the module
- * note holds how the two parts are told apart in a copy that holds
- * them joined, and where that reading can be fooled. The refs block is
- * stripped from the saved copy first, and one the codec will not read
- * throws its `RefsBlockError`.
- */
-export function readSnapshotChange(options: SnapshotChangeOptions): SnapshotChange {
-  const { body, notes, notesPath: path } = options;
-  const saved = readRefsBlock(options.saved).body;
-  if (saved === snapshotText(body, notes)) return { kind: 'unchanged', bodyLine: null, notesLine: null };
-
-  const now = normalise(body);
-  if (saved === `${now}\n` || saved.startsWith(`${now}${NOTES_SEPARATOR}`)) {
-    return { kind: 'notes', bodyLine: null, notesLine: notesChangeLine(path) };
-  }
-
-  const split = saved.lastIndexOf(NOTES_SEPARATOR);
-  const oldBody = split === -1
-    ? saved
-    : saved.slice(0, split);
-  const oldNotes = split === -1
-    ? ''
-    : normalise(saved.slice(split + NOTES_SEPARATOR.length)).trim();
-  const newNotes = notes === null
-    ? ''
-    : normalise(notes).trim();
-  const bodyLine = bodyChangeLine(normalise(oldBody), now);
-  return oldNotes === newNotes
-    ? { kind: 'body', bodyLine, notesLine: null }
-    : { kind: 'both', bodyLine, notesLine: notesChangeLine(path) };
-}
-
 /** What is at `file`, or null when nothing is. Refuses anything that is not a file. */
 function readIfFile(file: string, what: string): string | null {
   if (!existsSync(file)) return null;
@@ -644,6 +467,12 @@ export interface SpecSnapshotOptions {
   readonly issue: SpecIssue;
   /** True under `--refresh`: a snapshot whose issue body differs is rewritten, not refused. */
   readonly refresh: boolean;
+  /**
+   * The stretch's rules file, read by the caller, appended after the
+   * notes; null or left out when there is none, and the snapshot is then
+   * the one the body and the notes alone write.
+   */
+  readonly rules?: StretchRules | null;
 }
 
 /** The snapshot a write left behind. */
@@ -656,6 +485,8 @@ export interface SpecSnapshot {
   readonly action: SnapshotAction;
   /** The local notes file appended, as a path, or null when there was none. */
   readonly notes: string | null;
+  /** The stretch's rules file appended, as the path it was handed with, or null when it was handed none. */
+  readonly rules: string | null;
   /**
    * Where the saved copy this write replaced was moved, under
    * `specs.dir` as configured, or null when nothing was replaced.
@@ -667,12 +498,13 @@ export interface SpecSnapshot {
 
 /**
  * Writes issue `options.issue` to `<specs.dir>/rafa-<n>-<slug>.md`,
- * with its local notes appended, and answers where it went and what the
- * write did.
+ * with its local notes and then `options.rules` appended, and answers
+ * where it went and what the write did.
  *
  * A saved copy that matches, its refs block aside, is left alone
  * (`unchanged`), and every rewrite keeps the block it carried. One whose
- * local notes alone differ is rebuilt (`notes-rebuilt`), and one whose
+ * local notes or stretch rules alone differ is rebuilt
+ * (`notes-rebuilt`), and one whose
  * issue body differs is rebuilt only under `options.refresh`
  * (`refreshed`); before either rewrite the saved copy is moved to
  * `previous/` by `movePreviousCopy`, and {@link SpecSnapshot.previous}
@@ -686,6 +518,7 @@ export interface SpecSnapshot {
  */
 export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
   const { repoRoot, specsDir, issue, refresh } = options;
+  const rules = options.rules ?? null;
   const path = specPath(specsDir, issue.number, issue.title);
   const notes = notesPath(specsDir, issue.number);
   if (path === notes) {
@@ -695,7 +528,7 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
   const local = readLocalNotes(repoRoot, specsDir, issue.number);
   const absolute = resolve(repoRoot, path);
   const existing = readIfFile(absolute, 'the spec snapshot');
-  const text = carryRefsBlock(existing, snapshotText(issue.body, local));
+  const text = carryRefsBlock(existing, snapshotText(issue.body, local, rules?.text ?? null));
   const written: SpecSnapshot = {
     path,
     absolute,
@@ -703,11 +536,12 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
     notes: local === null
       ? null
       : notes,
+    rules: rules?.path ?? null,
     previous: null,
     text,
   };
 
-  const action = rewriteAction(existing, issue.body, local, notes, refresh);
+  const action = rewriteAction(existing, { body: issue.body, notes: local, notesPath: notes, rules }, refresh);
   if (action === 'unchanged') return { ...written, action, text: existing ?? text };
   if (action === null) {
     throw new CommandExit(ISSUE_REFUSAL_EXIT, snapshotDiffersMessage(path, issue.number));
@@ -729,18 +563,16 @@ export function writeSpecSnapshot(options: SpecSnapshotOptions): SpecSnapshot {
 /**
  * What a write over the saved copy `existing` is to do: `created` when
  * there is none, `unchanged` when it matches, `notes-rebuilt` when only
- * the local notes differ, `refreshed` when the issue body differs under
- * `--refresh`, and null for the refusal.
+ * the local notes or the stretch rules differ, `refreshed` when the
+ * issue body differs under `--refresh`, and null for the refusal.
  */
 function rewriteAction(
   existing: string | null,
-  body: string,
-  notes: string | null,
-  notesFile: string,
+  now: Omit<SnapshotChangeOptions, 'saved'>,
   refresh: boolean,
 ): SnapshotAction | null {
   if (existing === null) return 'created';
-  const { kind } = readSnapshotChange({ saved: existing, body, notes, notesPath: notesFile });
+  const { kind } = readSnapshotChange({ ...now, saved: existing });
   if (kind === 'unchanged') return 'unchanged';
   if (kind === 'notes') return 'notes-rebuilt';
   return refresh
