@@ -229,6 +229,7 @@ function fixture(overrides: Partial<Tracker> = {}, extra: Partial<StartStaleDocs
     env: {},
     resolve,
     readVersion: () => VERSION,
+    readNewestRelease: () => undefined,
     ...extra,
   };
   return { root, spied, resolveCalls, options };
@@ -337,6 +338,91 @@ describe('across a run', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]?.body.match(/- \[ \] /g)).toHaveLength(2);
     expect(handler.atRunEnd()).toEqual([]);
+  });
+});
+
+/** Opens a marked chore titled for `version` under `root`, as an earlier run's wrap-up did. */
+async function plantChore(root: string, version: string): Promise<void> {
+  const tracker = createLocalTracker({ issuesDir: localIssuesDir(root), fallbackReason: null, now: CLOCK });
+  const planted = await addStaleDocLine({ tracker, version, entry: { where: null, what: 'an earlier run\'s line' } });
+  if (planted.action !== 'created') throw new Error(`the chore was not planted: ${planted.action}`);
+}
+
+/** Makes `root` a repository of one commit tagged `tag`, under a HOME of its own. */
+function tagRepository(root: string, tag: string): void {
+  const home = join(root, '.home');
+  mkdirSync(home);
+  const env = {
+    PATH: process.env['PATH'] ?? '',
+    HOME: home,
+    GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
+    GIT_CONFIG_NOSYSTEM: '1',
+    ...gitIdentityEnv(),
+    LC_ALL: 'C',
+  };
+  writeFileSync(join(root, 'README.md'), '# demo\n');
+  for (const args of [
+    ['init', '-q', '--initial-branch=main', '.'],
+    ['add', 'README.md'],
+    ['commit', '-q', '-m', 'first'],
+    ['tag', tag],
+  ]) {
+    execFileSync('git', args, { cwd: root, env, stdio: 'ignore' });
+  }
+}
+
+describe('the newest root release tag handed with each line', () => {
+  it('retitles an open chore of an unreleased version to the forecast, reading the tag once a run', async () => {
+    captureLines();
+    let reads = 0;
+    const readNewestRelease = (): string => {
+      reads += 1;
+      return '1.3.0';
+    };
+    const { root, options } = fixture({}, { readNewestRelease });
+    await plantChore(root, '1.3.5');
+    const handler = createStartStaleDocs(options);
+
+    const first = await handler.afterTask(taskInput([PAGE]));
+    const second = await handler.afterTask(taskInput([README]));
+
+    expect(first?.lines[0]).toMatchObject({ action: 'appended', retitledFrom: staleDocsTitle('1.3.5') });
+    expect(second?.lines.map((line) => line.action)).toEqual(['appended']);
+    expect(reads).toBe(1);
+    expect((await markedIssues(root)).map((issue) => issue.title)).toEqual([staleDocsTitle(VERSION)]);
+  });
+
+  it('opens an issue of its own beside that chore when the tags could not be read', async () => {
+    // The control of the case above: the same chore and line, no reading.
+    captureLines();
+    const { root, options } = fixture();
+    await plantChore(root, '1.3.5');
+    const handler = createStartStaleDocs(options);
+
+    const handled = await handler.afterTask(taskInput([PAGE]));
+
+    expect(handled?.lines.map((line) => line.action)).toEqual(['created']);
+    expect((await markedIssues(root)).map((issue) => issue.title).sort())
+      .toEqual([staleDocsTitle('1.3.5'), staleDocsTitle(VERSION)].sort());
+  });
+
+  it('reads the checkout\'s root tags when no reader is planted: a released chore left alone, an unreleased one retitled', async () => {
+    captureLines();
+    const released = fixture({}, { readNewestRelease: undefined });
+    tagRepository(released.root, 'v1.3.5');
+    await plantChore(released.root, '1.3.5');
+    const unreleased = fixture({}, { readNewestRelease: undefined });
+    tagRepository(unreleased.root, 'v1.3.0');
+    await plantChore(unreleased.root, '1.3.5');
+
+    const left = await createStartStaleDocs(released.options).afterTask(taskInput([PAGE]));
+    const moved = await createStartStaleDocs(unreleased.options).afterTask(taskInput([PAGE]));
+
+    expect(left?.lines.map((line) => line.action)).toEqual(['created']);
+    const kept = (await markedIssues(released.root)).find((issue) => issue.title === staleDocsTitle('1.3.5'));
+    expect(kept?.body).not.toContain(PAGE[1]);
+    expect(moved?.lines[0]).toMatchObject({ action: 'appended', retitledFrom: staleDocsTitle('1.3.5') });
+    expect((await markedIssues(unreleased.root)).map((issue) => issue.title)).toEqual([staleDocsTitle(VERSION)]);
   });
 });
 

@@ -183,21 +183,43 @@ export interface StaleDocsVersionOptions {
   readonly config: RafaConfig;
 }
 
-/** What `addStaleDocLine` did with one line. */
+/**
+ * What `addStaleDocLine` did with one line. An `appended` or `held`
+ * answer carries `retitledFrom`, the title the issue held before it was
+ * retitled to `title`, and `duplicate`, the issue this call created,
+ * found an older one beside and closed; each is absent when it did not
+ * happen, so a switch over the five actions may read them or not.
+ */
 export type StaleDocLineResult =
-  /** No issue of the title was open: one was created holding the line. */
+  /** No open issue could hold the line: one was created holding it. */
   | { readonly action: 'created'; readonly title: string; readonly ref: IssueRef }
-  /** The issue was found and the line appended to its body. */
-  | { readonly action: 'appended'; readonly title: string; readonly ref: IssueRef }
-  /** The issue already holds the line; nothing was written. */
-  | { readonly action: 'held'; readonly title: string; readonly ref: IssueRef }
+  /** An open issue was found and the line appended to its body. */
+  | {
+    readonly action: 'appended';
+    readonly title: string;
+    readonly ref: IssueRef;
+    readonly retitledFrom?: string;
+    readonly duplicate?: IssueRef;
+  }
+  /** The issue already holds the line; nothing but a retitle or a duplicate's close was written. */
+  | {
+    readonly action: 'held';
+    readonly title: string;
+    readonly ref: IssueRef;
+    readonly retitledFrom?: string;
+    readonly duplicate?: IssueRef;
+  }
   /** No tracker can hold the issue; the caller keeps the line. */
   | { readonly action: 'kept'; readonly title: string; readonly reason: string }
   /** A tracker call rejected; nothing more was tried. */
   | { readonly action: 'failed'; readonly title: string; readonly problem: string };
 
-/** The tracker members adding a line calls. */
-export type StaleDocsTracker = Pick<Tracker, 'create'> & Partial<Pick<Tracker, 'openIssues' | 'edit'>>;
+/**
+ * The tracker members adding a line calls: `comment` and `transition`
+ * close an issue a create raced, which the port requires of every tracker.
+ */
+export type StaleDocsTracker = Pick<Tracker, 'create' | 'comment' | 'transition'>
+  & Partial<Pick<Tracker, 'openIssues' | 'edit'>>;
 
 /** What `addStaleDocLine` adds, and where. */
 export interface AddStaleDocLineOptions {
@@ -207,6 +229,14 @@ export interface AddStaleDocLineOptions {
   readonly version: string;
   /** The line to add. */
   readonly entry: StaleDocEntry;
+  /**
+   * The version the newest root release tag names, its `v` off, as
+   * release's `readTags` answers it in `latest.version`; null when the
+   * repository holds no root release tag. Left out when the tags were
+   * not read: the issue is then found by its exact title alone and never
+   * retitled.
+   */
+  readonly newestRelease?: string | null;
 }
 
 /**

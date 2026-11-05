@@ -426,7 +426,7 @@ describe('rafa stretch end --dry-run, spawned', () => {
       'stretch end: stretch 7 (stretch/7 into main), 0 Closes line(s) from the ledger, dry run: each step is printed and none is run',
       `write ${join(folder, 'pr-body.md')}: report.md with the ledger's Closes lines`,
       `rafa pr open --head=stretch/7 --base=main '--title=Stretch 7' --body-file=${join(folder, 'pr-body.md')}`,
-      'dry run: would open stretch/7 into main, or print the pull request already open from it; nothing was run',
+      'dry run: would open stretch/7 into main, or print the pull request already open from it and compare its body with pr-body.md, updating it when they differ; nothing was run',
     ]);
 
     expect(snapshot(world)).toEqual(before);

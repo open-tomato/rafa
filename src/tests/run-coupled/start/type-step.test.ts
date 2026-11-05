@@ -27,6 +27,7 @@ import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 import { TYPE_CHECK_FILE, TYPE_CHECK_SCRATCH, typeCheckLines } from '@open-tomato/rafa-run/start/task-gate-lines';
 import {
+  cannotStartBlockerText,
   findNodeModules,
   newErrors,
   parseTscOutput,
@@ -35,6 +36,7 @@ import {
   runTsc,
   runTypeStep,
   scratchTsconfig,
+  scriptInterpreter,
   TSC_FLAGS,
   tscArgv,
   typeBlockerText,
@@ -185,7 +187,7 @@ describe('runTypeStep over a planted repository', () => {
     const base = commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'base');
     commit({ 'a.test.ts': [...CLEAN, ERROR_LINE, '// edited by the task'] }, 'task');
     const held = await runTypeStep(realInput(base));
-    expect(held).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
+    expect(held).toEqual({ ran: true, red: false, interrupted: false, cannotStart: false, blocker: null });
     expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 1 already held at ${base}, 0 not held.`);
 
     // Control: a second error with the same code and message is one more than the base held.
@@ -200,7 +202,7 @@ describe('runTypeStep over a planted repository', () => {
     const base = commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'base');
     commit({ 'a.test.ts': ['// one', '// two', ...CLEAN, ERROR_LINE] }, 'task');
     const outcome = await runTypeStep(realInput(base));
-    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, cannotStart: false, blocker: null });
     expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 1 already held at ${base}, 0 not held.`);
   }, TSC_TIMEOUT);
 
@@ -218,7 +220,7 @@ describe('runTypeStep over a planted repository', () => {
     git('mv', 'a.test.ts', 'renamed.test.ts');
     commit({}, 'task');
     const outcome = await runTypeStep(realInput(base));
-    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, cannotStart: false, blocker: null });
     const worktrees = git('worktree', 'list', '--porcelain').split('\n')
       .filter((line) => line.startsWith('worktree '));
     expect(worktrees).toHaveLength(1);
@@ -228,7 +230,7 @@ describe('runTypeStep over a planted repository', () => {
     const base = commit({ 'README.md': ['# planted'] }, 'base');
     commit({ 'a.test.ts': CLEAN }, 'task');
     const outcome = await runTypeStep(realInput(base));
-    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: true, red: false, interrupted: false, cannotStart: false, blocker: null });
     expect(linesAt('info')).toEqual(['🔎 type step after "second task": tsc over 1 test file(s): no type error.']);
 
     // Controls: the same file through the two wrong configs of the module note.
@@ -253,7 +255,7 @@ describe('runTypeStep over a planted repository', () => {
     const seen: TypeRunOptions[] = [];
     const runTypes = runnerAnswering({ exitCode: 0, stdout: '', stderr: '' }, seen);
     const outcome = await runTypeStep(realInput(base, { runTypes }));
-    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, cannotStart: false, blocker: null });
     expect(seen).toHaveLength(0);
     expect(linesAt('info')).toEqual(['🔎 type step after "second task": the task changed no .test.ts file; nothing to type-check.']);
 
@@ -269,7 +271,7 @@ describe('runTypeStep over a planted repository', () => {
     commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'task');
     rmSync(join(repo, 'node_modules'));
     const outcome = await runTypeStep(realInput(base));
-    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, cannotStart: false, blocker: null });
     expect(linesAt('warn')[0]).toContain('could not run tsc (ENOENT');
 
     // Control: with node_modules back the same diff runs, and is red.
@@ -480,7 +482,7 @@ describe('runTypeStep finds node_modules by the walk', () => {
     const base = plantCommits();
     const decoy = plantTsc(top);
     const outcome = await runTypeStep({ checkout: main, base, task: 'second task', git: createGitRunner(main), stopCode: STOP });
-    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, cannotStart: false, blocker: null });
     expect(linesAt('warn')[0]).toContain('could not run tsc (ENOENT');
     expect(linesAt('warn')[0]).toContain(join(main, 'node_modules', '.bin', 'tsc'));
     expect(existsSync(join(decoy, '.bin', 'tsc.ran'))).toBe(false);
@@ -514,7 +516,7 @@ describe('runTypeStep over scripted seams', () => {
     const seen: TypeRunOptions[] = [];
     const clean = { exitCode: 0, stdout: '', stderr: '' };
     const outcome = await runTypeStep(scriptedInput(ADDED, clean, seen, { git: gitWith('base0000', ADDED, calls) }));
-    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, blocker: null });
+    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, cannotStart: false, blocker: null });
     expect(seen).toHaveLength(0);
     expect(calls).toHaveLength(0);
     expect(linesAt('info')).toEqual(['🔎 type step after "second task": no tsconfig.json at the checkout root; nothing to type-check.']);
@@ -535,7 +537,7 @@ describe('runTypeStep over scripted seams', () => {
   it('reads a run ended on the stop code, or under the runner\'s SIGINT, as a stop and never red', async () => {
     const red = { exitCode: 2, stdout: `a.test.ts(6,14): error ${TS2322.replace(' ', ': ')}\n`, stderr: '' };
     expect(await runTypeStep(scriptedInput(ADDED, { exitCode: STOP, stdout: '', stderr: '' })))
-      .toEqual({ ran: true, red: false, interrupted: true, blocker: null });
+      .toEqual({ ran: true, red: false, interrupted: true, cannotStart: false, blocker: null });
     expect(await runTypeStep(scriptedInput(ADDED, red, [], { isInterrupted: () => true })))
       .toMatchObject({ red: false, interrupted: true });
 
@@ -554,7 +556,7 @@ describe('runTypeStep over scripted seams', () => {
 
     // Control: an error in a module the test imports is check-types's, and leaves the step green.
     const imported = await runTypeStep(scriptedInput(ADDED, { exitCode: 2, stdout: `src/a.ts(1,14): error ${TS2322.replace(' ', ': ')}\n`, stderr: '' }));
-    expect(imported).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
+    expect(imported).toEqual({ ran: true, red: false, interrupted: false, cannotStart: false, blocker: null });
   });
 });
 
@@ -606,5 +608,134 @@ describe('typeBlockerText', () => {
   it('closes a message that ends without a period with one', () => {
     const text = typeBlockerText('type step', 'main', [error('Type \'string\' is not assignable')]);
     expect(text).toContain('TS2322 Type \'string\' is not assignable. Fix them');
+  });
+});
+
+/** The `env` a test spawns by absolute path, so the PATH it sets reaches the shebang of the tsc it runs. */
+const ENV = '/usr/bin/env';
+
+/** The system directories a PATH with no node keeps when no node sits in them. */
+const SYSTEM_DIRS: readonly string[] = ['/usr/bin', '/bin'];
+
+/**
+ * A PATH with no node: `dir` holding a link to the running bun and
+ * nothing else, then {@link SYSTEM_DIRS} when no node sits in them, and
+ * `dir` alone when one does.
+ */
+function pathWithNoNode(dir: string): string {
+  symlinkSync(process.execPath, join(dir, 'bun'));
+  const system = SYSTEM_DIRS.join(':');
+  return Bun.which('node', { PATH: system }) === null
+    ? `${dir}:${system}`
+    : dir;
+}
+
+/** A runner spawning the step's argv for real through {@link ENV}, under `path`. */
+function runUnder(path: string): (options: TypeRunOptions) => Promise<TypeRunResult> {
+  return (options) => runTsc({ ...options, argv: [ENV, `PATH=${path}`, ...options.argv] });
+}
+
+/** The blocker of a tsc under `tsc` that exited `code` printing `said`, its first line naming node. */
+function nodeBlocker(tsc: string, code: number, said: string): string {
+  return `The runner's type step after "second task" could not start tsc: ${tsc} exited ${code} (${said}). `
+    + 'tsc runs under node, which its first line names: put node on the PATH the loop runs under, then run the task again. '
+    + 'This is no type error of the task\'s, and no change to its files fixes it.';
+}
+
+describe('runTypeStep over a tsc that cannot start', () => {
+  const ADDED = [['A', 'a.test.ts']] as const;
+  const MISSING = 'env: \'node\': No such file or directory';
+
+  it('reads a real tsc spawned under a PATH with no node as cannot start, never red, and red once node is on the PATH', async () => {
+    const base = commit({ 'README.md': ['# planted'] }, 'base');
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'task');
+    const tsc = join(findNodeModules(repo, createGitRunner(repo)) ?? 'none found', '.bin', 'tsc');
+    const dir = mkdtempSync(join(tmpdir(), 'type-step-no-node-'));
+    try {
+      const path = pathWithNoNode(dir);
+      expect(Bun.which('node', { PATH: path })).toBeNull();
+      expect(Bun.which('bun', { PATH: path })).not.toBeNull();
+
+      const outcome = await runTypeStep(realInput(base, { runTypes: runUnder(path) }));
+      expect(outcome).toMatchObject({ ran: false, red: false, interrupted: false, cannotStart: true });
+      expect(outcome.blocker).toContain(`could not start tsc: ${tsc} exited 127 (`);
+      expect(outcome.blocker).toContain('No such file or directory');
+      expect(outcome.blocker).toContain('tsc runs under node, which its first line names: put node on the PATH the loop runs under');
+      expect(linesAt('warn')).toEqual([`⚠️  ${outcome.blocker ?? ''}`]);
+
+      // Control: the same spawn through env under the runner's own PATH starts tsc, and reads the error as red.
+      const started = await runTypeStep(realInput(base, { runTypes: runUnder(process.env.PATH ?? '') }));
+      expect(started).toMatchObject({ ran: true, red: true, interrupted: false, cannotStart: false });
+      expect(started.blocker).toContain(`a.test.ts:6:14 ${TS2322}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, TSC_TIMEOUT);
+
+  it('reads an exit of 127 or 126 as cannot start with a blocker naming node and the PATH, and 2 with nothing printed as red', async () => {
+    const tsc = join(findNodeModules(repo, createGitRunner(repo)) ?? 'none found', '.bin', 'tsc');
+    for (const code of [127, 126]) {
+      lines = [];
+      const outcome = await runTypeStep(scriptedInput(ADDED, { exitCode: code, stdout: '', stderr: `${MISSING}\n` }));
+      expect(outcome).toEqual({ ran: false, red: false, interrupted: false, cannotStart: true, blocker: nodeBlocker(tsc, code, MISSING) });
+      expect(linesAt('warn')).toEqual([`⚠️  ${nodeBlocker(tsc, code, MISSING)}`]);
+    }
+
+    // Controls: an exit of 2 that printed no error is the could-not-check red, and the stop code is still a stop.
+    const broken = await runTypeStep(scriptedInput(ADDED, { exitCode: 2, stdout: '', stderr: `${MISSING}\n` }));
+    expect(broken).toMatchObject({ ran: true, red: true, cannotStart: false });
+    expect(broken.blocker).toBe(`The runner's type step after "second task" could not type-check the task's test files: tsc exited 2: ${MISSING}`);
+    expect(await runTypeStep(scriptedInput(ADDED, { exitCode: 127, stdout: '', stderr: '' }, [], { stopCode: 127 })))
+      .toMatchObject({ interrupted: true, cannotStart: false });
+  });
+
+  it('ends the step as cannot start when tsc starts at HEAD and not at the base', async () => {
+    const base = commit({ 'a.test.ts': CLEAN }, 'base');
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'task');
+    const answers: TypeRunResult[] = [
+      { exitCode: 2, stdout: `a.test.ts(6,14): error ${TS2322.replace(' ', ': ')}\n`, stderr: '' },
+      { exitCode: 127, stdout: '', stderr: `${MISSING}\n` },
+    ];
+    const seen: TypeRunOptions[] = [];
+    const runTypes = (options: TypeRunOptions): Promise<TypeRunResult> => {
+      seen.push(options);
+      return Promise.resolve(answers[seen.length - 1] ?? answers[0] ?? { exitCode: 0, stdout: '', stderr: '' });
+    };
+    const outcome = await runTypeStep(realInput(base, { runTypes }));
+    expect(seen).toHaveLength(2);
+    expect(seen[1]?.cwd).not.toBe(repo);
+    expect(outcome).toMatchObject({ ran: false, red: false, cannotStart: true });
+    expect(outcome.blocker).toContain('put node on the PATH the loop runs under');
+  });
+});
+
+describe('scriptInterpreter', () => {
+  /** Writes `text` to `name` under the planted repository; answers its path. */
+  function script(name: string, text: string): string {
+    writeFileSync(join(repo, name), text, 'utf8');
+    return join(repo, name);
+  }
+
+  it('reads the program env runs, past its options, and the program itself otherwise', () => {
+    expect(scriptInterpreter(join(findNodeModules(repo, createGitRunner(repo)) ?? 'none found', '.bin', 'tsc'))).toBe('node');
+    expect(scriptInterpreter(script('a', '#!/usr/bin/env node\nrequire(1);\n'))).toBe('node');
+    expect(scriptInterpreter(script('b', '#!/usr/bin/env -S NODE_OPTIONS=x bun --smol\n'))).toBe('bun');
+    expect(scriptInterpreter(script('c', '#! /opt/node/bin/node\n'))).toBe('node');
+    expect(scriptInterpreter(script('d', '#!/bin/sh\n'))).toBe('sh');
+  });
+
+  it('answers null for a file with no #! line, one that holds none after env, and one that is not there', () => {
+    expect(scriptInterpreter(script('e', 'require(1);\n'))).toBeNull();
+    expect(scriptInterpreter(script('f', '#!/usr/bin/env\n'))).toBeNull();
+    expect(scriptInterpreter(join(repo, 'gone'))).toBeNull();
+  });
+});
+
+describe('cannotStartBlockerText', () => {
+  it('asks for the tsc to be made runnable from the PATH when its first line names no interpreter', () => {
+    const text = cannotStartBlockerText('type step', '/m/.bin/tsc', { exitCode: 126 }, undefined, null);
+    expect(text).toBe('The runner\'s type step could not start tsc: /m/.bin/tsc exited 126. '
+      + 'Its first line names no interpreter, so make /m/.bin/tsc runnable from the PATH the loop runs under, then run the task again. '
+      + 'This is no type error of the task\'s, and no change to its files fixes it.');
   });
 });

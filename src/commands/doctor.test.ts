@@ -130,6 +130,13 @@
  * which prints no `References:` line and gives `refs` with no copy. What
  * the row counts and how it reads issues is `./doctor-refs.test.ts`'s.
  *
+ * ## The tsc row
+ *
+ * Its case links the checkout's own `node_modules/.bin/tsc` into a world
+ * holding a `tsconfig.json`, and runs it under the world's PATH, which
+ * holds no node, beside the same world with node's directory on the
+ * PATH. What each reading of the row prints is `./doctor-tsc.test.ts`'s.
+ *
  * ## Spawned
  *
  * One case runs `bun src/rafa.ts doctor` in two scratch repositories
@@ -139,15 +146,17 @@
  * registered command's own seams are read: `process.env`, the real probe
  * runner and its timeout.
  */
-import type { DoctorResult, DoctorSeams } from './doctor.js';
+import type { DoctorResult } from './doctor-readings.js';
+import type { DoctorSeams } from './doctor.js';
 import type { PrerequisiteItem } from '@open-tomato/rafa/core/config';
 import type { OutputStream } from '@open-tomato/rafa/core/output';
 import type { ProbeOptions, ProbeRun } from '@open-tomato/rafa/preflight/run';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -1940,4 +1949,27 @@ describe('the effort sync row', () => {
     expect(failed.exitCode).toBe(1);
     expect(resultData(failed.stdout)).toBeUndefined();
   });
+});
+
+describe('the tsc row', () => {
+  it('exits 1 for a tsc that cannot start under a PATH with no node, naming node, where node on the PATH exits 0', async () => {
+    const world = plantWorld();
+    plant(world.root, 'tsconfig.json', '{}\n');
+    mkdirSync(join(world.root, 'node_modules', '.bin'), { recursive: true });
+    const tsc = join(world.root, 'node_modules', '.bin', 'tsc');
+    symlinkSync(realpathSync(fileURLToPath(new URL('../../node_modules/.bin/tsc', import.meta.url))), tsc);
+    const node = Bun.which('node');
+    expect(node).not.toBeNull();
+    expect(Bun.which('node', { PATH: world.rafaBin })).toBeNull();
+
+    const run = await doctor(world);
+    const passed = await doctor(world, [], { env: { PATH: [world.rafaBin, dirname(node ?? '')].join(delimiter) } });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`rafa doctor: tsc: ${tsc} exited 127`);
+    expect(run.stderr).toContain('put node on the PATH the loop runs under');
+    expect(run.stderr).not.toContain('rafa loop start would halt here');
+    expect(passed.exitCode).toBe(0);
+    expect(lines(passed.stdout)).toContainEqual(expect.stringMatching(/^tsc: ok, Version \d+\.\d+\.\d+ \(/u));
+  }, SPAWN_TIMEOUT);
 });

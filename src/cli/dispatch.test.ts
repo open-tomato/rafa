@@ -98,6 +98,18 @@
  * phrase being the control whose line stays bare. One mutation of
  * `dispatch.ts`, the command's phrases replaced by none, was driven on
  * 2026-10-15 and reddened two of the three cases.
+ *
+ * The undeclared flag cases came with the `unknown_flag` refusal
+ * (#1267), and the stand-ins whose cases are about something else
+ * declare the flags they type: `loop start` its `--plan`, `plan create`
+ * its `--spec` and the mounted `issue next` its `--since`. Four
+ * mutations of `dispatch.ts` were driven on 2026-11-04, one run each over
+ * this file with 111 pass before, each restored sha256-identical. No
+ * refusal reddened five cases, exit code 1 in place of 2 four, the line
+ * read as typed and not after its deprecated flags one, and the hint
+ * spelled canonically in place of the route's label one. The help cases
+ * redden under none of them: they hold that routing answers a help
+ * request before any refusal is read.
  */
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
@@ -192,6 +204,7 @@ const REGISTRY = createCommandRegistry({
   commands: [
     command('loop', 'start', {
       aliases: ['start'],
+      flags: [{ name: 'plan', description: 'The plan.', type: 'string' }],
       run: async (context) => {
         seen = { context, active: activeOutput() };
         context.output.info('starting');
@@ -252,7 +265,7 @@ const REGISTRY = createCommandRegistry({
         { name: 'path', description: 'The path.', type: 'string', aliases: ['p'] },
       ],
     }),
-    command('plan', 'create', { aliases: ['plan'] }),
+    command('plan', 'create', { aliases: ['plan'], flags: [{ name: 'spec', description: 'The spec.', type: 'string' }] }),
     command('module', 'exec', {
       exec: true,
       run: async (context) => {
@@ -268,6 +281,7 @@ const REGISTRY = createCommandRegistry({
 
 /** The mounted command a module entry exports. */
 const ISSUE_NEXT = command('issue', 'next', {
+  flags: [{ name: 'since', description: 'Since when.', type: 'string' }],
   run: async (context) => {
     seen = { context, active: activeOutput() };
     context.output.info('next issue');
@@ -1334,5 +1348,95 @@ describe('the project a command runs in', () => {
       { ok: false, error: { code: 'unknown_subject', cause: 'cli:unknown-subject' } },
       { ok: false, error: { code: 'invalid_spec', cause: 'cli:invalid-spec' } },
     ]);
+  });
+});
+
+describe('a flag the command does not declare', () => {
+  /** The stderr text the refusal of `--dry-run` and `--bogus` on `loop start` writes in text mode. */
+  const REFUSED = 'rafa: unknown flags "--dry-run", "--bogus" for "rafa loop start"; its flags are --plan [cli:unknown-flag]\n'
+    + '  hint: run rafa loop start --help for its flags\n';
+
+  it('refuses it with exit code 2 before the command runs, naming each undeclared flag and the declared ones', async () => {
+    const refused = await run(['loop', 'start', '--dry-run', '--plan=x', '--bogus', '--dry-run']);
+    const refusedSeen = seen;
+    const control = await run(['-v', 'loop', 'start', '--plan=x', '--', '--dry-run']);
+
+    expect(refused.outcome.exitCode).toBe(2);
+    expect(refused.stderr).toBe(REFUSED);
+    expect(refused.stdout).toBe('');
+    expect(refusedSeen).toBeNull();
+    expect(control.outcome.exitCode).toBe(0);
+    expect(control.stdout).toStartWith('starting\n');
+    expect(seen?.context.args).toEqual(['--dry-run']);
+  });
+
+  it('carries the code, the cause, the hint and the command in the one result event in json mode, writing nothing to stderr', async () => {
+    const { outcome, stdout, stderr } = await run(['--output=json', 'loop', 'start', '--dry-run']);
+    const events = eventsOf(stdout);
+
+    expect(outcome.exitCode).toBe(2);
+    expect(stderr).toBe('');
+    expect(events.map((event) => event.type)).toEqual(['start', 'result']);
+    expect(events[1]).toEqual({
+      type: 'result',
+      ok: false,
+      error: {
+        code: 'unknown_flag',
+        message: 'unknown flag "--dry-run" for "rafa loop start"; its flags are --plan',
+        cause: 'cli:unknown-flag',
+        hint: 'run rafa loop start --help for its flags',
+        module: 'loop',
+        action: 'start',
+      },
+      ts: NOW.toISOString(),
+    });
+    expect(seen).toBeNull();
+  });
+
+  it('refuses one on a mounted module command, naming it as its line was routed', async () => {
+    const { outcome, stdout } = await run(
+      ['--output=json', 'module', 'exec', 'linear', 'next', '--since=today', '--until=never'],
+      { modules: MODULES, importModule },
+    );
+
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.result.error).toMatchObject({
+      code: 'unknown_flag',
+      message: 'unknown flag "--until=never" for "rafa module exec linear next"; its flags are --since',
+      hint: 'run rafa module exec linear next --help for its flags',
+    });
+    expect(eventsOf(stdout).filter((event) => event.type === 'log')).toHaveLength(1);
+    expect(seen).toBeNull();
+  });
+
+  it.each([['--help'], ['-h']])('prints the help and exits 0 for %s beside an undeclared flag', async (help) => {
+    const { outcome, stdout, stderr } = await run(['loop', 'start', '--bogus', help]);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(stdout).toBe('usage: rafa loop start [args] [flags]\n');
+    expect(stderr).toBe('');
+    expect(seen).toBeNull();
+  });
+
+  it('reads the line after its deprecated flags, and tells an unreadable spec first', async () => {
+    const deprecated = await run(['effort', 'report', '--json'], {
+      registry: createCommandRegistry({
+        subjects: [{ name: 'effort', summary: 'effort' }],
+        commands: [command('effort', 'report', {
+          flags: [{ name: 'json', description: 'The old spelling.', type: 'boolean', deprecated: { use: '--output=json --bogus' } }],
+        })],
+      }),
+    });
+    const spec = await run(['loop', 'spec', '--bogus']);
+
+    expect(deprecated.outcome.result.error).toMatchObject({ code: 'unknown_flag', message: startsWith('unknown flag "--bogus" ') });
+    expect(spec.outcome.result.error).toMatchObject({ code: 'invalid_spec' });
+  });
+
+  it('refuses it without reading the working directory or the home', async () => {
+    const { outcome } = await run(['loop', 'start', '--bogus'], { cwd: 'not/absolute', home: 'not/absolute/either' });
+
+    expect(outcome.exitCode).toBe(2);
+    expect(outcome.result.error).toMatchObject({ code: 'unknown_flag', cause: 'cli:unknown-flag' });
   });
 });

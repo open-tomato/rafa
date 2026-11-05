@@ -20,7 +20,9 @@
  * `<dir>/<session>/subagents/agent-*.jsonl`, the population
  * `session-log-dirs.ts` describes and `collect.ts` deliberately leaves out
  * of its session rows.
- * {@link subagentLogPaths} lists them with one directory read. A call is a
+ * {@link subagentLogPaths} lists them with one directory read, and lists
+ * no other file of the folder, such as the `agent-*.meta.json` Claude Code
+ * 2.1.318 writes beside each log. A call is a
  * sidechain call when its log is one of those or its record carries
  * `isSidechain: true`. Measured on 2026-09-26 over the 3,710 logs under
  * `~/.claude/projects`: 68,009 records in `agent-*.jsonl` files, every one
@@ -42,11 +44,16 @@
  *
  * {@link SKILL_USE_FIXTURE_VERSION} is the Claude Code version whose log
  * format this module was written and tested against, the `version` of
- * every record in `testdata/skill-use/`. That fixture was recorded from a
- * real `claude -p` session under 2.1.280 that invoked two project skills
- * in its main thread and one in a subagent, stripped to the records
- * carrying a tool call, with the `Agent` call's prompt and description
- * replaced.
+ * every record of session `ac7aeff1-84f2-46c9-bb9c-b9ceb994599f` in
+ * `testdata/skill-use/`. That fixture was recorded from a real `claude -p`
+ * session under 2.1.280 that invoked two project skills in its main thread
+ * and one in a subagent, stripped to the records carrying a tool call,
+ * with the `Agent` call's prompt and description replaced. The second
+ * session there, `28eea32a-3a3f-4b3e-99a8-20e057775d5e`, was recorded the
+ * same way under 2.1.318: its main thread started one subagent, which
+ * invoked one project skill. Its paths are dropped, and its session and
+ * agent ids replaced the same way in both logs. It holds the sidechain
+ * half above the fixture's version, which is not vouched for.
  *
  * {@link SKILL_USE_CLI_FLOOR} is the oldest version whose `Skill` call
  * shape the reader is known to read. It is the fixture's version, since no
@@ -76,13 +83,20 @@
  * non-blank string. Records without a `version`, such as `queue-operation`
  * and `last-prompt`, are read past.
  *
- * The sidechain half is not vouched for above the fixture. The same
- * measurement found no `<session>/subagents/` folder beside any of the
- * 769 logs, no record flagged `isSidechain: true` and no `tool_use` block
- * named `Agent`; `Agent` appears only in the tool lists a request offers.
- * No loop session of those versions started a subagent, so the sidechain
- * half of their readings counts nothing, and where a subagent of 2.1.296
- * or later writes its log has not been read.
+ * The sidechain half of a loop session of those versions counts nothing
+ * because none of them started a subagent, not because the logs moved.
+ * The same measurement found no `<session>/subagents/` folder beside any
+ * of the 769 logs, no record flagged `isSidechain: true` and no
+ * `tool_use` block named `Agent`; `Agent` appears only in the tool lists
+ * a request offers.
+ * Recorded on 2026-11-04 under 2.1.318, a subagent's log is where the
+ * fixture's was, `<session>/subagents/agent-<id>.jsonl`, with an
+ * `agent-<id>.meta.json` beside it. Every record of that log carries
+ * `isSidechain: true` except the `api-request-shape`, `api-request-blob`
+ * and `api-request` records, which carry no `isSidechain` and no
+ * `tool_use` block; of those, `api-request-blob` carries no `version`. The
+ * reader counts the subagent's `Skill` call as a sidechain call, and the
+ * reading answers `vouched` false with the versions `['2.1.318']`.
  *
  * ## The reading
  *
@@ -109,7 +123,7 @@ import { bareSkillName } from '@open-tomato/rafa-inventory';
 /** The oldest Claude Code version whose logs are read by skill name. */
 export const SKILL_USE_CLI_FLOOR = '2.1.280';
 
-/** The `version` of every record in `testdata/skill-use/`, the one version a reading is vouched for. */
+/** The `version` of every record of the 2.1.280 session in `testdata/skill-use/`, the one version vouched for. */
 export const SKILL_USE_FIXTURE_VERSION = '2.1.280';
 
 /** A Claude Code version as the reader compares it: three whole numbers. */

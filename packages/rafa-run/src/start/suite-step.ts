@@ -7,18 +7,17 @@
  *
  * Each step runs `bun test` itself (`suite/run.ts`: no timeout,
  * `CLAUDECODE` and `FORCE_COLOR` removed, failures read from Bun's JUnit
- * file), appends
- * one {@link SessionStep} to the run record (`core/loop/sessions.ts`) BEFORE
- * anything acts on it, prints what it found, and answers a
- * {@link StepOutcome}. Deciding whether the run goes on is the caller's:
- * nothing here stops the loop.
+ * file), appends one {@link SessionStep} to the run record
+ * (`core/loop/sessions.ts`) BEFORE anything acts on it, prints what it
+ * found, and answers a {@link StepOutcome}. Deciding whether the run
+ * goes on is the caller's: nothing here stops the loop.
  *
  * ## The steps
  *
  * | Step | Runs | Blocks |
  * |---|---|---|
  * | baseline ({@link ensureBaseline}) | the full suite, once per plan; nothing when no check-point entry names a check | nothing; halts the run when it failed outside any test case |
- * | task ({@link runTaskStep}, `suite-task-step.ts`) | `resolveChecks` (`suite/checks.ts`) of `checks.task` over the task's diff; nothing for an empty entry | a repair task it inserts, or the repair it followed |
+ * | task ({@link runTaskStep}, `suite-task-step.ts`) | `resolveChecks` (`suite/checks.ts`) of `checks.task` over the task's diff; nothing for an empty entry | a repair task it inserts, or the repair it followed; neither when a diff check cannot start |
  * | stage ({@link runStageStep}, `suite-stage-step.ts`) | `resolveChecks` of `checks.stage` over the stage's diff; nothing for an empty entry | a repair task it inserts |
  * | pre-wrap-up ({@link runPreWrapUpStep}) | `resolveChecks` of `checks.loop` over the plan's diff; nothing for an empty entry | a repair task it inserts, or the ticked one it inserted before |
  *
@@ -143,13 +142,12 @@
  *
  * The pre-wrap-up step stands in for the last stage's stage step, so
  * {@link dueStages} never answers a stage once no task is left open. A
- * red one inserts a repair task after the
- * checklist's last task, or, when the tracker holds a ticked pre-wrap-up
- * repair already, writes its blocker on that line again and inserts
- * nothing ({@link StepOutcome.repairInserted} false), so one repair
- * session is the most it adds. The caller (`suite-steps-run.ts`) turns
- * the loop back to dispatch an inserted repair in the same run, and
- * stops before the wrap-up on a repair blocked again.
+ * red one inserts a repair task after the checklist's last task, or, when
+ * the tracker holds a ticked pre-wrap-up repair already, writes its blocker
+ * on that line again and inserts nothing ({@link StepOutcome.repairInserted}
+ * false), so one repair session is the most it adds. The caller
+ * (`suite-steps-run.ts`) turns the loop back to dispatch an inserted repair
+ * in the same run, and stops before the wrap-up on a repair blocked again.
  *
  * ## Red, and what a red step writes
  *
@@ -171,17 +169,16 @@
  *
  * A task, stage or pre-wrap-up step whose only red is that excess of
  * errors outside any test (no new failure, a summary read, no red lint
- * and no red type step)
- * is retaken once over the same run ({@link retakeOnErrors}), since such
- * an error can come from a file that throws on one load and not the
- * next. The first run is recorded and printed with the file and first
- * line of each error, then the retake is settled as the step. A retake
- * holding no more errors than the baseline, and not failed outside any
- * test case, prints one `Intermittent`
- * warning naming the first run's files and lines, and blocks nothing;
- * a retake over the count again is red, and halts the run as any red
- * step does. The retake writes over the first run's JUnit and output
- * files, so those on disk are the settled run's.
+ * and no red type step) is retaken once over the same run
+ * ({@link retakeOnErrors}), since such an error can come from a file
+ * that throws on one load and not the next. The first run is recorded
+ * and printed with the file and first line of each error, then the
+ * retake is settled as the step. A retake holding no more errors than
+ * the baseline, and not failed outside any test case, prints one
+ * `Intermittent` warning naming the first run's files and lines, and
+ * blocks nothing; a retake over the count again is red, and halts the
+ * run as any red step does. The retake writes over the first run's
+ * JUnit and output files, so those on disk are the settled run's.
  *
  * A task, stage or pre-wrap-up step that reads NEW failures runs
  * each newly red test file alone, once, before it settles
@@ -210,22 +207,24 @@
  * A red task, stage or pre-wrap-up step inserts a `[BLOCKED]` repair
  * task above the first open plan task, through `insertTrackerTask`
  * (`utils/tracker.ts`), leaving that task as it was: its text names the
- * commit the step ran at, its declaration is
- * `{agent=build-error-resolver}`, and its blocker comment is the step's
- * text. With no open task left, the repair goes after the checklist's
- * last task. A red task step that follows a repair task, and a red
- * pre-wrap-up step finding a ticked pre-wrap-up repair, write the
- * blocker on that repair's line instead, marking it `[BLOCKED]` again,
- * and insert nothing. The text and the writes live in
- * `suite-blocker.ts`. The text names each new failing test file with its
- * count, the command running them (`bun test <files>`), the first error
- * line Bun printed for them, and the errors outside any test, by file
- * and first line, or the missing summary when those made it red; the
- * repair session is handed it through `BLOCKER_PROMPT_PREFIX`
- * (`start/dispatch.ts`). The recorded step keeps those error lines too,
- * up to `MAX_ERROR_LINES` (`suite/failure-lines.ts`) on each of its
- * `newFailures`: Bun's JUnit report names a failing case and not what
- * failed it, so stderr is where they are read.
+ * commit the step ran at, its declaration is `{agent=build-error-resolver}`,
+ * and its blocker comment is the step's text. With no open task left,
+ * the repair goes after the checklist's last task. A red task step that
+ * follows a repair task, and a red pre-wrap-up step finding a ticked
+ * pre-wrap-up repair, write the blocker on that repair's line instead,
+ * marking it `[BLOCKED]` again, and insert nothing. A task step with a
+ * diff check that could not start (`isCheckUnstartable` in
+ * `task-step-checks.ts`) does neither, since no repair puts a missing
+ * tool on the PATH: it is red on its blocker alone, and halts. The text
+ * and the writes live in `suite-blocker.ts`. The text names each new
+ * failing test file with its count, the command running them (`bun test
+ * <files>`), the first error line Bun printed for them, and the errors
+ * outside any test, by file and first line, or the missing summary when
+ * those made it red; the repair session is handed it through
+ * `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`). The recorded step keeps
+ * those error lines too, up to `MAX_ERROR_LINES` (`suite/failure-lines.ts`)
+ * on each of its `newFailures`: Bun's JUnit report names a failing case
+ * and not what failed it, so stderr is where they are read.
  *
  * ## SIGINT: a stop, not a red step
  *
@@ -330,6 +329,7 @@ import { addToLedger, completeStages } from './suite-stage-ledger.js';
 import { entryChecksOf } from './suite-stage-step.js';
 import { checkRunsOf } from './suite-task-step.js';
 import { foldResults, readTaskAlwaysRun } from './task-always-run.js';
+import { isCheckUnstartable } from './task-step-checks.js';
 import { runTsc } from './type-step.js';
 
 export { blockerText } from './suite-blocker.js';
@@ -629,7 +629,7 @@ export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepS
     : [];
   const blocker = [...tested, ...checked].join(' ');
   activeOutput().error(`❌ ${blocker}`);
-  const written = settling.repair === null
+  const written = settling.repair === null || isCheckUnstartable(settling)
     ? null
     : writeRepairTask(context.trackerPath, blocker, { ...settling.repair, commit: readHead(seams.git) });
   if (written !== null) activeOutput().error(written.inserted

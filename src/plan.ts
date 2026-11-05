@@ -254,6 +254,7 @@ import { recordPlanIssue } from './commands/plan/plan-record.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
+import { stretchRulesReader } from './commands/plan/stretch-rules.js';
 import { requireNoticesAnswered } from './notices/run.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -618,6 +619,8 @@ export default async function plan(
     dangerousAcceptStaleRefs,
   } = config;
   const flags = readGateFlags(args);
+  // `RAFA_STRETCH_RULES`, read once however often the spec is resolved.
+  const readRules = stretchRulesReader(process.env, repoRoot);
 
   // The spec, the cheap refusals over it, then the claim on its issue,
   // all before any session is paid for ("The claim").
@@ -632,6 +635,7 @@ export default async function plan(
       passOver,
       branchTemplate: namingBranch,
       projectConfig: config,
+      readRules,
     }),
     prepare: async (spec) => {
       const stub = argValue(args, '--stub') ?? stubFromSpecPath(path.resolve(repoRoot, spec.path));

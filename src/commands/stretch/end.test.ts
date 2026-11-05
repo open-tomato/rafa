@@ -18,7 +18,7 @@ import type { StretchItem } from '../../stretch/items.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { GitResult } from '@open-tomato/rafa/core/git';
 import type { PullRequestsAnswers } from '@open-tomato/rafa/pr/pull-requests-double';
-import type { MergedPullRequest, PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
+import type { MergedPullRequest, PullRequestDetail, PullRequestDraft, PullRequestSummary } from '@open-tomato/rafa/pr/types';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,7 +32,7 @@ import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-dou
 import { appendItem, itemsPath } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
-import { bodyPath, closesLines, createStretchEndCommand, endBody, endTitle, reportPath } from './end.js';
+import { bodyPath, closesLines, createStretchEndCommand, endBody, endTitle, reportPath, sameBody } from './end.js';
 import { stretchRecordPath } from './start.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-stretch-end-')));
@@ -75,6 +75,20 @@ function summary(over: Partial<PullRequestSummary> = {}): PullRequestSummary {
     isCrossRepository: false,
     updatedAt: '2026-10-07T09:00:00Z',
     ...over,
+  };
+}
+
+/** The open pull request from `stretch/4` in full, holding `body`. */
+function detail(body: string): PullRequestDetail {
+  return {
+    ...summary(),
+    body,
+    headRefOid: 'c'.repeat(40),
+    headCommittedAt: null,
+    mergeable: 'mergeable',
+    mergeStateStatus: 'CLEAN',
+    labels: [],
+    closes: [],
   };
 }
 
@@ -219,18 +233,97 @@ describe('the first run: the pull request into the default branch', () => {
     expect(seams.gitCalls()).toEqual([]);
   });
 
-  it('opens none when stretch/4 already has an open pull request, printing it', async () => {
-    const project = freshProject();
+  it('opens none when stretch/4 already has an open pull request, and updates its body when it differs', async () => {
+    const edits: (readonly [number, string])[] = [];
+    const project = freshProject({ items: [item()] });
     const seams = caseSeams({
       listMerged: () => Promise.resolve([]),
       findOpen: () => Promise.resolve(summary()),
+      get: () => Promise.resolve(detail(REPORT)),
+      editBody: (number, body) => {
+        edits.push([number, body]);
+        return Promise.resolve();
+      },
+    });
+
+    const run = await ran(seams.seams, project);
+
+    const body = `${REPORT}\nCloses #812\n`;
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.sent().map((call) => call.split(' ', 2).join(' '))).toEqual(['listMerged', 'findOpen stretch/4', 'get 950', 'editBody 950']);
+    expect(edits).toEqual([[950, body]]);
+    expect(linesOf(run).slice(-3)).toEqual([
+      '✅ Already open, so none was opened: #950 Stretch 4 (stretch/4 → main) https://github.com/open-tomato/rafa/pull/950',
+      `body updated: #950 now holds ${bodyPath(project.root, 4)}`,
+      'once #950 has merged, run rafa stretch end again to put pr.base back',
+    ]);
+  });
+
+  it('edits no body when the open pull request already holds it, line endings and the final newline left out', async () => {
+    const project = freshProject({ items: [item()] });
+    const stored = `${REPORT}\nCloses #812`.replaceAll('\n', '\r\n');
+    const seams = caseSeams({
+      listMerged: () => Promise.resolve([]),
+      findOpen: () => Promise.resolve(summary()),
+      get: () => Promise.resolve(detail(stored)),
+    });
+
+    const run = await ran(seams.seams, project);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.sent()).toEqual(['listMerged', 'findOpen stretch/4', 'get 950']);
+    expect(linesOf(run)).toContain(`body unchanged: #950 already holds ${bodyPath(project.root, 4)}`);
+    expect(sameBody(stored, `${REPORT}\nCloses #812\n`)).toBe(true);
+    expect(sameBody(stored, `${REPORT}\nCloses #813\n`)).toBe(false);
+  });
+
+  it('reads no body back from a pull request this run opened', async () => {
+    const project = freshProject();
+    const seams = caseSeams({
+      listMerged: () => Promise.resolve([]),
+      findOpen: () => Promise.resolve(null),
+      create: () => Promise.resolve(summary()),
     });
 
     const run = await ran(seams.seams, project);
 
     expect(run.exitCode).toBe(0);
-    expect(seams.sent()).toEqual(['listMerged', 'findOpen stretch/4']);
-    expect(linesOf(run)).toContain('✅ Already open, so none was opened: #950 Stretch 4 (stretch/4 → main) https://github.com/open-tomato/rafa/pull/950');
+    expect(seams.sent().map((call) => call.split(' ')[0])).toEqual(['listMerged', 'findOpen', 'create']);
+    expect(linesOf(run).some((line) => line.startsWith('body '))).toBe(false);
+  });
+
+  it('refuses with exit 1 naming the open pull request when the body edit is rejected', async () => {
+    const project = freshProject({ items: [item()] });
+    const seams = caseSeams({
+      listMerged: () => Promise.resolve([]),
+      findOpen: () => Promise.resolve(summary()),
+      get: () => Promise.resolve(detail(REPORT)),
+      editBody: () => Promise.reject(new Error('HTTP 403')),
+    });
+
+    const run = await ran(seams.seams, project);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('the body of #950 (https://github.com/open-tomato/rafa/pull/950), the pull request already open from'
+      + ' stretch/4, could not be updated: HTTP 403');
+    expect(seams.sent().at(-1)).toStartWith('editBody 950');
+    expect(existsSync(bodyPath(project.root, 4))).toBe(true);
+  });
+
+  it('refuses with exit 1 naming the open pull request when its body cannot be read', async () => {
+    const project = freshProject();
+    const seams = caseSeams({
+      listMerged: () => Promise.resolve([]),
+      findOpen: () => Promise.resolve(summary()),
+      get: () => Promise.reject(new Error('HTTP 502')),
+    });
+
+    const run = await ran(seams.seams, project);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('the body of #950 (https://github.com/open-tomato/rafa/pull/950), the pull request already open from'
+      + ' stretch/4, could not be read: HTTP 502');
+    expect(seams.sent()).toEqual(['listMerged', 'findOpen stretch/4', 'get 950']);
   });
 
   it('takes the default branch from origin/HEAD when there is no stretch.json, and main when git answers none', async () => {
@@ -285,7 +378,8 @@ describe('the first run: the pull request into the default branch', () => {
       'stretch end: stretch 4 (stretch/4 into main), 1 Closes line(s) from the ledger, dry run: each step is printed and none is run',
       `write ${bodyPath(project.root, 4)}: report.md with the ledger's Closes lines`,
       `rafa pr open --head=stretch/4 --base=main '--title=Stretch 4' --body-file=${bodyPath(project.root, 4)}`,
-      'dry run: would open stretch/4 into main, or print the pull request already open from it; nothing was run',
+      'dry run: would open stretch/4 into main, or print the pull request already open from it and compare its body with'
+        + ' pr-body.md, updating it when they differ; nothing was run',
     ]);
   });
 });

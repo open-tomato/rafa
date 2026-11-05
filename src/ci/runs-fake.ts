@@ -44,6 +44,20 @@
  *     newest run. `--commit` as the last argument exits 1 with `flag
  *     needs an argument: --commit` and the usage text.
  *
+ * The head-commit read of `./runs.ts` was read off `gh` 2.103.3 on
+ * 2026-11-04 against `open-tomato/rafa`, read-only, with `--repo`, on
+ * `stretch/111`; {@link RECORDED_STRETCH_111} holds the newest seven runs
+ * that read listed, the fields the fake models and the times `gh` gave as
+ * `createdAt`:
+ *
+ *   - `--branch stretch/111 --commit <sha> --limit 100` answered every
+ *     run of the commit on the branch, of every workflow, newest first,
+ *     as the fake does: for `90471b00` a skipped fragment run above two
+ *     failed `verify` runs, for `af33ef17` a passing `verify` run above a
+ *     skipped fragment run and another passing `verify` run.
+ *   - `--limit 2` beside `--commit` answered the first two of the three,
+ *     as the fake's cut does.
+ *
  * ## Strict
  *
  * Only `run list` with `--branch`, `--commit`, `--workflow`, `--limit`
@@ -88,6 +102,27 @@ export interface FakeRun {
   readonly conclusion: string;
   /** An ISO time; the fake answers runs newest first by it. */
   readonly createdAt: string;
+}
+
+/**
+ * The runs of `stretch/111` on `open-tomato/rafa` as `gh` 2.103.3 listed
+ * them on 2026-11-04, newest first: three of the head commit `af33ef17`,
+ * then the three of `90471b00`, where a skipped fragment run is newer
+ * than the two failed `verify` runs, then one passing run of `06045dc0`.
+ */
+export const RECORDED_STRETCH_111: readonly FakeRun[] = Object.freeze([
+  recorded(41462572168, 'verify', 'af33ef179a697221713e0612b3095e88cb1e1089', 'success', '2026-11-02T14:30:19Z'),
+  recorded(41462566369, 'Release bot fragment', 'af33ef179a697221713e0612b3095e88cb1e1089', 'skipped', '2026-11-02T14:30:17Z'),
+  recorded(41462556004, 'verify', 'af33ef179a697221713e0612b3095e88cb1e1089', 'success', '2026-11-02T14:30:13Z'),
+  recorded(41456634201, 'Release bot fragment', '90471b00a1d620a6e81f23c2dd625b3c36ae1511', 'skipped', '2026-11-02T13:51:41Z'),
+  recorded(41456633215, 'verify', '90471b00a1d620a6e81f23c2dd625b3c36ae1511', 'failure', '2026-11-02T13:51:40Z'),
+  recorded(41456159309, 'verify', '90471b00a1d620a6e81f23c2dd625b3c36ae1511', 'failure', '2026-11-02T13:48:25Z'),
+  recorded(41445278412, 'verify', '06045dc0eb65ea5e2c0eb6b151a71d731f73df5e', 'success', '2026-11-02T12:30:34Z'),
+]);
+
+/** A completed run of `stretch/111`, as the recording listed it. */
+function recorded(databaseId: number, workflowName: string, headSha: string, conclusion: string, createdAt: string): FakeRun {
+  return Object.freeze({ databaseId, workflowName, headBranch: 'stretch/111', headSha, status: 'completed', conclusion, createdAt });
 }
 
 /** The fake: a {@link GhRunner} and what it was handed. */

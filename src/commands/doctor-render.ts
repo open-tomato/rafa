@@ -13,7 +13,7 @@
  * lines report and why is `doctor.ts`'s module note; this module only
  * words them.
  */
-import type { DoctorPreflight, DoctorStartTier } from './doctor.js';
+import type { DoctorPreflight, DoctorStartTier } from './doctor-readings.js';
 import type { PreflightCheck, PreflightReport } from '@open-tomato/rafa/preflight/run';
 import type { BoardRow, BoardStatus } from '@open-tomato/rafa-board';
 

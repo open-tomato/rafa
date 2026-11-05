@@ -34,7 +34,14 @@
  *      plan of the issue already in `plan.dir` is kept instead, as after
  *      an item whose loop never started, and `keep <plan>` is printed. A
  *      plan create that ends non-zero ends the item with its own exit
- *      code, so a spec not ready (3) still reads as such;
+ *      code, so a spec not ready (3) still reads as such. When the
+ *      stretch folder holds a `rules.md` file ({@link rulesFilePath}),
+ *      the line runs with `RAFA_STRETCH_RULES` set to its absolute path,
+ *      printed in front of it, so `plan create` appends the stretch's
+ *      working rules to the issue's snapshot; the line after it names
+ *      the file appended. A kept plan runs no `plan create`, so its line
+ *      names the file as not appended. With no `rules.md`, or a
+ *      directory of that name, the line is the bare one;
  *   2. `RAFA_OUTPUT=events rafa loop start --plan=<plan> --as-worktree
  *      --no-ci-wait`, started as a detached child in its own session,
  *      both its streams appended to `.rafa/stretch/<n>/loop-<issue>.log`
@@ -69,8 +76,8 @@
  * Every step is printed, in the same order, and none is run: no plan
  * session, no folder, no log and no loop; with `--wait`, the merge half's
  * lines follow (`mergeDryRunLines`). The readings that decide which
- * steps there are still run: the config, `plan.dir` and the session
- * records. With no plan of the issue yet, the loop line names the plan
+ * steps there are still run: the config, `plan.dir`, the session
+ * records and whether the stretch folder holds a `rules.md`. With no plan of the issue yet, the loop line names the plan
  * as `PLAN-rafa-<issue>-<slug>.md`, the slug being the issue title's,
  * which only the planning step reads. It starts no session, so `spends`
  * is declared `unless --dry-run`. With `--resume` the lines are
@@ -111,6 +118,7 @@ import { plansDirAt, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
 
 import { stretchFolder } from '../../stretch/folder.js';
 import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
+import { STRETCH_RULES_ENV } from '../plan/stretch-rules.js';
 
 import { afterLoopWait, mergeDryRunLines } from './item-merge.js';
 import { resumeDryRunLines, resumeItem } from './item-resume.js';
@@ -176,6 +184,22 @@ export interface ItemLine {
 /** `<root>/.rafa/stretch/<n>/loop-<issue>.log`. */
 export function itemLogPath(root: string, n: number, issue: number): string {
   return join(stretchFolder(root, n), `loop-${String(issue)}.log`);
+}
+
+/** The stretch's working rules, as the stretch engineer writes them at the bucket's approval. */
+export const RULES_FILE = 'rules.md';
+
+/** `<root>/.rafa/stretch/<n>/rules.md`. */
+export function rulesFilePath(root: string, n: number): string {
+  return join(stretchFolder(root, n), RULES_FILE);
+}
+
+/** The stretch's rules file when it is a file, else null: none there, or a directory of that name. */
+export function stretchRulesFile(root: string, n: number): string | null {
+  const path = rulesFilePath(root, n);
+  return statSync(path, { throwIfNoEntry: false })?.isFile() === true
+    ? path
+    : null;
 }
 
 /** The stretch number a `pr.base` names, or null for one naming no `stretch/<n>` branch. */
@@ -297,18 +321,39 @@ function childEnv(context: RafaContext, extra: Readonly<Record<string, string>> 
   return { ...env, ...extra };
 }
 
+/** What the plan step reads of the item. */
+interface PlanStepInput {
+  readonly root: string;
+  readonly plans: PlansDir;
+  readonly line: ItemLine;
+  /** The stretch's rules file, absolute, or null for none. */
+  readonly rules: string | null;
+}
+
 /** Step 1: the issue's plan, kept or made by `rafa plan create --issue`; null under a dry run with none. */
-async function planStep(context: RafaContext, root: string, plans: PlansDir, line: ItemLine, seams: StretchItemSeams): Promise<string | null> {
+async function planStep(context: RafaContext, step: PlanStepInput, seams: StretchItemSeams): Promise<string | null> {
+  const { root, plans, line, rules } = step;
   const info = (text: string): void => context.output.info(text);
   const kept = existingPlan(plans, line.issue);
   if (kept !== null) {
     info(`keep ${kept}, written by an earlier plan create`);
+    if (rules !== null) info(`stretch rules: ${rules} is not appended, as no plan create runs for a kept plan`);
     return kept;
   }
   const argv = [...seams.rafa, 'plan', 'create', `--issue=${String(line.issue)}`];
-  info(lineText(argv));
+  const extra: Record<string, string> = rules === null
+    ? {}
+    : { [STRETCH_RULES_ENV]: rules };
+  info(rules === null
+    ? lineText(argv)
+    : `${STRETCH_RULES_ENV}=${lineText([rules])} ${lineText(argv)}`);
+  if (rules !== null) {
+    info(`stretch rules: ${line.dryRun
+      ? 'would append'
+      : 'appends'} ${rules} to the snapshot`);
+  }
   if (line.dryRun) return null;
-  const exitCode = await seams.runRafa(argv, root, childEnv(context));
+  const exitCode = await seams.runRafa(argv, root, childEnv(context, extra));
   if (exitCode === null) throw failure(`${lineText(argv)} could not start. Nothing else was run.`);
   if (exitCode !== 0) {
     throw new CommandExit(exitCode, `❌ ${COMMAND_NAME}: ${lineText(argv)} ended with exit code ${String(exitCode)}; no loop was started.`);
@@ -483,7 +528,7 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
     ? ', dry run: each step is printed and none is run'
     : ''}`);
   const log = itemLogPath(root, n, line.issue);
-  const plan = await planStep(context, root, plans, line, seams);
+  const plan = await planStep(context, { root, plans, line, rules: stretchRulesFile(root, n) }, seams);
   const placeholder = posix.join(plans.label, `PLAN-${boardId(line.issue)}-<slug>.md`);
   info(loopLineText(seams.rafa, plan, placeholder, log));
   if (plan === null || line.dryRun) {

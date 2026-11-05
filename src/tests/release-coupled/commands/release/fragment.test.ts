@@ -5,7 +5,12 @@
  * The dispatched cases drive a real scratch world, as `list.test.ts`
  * does: a bare origin whose `main` already holds `dependabot-7.md`, and
  * the caller's clone the command runs in, so the name is chosen off
- * git's own reading of the base after a real fetch.
+ * git's own reading of the base after a real fetch. Every dispatched
+ * case passes the directory it runs in through the `cwd` seam, since
+ * the default, `process.cwd()`, is this checkout.
+ *
+ * The root cases add a linked worktree of the caller's clone holding no
+ * `.rafa/`, the command's project still the caller's, and run in it.
  *
  * Controls for readings that would pass while wrong:
  *
@@ -17,11 +22,15 @@
  *     held before, so a refusal that still wrote would fail;
  *   - a package the workspace holds and publishes is written, beside
  *     the refused private and unknown ones, so the check is known to
- *     pass a good name.
+ *     pass a good name;
+ *   - the worktree case asserts the caller's `.changes/` stays empty, and
+ *     a run from a subdirectory of the caller, whose toplevel is the
+ *     project root, still prints the path relative, so the absolute
+ *     path is known to come from the root differing.
  */
 import type { PlantedProject } from '../../../cli-capture.js';
 import type { CliEvent } from '@open-tomato/rafa/ports';
-import type { ReleaseFragmentResult } from '@open-tomato/rafa-release/commands/release/fragment';
+import type { FragmentSeams, ReleaseFragmentResult } from '@open-tomato/rafa-release/commands/release/fragment';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -126,17 +135,28 @@ function world(): World {
   return { project: { root: caller, home: projectHome }, inCaller: (args) => git(caller, args) };
 }
 
-/** Dispatches `rafa release fragment` with `words` after it in `project`. */
+/**
+ * Dispatches `rafa release fragment` with `words` after it in `project`,
+ * run in the project root unless `seams` names another directory.
+ */
 async function ran(
   project: PlantedProject,
   words: readonly string[],
+  seams: FragmentSeams = {},
 ): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
   return dispatchInProject(
     ['release', 'fragment', ...words],
     [{ name: 'release', summary: 'releases' }],
-    [createReleaseFragmentCommand()],
+    [createReleaseFragmentCommand({ cwd: () => project.root, ...seams })],
     project,
   );
+}
+
+/** A linked worktree of the caller's clone on a branch of its own, holding no `.rafa/`. */
+function linkedWorktree(w: World): string {
+  const dir = join(dirname(w.project.root), 'linked');
+  w.inCaller(['worktree', 'add', '-q', '-b', 'linked', dir]);
+  return dir;
 }
 
 /** The names under the caller's `.changes/`, sorted; empty when there is no such directory. */
@@ -311,6 +331,92 @@ describe('rafa release fragment', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('the tree of origin/main could not be read');
+    expect(changesOf(w.project)).toEqual([]);
+  });
+});
+
+describe('the root rafa release fragment writes under', () => {
+  it('writes under the worktree it runs in, printing the path absolute, and leaves the project root alone', async () => {
+    const w = world();
+    const linked = linkedWorktree(w);
+
+    const run = await ran(w.project, ['--plan=dependabot-7', '--level=patch', '--title=Bump zod', '--note=deps: bump zod'], { cwd: () => linked });
+
+    expect(run.exitCode).toBe(0);
+    expect(existsSync(join(linked, '.rafa'))).toBe(false);
+    expect(run.stdout).toBe(`${join(linked, '.changes', 'dependabot-7-2.md')}\n`);
+    expect(readdirSync(join(linked, '.changes'))).toEqual(['dependabot-7-2.md']);
+    expect(changesOf(w.project)).toEqual([]);
+  });
+
+  it('reads the worktree from a subdirectory of it, and gives the absolute path as the json result', async () => {
+    const w = world();
+    const linked = linkedWorktree(w);
+
+    const run = await ran(w.project, ['--plan=dependabot-8', '--level=none', '--title=Bump bun', '--output=json'], { cwd: () => join(linked, 'packages') });
+
+    expect(run.exitCode).toBe(0);
+    expect((dataOf(eventsOf(run.stdout)) as ReleaseFragmentResult).path).toBe(join(linked, '.changes', 'dependabot-8.md'));
+    expect(changesOf(w.project)).toEqual([]);
+  });
+
+  it('checks the package against the worktree\'s own workspace', async () => {
+    const w = world();
+    const linked = linkedWorktree(w);
+    plant(w.project.root, { 'packages/extra/package.json': '{\n  "name": "@scope/extra",\n  "version": "0.1.0"\n}\n' });
+
+    const run = await ran(w.project, ['--plan=p-1', '--level=patch', '--title=T', '--package=@scope/extra'], { cwd: () => linked });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('the workspace holds no package named @scope/extra');
+    expect(existsSync(join(linked, '.changes'))).toBe(false);
+  });
+
+  it('refuses a name already in the worktree\'s HEAD, naming it absolute', async () => {
+    const w = world();
+    const linked = linkedWorktree(w);
+    plant(linked, { '.changes/dependabot-8.md': WAITING });
+    execFileSync('git', ['add', '.changes/dependabot-8.md'], { cwd: linked, env: isolatedEnv(w.project.home), stdio: 'pipe' });
+    execFileSync('git', ['commit', '-q', '-m', 'fragment'], { cwd: linked, env: isolatedEnv(w.project.home), stdio: 'pipe' });
+    rmSync(join(linked, '.changes', 'dependabot-8.md'));
+
+    const run = await ran(w.project, ['--plan=dependabot-8', '--level=none', '--title=Bump bun'], { cwd: () => linked });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`${join(linked, '.changes', 'dependabot-8.md')} is already on this branch`);
+  });
+
+  it('prints the path relative when run from a subdirectory of the project root', async () => {
+    const w = world();
+
+    const run = await ran(w.project, ['--plan=dependabot-8', '--level=none', '--title=Bump bun'], { cwd: () => join(w.project.root, 'packages') });
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toBe('.changes/dependabot-8.md\n');
+    expect(changesOf(w.project)).toEqual(['dependabot-8.md']);
+  });
+
+  it('falls back to the project root where the probe finds no repository', async () => {
+    const w = world();
+    const outside = join(dirname(w.project.root), 'home');
+
+    const run = await ran(w.project, ['--plan=dependabot-8', '--level=none', '--title=Bump bun'], { cwd: () => outside, toplevel: () => null });
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toBe('.changes/dependabot-8.md\n');
+    expect(changesOf(w.project)).toEqual(['dependabot-8.md']);
+  });
+
+  it('refuses with exit 1, writing nothing, when the probe cannot answer', async () => {
+    const w = world();
+    const toplevel = (): string | null => {
+      throw new Error('git could not run');
+    };
+
+    const run = await ran(w.project, ['--plan=dependabot-8', '--level=none', '--title=Bump bun'], { toplevel });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`the git worktree of ${w.project.root} could not be read, so no fragment was written: git could not run`);
     expect(changesOf(w.project)).toEqual([]);
   });
 });
