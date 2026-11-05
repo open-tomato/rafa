@@ -37,7 +37,6 @@ package once its coupling is gone, or into the module it really tests.
 | `board/trust.test.ts` | `packages/rafa-pr/src/pr/gh-fake.ts` |
 | `commands/board/list.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/board/sync.test.ts` | `src/tests/cli-capture.ts` |
-| `commands/doctor-refs-roadmap.test.ts` | `src/commands/index.ts` |
 | `commands/doctor-refs.test.ts` | `src/commands/index.ts` |
 | `commands/epic/cancel-native.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/epic/cancel.test.ts` | `src/tests/cli-capture.ts` |

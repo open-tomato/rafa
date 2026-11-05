@@ -53,7 +53,6 @@ package once its coupling is gone, or into the module it really tests.
 | `commands/pr/triage-resolve.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/pr/triage.test.ts` | `src/tests/cli-capture.ts`, `src/tests/ending-probe.ts` |
 | `commands/pr/view.test.ts` | `src/tests/cli-capture.ts` |
-| `commands/pr/wait-grace-driven.test.ts` | `src/tests/cli-capture.ts` |
 | `commands/pr/wait.test.ts` | `src/tests/cli-capture.ts`, `src/tests/ending-probe.ts` |
 | `pr/conflict-sentence.sweep.test.ts` | `packages/rafa-effort/src/effort/classify.ts`, `packages/rafa-run/src/start/wrap-up.ts`, `src/tests/sweep-timeout.ts` |
 | `triage/leftover-repair.test.ts` | `packages/rafa-run/src/start/suite-blocker.ts` |
