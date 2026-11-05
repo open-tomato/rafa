@@ -101,7 +101,7 @@ describe('the plan renderDocUpdatePlan renders', () => {
     const model = parsePlan(renderDocUpdatePlan({ issue: '7', lines: OPEN_LINES }));
 
     expect(model.issues).toEqual([]);
-    expect(model.header).toEqual({ stub: 'rafa-7-doc-update', issue: '7', spec: null, release: 'none', extras: [] });
+    expect(model.header).toEqual({ stub: 'rafa-7-doc-update', issue: '7', spec: null, release: 'none', closes: [], extras: [] });
     expect(model.stages.map((stage) => stage.name)).toEqual(['Stale doc lines']);
     expect(model.tasks.map((task) => [task.status, task.text, task.declaration?.agent, task.stage])).toEqual([
       ['unchecked', `${DOC_UPDATE_TASK_PREFIX}${OPEN_LINES[0] ?? ''}`, 'doc-updater', 0],
