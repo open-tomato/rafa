@@ -40,11 +40,14 @@
  * have planted-source cases below.
  */
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
-import { describe, expect, setDefaultTimeout, test } from 'bun:test';
+import { afterAll, describe, expect, setDefaultTimeout, test } from 'bun:test';
 import ts from 'typescript';
 
+import { SOURCE_ROOTS } from './source-roots.js';
 import { SWEEP_TIMEOUT } from './sweep-timeout.js';
 
 setDefaultTimeout(SWEEP_TIMEOUT);
@@ -457,18 +460,26 @@ function bareExitAssertions(source: string): BareAssertion[] {
   return found;
 }
 
-/** The tracked test files under `src/`, repo-relative. */
+/**
+ * The tracked test files under every root of {@link SOURCE_ROOTS},
+ * repo-relative. Git's pathspec `*` crosses `/`, so `<root>/*.test.ts`
+ * lists every test below the root in one pathspec.
+ */
 function trackedTests(): string[] {
-  return execFileSync('git', ['ls-files', '-z', '--', 'src/*.test.ts'], { cwd: REPO_ROOT, encoding: 'utf8' })
+  const pathspecs = SOURCE_ROOTS.map((root) => `${root}/*.test.ts`);
+  return execFileSync('git', ['ls-files', '-z', '--', ...pathspecs], { cwd: REPO_ROOT, encoding: 'utf8' })
     .split('\0')
     .filter((path) => path !== '');
 }
 
-/** `<path>:<line>: <assertion>` for each bare assertion on a spawned run across `paths`. */
-async function offenders(paths: readonly string[]): Promise<string[]> {
+/**
+ * `<path>:<line>: <assertion>` for each bare assertion on a spawned run
+ * across `paths`, each read under `base` and named by its path as given.
+ */
+async function offenders(paths: readonly string[], base: string = REPO_ROOT): Promise<string[]> {
   const found: string[] = [];
   for (const path of paths) {
-    const source = await Bun.file(join(REPO_ROOT, path)).text();
+    const source = await Bun.file(join(base, path)).text();
     for (const { line, text } of bareExitAssertions(source)) found.push(`${path}:${line}: ${text}`);
   }
   return found;
@@ -500,7 +511,7 @@ const SPAWNED_EXPECT_EXIT = planted(
 );
 
 describe('spawned exit codes', () => {
-  test('no test file under src/ asserts a spawned rafa run\'s exit code bare', async () => {
+  test('no test file under a source root asserts a spawned rafa run\'s exit code bare', async () => {
     const found = await offenders(trackedTests());
 
     expect(found, `assert these with expectExit from src/tests/cli-capture.ts:\n${found.join('\n')}`).toEqual([]);
@@ -511,6 +522,33 @@ describe('spawned exit codes', () => {
 
     expect(listing).toContain('src/commands/doctor.test.ts');
     expect(listing).toContain('src/tests/loop-output.test.ts');
+    expect(listing).toContain('packages/rafa-run/src/start/dispatch.test.ts');
+    expect(listing).toContain('packages/rafa-pr/src/commands/pr/resolve-loop.test.ts');
+  });
+});
+
+describe('offenders over a planted tree', () => {
+  const PLANTED_PATH = 'packages/planted/src/bare.test.ts';
+  const base = mkdtempSync(join(tmpdir(), 'spawned-exit-code-'));
+
+  afterAll(() => {
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  /** Writes `source` to the planted path under `base` and reads the offenders there. */
+  async function plantAndRead(source: string): Promise<string[]> {
+    const file = join(base, PLANTED_PATH);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, source);
+    return offenders([PLANTED_PATH], base);
+  }
+
+  test('reads a bare assertion planted under a package root as one offender naming its path', async () => {
+    expect(await plantAndRead(SPAWNED_BARE)).toEqual([`${PLANTED_PATH}:6: expect(run.exitCode).toBe(1)`]);
+  });
+
+  test('reads none once the planted file asserts with expectExit', async () => {
+    expect(await plantAndRead(SPAWNED_EXPECT_EXIT)).toEqual([]);
   });
 });
 

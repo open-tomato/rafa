@@ -44,6 +44,15 @@
  *  - the flag ignored, so `none` refuses as without it: 6 fail.
  *  - the flag read before the merge state, so a conflicting pull
  *    request reading `none` merges: 2 fail.
+ *
+ * Four more were driven the same way on 2026-11-02 against the
+ * `pull-base` retry, 69 pass either side:
+ *
+ *  - the retry's fetch without `-C <path>` for a base held elsewhere:
+ *    1 fail.
+ *  - a retry on `switch-base` too: 2 fail.
+ *  - `MULTIPLE_BRANCHES_TEXT` changed to text git did not print: 1 fail.
+ *  - no retry on the plain `pull-base`: 1 fail.
  */
 import type { CheckRow } from './checks.js';
 import type { MergeRefusalReading } from './merge.js';
@@ -55,6 +64,7 @@ import { classifyState } from './checks.js';
 import {
   cleanUpSteps,
   commandLine,
+  MULTIPLE_BRANCHES_TEXT,
   parseTreePaths,
   parseWorktrees,
   readMergeRefusal,
@@ -548,6 +558,84 @@ describe('cleanUpSteps', () => {
       'delete origin/feat/ci-gate',
       'prune deleted remote branches',
     ]);
+  });
+
+  it('leaves both deletes out of a kept branch, and so out of a failed step\'s tail', () => {
+    const steps = cleanUpSteps({ ...plan, branch: 'integration', kept: true });
+    expect(steps.map((step) => step.id)).toEqual(['switch-base', 'pull-base', 'prune-remotes']);
+    expect(remainingFrom(steps, 'pull-base').map((step) => commandLine(step)))
+      .toEqual(['git pull --ff-only', 'git fetch --prune']);
+  });
+
+  it('pulls a base another worktree holds there, then detaches this checkout at it', () => {
+    const steps = cleanUpSteps({ ...plan, baseHeldAt: '/repo/main checkout' });
+    expect(steps.map((step) => step.id)).toEqual([
+      'pull-base',
+      'switch-base',
+      'delete-local',
+      'delete-remote',
+      'prune-remotes',
+    ]);
+    expect(steps.slice(0, 2).map((step) => step.argv)).toEqual([
+      ['git', '-C', '/repo/main checkout', 'pull', '--ff-only'],
+      ['git', 'switch', '--detach', 'main'],
+    ]);
+    expect(steps.slice(0, 2).map((step) => step.label)).toEqual([
+      'pull main in /repo/main checkout, fast-forward only',
+      'detach this checkout at main',
+    ]);
+    const pasted = remainingFrom(steps, 'pull-base').map((step) => commandLine(step));
+    expect(pasted.slice(0, 2)).toEqual(['git -C \'/repo/main checkout\' pull --ff-only', 'git switch --detach main']);
+  });
+
+  it('switches to the base as before when no other worktree holds it', () => {
+    expect(cleanUpSteps({ ...plan, baseHeldAt: null }).map((step) => step.argv))
+      .toEqual(cleanUpSteps(plan).map((step) => step.argv));
+  });
+
+  it('gives pull-base alone a retry, fetching the base from origin first', () => {
+    const steps = cleanUpSteps(plan);
+    expect(steps.filter((step) => step.retry !== undefined).map((step) => step.id)).toEqual(['pull-base']);
+    expect(steps.find((s) => s.id === 'pull-base')?.retry).toEqual({
+      when: MULTIPLE_BRANCHES_TEXT,
+      before: ['git', 'fetch', 'origin', 'main'],
+    });
+  });
+
+  it('retries on the text git printed when the pull met several heads', () => {
+    const said = 'fatal: Cannot fast-forward to multiple branches.';
+    expect(said).toContain(MULTIPLE_BRANCHES_TEXT);
+    expect('fatal: Not possible to fast-forward, aborting.').not.toContain(MULTIPLE_BRANCHES_TEXT);
+  });
+
+  it('fetches with -C <path> where another worktree holds the base', () => {
+    const steps = cleanUpSteps({ ...plan, baseHeldAt: '/repo/main checkout' });
+    expect(steps.filter((step) => step.retry !== undefined).map((step) => step.id)).toEqual(['pull-base']);
+    expect(steps.find((s) => s.id === 'pull-base')?.retry).toEqual({
+      when: MULTIPLE_BRANCHES_TEXT,
+      before: ['git', '-C', '/repo/main checkout', 'fetch', 'origin', 'main'],
+    });
+  });
+
+  it('gives no other step a retry, in any shape of the plan', () => {
+    const shapes = [
+      plan,
+      { ...plan, localBranchPresent: false },
+      { ...plan, remoteBranchPresent: false },
+      { ...plan, kept: true },
+      { ...plan, remote: 'upstream' },
+      { ...plan, baseHeldAt: '/repo/main' },
+    ];
+    for (const shape of shapes) {
+      const others = cleanUpSteps(shape).filter((step) => step.id !== 'pull-base');
+      expect(others.length).toBeGreaterThan(0);
+      expect(others.filter((step) => step.retry !== undefined)).toEqual([]);
+    }
+  });
+
+  it('pastes a retried step as its own command, not the fetch before it', () => {
+    const steps = cleanUpSteps(plan);
+    expect(remainingFrom(steps, 'pull-base').map((step) => commandLine(step))[0]).toBe('git pull --ff-only');
   });
 
   it('undoes nothing: no step reverts, resets or force-pushes', () => {

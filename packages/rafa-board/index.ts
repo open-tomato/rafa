@@ -144,6 +144,7 @@ export type { IssueBoard } from './src/board/issue-board.js';
 export type {
   SpecIssue,
   SpecIssueReader,
+  StretchRules,
 } from './src/board/issue.js';
 export { createGhSpecIssueReader } from './src/board/issue.js';
 

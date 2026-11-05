@@ -73,6 +73,11 @@
  * read. What a caller does with it is the caller's: `release status`
  * renders a `?` cell, and `rafa next`'s epic end leaves its release
  * line out rather than read a failed tag listing as no tags.
+ * {@link newestRootRelease} folds a reading into the one value the
+ * stale-docs issue's find step takes (`newestRelease` of
+ * `addStaleDocLine`): the latest root tag's version, null for no root
+ * tag, and undefined for a listing that failed, which that step reads
+ * as no reading at all rather than as no release.
  */
 import type { SemanticVersion } from './version.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
@@ -296,6 +301,17 @@ export function readTags(git: GitRunner): TagReading {
   }
   const tags = releaseTagsOf(result.stdout);
   return { tags, latest: tags.find((tag) => tag.package === null) ?? null, problem: null };
+}
+
+/**
+ * The version of the highest root release tag of the repository `git`
+ * runs in, its `v` off; null when it holds no root tag, and undefined
+ * when the tags could not be listed. See the module note.
+ */
+export function newestRootRelease(git: GitRunner): string | null | undefined {
+  const reading = readTags(git);
+  if (reading.problem !== null) return undefined;
+  return reading.latest?.version ?? null;
 }
 
 /**

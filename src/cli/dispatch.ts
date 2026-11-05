@@ -14,6 +14,10 @@
  *      deprecated for, against the routed command's `args` and `flags`.
  *      A spec `parseArgs` refuses is the `invalid_spec` refusal, and the
  *      context is assembled again without it so the refusal can be told.
+ *      A flag word that line types and the command does not declare is
+ *      the `unknown_flag` refusal (`flag-refusal.ts`), told once the spec
+ *      is read and before the project is resolved, so the command never
+ *      runs; a help request beside one is routed as help and never read.
  *   4. The start event is written, then each warning the caller handed
  *      in and each module command warning, at warn level.
  *   5. The route is settled. A help request writes the help text and a
@@ -163,7 +167,10 @@
  *
  * A refusal from routing, `invalid_spec` or `no_project` ends with exit
  * code 1 and `rafa: <message>` on stderr in text mode, its `cause` the
- * `cli:` code of its dispatcher code. A `no_project` built from a coded
+ * `cli:` code of its dispatcher code. `unknown_flag` ends with exit code
+ * 2 (#1267), coded as `cli:unknown-flag` with the command's subject and
+ * action and the hint naming its `--help` by the route's label, so in text mode its line ends
+ * with the bracket and the hint line follows. A `no_project` built from a coded
  * error the walk threw carries that error's code and hint instead, with
  * the command's action where the error names none. An error thrown past
  * the command, caught by the catch-all as `command_error`, is read with
@@ -192,8 +199,8 @@
  * start that does not resolve or a git that cannot name the main
  * checkout, ends the same way with the walk's message.
  *
- * A help request, a version request, a routing refusal, `invalid_spec`
- * and a command declaring `needsProject: false` read neither the working
+ * A help request, a version request, a routing refusal, `invalid_spec`,
+ * `unknown_flag` and a command declaring `needsProject: false` read neither the working
  * directory nor the home, so each answers outside a project as it does inside one, and
  * such a command runs with `project` null.
  *
@@ -201,7 +208,7 @@
  *
  * {@link DispatchOptions.commandHook} is called around a command that
  * runs inside a project, in text mode, and around nothing else: help, a
- * version request, a routing refusal, `invalid_spec`, `no_project`, a
+ * version request, a routing refusal, `invalid_spec`, `unknown_flag`, `no_project`, a
  * command declaring `needsProject: false` and every invocation in json
  * mode call neither half. Its `before` is awaited once the project is
  * resolved and ahead of the deprecation lines, and a line it answers is
@@ -245,7 +252,7 @@
 import type { Ending } from './ending.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
-import type { FailureBoundary } from '../errors/handler.js';
+import type { Failure, FailureBoundary } from '../errors/handler.js';
 import type { LoggerResolver } from '@open-tomato/rafa/adapters/logger/active';
 import type { CommandRegistry } from '@open-tomato/rafa/cli/registry';
 import type { CliContext , RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa/core/command';
@@ -264,20 +271,25 @@ import { runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
 import { runWithActiveOutput } from '@open-tomato/rafa/core/output';
 import { resolveScope, ScopeError } from '@open-tomato/rafa/project/scope';
 
-import { failureOf } from '../errors/handler.js';
+import { causeOfDispatchCode, failureOf } from '../errors/handler.js';
 
 import { assembleContext } from './core/assembleContext.js';
 import { endingError, failure, finish, messageOf, success } from './ending.js';
+import { undeclaredFlags, unknownFlagHint, unknownFlagMessage } from './flag-refusal.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
 
 /** What every refusal the dispatcher throws opens with. */
 const REFUSAL = 'dispatcher';
 
+/** The exit code of the `unknown_flag` refusal, apart from the 1 every other refusal ends with. */
+const UNKNOWN_FLAG_EXIT = 2;
+
 /** Every code a failed terminal event carries. */
 export const DISPATCH_ERROR_CODES: readonly [
   ...typeof ROUTE_REFUSALS,
   'invalid_spec',
+  'unknown_flag',
   'no_project',
   'command_exit',
   'command_error',
@@ -285,6 +297,7 @@ export const DISPATCH_ERROR_CODES: readonly [
 ] = [
   ...ROUTE_REFUSALS,
   'invalid_spec',
+  'unknown_flag',
   'no_project',
   'command_exit',
   'command_error',
@@ -560,6 +573,23 @@ function boundaryOf(command: RafaCommand): FailureBoundary {
   return { module: command.subject, action: command.action };
 }
 
+/**
+ * The `unknown_flag` refusal of a command line typing a flag its command
+ * does not declare, read after its deprecated flags, or null when it
+ * types none; see the module note.
+ */
+function refusedFlags(route: CommandRoute): Ending | null {
+  const undeclared = undeclaredFlags(readDeprecatedFlags(route).line, route.command);
+  if (undeclared.length === 0) return null;
+  const found: Failure = {
+    cause: causeOfDispatchCode('unknown_flag'),
+    hint: unknownFlagHint(route.command, route.label),
+    ...boundaryOf(route.command),
+    coded: true,
+  };
+  return { ...failure('unknown_flag', unknownFlagMessage(route.command, undeclared, route.label), found), exitCode: UNKNOWN_FLAG_EXIT };
+}
+
 /** Runs a routed command with its context; see the module note. */
 async function runCommand(
   route: CommandRoute,
@@ -713,9 +743,8 @@ async function settle(
     case 'refusal':
       return failure(route.code satisfies RouteRefusalCode, route.message);
     case 'command':
-      return problem === null
-        ? settleCommand(route, base, registry, settings)
-        : failure('invalid_spec', problem);
+      if (problem !== null) return failure('invalid_spec', problem);
+      return refusedFlags(route) ?? settleCommand(route, base, registry, settings);
   }
 }
 

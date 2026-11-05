@@ -9,6 +9,39 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.51.0 — 2026-11-05, Bug sweep 41 — four readings of a state that is not there; Bug sweep 42 — two release lines that act on something other than what was asked; Bug sweep 43 — the stretch's own lines, and the 0.50.0 doc lines
+<!-- rafa:fragments rafa-1439-bug-sweep-41 rafa-1440-bug-sweep-42 rafa-1441-bug-sweep-43 rafa-1446-bug-sweep-44 -->
+
+- ci: `rafa ci status --branch` reads every workflow on the branch's head commit and takes the worst as the verdict, so a newer skipped run no longer hides a failed one; `skipped` and `neutral` pass, and `--output=json` now writes the commit with one entry per workflow in place of a single run.
+- stretch: the pit stop after a stretch item reads every CI workflow on the branch's head commit, so a skipped run no longer hides a failed one.
+- stretch: `rafa stretch item` hands the stretch's `rules.md` to `plan create` and prints the file it appends, also under `--dry-run` and on a kept plan; `rafa stretch end` run again refreshes the open stretch pull request's body when the report or ledger changed, printing `body updated` or `body unchanged`.
+- release: one stale-docs chore per release — the wrap-up and `rafa epic close` read the newest release tag, retitle an open unreleased chore when the forecast version moves, leave a released chore alone, and fold a racing second create into the older chore, closing the new one as a duplicate.
+- release: `rafa release fragment` run in a linked worktree now writes the fragment into that worktree rather than the main checkout, and prints its absolute path.
+- run: the type step reads a `tsc` that cannot start (exit 126 or 127) as cannot start rather than a type error, with a blocker saying to put `node` on the PATH the loop runs under.
+- loop: a task step whose `tsc` cannot start halts on its blocker without inserting a repair task.
+- doctor: `rafa doctor` prints a `tsc` row in projects with a `tsconfig.json` and exits 1 when `tsc` cannot start, naming the interpreter to put on the PATH.
+- CLI: Every command now refuses a flag it does not declare, before it runs, with exit code 2 and the cause `cli:unknown-flag`, naming the stray flags and the command's own; `rafa release tag --dry-run` no longer writes the tag, `rafa roadmap --state` and `--roadmap` are refused this way (exit 2, formerly exit 1 from the command), and scripts that passed stray flags must drop them.
+- plan: `plan create --issue` and `--next` append the stretch rules file named by `RAFA_STRETCH_RULES` to the planner snapshot under `## Stretch rules`, after the local notes, name it on the snapshot and `--dry-run` lines, and rebuild the snapshot as a notes change when the rules change.
+- docs: The stretch operators page documents `rules.md` and the body refresh of a second `rafa stretch end`.
+- cli: `rafa stretch end`'s help says it prints `body updated` or `body unchanged`.
+
+## 0.50.0 — 2026-11-03, selectLessons keeps a trigger lesson only on two matched words; Three causes of a stopped stretch item, and a way to finish one; Two readings that throw away good data
+<!-- rafa:fragments rafa-1395-lesson-trigger-floor rafa-1391-spec-test-index-record rafa-1400-bug-sweep-37 rafa-1401-bug-sweep-38 rafa-1402-bug-sweep-39 rafa-1418-bug-sweep-40 -->
+
+- lessons: a lesson reaches a task by its trigger only when two words of the task match it, so tasks naming nothing a lesson knows are handed none
+- pr: `rafa pr merge` fetches the base and pulls it once more when its clean-up pull fails with `Cannot fast-forward to multiple branches`, and each step of its json result now carries `retried`.
+- stretch: `rafa stretch item --wait` waits for the pull request's mergeability and checks and merges with `rafa pr merge <pr> --yes` instead of `--skip-checks`, goes on to the CI wait, the ledger line and the pit-stop readings whenever the pull request reads merged even if the clean-up failed (warning to run `rafa cleanup`), and the new `rafa stretch item <issue> --resume` finishes an item whose loop has ended from the pull request its log names, skipping the merge of one already merged; `--resume` beside `--wait` is refused.
+- effort: the skill-use collector now reads a Claude Code session log by skill name whenever every record is at or above the floor of 2.1.280, instead of storing every version other than 2.1.280 as unknown; sessions logged above the recorded fixture's version are counted as unvouched beside read and unknown on the skills line of `rafa effort collect`, and `--verbose` names each session's versions
+- doctor: `rafa doctor` warns only when the installed Claude Code is below the skill-use floor, and prints a note when it is newer than the version the skill-use fixture was recorded under
+- board: `rafa board sync` sends a `gh` call again when it fails with `unexpected end of JSON input`, as it already does on an HTTP 502, instead of stopping
+
+## 0.49.0 — 2026-10-30, rafa pr merge keeps a trunk head branch on both sides; rafa pr merge cleans up when another worktree holds the base
+<!-- rafa:fragments rafa-1266 rafa-1266-base-worktree -->
+
+- pr: rafa pr merge never deletes a head branch that is pr.base, the remote's default branch, main where pr.base names none, or a branch cleanup.keep names, and prints one line saying it kept it
+- pr: rafa pr merge --keep-branch keeps any head branch on both sides
+- pr: rafa pr merge pulls a base another worktree holds in that worktree and detaches the current checkout at it, where git switch used to fail after the merge
+
 ## 0.48.0 — 2026-10-30, chore(deps): bump the minor-and-patch group with 3 updates; chore(deps): bump actions/setup-node from 4 to 7; chore(deps): bump dependabot/fetch-metadata from 2 to 3; chore(deps): bump actions/checkout from 4 to 7; A project names the command a loop runs in its worktree
 <!-- rafa:fragments fix-rafa-tooling-stretch-merge fix-doctor-cleanup-row-clock dependabot-1323 dependabot-1242 dependabot-1244 dependabot-1243 rafa-1252-bug-sweep-35 rafa-1311-spec-monorepo-decouple-1 rafa-1317-spec-monorepo-decouple-2 rafa-1320-spec-monorepo-pass-4a rafa-1325-spec-monorepo-decouple-3 rafa-1327-spec-monorepo-pass-4b rafa-1333-spec-monorepo-decouple-4 rafa-1336-spec-monorepo-decouple-5 rafa-1341-spec-cleanup-scratch-repository rafa-1347-spec-loop-worktreesetup-command rafa-1349-spec-monorepo-pass-4c rafa-1362-spec-monorepo-decouple-6 rafa-1366-spec-monorepo-pass-4d rafa-1368-spec-monorepo-decouple-7 rafa-1372-spec-upstream-step-s rafa-1374-spec-monorepo-pass-4e rafa-1378-spec-core-s-compiler rafa-1380-spec-monorepo-pass-4f -->
 

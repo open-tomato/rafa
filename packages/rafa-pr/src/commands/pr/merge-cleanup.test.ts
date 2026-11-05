@@ -10,7 +10,7 @@
  * `merge.test.ts` and `merge-driven.test.ts` run the same functions
  * through `rafa pr merge` itself.
  */
-import type { FollowUpPlace } from './merge-cleanup.js';
+import type { CleanUpShape, FollowUpPlace, KeepSettings } from './merge-cleanup.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 import type { MergeGuardSettings } from '@open-tomato/rafa-release/release/guard-merge';
@@ -28,8 +28,11 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { createGitRunner } from '../../pr/index.js';
 
 import {
+  baseHeldElsewhere,
   cleanUpAfterMerge,
   followUpsFor,
+  keptBecause,
+  keptLine,
   localHoldsBranch,
   readyLine,
   remoteHoldsBranch,
@@ -147,6 +150,15 @@ describe('readyLine', () => {
   });
 });
 
+describe('readyLine and keptLine for a base another worktree holds', () => {
+  it('say where the base was pulled and that this checkout is detached at it', () => {
+    expect(readyLine('main', 'feat/x', { local: true, remote: true }, '/repo'))
+      .toBe('main is pulled in /repo and this checkout is detached at it, and feat/x is gone locally and on origin.');
+    expect(keptLine('main', 'integration', 'it is pr.base', '/repo'))
+      .toBe('main is pulled in /repo and this checkout is detached at it; integration is kept locally and on origin, since it is pr.base.');
+  });
+});
+
 describe('runCleanUp', () => {
   it('runs every step in order and reports each done', () => {
     const { git, calls } = fakeGit();
@@ -159,7 +171,7 @@ describe('runCleanUp', () => {
       'push origin --delete feat/x',
       'fetch --prune',
     ]);
-    expect(reports.every((report) => report.ok && !report.skipped)).toBe(true);
+    expect(reports.every((report) => report.ok && !report.skipped && !report.retried)).toBe(true);
     expect(info.lines).toEqual([
       'switch to main: done',
       'pull main, fast-forward only: done',
@@ -174,7 +186,7 @@ describe('runCleanUp', () => {
     const info = collector();
     const reports = runCleanUp(git, MERGED, { local: false, remote: false }, info.report);
     expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch --prune']);
-    expect(reports.find((report) => report.id === 'delete-local')).toMatchObject({ ok: true, skipped: true });
+    expect(reports.find((report) => report.id === 'delete-local')).toMatchObject({ ok: true, skipped: true, retried: false });
     expect(info.lines).toContain('delete the local branch feat/x: skipped — no local branch feat/x; nothing to delete');
   });
 
@@ -202,7 +214,229 @@ describe('runCleanUp', () => {
   });
 });
 
+/** What git said in #1171, after a merge that went through. */
+const MULTIPLE_BRANCHES: GitResult = { ok: false, stdout: '', stderr: 'fatal: Cannot fast-forward to multiple branches.' };
+
+/** Runs the clean-up and answers what it threw, or null when it threw nothing. */
+function cleanUpThrown(git: GitRunner, info = collector(), shape: CleanUpShape = {}): unknown {
+  try {
+    runCleanUp(git, MERGED, { local: true, remote: true }, info.report, shape);
+  } catch (error) {
+    return error;
+  }
+  return null;
+}
+
+/** A runner whose `git pull --ff-only` answers each of `pulls` in turn, OK once they run out. */
+function pullsInTurn(
+  pulls: readonly GitResult[],
+  answers: Readonly<Record<string, GitResult>> = {},
+): { git: GitRunner; calls: string[] } {
+  const left = [...pulls];
+  const inner = fakeGit(answers);
+  const git: GitRunner = (args) => {
+    const answer = inner.git(args);
+    return args.join(' ') === 'pull --ff-only'
+      ? left.shift() ?? OK
+      : answer;
+  };
+  return { git, calls: inner.calls };
+}
+
+describe('runCleanUp, the pull tried once more', () => {
+  it('fetches and pulls again after the multiple-branches text, reporting the step once as retried', () => {
+    const { git, calls } = pullsInTurn([MULTIPLE_BRANCHES]);
+    const info = collector();
+    const reports = runCleanUp(git, MERGED, { local: true, remote: true }, info.report);
+    expect(calls).toEqual([
+      'switch main',
+      'pull --ff-only',
+      'fetch origin main',
+      'pull --ff-only',
+      'branch -D feat/x',
+      'push origin --delete feat/x',
+      'fetch --prune',
+    ]);
+    expect(reports.map((report) => [report.id, report.ok, report.retried])).toEqual([
+      ['switch-base', true, false],
+      ['pull-base', true, true],
+      ['delete-local', true, false],
+      ['delete-remote', true, false],
+      ['prune-remotes', true, false],
+    ]);
+    expect(info.lines.slice(0, 3)).toEqual([
+      'switch to main: done',
+      'pull main, fast-forward only: retrying after git fetch origin main',
+      'pull main, fast-forward only: done',
+    ]);
+  });
+
+  it('reports a second pull that fails as a clean-up failure, the merge done', () => {
+    const second: GitResult = { ok: false, stdout: '', stderr: 'fatal: Not possible to fast-forward' };
+    const { git, calls } = pullsInTurn([MULTIPLE_BRANCHES, second]);
+    const thrown = cleanUpThrown(git);
+    expect(thrown).toBeInstanceOf(CommandExit);
+    expect((thrown as CommandExit).exitCode).toBe(1);
+    expect((thrown as CommandExit).message.split('\n')).toEqual([
+      '❌ pull main, fast-forward only: failed',
+      '   fatal: Not possible to fast-forward',
+      '#41 is merged, and the merge is left alone. Run the rest yourself:',
+      '   git pull --ff-only',
+      '   git branch -D feat/x',
+      '   git push origin --delete feat/x',
+      '   git fetch --prune',
+    ]);
+    expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch origin main', 'pull --ff-only']);
+  });
+
+  it('does not retry a pull that failed with another text', () => {
+    const { git, calls } = pullsInTurn([{ ok: false, stdout: '', stderr: 'fatal: Not possible to fast-forward' }]);
+    const info = collector();
+    expect(cleanUpThrown(git, info)).toBeInstanceOf(CommandExit);
+    expect(calls).toEqual(['switch main', 'pull --ff-only']);
+    expect(info.lines.some((line) => line.includes('retrying'))).toBe(false);
+  });
+
+  it('reports a fetch that fails as the step\'s failure, quoting the fetch, with no second pull', () => {
+    const { git, calls } = pullsInTurn([MULTIPLE_BRANCHES], {
+      'fetch origin main': { ok: false, stdout: '', stderr: 'fatal: unable to access origin' },
+    });
+    const thrown = cleanUpThrown(git);
+    expect(thrown).toBeInstanceOf(CommandExit);
+    expect((thrown as CommandExit).exitCode).toBe(1);
+    const lines = (thrown as CommandExit).message.split('\n');
+    expect(lines.slice(0, 3)).toEqual([
+      '❌ pull main, fast-forward only: failed',
+      '   fatal: unable to access origin',
+      '#41 is merged, and the merge is left alone. Run the rest yourself:',
+    ]);
+    expect(lines[3]).toBe('   git pull --ff-only');
+    expect(calls).toEqual(['switch main', 'pull --ff-only', 'fetch origin main']);
+  });
+
+  it('fetches in the worktree that holds the base, as the pull runs there', () => {
+    const { git, calls } = fakeGit({ '-C /repo pull --ff-only': MULTIPLE_BRANCHES });
+    expect(cleanUpThrown(git, collector(), { baseHeldAt: '/repo' })).toBeInstanceOf(CommandExit);
+    expect(calls.slice(0, 3)).toEqual(['-C /repo pull --ff-only', '-C /repo fetch origin main', '-C /repo pull --ff-only']);
+  });
+});
+
+/** The git line `readRemoteHead` reads the remote's default branch with. */
+const REMOTE_HEAD = 'symbolic-ref --quiet --short refs/remotes/origin/HEAD';
+
+/** The keep settings of a project naming no base and no pattern, the flag off. */
+const NOTHING_KEPT: KeepSettings = { base: null, keep: [], keepBranch: false };
+
+/** The promotion pull request the incident merged: the trunk into the release branch. */
+const PROMOTED = { number: 1265, headRefName: 'integration', baseRefName: 'main' };
+
+describe('keptBecause', () => {
+  it('keeps the branch pr.base names, asking git nothing', () => {
+    const { git, calls } = fakeGit();
+    expect(keptBecause(git, 'integration', { ...NOTHING_KEPT, base: 'integration' })).toBe('it is pr.base');
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps the remote\'s default branch even where pr.base names another', () => {
+    const { git } = fakeGit({ [REMOTE_HEAD]: { ok: true, stdout: 'origin/integration\n', stderr: '' } });
+    expect(keptBecause(git, 'integration', { ...NOTHING_KEPT, base: 'develop' }))
+      .toBe('it is origin\'s default branch');
+  });
+
+  it('keeps main where pr.base names none and the remote names no default', () => {
+    const { git } = fakeGit({ [REMOTE_HEAD]: { ok: false, stdout: '', stderr: '' } });
+    expect(keptBecause(git, 'main', NOTHING_KEPT)).toBe('it is main, the base where pr.base names none');
+  });
+
+  it('keeps a branch a cleanup.keep pattern names', () => {
+    const { git } = fakeGit();
+    expect(keptBecause(git, 'release/1.2', { ...NOTHING_KEPT, keep: ['release/*'] }))
+      .toBe('a cleanup.keep pattern names it');
+  });
+
+  it('keeps any branch under --keep-branch', () => {
+    const { git } = fakeGit();
+    expect(keptBecause(git, 'feat/x', { ...NOTHING_KEPT, keepBranch: true })).toBe('--keep-branch was given');
+  });
+
+  it('keeps nothing else: a feature branch is deleted', () => {
+    const { git } = fakeGit({ [REMOTE_HEAD]: { ok: true, stdout: 'origin/main\n', stderr: '' } });
+    expect(keptBecause(git, 'feat/x', { base: 'integration', keep: ['release/*'], keepBranch: false })).toBeNull();
+  });
+});
+
+/** The git lines `baseHeldElsewhere` reads the checkouts with. */
+const WORKTREES = 'worktree list --porcelain';
+const TOPLEVEL = 'rev-parse --show-toplevel';
+
+/** What `git worktree list --porcelain` prints for a main checkout on `integration` and a session worktree. */
+const TWO_CHECKOUTS = [
+  'worktree /repo',
+  'HEAD 17ad52742f6c033d33c7c034ed8d44a63b6df889',
+  'branch refs/heads/integration',
+  '',
+  'worktree /repo/.claude/worktrees/session',
+  'HEAD 67672f618d097f1c8143ac288986f80e322f77a7',
+  'branch refs/heads/claude/session',
+  '',
+].join('\n');
+
+/** The answers of a session worktree whose base the main checkout holds. */
+const IN_SESSION_WORKTREE: Readonly<Record<string, GitResult>> = {
+  [WORKTREES]: { ok: true, stdout: TWO_CHECKOUTS, stderr: '' },
+  [TOPLEVEL]: { ok: true, stdout: '/repo/.claude/worktrees/session\n', stderr: '' },
+};
+
+describe('baseHeldElsewhere', () => {
+  it('answers the other worktree that holds the base', () => {
+    const { git } = fakeGit(IN_SESSION_WORKTREE);
+    expect(baseHeldElsewhere(git, 'integration', collector().report)).toBe('/repo');
+  });
+
+  it('answers null when this checkout holds the base', () => {
+    const { git } = fakeGit({ ...IN_SESSION_WORKTREE, [TOPLEVEL]: { ok: true, stdout: '/repo\n', stderr: '' } });
+    expect(baseHeldElsewhere(git, 'integration', collector().report)).toBeNull();
+  });
+
+  it('answers null without reading the root when no checkout holds the base', () => {
+    const { git, calls } = fakeGit(IN_SESSION_WORKTREE);
+    expect(baseHeldElsewhere(git, 'main', collector().report)).toBeNull();
+    expect(calls).toEqual([WORKTREES]);
+  });
+
+  it('warns and answers null when the worktrees cannot be listed', () => {
+    const { git } = fakeGit({ [WORKTREES]: { ok: false, stdout: '', stderr: 'fatal: broken' } });
+    const warned = collector();
+    expect(baseHeldElsewhere(git, 'integration', warned.report)).toBeNull();
+    expect(warned.lines).toEqual([
+      'could not read which worktree holds integration, so it is switched to here: fatal: broken',
+    ]);
+  });
+});
+
 describe('cleanUpAfterMerge', () => {
+  it('pulls a base the main checkout holds there and detaches this worktree, so no switch is refused', () => {
+    const merged = { number: 1392, headRefName: 'fix/x', baseRefName: 'integration' };
+    const { git, calls } = fakeGit({
+      ...IN_SESSION_WORKTREE,
+      'ls-remote --heads origin fix/x': { ok: true, stdout: 'abc\trefs/heads/fix/x\n', stderr: '' },
+      'show-ref --verify --quiet refs/heads/fix/x': { ok: false, stdout: '', stderr: '' },
+    });
+    const info = collector();
+    const { steps } = cleanUpAfterMerge(git, merged, NOTHING_KEPT, { info: info.report, warn: collector().report });
+    expect(calls).not.toContain('switch integration');
+    expect(calls.slice(-4)).toEqual([
+      '-C /repo pull --ff-only',
+      'switch --detach integration',
+      'push origin --delete fix/x',
+      'fetch --prune',
+    ]);
+    expect(steps.every((step) => step.ok)).toBe(true);
+    expect(info.lines.at(-1)).toBe(
+      'integration is pulled in /repo and this checkout is detached at it, and fix/x is gone on origin; there was no local branch to delete.',
+    );
+  });
+
   it('probes the remote before the local branch, runs the steps, and ends on the ready line', () => {
     const { git, calls } = fakeGit({
       'ls-remote --heads origin feat/x': { ok: false, stdout: '', stderr: 'remote gone' },
@@ -210,11 +444,76 @@ describe('cleanUpAfterMerge', () => {
     });
     const info = collector();
     const warned = collector();
-    const steps = cleanUpAfterMerge(git, MERGED, { info: info.report, warn: warned.report });
-    expect(calls.slice(0, 2)).toEqual(['ls-remote --heads origin feat/x', 'show-ref --verify --quiet refs/heads/feat/x']);
+    const { steps, kept } = cleanUpAfterMerge(git, MERGED, NOTHING_KEPT, { info: info.report, warn: warned.report });
+    expect(calls.slice(0, 4)).toEqual([
+      REMOTE_HEAD,
+      WORKTREES,
+      'ls-remote --heads origin feat/x',
+      'show-ref --verify --quiet refs/heads/feat/x',
+    ]);
     expect(warned.lines.map((line) => line.split(' ')[0])).toEqual(['origin', 'could']);
     expect(steps.map((step) => step.id)).toEqual(['switch-base', 'pull-base', 'delete-local', 'prune-remotes']);
+    expect(kept).toBeNull();
     expect(info.lines.at(-1)).toBe('main is checked out and pulled, and feat/x is gone locally; origin had already deleted it.');
+  });
+
+  it('still deletes a feature branch on both sides where the project names trunks', () => {
+    const { git, calls } = fakeGit({
+      'ls-remote --heads origin feat/x': { ok: true, stdout: 'abc\trefs/heads/feat/x\n', stderr: '' },
+    });
+    const { kept } = cleanUpAfterMerge(git, MERGED, { ...NOTHING_KEPT, base: 'integration' }, {
+      info: collector().report,
+      warn: collector().report,
+    });
+    expect(kept).toBeNull();
+    expect(calls).toContain('branch -D feat/x');
+    expect(calls).toContain('push origin --delete feat/x');
+  });
+
+  it('keeps a trunk head on both sides, probing neither, and says so in one line', () => {
+    const { git, calls } = fakeGit();
+    const info = collector();
+    const { steps, kept } = cleanUpAfterMerge(git, PROMOTED, { ...NOTHING_KEPT, base: 'integration' }, {
+      info: info.report,
+      warn: collector().report,
+    });
+    expect(calls).toEqual([WORKTREES, 'switch main', 'pull --ff-only', 'fetch --prune']);
+    expect(steps.map((step) => step.id)).toEqual(['switch-base', 'pull-base', 'prune-remotes']);
+    expect(kept).toBe('it is pr.base');
+    expect(info.lines.filter((line) => line.includes('kept'))).toEqual([
+      'main is checked out and pulled; integration is kept locally and on origin, since it is pr.base.',
+    ]);
+  });
+
+  it('names no trunk delete in the tail a failed step prints', () => {
+    const { git } = fakeGit({ 'pull --ff-only': { ok: false, stdout: '', stderr: 'fatal: diverged' } });
+    let thrown: unknown = null;
+    try {
+      cleanUpAfterMerge(git, PROMOTED, { ...NOTHING_KEPT, base: 'integration' }, {
+        info: collector().report,
+        warn: collector().report,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(CommandExit);
+    const message = (thrown as CommandExit).message;
+    expect(message).not.toContain('branch -D');
+    expect(message).not.toContain('--delete');
+    expect(message.split('\n').slice(-2)).toEqual(['   git pull --ff-only', '   git fetch --prune']);
+  });
+
+  it('keeps a feature branch under --keep-branch, deleting it on neither side', () => {
+    const { git, calls } = fakeGit();
+    const info = collector();
+    const { kept } = cleanUpAfterMerge(git, MERGED, { ...NOTHING_KEPT, keepBranch: true }, {
+      info: info.report,
+      warn: collector().report,
+    });
+    expect(kept).toBe('--keep-branch was given');
+    expect(calls).toEqual([REMOTE_HEAD, WORKTREES, 'switch main', 'pull --ff-only', 'fetch --prune']);
+    expect(info.lines.at(-1))
+      .toBe('main is checked out and pulled; feat/x is kept locally and on origin, since --keep-branch was given.');
   });
 });
 

@@ -639,6 +639,8 @@ describe('the clean-up', () => {
       'status --porcelain',
       'worktree list --porcelain',
       'rev-parse --show-toplevel',
+      'symbolic-ref --quiet --short refs/remotes/origin/HEAD',
+      'worktree list --porcelain',
       `ls-remote --heads origin ${BRANCH}`,
       `show-ref --verify --quiet refs/heads/${BRANCH}`,
       `switch ${BASE}`,
@@ -651,6 +653,31 @@ describe('the clean-up', () => {
     expect(lines).toContain(`switch to ${BASE}: done`);
     expect(lines).toContain(`delete origin/${BRANCH}: done`);
     expect(lines.at(-1)).toBe(`${BASE} is checked out and pulled, and ${BRANCH} is gone locally and on origin.`);
+  });
+
+  it('pulls a base another worktree holds there and detaches this checkout, switching nowhere', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const main = `${project.root}-main`;
+    const seams = caseSeams(stub.pulls, project, {
+      git: {
+        'worktree list --porcelain':
+          ok(`worktree ${main}\nbranch refs/heads/${BASE}\n\nworktree ${project.root}\nbranch refs/heads/${BRANCH}\n\n`),
+      },
+    });
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.git.ran()).not.toContain(`switch ${BASE}`);
+    expect(seams.git.ran().slice(-5)).toEqual([
+      `-C ${main} pull --ff-only`,
+      `switch --detach ${BASE}`,
+      `branch -D ${BRANCH}`,
+      `push origin --delete ${BRANCH}`,
+      'fetch --prune',
+    ]);
+    expect(lines.at(-1))
+      .toBe(`${BASE} is pulled in ${main} and this checkout is detached at it, and ${BRANCH} is gone locally and on origin.`);
   });
 
   it('leaves the remote delete out where the remote no longer holds the branch, and says so', async () => {
@@ -757,6 +784,35 @@ describe('the clean-up', () => {
     expect(run.stderr).not.toContain('reset');
     expect(run.stderr).not.toContain('--force');
     expect(run.stderr).toContain(`git push origin --delete ${BRANCH}`);
+  });
+
+  it('keeps a head branch pr.base names on both sides, saying so, and carries why in the result', async () => {
+    const stub = stubPulls({ get: () => Promise.resolve(detail({ headRefName: 'integration' })) });
+    const project = freshProject(`${GH_CONFIG}  base: integration\n`);
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines, events } = await ran(seams.seams, project, ['41', '--yes', '--output=json']);
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.git.ran().filter((line) => line.startsWith('branch -D') || line.includes('--delete'))).toEqual([]);
+    expect(seams.git.ran()).not.toContain('ls-remote --heads origin integration');
+    expect(dataOf(events)['kept']).toBe('it is pr.base');
+    expect(lines.join('\n')).toContain(
+      `${BASE} is checked out and pulled; integration is kept locally and on origin, since it is pr.base.`,
+    );
+  });
+
+  it('keeps a feature branch on both sides under --keep-branch', async () => {
+    const stub = stubPulls();
+    const project = freshProject();
+    const seams = caseSeams(stub.pulls, project);
+    const { run, lines } = await ran(seams.seams, project, ['41', '--yes', '--keep-branch']);
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(seams.git.ran()).not.toContain(`branch -D ${BRANCH}`);
+    expect(seams.git.ran()).not.toContain(`push origin --delete ${BRANCH}`);
+    expect(seams.git.ran()).toContain('fetch --prune');
+    expect(lines.at(-1))
+      .toBe(`${BASE} is checked out and pulled; ${BRANCH} is kept locally and on origin, since --keep-branch was given.`);
   });
 });
 
@@ -1293,14 +1349,20 @@ describe('the ending service', () => {
 });
 
 describe('the command itself', () => {
-  it('routes as pr merge, declares both renderings, one optional number and its four flags, and is frozen', () => {
+  it('routes as pr merge, declares both renderings, one optional number and its five flags, and is frozen', () => {
     const command = createPrMergeCommand();
 
     expect([command.subject, command.action, command.name]).toEqual(['pr', 'merge', 'pr merge']);
     expect(command.outputs).toEqual(['text', 'json']);
     expect(command.args.map((arg) => [arg.name, arg.required ?? false])).toEqual([['n', false]]);
     expect(command.flags.map((flag) => [flag.name, flag.type]))
-      .toEqual([['yes', 'boolean'], ['skip-checks', 'boolean'], ['method', 'string'], ['hint', 'boolean']]);
+      .toEqual([
+        ['yes', 'boolean'],
+        ['skip-checks', 'boolean'],
+        ['keep-branch', 'boolean'],
+        ['method', 'string'],
+        ['hint', 'boolean'],
+      ]);
     expect(Object.isFrozen(command)).toBe(true);
   });
 
@@ -1313,6 +1375,7 @@ describe('the command itself', () => {
       'rafa pr merge',
       'rafa pr merge 41 --yes',
       'rafa pr merge 41 --skip-checks',
+      'rafa pr merge 41 --keep-branch',
       'rafa pr merge 41 --method=rebase --output=json',
     ]);
   });

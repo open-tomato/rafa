@@ -22,23 +22,35 @@
  *
  * ## The steps, in order
  *
- *   1. `gh pr view <pr> --json ...` reads the pull request. Its base must
- *      be a `stretch/*` branch: checks are skipped only on an integration
- *      branch, never on the default branch or any other base, so another
- *      base is refused with exit 1 and nothing merged. A pull request
- *      that is not open is refused the same way.
- *   2. `rafa pr merge <pr> --skip-checks --yes` on this terminal: the
- *      `pr merge` logic, which frees the loop worktree holding the head
- *      branch and cleans up after the merge. `verify` runs on a push to
- *      `stretch/**` and on pull requests into `main` or `integration` only
- *      (`.github/workflows/verify.yml`), so the pull request reports no
- *      checks and `--yes` beside `--skip-checks` is let through. Its exit
- *      code, when not 0, is the item's.
- *   3. `gh pr view <pr> --json ...` again, for the merge commit: the new
- *      head of the integration branch. Measured on `gh` 2.102.0 against
- *      `open-tomato/rafa`: a merged pull request answers
- *      `"mergeCommit":{"oid":"<sha>"}` and `"state":"MERGED"`, an open one
- *      `"mergeCommit":null`.
+ *   1. `gh pr view <pr> --json ...` reads the pull request (`viewPull`,
+ *      `./item-pull.ts`). Its base must be a `stretch/*` branch: an item
+ *      merges into an integration branch, never the default branch or
+ *      any other base, so another base is refused with exit 1 and
+ *      nothing merged. A pull request that is not open is refused the
+ *      same way. Then the two waits of `./item-checks.ts`, each refused
+ *      with exit 1 naming `rafa stretch item <issue> --resume`: the
+ *      mergeability, read again while GitHub answers `UNKNOWN` (#1191),
+ *      then the pull request's checks, since every pull request reports
+ *      the `fragment` check and `pr merge` refuses one whose checks have
+ *      not passed (#1255).
+ *   2. `rafa pr merge <pr> --yes` on this terminal: the `pr merge` logic,
+ *      which frees the loop worktree holding the head branch and cleans
+ *      up after the merge. No `--skip-checks`: `pr merge` refuses it
+ *      where the pull request reports any check. Its exit code is kept
+ *      for step 3 rather than ending the item, since a clean-up that
+ *      fails after the merge went through ends `pr merge` non-zero too
+ *      (#1171). A line that could not start ends the item with exit 2.
+ *   3. `gh pr view <pr> --json ...` again, up to {@link MERGED_READ_TRIES}
+ *      times every {@link MERGED_POLL_MS}, until it reads `MERGED` with a
+ *      merge commit: the new head of the integration branch. Measured on
+ *      `gh` 2.102.0 against `open-tomato/rafa`: a merged pull request
+ *      answers `"mergeCommit":{"oid":"<sha>"}` and `"state":"MERGED"`, an
+ *      open one `"mergeCommit":null`. Read merged, steps 4 to 6 run
+ *      whatever `pr merge`'s code, and a code that was not 0 prints one
+ *      warning naming it: the clean-up is what failed, and `rafa cleanup`
+ *      finishes it. Not merged after the reads, the item ends with
+ *      `pr merge`'s code when it was not 0, else 2, and nothing after
+ *      runs.
  *   4. The run on the merge commit, read through `readNewestRun`
  *      (`src/ci/runs.ts`) by the base and that commit every
  *      {@link CI_POLL_MS}, until it is completed, red or green. A push
@@ -50,8 +62,8 @@
  *      its ledger line is written either way. The {@link CI_WAIT_MS}
  *      warning says which of two things the last read that answered
  *      found: no run on the commit, or a run on it that had not ended.
- *      Step 6 still reads the newest run of the base, which after such
- *      a push is not the run this step waited on.
+ *      Step 6 still reads every workflow on the head commit of the base,
+ *      which after such a push is not the commit this step waited on.
  *   5. One line appended to the item ledger, `.rafa/stretch/<n>/items.ndjson`
  *      (`src/stretch/items.ts`): the issue, the plan stub, the pull
  *      request, the merge commit, a `Closes #<n>` line per issue the body
@@ -66,15 +78,20 @@
  *
  * ## `--dry-run`
  *
- * {@link mergeDryRunLines} are the lines steps 2 to 6 print in a dry run
- * with `--wait`; the pull request's number is not known before the loop
- * opens it, so the lines name it `<pr>`, and the merge commit is not
- * known before the merge, so the `gh run list` line names it
- * `--commit <merge-commit>`.
+ * {@link mergeDryRunLines} are the lines the two waits and steps 2 to 6
+ * print in a dry run with `--wait`; the pull request's number is not
+ * known before the loop opens it, so the lines name it `<pr>`, and the
+ * merge commit is not known before the merge, so the `gh run list` line
+ * names it `--commit <merge-commit>`.
+ *
+ * Steps 1 to 3 are {@link mergePull} and steps 4 to 6 {@link finishItem},
+ * so an item resumed after its loop has ended runs the same two.
  *
  * Every process goes through {@link ItemMergeSeams}, so no test runs
  * `rafa`, reaches GitHub or sleeps.
  */
+import type { WaitSeams } from './item-checks.js';
+import type { ViewedPull } from './item-pull.js';
 import type { BranchRun } from '../../ci/runs.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { Tracker } from '@open-tomato/rafa/ports';
@@ -93,6 +110,15 @@ import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
 import { readPitReadings, renderPitReadings } from '../../stretch/pit-readings.js';
 
+import {
+  awaitChecks,
+  awaitMergeability,
+  CHECKS_POLL_MS,
+  CHECKS_WAIT_MS,
+  MERGEABILITY_POLL_MS,
+  MERGEABILITY_WAIT_MS,
+} from './item-checks.js';
+import { viewPull } from './item-pull.js';
 import { STRETCH_BRANCH_PREFIX, stretchRecordPath } from './start.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -107,11 +133,14 @@ export const CI_WAIT_MS: number = 90 * 60_000;
 /** How many reads of the run on the merge commit may fail in a row before the wait gives up. */
 export const CI_READ_TRIES = 3;
 
-/** The flags the merge runs with: no checks to wait on, and no question. */
-export const MERGE_FLAGS: readonly string[] = Object.freeze(['--skip-checks', '--yes']);
+/** The flags the merge runs with: no question, the checks already waited on. */
+export const MERGE_FLAGS: readonly string[] = Object.freeze(['--yes']);
 
-/** The `--json` fields the pull request is read with. */
-export const PR_VIEW_FIELDS = ['number', 'state', 'baseRefName', 'headRefName', 'body', 'mergeCommit'] as const;
+/** How many times step 3 reads the pull request for its merge commit. */
+export const MERGED_READ_TRIES = 5;
+
+/** How long apart two reads of step 3 are. */
+export const MERGED_POLL_MS = 5_000;
 
 /** The events that end a loop's wait for its pull request, as `loop wait` reads them. */
 const ENDING_EVENTS = ['pr', 'no-pr', 'halt', 'error'] as const;
@@ -125,9 +154,6 @@ const FAILED_EXIT = 2;
 /** How many characters of a commit a line shows. */
 const SHORT_SHA = 7;
 
-/** A full commit sha. */
-const SHA = /^[0-9a-f]{40}$/;
-
 /** What a dry run's line shows where the merge commit will be. */
 const MERGE_COMMIT_PLACEHOLDER = '<merge-commit>';
 
@@ -139,16 +165,13 @@ const MERGE_COMMIT_PLACEHOLDER = '<merge-commit>';
 const STAND_IN_SHA = '0'.repeat(40);
 
 /** The processes, `gh` and clock this half reaches through; see the module note. */
-export interface ItemMergeSeams {
+export interface ItemMergeSeams extends WaitSeams {
   /** Runs a rafa line on this terminal and answers its exit code, or null when it could not start. */
   readonly runRafa: (argv: readonly string[], cwd: string, env: Readonly<Record<string, string>>) => Promise<number | null>;
   /** The `gh` runner for the project root. */
   readonly gh: (root: string) => GhRunner;
   /** The tracker the open bugs and the bugs filed since the cut-off are read from. */
   readonly tracker: (gh: GhRunner) => Pick<Tracker, 'openIssues' | 'filedIssues'>;
-  /** Waits `ms` milliseconds. */
-  readonly sleep: (ms: number) => Promise<void>;
-  readonly now: () => Date;
   /** The program words that run rafa. */
   readonly rafa: readonly string[];
 }
@@ -170,23 +193,31 @@ export interface WaitedItem {
   readonly env: Readonly<Record<string, string>>;
 }
 
+/** What steps 1 to 3 need of the item: where it runs, its issue, and the environment a rafa child runs with. */
+export type MergeInput = Pick<WaitedItem, 'root' | 'issue' | 'env'>;
+
+/** What steps 4 to 6 need of the item, the cut-off new bugs are counted from among it. */
+export interface FinishInput {
+  readonly root: string;
+  /** The stretch `pr.base` names. */
+  readonly n: number;
+  readonly issue: number;
+  /** The plan's stub, as the ledger keeps it. */
+  readonly stub: string;
+  /** The cut-off new bugs are counted from. */
+  readonly since: Date;
+}
+
+/** A pull request read merged, its merge commit known. */
+export interface MergedPull extends ViewedPull {
+  readonly mergeCommit: string;
+}
+
 /** How the loop ended, as its events file says. */
 export type LoopEnding =
   | { readonly kind: 'pr'; readonly number: number }
   | { readonly kind: 'no-pr' | 'halt' | 'error'; readonly reason: string }
   | { readonly kind: 'none'; readonly reason: string };
-
-/** The pull request, as `gh pr view` answers it. */
-export interface ViewedPull {
-  readonly number: number;
-  /** `OPEN`, `MERGED` or `CLOSED`, as `gh` writes it. */
-  readonly state: string;
-  readonly base: string;
-  readonly head: string;
-  readonly body: string;
-  /** The merge commit's sha, or null before it merged. */
-  readonly mergeCommit: string | null;
-}
 
 /** A refusal with exit code 1 naming `why`. */
 function refusal(why: string): CommandExit {
@@ -243,62 +274,11 @@ export function noPullRequestLine(issue: number, ending: Exclude<LoopEnding, { k
   return `the loop of #${String(issue)} ${how}: ${ending.reason}`;
 }
 
-/** The arguments after `gh` that read pull request `number`. */
-export function prViewArgs(number: number): string[] {
-  return ['pr', 'view', String(number), '--json', PR_VIEW_FIELDS.join(',')];
-}
-
-/** The text `field` of `row` holds, or a failure naming it. */
-function textField(row: Readonly<Record<string, unknown>>, field: string, command: string): string {
-  const value = row[field];
-  if (typeof value !== 'string') throw failure(`${command} answered ${field} ${describeValue(value)}, expected a string`);
-  return value;
-}
-
-/** The merge commit `gh` wrote, null for none, or a failure. */
-function mergeCommitOf(value: unknown, command: string): string | null {
-  if (value === null || value === undefined) return null;
-  const oid = isMapping(value)
-    ? value['oid']
-    : undefined;
-  if (typeof oid !== 'string' || !SHA.test(oid)) {
-    throw failure(`${command} answered mergeCommit ${describeValue(value)}, expected null or an object holding a 40-character oid`);
-  }
-  return oid;
-}
-
-/** Pull request `number`, read through `gh pr view`; a failure when `gh` fails or answers something else. */
-export async function viewPull(gh: GhRunner, number: number): Promise<ViewedPull> {
-  const args = prViewArgs(number);
-  const command = `gh ${args.join(' ')}`;
-  const result = await gh(args);
-  if (!result.ok) {
-    const said = result.stderr.trim() || result.stdout.trim() || 'it exited non-zero and wrote nothing';
-    throw failure(`${command} failed: ${said}`);
-  }
-  let row: unknown;
-  try {
-    row = JSON.parse(result.stdout) as unknown;
-  } catch (error) {
-    throw failure(`${command} wrote output that is not JSON: ${messageOf(error)}`);
-  }
-  if (!isMapping(row)) throw failure(`${command} answered ${describeValue(row)}, expected an object`);
-  if (row['number'] !== number) throw failure(`${command} answered number ${describeValue(row['number'])}`);
-  return {
-    number,
-    state: textField(row, 'state', command),
-    base: textField(row, 'baseRefName', command),
-    head: textField(row, 'headRefName', command),
-    body: textField(row, 'body', command),
-    mergeCommit: mergeCommitOf(row['mergeCommit'], command),
-  };
-}
-
 /** Refuses a pull request that is not open or whose base is not a `stretch/*` branch. */
 function refuseUnmergeable(pull: ViewedPull): void {
   if (!pull.base.startsWith(STRETCH_BRANCH_PREFIX) || pull.base === STRETCH_BRANCH_PREFIX) {
-    throw refusal(`#${String(pull.number)} opens into ${pull.base}, not a ${STRETCH_BRANCH_PREFIX}* branch: an item is`
-      + ' merged with its checks skipped only into an integration branch. Nothing was merged.');
+    throw refusal(`#${String(pull.number)} opens into ${pull.base}, not a ${STRETCH_BRANCH_PREFIX}* branch: an item`
+      + ' merges into an integration branch, never the default branch. Nothing was merged.');
   }
   if (pull.state !== 'OPEN') {
     throw refusal(`#${String(pull.number)} is ${pull.state}, not open. Nothing was merged.`);
@@ -315,6 +295,10 @@ export function mergeDryRunLines(rafa: readonly string[], root: string, n: numbe
   const base = `${STRETCH_BRANCH_PREFIX}${String(n)}`;
   const runList = lineText(['gh', ...runListArgs({ branch: base, commit: STAND_IN_SHA })]).replace(STAND_IN_SHA, MERGE_COMMIT_PLACEHOLDER);
   return [
+    `wait for GitHub to compute the mergeability of <pr>  (again every ${String(MERGEABILITY_POLL_MS / 1_000)}s while it reads`
+      + ` UNKNOWN, up to ${String(MERGEABILITY_WAIT_MS / 60_000)} minutes)`,
+    `wait for the checks of <pr> to pass  (again every ${String(CHECKS_POLL_MS / 1_000)}s, up to`
+      + ` ${String(CHECKS_WAIT_MS / 60_000)} minutes)`,
     `${lineText([...rafa, 'pr', 'merge'])} <pr> ${lineText(MERGE_FLAGS)}`,
     `${runList}  (again every ${String(CI_POLL_MS / 1_000)}s until the run on the merge commit ends)`,
     `append the item to ${itemsPath(root, n)}`,
@@ -323,7 +307,7 @@ export function mergeDryRunLines(rafa: readonly string[], root: string, n: numbe
 }
 
 /** The `startedAt` of the stretch's `stretch.json`, or null when there is none to read. */
-function stretchStartedAt(root: string, n: number): Date | null {
+export function stretchStartedAt(root: string, n: number): Date | null {
   let record: unknown;
   try {
     record = JSON.parse(readFileSync(stretchRecordPath(root, n), 'utf8')) as unknown;
@@ -395,39 +379,73 @@ async function awaitRun(context: RafaContext, wait: RunWait, seams: ItemMergeSea
   }
 }
 
-/** Step 2: `rafa pr merge <pr> --skip-checks --yes`, its exit code the item's when not 0. */
-async function mergeStep(context: RafaContext, item: WaitedItem, number: number, seams: ItemMergeSeams): Promise<void> {
+/** Step 2: `rafa pr merge <pr> --yes`, answering its exit code; a failure, exit 2, when the line could not start. */
+async function mergeStep(context: RafaContext, item: MergeInput, number: number, seams: ItemMergeSeams): Promise<number> {
   const argv = mergeArgv(seams.rafa, number);
   context.output.info(lineText(argv));
   const exitCode = await seams.runRafa(argv, item.root, item.env);
   if (exitCode === null) throw failure(`${lineText(argv)} could not start; #${String(number)} is not merged.`);
-  if (exitCode !== 0) {
-    throw new CommandExit(exitCode, `❌ ${COMMAND_NAME}: ${lineText(argv)} ended with exit code ${String(exitCode)};`
-      + ' no CI wait, ledger line or pit-stop reading followed.');
-  }
+  return exitCode;
 }
 
-/** Steps 1 to 6 for pull request `number`; see the module note. */
-async function mergeItem(context: RafaContext, item: WaitedItem, number: number, seams: ItemMergeSeams): Promise<void> {
+/** Whether `pull` reads merged with a merge commit. */
+function isMerged(pull: ViewedPull): pull is MergedPull {
+  return pull.state === 'MERGED' && pull.mergeCommit !== null;
+}
+
+/** Step 3: reads the pull request until it reads merged, up to {@link MERGED_READ_TRIES} times; the last read. */
+async function readMerged(gh: GhRunner, number: number, seams: ItemMergeSeams): Promise<ViewedPull> {
+  let pull = await viewPull(gh, number);
+  for (let read = 1; read < MERGED_READ_TRIES && !isMerged(pull); read += 1) {
+    await seams.sleep(MERGED_POLL_MS);
+    pull = await viewPull(gh, number);
+  }
+  return pull;
+}
+
+/**
+ * Steps 1 to 3 for pull request `number`: the base guard, the two waits,
+ * the merge and the read of its merge commit; see the module note.
+ * Answers the pull request read merged, or ends the item.
+ */
+export async function mergePull(context: RafaContext, item: MergeInput, number: number, seams: ItemMergeSeams): Promise<MergedPull> {
+  const gh = seams.gh(item.root);
+  refuseUnmergeable(await viewPull(gh, number));
+  const target = { issue: item.issue, number };
+  await awaitMergeability(context, gh, target, seams);
+  await awaitChecks(context, gh, target, seams);
+
+  const exitCode = await mergeStep(context, item, number, seams);
+  const line = lineText(mergeArgv(seams.rafa, number));
+  const pull = await readMerged(gh, number, seams);
+  const reads = `after ${String(MERGED_READ_TRIES)} reads`;
+  if (!isMerged(pull)) {
+    const how = `#${String(number)} reads ${pull.state} with no merge commit ${reads}`;
+    if (exitCode !== 0) {
+      throw new CommandExit(exitCode, `❌ ${COMMAND_NAME}: ${line} ended with exit code ${String(exitCode)}, and ${how};`
+        + ' no CI wait, ledger line or pit-stop reading followed.');
+    }
+    throw failure(`${line} ended 0, and ${how}.`);
+  }
+  if (exitCode !== 0) {
+    context.output.warn(`${line} ended with exit code ${String(exitCode)}, and #${String(number)} is merged: the clean-up`
+      + ' after the merge is what failed; finish it with rafa cleanup.');
+  }
+  context.output.info(`merged #${String(number)} into ${pull.base} at ${short(pull.mergeCommit)}`);
+  return pull;
+}
+
+/** Steps 4 to 6 for the merged pull request: the CI wait, the ledger line and the readings; see the module note. */
+export async function finishItem(context: RafaContext, item: FinishInput, merged: MergedPull, seams: ItemMergeSeams): Promise<void> {
   const info = (text: string): void => context.output.info(text);
   const gh = seams.gh(item.root);
-  const pull = await viewPull(gh, number);
-  refuseUnmergeable(pull);
-  const since = bugCutOff(item);
-
-  await mergeStep(context, item, number, seams);
-  const merged = await viewPull(gh, number);
-  if (merged.state !== 'MERGED' || merged.mergeCommit === null) {
-    throw failure(`rafa pr merge ended 0, and #${String(number)} reads ${merged.state} with no merge commit.`);
-  }
-  info(`merged #${String(number)} into ${merged.base} at ${short(merged.mergeCommit)}`);
   await awaitRun(context, { gh, branch: merged.base, commit: merged.mergeCommit }, seams);
 
   const closes = [...new Set(closedIssuesIn(merged.body))].map((issue) => `Closes #${String(issue)}`);
   appendItem(item.root, item.n, {
     issue: String(item.issue),
     plan: item.stub,
-    pullRequest: number,
+    pullRequest: merged.number,
     mergeCommit: merged.mergeCommit,
     closes,
     at: seams.now().toISOString(),
@@ -436,8 +454,15 @@ async function mergeItem(context: RafaContext, item: WaitedItem, number: number,
     ? ', closing no issue'
     : `, ${closes.join(', ')}`}`);
 
-  const readings = await readPitReadings({ gh, tracker: seams.tracker(gh) }, { branch: merged.base, since });
+  const readings = await readPitReadings({ gh, tracker: seams.tracker(gh) }, { branch: merged.base, since: item.since });
   for (const line of renderPitReadings(readings)) info(line);
+}
+
+/** Steps 1 to 6 for pull request `number`, new bugs counted from {@link bugCutOff}; see the module note. */
+async function mergeItem(context: RafaContext, item: WaitedItem, number: number, seams: ItemMergeSeams): Promise<void> {
+  const since = bugCutOff(item);
+  const merged = await mergePull(context, item, number, seams);
+  await finishItem(context, { root: item.root, n: item.n, issue: item.issue, stub: item.stub, since }, merged, seams);
 }
 
 /**

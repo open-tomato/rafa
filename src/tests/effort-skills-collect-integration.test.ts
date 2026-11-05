@@ -66,7 +66,7 @@ import { writePlanCi } from '@open-tomato/rafa/store/plan-ci';
 import { writeTaskReport } from '@open-tomato/rafa/store/reports';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { sessionLogDir } from '@open-tomato/rafa-effort/effort/collect';
-import { SKILL_USE_CLI_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
+import { SKILL_USE_FIXTURE_VERSION } from '@open-tomato/rafa-effort/effort/skill-use';
 import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
@@ -199,7 +199,7 @@ function lessonFile(id: string, artifact: string): string {
  * `effort/session-log.ts` and `effort/skill-use.ts` read: an `enqueue`
  * naming the prompt's own first line, so `classify.ts` throws on
  * nothing, and one `assistant` record pinned at
- * {@link SKILL_USE_CLI_VERSION}, carrying one `Skill` tool call per name
+ * {@link SKILL_USE_FIXTURE_VERSION}, carrying one `Skill` tool call per name
  * given.
  */
 function writerScript(): string {
@@ -218,7 +218,7 @@ function writerScript(): string {
     '  entrypoint: "sdk-cli",',
     '  isSidechain: false,',
     '  effort: "xhigh",',
-    `  version: ${JSON.stringify(SKILL_USE_CLI_VERSION)},`,
+    `  version: ${JSON.stringify(SKILL_USE_FIXTURE_VERSION)},`,
     '  sessionId,',
     '  message: {',
     '    model: "claude-opus-5",',
@@ -417,7 +417,7 @@ describe('a fixture plan run under the stand-in claude, collected, then reported
     const collected = run(scratch, ['effort', 'collect']);
     expectExit(collected, 0, { ...scratch });
     expect(collected.stdout).toContain('sessions  1 logs, 0 outside window, 0 already stored, 1 read, 0 failed, +1 rows');
-    expect(collected.stdout).toContain('skills    1 appended sessions, 0 already counted, 1 read, 0 unknown, 0 failed, +3 rows');
+    expect(collected.stdout).toContain('skills    1 appended sessions, 0 already counted, 1 read, 0 unvouched, 0 unknown, 0 failed, +3 rows');
 
     plantLessonRow(scratch.repo);
 

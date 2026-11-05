@@ -15,6 +15,8 @@ const RETRIED_CASES: readonly (readonly [stderr: string, reason: string])[] = [
   ['Post "https://api.github.com/graphql": net/http: TLS handshake timeout', 'TLS handshake timeout'],
   ['Post "https://api.github.com/graphql": read: connection reset by peer', 'connection reset'],
   ['Post "https://api.github.com/graphql": EOF', 'EOF'],
+  ['unexpected end of JSON input', 'unexpected end of JSON input'],
+  ['Post "https://api.github.com/graphql": unexpected end of JSON input', 'unexpected end of JSON input'],
   ['HTTP 502: Bad Gateway (https://api.github.com/graphql)', 'HTTP 502'],
   ['HTTP 503: Service Unavailable (https://api.github.com/graphql)', 'HTTP 503'],
   ['HTTP 504: Gateway Timeout (https://api.github.com/graphql)', 'HTTP 504'],
@@ -28,6 +30,7 @@ const PERMANENT_CASES: readonly (readonly [name: string, stderr: string, reason:
   ['a scope hint from gh', 'error: your authentication token is missing required scopes [read:project]\nTo request it, run:  gh auth refresh -s read:project\nneeds the "read:project" scope', 'needs the "read:project" scope'],
   ['a rate-limit refusal', 'GraphQL: API rate limit exceeded for user ID 1. (RATE_LIMITED)', 'rate limit'],
   ['a secondary rate limit over a 503 word', 'HTTP 403: You have exceeded a secondary rate limit (https://api.github.com/graphql)', 'secondary rate limit'],
+  ['an unrelated JSON error', 'invalid character \'<\' looking for beginning of value', 'invalid character \'<\' looking for beginning of value'],
 ];
 
 /** A runner answering `answers` in turn, the last one again once they run out, recording each call. */
@@ -139,7 +142,7 @@ describe('retryingGhRunner', () => {
 
   test('stops after the configured retries and answers the last failure, waiting 2 + 4 + 8 s', async () => {
     const last = failure('HTTP 503: Service Unavailable');
-    const { gh, calls } = scripted([failure(MEASURED_TIMEOUT), failure('EOF'), failure('i/o timeout'), last]);
+    const { gh, calls } = scripted([failure(MEASURED_TIMEOUT), failure('EOF'), failure('unexpected end of JSON input'), last]);
     const { sleep, waits } = recordedSleep();
     const runner = retryingGhRunner(gh, { retries: 3, retryWaitSeconds: 2, sleep });
 

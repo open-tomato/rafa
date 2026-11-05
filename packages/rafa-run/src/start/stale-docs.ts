@@ -43,6 +43,15 @@
  * Nothing of it throws; an unreadable forecast is the patch bump, and an
  * unreadable version `next`.
  *
+ * Beside it, once, the newest root release tag is read through
+ * `newestRootRelease` (`git tag --list` in the checkout, whose tags are
+ * the repository's) and handed to `addStaleDocLine` as `newestRelease`
+ * with every line: a marked chore titled for a version at or below that
+ * tag is released and left alone, and an open chore of an unreleased
+ * version the forecast moved off is retitled rather than joined by a
+ * second one. A repository with no root tag hands null; a listing that
+ * failed hands nothing, and the issue is found by its exact title alone.
+ *
  * The tracker is the run's chain (`resolveTracker`), resolved at most
  * once per run, on the first line to add, and never for a run whose doc
  * task left nothing: a resolution runs `gh auth status` and
@@ -124,6 +133,7 @@ import {
   addStaleDocLine,
   docUpdateLineText,
   forecastSettle,
+  newestRootRelease,
   readFragmentTree,
   readManifestVersion,
   releaseStrategyFor,
@@ -173,6 +183,11 @@ export interface StartStaleDocsOptions {
   readonly resolve?: (options: ResolveTrackerOptions) => Promise<TrackerResolution>;
   /** Reads the version the issue is titled for. {@link readStaleDocsVersion} when left out. */
   readonly readVersion?: () => string;
+  /**
+   * Reads the newest root release tag's version: null for none, undefined
+   * for a listing that failed. `newestRootRelease` in the checkout when left out.
+   */
+  readonly readNewestRelease?: () => string | null | undefined;
   /** Seams for the row write. */
   readonly seams?: FindingsWriterSeams;
 }
@@ -341,12 +356,20 @@ export function createStartStaleDocs(options: StartStaleDocsOptions): StartStale
   const redact = (text: string): string => local(redactSecrets(text, secrets));
   const kept = new Map<string, string>();
   let version: string | null = null;
+  let newestRelease: { readonly value: string | null | undefined } | null = null;
   let tracker: Promise<StaleDocsTracker | null> | null = null;
   let docUpdatePlan: DocUpdatePlan | null | undefined;
 
   const versionOnce = (): string => {
     version ??= (options.readVersion ?? (() => readStaleDocsVersion(options)))();
     return version;
+  };
+
+  const newestReleaseOnce = (): string | null | undefined => {
+    newestRelease ??= {
+      value: (options.readNewestRelease ?? (() => newestRootRelease(createGitRunner(options.checkout))))(),
+    };
+    return newestRelease.value;
   };
 
   const resolveOnce = (): Promise<StaleDocsTracker | null> => {
@@ -380,7 +403,12 @@ export function createStartStaleDocs(options: StartStaleDocsOptions): StartStale
   };
 
   const addLine = async (entry: StaleDocEntry): Promise<StaleDocLineResult> => {
-    const result = await addStaleDocLine({ tracker: await resolveOnce(), version: versionOnce(), entry });
+    const result = await addStaleDocLine({
+      tracker: await resolveOnce(),
+      version: versionOnce(),
+      entry,
+      newestRelease: newestReleaseOnce(),
+    });
     const text = staleDocLineText(entry);
     if (result.action === 'kept') kept.set(text, result.title);
     const { warn, line } = resultLine(result, text);

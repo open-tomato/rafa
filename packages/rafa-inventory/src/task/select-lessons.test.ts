@@ -1,7 +1,7 @@
 /**
  * Unit tests for `selectLessons`: the artifact-path match in the task
- * text and the stage context, the trigger rank above the floor against
- * the task text, the cap of 5, and highest confidence first. Every
+ * text and the stage context, the trigger's matched words against the
+ * floor in the task text, the cap of 5, and highest confidence first. Every
  * keeping case is paired with a lesson in the same bundle that must be
  * dropped, so a filter that kept everything would fail it.
  */
@@ -10,8 +10,7 @@ import type { BlessedBundle, InstinctRecord } from '../learning/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { RANK_FLOOR } from './resolve-skills.js';
-import { isArtifactPath, LESSON_LIMIT, namesPath, selectLessons } from './select-lessons.js';
+import { isArtifactPath, LESSON_LIMIT, namesPath, selectLessons, TRIGGER_WORD_FLOOR } from './select-lessons.js';
 
 const UNRELATED_TRIGGER = 'when rotating the kubernetes certificates';
 
@@ -118,20 +117,29 @@ describe('isArtifactPath', () => {
 });
 
 describe('selectLessons: the trigger', () => {
-  it('keeps a lesson whose trigger the ranker scores above the floor against the task text', () => {
+  it('keeps a lesson whose trigger matches at least the floor\'s words of the task text', () => {
     const matching = lesson('matching', { trigger: 'when a migration adds a column to dispatches' });
     const other = lesson('other');
 
     const kept = selectLessons(task('Add the dispatches migration for the resolver column'), bundle(matching, other));
 
-    expect(RANK_FLOOR).toBe(0);
+    expect(TRIGGER_WORD_FLOOR).toBe(2);
     expect(ids(kept)).toEqual(['matching']);
   });
 
-  it('matches by the ranker\'s prefix rule, not only by equal words', () => {
-    const prefixed = lesson('prefixed', { trigger: 'when testing the collector' });
+  it('drops a trigger sharing one word with the task text, and keeps one sharing two', () => {
+    const one = lesson('one', { trigger: 'when git add reports no changes' });
+    const two = lesson('two', { trigger: 'when the ballot quorum is lost' });
 
-    expect(ids(selectLessons(task('Add the collector tests'), bundle(prefixed)))).toEqual(['prefixed']);
+    const kept = selectLessons(task('Add a retry to the ballot quorum'), bundle(one, two));
+
+    expect(ids(kept)).toEqual(['two']);
+  });
+
+  it('matches by the ranker\'s prefix rule, not only by equal words', () => {
+    const prefixed = lesson('prefixed', { trigger: 'when testing the collectors' });
+
+    expect(ids(selectLessons(task('Test the collector'), bundle(prefixed)))).toEqual(['prefixed']);
   });
 
   it('does not score the trigger against the stage context', () => {

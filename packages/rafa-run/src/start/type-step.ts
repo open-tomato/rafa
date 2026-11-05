@@ -108,17 +108,36 @@
  * tsconfig, or that exited nonzero and printed no error at all, could
  * not check the files: it is red, and the blocker says the step could
  * not type-check, with the exit code and the first line tsc printed,
- * since a config tsc cannot read would otherwise pass every task.
+ * since a config tsc cannot read would otherwise pass every task. An
+ * exit of 126 or 127 is not one of these: see the next section.
  *
  * A run that ends on the stop code, or while the runner has received
  * SIGINT, is {@link TypeOutcome.interrupted}: never red, as an
  * interrupted test run is not.
+ *
+ * ## A tsc that cannot start
+ *
+ * A run that exits {@link CANNOT_START_CODES} (126 or 127) is
+ * {@link TypeOutcome.cannotStart}: tsc never started, so the run is
+ * neither red nor a type error, and no repair of the task's files fixes
+ * it. `node_modules/.bin/tsc` opens with `#!/usr/bin/env node`; measured
+ * on bun 1.3.14 and tsc 5.9.3 (2026-11-04), spawned under a PATH holding
+ * a link to `bun` and `/usr/bin:/bin` and no `node`, it prints `env:
+ * 'node': No such file or directory` and exits 127, and a script the
+ * shell finds but cannot execute exits 126. The outcome still carries a
+ * blocker, {@link cannotStartBlockerText}: it names tsc, the interpreter
+ * read off the first line of `<modules>/.bin/tsc`
+ * ({@link scriptInterpreter}), and says to put that interpreter on the
+ * PATH the loop runs under. The check comes after the stop code's, so a
+ * stop is still a stop. The same exit at the base ends the step the same
+ * way. A tsc `Bun.spawn` cannot exec at all throws instead, and is the
+ * fourth case of the table above.
  */
 import type { GitRunner } from '@open-tomato/rafa-pr';
 
-import { existsSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdtempSync, openSync, readSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
@@ -129,6 +148,12 @@ export const TEST_FILE_SUFFIX = '.test.ts';
 
 /** The flags the step runs tsc with, after `-p <scratch>`. */
 export const TSC_FLAGS: readonly string[] = ['--noEmit', '--pretty', 'false'];
+
+/** The exit codes of a tsc that never started: 126 found but not executable, 127 not found (its interpreter, under `env`). */
+export const CANNOT_START_CODES: readonly number[] = [126, 127];
+
+/** How many bytes of a script {@link scriptInterpreter} reads for its first line. */
+const SHEBANG_BYTES = 256;
 
 /** How many errors the blocker and the run output list before they count the rest. */
 export const ERRORS_LISTED = 10;
@@ -188,7 +213,9 @@ export interface TypeOutcome {
   readonly red: boolean;
   /** True when the run was read as a stop on SIGINT, never red. */
   readonly interrupted: boolean;
-  /** The blocker text of a red run; null otherwise. */
+  /** True when tsc exited 126 or 127 and never started: never red, its blocker naming the interpreter. See the module note. */
+  readonly cannotStart: boolean;
+  /** The blocker text of a red run, or of one that cannot start; null otherwise. */
   readonly blocker: string | null;
 }
 
@@ -213,6 +240,7 @@ export interface TypeStepInput {
 type TreeRun =
   | { readonly kind: 'threw'; readonly why: string }
   | { readonly kind: 'interrupted' }
+  | { readonly kind: 'cannot-start'; readonly run: TypeRunResult; readonly said: string | undefined }
   | { readonly kind: 'broken'; readonly run: TypeRunResult; readonly said: string | undefined }
   | { readonly kind: 'read'; readonly errors: readonly TypeDiagnostic[] };
 
@@ -221,9 +249,9 @@ type BaseReading =
   | { readonly errors: readonly TypeDiagnostic[] }
   | { readonly outcome: TypeOutcome };
 
-const NOTHING_RAN: TypeOutcome = { ran: false, red: false, interrupted: false, blocker: null };
-const GREEN: TypeOutcome = { ran: true, red: false, interrupted: false, blocker: null };
-const INTERRUPTED: TypeOutcome = { ran: true, red: false, interrupted: true, blocker: null };
+const NOTHING_RAN: TypeOutcome = { ran: false, red: false, interrupted: false, cannotStart: false, blocker: null };
+const GREEN: TypeOutcome = { ran: true, red: false, interrupted: false, cannotStart: false, blocker: null };
+const INTERRUPTED: TypeOutcome = { ran: true, red: false, interrupted: true, cannotStart: false, blocker: null };
 
 /** Spawns `argv` in `cwd`, reading both streams to their end. */
 export async function runTsc(options: TypeRunOptions): Promise<TypeRunResult> {
@@ -446,6 +474,49 @@ export function brokenBlockerText(label: string, run: Pick<TypeRunResult, 'exitC
     : `: ${said}`}`;
 }
 
+/**
+ * The interpreter the first line of the script at `path` names: the
+ * program after `env` and its options for `#!/usr/bin/env node`, else the
+ * base name of the program itself. Null when the file cannot be read or
+ * opens with no `#!`.
+ */
+export function scriptInterpreter(path: string): string | null {
+  let head: string;
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      const buffer = Buffer.alloc(SHEBANG_BYTES);
+      head = buffer.toString('utf8', 0, readSync(fd, buffer, 0, SHEBANG_BYTES, 0));
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+  const first = head.split('\n')[0] ?? '';
+  if (!first.startsWith('#!')) return null;
+  const [program = '', ...rest] = first.slice(2).trim()
+    .split(/\s+/u);
+  const named = basename(program) === 'env'
+    ? rest.find((word) => !word.startsWith('-') && !word.includes('='))
+    : program;
+  return named === undefined || named === ''
+    ? null
+    : basename(named);
+}
+
+/** The blocker of a tsc that exited 126 or 127, `interpreter` read off its first line; see the module note. */
+export function cannotStartBlockerText(label: string, tsc: string, run: Pick<TypeRunResult, 'exitCode'>, said: string | undefined, interpreter: string | null): string {
+  const heard = said === undefined
+    ? ''
+    : ` (${said})`;
+  const fix = interpreter === null
+    ? `Its first line names no interpreter, so make ${tsc} runnable from the PATH the loop runs under`
+    : `tsc runs under ${interpreter}, which its first line names: put ${interpreter} on the PATH the loop runs under`;
+  return `The runner's ${label} could not start tsc: ${tsc} exited ${run.exitCode}${heard}. `
+    + `${fix}, then run the task again. This is no type error of the task's, and no change to its files fixes it.`;
+}
+
 /** The error that says tsc could not check the files: one with no file, or on the scratch tsconfig. */
 function configError(errors: readonly TypeDiagnostic[], scratch: string, cwd: string): TypeDiagnostic | undefined {
   const config = relative(cwd, scratch);
@@ -472,6 +543,7 @@ async function checkTree(input: TypeStepInput, modules: string, tree: string, fi
       return { kind: 'threw', why: messageOf(error) };
     }
     if (run.exitCode === input.stopCode || input.isInterrupted?.() === true) return { kind: 'interrupted' };
+    if (CANNOT_START_CODES.includes(run.exitCode)) return { kind: 'cannot-start', run, said: firstLine(run) };
     const errors = parseTscOutput(run.stdout, tree);
     const config = configError(errors, scratch, tree);
     if (config !== undefined) return { kind: 'broken', run, said: `error ${config.code}: ${config.message.split('\n')[0] ?? ''}` };
@@ -512,6 +584,7 @@ async function baseErrors(input: TypeStepInput, label: string, modules: string, 
   const run = await inBaseTree(input, label, modules, (tree) => checkTree(input, modules, tree, pairs.map((file) => file.base)));
   if (run === null) return { outcome: GREEN };
   if (run.kind === 'interrupted') return { outcome: interrupted(label) };
+  if (run.kind === 'cannot-start') return { outcome: cannotStart(label, modules, run) };
   if (run.kind !== 'read') {
     const why = run.kind === 'threw'
       ? run.why
@@ -527,6 +600,14 @@ async function baseErrors(input: TypeStepInput, label: string, modules: string, 
 function interrupted(label: string): TypeOutcome {
   activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as errors.`);
   return INTERRUPTED;
+}
+
+/** Prints a tsc that cannot start and answers its outcome; see the module note. */
+function cannotStart(label: string, modules: string, run: { readonly run: TypeRunResult; readonly said: string | undefined }): TypeOutcome {
+  const tsc = join(modules, ...TSC_BIN);
+  const blocker = cannotStartBlockerText(label, tsc, run.run, run.said, scriptInterpreter(tsc));
+  activeOutput().warn(`⚠️  ${blocker}`);
+  return { ran: false, red: false, interrupted: false, cannotStart: true, blocker };
 }
 
 /** The test files to check, or null after printing why nothing runs. */
@@ -554,10 +635,11 @@ export async function runTypeStep(input: TypeStepInput): Promise<TypeOutcome> {
     return NOTHING_RAN;
   }
   if (head.kind === 'interrupted') return interrupted(label);
+  if (head.kind === 'cannot-start') return cannotStart(label, modules, head);
   if (head.kind === 'broken') {
     const blocker = brokenBlockerText(label, head.run, head.said);
     activeOutput().info(`🔎 ${label}: ${blocker}`);
-    return { ran: true, red: true, interrupted: false, blocker };
+    return { ran: true, red: true, interrupted: false, cannotStart: false, blocker };
   }
   const ran = `🔎 ${label}: tsc over ${files.length} test file(s)`;
   if (head.errors.length === 0) {
@@ -570,5 +652,5 @@ export async function runTypeStep(input: TypeStepInput): Promise<TypeOutcome> {
   activeOutput().info(`${ran}: ${head.errors.length} error(s), ${head.errors.length - added.length} already held at ${input.base}, ${added.length} not held.`);
   for (const line of listed(added)) activeOutput().info(`   ${line}`);
   if (added.length === 0) return GREEN;
-  return { ran: true, red: true, interrupted: false, blocker: typeBlockerText(label, input.base, added) };
+  return { ran: true, red: true, interrupted: false, cannotStart: false, blocker: typeBlockerText(label, input.base, added) };
 }

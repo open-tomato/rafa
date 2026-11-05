@@ -21,9 +21,9 @@ import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { runPreflight } from '@open-tomato/rafa/preflight/run';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { runPreflight } from '@open-tomato/rafa/preflight/run';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,
@@ -32,7 +32,7 @@ import {
   GH_INSTALL_LINE,
   ghOnPathItem,
   ghPreflightItems,
-} from '@open-tomato/rafa-pr/pr/preflight-items';
+} from './preflight-items.js';
 
 /** Every scratch directory made here, removed when the file is done. */
 const scratchDirs: string[] = [];

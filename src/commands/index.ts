@@ -184,8 +184,10 @@
  *     `pr wait [<n>] [--timeout=<minutes>]`, its checks polled until
  *     they settle or the deadline passes with nothing written, exiting 0
  *     green, 1 red and on no checks at all, and 3 at the deadline; and
- *     `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]`,
- *     one merged and both branches cleaned up after it;
+ *     `pr merge [<n>] [--yes] [--skip-checks] [--keep-branch]
+ *     [--method=squash|merge|rebase]`, one merged and both branches
+ *     cleaned up after it, unless the head is a trunk or
+ *     `--keep-branch` keeps it;
  *     `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`,
  *     one opened from a pushed head, or the one already open on the head
  *     printed and none opened;
@@ -402,18 +404,22 @@
  *     version printed, and the three operators opened in one tmux
  *     session, or the engineer in this terminal without tmux; `--role`
  *     starts that one session here. It spends unless `--dry-run`.
- *   - `stretch item <issue> [--wait] [--dry-run]`: one item of the
- *     stretch `pr.base` names planned with `plan create --issue`, a plan
+ *   - `stretch item <issue> [--wait | --resume] [--dry-run]`: one item
+ *     of the stretch `pr.base` names planned with `plan create --issue`, a plan
  *     of the issue already there kept, and its loop started detached
  *     with `--as-worktree --no-ci-wait`, its events output appended to
  *     `.rafa/stretch/<n>/loop-<issue>.log`; `--wait` then runs
  *     `loop wait` on its session and, once the loop has a pull request,
- *     merges it with `pr merge --skip-checks --yes` into a `stretch/*`
- *     base only, waits for the run on the merge commit, appends the
- *     item to `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop
- *     readings (`./stretch/item-merge.ts`). Refused with exit code 1
- *     when `pr.base` names no `stretch/<n>` branch. It spends unless
- *     `--dry-run`.
+ *     waits for its mergeability and its checks, merges it with
+ *     `pr merge --yes` into a `stretch/*` base only, waits for the run
+ *     on the merge commit, appends the item to
+ *     `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop readings
+ *     (`./stretch/item-merge.ts`). `--resume`, refused beside
+ *     `--wait`, starts no plan and no loop: it finishes an item whose
+ *     loop has ended from the pull request its log names, skipping the
+ *     merge of one merged already (`./stretch/item-resume.ts`). Refused
+ *     with exit code 1 when `pr.base` names no `stretch/<n>` branch. It
+ *     spends unless `--dry-run`.
  *   - `stretch end [--dry-run]`: the stretch `pr.base` names opened from
  *     `stretch/<n>` into the default branch through the `pr open` logic,
  *     its body `.rafa/stretch/<n>/report.md` with every ledger item's
@@ -564,7 +570,7 @@ const SKILL_SUBJECT: SubjectSpec = { name: 'skill', summary: 'check a skills dir
 const INSTINCT_SUBJECT: SubjectSpec = { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' };
 const UPDATE_SUBJECT: SubjectSpec = { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' };
 const CONFIG_SUBJECT: SubjectSpec = { name: 'config', summary: 'show every setting and where it came from; set one key in the project\'s config, keeping every comment' };
-const CI_SUBJECT: SubjectSpec = { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' };
+const CI_SUBJECT: SubjectSpec = { name: 'ci', summary: 'read every CI workflow on a branch\'s head commit: its state, the commit and the cases it failed' };
 const STRETCH_SUBJECT: SubjectSpec = { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' };
 const BUG_SUBJECT: SubjectSpec = { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, check for codes that read alike, and recheck whether a bug still reproduces' };
 const DOCS_SUBJECT: SubjectSpec = { name: 'docs', summary: 'write a plan repairing the open lines of the stale-docs issues' };

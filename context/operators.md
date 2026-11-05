@@ -53,10 +53,17 @@ exception is the engineer's detached loop start, which needs its redirect.
 
 A stretch writes under `.rafa/stretch/<n>/`: `operators/` (the
 launcher's copy, below), `agent.json` (the agent's session id, which
-the watchtower finds it by), `bucket.md`, `loop-<issue>.log`,
-`pit-stops.md`, `watch.md` (the watchtower's one write), `analysis.md`
-(the analyst's one write) and `report.md`. Its wrap-up writes the next
-stretch's opening message to `.rafa/stretch/engineer-prompt.md`.
+the watchtower finds it by), `bucket.md`, `rules.md` (below),
+`loop-<issue>.log`, `pit-stops.md`, `watch.md` (the watchtower's one
+write), `analysis.md` (the analyst's one write) and `report.md`. Its
+wrap-up writes the next stretch's opening message to
+`.rafa/stretch/engineer-prompt.md`.
+
+`rules.md` holds the working rules the person approved for every item of
+the stretch. The stretch engineer writes it at the bucket's approval.
+Every item's planner reads it through `rafa stretch item`, which hands it
+over as `RAFA_STRETCH_RULES`, so `plan create` appends it to the item's
+snapshot under `## Stretch rules`, after the issue's notes.
 
 The integration branch is `stretch/<n>`, and `pr.base` points at it for the
 stretch. `release settle` folds `origin/<pr.base>`
@@ -87,13 +94,16 @@ the copies, since no new stretch reads them and one started with them may.
 Whether the tmux session stays is open: #598 rejected a tmux session on
 the host, read with capture-pane.
 
-`rafa stretch item <issue> [--wait] [--dry-run]` handles one item from
-loop start to its pit-stop readings. It takes the integration branch from
-`pr.base` (which must name a `stretch/<n>` branch), runs
-`rafa plan create --issue`, and starts the loop detached with
+`rafa stretch item <issue> [--wait | --resume] [--dry-run]` handles one
+item from loop start to its pit-stop readings. It takes the integration
+branch from `pr.base` (which must name a `stretch/<n>` branch), runs
+`rafa plan create --issue`, with `RAFA_STRETCH_RULES` naming
+`.rafa/stretch/<n>/rules.md` when that file exists so the stretch's rules
+land in the snapshot, and starts the loop detached with
 `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`.
 With `--wait`, it waits on the loop through `rafa loop wait`. Once the loop
-has a pull request, `item` merges it with `--skip-checks` into the
+has a pull request, `item` waits for GitHub to compute its mergeability and
+for its checks to pass, merges it with `rafa pr merge <pr> --yes` into the
 integration branch, frees the worktree, and waits for the run on the merge
 commit. It asks for that run by commit (`--commit`), so a newer push to the
 branch that has a run of its own does not make the wait read that run. The
@@ -104,6 +114,13 @@ on <branch> at <sha> had not ended within 90 minutes`. Then it appends the
 ledger line and prints the pit-stop readings: the failed cases by file and
 case, the open-bug count, and the bugs filed since the last item. It decides
 nothing; the pit stop does.
+
+`--resume` finishes an item whose loop has ended, as after an item that
+ended on a refused merge: it starts no plan and no loop, reads the pull
+request from the last `rafa· pr #<n> opened` line of the item's log, and
+runs the same merge half on it. A pull request merged already has its merge
+skipped. It refuses an issue the ledger already holds, and is refused
+beside `--wait`.
 
 The filed-since line reads `Filed since <time>: <n>.`, where the time is the
 last ledger line's, or the stretch's start when the ledger holds none. Then one
@@ -128,7 +145,10 @@ whose listing threw; the count still prints beside it.
 `rafa stretch end [--dry-run]` opens the integration branch into the
 default branch with `report.md` as its body and every merged item's `Closes`
 lines appended, and once that pull request has merged, puts back the
-`pr.base` recorded in `stretch.json`.
+`pr.base` recorded in `stretch.json`. Run again while that pull request is
+open, it rewrites `pr-body.md` and updates the open pull request's body when
+the two differ, printing `body updated`, or `body unchanged` when they do
+not; line endings and the trailing newline do not count as a difference.
 
 The item ledger, `.rafa/stretch/<n>/items.ndjson`, is one line per item:
 issue, plan, pull request, merge commit, its `Closes` lines, and a

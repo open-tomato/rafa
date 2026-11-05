@@ -164,7 +164,7 @@
  *    own: 428 pass and 2 fail, the two allow-list cases.
  */
 import type { AlternativeOffer } from './blocked-line.js';
-import type { SpecIssue } from './issue.js';
+import type { SpecIssue, StretchRules } from './issue.js';
 import type { ReadyOffer } from './plan-spec.js';
 import type { RefreshOffer } from './snapshot-settle.js';
 import type { BoardTrust } from './trust.js';
@@ -195,6 +195,7 @@ import { SPEC_READY_LABEL, specReadyRefusalMessage, TEMPLATE_HEADINGS } from './
 import { BOARD_LISTING_LIMIT, boardListingCommand } from './roadmap-board.js';
 import { PR_LIST_FIELDS } from './roadmap.js';
 import { notesRebuiltLine, refreshQuestion } from './snapshot-settle.js';
+import { describeIssue, dryRunLine } from './spec-source.js';
 import { TRUST_REFUSAL_EXIT } from './trust.js';
 
 /** Where snapshots go, as a project configures it. */
@@ -377,6 +378,7 @@ interface PlanSpecFields {
   readonly passOver?: ReadonlyMap<number, string>;
   readonly branchTemplate?: string;
   readonly output?: Output;
+  readonly rules?: StretchRules;
 }
 
 /**
@@ -426,6 +428,9 @@ function ask(
     ...fields.branchTemplate === undefined
       ? {}
       : { branchTemplate: fields.branchTemplate },
+    ...fields.rules === undefined
+      ? {}
+      : { rules: fields.rules },
     gh,
     git,
     output: fields.output ?? OUTPUT,
@@ -749,6 +754,28 @@ describe('the spec the roadmap picks', () => {
     const resolved = await ask({ kind: 'issue', issue: 20 }, board.gh, git.git, { dryRun: true });
 
     expect(resolved).toEqual({ outcome: 'stopped', reason: 'dry-run' });
+    expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
+  });
+
+  it('hands a stretch rules file on, appending it to the snapshot', async () => {
+    const rules: StretchRules = { path: '.rafa/stretch/112/rules.md', text: '- one rule\n' };
+
+    await ask({ kind: 'issue', issue: 20 }, plantedGh([issueOf(20)]).gh, plantedGit().git, { rules });
+
+    expect(readFileSync(join(root, snapshotAt(20)), 'utf8')).toBe(snapshotText(completeBody(20), null, rules.text));
+  });
+
+  it('names a stretch rules file on the --dry-run line, writing nothing', async () => {
+    const rules: StretchRules = { path: '.rafa/stretch/112/rules.md', text: '- one rule\n' };
+    const lines: string[] = [];
+
+    await ask({ kind: 'issue', issue: 20 }, plantedGh([issueOf(20)]).gh, plantedGit().git, {
+      dryRun: true,
+      rules,
+      output: sinkOutput({ info: (line) => lines.push(line) }),
+    });
+
+    expect(lines).toEqual([dryRunLine(describeIssue(issueOf(20)), rules.path)]);
     expect(existsSync(join(root, snapshotAt(20)))).toBe(false);
   });
 });

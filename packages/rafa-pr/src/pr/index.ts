@@ -70,6 +70,7 @@ export type {
   MergeState,
   MergeStep,
   MergeStepId,
+  MergeStepRetry,
   WorktreeEntry,
 } from './merge.js';
 export type { PushOutcome } from './none.js';
@@ -93,6 +94,7 @@ export { isMergeMethod, MERGE_METHODS } from '@open-tomato/rafa/pr/types';
 export {
   cleanUpSteps,
   commandLine,
+  MULTIPLE_BRANCHES_TEXT,
   parseTreePaths,
   parseWorktrees,
   readMergeRefusal,

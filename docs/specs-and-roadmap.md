@@ -709,7 +709,7 @@ An example epic body:
 
 Estimate: two weeks
 Date: 2026-10-31
-Owns: src/board/, src/commands/epics.ts
+Owns: packages/rafa-board/src/board/, packages/rafa-board/src/commands/epic/
 
 - [ ] #245 the board listing
 - [x] #246 the epic model
@@ -805,10 +805,11 @@ Every epic body has three optional fields besides the checklist:
 - **`Date:`** — the target date as `YYYY-MM-DD`, or left out if there
   is none. The date is checked for being a real calendar day; malformed
   dates are warnings but do not block the epic.
-- **`Owns:`** — a comma- or space-separated list of folder paths the
-  epic owns (e.g., `src/board/, src/commands/epics.ts`). Backticks are
-  stripped. The borders spec defines what "owns" means; rafa does not
-  validate that paths exist.
+- **`Owns:`** — a comma- or space-separated list of folder paths the epic
+  owns (e.g., `packages/rafa-board/src/board/,
+  packages/rafa-board/src/commands/epic/`). Backticks are stripped. The
+  borders spec defines what "owns" means; rafa does not validate that paths
+  exist.
 
 Every epic must have:
 

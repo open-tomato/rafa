@@ -400,7 +400,9 @@ export const PR_MERGE_DECLARATION: CommandDeclaration = Object.freeze<CommandDec
   description: 'Merges one pull request through the GitHub CLI and then, in code, switches to the base branch,'
     + ' pulls it fast-forward only, deletes the head branch locally and on the remote where it is still there,'
     + ' and prunes, reporting each step; a head branch this checkout has no local branch for is reported as a'
-    + ' skipped local delete, and the rest still run. Refuses before it asks anything on a tracked change in the working tree or an'
+    + ' skipped local delete, and the rest still run. A head branch that is a trunk (`pr.base`, the remote\'s default'
+    + ' branch, `main` where `pr.base` names none, or a branch `cleanup.keep` names) is kept on both sides, with one'
+    + ' line saying so, and `--keep-branch` keeps any other head branch the same way. Refuses before it asks anything on a tracked change in the working tree or an'
     + ' untracked path the pull request\'s head or the base\'s remote-tracking branch holds, on a pull'
     + ' request that is not green or does not merge, and on a head branch checked out in another worktree, except a'
     + ' clean, ended loop worktree under `loop.worktreeDir`, which it removes after copying its two plan files out. It'
@@ -449,6 +451,11 @@ export const PR_MERGE_DECLARATION: CommandDeclaration = Object.freeze<CommandDec
       type: 'boolean',
     },
     {
+      name: 'keep-branch',
+      description: 'Keep the head branch locally and on the remote after the merge. A trunk is kept without it.',
+      type: 'boolean',
+    },
+    {
       name: 'method',
       description: 'How to merge: squash, merge or rebase. `pr.mergeMethod` when it is left out.',
       type: 'string',
@@ -467,6 +474,10 @@ export const PR_MERGE_DECLARATION: CommandDeclaration = Object.freeze<CommandDec
     {
       cmd: 'rafa pr merge 41 --skip-checks',
       note: 'Warns that nothing on GitHub tested pull request 41, asks, merges it and comments that it had no checks.',
+    },
+    {
+      cmd: 'rafa pr merge 41 --keep-branch',
+      note: 'Merges pull request 41 and keeps its head branch on both sides, deleting neither.',
     },
     {
       cmd: 'rafa pr merge 41 --method=rebase --output=json',

@@ -216,4 +216,96 @@ describe('the doc task\'s unsettled entries over a local tracker', () => {
     expect(printedAgain).toEqual([]);
     for (const line of printed) expect(info).toContain(line);
   });
+
+  describe('with the newest root release tag read', () => {
+    /** A run for `version` whose newest root release tag reads `newest`. */
+    const runFor = (root: string, version: string, newest: string | null) => createStartStaleDocs({
+      repoRoot: root,
+      checkout: root,
+      config: CONFIG,
+      home: join(tempBase, 'home'),
+      env: {},
+      readVersion: () => version,
+      readNewestRelease: () => newest,
+    });
+
+    it('joins the open chore of the same title instead of creating a second', async () => {
+      // Arrange
+      captureInfo();
+      const root = newRoot();
+      await runFor(root, VERSION, '1.3.0').afterTask(docTask([PAGE_LINE]));
+
+      // Act
+      const again = await runFor(root, VERSION, '1.3.0').afterTask(docTask([README_LINE]));
+
+      // Assert
+      expect(again?.lines.map((line) => line.action)).toEqual(['appended']);
+      const files = issueFiles(root);
+      expect(files).toHaveLength(1);
+      expect(itemsOf(readFileSync(join(localIssuesDir(root), files[0] ?? ''), 'utf8'))).toEqual([PAGE_LINE, README_LINE]);
+    });
+
+    it('retitles the open chore when the forecast moved, rather than creating a second', async () => {
+      // Arrange: a chore open for 1.4.0, then a forecast that moves to 1.5.0.
+      captureInfo();
+      const root = newRoot();
+      await runFor(root, VERSION, '1.3.0').afterTask(docTask([PAGE_LINE]));
+      const before = issueFiles(root);
+
+      // Act
+      const moved = await runFor(root, '1.5.0', '1.3.0').afterTask(docTask([README_LINE]));
+
+      // Assert: the same file now carries the new title and both lines.
+      expect(moved?.lines.map((line) => line.action)).toEqual(['appended']);
+      expect(issueFiles(root)).toEqual(before);
+      const contents = readFileSync(join(localIssuesDir(root), before[0] ?? ''), 'utf8');
+      expect(contents).toContain(staleDocsTitle('1.5.0'));
+      expect(contents).not.toContain(staleDocsTitle(VERSION));
+      expect(itemsOf(contents)).toEqual([PAGE_LINE, README_LINE]);
+    });
+
+    it('leaves a chore of a released version alone and files a new one', async () => {
+      // Arrange: a chore open for 1.4.0, which has since been released.
+      captureInfo();
+      const root = newRoot();
+      await runFor(root, VERSION, '1.3.0').afterTask(docTask([PAGE_LINE]));
+      const [releasedFile] = issueFiles(root);
+      const releasedBefore = readFileSync(join(localIssuesDir(root), releasedFile ?? ''), 'utf8');
+
+      // Act
+      const next = await runFor(root, '1.5.0', VERSION).afterTask(docTask([README_LINE]));
+
+      // Assert: the released chore is byte for byte as it was; a second holds the line.
+      expect(next?.lines.map((line) => line.action)).toEqual(['created']);
+      expect(readFileSync(join(localIssuesDir(root), releasedFile ?? ''), 'utf8')).toBe(releasedBefore);
+      const files = issueFiles(root);
+      expect(files).toHaveLength(2);
+      const fresh = files.find((name) => name !== releasedFile) ?? '';
+      const freshContents = readFileSync(join(localIssuesDir(root), fresh), 'utf8');
+      expect(freshContents).toContain(staleDocsTitle('1.5.0'));
+      expect(itemsOf(freshContents)).toEqual([README_LINE]);
+    });
+
+    it('leaves one open marked chore holding both lines when two wrap-ups race to create', async () => {
+      // Arrange: a root with no chore, and two runs that both find none.
+      captureInfo();
+      const root = newRoot();
+
+      // Act
+      const [left, right] = await Promise.all([
+        runFor(root, VERSION, '1.3.0').afterTask(docTask([PAGE_LINE])),
+        runFor(root, VERSION, '1.3.0').afterTask(docTask([README_LINE])),
+      ]);
+
+      // Assert: no call failed, and exactly one chore is open, holding both lines.
+      const actions = [left, right].flatMap((handled) => handled?.lines.map((line) => line.action) ?? []);
+      expect(actions).not.toContain('failed');
+      expect(issueFiles(root)).toHaveLength(2);
+      expect([left, right].flatMap((handled) => handled?.lines ?? []).some((line) => 'duplicate' in line)).toBe(true);
+      const tracker = createLocalTracker({ issuesDir: localIssuesDir(root), fallbackReason: null });
+      const open = (await tracker.openIssues?.('chore') ?? []).filter((issue) => issue.body.includes(STALE_DOCS_MARKER));
+      expect(open).toHaveLength(1);
+      expect(itemsOf(open[0]?.body ?? '').sort()).toEqual([PAGE_LINE, README_LINE].sort());
+    });
+  });
 });

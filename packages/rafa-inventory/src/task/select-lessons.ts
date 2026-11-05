@@ -25,12 +25,29 @@
  *     path-shaped, such as an error message, never matches this way; it
  *     can only be kept by its trigger.
  *   - **Its trigger.** `scoreCandidate` (`inventory/search/rank.ts`)
- *     scores the trigger against the task text's `questionWords`, and the
- *     score is above {@link RANK_FLOOR}, the floor the `tag` resolver
- *     reads. The trigger is scored against the task text only, never the
+ *     scores the trigger against the task text's `questionWords`, and at
+ *     least {@link TRIGGER_WORD_FLOOR} distinct question words match it.
+ *     The trigger is scored against the task text only, never the
  *     stage context: a stage context is shared by every task of its
  *     stage, and a trigger matching it would hand the same lesson to all
  *     of them.
+ *
+ * ## The trigger floor
+ *
+ * One shared word is not enough. Task texts are full of ordinary words
+ * (`add`, `tests`, `refresh`) that triggers carry too, so a floor of one
+ * matched word handed lessons to tasks naming nothing a lesson knows:
+ * the lesson-door golden set (`addons/dyno`) measured
+ * four lessons on its two abstention tasks, and ten extra lessons on
+ * its eight answerable tasks. Every expected lesson there matches two
+ * words or more, so a floor of two keeps all eight and hands the
+ * abstention tasks nothing.
+ *
+ * The floor counts words, not score. A lesson's trigger is scored as one
+ * field, `when_to_use`, so the score is the word count times that
+ * field's weight; counting the words keeps the floor apart from
+ * `FIELD_WEIGHTS`. It is not `RANK_FLOOR`, which the `tag` resolver reads
+ * over five fields, where one score means something else.
  *
  * The bundle is taken as blessed: this module does not filter it again
  * by status, confidence or promotion. `bless` (`learning/bless.ts`) has
@@ -51,10 +68,11 @@ import type { BlessedBundle, InstinctRecord } from '../learning/index.js';
 
 import { questionWords, scoreCandidate } from '../inventory/search/rank.js';
 
-import { RANK_FLOOR } from './resolve-skills.js';
-
 /** How many lessons a task is handed at most. */
 export const LESSON_LIMIT = 5;
+
+/** How many distinct question words a trigger has to match; see "The trigger floor". */
+export const TRIGGER_WORD_FLOOR = 2;
 
 /** Whether `artifact` reads as a path; see "What is kept". */
 export function isArtifactPath(artifact: string): boolean {
@@ -110,9 +128,9 @@ function triggerCandidate(lesson: InstinctRecord): RankCandidate {
   return { record, description: null, body: '' };
 }
 
-/** Whether `lesson`'s trigger scores above the floor against `words`. */
+/** Whether `lesson`'s trigger matches at least {@link TRIGGER_WORD_FLOOR} of `words`. */
 function triggerMatches(lesson: InstinctRecord, words: readonly string[]): boolean {
-  return words.length > 0 && scoreCandidate(triggerCandidate(lesson), words).score > RANK_FLOOR;
+  return scoreCandidate(triggerCandidate(lesson), words).words.length >= TRIGGER_WORD_FLOOR;
 }
 
 /**

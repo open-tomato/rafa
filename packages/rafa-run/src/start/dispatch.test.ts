@@ -444,7 +444,7 @@ describe('dispatchTask, handing its task out', () => {
   const BLESSED: InstinctRecord[] = [
     {
       id: 'lesson-served',
-      trigger: 'when adding a served skill',
+      trigger: 'when you add a served skill',
       action: 'serve it before the spawn',
       action_hash: 'hash-served',
       confidence: 0.7,
@@ -549,7 +549,7 @@ describe('dispatchTask, handing its task out', () => {
       '- `tier-skill`: A served skill',
       '',
       '## Lessons from earlier tasks',
-      '- When adding a served skill: serve it before the spawn (confidence 0.70, from 2 tasks, lesson lesson-served)',
+      '- When you add a served skill: serve it before the spawn (confidence 0.70, from 2 tasks, lesson lesson-served)',
       '',
       'The loop commits.',
     ].join('\n'));

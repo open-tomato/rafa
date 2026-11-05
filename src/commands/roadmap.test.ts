@@ -191,13 +191,16 @@ describe('rafa roadmap, beside rafa issue list --roadmap', () => {
     expect(result?.data?.rows).toHaveLength(2);
   });
 
-  it('refuses --state as issue list --roadmap refuses it, running no gh', async () => {
-    const shortcut = await run(['roadmap', '--state=open']);
+  it('leaves --state and --roadmap to the dispatcher, which refuses both as undeclared with exit 2, running no gh', async () => {
+    const shortcut = await run(['roadmap', '--state=open', '--roadmap']);
+    const long = await run(['issue', 'list', '--roadmap', '--state=open']);
 
-    expect(shortcut).toEqual(await run(['issue', 'list', '--roadmap', '--state=open']));
-    expect(shortcut.exitCode).toBe(1);
-    expect(shortcut.stderr).toStartWith('❌ --state cannot narrow --roadmap');
+    expect(shortcut.exitCode).toBe(2);
+    expect(shortcut.stderr).toStartWith('rafa: unknown flags "--state=open", "--roadmap" for "rafa roadmap"; its flags are --all, --full,');
+    expect(shortcut.stderr).toEndWith('[cli:unknown-flag]\n  hint: run rafa roadmap --help for its flags\n');
     expect(shortcut.calls).toEqual([]);
+    expect(long.exitCode).toBe(1);
+    expect(long.stderr).toStartWith('❌ --state cannot narrow --roadmap');
   });
 
   it('takes --all, which issue list refuses without --roadmap, the control that roadmap is set', async () => {

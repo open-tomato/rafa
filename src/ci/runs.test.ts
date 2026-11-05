@@ -3,8 +3,8 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 
 import { describe, expect, it } from 'bun:test';
 
-import { createFakeRunsGh } from './runs-fake.js';
-import { readNewestRun, RUN_LIST_FIELDS, runListArgs } from './runs.js';
+import { createFakeRunsGh, RECORDED_STRETCH_111 } from './runs-fake.js';
+import { HEAD_RUN_LIMIT, headRunsArgs, readHeadRuns, readNewestRun, RUN_LIST_FIELDS, runListArgs } from './runs.js';
 
 const SHA_RED = 'b1748d99413b773649728a00fab7dcdbee52c0b5';
 const SHA_GREEN = '18b373104cf0c4c430c1b8c6d5fa1aec4676318a';
@@ -376,5 +376,153 @@ describe('the fake is strict', () => {
 
   it('answers a modelled command (the control for the refusals)', async () => {
     expect((await fake.gh(['run', 'list', '--json', 'status'])).stdout).toBe('[{"status":"completed"}]\n');
+  });
+});
+
+const SHA_PLANTED = '90471b00a1d620a6e81f23c2dd625b3c36ae1511';
+const SHA_HEAD_111 = 'af33ef179a697221713e0612b3095e88cb1e1089';
+
+/**
+ * `gh run list --repo open-tomato/rafa --branch stretch/111 --commit
+ * 90471b00a1d620a6e81f23c2dd625b3c36ae1511 --limit 100 --json
+ * databaseId,workflowName,status,conclusion,headSha`, as `gh` 2.103.3
+ * wrote it on 2026-11-04: a skipped run newer than two failed ones.
+ */
+const RECORDED_PLANTED_PAIR = `[{"conclusion":"skipped","databaseId":41456634201,"headSha":"${SHA_PLANTED}","status":"completed","workflowName":"Release bot fragment"},{"conclusion":"failure","databaseId":41456633215,"headSha":"${SHA_PLANTED}","status":"completed","workflowName":"verify"},{"conclusion":"failure","databaseId":41456159309,"headSha":"${SHA_PLANTED}","status":"completed","workflowName":"verify"}]\n`;
+
+/** `gh run list --repo open-tomato/rafa --branch stretch/111 --limit 1 --json ...`, the same day. */
+const RECORDED_NEWEST_111 = `[{"conclusion":"success","databaseId":41462572168,"headSha":"${SHA_HEAD_111}","status":"completed","workflowName":"verify"}]\n`;
+
+/** A runner answering `results` in turn, recording what it was handed. */
+function answeringInTurn(...results: GhResult[]): { gh: GhRunner; calls: (readonly string[])[] } {
+  const calls: (readonly string[])[] = [];
+  return {
+    calls,
+    gh: (args) => {
+      calls.push(args);
+      return Promise.resolve(results[calls.length - 1] ?? { ok: false, stdout: '', stderr: 'no answer planted\n' });
+    },
+  };
+}
+
+describe('headRunsArgs', () => {
+  it('reads every run of the commit on the branch, up to the limit, with the fields the reader takes', () => {
+    expect(headRunsArgs('stretch/111', SHA_PLANTED)).toEqual([
+      'run', 'list', '--branch', 'stretch/111', '--commit', SHA_PLANTED, '--limit', '100', '--json', 'databaseId,workflowName,status,conclusion,headSha',
+    ]);
+  });
+
+  it('refuses an empty branch and a commit that is not a 40-character sha, and takes the whole pair (the control)', () => {
+    expect(() => headRunsArgs('', SHA_PLANTED)).toThrow('ci runs: refused a branch ""');
+    expect(() => headRunsArgs('stretch/111', '90471b0')).toThrow('ci runs: refused a commit "90471b0", expected a 40-character sha');
+    expect(() => headRunsArgs('stretch/111', SHA_PLANTED)).not.toThrow();
+  });
+});
+
+describe('readHeadRuns over recorded output', () => {
+  it('reads every run of the head commit, the failed ones below a newer skip included', async () => {
+    const newest = `[{"conclusion":"skipped","databaseId":41456634201,"headSha":"${SHA_PLANTED}","status":"completed","workflowName":"Release bot fragment"}]\n`;
+    const { gh, calls } = answeringInTurn(ok(newest), ok(RECORDED_PLANTED_PAIR));
+    expect(await readHeadRuns(gh, 'stretch/111')).toEqual({
+      commit: SHA_PLANTED,
+      runs: [
+        { id: 41456634201, workflow: 'Release bot fragment', state: 'completed', conclusion: 'skipped', commit: SHA_PLANTED },
+        { id: 41456633215, workflow: 'verify', state: 'completed', conclusion: 'failure', commit: SHA_PLANTED },
+        { id: 41456159309, workflow: 'verify', state: 'completed', conclusion: 'failure', commit: SHA_PLANTED },
+      ],
+    });
+    expect(calls).toEqual([runListArgs({ branch: 'stretch/111' }), headRunsArgs('stretch/111', SHA_PLANTED)]);
+  });
+
+  it('answers null for a branch with no run, sending one command', async () => {
+    const { gh, calls } = answeringInTurn(ok('[]\n'));
+    expect(await readHeadRuns(gh, 'stretch/9')).toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+
+  it('throws on a failed second command, naming it', async () => {
+    const { gh } = answeringInTurn(ok(RECORDED_NEWEST_111), { ok: false, stdout: '', stderr: 'HTTP 502\n' });
+    await expect(readHeadRuns(gh, 'stretch/111')).rejects.toThrow(
+      `ci runs: gh run list --branch stretch/111 --commit ${SHA_HEAD_111} --limit 100 --json databaseId,workflowName,status,conclusion,headSha failed: HTTP 502`,
+    );
+  });
+
+  it('throws on an empty list of the head commit, which cannot be every run of a commit that has one', async () => {
+    const { gh } = answeringInTurn(ok(RECORDED_NEWEST_111), ok('[]\n'));
+    await expect(readHeadRuns(gh, 'stretch/111')).rejects.toThrow('answered no run, although the newest run on the branch, 41462572168, is of that commit');
+  });
+
+  it('throws on a run of another commit in the list', async () => {
+    const { gh } = answeringInTurn(ok(RECORDED_NEWEST_111), ok(RECORDED_PLANTED_PAIR));
+    await expect(readHeadRuns(gh, 'stretch/111')).rejects.toThrow(
+      `answered run 41456634201 of commit ${SHA_PLANTED}, expected only runs of ${SHA_HEAD_111}`,
+    );
+  });
+
+  it('throws on a malformed row below a good one, which readNewestRun\'s single row never shows', async () => {
+    const rows = JSON.stringify([JSON.parse(RECORDED_NEWEST_111)[0], { databaseId: 2 }]);
+    const { gh } = answeringInTurn(ok(RECORDED_NEWEST_111), ok(rows));
+    await expect(readHeadRuns(gh, 'stretch/111')).rejects.toThrow('workflowName undefined, expected a string');
+  });
+});
+
+describe('readHeadRuns through the recorded fake', () => {
+  it('reads the three runs of af33ef17, the head of stretch/111, and none of the older commits', async () => {
+    const fake = createFakeRunsGh(RECORDED_STRETCH_111);
+    const head = await readHeadRuns(fake.gh, 'stretch/111');
+    expect(head?.commit).toBe(SHA_HEAD_111);
+    expect(head?.runs.map((r) => [r.id, r.workflow, r.conclusion])).toEqual([
+      [41462572168, 'verify', 'success'],
+      [41462566369, 'Release bot fragment', 'skipped'],
+      [41462556004, 'verify', 'success'],
+    ]);
+    expect(fake.calls()).toEqual([runListArgs({ branch: 'stretch/111' }), headRunsArgs('stretch/111', SHA_HEAD_111)]);
+  });
+
+  it('reads the planted pair when 90471b00 is the head: both failed verify runs under the newer skip', async () => {
+    const fake = createFakeRunsGh(RECORDED_STRETCH_111.filter((r) => r.headSha !== SHA_HEAD_111));
+    const head = await readHeadRuns(fake.gh, 'stretch/111');
+    expect(head?.commit).toBe(SHA_PLANTED);
+    expect(head?.runs.map((r) => [r.id, r.conclusion])).toEqual([
+      [41456634201, 'skipped'],
+      [41456633215, 'failure'],
+      [41456159309, 'failure'],
+    ]);
+  });
+
+  it('reads only the skip through readNewestRun on the same runs (the control: the reading readHeadRuns fixes)', async () => {
+    const fake = createFakeRunsGh(RECORDED_STRETCH_111.filter((r) => r.headSha !== SHA_HEAD_111));
+    expect(await readNewestRun(fake.gh, { branch: 'stretch/111', commit: SHA_PLANTED })).toMatchObject({
+      id: 41456634201,
+      conclusion: 'skipped',
+    });
+  });
+
+  it('answers the bytes gh wrote for the head-commit command', async () => {
+    const fake = createFakeRunsGh(RECORDED_STRETCH_111);
+    expect(await fake.gh(headRunsArgs('stretch/111', SHA_PLANTED))).toEqual(ok(RECORDED_PLANTED_PAIR));
+    expect(await fake.gh(runListArgs({ branch: 'stretch/111' }))).toEqual(ok(RECORDED_NEWEST_111));
+  });
+
+  it('cuts the list at --limit as gh did: two of the three', async () => {
+    const fake = createFakeRunsGh(RECORDED_STRETCH_111);
+    const rows = JSON.parse((await fake.gh(['run', 'list', '--branch', 'stretch/111', '--commit', SHA_PLANTED, '--limit', '2', '--json', 'databaseId'])).stdout) as unknown;
+    expect(rows).toEqual([{ databaseId: 41456634201 }, { databaseId: 41456633215 }]);
+  });
+
+  it('answers null for a branch with no run', async () => {
+    expect(await readHeadRuns(createFakeRunsGh(RECORDED_STRETCH_111).gh, 'stretch/4')).toBeNull();
+  });
+
+  it('throws on a head commit with as many runs as the limit, and reads one run fewer (the control)', async () => {
+    const many = (count: number): FakeRun[] => Array.from({ length: count }, (_, index) => run({
+      databaseId: index + 1,
+      headBranch: 'stretch/7',
+      createdAt: `2026-11-02T10:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}Z`,
+    }));
+    await expect(readHeadRuns(createFakeRunsGh(many(HEAD_RUN_LIMIT)).gh, 'stretch/7')).rejects.toThrow(
+      'answered 100 runs, as many as the limit, so the list may be cut',
+    );
+    expect((await readHeadRuns(createFakeRunsGh(many(HEAD_RUN_LIMIT - 1)).gh, 'stretch/7'))?.runs).toHaveLength(99);
   });
 });

@@ -188,10 +188,19 @@
  * lines that load a module providing it. Its line follows the effort
  * store schema row on every run, a halt's included.
  *
+ * ## The tsc row
+ *
+ * A project root holding a `tsconfig.json` then gets the `tsc` row
+ * (`./doctor-tsc.ts`, whose note holds the outcomes): it runs
+ * `node_modules/.bin/tsc --version` under the invocation's environment,
+ * `ok` naming the version, and `fail` on an exit of 126 or 127, the
+ * type step's `cannot start`, naming the interpreter to put on the PATH.
+ * Its line follows the effort sync row, a halt's included.
+ *
  * ## The exit code
  *
- * 0 when no required item failed and neither the effort store schema
- * row nor the effort sync row failed, whatever failed among the
+ * 0 when no required item failed and none of the effort store schema
+ * row, the effort sync row and the `tsc` row failed, whatever failed among the
  * optional ones and whatever was warned. 1 when a required item failed or timed out,
  * which is when `loop start` would halt before any session: the refusal
  * opens with the runner's halt, which names each such item, its probe,
@@ -200,7 +209,9 @@
  * refuses it and its next safe step, after a halt's text when both
  * happen. 1 when the effort sync row fails, its refusal naming the
  * strategy and why no adapter serves it, after the halt's and the
- * schema row's text when those happen. 1 as well, each
+ * schema row's text when those happen. 1 when the `tsc` row fails, its
+ * refusal naming tsc's exit and the interpreter, after the other
+ * refusals. 1 as well, each
  * ending `Nothing was checked.`, for a positional word, a `--plan` with
  * no file, a `--deep` holding a value, a plan named that is no file, a plan path that cannot be
  * checked, such as one under a file (`stat` answers `ENOTDIR`, measured
@@ -224,13 +235,14 @@
  * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the
  * stretch row (`./doctor-stretch.ts`), when `pr.base` names a `stretch/*` branch; then the `Skill tiers` rows
  * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then the
- * effort sync row; then, under `--deep`,
+ * effort sync row; then the `tsc` row, when there is a `tsconfig.json`; then, under `--deep`,
  * `renderDeep`'s sections. A halt
  * has no verdict line: it is the refusal, on stderr. json mode prints no
  * version line, where `rafa describe` gives the same version as data, and
- * the terminal result's `data` is a {@link DoctorResult}, every path
+ * the terminal result's `data` is a `DoctorResult` (`./doctor-readings.ts`), every path
  * absolute, for a preflight that did not halt and an effort store schema
- * row and an effort sync row that did not fail. A halt gives no `data`,
+ * row, an effort sync row and a `tsc` row that did not fail; the `tsc`
+ * row is not part of it. A halt gives no `data`,
  * nor does a failing row: the terminal event is the `command_exit`
  * error, whose message is the halt naming every failed required item,
  * then each failing row's refusal, the schema row's with its next safe
@@ -249,26 +261,22 @@
  * each left out being the runner's own, and so are the `--deep` reading's
  * (`DeepDoctorSeams`).
  */
-import type { DoctorBoardReadings, DoctorBoardSeams } from './doctor-board.js';
-import type { DoctorCleanupReading, DoctorCleanupSeams } from './doctor-cleanup.js';
+import type { DoctorBoardSeams } from './doctor-board.js';
+import type { DoctorCleanupSeams } from './doctor-cleanup.js';
 import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
-import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
 import type { InstallReadings } from './doctor-install.js';
-import type { PreviousCopiesReading } from './doctor-previous.js';
-import type { DoctorProjectReading } from './doctor-project.js';
-import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
-import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
-import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
+import type { BoardReadings, DoctorPreflight, DoctorResult, DoctorStartTier } from './doctor-readings.js';
+import type { DoctorReleaseSeams } from './doctor-release.js';
+import type { DoctorTiersRunSeams } from './doctor-tiers.js';
+import type { DoctorTscSeams } from './doctor-tsc.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { PrProvider } from '@open-tomato/rafa/core/config/sections';
-import type { PreflightItems, PrerequisiteReminder } from '@open-tomato/rafa/preflight/prerequisites-md';
-import type { PreflightCheck, PreflightOptions, PreflightReport, PreflightTiers } from '@open-tomato/rafa/preflight/run';
-import type { BinPathReading } from '@open-tomato/rafa/project/bin-path';
+import type { PreflightItems } from '@open-tomato/rafa/preflight/prerequisites-md';
+import type { PreflightOptions, PreflightTiers } from '@open-tomato/rafa/preflight/run';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
-import type { LegacyStoreReading } from '@open-tomato/rafa/store/legacy';
-import type { DoctorRefsReading, DoctorRefsSeams } from '@open-tomato/rafa-board';
-import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '@open-tomato/rafa-effort';
+import type { DoctorRefsSeams } from '@open-tomato/rafa-board';
+import type { DoctorEffortSyncSeams } from '@open-tomato/rafa-effort';
 import type { AccountSeams, ResolvePrProviderOptions } from '@open-tomato/rafa-pr';
 
 import { basename, resolve } from 'node:path';
@@ -309,6 +317,7 @@ import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
 import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
+import { writeDoctorTsc } from './doctor-tsc.js';
 
 /**
  * How the checks run; see the module note. Each left out is the
@@ -317,7 +326,7 @@ import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
  * its inventory is built — are {@link DeepDoctorSeams} (`./doctor-deep.ts`).
  */
 export interface DoctorSeams extends DeepDoctorSeams, DoctorBoardSeams, DoctorCleanupSeams, DoctorEffortSyncSeams,
-  DoctorRefsSeams, DoctorReleaseSeams, DoctorTiersRunSeams {
+  DoctorRefsSeams, DoctorReleaseSeams, DoctorTiersRunSeams, DoctorTscSeams {
   readonly checks: Pick<PreflightOptions, 'runProbe' | 'request' | 'timeoutMs' | 'now'>;
   /** The `origin` probe the provider is read through. `gitRemoteUrl` when left out. */
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
@@ -327,114 +336,6 @@ export interface DoctorSeams extends DeepDoctorSeams, DoctorBoardSeams, DoctorCl
 
 /** The seams the registered command runs with: the runner's own, every one. */
 export const DEFAULT_DOCTOR_SEAMS: DoctorSeams = Object.freeze({ checks: Object.freeze({}) });
-
-/**
- * How a report read the plan's start-only `[start]` items: probed on a
- * first dispatch, passed over on a resume. See the module note.
- */
-export interface DoctorStartTier {
-  /** How many of them were checked: the plan's own on a first dispatch, none on a resume. */
-  readonly checked: number;
-  /** How many of them this resume passed over unchecked; 0 on a first dispatch. */
-  readonly skipped: number;
-  /** The tracker whose ticked task made this a resume, by its base name; null on a first dispatch. */
-  readonly tracker: string | null;
-}
-
-/** The preflight of one plan, checked with no run started. */
-export interface DoctorPreflight {
-  /** The project root each probe ran in. */
-  readonly root: string;
-  /** The plan the items were read for, absolute; null when there is none. */
-  readonly plan: string | null;
-  /** Where the default plan was looked for, in order, when there is no plan; empty otherwise. */
-  readonly lookedFor: readonly string[];
-  /** The plan's PREREQUISITES file that was merged in, absolute; null when none was. */
-  readonly prerequisitesFile: string | null;
-  /** How many of the checked items the pull request provider contributed; 0 or 2. */
-  readonly automatic: number;
-  /** The pull request provider the project resolves to, which decided those items and the board rows. */
-  readonly provider: PrProvider;
-  /** How the plan's start-only `[start]` items were read, and how many of the checked items are theirs. */
-  readonly startTier: DoctorStartTier;
-  /** Every check, and the halt and the `known-missing:` lines the runner worded. */
-  readonly report: PreflightReport;
-  /** The steps the PREREQUISITES file names and nothing checks. */
-  readonly reminders: readonly PrerequisiteReminder[];
-  /** The config the preflight resolved, which the plan's risk total reads too. */
-  readonly config: RafaConfig;
-  /** That config with where each key came from, which the `--deep` reading reads. */
-  readonly resolved: ResolvedConfig;
-  /** Whether the line asked for the `--deep` sections. */
-  readonly deep: boolean;
-}
-
-/** What json mode gives as the terminal result's `data`, for a run `doctor` exits 0 from. */
-export interface DoctorResult {
-  /** The project root each probe ran in. */
-  readonly root: string;
-  /** The plan the items were read for, absolute; null when there is none. */
-  readonly plan: string | null;
-  /** The plan's PREREQUISITES file that was merged in, absolute; null when none was. */
-  readonly prerequisitesFile: string | null;
-  /** Every check, the required tier first. */
-  readonly checks: readonly PreflightCheck[];
-  /** How many of them the pull request provider contributed, which are the first of the required tier. */
-  readonly automatic: number;
-  /** How the plan's start-only `[start]` items were read: how many were checked, and how many a resume passed over. */
-  readonly startTier: DoctorStartTier;
-  /** The `known-missing:` line of each failed optional item, as every task prompt would carry it. */
-  readonly knownMissing: readonly string[];
-  /** The steps the PREREQUISITES file names and nothing checks. */
-  readonly reminders: readonly PrerequisiteReminder[];
-  /** Where `~/.rafa/bin` sits on the `PATH` handed in. */
-  readonly binPath: BinPathReading;
-  /** Which store files each effort directory holds; null when they could not be checked. */
-  readonly legacyStore: LegacyStoreReading | null;
-  /** Which of `plan.dir` and `specs.dir` still name a pre-init directory; null for a config that could not be loaded. */
-  readonly preInitDirs: PreInitDirsReading | null;
-  /** How many previous copies `previous/` under `specs.dir` holds; null when they could not be counted. */
-  readonly previousCopies: PreviousCopiesReading | null;
-  /** Every part of the GitHub board as it was read; null for a project with no GitHub board. */
-  readonly board: DoctorBoardReadings['board'];
-  /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board or in `native` mode. */
-  readonly blocked: DoctorBoardReadings['blocked'];
-  /** Every issue carrying two `epic:` labels and every orphan `epic:` label; null for a project with no GitHub board or in `native` mode. */
-  readonly epics: DoctorBoardReadings['epics'];
-  /** Every truncated relationship list (`./doctor-relations.ts`); in `native` mode only, left out otherwise. */
-  readonly relations?: DoctorBoardReadings['relations'];
-  /** Every mark of the mode `board.relationships` does not name (`./doctor-marks.ts`); left out when no layer sets the key. */
-  readonly marks?: DoctorBoardReadings['marks'];
-  /** Every unresolved board owner, unlabelled Roadmap and lost position slot; null for a project with no GitHub board. */
-  readonly boards: DoctorBoardReadings['boards'];
-  /** The project rows (`./doctor-project.ts`); null without a `gh` provider or `board.project.number`. */
-  readonly project: DoctorProjectReading | null;
-  /** How many rows each group `rafa cleanup` lists holds, read without fetching, or why git refused. */
-  readonly cleanup: DoctorCleanupReading;
-  /** The suspect, dangling and unknown references of every saved copy under `specs.dir`, or why it could not be listed. */
-  readonly refs: DoctorRefsReading;
-  /** The release row (`./doctor-release.ts`): `{ enabled: false }` for a project whose release is off. */
-  readonly release: DoctorReleaseReading;
-  /** The skill tier rows and the Claude Code version they were read against (`./doctor-tiers.ts`). */
-  readonly tiers: DoctorTiersReading;
-  /** The `effort store schema` row (`./doctor-effort-schema.ts`); a failing one gives no `data`. */
-  readonly effortSchema: DoctorEffortSchemaReading;
-  /** The `effort sync` row (`./doctor-effort-sync.ts`); a failing one gives no `data`. */
-  readonly effortSync: DoctorEffortSyncReading;
-  /** Every `--deep` section as it was read; null without `--deep`. */
-  readonly deep: DeepReading | null;
-}
-
-/** The readings of the GitHub board, each null for a project that has none, and the rows every repository gets. */
-interface BoardReadings extends DoctorBoardReadings {
-  readonly project: DoctorProjectReading | null;
-  readonly cleanup: DoctorCleanupReading;
-  readonly refs: DoctorRefsReading;
-  readonly release: DoctorReleaseReading;
-  readonly tiers: DoctorTiersReading;
-  readonly effortSchema: DoctorEffortSchemaReading;
-  readonly effortSync: DoctorEffortSyncReading;
-}
 
 /** The line every refusal before a check ends with. */
 const NOTHING_CHECKED = 'Nothing was checked.';
@@ -617,8 +518,8 @@ async function checkPreflight(context: RafaContext, project: ProjectFound, seams
 }
 
 /**
- * The refusal for a halt, a failing `effort store schema` or
- * `effort sync` row, or any of them together: the runner's own text and
+ * The refusal for a halt, a failing `effort store schema`, `effort sync`
+ * or `tsc` row, or any of them together: the runner's own text and
  * what `loop start` would do, then each failing row's refusal in that
  * order; null for none.
  */
@@ -735,11 +636,12 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     writeText(context, renderDoctorTiers(readings.tiers));
     writeDoctorEffortSchema(context, effortSchema);
     writeText(context, renderDoctorEffortSync(effortSync));
+    const tsc = await writeDoctorTsc(context, project.root, seams);
     const deep = await checkDeep(context, preflight, seams);
     writeText(context, deep === null
       ? []
       : renderDeep(deep));
-    const refusal = doctorRefusal(preflight.report.halt, [effortSchemaRefusal(effortSchema), effortSyncRefusal(effortSync)]);
+    const refusal = doctorRefusal(preflight.report.halt, [effortSchemaRefusal(effortSchema), effortSyncRefusal(effortSync), tsc]);
     if (refusal !== null) throw refusal;
     if (context.outputMode === 'json') context.output.result(resultOf(preflight, install, readings, deep));
   } finally {

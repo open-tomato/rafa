@@ -22,8 +22,10 @@ Ten actions read and control pull requests:
   (`packages/rafa-pr/src/commands/pr/list-forecast.ts`, over
   `packages/rafa-release/src/release/body-forecast.ts`; no fetch, no fold, no
   extra `gh` command)
-- `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]` —
-  merge the PR; `--skip-checks` is for a PR that reports no checks at all
+- `pr merge [<n>] [--yes] [--skip-checks] [--keep-branch]
+  [--method=squash|merge|rebase]` — merge the PR; `--skip-checks` is for a
+  PR that reports no checks at all; a trunk head branch is kept on both
+  sides, and `--keep-branch` keeps any other head branch the same way
 - `pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config]
   [--max-attempts=2]` — assess it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
@@ -198,6 +200,22 @@ Providers reading of `rafa doctor --deep` does) wraps `fake.run` in a
 runner that answers the `auth` forms itself and hands the rest on. This
 sentence replaces nothing.
 
+### CI status on the head commit
+
+`rafa ci status --branch=<branch>` prints one line per workflow that ran on the
+branch's head commit, each the workflow's newest run on that commit, under a
+headline with the worst of them: `red` beats `running`, which beats `green`,
+which beats `none`. A `skipped` or `neutral` run reads green, so a workflow
+that ran nothing holds nothing red. A red run's failed cases come from its
+`gh run view --log-failed` text.
+
+The planted case is the runs of `90471b00` on `stretch/111`: the fragment
+workflow's run 41456634201 `skipped` is the newest run of the commit, above two
+`verify` runs, 41456633215 and 41456159309, both `failure`. The reading holds
+two lines, the fragment green and `verify` red on its newer run, and the branch
+reads red. Reading the newest run of the commit alone would have read the skip
+and passed.
+
 ### The merge flow
 
 1. Refuse on a tracked change in the working tree, or on an untracked path the
@@ -249,7 +267,29 @@ sentence replaces nothing.
    <name>; nothing to delete`; the remote delete and the prune still run,
    and the exit code stays 0. A branch checked out in another worktree is
    present, so step 1 still refuses it, or frees it when an ended loop
-   worktree holds it.
+   worktree holds it. A head branch that is a trunk is kept on both sides
+   and probed on neither: `pr.base`, the branch `origin`'s `HEAD` names,
+   `main` where `pr.base` names none, or a branch a `cleanup.keep` pattern
+   names, the set `rafa cleanup` never lists (#1266). `--keep-branch` keeps
+   any other head branch the same way. Neither delete is then in the list,
+   so a failed step's tail names neither, and one line says
+   `<base> is checked out and pulled; <branch> is kept locally and on
+   origin, since <why>.`; the json result's `kept` holds the why. A base
+   another worktree holds — the main checkout on `integration` while the
+   merge runs from a session worktree — would fail `git switch <base>`, so
+   the two base steps change places: `git -C <path> pull --ff-only` in that
+   worktree, then `git switch --detach <base>` here, and the ready line says
+   `<base> is pulled in <path> and this checkout is detached at it`. The
+   holder is read from `git worktree list --porcelain` after the merge.
+   A pull that fails with `Cannot fast-forward to multiple branches` is
+   tried once more (#1171): `<label>: retrying after git fetch origin
+   <base>` (with `-C <path>` where the pull runs in another worktree),
+   the fetch, then the pull again. The step is reported once, with the
+   second try's outcome, and its json `steps` entry carries
+   `retried: true`; every other step carries `retried: false`. A fetch
+   that fails, a second pull that fails, or a pull that fails with any
+   other text is a clean-up failure as any failed step is: exit code 1,
+   the merge left alone, the tail from the pull listed to paste.
 5. Tick the roadmap and print what is ready.
 6. Run the unblock reading over every open issue labelled `spec:blocked` whose
    `Blocked by:` line names an issue this PR closes, asking `#<n> was blocked by

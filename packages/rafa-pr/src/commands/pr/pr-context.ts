@@ -135,7 +135,7 @@ export const PR_USAGE: Readonly<Record<PrAction, string>> = Object.freeze({
   show: 'rafa pr show [<n>]',
   view: 'rafa pr view [<n>]',
   list: 'rafa pr list',
-  merge: 'rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]',
+  merge: 'rafa pr merge [<n>] [--yes] [--skip-checks] [--keep-branch] [--method=squash|merge|rebase]',
   triage: 'rafa pr triage [<n>] [--no-comment] [--resolve] [--allow-local-config] [--max-attempts=<count>]',
   wait: 'rafa pr wait [<n>] [--timeout=<minutes>]',
   open: 'rafa pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>',
@@ -223,6 +223,8 @@ export interface PrContext {
   readonly mergeMethod: MergeMethod;
   /** `pr.base`, or null when nobody has named one. */
   readonly base: string | null;
+  /** `cleanup.keep`, the branches `pr merge` keeps beside the trunks, as `rafa cleanup` never lists them. */
+  readonly cleanupKeep: readonly string[];
   /** `pr.resolveBudget`, the US dollars each `pr triage --resolve` session is capped at. */
   readonly resolveBudget: number;
   /** `board.trustedAuthors`: the logins board text is trusted from without a permission lookup. */
@@ -263,6 +265,7 @@ type PrConfig = Pick<
   | 'prProvider'
   | 'prMergeMethod'
   | 'prBase'
+  | 'cleanupKeep'
   | 'prResolveBudget'
   | 'boardTrustedAuthors'
   | 'roadmapIssue'
@@ -326,6 +329,7 @@ export async function openPrContext(context: RafaContext, seams: PrSeams = DEFAU
     pulls: makeProvider(project.root),
     mergeMethod: config.prMergeMethod,
     base: config.prBase,
+    cleanupKeep: config.cleanupKeep,
     resolveBudget: config.prResolveBudget,
     trustedAuthors: config.boardTrustedAuthors,
     roadmapIssue: config.roadmapIssue,

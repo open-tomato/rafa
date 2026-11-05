@@ -11,7 +11,8 @@
  * module only holds the checks' code. A test run read as a stop
  * (`isStepInterrupted`) runs no check, and the answer then carries none;
  * a lint read as a stop runs no type step, and the answer carries the
- * lint alone. The seams, the context and {@link SIGINT_EXIT_CODE} live in
+ * lint alone. {@link isCheckUnstartable} answers whether a check could
+ * not start, on which `settleStep` writes no repair task. The seams, the context and {@link SIGINT_EXIT_CODE} live in
  * `suite-step.ts`, imported back here: the cycle is safe because neither
  * module reads the other's bindings at load, only inside the functions,
  * as with `suite-stage-step.ts`.
@@ -36,6 +37,17 @@ export function lintTask(context: SuiteStepContext, seams: Required<SuiteStepSea
 export function typeCheckTask(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput): Promise<TypeOutcome> {
   const isInterrupted = context.isInterrupted ?? (() => false);
   return runTypeStep({ checkout: context.checkout, base: input.base, task: input.task, git: seams.git, runTypes: seams.runTypes, stopCode: SIGINT_EXIT_CODE, isInterrupted });
+}
+
+/**
+ * True when a diff check `settling` carries could not start: the type
+ * step's {@link TypeOutcome.cannotStart}, a tsc that exited 126 or 127.
+ * The lint has no such reading. `settleStep` then writes no repair task,
+ * since no repair of the task's files puts the tool on the PATH; the
+ * step stays red on the check's blocker, and the run halts on it.
+ */
+export function isCheckUnstartable(settling: Pick<Settling, 'lint' | 'types'>): boolean {
+  return settling.types?.cannotStart === true;
 }
 
 /** The task step's checks over its diff after the test run `result`: none when that run was a stop. See the module note. */

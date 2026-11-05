@@ -133,8 +133,9 @@ that a running loop may be using, so run `rafa loop list` and
 - **Pull request into `stretch/**`.** A pull request into a `stretch/` branch
   reports the `fragment` check, so `--skip-checks` is refused on it as on
   the two above. Merge by handing over `rafa pr merge <n>`. `rafa stretch
-  item --wait` still passes that flag at its merge step; after its refusal
-  there, run `rafa pr merge <n>` by hand.
+  item --wait` waits for the checks and merges with `rafa pr merge <n>
+  --yes`, without that flag. An item whose loop ended on a refused merge is
+  finished with `rafa stretch item <issue> --resume`, which merges the same way.
 - **A dirty tree.** It refuses on uncommitted changes, which a loop running
   in the same checkout leaves. Check `git status` in the checkout the
   command is for.

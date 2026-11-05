@@ -138,9 +138,13 @@ stale-docs issue: a `chore` issue titled
 unticked checklist item, `- [ ] <where>: <what>`. `<version>` is the settle
 forecast when the line is added (see `context/release.md`); when the forecast
 names none it is the patch bump of the version file, and when release is off it
-is the word `next`. A later run for the same version adds to the same issue. A
-forecast that shifts opens a second issue, and the readers take every open
-marked issue, so no line is lost. A person closes the issue.
+is the word `next`. A later run for the same version adds to the same issue. The
+newest root release tag is read beside the version: a marked issue titled for a
+version at or below it is released and left alone, and an open issue of an
+unreleased version the forecast moved off is retitled to the new version and
+takes the line. When the tags cannot be read, a forecast that shifts opens a
+second issue, and the readers take every open marked issue, so no line is lost.
+A person closes the issue.
 
 **No board, no issue.** A run whose tracker chain lands on no tracker that can
 both list and edit issues creates nothing. Its unsettled lines are kept and

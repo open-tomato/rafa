@@ -292,8 +292,9 @@ and `AGENTS.md` at 80 lines. `src/tests/turbo-config.sweep.test.ts` holds the
 key. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` and `affected` checks (merge with
-`rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
-check (merge with `rafa pr merge <n> --skip-checks`). One more gate runs
+`rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports
+the `fragment` check (merge with `rafa pr merge <n>`; `--skip-checks` is refused
+there). One more gate runs
 at `git commit`: `.githooks/pre-commit`
 runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
 refusing a commit whose staged blobs carry a raw control byte or an
@@ -740,6 +741,16 @@ step's line in the task session output reports the held error count from
 the base, allowing later sweeps to compare against this baseline and measure
 progress on the backlog.
 
+**A tsc that cannot start is not a red step.** A type step whose `tsc` exits
+126 or 127 never ran its checks. 127 means the interpreter the tsc script's
+first line names (`#!/usr/bin/env node`, so `node`) is not on the PATH; 126
+means the file was found but cannot be executed. The step reads either exit as
+neither red nor a type error, and no change to the task's files fixes it. The
+blocker names the interpreter, so the fix is to put that interpreter on the
+PATH the loop runs under. `rafa doctor` reads the same exits on its `tsc` row,
+where it exits 1 with the same reading, so a missing `node` shows there before
+a run starts.
+
 Widening an exported interface reaches every `*.test.ts` literal with no
 gate saying so: grep the type name across the test files and fix each
 literal by hand. Adding `blocking` to `SpecReviewGap` reddened a `toEqual`
@@ -802,7 +813,9 @@ or `CASE_TIMEOUT_MS` constant, or a `{ timeout }` literal):
   `src/tests/sweep-timeout.ts`. Each sweep file sets it for its own cases
   with `setDefaultTimeout(SWEEP_TIMEOUT)` at module level, before its first
   `describe`. That call reaches no other file of the run, so a sweep's
-  limit does not lift a unit test beside it;
+  limit does not lift a unit test beside it. The roots a content sweep
+  reads are the eight of `SOURCE_ROOTS` in `src/tests/source-roots.ts`, the
+  one list every such sweep walks;
 - a spawned case should pass `RUN_TIMEOUT` (`{ timeout: 60_000 }`, from
   `src/tests/loop-scratch.ts`) as its middle argument, `it(name,
   RUN_TIMEOUT, fn)`, which gives the child process a minute. A file with
@@ -894,8 +907,10 @@ all failure output lands in one place a reader can find: the test itself
 names the assertion that failed, and the error message names the scratch
 directory, the exit code, and the streams the child wrote.
 `src/tests/spawned-exit-code.sweep.test.ts` holds the rule: it fails on
-any test file under `src/` asserting a spawned rafa run's exit code with
-a bare `expect(run.exitCode).toBe(n)`. It reads each asserted value back
+any tracked test file under a root of `src/tests/source-roots.ts` (the
+root's `src/`, core's and the six feature packages' `src/`) asserting a
+spawned rafa run's exit code with a bare
+`expect(run.exitCode).toBe(n)`. It reads each asserted value back
 to its declaration, so an in-process result asserted bare still passes.
 
 ### Fixture scrub, guard, and path rules

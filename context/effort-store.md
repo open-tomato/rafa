@@ -1055,8 +1055,14 @@ is handed a store, so the parity suites, whose `repoRoot` is the live sibling,
 pass `skills: null`. One session invoked from both sides is two rows, one per
 side. An `unknown` row — one row holding the session and NULL in `name`,
 `sidechain` and `count` — marks a session whose log the collector could not
-vouch for (log version mismatch, unreadable line, or unreadable skill call). A
-session that invoked no skill stores no row at all.
+read (a log version below the floor, unreadable line, or unreadable skill
+call), and the skill half counts it under `unknown` alone. A session read by
+skill name whose records do not all carry `SKILL_USE_FIXTURE_VERSION`, the
+version its recorded fixture was logged under, is stored by name and counted
+under `unvouched` on the `skills` line of the collect summary, beside
+`unknown`; `--verbose` names each read session's versions and standing, as in
+`skills: read <id> (2.1.316, unvouched)`. A session that invoked no skill
+stores no row at all.
 
 **Claude Code's own usage record covers only plugin-delivered skills, never a
 project skill, so `skill_invocations` has no CLI-native count to check
@@ -1065,8 +1071,9 @@ is `pluginUsage` in `~/.claude/.claude.json`: a map keyed
 `<plugin>@<marketplace>`, each entry holding `usageCount`, `lastUsedAt` and
 `lastUsedNumStartups`, and it backs the "last used" / "never invoked" text
 the `/plugin` skill-detail view and `/skill-doctor` read. Verified on
-2026-09-27 with a real `claude -p` session under the pinned
-`SKILL_USE_CLI_VERSION` (2.1.280): a scratch repo with two project skills
+2026-09-27 with a real `claude -p` session under
+`SKILL_USE_FIXTURE_VERSION` (2.1.280), the fixture's version and the floor
+`SKILL_USE_CLI_FLOOR`: a scratch repo with two project skills
 planted under `.claude/skills/`, outside any plugin, each invoked once by
 name in the one session recorded. `readSkillUse` over that session's log
 answered the expected `probe-alpha` and `probe-beta` counts of 1 each,
@@ -1088,9 +1095,12 @@ the `skill` field from the input of a `Skill` tool call, mapped to a bare name
 with `bareSkillName`, and no message content otherwise — not the call's
 args, every other tool's input, every prompt, or any tool output. The
 counts it answers can therefore be stored beside the session rows without
-the store becoming a copy of a transcript. The collector vouches for the log
-format by comparing each record's `version` against `SKILL_USE_CLI_VERSION`;
-a session read as `unknown` is never averaged as a session that used no skill.
+the store becoming a copy of a transcript. The collector reads a session by
+skill name when each record's `version` is an `X.Y.Z` at or above the floor
+`SKILL_USE_CLI_FLOOR` (2.1.280), and vouches for the reading only when every
+one is `SKILL_USE_FIXTURE_VERSION` (2.1.280), the version of its recorded
+fixture; a session read as `unknown` is never averaged as a session that
+used no skill.
 
 **`plan_ci` is written by `pr triage` and `pr merge`, held by the plan CI
 readers.** It arrived at schema version 13: one row per settled reading of

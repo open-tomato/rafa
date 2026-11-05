@@ -49,7 +49,7 @@ After this plan merges and the runtime holding `rafa effort collect --skills` is
 
 **Note**: The "before" data is initially recorded as `unknown` because:
 1. Skill collection was not implemented when these plans ran.
-2. Claude Code session logs from before the current `SKILL_USE_CLI_VERSION` cannot be parsed, storing `unknown` in the count column.
+2. Claude Code session logs below `SKILL_USE_CLI_FLOOR` cannot be parsed, storing `unknown` in the count column.
 3. Baseline M1 for "arm none" is established by running the query above on the main checkout after this plan merges and 0.18.0 is installed with skill collection enabled.
 
 ## After: measured runs with resolver arms

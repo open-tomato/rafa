@@ -353,14 +353,16 @@ describe('rafa stretch item --dry-run, spawned', () => {
       `keep .rafa/plans/PLAN-${stub}.md, written by an earlier plan create`,
       `RAFA_OUTPUT=events rafa loop start --plan=.rafa/plans/PLAN-${stub}.md --as-worktree --no-ci-wait`,
       'rafa loop wait --session-id=<session id>',
-      'rafa pr merge <pr> ',
-      '--skip-checks',
+      'wait for GitHub to compute the mergeability of <pr>',
+      'wait for the checks of <pr> to pass',
+      'rafa pr merge <pr> --yes',
       'gh run list',
       `append the item to ${items}`,
       'print the pit-stop readings of stretch/7',
       `dry run: would start the loop of #${ISSUE} for stretch/7; nothing was run`,
     ]);
     expect(said(run)).not.toContain('rafa plan create');
+    expect(said(run)).not.toContain('--skip-checks');
 
     expect(snapshot(world)).toEqual(before);
     expect(calls(world.ghLog)).toEqual([]);
@@ -424,7 +426,7 @@ describe('rafa stretch end --dry-run, spawned', () => {
       'stretch end: stretch 7 (stretch/7 into main), 0 Closes line(s) from the ledger, dry run: each step is printed and none is run',
       `write ${join(folder, 'pr-body.md')}: report.md with the ledger's Closes lines`,
       `rafa pr open --head=stretch/7 --base=main '--title=Stretch 7' --body-file=${join(folder, 'pr-body.md')}`,
-      'dry run: would open stretch/7 into main, or print the pull request already open from it; nothing was run',
+      'dry run: would open stretch/7 into main, or print the pull request already open from it and compare its body with pr-body.md, updating it when they differ; nothing was run',
     ]);
 
     expect(snapshot(world)).toEqual(before);
