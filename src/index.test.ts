@@ -579,6 +579,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../plan/needs.js', ['isUnmet', 'readPlanNeeds', 'readSpecNeeds']],
     ['../skill/list.js', ['isSourceShape']],
     ['./spec-route.js', ['resolveCreateSpec']],
+    ['./stretch-rules.js', ['stretchRulesReader']],
   ]],
   ['./commands/loop/start.js', [
     ['@open-tomato/rafa-run', ['DEFAULT_CI_ATTEMPTS', 'endingWith', 'refuseMisplacedRuntime']],

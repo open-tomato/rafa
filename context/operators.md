@@ -60,8 +60,11 @@ wrap-up writes the next stretch's opening message to
 `.rafa/stretch/engineer-prompt.md`.
 
 `rules.md` holds the working rules the person approved for every item of
-the stretch. The stretch engineer writes it at the bucket's approval.
-Every item's planner reads it through `rafa stretch item`, which hands it
+the stretch. The person and the stretch engineer write it together: the
+engineer drafts it in the bucket's message, the person changes the draft in
+the conversation, and the engineer writes it once the person calls it final,
+or reads it back when the person edited the file in the terminal. Every
+item's planner reads it through `rafa stretch item`, which hands it
 over as `RAFA_STRETCH_RULES`, so `plan create` appends it to the item's
 snapshot under `## Stretch rules`, after the issue's notes.
 

@@ -186,7 +186,7 @@ export function itemLogPath(root: string, n: number, issue: number): string {
   return join(stretchFolder(root, n), `loop-${String(issue)}.log`);
 }
 
-/** The stretch's working rules, as the stretch engineer writes them at the bucket's approval. */
+/** The stretch's working rules, as the person and the stretch engineer write them at the bucket's approval. */
 export const RULES_FILE = 'rules.md';
 
 /** `<root>/.rafa/stretch/<n>/rules.md`. */

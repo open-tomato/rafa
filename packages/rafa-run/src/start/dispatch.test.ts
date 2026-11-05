@@ -36,6 +36,14 @@
  * shape, an abbreviated base and a refused one, are driven in
  * `task-gate-lines.test.ts`.
  *
+ * Also for the tracker reaching the prompt (`tracker-line.ts`):
+ * `buildTaskPrompt` placing the line naming it by absolute path directly
+ * after the scoped-task lines and ahead of the blocker and base lines,
+ * the prompt unchanged with no path, a relative path refused, and the
+ * plan's stamp still the first; and `dispatchTask` handing the runner the
+ * prompt its `trackerPath` option put that line in, and refusing a
+ * relative one before any session is spawned.
+ *
  * Also for `dispatchTask` running the loop guard just before its spawn:
  * against a real repository and a linked worktree cut from it, a
  * checkout that held spawns the session as before, and one removed
@@ -74,7 +82,7 @@ import { dirname, join } from 'node:path';
 
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
-import { parseTaskDeclaration, resolveDeclarationFlags } from '@open-tomato/rafa/core/plan';
+import { parseTaskDeclaration, planStubFromPrompt, resolveDeclarationFlags, stampPrompt } from '@open-tomato/rafa/core/plan';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
@@ -94,6 +102,7 @@ import {
 } from './dispatch.js';
 import { haltBeforeSession } from './session-guard.js';
 import { alwaysRunLines, BASE_PROMPT_PREFIX, typeCheckLines } from './task-gate-lines.js';
+import { TRACKER_PROMPT_PREFIX, trackerLines } from './tracker-line.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -1208,6 +1217,91 @@ describe('buildTaskPrompt and dispatchTask, naming the type check the runner wil
     expect((await dispatchWith(RECIPE)).prompt).toContain(typeCheckLines(RECIPE)[0] ?? 'no line');
     expect((await dispatchWith()).prompt).not.toContain('runner\'s type step will');
     expect((await dispatchWith(null)).prompt).not.toContain('runner\'s type step will');
+  });
+});
+
+describe('buildTaskPrompt and dispatchTask, naming the tracker that holds the task\'s line', () => {
+  const TASK = 'Make the widget round';
+  const PROMPT_MD = '# PROMPT.md\nDo the task.';
+  const PLAN = '# Plan\n- [ ] Make the widget round';
+  const BASE = 'a5a383a0c3f1e2d4b6a798011223344556677889';
+  const TRACKER = '/home/dev/project/.rafa/plans/PLAN_TRACKER-widget.md';
+  const TRACKER_LINE = trackerLines(TRACKER)[0] ?? 'no line';
+  const BEFORE = buildTaskPrompt(TASK, PROMPT_MD, PLAN);
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('holds the prompt unchanged with no path, against a path that changes it', () => {
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, null, [], [], null, null)).toBe(BEFORE);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, null, [], [], null, TRACKER)).not.toBe(BEFORE);
+  });
+
+  it('refuses a relative path as a programming error, against the absolute one it takes', () => {
+    expect(() => buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, null, [], [], null, '.rafa/plans/PLAN_TRACKER-widget.md'))
+      .toThrow('is not absolute');
+    expect(() => buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, null, [], [], null, TRACKER)).not.toThrow();
+  });
+
+  it('places the tracker line directly after the scoped-task lines, ahead of the blocker and base lines', () => {
+    const lines = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], 'hook refused', NO_TASK_SECTIONS, BASE, [], [], null, TRACKER).split('\n');
+
+    expect(lines[0]).toBe(`Your scoped task is: ${TASK}`);
+    expect(lines[1]?.startsWith('Consider tasks listed above this one')).toBe(true);
+    expect(lines[2]).toBe(TRACKER_LINE);
+    expect(lines[2]?.startsWith(TRACKER_PROMPT_PREFIX)).toBe(true);
+    expect(lines[2]).toContain(`\`${TRACKER}\``);
+    expect(lines[3]?.startsWith('An earlier run of this task left it blocked on: ')).toBe(true);
+    expect(lines[4]?.startsWith(BASE_PROMPT_PREFIX)).toBe(true);
+    expect(lines[5]).toBe('');
+  });
+
+  it('keeps the plan\'s stamp the first one in the prompt', () => {
+    const prompt = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, null, [], [], null, TRACKER);
+
+    // The tracker's own name carries a stub, so a line read as a stamp would answer it.
+    expect(planStubFromPrompt(prompt)).toBeNull();
+    expect(planStubFromPrompt(stampPrompt('plan-of-the-run', prompt))).toBe('plan-of-the-run');
+  });
+
+  it('hands the runner a prompt naming the tracker its dispatch was given, none without one, and refuses a relative one unspawned', async () => {
+    const root = freshRoot();
+    const prompts: string[] = [];
+    const run: TaskSessionRunner = (prompt) => {
+      prompts.push(prompt);
+      return Promise.resolve({ exitCode: 0, stdout: '' });
+    };
+    setActiveOutput(sinkOutput({}));
+    const dispatchWith = (trackerPath?: string | null): ReturnType<typeof dispatchTask> => dispatchTask({
+      taskInfo: { task: LINE, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${LINE}\n`,
+      inject: 'full',
+      repoRoot: root,
+      checkout: join(root, '.rafa', 'worktrees', 'task'),
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      base: BASE,
+      ...(trackerPath === undefined
+        ? {}
+        : { trackerPath }),
+      run,
+      newSessionId: () => 'session-under-test',
+    });
+
+    const named = await dispatchWith(TRACKER);
+    const unnamed = await dispatchWith();
+    const nulled = await dispatchWith(null);
+
+    expect(named.prompt).toBe(prompts[0] ?? '');
+    expect(named.prompt.split('\n')[2]).toBe(TRACKER_LINE);
+    expect(unnamed.prompt).not.toContain(TRACKER_PROMPT_PREFIX);
+    expect(nulled.prompt).toBe(unnamed.prompt);
+    await expect(dispatchWith('PLAN_TRACKER-widget.md')).rejects.toThrow('is not absolute');
+    expect(prompts).toHaveLength(3);
   });
 });
 
