@@ -295,6 +295,48 @@ describe('the branch template a --next walk reads claims under', () => {
   });
 });
 
+describe('the stretch rules a board route appends', () => {
+  /** The rules file as the reader answers it. */
+  const RULES = { path: '.rafa/stretch/112/rules.md', text: '- one rule\n' };
+
+  it('reads the rules on --issue and hands them to the resolution', async () => {
+    const route = recording();
+    let reads = 0;
+    const readRules = (): typeof RULES => {
+      reads += 1;
+      return RULES;
+    };
+
+    await resolveCreateSpec({ args: ['--issue=63'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [], readRules }, route.seams);
+
+    expect(route.asked().rules).toBe(RULES);
+    expect(reads).toBe(1);
+  });
+
+  it('never reads the rules on --spec, which writes no snapshot', async () => {
+    const route = recording();
+    const readRules = (): never => {
+      throw new Error('the --spec route read the rules');
+    };
+
+    await resolveCreateSpec({ args: ['--spec=x.md'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [], readRules }, route.seams);
+
+    expect(Object.keys(route.asked())).not.toContain('rules');
+  });
+
+  it('leaves the key out when the reader answers none, or none was handed, the control', async () => {
+    const none = recording();
+    const unset = recording();
+    const options = { args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [] };
+
+    await resolveCreateSpec({ ...options, readRules: () => null }, none.seams);
+    await resolveCreateSpec(options, unset.seams);
+
+    expect(Object.keys(none.asked())).not.toContain('rules');
+    expect(Object.keys(unset.asked())).not.toContain('rules');
+  });
+});
+
 describe('the --spec route through the resolution the command uses', () => {
   it('answers the spec found under the specs directory, with no issue to publish on', async () => {
     const repoRoot = plant(join(SPECS_DIR, 'my-feature.md'));

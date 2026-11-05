@@ -53,11 +53,22 @@
  * as no, so it reaches this module as `false` and refuses the same way.
  * An offer that throws is thrown on, with nothing written.
  *
+ * ## The stretch rules
+ *
+ * A stretch's rules file, read by the caller, is handed in as
+ * {@link SettleSnapshotOptions.rules} and handed on to both the reading
+ * and the write, so a copy whose rules alone changed takes the `notes`
+ * row above. A snapshot that carries rules is followed by
+ * {@link stretchRulesLine}, naming the rules file and the snapshot,
+ * whichever row it took; a run handed none, or rules holding nothing
+ * but whitespace, prints nothing more than it did before rules existed.
+ * This module reads no environment value and no stretch folder.
+ *
  * The filesystem is reached only under the `repoRoot` a caller names,
  * so every case in `./snapshot-settle.test.ts` writes in its own
  * temporary directory.
  */
-import type { SnapshotChange, SpecIssue, SpecSnapshot } from './issue.js';
+import type { SnapshotChange, SpecIssue, SpecSnapshot, StretchRules } from './issue.js';
 import type { Output } from '@open-tomato/rafa/ports';
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -118,6 +129,11 @@ export function notesRebuiltLine(path: string, issue: number, previous: string):
     + ` the old copy is at ${previous}`;
 }
 
+/** The line a snapshot carrying a stretch's rules is followed by, naming the rules file and the snapshot. */
+export function stretchRulesLine(rules: string, path: string): string {
+  return `stretch rules: appended ${rules} to ${path}`;
+}
+
 /** What {@link settleSpecSnapshot} is asked. */
 export interface SettleSnapshotOptions {
   /** The project root the paths are resolved against. */
@@ -132,6 +148,8 @@ export interface SettleSnapshotOptions {
   readonly offerRefresh?: RefreshOffer | null;
   /** Where the difference lines and the info line go. */
   readonly output: Output;
+  /** The stretch's rules file, read by the caller; null or left out when there is none. */
+  readonly rules?: StretchRules | null;
 }
 
 /** A saved copy as read: its text and when it was taken. */
@@ -170,7 +188,8 @@ function printChange(change: SnapshotChange, output: Output): void {
  *
  * Prints the body line and the notes line of a copy that differs before
  * anything else; prints {@link notesRebuiltLine} after a notes-only
- * rebuild; hands a changed body to `options.offerRefresh` unless
+ * rebuild, and {@link stretchRulesLine} last when `options.rules`
+ * holds anything but whitespace; hands a changed body to `options.offerRefresh` unless
  * `options.refresh` is set.
  *
  * Throws `CommandExit({@link ISSUE_REFUSAL_EXIT},
@@ -182,8 +201,25 @@ function printChange(change: SnapshotChange, output: Output): void {
  * and so is anything the offer throws.
  */
 export async function settleSpecSnapshot(options: SettleSnapshotOptions): Promise<SpecSnapshot> {
+  const { output } = options;
+  const rules = options.rules ?? null;
+  const written = await settle(options, rules);
+  if (rules !== null && rules.text.trim() !== '') output.info(stretchRulesLine(rules.path, written.path));
+  return written;
+}
+
+/** {@link settleSpecSnapshot} up to the write, the rules line aside. */
+async function settle(options: SettleSnapshotOptions, rules: StretchRules | null): Promise<SpecSnapshot> {
   const { repoRoot, specsDir, issue, refresh, output } = options;
-  const write = (rewrite: boolean): SpecSnapshot => writeSpecSnapshot({ repoRoot, specsDir, issue, refresh: rewrite });
+  const write = (rewrite: boolean): SpecSnapshot => writeSpecSnapshot({
+    repoRoot,
+    specsDir,
+    issue,
+    refresh: rewrite,
+    ...rules === null
+      ? {}
+      : { rules },
+  });
   const path = specPath(specsDir, issue.number, issue.title);
   const notes = notesPath(specsDir, issue.number);
   // The collision is `writeSpecSnapshot`'s refusal; reading the notes
@@ -198,6 +234,7 @@ export async function settleSpecSnapshot(options: SettleSnapshotOptions): Promis
     body: issue.body,
     notes: readLocalNotes(repoRoot, specsDir, issue.number),
     notesPath: notes,
+    rules,
   });
   if (change.kind === 'unchanged') return write(refresh);
 

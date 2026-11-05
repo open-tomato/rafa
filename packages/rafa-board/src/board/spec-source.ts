@@ -158,8 +158,19 @@
  * input or no offer at all — the refusal a changed body always met. The
  * offer is a seam this module only passes on; `./plan-spec.ts` hands
  * none under `--dry-run`, and this module never reaches it there.
+ *
+ * ## The stretch rules
+ *
+ * A stretch's rules file reaches this module as
+ * {@link SpecSourceOptions.rules}, read by the caller
+ * (`src/commands/plan/stretch-rules.ts`, which reads
+ * `RAFA_STRETCH_RULES`); nothing here reads the environment. The board
+ * routes hand it to `settleSpecSnapshot`, which appends it after the
+ * notes, and the `--dry-run` stop names the file a real run would have
+ * appended ({@link dryRunLine}). `--spec=<file>` writes no snapshot, so
+ * it reads no rules and its line names none.
  */
-import type { SpecIssue, SpecIssueReader, SpecSnapshot } from './issue.js';
+import type { SpecIssue, SpecIssueReader, SpecSnapshot, StretchRules } from './issue.js';
 import type { RefreshOffer } from './snapshot-settle.js';
 import type { RoadmapOutcome, RoadmapSeams, RoadmapStop, RoadmapWalk } from './spec-source-roadmap.js';
 import type { AheadCandidate } from '../claims/ahead.js';
@@ -405,6 +416,12 @@ export interface SpecSourceOptions {
   readonly roadmap?: RoadmapSeams;
   /** Where the lines go; the active output when left out. */
   readonly output?: Output;
+  /**
+   * The stretch's rules file, read by the caller, which the board routes
+   * append to the snapshot after the notes; null or left out when there
+   * is none. See the stretch rules note.
+   */
+  readonly rules?: StretchRules | null;
 }
 
 /** The one spec a run plans from, and where it came from. */
@@ -454,9 +471,16 @@ export function describeIssue(issue: SpecIssue): string {
   return `issue #${String(issue.number)} "${issue.title}"`;
 }
 
-/** The line `--dry-run` stops on, naming what a real run would have planned from. */
-export function dryRunLine(what: string): string {
-  return `🔎 ${DRY_RUN_FLAG}: would plan from ${what}. Nothing was written.`;
+/**
+ * The line `--dry-run` stops on, naming what a real run would have
+ * planned from and, when `rules` names one, the stretch rules file it
+ * would have appended; with no `rules`, the line the base printed.
+ */
+export function dryRunLine(what: string, rules: string | null = null): string {
+  const appended = rules === null
+    ? ''
+    : `, appending the stretch rules of ${rules}`;
+  return `🔎 ${DRY_RUN_FLAG}: would plan from ${what}${appended}. Nothing was written.`;
 }
 
 /** The seams `--next` reads through; a `--next` resolution handed none is a defect in the caller. */
@@ -465,6 +489,16 @@ function requireRoadmapSeams(seams: RoadmapSeams | undefined): RoadmapSeams {
     throw new TypeError(`${PREFIX}: ${NEXT_FLAG} was resolved with no roadmap seams`);
   }
   return seams;
+}
+
+/**
+ * `rules` as the dry-run line reads it: null for rules holding nothing
+ * but whitespace, which the snapshot writes no heading for.
+ */
+function appendedRules(rules: StretchRules | null): StretchRules | null {
+  return rules === null || rules.text.trim() === ''
+    ? null
+    : rules;
 }
 
 /** A resolution that answers no spec. */
@@ -564,8 +598,9 @@ export async function resolveSpecSource(options: SpecSourceOptions): Promise<Spe
   requireSpecIssue(read);
   await options.inspect?.(read);
 
+  const rules = options.rules ?? null;
   if (dryRun) {
-    output.info(dryRunLine(describeIssue(read)));
+    output.info(dryRunLine(describeIssue(read), appendedRules(rules)?.path ?? null));
     return stopped('dry-run');
   }
 
@@ -576,6 +611,9 @@ export async function resolveSpecSource(options: SpecSourceOptions): Promise<Spe
     refresh,
     offerRefresh: options.offerRefresh ?? null,
     output,
+    ...rules === null
+      ? {}
+      : { rules },
   });
   return Object.freeze({
     outcome: 'spec' as const,

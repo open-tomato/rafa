@@ -76,6 +76,13 @@
  * handed the candidate found, as the port documents a spec path:
  * repository-relative or absolute.
  *
+ * The two board routes append a stretch's rules file to the snapshot
+ * when `rafa stretch item` handed one over in `RAFA_STRETCH_RULES`:
+ * {@link SpecRouteOptions.readRules} reads it (`./stretch-rules.ts`)
+ * and the text goes down as a parameter. `--spec=<file>` writes no
+ * snapshot, so it never calls the reader, and a value naming no file
+ * refuses only the routes that would have appended it.
+ *
  * ## Nothing here spawns
  *
  * The resolution and the three offers are seams ({@link SpecRouteSeams}), so
@@ -95,6 +102,7 @@ import type {
   ReadyOffer,
   RefreshConfig,
   RefreshOffer,
+  StretchRules,
 } from '@open-tomato/rafa-board';
 
 import fs from 'fs';
@@ -172,6 +180,12 @@ export interface SpecRouteOptions {
   readonly branchTemplate?: string;
   /** The keys the project refresh reads, so the gate's and the offer's label swaps refresh the issue; none sent when left out. */
   readonly projectConfig?: RefreshConfig;
+  /**
+   * Reads the stretch's rules file the board routes append, null when
+   * there is none (`./stretch-rules.ts`); called only on `--issue` and
+   * `--next`. No rules when left out.
+   */
+  readonly readRules?: () => StretchRules | null;
 }
 
 /** The resolution itself, as `board/plan-spec.ts` performs it. */
@@ -213,6 +227,9 @@ export async function resolveCreateSpec(
   const makeReadyOffer = seams.makeReadyOffer ?? createPlanReadyOffer;
   const makeAlternativeOffer = seams.makeAlternativeOffer ?? createPlanBlockedOffer;
   const makeRefreshOffer = seams.makeRefreshOffer ?? createPlanRefreshOffer;
+  const rules = source.request.kind === 'spec'
+    ? null
+    : options.readRules?.() ?? null;
 
   return await resolve({
     request: source.request,
@@ -241,5 +258,8 @@ export async function resolveCreateSpec(
     ...options.projectConfig === undefined
       ? {}
       : { projectConfig: options.projectConfig },
+    ...rules === null
+      ? {}
+      : { rules },
   });
 }

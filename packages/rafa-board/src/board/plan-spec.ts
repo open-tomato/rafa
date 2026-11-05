@@ -256,7 +256,7 @@
 import type { AlternativeOffer } from './blocked-line.js';
 import type { GateIssue } from './gate.js';
 import type { IssueBoard } from './issue-board.js';
-import type { SpecIssue } from './issue.js';
+import type { SpecIssue, StretchRules } from './issue.js';
 import type { RefreshConfig } from './project/refresh.js';
 import type { RefreshOffer } from './snapshot-settle.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
@@ -500,6 +500,12 @@ export interface PlanSpecOptions {
    * `warn`. No refresh is sent when left out.
    */
   readonly projectConfig?: RefreshConfig;
+  /**
+   * The stretch's rules file, read by the caller, handed on to
+   * `./spec-source.ts`, which appends it to the snapshot and names it on
+   * the `--dry-run` line; null or left out when there is none.
+   */
+  readonly rules?: StretchRules | null;
 }
 
 /** What a resolution answers: one spec with its issue, or the reason it stopped. */
@@ -609,6 +615,9 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
         : { branchTemplate: options.branchTemplate },
     },
     output,
+    ...options.rules === undefined || options.rules === null
+      ? {}
+      : { rules: options.rules },
   });
 
   if (resolution.outcome === 'stopped') {
