@@ -3,9 +3,10 @@
  * issue that no longer matches it: say what differs, then rebuild it,
  * ask, or refuse, depending on which part changed.
  *
- * `./issue.ts` holds the reading ({@link readSnapshotChange}) and the
- * write ({@link writeSpecSnapshot}, which moves the old copy to
- * `previous/` before any rewrite). Neither prints or asks. This module
+ * `./snapshot-change.ts` holds the reading ({@link readSnapshotChange},
+ * re-exported from `./issue.ts`) and `./issue.ts` the write
+ * ({@link writeSpecSnapshot}, which moves the old copy to `previous/`
+ * before any rewrite). Neither prints or asks. This module
  * is the step between them that does, run by `./spec-source.ts` where
  * the bare write used to run: AFTER `requireSpecIssue`, the trust
  * check, the readiness checks and the leak refusal, and after the
