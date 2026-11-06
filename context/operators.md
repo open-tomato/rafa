@@ -41,7 +41,7 @@ test reads them.
 | `rafa-stretch-watchtower` | watches it read-only and alerts the person |
 | `rafa-stretch-analyst` | da²: tests the person's hunches against the stretch's data, read-only, writing only `analysis.md` |
 | `rafa-stretch-sweep` | phase 1: recheck, duplicate groups, ranking, tiers, the bucket report |
-| `rafa-stretch-pit-stop` | phase 3: the four checks after each item, and the decision |
+| `rafa-stretch-pit-stop` | phase 3: the five checks after each item, and the decision |
 | `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
 
 Every operator agent carries the single-command rule: run every `rafa` line as
