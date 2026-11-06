@@ -120,6 +120,7 @@ export {
   ghPreflightItems,
   ghPullRequestsIn,
   gitSaid,
+  headTimeOf,
   parseWorktrees,
   pushBranch,
   requireGhProvider,

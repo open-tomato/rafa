@@ -125,7 +125,9 @@
  *
  *   - `module`: the part of the code the bug sits in.
  *   - `action`: what was being done when it showed.
- *   - `reproduce`: the command or steps that show it again.
+ *   - `reproduce`: one command run from the checkout root whose output
+ *     or exit code shows the bug; prose naming the condition only when
+ *     no command can show it.
  *   - `cause`: why it happens, as a cause code or in words.
  *
  * Whether `cause` is a code or a sentence is the cause rule's business,

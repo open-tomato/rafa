@@ -40,11 +40,12 @@ goes one of three ways, and the first that matches wins.
 2. **You run it.** Reads (`show`, `list`, `status`, `current`, any
    `--dry-run`) and other writes the user asked for in this conversation.
    Your Bash tool has no terminal, so a command that asks a question
-   refuses there: pass `--yes` where the command has it, `--no-hint` to
-   skip the closing question, and `--output=json` when you parse the
-   result. A command with no `--yes` that still asks refuses without a
-   terminal: it goes to case 1, and `</dev/null` never stands in for an
-   answer.
+   refuses there: pass `--yes` where the command has it, `--no-hint` on the
+   six commands whose help lists it (`pr merge`, `pr wait`, `pr triage`,
+   `plan create`, `issue ready`, `loop start`) to skip the closing question,
+   and `--output=json` when you parse the result. A command with no `--yes`
+   that still asks refuses without a terminal: it goes to case 1, and
+   `</dev/null` never stands in for an answer.
 3. **You ask first.** A write nobody asked for, such as moving an issue or
    posting a comment: ask once, then run it as in 2.
 
@@ -74,10 +75,11 @@ Write a flag that takes a value as `--name=value`, the form help and its
 examples use: `--plan=.rafa/plans/PLAN-<stub>.md`. The space form parses
 too, but mixing the two in one reply reads as two different flags. A
 boolean is `--name`, and a boolean that defaults on is turned off with
-`--no-name` (`--no-hint`, `--no-comment`). Every command takes
-`--output=json`, which prints one JSON event per line: a `start` line,
-then a `result` line whose `data` holds the answer. Read the `result`
-line; the whole output is not one JSON document.
+`--no-name` (`--no-hint` on the six commands named in case 2,
+`--no-comment`). Every command takes `--output=json`, which prints one
+JSON event per line: a `start` line, then a `result` line whose `data`
+holds the answer. Read the `result` line; the whole output is not one JSON
+document.
 
 Some inputs are positional arguments, not flags: `rafa plan validate
 <file>`, not `--plan=<file>`. Before using an action or flag for the first

@@ -11,6 +11,11 @@
  * case can move the run from in progress to completed; `run view
  * --log-failed` answers the captured log of `src/ci/testdata/`. Each
  * open bug carries its own `createdAt`, so `issue view` is not modelled.
+ * `rafa effort collect` is a fake that answers the case's exit code and
+ * moves the clock {@link COLLECT_MS} on, the effort dashboard a planted
+ * one holding the item's plan row, and the recheck runner, `git` and the
+ * tracker's `get` and `editable` refuse when called: every planted bug's
+ * body names no `Rerun`, so each is judged `manual` and nothing runs.
  * The events file, the session record, the ledger and `stretch.json` are
  * real files.
  *
@@ -19,13 +24,18 @@
  * cut-off cases list a bug filed after the cut-off beside one filed
  * before it, so the filter is seen to drop as well as keep, and a
  * `pr merge` that ended 1 is read merged beside one read open, so the
- * exit code is seen to end the item as well as not.
+ * exit code is seen to end the item as well as not. The collect that
+ * ended 1 reads the dashboard no time beside the full run that reads it
+ * once, so the collect's code is seen to gate the effort reading.
  */
 import type { StretchItemSeams } from './item.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
+import type { DashboardReadOptions } from '../../stretch/pit-effort.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
+import type { RecheckBugOptions } from '../bug/recheck-run.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { Dashboard } from '@open-tomato/rafa-effort';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -76,6 +86,22 @@ const START = Date.parse('2026-10-07T09:00:00.000Z');
 const BODY = 'Plan for #812.\n\nCloses #812\nFixes #812\ncloses #604\n';
 const THREE_CASES = await Bun.file(new URL('../../ci/testdata/three-cases.log-failed.txt', import.meta.url)).text();
 const GATE_FILE = 'src/tests/task-gate-spawned.test.ts';
+/** How long the fake `rafa effort collect` takes on the planted clock. */
+const COLLECT_MS = 12_000;
+/** The `Effort:` line the planted dashboard renders for {@link STUB}. */
+const EFFORT_LINE = `Effort: ${STUB}: 3 tasks, p50 2.4 min against 5.5 min, max 4.1 min.`;
+
+/** A dashboard holding the item's plan row beside another plan's, and a `minutes` baseline of 5.5 min. */
+function plantedDashboard(): Dashboard {
+  const row = (key: string, tasks: number, p50: number, max: number): object => (
+    { key, kind: 'plan', tasks, perTask: { minutes: { min: null, avg: null, p50, max } } }
+  );
+  const planted = {
+    trend: { metrics: [{ name: 'minutes', baselineP50: 5.5 }] },
+    loops: { rows: [row('rafa-604-config-set', 7, 9.9, 9.9), row(STUB, 3, 2.4, 4.1)] },
+  };
+  return planted as unknown as Dashboard;
+}
 
 /** A run of `verify` on the integration branch. */
 function verifyRun(fields: Partial<FakeRun> = {}): FakeRun {
@@ -120,6 +146,12 @@ interface CaseOptions {
   readonly filed?: readonly OpenIssue[];
   /** The message `filedIssues` throws, when it should. */
   readonly filedThrows?: string;
+  /** The exit code `rafa effort collect` answers; 0 when left out. */
+  readonly collectExit?: number;
+  /** The project's config; {@link STRETCH_CONFIG} when left out. */
+  readonly config?: string;
+  /** Who opened each bug, by number, as `editable` answers it; `editable` refuses when left out. */
+  readonly authors?: Readonly<Record<string, string>>;
 }
 
 interface Case {
@@ -129,12 +161,18 @@ interface Case {
   readonly sleeps: number[];
   /** How many times `pr view` was read after the merge ran. */
   readonly viewsAfterMerge: () => number;
+  /** Every read of the effort dashboard. */
+  readonly dashboardReads: DashboardReadOptions[];
+  /** Every run of the recheck runner. */
+  readonly rechecks: RecheckBugOptions[];
+  /** Every git line, by its words. */
+  readonly gitCalls: string[][];
   readonly seams: StretchItemSeams;
 }
 
 function plant(options: CaseOptions = {}): Case {
   const caseDir = realpathSync(mkdtempSync(join(scope, 'case-')));
-  const project = plantProject(caseDir, STRETCH_CONFIG);
+  const project = plantProject(caseDir, options.config ?? STRETCH_CONFIG);
   const { root } = project;
   mkdirSync(join(root, '.rafa', 'plans'), { recursive: true });
   writeFileSync(join(root, PLAN), '# Plan\n\n- [ ] a task\n');
@@ -155,6 +193,10 @@ function plant(options: CaseOptions = {}): Case {
   let viewsAfterMerge = 0;
   let listReads = 0;
   const runLists = options.runs ?? [[verifyRun()]];
+  const dashboardReads: DashboardReadOptions[] = [];
+  const rechecks: RecheckBugOptions[] = [];
+  const gitCalls: string[][] = [];
+  const authors = options.authors;
 
   const gh: GhRunner = (args) => {
     ghCalls.push([...args]);
@@ -200,6 +242,10 @@ function plant(options: CaseOptions = {}): Case {
         if (options.merges ?? true) merged = true;
         return Promise.resolve(options.mergeExit ?? 0);
       }
+      if (argv[1] === 'effort') {
+        clock += COLLECT_MS;
+        return Promise.resolve(options.collectExit ?? 0);
+      }
       return Promise.resolve(options.waitExit ?? 0);
     },
     launch: () => {
@@ -216,6 +262,11 @@ function plant(options: CaseOptions = {}): Case {
     isAlive: (pid) => pid === LOOP_PID,
     gh: () => gh,
     tracker: () => ({
+      kind: 'github',
+      get: () => Promise.reject(new Error('fake tracker: get is not modelled')),
+      editable: (ref) => (authors === undefined
+        ? Promise.reject(new Error('fake tracker: editable is not modelled'))
+        : Promise.resolve({ ref, title: '', body: '', open: true, labels: [], author: authors[ref.externalId] ?? '' })),
       openIssues: async () => Promise.resolve([...(options.bugs ?? [])]),
       filedIssues: async (_type, since) => {
         if (options.filedThrows !== undefined) throw new Error(options.filedThrows);
@@ -226,6 +277,18 @@ function plant(options: CaseOptions = {}): Case {
         )));
       },
     }),
+    readDashboard: (read) => {
+      dashboardReads.push(read);
+      return Promise.resolve(plantedDashboard());
+    },
+    recheck: (recheck) => {
+      rechecks.push(recheck);
+      return Promise.resolve({ verdict: 'reproduces', runs: 1, failedRuns: null, timedOutRuns: 0 });
+    },
+    git: () => (args) => {
+      gitCalls.push([...args]);
+      return { ok: false, stdout: '', stderr: 'fake git: not modelled' };
+    },
     sleep: async (ms) => {
       sleeps.push(ms);
       clock += ms;
@@ -234,12 +297,12 @@ function plant(options: CaseOptions = {}): Case {
     now: () => new Date(clock),
     rafa: ['rafa'],
   };
-  return { project, rafaCalls, ghCalls, sleeps, viewsAfterMerge: () => viewsAfterMerge, seams };
+  return { project, rafaCalls, ghCalls, sleeps, viewsAfterMerge: () => viewsAfterMerge, dashboardReads, rechecks, gitCalls, seams };
 }
 
-async function run(planted: Case, words: readonly string[] = ['812', '--wait']): Promise<CapturedRun> {
+async function run(planted: Case, words: readonly string[] = ['812', '--wait'], env: Readonly<Record<string, string>> = {}): Promise<CapturedRun> {
   const command = createStretchItemCommand(planted.seams);
-  return dispatchInProject(['stretch', 'item', ...words], [STRETCH_SUBJECT], [command], planted.project, { PATH: '/fake/bin' });
+  return dispatchInProject(['stretch', 'item', ...words], [STRETCH_SUBJECT], [command], planted.project, { PATH: '/fake/bin', ...env });
 }
 
 /** The index of each line in `stdout`, which must hold every one, rising. */
@@ -254,6 +317,7 @@ function expectInOrder(stdout: string, lines: readonly string[]): void {
 
 const WAIT_LINE = ['rafa', 'loop', 'wait', `--session-id=${SESSION_ID}`];
 const MERGE_LINE = ['rafa', 'pr', 'merge', String(PR), '--yes'];
+const COLLECT_LINE = ['rafa', 'effort', 'collect'];
 
 describe('rafa stretch item --wait, a loop that opened a pull request', () => {
   it('waits for its checks, merges it, waits for the run on the merge commit, appends the ledger and prints the readings', async () => {
@@ -269,7 +333,7 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     const outcome = await run(planted);
 
     expect(outcome.exitCode).toBe(0);
-    expect(planted.rafaCalls).toEqual([WAIT_LINE, MERGE_LINE]);
+    expect(planted.rafaCalls).toEqual([WAIT_LINE, MERGE_LINE, COLLECT_LINE]);
     expect(planted.ghCalls[0]).toEqual(prViewArgs(PR));
     expect(planted.ghCalls.filter((args) => args[1] === 'list')).toHaveLength(5);
     expect(planted.sleeps).toEqual([CI_POLL_MS, CI_POLL_MS]);
@@ -298,6 +362,8 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
       'Bugs: 2 open.',
       `Filed since ${new Date(START).toISOString()}: 1.`,
       '   #870 filed during the item',
+      EFFORT_LINE,
+      'Recheck #870: manual',
     ]);
     expect(outcome.stdout).not.toContain('#700 filed long ago');
     expect(outcome.stdout).not.toContain('warn:');
@@ -515,6 +581,89 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
   });
 });
 
+describe('rafa stretch item --wait, the effort collect and the rechecks', () => {
+  it('runs rafa effort collect after the ledger line and prints its time before the readings, which it reads for the item', async () => {
+    const planted = plant({ bugs: [bug('870', 'filed during the item', '2026-10-07T09:10:00Z')] });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rafaCalls.at(-1)).toEqual(COLLECT_LINE);
+    expectInOrder(outcome.stdout, [
+      `ledger: #812 appended to ${itemsPath(planted.project.root, 4)}`,
+      'rafa effort collect\n',
+      'rafa effort collect ended 0 in 12.0s',
+      `CI: ❌ ${BRANCH}: red on c4da2c4, 1 workflow.`,
+      'Bugs: 1 open.',
+      `Filed since ${new Date(START).toISOString()}: 1.`,
+      EFFORT_LINE,
+      'Recheck #870: manual',
+    ]);
+    expect(planted.dashboardReads.map((read) => read.repoRoot)).toEqual([planted.project.root]);
+    expect(outcome.stdout).not.toContain('not wired');
+  });
+
+  it('prints the effort as not read after a collect that ended 1, reading no dashboard, the other readings still printed', async () => {
+    const planted = plant({ collectExit: 1, bugs: [bug('870', 'filed during the item', '2026-10-07T09:10:00Z')] });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.dashboardReads).toEqual([]);
+    expectInOrder(outcome.stdout, [
+      'rafa effort collect ended 1 in 12.0s',
+      `CI: ❌ ${BRANCH}: red on c4da2c4, 1 workflow.`,
+      'Bugs: 1 open.',
+      `Filed since ${new Date(START).toISOString()}: 1.`,
+      'Effort: not read (rafa effort collect ended with exit code 1).',
+      'Recheck #870: manual',
+    ]);
+    expect(outcome.stdout).not.toContain(`Effort: ${STUB}:`);
+  });
+
+  it('prints the rechecks as not read when the bugs filed since were not read', async () => {
+    const planted = plant({ filedThrows: 'gh issue list: HTTP 502' });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('Recheck: not read (gh issue list: HTTP 502).');
+    expect(outcome.stdout).not.toContain('Recheck: no bug filed since.');
+  });
+
+  it('judges a runnable bug with the config\'s runs, deadline and trusted authors, its secrets left out, an untrusted one skipped', async () => {
+    const config = `${STRETCH_CONFIG}bugs:\n  recheck:\n    runs: 4\n    timeoutSeconds: 30\nboard:\n  trustedAuthors: [alice]\n`;
+    const body = ['## Reproduce', '', 'run the gate', '', '## Rerun', '', '```', `bun test ${GATE_FILE}`, '```', ''].join('\n');
+    const filed = (id: string, at: string): OpenIssue => ({ ...bug(id, `runnable ${id}`, at), body });
+    const planted = plant({
+      config,
+      authors: { '870': 'alice', '871': 'mallory' },
+      bugs: [filed('870', '2026-10-07T09:10:00Z'), filed('871', '2026-10-07T09:11:00Z')],
+    });
+    mkdirSync(join(planted.project.root, 'src', 'tests'), { recursive: true });
+    writeFileSync(join(planted.project.root, GATE_FILE), 'import { test } from "bun:test";\ntest("a case", () => {});\n');
+
+    const outcome = await run(planted, ['812', '--wait'], { GITHUB_TOKEN: 'ghp_planted0secret0value' });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.rechecks).toHaveLength(1);
+    expect(planted.rechecks[0]).toMatchObject({ checkout: planted.project.root, runs: 4, timeoutMs: 30_000 });
+    expect(planted.rechecks[0]?.env['PATH']).toBe('/fake/bin');
+    expect(planted.rechecks[0]?.env['GITHUB_TOKEN']).toBeUndefined();
+    expect(planted.gitCalls).toEqual([['remote', 'get-url', 'origin']]);
+    expectInOrder(outcome.stdout, ['Recheck #870: reproduces', 'Recheck #871: skipped: opened by mallory, ']);
+  });
+
+  it('prints no bug filed since as the recheck reading when none was filed', async () => {
+    const planted = plant();
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('Recheck: no bug filed since.');
+  });
+});
+
 describe('rafa stretch item --wait, refusals before the merge', () => {
   it.each([
     ['the default branch', 'main'],
@@ -673,6 +822,12 @@ describe('the dry run', () => {
     expect(lines[1]).toBe('wait for the checks of <pr> to pass  (again every 20s, up to 20 minutes)');
     expect(lines[2]).toBe('rafa pr merge <pr> --yes');
     expect(lines[3]).toStartWith(`gh run list --branch ${BRANCH} --commit <merge-commit> --limit 1 --json`);
+    expect(lines.slice(4)).toEqual([
+      `append the item to ${itemsPath(planted.project.root, 4)}`,
+      'rafa effort collect',
+      `print the pit-stop readings of ${BRANCH}`,
+      'recheck each bug filed since the last item, as rafa bug recheck judges it, posting no comment',
+    ]);
     expectInOrder(outcome.stdout, ['rafa loop wait --session-id=<session id>', ...lines, 'dry run: would start the loop']);
     expect(existsSync(itemsPath(planted.project.root, 4))).toBe(false);
   });

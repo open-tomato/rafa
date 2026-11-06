@@ -17,7 +17,7 @@ body:
   - type: textarea
     attributes:
       label: Reproduce
-      description: The steps, or the condition that revealed it. When you have no steps, say what was running when it showed.
+      description: One command run from the checkout root whose output or exit code shows it; the condition only when no command can show it. Never unknown.
     validations:
       required: true
   - type: input

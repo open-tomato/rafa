@@ -75,9 +75,9 @@ A plan document may contain fenced blocks of the form `` ```rafa:*``` `` that
 carry metadata and context. Three kinds are read in phase 0:
 
 * `rafa:plan` — Header fields in YAML format: `stub`, `issue` (optional),
-  `spec` (optional). The stub identifies the plan and defaults to the spec's
-  basename or "untitled". The loop uses the spec path to link the plan to the
-  change that prompted it.
+  `spec` (optional), `release` (optional) and `closes` (optional). The stub
+  identifies the plan and defaults to the spec's basename or "untitled". The
+  loop uses the spec path to link the plan to the change that prompted it.
 * `rafa:context` — Markdown prose injected into the prompt of EVERY task under
   this plan.
 * `rafa:stage-context` — Markdown prose injected only into tasks under the
@@ -156,6 +156,20 @@ Recognized fields:
 - `issue` — Optional GitHub issue number (integer, e.g., `123`). Links the work back to the `open-tomato/rafa` board.
 - `spec` — Optional path to the specification document that guided the plan.
 - `release` — Optional release level for the version bump this plan's pull request ships: `patch`, `minor`, `major` or `none`. Anything else is reported as `unusable-field` and read as if unset. When absent, the level is the highest severity among the plan's collected change notes. The wrap-up writes this level to a release fragment file (under `release.fragments`, default `.changes/`) that `rafa release settle` will process to compute the version bump after the branch merges.
+- `closes` — Optional list of GitHub issue numbers the plan's pull request closes besides `issue`, such as `closes: [1444, 1479]`. Each entry must be a whole positive number. A value that is not a list, or a list holding anything else (a string, a float, `#12`, a mapping), is reported as `unusable-field` and read as unset: the whole list is refused, never part of it. Unset reads as no extra line, so the pull request closes only `issue`. Duplicates, and an entry equal to `issue`, are dropped where the body is written.
+
+The lightest header that uses `closes:` sits beside the `issue` it extends:
+
+````markdown
+```rafa:plan
+issue: "1484"
+closes: [1444, 1479]
+```
+````
+
+That plan's pull request body reads `Closes #1484`, `Closes #1444` and `Closes #1479`, each once.
+
+When a plan comes from a sweep spec, merged outside a stretch, fill `closes:` from the spec's bug list: every `#<n>` that its "Tasks the plan must carry" and "What you get" lines name goes in. The pull request then closes each bug the plan names, not only the spec's own issue.
 
 Unknown keys are retained and ignored by the loop; they do not cause parsing to fail.
 
@@ -171,6 +185,7 @@ All rafa work follows a consistent naming scheme across specifications, plans, b
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
 | Pull request title | `rafa-<n>: <title>` | `rafa-20: Add pull-request commands` |
 | Pull request body | `Closes #<n>` | `Closes #20` |
+| `closes:` field in `rafa:plan` | a list of issue numbers, one `Closes #<m>` line each | `closes: [1444, 1479]` |
 
 The slug summarizes what the user gets, using two to four words joined by hyphens. The order of work lives in ONE place: the pinned "Roadmap" issue on the `open-tomato/rafa` board.
 
@@ -260,7 +275,7 @@ out_of_scope_bugs:
     kind: bug
     module: "store"
     action: "appending to an open store"
-    reproduce: "run the store tests against a shared connection"
+    reproduce: "bun test src/tests/store-shared-connection.test.ts"
     cause: "the handle is shared across calls"
 changes:
   - level: minor
@@ -330,7 +345,7 @@ Out-of-scope bug entry fields:
 | `kind` | string | no | `bug` | What sort of leftover the entry is, one of the six below. An absent key reads as `bug` with no issue; a value outside the list is reported as an issue and read as `bug`. A different field from a finding's `kind`, with its own list |
 | `module` | string | no | `unknown` | The module the bug is in. Checked against the project's `issues.vocabulary.modules` when that is set, and read as any name of the shape when it is empty. A name outside the set is filed as `unknown`, with the word kept in the bug's record as `Reported module`; triage never refuses a bug over it |
 | `action` | string | no | `unknown` | What was running: a command, a step, a test. Checked against `issues.vocabulary.actions` the same way, the word kept as `Reported action` |
-| `reproduce` | string | no | "seen while running task <task line> of plan <stub>", or "seen while running `<command>`" for a dispatch with no plan stub | The steps, or the condition that revealed it. Double-quote it. A blank value or `unknown` takes the default: the bug record never holds `unknown` here |
+| `reproduce` | string | no | "seen while running task <task line> of plan <stub>", or "seen while running `<command>`" for a dispatch with no plan stub | One shell command run from the checkout root, such as `rafa plan needs --issue=12 --dry-run`, whose output or exit code shows the bug; prose only when no command can show it, and then the condition that revealed it. Double-quote it. A blank value or `unknown` takes the default: the bug record never holds `unknown` here |
 | `cause` | string | no | `unknown:new-context` | A cause code from `rafa bug codes`, or the cause in words. Double-quote it. A code the list lacks is filed as `<family>:new-context`, with the code kept as proposed, or as `unknown:new-context` when its family is unlisted; words that are no code are filed as `unknown:new-context`, with the words kept as the suspected cause |
 
 Out-of-scope entry kinds:

@@ -126,10 +126,10 @@ const PLAN_LINES = [
 const PLAN = doc(...PLAN_LINES);
 
 describe('the kinds and fields read', () => {
-  it('are three kinds the block reader knows, and four header fields', () => {
+  it('are three kinds the block reader knows, and five header fields', () => {
     expect(PLAN_BLOCK_KINDS).toEqual(['plan', 'context', 'stage-context']);
     for (const kind of PLAN_BLOCK_KINDS) expect(isRafaBlockKind(kind)).toBe(true);
-    expect(PLAN_HEADER_FIELDS).toEqual(['stub', 'issue', 'spec', 'release']);
+    expect(PLAN_HEADER_FIELDS).toEqual(['stub', 'issue', 'spec', 'release', 'closes']);
   });
 
   it('hold the release field to four levels, none among them', () => {
@@ -146,6 +146,7 @@ describe('a plan', () => {
       issue: 'OPT-123',
       spec: '.specs/my-feature.md',
       release: null,
+      closes: [],
       extras: [],
     });
     expect(model.context).toBe('Prose the loop injects into EVERY task.');
@@ -232,7 +233,7 @@ describe('a plan', () => {
 describe('a plan with no block', () => {
   it('reads a bare checklist with a null header and context, and reports nothing', () => {
     const model = parsePlan(doc('# Plan: Old', '', '# Stage: one', '- [ ] Task A', '- [x] Task B'));
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, closes: [], extras: [] });
     expect(model.context).toBeNull();
     expect(model.blocks).toEqual([]);
     expect(model.issues).toEqual([]);
@@ -245,7 +246,7 @@ describe('a plan with no block', () => {
 
   it('reads an empty document as an empty plan', () => {
     expect(parsePlan('')).toEqual({
-      header: { stub: null, issue: null, spec: null, release: null, extras: [] },
+      header: { stub: null, issue: null, spec: null, release: null, closes: [], extras: [] },
       context: null,
       stages: [],
       tasks: [],
@@ -268,7 +269,7 @@ describe('a rafa: fence opened mid-paragraph', () => {
     const model = parsePlan(midParagraph);
     expect(model.blocks).toEqual([]);
     expect(model.context).toBeNull();
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, closes: [], extras: [] });
     expect(stageNamesOf(model)).toEqual(['one']);
     expect(textsOf(model)).toEqual(['A']);
     expect(model.issues).toEqual([]);
@@ -405,7 +406,7 @@ describe('a task line inside a rafa block', () => {
 describe('the header', () => {
   it('reads each field through a trailing comment', () => {
     const model = header('stub: a   # the plan', 'issue: OPT-1   # optional', 'spec: s.md');
-    expect(model.header).toEqual({ stub: 'a', issue: 'OPT-1', spec: 's.md', release: null, extras: [] });
+    expect(model.header).toEqual({ stub: 'a', issue: 'OPT-1', spec: 's.md', release: null, closes: [], extras: [] });
     expect(model.issues).toEqual([]);
   });
 
@@ -416,6 +417,7 @@ describe('the header', () => {
       issue: null,
       spec: null,
       release: null,
+      closes: [],
       extras: [
         { key: 'tracker', value: 'linear' },
         { key: 'depth', value: 2 },
@@ -475,7 +477,7 @@ describe('the header', () => {
 
   it('reads the other fields beside an unusable one', () => {
     const model = header('stub: my-feature', 'issue: true', 'spec: s.md');
-    expect(model.header).toEqual({ stub: 'my-feature', issue: null, spec: 's.md', release: null, extras: [] });
+    expect(model.header).toEqual({ stub: 'my-feature', issue: null, spec: 's.md', release: null, closes: [], extras: [] });
     expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
   });
 
@@ -506,14 +508,59 @@ describe('the header', () => {
       issue: null,
       spec: 's.md',
       release: null,
+      closes: [],
       extras: [],
     });
     expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
   });
 
+  it('reads closes as an empty list when the block has no closes line, and reports nothing', () => {
+    const model = header('stub: a', 'issue: "11"');
+    expect(model.header.closes).toEqual([]);
+    expect(model.issues).toEqual([]);
+  });
+
+  it('reads closes written as a list of two numbers, in order and as numbers', () => {
+    const model = header('issue: "11"', 'closes: [12, 13]');
+    expect(model.header.closes).toEqual([12, 13]);
+    expect(model.header.extras).toEqual([]);
+    expect(model.issues).toEqual([]);
+  });
+
+  it.each([
+    ['a scalar number', 'closes: 12', 'rafa:plan closes is 12, not a list'],
+    ['a quoted scalar', 'closes: "12"', 'rafa:plan closes is "12", not a list'],
+    ['a mapping', 'closes:\n  a: 12', 'rafa:plan closes is a mapping, not a list'],
+    ['a list holding a string', 'closes: [12, "x"]', 'rafa:plan closes holds "x", so the whole list is unread'],
+    ['a list holding a float', 'closes: [12, 1.5]', 'rafa:plan closes holds 1.5, so the whole list is unread'],
+    ['a list holding a quoted #12', 'closes: ["#12"]', 'rafa:plan closes holds "#12", so the whole list is unread'],
+    ['a list holding zero', 'closes: [0, 12]', 'rafa:plan closes holds 0, so the whole list is unread'],
+    ['a list holding a list', 'closes: [12, [13]]', 'rafa:plan closes holds a list, so the whole list is unread'],
+  ] as const)('leaves closes empty for %s, never keeping part of it, and says why', (_label, line, text) => {
+    const model = header('issue: "11"', line);
+    expect(model.header.closes).toEqual([]);
+    expect(model.header.issue).toBe('11');
+    expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
+    expect(model.issues[0]?.text).toStartWith(text);
+    expect(model.issues[0]?.text).toContain('a list of whole positive issue numbers, such as [12, 13]');
+  });
+
+  it('says a bare closes is empty, as a # after a space leaves it', () => {
+    const model = header('closes: #12');
+    expect(model.header.closes).toEqual([]);
+    expect(reasonsOf(model)).toEqual([['unusable-field', 1]]);
+    expect(model.issues[0]?.text).toContain('YAML comment unless quoted');
+  });
+
+  it('keeps duplicates and the plan\'s own issue as written, for the body writer to drop', () => {
+    expect(header('issue: 11', 'closes: [11, 12, 12]').header.closes).toEqual([11, 12, 12]);
+    expect(header('closes: []').header.closes).toEqual([]);
+    expect(header('closes: []').issues).toEqual([]);
+  });
+
   it('reports a body that is not YAML against the opening fence, and reads the near miss', () => {
     const model = parsePlan(doc('# Plan: x', '```rafa:plan', 'stub: [a', '```'));
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, closes: [], extras: [] });
     expect(reasonsOf(model)).toEqual([['malformed-header', 2]]);
     expect(model.issues[0]?.text).toContain('not valid YAML');
     expect(header('stub: a').header.stub).toBe('a');
@@ -525,7 +572,7 @@ describe('the header', () => {
     ['two documents', ['stub: a', '---', 'stub: b']],
   ])('reports a body holding %s, which is no mapping of fields', (_label, lines) => {
     const model = header(...lines);
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, closes: [], extras: [] });
     expect(reasonsOf(model)).toEqual([['malformed-header', 1]]);
   });
 
@@ -535,7 +582,7 @@ describe('the header', () => {
     ['a blank line', ['']],
   ])('reads a body holding %s as a header that says nothing', (_label, lines) => {
     const model = header(...lines);
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, closes: [], extras: [] });
     expect(model.issues).toEqual([]);
     expect(model.blocks).toHaveLength(1);
   });
@@ -834,7 +881,7 @@ describe('a real plan file on disk', () => {
   const model = parsePlan(readFileSync(PATH, 'utf8'));
 
   it('reads no rafa:* block and reports nothing, so the checklist alone is under test', () => {
-    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, extras: [] });
+    expect(model.header).toEqual({ stub: null, issue: null, spec: null, release: null, closes: [], extras: [] });
     expect(model.context).toBeNull();
     expect(model.blocks).toEqual([]);
     expect(model.issues).toEqual([]);

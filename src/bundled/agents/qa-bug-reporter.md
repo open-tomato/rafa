@@ -109,8 +109,10 @@ never guess one.
 `## ` sections. rafa reads five of them as the bug's fields:
 
 - `What`: the context and the symptom.
-- `Reproduce`: the steps, or the condition that revealed it. Required, and
-  never "unknown": when no steps are known, say what was running when it
+- `Reproduce`: one shell command run from the checkout root whose output or
+  exit code shows the bug, such as `bun test src/x.test.ts`. Prose only when no
+  command can show it, and then the condition that revealed it. Required, and
+  never "unknown": when no command can show it, say what was running when it
   showed.
 - `Rerun`: one command that shows it again, when there is one.
 - `Artifact`: the verbatim output. rafa takes the error line from its first
@@ -159,7 +161,8 @@ Then file from the fields:
 ```bash
 rafa issue create --type=bug --body-file=/tmp/bug.md \
   --module=<module> --action=<action> --summary="<one line>" \
-  --cause=<code> --reproduce="<steps, or the revealing condition>" \
+  --cause=<code> \
+  --reproduce="<one command run from the checkout root, or the condition when no command can show it>" \
   --priority=<priority>
 ```
 

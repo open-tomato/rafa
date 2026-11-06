@@ -369,7 +369,7 @@ export const ISSUE_CREATE_DECLARATION: CommandDeclaration = Object.freeze<Comman
     },
     {
       name: 'reproduce',
-      description: 'A bug: the steps, or the condition that revealed it. Never unknown.',
+      description: 'A bug: one command run from the checkout root whose output or exit code shows it; the condition only when no command can. Never unknown.',
       type: 'string',
     },
     {

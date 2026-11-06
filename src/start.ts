@@ -805,6 +805,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         serving,
         handout,
         base,
+        // The tracker by its absolute path, which a worktree checkout holds no copy of.
+        trackerPath,
         guard: { expected, trackerPath },
         docTask: { planStub, prBase: runConfig.config.prBase },
       });

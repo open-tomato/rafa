@@ -434,7 +434,7 @@ export const judgeRafa = (words: string[]): Verdict | null => {
   if (pair === 'pr merge') return handOver(line, 'it merges and deletes branches');
   if (pair === 'release tag') return handOver(line, 'it tags a release');
   if (pair === 'loop start') return handOver(line, 'it starts a loop in a checkout and spends 🪙');
-  if (pair === 'issue ready') return handOver(line, 'it asks its question on a terminal and has no --yes');
+  if (pair === 'issue ready') return handOver(line, 'it asks its question on a terminal, which --yes answers unasked');
   if (subject === 'self-update') return handOver(line, 'it replaces the rafa that live loops run');
   if (subject === 'cleanup' && !hasFlag(words, 'dry-run') && !hasFlag(words, 'output')) return handOver(line, 'it removes branches from a checklist on a terminal');
   if (subject === 'next' && !nextIsSafe(words)) return handOver(line, 'it runs the steps it proposes; only --dry-run, or a --yes list of sync, wait, unblock, home and resume, runs unasked');

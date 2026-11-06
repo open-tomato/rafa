@@ -22,11 +22,13 @@
  * in that gap reads zero rows off a pull request whose checks are about
  * to appear. Zero rows on an OLD head is the settled reading above: no
  * run is coming. So a caller that knows when the head was committed
- * hands that time over ({@link WaitOptions.headCommittedAtMs}), and zero
+ * hands that time over ({@link WaitOptions.headCommittedAtMs}, read off
+ * a `PullRequestDetail` by {@link headTimeOf}), and zero
  * rows on a head younger than {@link FIRST_CHECK_GRACE_MS} is polled
  * again like a pending reading. A caller that hands over no time gets
  * `none` on the first poll, as every caller did before the grace
- * existed: the loop's CI gate and `pr triage --resolve` hand over none.
+ * existed: `pr wait` and the loop's CI gate hand a time over, while
+ * `pr triage --resolve` hands over none.
  *
  * The time is the head commit's COMMITTED date, which is not the push
  * time: a commit made an hour ago and pushed just now reads as old and
@@ -50,6 +52,7 @@
  * CI writer reads them; this file re-exports them under the same names.
  */
 
+import type { PullRequestDetail } from '@open-tomato/rafa/pr/types';
 import type { CheckOutcome, CheckRow, ChecksVerdict } from '@open-tomato/rafa/store/check-rows';
 
 import { verdictOf } from '@open-tomato/rafa/store/check-rows';
@@ -149,6 +152,23 @@ export function formatRows(rows: readonly CheckRow[]): string {
  * wait's own first poll.
  */
 export const FIRST_CHECK_GRACE_MS = 120_000;
+
+/**
+ * When the head of `detail` was committed, in the clock's milliseconds,
+ * or null where there is no time to give the grace: a pull request the
+ * read did not find, a provider that answers no date, a date that is no
+ * time. A caller hands a number to {@link WaitOptions.headCommittedAtMs}
+ * and leaves the option out on null, which is the wait with no grace.
+ */
+export function headTimeOf(detail: PullRequestDetail | null): number | null {
+  const committedAt = detail?.headCommittedAt ?? null;
+  const ms = committedAt === null
+    ? Number.NaN
+    : Date.parse(committedAt);
+  return Number.isNaN(ms)
+    ? null
+    : ms;
+}
 
 export interface WaitOptions {
   /**
