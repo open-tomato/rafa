@@ -6,9 +6,9 @@ A change made through an agent, a loop task or a session by hand, is
 tested at its scope first: `affected` (`bun test --changed=<base>`, the
 `tests=affected` scope below) for an isolated change, `related` (the test
 files under the touched `Owns:` folder, by path, the `tests=module` scope)
-when it reaches further. The full suite runs 6.4 minutes a pass as measured
-in stretch 4, so it is the warranty before a merge, run once every scoped run
-is green, and never the quick check between edits.
+when it reaches further. The full suite runs about 14.6 minutes a pass (875 s
+in the runner's baseline capture), so it is the warranty before a merge, run
+once every scoped run is green, and never the quick check between edits.
 
 A change still asks for the full suite before the merge-time run when:
 
@@ -748,8 +748,12 @@ means the file was found but cannot be executed. The step reads either exit as
 neither red nor a type error, and no change to the task's files fixes it. The
 blocker names the interpreter, so the fix is to put that interpreter on the
 PATH the loop runs under. `rafa doctor` reads the same exits on its `tsc` row,
-where it exits 1 with the same reading, so a missing `node` shows there before
-a run starts.
+where it exits 1 with the same reading, and `rafa loop start` refuses the run
+with exit 1 and that same text before it writes a session record, so a missing
+`node` shows at the first `loop start` on the machine, before any run starts.
+A stretch item launched on such a machine ends with exit 2 and prints the
+log's last lines, the refusal among them, not a reason for a missing pull
+request.
 
 Widening an exported interface reaches every `*.test.ts` literal with no
 gate saying so: grep the type name across the test files and fix each
