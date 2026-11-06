@@ -6,7 +6,7 @@ A change made through an agent, a loop task or a session by hand, is
 tested at its scope first: `affected` (`bun test --changed=<base>`, the
 `tests=affected` scope below) for an isolated change, `related` (the test
 files under the touched `Owns:` folder, by path, the `tests=module` scope)
-when it reaches further. The full suite runs about 14.6 minutes a pass (875 s
+when it reaches further. The full suite runs about 12.2 minutes a pass (875 s
 in the runner's baseline capture), so it is the warranty before a merge, run
 once every scoped run is green, and never the quick check between edits.
 

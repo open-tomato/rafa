@@ -67,11 +67,13 @@
  * case. A tracker run without `editsPriority` that still answers a
  * priority reddens the one case standing in for the four.
  */
+import type { ContractClock } from './contract-clock.js';
 import type { TrackerContractOptions } from './contract.js';
 import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
+import { advanceableContractClock } from './contract-clock.js';
 import { draftFixture, runTrackerContract, trackerContractCases } from './contract.js';
 
 /** Every contract case name, in the order the contract lists them. */
@@ -179,8 +181,8 @@ interface HeldIssue {
   readonly createdAt: string | null;
 }
 
-/** An in-memory tracker, and a reader of the comments it holds. */
-function memoryTracker(faults: Faults = {}): {
+/** An in-memory tracker stamping `createdAt` from `clock`, and a reader of the comments it holds. */
+function memoryTracker(clock: ContractClock, faults: Faults = {}): {
   tracker: Tracker;
   comments: (ref: IssueRef) => readonly string[];
 } {
@@ -212,7 +214,7 @@ function memoryTracker(faults: Faults = {}): {
         : String(issued);
       const createdAt = faults.datesFirstOnly === true && issued > 1
         ? null
-        : new Date().toISOString();
+        : new Date(clock.now()).toISOString();
       issues.set(externalId, { draft, state: 'todo', comments: [], createdAt });
       return { opt: draft.opt, kind: 'memory', externalId, url: null };
     },
@@ -297,7 +299,8 @@ function memoryTracker(faults: Faults = {}): {
 /**
  * Contract options over a fresh in-memory tracker for each case, made
  * with `faults` and with any function `breakWith` answers in place of
- * its own.
+ * its own, under an advanceable clock so the cut-off case waits on no
+ * timer.
  */
 function contractOptions(
   faults: Faults = {},
@@ -310,8 +313,9 @@ function contractOptions(
     expectedKind: 'memory',
     editsIssues: true,
     editsPriority: true,
-    create: async () => {
-      const made = memoryTracker(faults);
+    clock: advanceableContractClock,
+    create: async (clock) => {
+      const made = memoryTracker(clock, faults);
       comments = made.comments;
       return { ...made.tracker, ...breakWith(made.tracker) };
     },
