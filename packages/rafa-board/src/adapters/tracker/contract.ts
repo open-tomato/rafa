@@ -55,11 +55,12 @@
  *     cut-off is answered, in any state, with its title, body and a
  *     `createdAt` at or after the cut-off, beside a spike filed after it
  *     and a bug filed before it, which a listing of bugs leaves out; and
- *     a cut-off after every issue answers none. The first waits past a
- *     second boundary between the earlier bug and the cut-off, since a
- *     GitHub issue is dated to the second. Like `openIssues`, an adapter
- *     run with `readsFiledIssues: false` is held to leaving the reading
- *     out instead, by one case in place of the two.
+ *     a cut-off after every issue answers none. The first lets time pass
+ *     a second boundary between the earlier bug and the cut-off, since a
+ *     GitHub issue is dated to the second, and both read the cut-off
+ *     from the case's clock. Like `openIssues`, an adapter run with
+ *     `readsFiledIssues: false` is held to leaving the reading out
+ *     instead, by one case in place of the two.
  *   - `editable` and `edit`: rafa's own optional pair, which the source
  *     lacks, with five cases of their own. `editable` answers a created
  *     issue's title, body and open state, with labels and an author
@@ -81,6 +82,11 @@
  *     run without `editsPriority` is held to an `editable` answering no
  *     priority instead, by one case in place of the four, since the
  *     port reads an absent priority as a tracker that writes none.
+ *   - A clock per case, which the source lacks. `create` is handed a
+ *     fresh {@link ContractClock} from the `clock` factory, the wall
+ *     clock by default, and an adapter stamps `createdAt` from it. Under
+ *     `advanceableContractClock` the cut-off case advances the clock
+ *     instead of sleeping on a real timer, and nothing waits.
  *   - The cases are also answered as a list, by
  *     {@link trackerContractCases}, each a name and a function that
  *     rejects when the adapter breaks the case. {@link runTrackerContract}
@@ -88,6 +94,7 @@
  *     adapters to hold which cases reject: the control that each case can
  *     fail. Case names hold no apostrophe, which `eslint --fix` escapes.
  */
+import type { ContractClock } from './contract-clock.js';
 import type {
   EditableIssue,
   IssueDraft,
@@ -100,14 +107,17 @@ import type {
 
 import { describe, expect, it } from 'bun:test';
 
+import { realContractClock } from './contract-clock.js';
 import { ISSUE_STATES } from './issue-values.js';
 
 /** What the contract is run with. */
 export interface TrackerContractOptions {
   /** Names the suite. */
   readonly name: string;
-  /** A fresh, isolated tracker for each case. */
-  readonly create: () => Promise<Tracker>;
+  /** A fresh, isolated tracker for each case, stamping `createdAt` from the case's `clock`. */
+  readonly create: (clock: ContractClock) => Promise<Tracker>;
+  /** A fresh clock for each case. `realContractClock`, the wall clock, when left out. */
+  readonly clock?: () => ContractClock;
   /** Whether the adapter reports project support. */
   readonly expectsProjects: boolean;
   /** The `TrackerKind` the adapter reports. */
@@ -196,7 +206,17 @@ function filedIssuesOf(tracker: Tracker): NonNullable<Tracker['filedIssues']> {
   return tracker.filedIssues;
 }
 
-/** Longer than the second a GitHub issue is dated to, so a later cut-off falls after an earlier issue. */
+/** A fresh clock for a case, from the options' factory or the wall clock. */
+function caseClock(options: TrackerContractOptions): ContractClock {
+  return (options.clock ?? realContractClock)();
+}
+
+/** A tracker factory for cases that read no clock, handing each tracker a fresh one. */
+function caseCreate(options: TrackerContractOptions): () => Promise<Tracker> {
+  return async () => options.create(caseClock(options));
+}
+
+/** Longer than the second a GitHub issue is dated to, so a cut-off this far on falls after an earlier issue. */
 const SECOND_BOUNDARY_WAIT_MS = 1100;
 
 /** A day, the distance of a cut-off no issue just created is filed after. */
@@ -204,7 +224,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The cases of the optional `filedIssues` reading, or the one case holding it left out. */
 function filedIssuesCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
-  const { create } = options;
+  const create = caseCreate(options);
   if (options.readsFiledIssues === false) {
     return [
       {
@@ -222,11 +242,12 @@ function filedIssuesCases(options: TrackerContractOptions): readonly TrackerCont
     {
       name: 'filedIssues answers a bug moved to done after the cut-off, leaving out a spike and an earlier bug',
       run: async () => {
-        const tracker = await create();
+        const clock = caseClock(options);
+        const tracker = await options.create(clock);
         await tracker.preflight();
         await tracker.create(draftFixture({ opt: 0, title: 'Filed before', body: 'Early.\n' }));
-        await new Promise((resolve) => setTimeout(resolve, SECOND_BOUNDARY_WAIT_MS));
-        const cutOff = new Date(Math.floor(Date.now() / 1000) * 1000);
+        await clock.advance(SECOND_BOUNDARY_WAIT_MS);
+        const cutOff = new Date(Math.floor(clock.now() / 1000) * 1000);
         const closed = await tracker.create(draftFixture({ opt: 0, title: 'Filed then fixed', body: 'Late.\n' }));
         const spike = await tracker.create(draftFixture({ opt: 0, type: 'spike', title: 'Try passkeys', body: 'Idea.\n' }));
         await tracker.transition(closed, 'done');
@@ -244,11 +265,12 @@ function filedIssuesCases(options: TrackerContractOptions): readonly TrackerCont
     {
       name: 'filedIssues answers nothing for a cut-off after every issue was filed',
       run: async () => {
-        const tracker = await create();
+        const clock = caseClock(options);
+        const tracker = await options.create(clock);
         await tracker.preflight();
         await tracker.create(draftFixture({ opt: 0 }));
 
-        expect(await filedIssuesOf(tracker)('bug', new Date(Date.now() + DAY_MS))).toEqual([]);
+        expect(await filedIssuesOf(tracker)('bug', new Date(clock.now() + DAY_MS))).toEqual([]);
       },
     },
   ];
@@ -256,7 +278,7 @@ function filedIssuesCases(options: TrackerContractOptions): readonly TrackerCont
 
 /** The cases of the optional `openIssues` reading, or the one case holding it left out. */
 function openIssuesCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
-  const { create } = options;
+  const create = caseCreate(options);
   if (options.readsOpenIssues === false) {
     return [
       {
@@ -356,7 +378,7 @@ function editableRow(issue: EditableIssue): Omit<EditableIssue, 'ref'> & { reado
 
 /** The cases of a priority through the pair, or the one case holding `editable` to answering none. */
 function priorityCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
-  const { create } = options;
+  const create = caseCreate(options);
   if (options.editsPriority !== true) {
     return [
       {
@@ -447,7 +469,7 @@ function priorityCases(options: TrackerContractOptions): readonly TrackerContrac
  * priority through it, or the one case holding the pair left out.
  */
 function editCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
-  const { create } = options;
+  const create = caseCreate(options);
   if (options.editsIssues !== true) {
     return [
       {
@@ -547,7 +569,7 @@ function editCases(options: TrackerContractOptions): readonly TrackerContractCas
 
 /** Every contract case, in the order {@link runTrackerContract} registers them. */
 export function trackerContractCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
-  const { create } = options;
+  const create = caseCreate(options);
 
   return [
     {
