@@ -9,6 +9,23 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.52.0 — 2026-11-06, `rafa stretch item` prints all five pit-stop readings; `rafa loop start` refuses a loop whose `tsc` cannot start; Bug sweep 45 — a flag the skill says to pass, a CI poll read too early, and the stale-docs lines; Bug sweep 46 — the stretch's rules reach every planner and every task; Bug sweep 47 — a plan names every issue it closes, and a bug's reproduce is a command
+<!-- rafa:fragments rafa-1438 drop-three-parked-duplicates rafa-1477-spec-stretch-item-prints rafa-1478-spec-loop-start-refuses rafa-1482-bug-sweep-45 rafa-1483-bug-sweep-46 rafa-1484-bug-sweep-47 rafa-1509-spec-full-suite-drops -->
+
+- stretch: `rafa stretch item` now runs `rafa effort collect` once an item merges and closes with all five pit-stop readings: CI, open bugs, bugs filed since, an `Effort:` line for the item's plan, and a `Recheck #<n>:` verdict for each bug filed since the last item.
+- CLI: `rafa loop start` now refuses, before any config load, deferral or session, when the project's `tsc` cannot start (exit 126 or 127), and names the interpreter to put on the PATH the loop runs under.
+- docs: `context/cli.md` and `context/verification.md` document the new `loop start` refusal, its fix line and what a stretch item does with it, and the full suite is now documented as taking 14.6 minutes a pass.
+- docs: Bug reports and the bug issue template ask for one reproduce command run from the checkout root, and the plan header documentation lists `release` and `closes`.
+- skills: The rafa-tooling skill now tells sessions to pass `--no-hint` only to the six commands that declare it (`pr merge`, `pr wait`, `pr triage`, `plan create`, `issue ready`, `loop start`), so it no longer leads them into a `cli:unknown-flag` refusal.
+- run: The loop's CI gate now reads the pull request's head commit time before polling, so a freshly pushed head whose checks have not appeared yet gets the same first-check grace as `rafa pr wait` instead of ending at once with no checks.
+- operators: The stretch engineer and the sweep skill now say how `rules.md` is drafted beside the bucket, changed in the conversation, written once the person calls it final, or read back after an edit in the terminal; `context/operators.md` names the person and the engineer as its writers.
+- plan: `rafa plan needs --issue` now reads the stretch rules file `RAFA_STRETCH_RULES` names, as `rafa plan create` does, so a snapshot saved with rules no longer reads them as removed, and a value naming no file is refused.
+- plan: The `rafa:plan` header reads a `closes:` list of GitHub issue numbers, refused whole when any entry is not a positive whole number, and the plan skill documents it and how a sweep spec fills it.
+- loop: Each task prompt now names the plan tracker by its absolute path and says close-out notes go indented below the task line, so a task running in a worktree can find it.
+- loop: The loop's pull request now closes every issue in the plan's `closes:` list beside the plan's own issue, whether the wrap-up session or the runner opens it.
+- agents: Out-of-scope reports from the loop implementer and doc updater give a reproduce command run from the checkout root, with prose only when no command can show the bug.
+- board: `rafa issue create`'s `--reproduce` help and its missing-reproduce message ask for one command run from the checkout root, with the condition only when no command can show the bug.
+
 ## 0.51.0 — 2026-11-05, Bug sweep 41 — four readings of a state that is not there; Bug sweep 42 — two release lines that act on something other than what was asked; Bug sweep 43 — the stretch's own lines, and the 0.50.0 doc lines
 <!-- rafa:fragments rafa-1439-bug-sweep-41 rafa-1440-bug-sweep-42 rafa-1441-bug-sweep-43 rafa-1446-bug-sweep-44 -->
 
