@@ -35,7 +35,7 @@ step left for you. Read them there; do not run the checks again.
 | Bugs | the `Bugs:`, `Filed since` and `Recheck` lines of the item's closing output | the open count rising, a bug filed during this loop that repeats an open one (a `Recheck` line that says `reproduces`) |
 | Delivery | `rafa loop status`, `rafa pr list` | the run is done with no pull request, or its pull request did not merge |
 | Conflicts | `rafa pr show <pr>` | the pull request conflicts with the integration branch |
-| CI | `rafa ci status --branch=stretch/<n>` | the run failed (use `gh run view <id> --log-failed` to see why), or is still running |
+| CI | the `CI:` line of the item's closing output (`rafa ci status --branch=stretch/<n>` gives the same verdict) | the run failed (use `gh run view <id> --log-failed` to see why), or is still running |
 
 A CI failure already red in the local runs is inherited and noted in the pit-stop entry.
 A new failure is filed as one bug after a search for an existing one. A run still in progress
@@ -44,7 +44,9 @@ is read at the next pit stop.
 The readings in the closing output decide nothing; you do. The shapes:
 
 - `Effort: <stub>: <n> tasks, p50 <m> min against <b> min, max <x> min.`
-  is the item's effort against its baseline. `Effort: not read (<reason>).`
+  is the item's effort against its baseline; with no baseline in the store
+  it reads `against no baseline`. `Effort: <stub>: no task sessions stored.`
+  is a plan with no task sessions in the store. `Effort: not read (<reason>).`
   is a reading that failed.
 - `Bugs: <n> open.`, then `Filed since <time>: <n>.` with one indented line
   per bug filed after the last item, `#<n> <title>: <first line>`. `none` is
