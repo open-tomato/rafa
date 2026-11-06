@@ -87,6 +87,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { draftFixture, runTrackerContract } from '@open-tomato/rafa-board/adapters/tracker/contract';
+import { advanceableContractClock } from '@open-tomato/rafa-board/adapters/tracker/contract-clock';
 import { createGhRunner, createGithubTracker, GITHUB_LABELS } from '@open-tomato/rafa-board/adapters/tracker/github';
 import { createFakeGh } from '@open-tomato/rafa-board/adapters/tracker/github-fake';
 import { OPEN_ISSUES_LIMIT } from '@open-tomato/rafa-board/adapters/tracker/github-open-issues';
@@ -171,8 +172,13 @@ runTrackerContract({
   name: 'github',
   expectsProjects: false,
   expectedKind: 'github',
-  create: async () => {
-    contractFake = createFakeGh();
+  clock: advanceableContractClock,
+  create: async (clock) => {
+    // Stamped from the case's clock, to the second as gh writes a time.
+    contractFake = createFakeGh({
+      now: () => new Date(clock.now()).toISOString()
+        .replace(/\.\d{3}Z$/, 'Z'),
+    });
     return createGithubTracker({ gh: contractFake.run });
   },
   readComments: async (ref) => contractFake.issue(ref.externalId)?.comments ?? [],

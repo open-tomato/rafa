@@ -116,6 +116,7 @@ import { join } from 'node:path';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { advanceableContractClock } from './contract-clock.js';
 import { draftFixture, runTrackerContract } from './contract.js';
 import {
   createLocalTracker,
@@ -216,10 +217,11 @@ runTrackerContract({
   expectedKind: 'local',
   editsIssues: true,
   editsPriority: true,
-  create: async () => {
+  clock: advanceableContractClock,
+  create: async (clock) => {
     contractDir = freshDir('contract');
-    // The filedIssues cases hold a cut-off against the time an issue is filed, so this tracker keeps the system clock.
-    return localTracker(contractDir, { now: () => new Date().toISOString() });
+    // The filedIssues cases hold a cut-off against the time an issue is filed, so this tracker stamps from the case's clock.
+    return localTracker(contractDir, { now: () => new Date(clock.now()).toISOString() });
   },
   readComments: async (ref) => {
     const path = join(contractDir, `${ref.externalId}.md`);
