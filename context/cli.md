@@ -146,7 +146,7 @@ module's note is the long form.
 | `packages/rafa-release/src/commands/doctor-ladder.ts` | the release ladder row of `rafa doctor`, under the release row: the readings `packages/rafa-release/src/release/ladder.ts` takes (each ladder workflow's stat, the publish workflow's text, `.github/dependabot.yml`'s stat, the version file parsed as a JSON manifest), the level `ladderLevel` reads with the key that does not fit, and the missing preconditions `ladderPreconditions` answers; one `Release ladder: level <n>, <name>` line, `info` when nothing is missing and `warn` naming each missing item with the file or command that supplies it (`rafa release workflows --write` for a workflow) otherwise, in both modes, ending from level 2 up on the `RAFA_RELEASE_PUBLISH` reminder; never the exit code |
 | `src/commands/doctor-effort-schema.ts` | the `effort store schema` row of `rafa doctor`: the store every other command would open, read through `readSchemaReport` (`packages/rafa/src/effort/store/schema-report.ts`) and never brought forward; `fail` where `rafa effort schema --check` fails, with the refusal `doctor` exits 1 with, `warn` for each unknown additive migration and, in the project's own store alone, each `applied_by` holding `+dev:`, `ok` otherwise |
 | `src/commands/doctor-effort-sync.ts` | the `effort sync` row of `rafa doctor`, over the reading of `packages/rafa-effort/src/effort/sync/doctor-reading.ts`: `renderDoctorEffortSync` gives `Effort sync: ok, <strategy>`, ` (module)` added for a strategy a module serves, or `Effort sync: fail, <strategy>` with each line of the problem indented under it, and `effortSyncRefusal` the text `doctor` exits 1 with for a failing row, `SyncModuleMissing`'s `modules:` and `allowList:` lines included for `git`, `service` and `p2p` |
-| `src/commands/doctor-tsc.ts` | the `tsc` row of `rafa doctor`, read only for a project root holding a `tsconfig.json`: `readDoctorTsc` runs `<root>/node_modules/.bin/tsc --version` in the root under the context's environment, `ok` with the version it prints, `fail` on an exit of 126 or 127 (`CANNOT_START_CODES`, the type step's `cannot start`) naming the interpreter `scriptInterpreter` reads off its first line, and `warn` for a missing tsc, any other failing exit or a spawn that throws; `writeDoctorTsc` writes the row, `ok` at `info` in text mode alone and the others as warnings in both modes, and answers `tscRefusal`, the text `doctor` exits 1 with for a failing row |
+| `src/commands/doctor-tsc.ts` | the `tsc` row of `rafa doctor`, read only for a project root holding a `tsconfig.json`: `readDoctorTsc` runs `<root>/node_modules/.bin/tsc --version` in the root under the context's environment, `ok` with the version it prints, `fail` on an exit of 126 or 127 (`CANNOT_START_CODES`, the type step's `cannot start`) naming the interpreter `scriptInterpreter` reads off its first line, and `warn` for a missing tsc, any other failing exit or a spawn that throws; `writeDoctorTsc` writes the row, `ok` at `info` in text mode alone and the others as warnings in both modes, and answers `tscRefusal`, the text `doctor` exits 1 with for a failing row, which `loop start` also exits 1 with on a `cannot-start` reading (`refuseTscCannotStart`, `src/commands/loop/start.ts`) |
 | `packages/rafa-effort/src/effort/sync/doctor-reading.ts` | whether the strategy `effort.sync` names has an adapter: `readDoctorEffortSync` selects it through `selectSync` (`packages/rafa-effort/src/effort/sync/select.ts`) over `CORE_ADAPTER_REGISTRY` for a kind the composition root registers and over the registry `loadModules` answers for any other; `ok` naming the strategy and whether core or a module serves it, `fail` with the problem and whether it is `SyncModuleMissing`'s, never a throw; read by `src/commands/doctor-effort-sync.ts` and `src/commands/doctor.ts` for the row and by `packages/rafa-run/src/start/preflight-sync.ts` for the `loop start` refusal, it imports nothing under `src/commands/` |
 | `src/commands/doctor-description.ts` | the help description of `rafa doctor`, moved out of `src/commands/doctor.ts` to keep that module under the 800-line cap; text alone |
 | `src/commands/doctor-install.ts` | the install readings `rafa doctor` reads before its preflight and warns by after it: `~/.rafa/bin` on `PATH`, a store left under `.ralph/effort/`, a pre-init `plan.dir` or `specs.dir`, and the previous copies under `specs.dir` |
@@ -582,6 +582,23 @@ New; it replaces no earlier text. What a row or an action added to
   its `start` dropped and its failed `result` thrown with its code and
   message. The child writes its own session record, so `loop stop` signals
   the child.
+- **`loop start` refuses a `tsc` that cannot start, before anything else
+  runs** (`src/commands/loop/start.ts`, `refuseTscCannotStart`): the command
+  reads the `tsc` row of `rafa doctor` (`readDoctorTsc`, `doctor-tsc.ts`) over
+  the project root and the environment it was handed, and a `cannot-start`
+  reading (tsc exited 126 or 127) exits 1 with `doctor`'s refusal text,
+  `rafa doctor: tsc: <path> exited 127 (...)`. Its second sentence is the fix:
+  put the interpreter the script's first line names (`node`, for
+  `#!/usr/bin/env node`) on the PATH the loop runs under. The check runs
+  before `start`, so no config load, `--start-at` deferral, session record,
+  preflight or session comes first; every other reading goes on as before.
+- **`rafa stretch item` ends an item whose loop cannot start with exit 2**
+  (`stretch/item.ts`): the loop's streams are appended to
+  `.rafa/stretch/<n>/loop-<issue>.log`, and a child that ends before it writes
+  a session record makes the item exit 2 with the log's last lines, where the
+  refusal's text is. That refusal writes no session record and no events file,
+  so it is not the loop's reason for ending without a pull request, which
+  `readLoopEnding` (`stretch/item-merge.ts`) reads from the events file.
 - **`loop start --create-branch` creates the feature branch when on `main`,
   `master` or a detached HEAD** (`start/run-setup.ts`): when the working
   directory is checked out on `main` or `master`, or on no branch at all, the
