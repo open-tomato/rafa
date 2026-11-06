@@ -2,7 +2,10 @@
  * The per-bug judge of `rafa bug recheck` (#953): every bug already read
  * off the tracker, judged into one {@link RecheckRow} each, in the order
  * given. The command (`./recheck.ts`) reads the line, the tracker and
- * the config, and hands the bugs here with {@link JudgeBugsOptions}.
+ * the config, and hands the bugs here with {@link JudgeBugsOptions}; the
+ * pit stop of `rafa stretch item` (`../stretch/item-merge.ts`) hands it
+ * the bugs filed since the last item. Of the tracker, the judge reads
+ * its kind and `editable` alone ({@link JudgeTracker}).
  *
  * ## One bug
  *
@@ -73,10 +76,13 @@ export interface ReadBug {
   readonly author: string | null;
 }
 
+/** What the judge reads of the tracker: its kind, and `editable` for an author not yet read. */
+export type JudgeTracker = Pick<Tracker, 'kind' | 'editable'>;
+
 /** What {@link judgeBugs} judges every bug with; see the module note. */
 export interface JudgeBugsOptions {
-  /** The tracker the bugs were read off, asked for an author not yet read. */
-  readonly tracker: Tracker;
+  /** The tracker the bugs were read off, asked for an author not yet read: its kind and its `editable` alone are read. */
+  readonly tracker: JudgeTracker;
   /** The board trust authors are weighed by, built on its first call only. */
   readonly trust: () => BoardTrust;
   /** The checkout a reference is resolved against and run in. */
@@ -132,7 +138,7 @@ export function rowOf(bug: Pick<ReadBug, 'issue' | 'title'>, fields: Pick<Rechec
 }
 
 /** The author of `bug`: as already read, else `editable(ref).author`, `''` for none the tracker gives. */
-async function authorOf(tracker: Tracker, bug: ReadBug): Promise<string> {
+async function authorOf(tracker: JudgeTracker, bug: ReadBug): Promise<string> {
   if (bug.author !== null) return bug.author;
   if (tracker.editable === undefined) return '';
   return (await tracker.editable(bug.ref)).author;
@@ -143,7 +149,7 @@ async function authorOf(tracker: Tracker, bug: ReadBug): Promise<string> {
  * weighed through `readBoardTrust` once per login, a refusal answered as
  * the row's reason. See the module note.
  */
-function trustGateOf(tracker: Tracker, trust: () => BoardTrust): TrustGate {
+function trustGateOf(tracker: JudgeTracker, trust: () => BoardTrust): TrustGate {
   if (tracker.kind === LOCAL_KIND) return () => Promise.resolve(null);
   const readings = new Map<string, Promise<TrustReading>>();
   return async (bug) => {
