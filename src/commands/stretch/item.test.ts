@@ -135,7 +135,16 @@ function plant(options: CaseOptions = {}): Case {
       const row = { baseRefName: 'main', body: '', headRefName: 'feat/rafa-812-pit-readings', mergeCommit: null, mergeable: 'MERGEABLE', number: Number(args[2]), state: 'OPEN' };
       return Promise.resolve({ ok: true, stdout: JSON.stringify(row), stderr: '' });
     },
-    tracker: () => ({ openIssues: async () => Promise.resolve([]), filedIssues: async () => Promise.resolve([]) }),
+    tracker: () => ({
+      kind: 'github',
+      get: () => Promise.reject(new Error('fake tracker: get is not modelled')),
+      openIssues: async () => Promise.resolve([]),
+      filedIssues: async () => Promise.resolve([]),
+    }),
+    // The merge half refuses before step 6, so no case reaches the dashboard, the recheck runner or git.
+    readDashboard: () => Promise.reject(new Error('fake effort dashboard: not modelled')),
+    recheck: () => Promise.reject(new Error('fake recheck: not modelled')),
+    git: () => () => ({ ok: false, stdout: '', stderr: 'fake git: not modelled' }),
     sleep: async () => {
       clock += options.tickMs ?? 0;
       return Promise.resolve();

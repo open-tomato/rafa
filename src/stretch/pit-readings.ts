@@ -1,8 +1,11 @@
 /**
  * The pit-stop readings `rafa stretch item` prints once an item has
  * merged into the integration branch (#816): what the newest CI run on
- * that branch did, how many bugs are open, and which bugs were filed
- * since the last item. The readings decide nothing; the pit-stop skill
+ * that branch did, how many bugs are open, which bugs were filed since
+ * the last item, what the item's plan cost against the effort store's
+ * baseline, and whether each bug filed since still reproduces (#1477).
+ * They are read in that order and printed in it. The readings decide
+ * nothing; the pit-stop skill
  * (`src/bundled/operators/skills/rafa-stretch-pit-stop/SKILL.md`) does.
  *
  * ## What each reading reads
@@ -39,13 +42,27 @@
  *   line: the first non-blank line, trimmed, cut to
  *   {@link FIRST_LINE_MAX} characters, or null for a body with none. A
  *   tracker without `filedIssues` reads as not read
- *   ({@link NO_FILED_ISSUES}), never as none.
+ *   ({@link NO_FILED_ISSUES}), never as none. Each bug also keeps its
+ *   ref and its whole body, which no line prints: the recheck reading
+ *   hands them to the judge.
  *
  *   The GitHub adapter lists through `gh issue list --search`, which goes
  *   through GitHub's search API and its index, seconds behind a filing: a
  *   bug filed in the last moments before a reading can be missing from
  *   it. The readings run minutes after the loop ends, past the merge and
  *   the CI wait, so the lag is noted here and not worked around.
+ * - **Effort**: {@link readPitEffort} (`./pit-effort.ts`) over the
+ *   `runCollect`, `readDashboard` and `now` seams, for the query's `root`
+ *   and `stub`: `rafa effort collect` is run and timed, then the item's
+ *   `plan` row of the dashboard is read beside the `minutes` baseline.
+ *   The reading keeps the collect's exit code and seconds, so the caller
+ *   can print `collectLine`; the rendered lines hold the `Effort:` line
+ *   alone. A collect that did not end 0 leaves it not read.
+ * - **Rechecks**: {@link readPitRechecks} (`./pit-recheck.ts`) over the
+ *   bugs of the filed-since reading, each handed to the `judge` seam with
+ *   its ref, number, title and body, in filing order, in one call. A
+ *   filed-since reading not read leaves this one not read with the same
+ *   reason, and the judge is never called; none filed calls no judge.
  *
  * ## Why filed-since has a listing of its own
  *
@@ -65,16 +82,20 @@
  *
  * A reading that fails, a `gh` that would not answer or a tracker that
  * threw, is held as `{ ok: false, reason }` and printed as such; the
- * other readings are still read and printed. The count and the
+ * other readings are still read and printed. The effort reading fails
+ * alone, and the rechecks fail with the filed-since reading they judge,
+ * never the other way round. The count and the
  * filed-since reading send a call each, so a `filedIssues` that throws
  * leaves the count printed, and an `openIssues` that throws leaves the
  * filed bugs listed. A pit stop that sees one reading is worth more than
  * none, and a failure is never shown as a green run, a zero count or
  * none filed.
  */
+import type { PitEffort, PitEffortSeams } from './pit-effort.js';
+import type { PitFiledReading, PitJudge, PitRecheckRow } from './pit-recheck.js';
 import type { BranchRun } from '../ci/runs.js';
 import type { CiBranchReading } from '../ci/status-reading.js';
-import type { FiledIssue, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
+import type { FiledIssue, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
@@ -82,12 +103,17 @@ import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { readHeadRuns, readNewestRun } from '../ci/runs.js';
 import { branchReading, readWorkflowReadings, renderCiBranch } from '../ci/status-reading.js';
 
-/** Where the readings come from. */
-export interface PitSeams {
+import { readPitEffort, renderPitEffort } from './pit-effort.js';
+import { readPitRechecks, renderPitRechecks } from './pit-recheck.js';
+
+/** Where the readings come from: the effort seams beside `gh`, the tracker and the judge. */
+export interface PitSeams extends PitEffortSeams {
   /** The runner `gh run list` and `gh run view` are sent through. */
   readonly gh: GhRunner;
   /** The tracker port, read for its open bugs and for the bugs filed since the cut-off. */
   readonly tracker: Pick<Tracker, 'openIssues' | 'filedIssues'>;
+  /** Judges the bugs filed since: `judgeBugs` bound to the recheck config in production. */
+  readonly judge: PitJudge;
 }
 
 /** What to read. */
@@ -98,6 +124,10 @@ export interface PitQuery {
   readonly workflow?: string;
   /** Bugs filed after this time are listed as new. */
   readonly since: Date;
+  /** The project root the effort store and the session records are read under. */
+  readonly root: string;
+  /** The item's plan stub, the key of its effort row. */
+  readonly stub: string;
 }
 
 /** A reading that was read, or why it was not. */
@@ -118,6 +148,10 @@ export interface FiledBug {
    * {@link FIRST_LINE_MAX} characters; null for a body with none.
    */
   readonly firstLine: string | null;
+  /** The tracker's ref, which the judge reads the author by; no line prints it. */
+  readonly ref: IssueRef;
+  /** The whole body, which the judge reads the `Rerun` section of; no line prints it. */
+  readonly body: string;
 }
 
 /** Every pit-stop reading. */
@@ -126,6 +160,10 @@ export interface PitReadings {
   readonly openBugs: Reading<number>;
   /** The cut-off, ISO 8601, and the bugs filed after it, oldest first. */
   readonly filedSince: Reading<{ readonly since: string; readonly bugs: readonly FiledBug[] }>;
+  /** The item's effort, and the collect it was read after. */
+  readonly effort: PitEffort;
+  /** One judged row per bug filed since, in filing order. */
+  readonly rechecks: Reading<PitRecheckRow[]>;
 }
 
 /** Why the open bugs are not read on a tracker without `openIssues`. */
@@ -147,7 +185,17 @@ export async function readPitReadings(seams: PitSeams, query: PitQuery): Promise
   const openBugs: Reading<number> = bugs.ok
     ? { ok: true, value: bugs.value.length }
     : bugs;
-  return { ci, openBugs, filedSince: await readFiledSince(seams.tracker, query.since) };
+  const filedSince = await readFiledSince(seams.tracker, query.since);
+  const effort = await readPitEffort(seams, { root: query.root, stub: query.stub });
+  const rechecks = await readPitRechecks(seams.judge, judgedReading(filedSince));
+  return { ci, openBugs, filedSince, effort, rechecks };
+}
+
+/** The filed-since reading in the shape the recheck reading judges: each bug's ref, number, title and body. */
+function judgedReading(filed: PitReadings['filedSince']): PitFiledReading {
+  if (!filed.ok) return filed;
+  const bugs = filed.value.bugs.map((bug) => ({ ref: bug.ref, issue: Number(bug.id), title: bug.title, body: bug.body }));
+  return { ok: true, value: { bugs } };
 }
 
 /** The runs the CI lines are read from, newest first: the head commit's, or one workflow's newest. */
@@ -205,6 +253,8 @@ async function readFiledSince(tracker: PitSeams['tracker'], since: Date): Promis
       url: bug.ref.url,
       filedAt: new Date(at).toISOString(),
       firstLine: firstLineOf(bug.body),
+      ref: bug.ref,
+      body: bug.body,
     }));
   return { ok: true, value: { since: since.toISOString(), bugs: filed } };
 }
@@ -218,9 +268,15 @@ async function attempt<T>(read: () => Promise<T>): Promise<Reading<T>> {
   }
 }
 
-/** The lines `rafa stretch item` prints for `readings`, CI first, then the bugs. */
+/** The lines `rafa stretch item` prints for `readings`: CI, the bugs, the effort, then the rechecks. */
 export function renderPitReadings(readings: PitReadings): string[] {
-  return [...ciLines(readings.ci), openBugsLine(readings.openBugs), ...filedSinceLines(readings.filedSince)];
+  return [
+    ...ciLines(readings.ci),
+    openBugsLine(readings.openBugs),
+    ...filedSinceLines(readings.filedSince),
+    renderPitEffort(readings.effort.effort),
+    ...renderPitRechecks(readings.rechecks),
+  ];
 }
 
 function ciLines(ci: PitReadings['ci']): string[] {

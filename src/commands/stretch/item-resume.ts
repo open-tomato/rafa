@@ -28,8 +28,9 @@
  *     merge` is printed and no `pr merge` line runs;
  *   - any other state: a refusal naming it.
  *
- * Both go on to `finishItem`: the CI wait, the ledger line and the
- * pit-stop readings. New bugs are counted from the ledger's last line,
+ * Both go on to `finishItem`: the CI wait, the ledger line, the
+ * `rafa effort collect` line and the pit-stop readings, the recheck
+ * reading judged with the `recheckConfig` `./item.ts` hands in. New bugs are counted from the ledger's last line,
  * else the `startedAt` of `stretch.json`, else the log's last-change
  * time, read before the merge.
  *
@@ -42,7 +43,7 @@
  * Every process goes through `ItemMergeSeams`, so no test runs `rafa`,
  * reaches GitHub or sleeps.
  */
-import type { ItemMergeSeams, MergedPull } from './item-merge.js';
+import type { ItemMergeSeams, ItemRecheckConfig, MergedPull } from './item-merge.js';
 import type { ViewedPull } from './item-pull.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
@@ -97,6 +98,8 @@ export interface ResumeInput {
   readonly log: string;
   /** The environment a rafa child runs with. */
   readonly env: Readonly<Record<string, string>>;
+  /** What the recheck reading of the pit-stop readings judges with, handed on to `finishItem`. */
+  readonly recheckConfig: ItemRecheckConfig;
 }
 
 /** A refusal with exit code 1 naming `why`. */
@@ -216,5 +219,6 @@ export async function resumeItem(context: RafaContext, input: ResumeInput, seams
   } else {
     throw refusal(`#${String(number)} is ${pull.state}, neither open nor merged. Nothing was run.`);
   }
-  await finishItem(context, { root: input.root, n: input.n, issue: input.issue, stub, since }, merged, seams);
+  const finish = { root: input.root, n: input.n, issue: input.issue, stub, since, env: input.env, recheckConfig: input.recheckConfig };
+  await finishItem(context, finish, merged, seams);
 }

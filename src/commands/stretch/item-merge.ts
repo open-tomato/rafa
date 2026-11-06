@@ -74,7 +74,26 @@
  *   6. The pit-stop readings (`src/stretch/pit-readings.ts`) for the base,
  *      bugs counted as new from the last ledger line written BEFORE this
  *      one, else the `startedAt` of `.rafa/stretch/<n>/stretch.json`, else
- *      the loop's own start.
+ *      the loop's own start. They are CI, the open bugs, the bugs filed
+ *      since, the item's effort and a recheck of each bug filed since.
+ *      For the effort, `rafa effort collect` runs through `runRafa` in the
+ *      project root with the item's environment, its line printed as it
+ *      starts, and the effort dashboard is read through the
+ *      `readDashboard` seam for the item's stub and root. Its
+ *      `collectLine`, the exit code and the seconds it took, is printed
+ *      after it and before the readings' lines. A collect that could not
+ *      start or did not end 0 leaves the `Effort:` line not read, and the
+ *      other readings are still printed. The rechecks are `judgeBugs`
+ *      (`../bug/recheck-judge.ts`) over the bugs filed since, as
+ *      `rafa bug recheck` judges them and with no comment posted. The
+ *      judge runs under {@link FinishInput}'s `recheckConfig` (the runs,
+ *      the deadline, `board.trustedAuthors` and the named secrets, which
+ *      `./item.ts` reads from the config and the line's environment),
+ *      with the project root as the checkout and the item's environment
+ *      as the base one. It weighs authors by a `ghBoardTrust` over the
+ *      item's `gh`, built on its first use, whose repository label is
+ *      read through the `git` seam; and it runs each runnable reference
+ *      through the `recheck` seam.
  *
  * ## `--dry-run`
  *
@@ -88,18 +107,25 @@
  * so an item resumed after its loop has ended runs the same two.
  *
  * Every process goes through {@link ItemMergeSeams}, so no test runs
- * `rafa`, reaches GitHub or sleeps.
+ * `rafa`, reaches GitHub, reads the effort store, runs a recheck or
+ * sleeps.
  */
 import type { WaitSeams } from './item-checks.js';
 import type { ViewedPull } from './item-pull.js';
 import type { BranchRun } from '../../ci/runs.js';
+import type { PitEffortSeams } from '../../stretch/pit-effort.js';
+import type { PitJudge } from '../../stretch/pit-recheck.js';
+import type { RecheckBugOptions, RecheckRun } from '../bug/recheck-run.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { RafaConfig } from '@open-tomato/rafa/core/config';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { Tracker } from '@open-tomato/rafa/ports';
-import type { GhRunner } from '@open-tomato/rafa-board';
+import type { NamedSecret } from '@open-tomato/rafa/triage/filed-text';
+import type { BoardTrust, GhRunner } from '@open-tomato/rafa-board';
 
 import { readFileSync } from 'node:fs';
 
-import { closedIssuesIn } from '@open-tomato/rafa-board';
+import { boardRepoLabel, closedIssuesIn, ghBoardTrust } from '@open-tomato/rafa-board';
 import { eventsFileOf, readEventsFrom } from '@open-tomato/rafa-run';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -108,7 +134,9 @@ import { describeValue, isMapping, messageOf } from '@open-tomato/rafa/core/conf
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
+import { collectLine } from '../../stretch/pit-effort.js';
 import { readPitReadings, renderPitReadings } from '../../stretch/pit-readings.js';
+import { judgeBugs, MS_PER_SECOND } from '../bug/recheck-judge.js';
 
 import {
   awaitChecks,
@@ -170,10 +198,26 @@ export interface ItemMergeSeams extends WaitSeams {
   readonly runRafa: (argv: readonly string[], cwd: string, env: Readonly<Record<string, string>>) => Promise<number | null>;
   /** The `gh` runner for the project root. */
   readonly gh: (root: string) => GhRunner;
-  /** The tracker the open bugs and the bugs filed since the cut-off are read from. */
-  readonly tracker: (gh: GhRunner) => Pick<Tracker, 'openIssues' | 'filedIssues'>;
+  /**
+   * The tracker the open bugs and the bugs filed since the cut-off are
+   * read from, and the one the recheck judge reads its kind and each
+   * runnable bug's author from.
+   */
+  readonly tracker: (gh: GhRunner) => Pick<Tracker, 'kind' | 'get' | 'editable' | 'openIssues' | 'filedIssues'>;
+  /** The effort dashboard the item's effort is read from: the facade's `readDashboard` in production. */
+  readonly readDashboard: PitEffortSeams['readDashboard'];
+  /** Reruns one runnable bug for the recheck reading: `recheckBug` in production. */
+  readonly recheck: (options: RecheckBugOptions) => Promise<RecheckRun>;
+  /** The git runner for the project root, read for the repository label a trust refusal names. */
+  readonly git: (root: string) => GitRunner;
   /** The program words that run rafa. */
   readonly rafa: readonly string[];
+}
+
+/** What the recheck reading judges each bug with, read from the config and the line's environment by `./item.ts`. */
+export interface ItemRecheckConfig extends Pick<RafaConfig, 'bugsRecheckRuns' | 'bugsRecheckTimeoutSeconds' | 'boardTrustedAuthors'> {
+  /** The named secrets left out of a recheck's environment, as `namedSecrets` answers them. */
+  readonly secrets: readonly NamedSecret[];
 }
 
 /** The item whose loop `loop wait` waited on. */
@@ -191,6 +235,8 @@ export interface WaitedItem {
   readonly log: string;
   /** The environment a rafa child runs with. */
   readonly env: Readonly<Record<string, string>>;
+  /** What the recheck reading of step 6 judges with. */
+  readonly recheckConfig: ItemRecheckConfig;
 }
 
 /** What steps 1 to 3 need of the item: where it runs, its issue, and the environment a rafa child runs with. */
@@ -206,6 +252,10 @@ export interface FinishInput {
   readonly stub: string;
   /** The cut-off new bugs are counted from. */
   readonly since: Date;
+  /** The environment `rafa effort collect` runs with, and the base one of each recheck. */
+  readonly env: Readonly<Record<string, string>>;
+  /** What the recheck reading judges with. */
+  readonly recheckConfig: ItemRecheckConfig;
 }
 
 /** A pull request read merged, its merge commit known. */
@@ -290,6 +340,11 @@ function mergeArgv(rafa: readonly string[], number: number): string[] {
   return [...rafa, 'pr', 'merge', String(number), ...MERGE_FLAGS];
 }
 
+/** The `effort collect` line's words. */
+function collectArgv(rafa: readonly string[]): string[] {
+  return [...rafa, 'effort', 'collect'];
+}
+
 /** The lines a dry run with `--wait` prints for steps 2 to 6; see the module note. */
 export function mergeDryRunLines(rafa: readonly string[], root: string, n: number): string[] {
   const base = `${STRETCH_BRANCH_PREFIX}${String(n)}`;
@@ -302,7 +357,9 @@ export function mergeDryRunLines(rafa: readonly string[], root: string, n: numbe
     `${lineText([...rafa, 'pr', 'merge'])} <pr> ${lineText(MERGE_FLAGS)}`,
     `${runList}  (again every ${String(CI_POLL_MS / 1_000)}s until the run on the merge commit ends)`,
     `append the item to ${itemsPath(root, n)}`,
+    lineText(collectArgv(rafa)),
     `print the pit-stop readings of ${base}`,
+    'recheck each bug filed since the last item, as rafa bug recheck judges it, posting no comment',
   ];
 }
 
@@ -435,6 +492,31 @@ export async function mergePull(context: RafaContext, item: MergeInput, number: 
   return pull;
 }
 
+/**
+ * The judge of the recheck reading: `judgeBugs` over the item's tracker,
+ * a board trust built on its first use, the project root as the checkout
+ * and the item's environment; see the module note's step 6.
+ */
+function itemJudge(context: RafaContext, item: FinishInput, gh: GhRunner, tracker: ReturnType<ItemMergeSeams['tracker']>, seams: ItemMergeSeams): PitJudge {
+  const config = item.recheckConfig;
+  let board: BoardTrust | undefined;
+  const trust = (): BoardTrust => {
+    board ??= ghBoardTrust({ gh, trustedAuthors: config.boardTrustedAuthors, repo: boardRepoLabel(seams.git(item.root)) });
+    return board;
+  };
+  return (bugs) => judgeBugs(bugs, {
+    tracker,
+    trust,
+    checkout: item.root,
+    env: item.env,
+    secrets: config.secrets,
+    runs: config.bugsRecheckRuns,
+    timeoutMs: config.bugsRecheckTimeoutSeconds * MS_PER_SECOND,
+    recheck: seams.recheck,
+    warn: (text) => context.output.warn(text),
+  });
+}
+
 /** Steps 4 to 6 for the merged pull request: the CI wait, the ledger line and the readings; see the module note. */
 export async function finishItem(context: RafaContext, item: FinishInput, merged: MergedPull, seams: ItemMergeSeams): Promise<void> {
   const info = (text: string): void => context.output.info(text);
@@ -454,7 +536,17 @@ export async function finishItem(context: RafaContext, item: FinishInput, merged
     ? ', closing no issue'
     : `, ${closes.join(', ')}`}`);
 
-  const readings = await readPitReadings({ gh, tracker: seams.tracker(gh) }, { branch: merged.base, since: item.since });
+  const tracker = seams.tracker(gh);
+  const collect = collectArgv(seams.rafa);
+  const runCollect = (): Promise<number | null> => {
+    info(lineText(collect));
+    return seams.runRafa(collect, item.root, item.env);
+  };
+  const readings = await readPitReadings(
+    { gh, tracker, runCollect, readDashboard: seams.readDashboard, now: seams.now, judge: itemJudge(context, item, gh, tracker, seams) },
+    { branch: merged.base, since: item.since, root: item.root, stub: item.stub },
+  );
+  info(collectLine(readings.effort.collect));
   for (const line of renderPitReadings(readings)) info(line);
 }
 
@@ -462,7 +554,8 @@ export async function finishItem(context: RafaContext, item: FinishInput, merged
 async function mergeItem(context: RafaContext, item: WaitedItem, number: number, seams: ItemMergeSeams): Promise<void> {
   const since = bugCutOff(item);
   const merged = await mergePull(context, item, number, seams);
-  await finishItem(context, { root: item.root, n: item.n, issue: item.issue, stub: item.stub, since }, merged, seams);
+  const finish = { root: item.root, n: item.n, issue: item.issue, stub: item.stub, since, env: item.env, recheckConfig: item.recheckConfig };
+  await finishItem(context, finish, merged, seams);
 }
 
 /**
