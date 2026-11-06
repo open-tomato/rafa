@@ -93,6 +93,7 @@
 import type { WaitSeams } from './item-checks.js';
 import type { ViewedPull } from './item-pull.js';
 import type { BranchRun } from '../../ci/runs.js';
+import type { PitSeams } from '../../stretch/pit-readings.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { Tracker } from '@open-tomato/rafa/ports';
 import type { GhRunner } from '@open-tomato/rafa-board';
@@ -435,6 +436,20 @@ export async function mergePull(context: RafaContext, item: MergeInput, number: 
   return pull;
 }
 
+/** Why the effort and recheck readings are not read until they are wired into this command. */
+const UNWIRED_READING = 'not wired into rafa stretch item yet';
+
+/**
+ * The effort and recheck seams of the readings until this command hands
+ * in the real ones: no collect is run, and the dashboard and the judge
+ * each refuse with {@link UNWIRED_READING}, so both read as not read.
+ */
+const UNWIRED_PIT_SEAMS: Pick<PitSeams, 'runCollect' | 'readDashboard' | 'judge'> = {
+  runCollect: () => Promise.resolve(0),
+  readDashboard: () => Promise.reject(new Error(UNWIRED_READING)),
+  judge: () => Promise.reject(new Error(UNWIRED_READING)),
+};
+
 /** Steps 4 to 6 for the merged pull request: the CI wait, the ledger line and the readings; see the module note. */
 export async function finishItem(context: RafaContext, item: FinishInput, merged: MergedPull, seams: ItemMergeSeams): Promise<void> {
   const info = (text: string): void => context.output.info(text);
@@ -454,7 +469,10 @@ export async function finishItem(context: RafaContext, item: FinishInput, merged
     ? ', closing no issue'
     : `, ${closes.join(', ')}`}`);
 
-  const readings = await readPitReadings({ gh, tracker: seams.tracker(gh) }, { branch: merged.base, since: item.since });
+  const readings = await readPitReadings(
+    { gh, tracker: seams.tracker(gh), ...UNWIRED_PIT_SEAMS, now: seams.now },
+    { branch: merged.base, since: item.since, root: item.root, stub: item.stub },
+  );
   for (const line of renderPitReadings(readings)) info(line);
 }
 

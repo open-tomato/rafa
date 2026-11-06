@@ -26,11 +26,23 @@
  * round, so each reading is seen to stand alone; a body of several lines
  * runs beside an empty one, and a first line over
  * {@link FIRST_LINE_MAX} characters beside one under it.
+ *
+ * The effort reading reads a planted dashboard through planted
+ * `runCollect`, `readDashboard` and `now` seams, and the rechecks a
+ * planted judge that answers `gone` for every bug and logs what it was
+ * handed, so no case runs `rafa`, reads the store or spawns a test. The
+ * five readings are rendered whole in their order; a dashboard that
+ * throws runs beside the four others read, and a filed-since reading
+ * that is not read beside the judge's call log, which the ordered case
+ * shows at one call.
  */
+import type { DashboardReadOptions } from './pit-effort.js';
 import type { PitSeams } from './pit-readings.js';
+import type { PitJudge, PitJudgedBug } from './pit-recheck.js';
 import type { FakeRun } from '../ci/runs-fake.js';
 import type { FiledIssue, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { Dashboard } from '@open-tomato/rafa-effort';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -53,6 +65,70 @@ const GATE_FILE = 'src/tests/task-gate-spawned.test.ts';
 
 /** The cut-off every case reads from. */
 const SINCE = new Date('2026-10-07T10:00:00.000Z');
+
+/** The item's plan stub, the key of its planted effort row. */
+const STUB = 'rafa-812-pit-readings';
+
+/** The root and stub every case reads the effort for. */
+const ITEM = { root: '/planted/root', stub: STUB };
+
+/** The `Effort:` line the planted dashboard renders. */
+const EFFORT_LINE = `Effort: ${STUB}: 5 tasks, p50 1.5 min against 2.0 min, max 4.3 min.`;
+
+/** A dashboard holding the item's plan row, five tasks, and a `minutes` baseline of 2 min. */
+function plantedDashboard(): Dashboard {
+  const planted = {
+    trend: { metrics: [{ name: 'minutes', baselineP50: 2 }] },
+    loops: { rows: [{ key: STUB, kind: 'plan', tasks: 5, perTask: { minutes: { min: null, avg: null, p50: 1.483, max: 4.318 } } }] },
+  };
+  return planted as unknown as Dashboard;
+}
+
+/** What the planted effort and recheck seams were asked. */
+interface PlantedLog {
+  /** The bugs of each judge call. */
+  readonly judged: (readonly PitJudgedBug[])[];
+  readonly dashboards: DashboardReadOptions[];
+}
+
+/** The effort and recheck seams: a collect ending 0, the planted dashboard or `read`, and a judge answering `gone`. */
+function plantedSeams(read: () => Promise<Dashboard> = () => Promise.resolve(plantedDashboard())): {
+  seams: Pick<PitSeams, 'runCollect' | 'readDashboard' | 'now' | 'judge'>;
+  log: PlantedLog;
+} {
+  const log: PlantedLog = { judged: [], dashboards: [] };
+  const judge: PitJudge = (bugs) => {
+    log.judged.push([...bugs]);
+    return Promise.resolve({
+      rows: bugs.map((entry) => ({ issue: entry.issue, verdict: 'gone' as const, runs: 3, failedRuns: null, reason: null, reproduce: null })),
+    });
+  };
+  return {
+    seams: {
+      runCollect: () => Promise.resolve(0),
+      readDashboard: (options) => {
+        log.dashboards.push(options);
+        return read();
+      },
+      now: () => new Date('2026-10-07T13:00:00.000Z'),
+      judge,
+    },
+    log,
+  };
+}
+
+/** `seams` with the planted effort and recheck seams beside them. */
+function withPlanted(seams: Pick<PitSeams, 'gh' | 'tracker'>): PitSeams {
+  return { ...seams, ...plantedSeams().seams };
+}
+
+/** The rendered lines before the `Effort:` line: CI and the two bug readings. */
+function bugLines(lines: readonly string[]): string[] {
+  const effort = lines.findIndex((line) => line.startsWith('Effort:'));
+  return effort === -1
+    ? [...lines]
+    : lines.slice(0, effort);
+}
 
 function plantedRun(fields: Partial<FakeRun> = {}): FakeRun {
   return {
@@ -130,7 +206,7 @@ const NEW_B = bug('813', 'another bug from this item', '2026-10-07T11:00:00Z');
 
 /** Seams over `gh`, `open` as the open bugs and `filed` as the filed listing, the open one when left out. */
 function seams(gh: GhRunner, open: readonly FiledIssue[], filed: readonly FiledIssue[] = open): PitSeams {
-  return { gh, tracker: caseTracker(open, filed).tracker };
+  return withPlanted({ gh, tracker: caseTracker(open, filed).tracker });
 }
 
 describe('the CI reading', () => {
@@ -138,8 +214,8 @@ describe('the CI reading', () => {
     const green = caseGh([plantedRun()]);
     const red = caseGh([plantedRun({ conclusion: 'failure' })]);
 
-    const greenReading = await readPitReadings(seams(green.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE });
-    const redReading = await readPitReadings(seams(red.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE });
+    const greenReading = await readPitReadings(seams(green.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE, ...ITEM });
+    const redReading = await readPitReadings(seams(red.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE, ...ITEM });
 
     expect(greenReading.ci.ok && greenReading.ci.value.verdict).toBe('green');
     expect(green.calls().some((args) => args[1] === 'view')).toBe(false);
@@ -158,8 +234,8 @@ describe('the CI reading', () => {
     const both = caseGh([skipped, failed]);
     const alone = caseGh([skipped]);
 
-    const reading = await readPitReadings(seams(both.gh, []), { branch: BRANCH, since: SINCE });
-    const control = await readPitReadings(seams(alone.gh, []), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(both.gh, []), { branch: BRANCH, since: SINCE, ...ITEM });
+    const control = await readPitReadings(seams(alone.gh, []), { branch: BRANCH, since: SINCE, ...ITEM });
 
     if (!reading.ci.ok) throw new Error(reading.ci.reason);
     expect(reading.ci.value.verdict).toBe('red');
@@ -176,7 +252,7 @@ describe('the CI reading', () => {
     const older = plantedRun({ databaseId: 37190011111, headSha: OLDER_SHA, conclusion: 'failure', createdAt: '2026-10-06T04:00:00Z' });
     const ci = caseGh([head, older]);
 
-    const reading = await readPitReadings(seams(ci.gh, []), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(ci.gh, []), { branch: BRANCH, since: SINCE, ...ITEM });
 
     if (!reading.ci.ok) throw new Error(reading.ci.reason);
     expect(reading.ci.value.verdict).toBe('green');
@@ -188,7 +264,7 @@ describe('the CI reading', () => {
     const pair = RECORDED_STRETCH_111.filter((run) => run.headSha.startsWith('90471b00'));
     const ci = caseGh(pair);
 
-    const reading = await readPitReadings(seams(ci.gh, []), { branch: 'stretch/111', since: SINCE });
+    const reading = await readPitReadings(seams(ci.gh, []), { branch: 'stretch/111', since: SINCE, ...ITEM });
 
     if (!reading.ci.ok) throw new Error(reading.ci.reason);
     expect(reading.ci.value.verdict).toBe('red');
@@ -201,7 +277,7 @@ describe('the CI reading', () => {
     const running = plantedRun({ databaseId: 37190099003, workflowName: FRAGMENT, status: 'in_progress', conclusion: '', createdAt: '2026-10-07T04:00:00Z' });
     const ci = caseGh([running, plantedRun()]);
 
-    const reading = await readPitReadings(seams(ci.gh, []), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(ci.gh, []), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(reading.ci.ok && [reading.ci.value.verdict, reading.ci.value.exitCode]).toEqual(['running', 3]);
   });
@@ -209,7 +285,7 @@ describe('the CI reading', () => {
   it('sends --workflow only when one is named', async () => {
     const any = caseGh([plantedRun()]);
 
-    await readPitReadings(seams(any.gh, []), { branch: BRANCH, since: SINCE });
+    await readPitReadings(seams(any.gh, []), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(any.calls().filter((args) => args[1] === 'list').length).toBeGreaterThan(0);
     for (const args of any.calls()) expect(args).not.toContain('--workflow');
@@ -219,8 +295,8 @@ describe('the CI reading', () => {
     const named = caseGh([plantedRun()]);
     const unnamed = caseGh([plantedRun()]);
 
-    await readPitReadings(seams(named.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE });
-    await readPitReadings(seams(unnamed.gh, []), { branch: BRANCH, since: SINCE });
+    await readPitReadings(seams(named.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE, ...ITEM });
+    await readPitReadings(seams(unnamed.gh, []), { branch: BRANCH, since: SINCE, ...ITEM });
 
     const lists = (calls: readonly (readonly string[])[]): (readonly string[])[] => calls.filter((args) => args[0] === 'run' && args[1] === 'list');
     expect(lists(named.calls())).toEqual([runListArgs({ branch: BRANCH, workflow: WORKFLOW })]);
@@ -230,7 +306,7 @@ describe('the CI reading', () => {
   it('holds a gh failure as not read, and still reads the bugs', async () => {
     const unknownWorkflow = caseGh([plantedRun()]);
 
-    const reading = await readPitReadings(seams(unknownWorkflow.gh, [OLD]), { branch: BRANCH, workflow: 'nope', since: SINCE });
+    const reading = await readPitReadings(seams(unknownWorkflow.gh, [OLD]), { branch: BRANCH, workflow: 'nope', since: SINCE, ...ITEM });
 
     expect(reading.ci.ok).toBe(false);
     expect(!reading.ci.ok && reading.ci.reason).toContain('could not find any workflows named nope');
@@ -243,7 +319,7 @@ describe('the open-bug count', () => {
     const closedSince = bug('814', 'a bug filed and closed during the item', '2026-10-07T11:30:00Z');
     const { tracker, asked } = caseTracker([OLD, NEW_A, NEW_B], [NEW_A, NEW_B, closedSince]);
 
-    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker }, { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(withPlanted({ gh: caseGh([]).gh, tracker }), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(asked.open).toEqual(['bug']);
     expect(reading.openBugs).toEqual({ ok: true, value: 3 });
@@ -253,7 +329,7 @@ describe('the open-bug count', () => {
   it('reads as not read on a tracker without openIssues, never as zero, and still lists the filed bugs', async () => {
     const filedOnly: Pick<Tracker, 'openIssues' | 'filedIssues'> = { filedIssues: () => Promise.resolve([NEW_A]) };
 
-    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker: filedOnly }, { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(withPlanted({ gh: caseGh([]).gh, tracker: filedOnly }), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(reading.openBugs).toEqual({ ok: false, reason: NO_OPEN_ISSUES });
     expect(reading.filedSince.ok && reading.filedSince.value.bugs.map((filed) => filed.id)).toEqual(['812']);
@@ -265,7 +341,7 @@ describe('the open-bug count', () => {
       filedIssues: () => Promise.resolve([NEW_A]),
     };
 
-    const reading = await readPitReadings({ gh: caseGh([plantedRun()]).gh, tracker }, { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(withPlanted({ gh: caseGh([plantedRun()]).gh, tracker }), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(reading.openBugs).toEqual({ ok: false, reason: 'gh issue list failed: offline' });
     expect(reading.filedSince.ok).toBe(true);
@@ -277,13 +353,13 @@ describe('the bugs filed since', () => {
   it('asks filedIssues(\'bug\', since) once, with the cut-off', async () => {
     const { tracker, asked } = caseTracker([OLD], [NEW_A]);
 
-    await readPitReadings({ gh: caseGh([]).gh, tracker }, { branch: BRANCH, since: SINCE });
+    await readPitReadings(withPlanted({ gh: caseGh([]).gh, tracker }), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(asked.filed).toEqual([['bug', SINCE.toISOString()]]);
   });
 
   it('lists the bugs filed after the cut-off, oldest first, and drops one filed at it', async () => {
-    const reading = await readPitReadings(seams(caseGh([]).gh, [], [AT_CUT, NEW_A, NEW_B]), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(caseGh([]).gh, [], [AT_CUT, NEW_A, NEW_B]), { branch: BRANCH, since: SINCE, ...ITEM });
 
     if (!reading.filedSince.ok) throw new Error(reading.filedSince.reason);
     expect(reading.filedSince.value.since).toBe(SINCE.toISOString());
@@ -291,7 +367,7 @@ describe('the bugs filed since', () => {
   });
 
   it('reads no bug as filed since when the listing holds none after the cut-off', async () => {
-    const reading = await readPitReadings(seams(caseGh([]).gh, [OLD, OLDER], []), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(caseGh([]).gh, [OLD, OLDER], []), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(reading.filedSince).toEqual({ ok: true, value: { since: SINCE.toISOString(), bugs: [] } });
     expect(reading.openBugs).toEqual({ ok: true, value: 2 });
@@ -300,7 +376,7 @@ describe('the bugs filed since', () => {
   it('reads the times off the filed listing, with no gh call for a bug', async () => {
     const quiet = caseGh([]);
 
-    const reading = await readPitReadings(seams(quiet.gh, [OLD], [NEW_A, NEW_B]), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(quiet.gh, [OLD], [NEW_A, NEW_B]), { branch: BRANCH, since: SINCE, ...ITEM });
 
     if (!reading.filedSince.ok) throw new Error(reading.filedSince.reason);
     expect(reading.filedSince.value.bugs.map((filed) => filed.filedAt)).toEqual(['2026-10-07T11:00:00.000Z', '2026-10-07T12:00:00.000Z']);
@@ -309,10 +385,10 @@ describe('the bugs filed since', () => {
   });
 
   it('refuses to guess when a time does not parse, naming every such bug, and keeps the count', async () => {
-    const dated = await readPitReadings(seams(caseGh([]).gh, [OLD], [NEW_A, NEW_B]), { branch: BRANCH, since: SINCE });
+    const dated = await readPitReadings(seams(caseGh([]).gh, [OLD], [NEW_A, NEW_B]), { branch: BRANCH, since: SINCE, ...ITEM });
     const reading = await readPitReadings(
       seams(caseGh([]).gh, [OLD], [bug('812', NEW_A.title, 'soon'), NEW_B, bug('815', 'a third bug', '')]),
-      { branch: BRANCH, since: SINCE },
+      { branch: BRANCH, since: SINCE, ...ITEM },
     );
 
     expect(dated.filedSince.ok).toBe(true);
@@ -323,14 +399,14 @@ describe('the bugs filed since', () => {
   it('reads as not read on a tracker without filedIssues, never as none, and keeps the count', async () => {
     const openOnly: Pick<Tracker, 'openIssues' | 'filedIssues'> = { openIssues: () => Promise.resolve([OLD, NEW_A]) };
 
-    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker: openOnly }, { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(withPlanted({ gh: caseGh([]).gh, tracker: openOnly }), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(reading.openBugs).toEqual({ ok: true, value: 2 });
     expect(reading.filedSince).toEqual({ ok: false, reason: NO_FILED_ISSUES });
   });
 
   it('reads both bug readings as not read, each with its own reason, on a tracker with neither member', async () => {
-    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker: {} }, { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(withPlanted({ gh: caseGh([]).gh, tracker: {} }), { branch: BRANCH, since: SINCE, ...ITEM });
 
     expect(reading.openBugs).toEqual({ ok: false, reason: NO_OPEN_ISSUES });
     expect(reading.filedSince).toEqual({ ok: false, reason: NO_FILED_ISSUES });
@@ -342,9 +418,9 @@ describe('the bugs filed since', () => {
       filedIssues: () => Promise.reject(new Error('gh issue list --search failed: rate limited')),
     };
 
-    const lines = renderPitReadings(await readPitReadings({ gh: caseGh([]).gh, tracker }, { branch: BRANCH, since: SINCE }));
+    const lines = renderPitReadings(await readPitReadings(withPlanted({ gh: caseGh([]).gh, tracker }), { branch: BRANCH, since: SINCE, ...ITEM }));
 
-    expect(lines.slice(-2)).toEqual([
+    expect(bugLines(lines).slice(-2)).toEqual([
       'Bugs: 2 open.',
       'Filed since the last item: not read: gh issue list --search failed: rate limited',
     ]);
@@ -353,7 +429,7 @@ describe('the bugs filed since', () => {
   it('reads a cut-off that is no time as not read, and asks the tracker nothing for it', async () => {
     const { tracker, asked } = caseTracker([OLD], [NEW_A]);
 
-    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker }, { branch: BRANCH, since: new Date('not a time') });
+    const reading = await readPitReadings(withPlanted({ gh: caseGh([]).gh, tracker }), { branch: BRANCH, since: new Date('not a time'), ...ITEM });
 
     expect(reading.filedSince).toEqual({ ok: false, reason: 'the cut-off is not a valid time' });
     expect(asked.filed).toEqual([]);
@@ -367,11 +443,11 @@ describe('the first line of a filed bug', () => {
     const empty = bug('821', 'empty body', '2026-10-07T11:01:00Z', '');
     const blank = bug('822', 'blank body', '2026-10-07T11:02:00Z', ' \n\t\n');
 
-    const reading = await readPitReadings(seams(caseGh([]).gh, [], [several, empty, blank]), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(caseGh([]).gh, [], [several, empty, blank]), { branch: BRANCH, since: SINCE, ...ITEM });
 
     if (!reading.filedSince.ok) throw new Error(reading.filedSince.reason);
     expect(reading.filedSince.value.bugs.map((filed) => filed.firstLine)).toEqual(['The run read red on main.', null, null]);
-    expect(renderPitReadings(reading).slice(-3)).toEqual([
+    expect(bugLines(renderPitReadings(reading)).slice(-3)).toEqual([
       '   #820 several lines: The run read red on main.',
       '   #821 empty body',
       '   #822 blank body',
@@ -384,7 +460,7 @@ describe('the first line of a filed bug', () => {
     const over = bug('830', 'a long line', '2026-10-07T11:00:00Z', `${long}\nnext`);
     const under = bug('831', 'a short line', '2026-10-07T11:01:00Z', short);
 
-    const reading = await readPitReadings(seams(caseGh([]).gh, [], [over, under]), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(caseGh([]).gh, [], [over, under]), { branch: BRANCH, since: SINCE, ...ITEM });
 
     if (!reading.filedSince.ok) throw new Error(reading.filedSince.reason);
     expect(reading.filedSince.value.bugs.map((filed) => filed.firstLine)).toEqual(['a'.repeat(FIRST_LINE_MAX), short]);
@@ -404,9 +480,9 @@ describe('stretch 7: a bug filed after the cut-off and closed before the reading
     ];
     const closed = bug('1084', 'the bug the loop filed', '2026-10-14T03:04:38Z', 'A gate failed on the stretch branch.\n\nDetails.');
 
-    const lines = renderPitReadings(await readPitReadings(seams(caseGh([]).gh, open, [closed]), { branch: 'stretch/7', since: cutoff }));
+    const lines = renderPitReadings(await readPitReadings(seams(caseGh([]).gh, open, [closed]), { branch: 'stretch/7', since: cutoff, ...ITEM }));
 
-    expect(lines.slice(-3)).toEqual([
+    expect(bugLines(lines).slice(-3)).toEqual([
       'Bugs: 3 open.',
       'Filed since 2026-10-14T01:29:39.610Z: 1.',
       '   #1084 the bug the loop filed: A gate failed on the stretch branch.',
@@ -418,14 +494,14 @@ describe('the rendered lines', () => {
   it('prints the red run, its cases, the count and the new bugs', async () => {
     const red = caseGh([plantedRun({ conclusion: 'failure' })]);
 
-    const lines = renderPitReadings(await readPitReadings(seams(red.gh, [OLD, NEW_A]), { branch: BRANCH, workflow: WORKFLOW, since: SINCE }));
+    const lines = renderPitReadings(await readPitReadings(seams(red.gh, [OLD, NEW_A]), { branch: BRANCH, workflow: WORKFLOW, since: SINCE, ...ITEM }));
 
     expect(lines.slice(0, 3)).toEqual([
       `CI: ❌ ${BRANCH} (${WORKFLOW}): red on c4da2c4, 1 workflow.`,
       `   ❌ ${WORKFLOW} run 37190089292 is failure.`,
       `     ${GATE_FILE}`,
     ]);
-    expect(lines.slice(-3)).toEqual([
+    expect(bugLines(lines).slice(-3)).toEqual([
       'Bugs: 2 open.',
       `Filed since ${SINCE.toISOString()}: 1.`,
       '   #812 a bug from this item: The gate read red.',
@@ -433,18 +509,94 @@ describe('the rendered lines', () => {
   });
 
   it('prints a branch with no run, no new bug, and each reading not read with its reason', async () => {
-    const quiet = renderPitReadings(await readPitReadings(seams(caseGh([]).gh, [OLD], []), { branch: BRANCH, since: SINCE }));
+    const quiet = renderPitReadings(await readPitReadings(seams(caseGh([]).gh, [OLD], []), { branch: BRANCH, since: SINCE, ...ITEM }));
     const unread = renderPitReadings({
       ci: { ok: false, reason: 'gh offline' },
       openBugs: { ok: false, reason: NO_OPEN_ISSUES },
       filedSince: { ok: false, reason: NO_FILED_ISSUES },
+      effort: { effort: { ok: false, reason: 'rafa effort collect could not start' }, collect: { exitCode: null, seconds: 0 } },
+      rechecks: { ok: false, reason: NO_FILED_ISSUES },
     });
 
-    expect(quiet).toEqual([`CI: ⚪ No run on ${BRANCH}.`, 'Bugs: 1 open.', `Filed since ${SINCE.toISOString()}: none.`]);
+    expect(quiet).toEqual([
+      `CI: ⚪ No run on ${BRANCH}.`,
+      'Bugs: 1 open.',
+      `Filed since ${SINCE.toISOString()}: none.`,
+      EFFORT_LINE,
+      'Recheck: no bug filed since.',
+    ]);
     expect(unread).toEqual([
       'CI: not read: gh offline',
       `Bugs: not read: ${NO_OPEN_ISSUES}`,
       `Filed since the last item: not read: ${NO_FILED_ISSUES}`,
+      'Effort: not read (rafa effort collect could not start).',
+      `Recheck: not read (${NO_FILED_ISSUES}).`,
     ]);
+  });
+});
+
+describe('the effort and recheck readings beside the three others', () => {
+  it('prints the five readings in order: CI, Bugs, Filed since, Effort, then a Recheck line per bug filed since', async () => {
+    const planted = plantedSeams();
+    const ci = caseGh([plantedRun()]);
+
+    const reading = await readPitReadings(
+      { gh: ci.gh, tracker: caseTracker([OLD, NEW_A], [NEW_A, NEW_B]).tracker, ...planted.seams },
+      { branch: BRANCH, workflow: WORKFLOW, since: SINCE, ...ITEM },
+    );
+
+    expect(renderPitReadings(reading)).toEqual([
+      `CI: ✅ ${BRANCH} (${WORKFLOW}): green on c4da2c4, 1 workflow.`,
+      `   ✅ ${WORKFLOW} run 37190089292 is success.`,
+      'Bugs: 2 open.',
+      `Filed since ${SINCE.toISOString()}: 2.`,
+      '   #813 another bug from this item',
+      '   #812 a bug from this item: The gate read red.',
+      EFFORT_LINE,
+      'Recheck #813: gone',
+      'Recheck #812: gone',
+    ]);
+    expect(reading.effort.collect).toEqual({ exitCode: 0, seconds: 0 });
+    expect(planted.log.dashboards.map((options) => options.repoRoot)).toEqual([ITEM.root]);
+    expect(planted.log.judged).toEqual([[
+      { ref: NEW_B.ref, issue: 813, title: NEW_B.title, body: NEW_B.body, author: null },
+      { ref: NEW_A.ref, issue: 812, title: NEW_A.title, body: NEW_A.body, author: null },
+    ]]);
+  });
+
+  it('prints an effort reading that failed as not read, and the four others still read', async () => {
+    const planted = plantedSeams(() => Promise.reject(new Error('the effort store is locked')));
+
+    const lines = renderPitReadings(await readPitReadings(
+      { gh: caseGh([]).gh, tracker: caseTracker([OLD], [NEW_A]).tracker, ...planted.seams },
+      { branch: BRANCH, since: SINCE, ...ITEM },
+    ));
+
+    expect(lines).toEqual([
+      `CI: ⚪ No run on ${BRANCH}.`,
+      'Bugs: 1 open.',
+      `Filed since ${SINCE.toISOString()}: 1.`,
+      '   #812 a bug from this item: The gate read red.',
+      'Effort: not read (the effort store is locked).',
+      'Recheck #812: gone',
+    ]);
+    expect(planted.log.dashboards).toHaveLength(1);
+  });
+
+  it('prints Recheck: not read when the filed-since reading failed, the judge never called', async () => {
+    const planted = plantedSeams();
+    const tracker: Pick<Tracker, 'openIssues' | 'filedIssues'> = {
+      openIssues: () => Promise.resolve([OLD]),
+      filedIssues: () => Promise.reject(new Error('gh issue list --search failed: rate limited')),
+    };
+
+    const lines = renderPitReadings(await readPitReadings({ gh: caseGh([]).gh, tracker, ...planted.seams }, { branch: BRANCH, since: SINCE, ...ITEM }));
+
+    expect(lines.slice(-3)).toEqual([
+      'Filed since the last item: not read: gh issue list --search failed: rate limited',
+      EFFORT_LINE,
+      'Recheck: not read (gh issue list --search failed: rate limited).',
+    ]);
+    expect(planted.log.judged).toEqual([]);
   });
 });

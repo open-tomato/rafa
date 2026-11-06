@@ -115,8 +115,10 @@ commit, or the run found has not ended, within 90 minutes, it warns `no run
 on <branch> at <sha> was found within 90 minutes` or `run <id> (<workflow>)
 on <branch> at <sha> had not ended within 90 minutes`. Then it appends the
 ledger line and prints the pit-stop readings: the failed cases by file and
-case, the open-bug count, and the bugs filed since the last item. It decides
-nothing; the pit stop does.
+case, the open-bug count, the bugs filed since the last item, the `Effort:`
+line, and one `Recheck` line per bug filed since. The command does not yet
+hand in the effort and recheck seams, so those two print as not read. It
+decides nothing; the pit stop does.
 
 `--resume` finishes an item whose loop has ended, as after an item that
 ended on a refused merge: it starts no plan and no loop, reads the pull
