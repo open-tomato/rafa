@@ -113,6 +113,10 @@ file's wrapped lines before searching.
   `stale_docs`; `docs` is the fallback for one written in the wrong field.
   The loop checks every `own-` claim, so a guess between `bug` and
   `own-fallout` is written as `bug`.
+- **Reproduce of each out-of-scope entry.** Give `reproduce` as one command
+  run from the checkout root whose output or exit code shows the bug, such
+  as `bun test src/x.test.ts` or `grep -n pattern src/y.ts`. Prose only when
+  no command can show it, and then it names the condition.
 - Never commit, never push, never open a pull request, never merge. The
   loop owns all four, and `src/PROMPT.md` states what it does once this
   session exits cleanly. Leave your work in the tree in a state the

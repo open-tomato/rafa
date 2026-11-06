@@ -43,6 +43,10 @@ with no `packages/` directory and no workspace boundaries to navigate.
   `stale_docs`; `docs` is the fallback for one written in the wrong field.
   The loop checks every `own-` claim, so a guess between `bug` and
   `own-fallout` is written as `bug`.
+- **Reproduce of each out-of-scope entry.** Give `reproduce` as one command
+  run from the checkout root whose output or exit code shows the bug, such
+  as `bun test src/x.test.ts` or `grep -n pattern src/y.ts`. Prose only when
+  no command can show it, and then it names the condition.
 
 ## Verification
 

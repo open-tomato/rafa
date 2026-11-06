@@ -15,6 +15,7 @@
  * issue: OPT-123
  * spec: .rafa/specs/my-feature.md
  * release: minor
+ * closes: [124, 125]
  * ```
  *
  * ```rafa:context
@@ -116,11 +117,11 @@
  *
  * ## The header, measured on bun 1.3.14
  *
- * `Bun.YAML.parse` reads the `rafa:plan` body. A field is usable only
- * as a string holding more than whitespace, a stub only as one
- * `planStampLine` can stamp, and `release` only as one of
- * {@link PLAN_RELEASE_LEVELS} exactly as spelled. Anything else leaves
- * the field null and is reported as `unusable-field`, because two
+ * `Bun.YAML.parse` reads the `rafa:plan` body. A field other than
+ * `closes` is usable only as a string holding more than whitespace, a
+ * stub only as one `planStampLine` can stamp, and `release` only as one
+ * of {@link PLAN_RELEASE_LEVELS} exactly as spelled. Anything else
+ * leaves the field null and is reported as `unusable-field`, because two
  * spellings a plan plausibly writes do not parse to what they say:
  *
  *   - `issue: #42` parses as `issue: null`, since a `#` after a space
@@ -132,6 +133,19 @@
  *     as `"42"`; quote a form whose digits matter. Anything not a
  *     whole number — `issue: 4.5`, a list, a mapping — is still
  *     refused.
+ *
+ * `closes` is the one LIST field: the GitHub issue numbers the plan's
+ * pull request closes besides its own `issue`, such as
+ * `closes: [124, 125]`. It is usable only as a YAML list whose every
+ * entry is a safe positive whole number, and it is read whole or not
+ * at all: a scalar (`closes: 12`, `closes: "12"`), a mapping, or a list
+ * holding one entry that is a string, a float, zero, a negative number
+ * or a nested collection — `[12, "x"]`, `[12, 1.5]`, `["#12"]` — leaves
+ * the list empty and is reported as `unusable-field`, never kept in
+ * part. A plan with no `closes` line reads as the empty list, the same
+ * as `closes: []`. Duplicates, and an entry equal to `issue`, are kept
+ * here as written; the reader that writes a pull request body drops
+ * them.
  *
  * `release` is the one CLOSED-SET field: it is the version bump the
  * plan is worth, and a bump has to be one of four words for a caller to
@@ -175,10 +189,13 @@ export const PLAN_BLOCK_KINDS = ['plan', 'context', 'stage-context'] as const;
 export type PlanBlockKind = (typeof PLAN_BLOCK_KINDS)[number];
 
 /** The fields a `rafa:plan` block answers to. */
-export const PLAN_HEADER_FIELDS = ['stub', 'issue', 'spec', 'release'] as const;
+export const PLAN_HEADER_FIELDS = ['stub', 'issue', 'spec', 'release', 'closes'] as const;
 
-/** One of the four header fields. */
+/** One of the five header fields. */
 export type PlanHeaderField = (typeof PLAN_HEADER_FIELDS)[number];
+
+/** One of the four header fields read as a single string. */
+type PlanScalarField = Exclude<PlanHeaderField, 'closes'>;
 
 /**
  * The version bumps a plan's `release` field answers to, largest last
@@ -200,7 +217,10 @@ export interface PlanHeaderExtra {
   readonly value: unknown;
 }
 
-/** What the `rafa:plan` block said. Every field is null without one. */
+/**
+ * What the `rafa:plan` block said. Every single-valued field is null
+ * without one, and {@link PlanHeader.closes} is empty.
+ */
 export interface PlanHeader {
   /** The plan's stub, one a plan stamp can carry. */
   readonly stub: string | null;
@@ -215,6 +235,13 @@ export interface PlanHeader {
    * plan ships no bump, where null says the plan said nothing.
    */
   readonly release: PlanReleaseLevel | null;
+  /**
+   * The GitHub issue numbers the plan's pull request closes besides
+   * `issue`, as written: each a safe positive whole number, duplicates
+   * and the plan's own issue not yet dropped. Empty when the block has
+   * no `closes` line, or one that is not a list of such numbers.
+   */
+  readonly closes: readonly number[];
   /** Every key that names no field, retained and acting on nothing. */
   readonly extras: readonly PlanHeaderExtra[];
 }
@@ -265,7 +292,10 @@ export type PlanIssueReason =
   | 'orphan-stage-context'
   /** A `rafa:plan` body that is not YAML, or not a mapping. */
   | 'malformed-header'
-  /** A header field whose value is not a usable string. Left null. */
+  /**
+   * A header field whose value is not usable: not a usable string, left
+   * null, or for `closes` not a list of issue numbers, left empty.
+   */
   | 'unusable-field'
   /** An open task line inside a `rafa:*` block, read as its body. */
   | 'task-in-block';
@@ -381,7 +411,7 @@ function isPlanBlockKind(kind: string): kind is PlanBlockKind {
   return (PLAN_BLOCK_KINDS as readonly string[]).includes(kind);
 }
 
-/** True when `key` names one of the four header fields. */
+/** True when `key` names one of the five header fields. */
 function isHeaderField(key: string): key is PlanHeaderField {
   return (PLAN_HEADER_FIELDS as readonly string[]).includes(key);
 }
@@ -419,7 +449,7 @@ function planIssue(reason: PlanIssueReason, line: number, text: string): PlanIss
 
 /** A header that says nothing. */
 function emptyHeader(): PlanHeader {
-  return { stub: null, issue: null, spec: null, release: null, extras: [] };
+  return { stub: null, issue: null, spec: null, release: null, closes: [], extras: [] };
 }
 
 /** The line's checkbox and text, or null when it is no task line. */
@@ -584,7 +614,7 @@ function bindBlocks(blocks: readonly RafaBlock[], headings: readonly Heading[]):
 }
 
 /** The field's value when it is usable, else null. See the module note. */
-function usableField(field: PlanHeaderField, value: unknown): string | null {
+function usableField(field: PlanScalarField, value: unknown): string | null {
   if (field === 'issue' && typeof value === 'number') {
     return Number.isSafeInteger(value)
       ? String(value)
@@ -596,12 +626,39 @@ function usableField(field: PlanHeaderField, value: unknown): string | null {
   return value;
 }
 
+/** True for a safe positive whole number, the one entry `closes` takes. */
+function isIssueNumber(entry: unknown): entry is number {
+  return typeof entry === 'number' && Number.isSafeInteger(entry) && entry > 0;
+}
+
+/**
+ * The `closes` list when every entry is an issue number, else null:
+ * the whole list or none of it. See the module note.
+ */
+function usableClosesField(value: unknown): readonly number[] | null {
+  if (!Array.isArray(value)) return null;
+  const entries: readonly unknown[] = value;
+  return entries.every(isIssueNumber)
+    ? [...entries]
+    : null;
+}
+
+/** Why a `closes` value is not usable, naming the first entry refused. */
+function closesText(subject: string, value: unknown): string {
+  const wanted = 'a list of whole positive issue numbers, such as [12, 13]';
+  if (!Array.isArray(value)) return `${subject} is ${describeValue(value)}, not ${wanted}`;
+  const entries: readonly unknown[] = value;
+  const refused = entries.find((entry) => !isIssueNumber(entry));
+  return `${subject} holds ${describeValue(refused)}, so the whole list is unread; write ${wanted}`;
+}
+
 /** Why a field's value is not usable, for an operator to read. */
 function unusableText(field: PlanHeaderField, value: unknown): string {
   const subject = `rafa:plan ${field}`;
   if (value === null) {
     return `${subject} is empty; a value opening with # after a space is a YAML comment unless quoted`;
   }
+  if (field === 'closes') return closesText(subject, value);
   if (field === 'release') {
     return `${subject} is ${describeValue(value)}, not one of ${PLAN_RELEASE_LEVELS.join(', ')}`;
   }
@@ -620,7 +677,7 @@ function unusableText(field: PlanHeaderField, value: unknown): string {
  * {@link PlanHeader} holds it as. `usableField` has already refused
  * every other spelling, so the guard here only tells the type system.
  */
-function releaseOf(values: ReadonlyMap<PlanHeaderField, string>): PlanReleaseLevel | null {
+function releaseOf(values: ReadonlyMap<PlanScalarField, string>): PlanReleaseLevel | null {
   const value = values.get('release');
   if (value === undefined || !isReleaseLevel(value)) return null;
   return value;
@@ -628,13 +685,20 @@ function releaseOf(values: ReadonlyMap<PlanHeaderField, string>): PlanReleaseLev
 
 /** Reads the header fields out of a parsed `rafa:plan` body. */
 function readFields(document: Mapping, line: number): HeaderReading {
-  const values = new Map<PlanHeaderField, string>();
+  const values = new Map<PlanScalarField, string>();
   const extras: PlanHeaderExtra[] = [];
   const issues: PlanIssue[] = [];
+  let closes: readonly number[] = [];
 
   for (const [key, value] of Object.entries(document)) {
     if (!isHeaderField(key)) {
       extras.push({ key, value });
+      continue;
+    }
+    if (key === 'closes') {
+      const list = usableClosesField(value);
+      if (list === null) issues.push(planIssue('unusable-field', line, unusableText(key, value)));
+      else closes = list;
       continue;
     }
     const usable = usableField(key, value);
@@ -647,6 +711,7 @@ function readFields(document: Mapping, line: number): HeaderReading {
     issue: values.get('issue') ?? null,
     spec: values.get('spec') ?? null,
     release: releaseOf(values),
+    closes,
     extras,
   };
   return { header, issues };

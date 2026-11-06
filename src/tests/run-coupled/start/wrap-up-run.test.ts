@@ -756,7 +756,7 @@ describe('the runner\'s pull request input', () => {
   it('titles the pull request from the plan heading with its Plan: label off', () => {
     const input = runnerPrInputFor({ branch: BRANCH, base: 'main', planContent: plan('579'), planStub: 'some-plan', notes: ['- one'] });
 
-    expect(input).toEqual({ branch: BRANCH, base: 'main', issue: 579, planTitle: 'A loop run ends delivered', notes: ['- one'] });
+    expect(input).toEqual({ branch: BRANCH, base: 'main', issue: 579, closes: [], planTitle: 'A loop run ends delivered', notes: ['- one'] });
   });
 
   it('titles the pull request of a plan created under assumptions from its Plan: heading', () => {

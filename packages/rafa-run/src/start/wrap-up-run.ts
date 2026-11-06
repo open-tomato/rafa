@@ -35,7 +35,8 @@
  * reading. Still none, or `false` retries, and the runner opens the pull
  * request itself (`start/runner-pr.ts`), titled from the plan's issue and
  * title ({@link runnerPrInputFor}) with the fragment's notes in its body,
- * and the issue it closes refreshed on the project, whose warning lines
+ * closing the plan's issue and each of its header's `closes:` list, and
+ * every issue it closes refreshed on the project, whose warning lines
  * follow the opened line.
  * A repository whose `pr.provider` resolves to `none` has no pull request
  * to deliver, and none of this runs: the CI gate's own `none` path
@@ -548,8 +549,9 @@ export function planIssueNumber(planContent: string, planStub: string | null, br
 
 /**
  * The runner's pull request input: the issue {@link planIssueNumber}
- * reads and the title `planTitleIn` reads (`start/release-stage.ts`), or
- * null when the plan names no issue number.
+ * reads, the `rafa:plan` header's `closes:` list as `parsePlan` reads it
+ * (empty when unset or unusable), and the title `planTitleIn` reads
+ * (`start/release-stage.ts`), or null when the plan names no issue number.
  */
 export function runnerPrInputFor(source: RunnerPrSource): RunnerPrInput | null {
   const issue = planIssueNumber(source.planContent, source.planStub, source.branch);
@@ -558,6 +560,7 @@ export function runnerPrInputFor(source: RunnerPrSource): RunnerPrInput | null {
     branch: source.branch,
     base: source.base,
     issue,
+    closes: parsePlan(source.planContent).header.closes,
     planTitle: planTitleIn(source.planContent, source.planStub),
     notes: source.notes,
   };

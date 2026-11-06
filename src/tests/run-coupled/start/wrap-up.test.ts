@@ -175,12 +175,14 @@ function sha256(text: string): string {
 /**
  * The `gh` prompt with no pull request open, first hashed at `08415e9`,
  * before the provider argument, and hashed again once the issue-number
- * bullet named the branch as the `naming.branch` template with the stub.
+ * bullet named the branch as the `naming.branch` template with the stub,
+ * and again once the naming bullet asked for a `Closes #<m>` line per
+ * number of the plan's `closes:` list.
  */
-const GH_CREATE_PROMPT_SHA = '994e6b0d9a0ac9a4825cf699f34f3013ec2771d32c89d006304f02ac427ad1c7';
+const GH_CREATE_PROMPT_SHA = '77b0236eacd60136e01b24b7a2119de5651174412d1cba7343252dbf88add52e';
 
-/** The `gh` prompt with pull request 601 open, hashed at the same two points. */
-const GH_EDIT_PROMPT_SHA = 'cdfcb9de51386e2a2dae48cffe6a6a6bdfcc650a4e55fe3d0d035132194bafc1';
+/** The `gh` prompt with pull request 601 open, hashed at the same three points. */
+const GH_EDIT_PROMPT_SHA = 'e0a653ed965b1a510f29f9763c374098894d8516450a2a9b27c42271cfd45bc8';
 
 /** A phrase of each bullet that only serves a pull request, left out under `none`. */
 const PULL_REQUEST_ONLY: readonly string[] = [
@@ -310,6 +312,8 @@ describe('the wrap-up prompt\'s pull-request naming', () => {
 
     expect(prompt).toContain('Title the PR `rafa-<n>: <title>`');
     expect(prompt).toContain('`Closes #<n>`');
+    expect(prompt).toContain('Below `Closes #<n>`, write one more `Closes #<m>` line for each number `<m>` of the plan\'s `closes:` list');
+    expect(prompt).toContain('never writing a number twice and writing none when the plan has no `closes:` list');
 
     // The control: the superseded spelling is gone, so the assertions
     // above could not have passed on the old bullet.
