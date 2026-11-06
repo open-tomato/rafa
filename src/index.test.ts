@@ -583,8 +583,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/loop/start.js', [
     ['@open-tomato/rafa-run', ['DEFAULT_CI_ATTEMPTS', 'endingWith', 'refuseMisplacedRuntime']],
-    ['@open-tomato/rafa/core/command', ['DEFAULT_CI_TIMEOUT_MIN', 'HINT_FLAG_SPEC']],
+    ['@open-tomato/rafa/core/command', ['CommandExit', 'DEFAULT_CI_TIMEOUT_MIN', 'HINT_FLAG_SPEC']],
     ['../../start.js', ['default']],
+    ['../doctor-tsc.js', ['readDoctorTsc', 'tscRefusal']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
   ['./commands/loop/stop.js', [
