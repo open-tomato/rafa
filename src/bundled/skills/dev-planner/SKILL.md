@@ -75,9 +75,9 @@ A plan document may contain fenced blocks of the form `` ```rafa:*``` `` that
 carry metadata and context. Three kinds are read in phase 0:
 
 * `rafa:plan` — Header fields in YAML format: `stub`, `issue` (optional),
-  `spec` (optional). The stub identifies the plan and defaults to the spec's
-  basename or "untitled". The loop uses the spec path to link the plan to the
-  change that prompted it.
+  `spec` (optional), `release` (optional) and `closes` (optional). The stub
+  identifies the plan and defaults to the spec's basename or "untitled". The
+  loop uses the spec path to link the plan to the change that prompted it.
 * `rafa:context` — Markdown prose injected into the prompt of EVERY task under
   this plan.
 * `rafa:stage-context` — Markdown prose injected only into tasks under the

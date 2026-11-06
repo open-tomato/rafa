@@ -72,7 +72,10 @@ export interface BugRecord {
   readonly summary: string | null;
   /** The description. The `What` section. */
   readonly what: string | null;
-  /** The steps, or the condition that revealed the bug. Never `unknown`. */
+  /**
+   * One shell command run from the checkout root whose output or exit code
+   * shows the bug; the condition only when no command can show it. Never `unknown`.
+   */
   readonly reproduce: string | null;
   /** One command that shows the bug again. */
   readonly rerun: string | null;
