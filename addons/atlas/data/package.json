@@ -1,0 +1,29 @@
+{
+  "name": "@open-tomato/atlas-data",
+  "version": "0.0.0",
+  "description": "Atlas layer 2 and 4: bucket tables in a SQLite replica, a tabular query engine over them, and the Standard Schema contracts (descriptors, query params, metrics, envelope) that query and config share.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./contract": "./src/contract/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --build",
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  }
+}

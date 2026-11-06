@@ -1,0 +1,33 @@
+{
+  "name": "@open-tomato/rafa-atlas",
+  "version": "0.0.0",
+  "description": "The rafa bundle of Atlas: reads a rafa project (effort store snapshot, plans, board cache, git, GitHub, modules) into an Atlas replica, carries the metric catalogue of the four lenses, and provides the build, serve and describe commands as a rafa module.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./registry": "./src/registry.ts",
+    "./build": "./src/build/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --build",
+    "lint": "eslint .",
+    "test": "bun test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@open-tomato/atlas-data": "workspace:*",
+    "@open-tomato/atlas-transport": "workspace:*",
+    "@open-tomato/rafa-board": "workspace:*",
+    "@open-tomato/rafa-core": "workspace:*",
+    "@open-tomato/rafa-effort": "workspace:*"
+  },
+  "devDependencies": {
+    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  }
+}

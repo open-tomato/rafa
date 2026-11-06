@@ -23,7 +23,9 @@
  *     the member it lands in, as `isPublicEntry` reads it;
  *   - `off-target`: the subpath matches a key, and the file it lands on is
  *     not the one the key's target names (the `paths` map of
- *     `tsconfig.packages.json` and core's `exports` disagree).
+ *     `tsconfig.packages.json` and core's `exports` disagree). A target
+ *     is read from the conditions `TARGET_CONDITIONS` lists, so a member
+ *     built for publishing names its checkout entry under `source`.
  *
  * The importer's own member is the one its folder is in, except that a
  * file `isCoreRead` of `scripts/survey/core-moves.ts` holds is core's: the
@@ -58,8 +60,15 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /** The scope whose bare specifiers the sweep holds. */
 const SCOPE = '@open-tomato/';
 
-/** The keys of an `exports` condition object read as a file path, in order. */
-const TARGET_CONDITIONS: readonly string[] = ['bun', 'import', 'default'];
+/**
+ * The keys of an `exports` condition object read as a file path, in
+ * order. `source` first: a member that publishes a build names under it
+ * the file its entry is in this checkout, the one its importers' `paths`
+ * map lands on, while `import` names the built file consumers get. Node,
+ * bun and TypeScript skip a condition they do not know, so it changes
+ * nothing for a consumer.
+ */
+const TARGET_CONDITIONS: readonly string[] = ['source', 'bun', 'import', 'default'];
 
 /** What a specifier breaks. */
 type Breach = 'no-exports' | 'not-exported' | 'off-target';
@@ -463,6 +472,22 @@ describe('the planted-tree controls', () => {
       member: PLANTED_CORE,
       specifier: '@open-tomato/planted/b',
     }]);
+  });
+
+  it('passes a built member\'s entry through its source condition, and fails it through import alone', () => {
+    const built = (conditions: Record<string, string>): string => JSON.stringify({
+      exports: { './a': conditions },
+      name: '@open-tomato/planted-core',
+    });
+    const importer = { 'app/main.ts': 'import { a } from \'@open-tomato/planted/a\';\n' };
+
+    const withSource = readPlanted({ ...importer, 'packages/core/package.json': built({ import: './dist/a.js', source: './src/a.ts' }) });
+    const importOnly = readPlanted({ ...importer, 'packages/core/package.json': built({ import: './dist/a.js' }) });
+
+    expect(withSource.violations).toEqual([]);
+    expect(importOnly.violations.map((violation) => [violation.breach, violation.landed])).toEqual([
+      ['off-target', 'packages/core/src/a.ts'],
+    ]);
   });
 
   it('fails a bare specifier landing in a member with no exports', () => {

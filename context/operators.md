@@ -41,7 +41,7 @@ test reads them.
 | `rafa-stretch-watchtower` | watches it read-only and alerts the person |
 | `rafa-stretch-analyst` | da²: tests the person's hunches against the stretch's data, read-only, writing only `analysis.md` |
 | `rafa-stretch-sweep` | phase 1: recheck, duplicate groups, ranking, tiers, the bucket report |
-| `rafa-stretch-pit-stop` | phase 3: the four checks after each item, and the decision |
+| `rafa-stretch-pit-stop` | phase 3: the five checks after each item, and the decision |
 | `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
 
 Every operator agent carries the single-command rule: run every `rafa` line as
@@ -60,8 +60,11 @@ wrap-up writes the next stretch's opening message to
 `.rafa/stretch/engineer-prompt.md`.
 
 `rules.md` holds the working rules the person approved for every item of
-the stretch. The stretch engineer writes it at the bucket's approval.
-Every item's planner reads it through `rafa stretch item`, which hands it
+the stretch. The person and the stretch engineer write it together: the
+engineer drafts it in the bucket's message, the person changes the draft in
+the conversation, and the engineer writes it once the person calls it final,
+or reads it back when the person edited the file in the terminal. Every
+item's planner reads it through `rafa stretch item`, which hands it
 over as `RAFA_STRETCH_RULES`, so `plan create` appends it to the item's
 snapshot under `## Stretch rules`, after the issue's notes.
 
@@ -111,8 +114,12 @@ wait ends on the merge commit's run, red or green. If no run is found on the
 commit, or the run found has not ended, within 90 minutes, it warns `no run
 on <branch> at <sha> was found within 90 minutes` or `run <id> (<workflow>)
 on <branch> at <sha> had not ended within 90 minutes`. Then it appends the
-ledger line and prints the pit-stop readings: the failed cases by file and
-case, the open-bug count, and the bugs filed since the last item. It decides
+ledger line, runs `rafa effort collect` and prints its exit code and time
+(`rafa effort collect ended 0 in <s>s`), then the pit-stop readings: the
+failed cases by file and case, the open-bug count, the bugs filed since the
+last item, the `Effort:` line, and one `Recheck` line per bug filed since,
+judged as `rafa bug recheck` judges it, with no comment posted. A collect
+that does not end 0 prints the `Effort:` line as not read. It decides
 nothing; the pit stop does.
 
 `--resume` finishes an item whose loop has ended, as after an item that

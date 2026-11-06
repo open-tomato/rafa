@@ -19,9 +19,26 @@ export default [
       // The declarations each code package's `tsc --build` writes, which
       // `eslint .` from the root otherwise lints after a `check-types` run.
       '**/.tsbuild/**',
+      // The Atlas libraries' build outputs (`charts`, `ui`): the bundles,
+      // the built Storybooks and the visual suites' per-machine baselines.
+      'addons/atlas/*/dist/**',
+      'addons/atlas/*/storybook-static/**',
+      'addons/atlas/*/visual/__image_snapshots__/**',
+      'addons/atlas/*/visual/__diff_output__/**',
     ],
   },
   ...baseConfig,
+  {
+    // The demo reads `@open-tomato/charts` and `@open-tomato/atlas-ui`, and
+    // `ui` reads `charts`, through tsconfig `paths`, which the import
+    // resolver does not follow, and the libraries' exports name a dist/
+    // that CI's lint step never builds. `tsc --build` holds these imports;
+    // the two packages' own leaf configs skip them the same way.
+    files: ['addons/atlas/demo/**', 'addons/atlas/ui/**'],
+    rules: {
+      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/(atlas-ui|charts)(/|$)'] }],
+    },
+  },
   {
     // The learning library's boundary: `packages/rafa-inventory/src/learning/`
     // is a pure library shipped as `@open-tomato/rafa/learning`, so it imports

@@ -42,7 +42,7 @@ An entry point is a member imported from outside the cluster, or a command regis
 | --- | --- | --- | --- |
 | Commands | **missing** | none | a sweep is not a command; it audits the files behind `epic move`, `epic new`, `epic close`, `epic cancel`, `issue unblock`, `issue create` and the epic tick of `pr merge`, whose files are in `c01-github`, `c03-index` and `c07-index` |
 | Steps with guards | **missing** | none | the allow-list is a guard on imports, enforced by test, not a step with a class; the baseline spawn is a check run beside it |
-| Config section | **missing** | none | it reads no key; the mode it audits, `board.relationships` (`src/config-schema.ts`, `c03-config`), selects the branch the allow-listed files keep |
+| Config section | **missing** | none | it reads no key; the mode it audits, `board.relationships` (`packages/rafa/src/core/config/core-section.ts`, line 278, its values in `config-sections.ts`), selects the branch the allow-listed files keep |
 | Flows | **missing** | none | no multi-step path is driven; one scan, three predicates and one spawn |
 
 ### Commands
@@ -55,7 +55,7 @@ None registered. The audit is the guard that keeps the labels reads of `packages
 
 ### Config section
 
-None. `board.relationships` (the mode switch) is declared in `src/config-schema.ts` (`c03-config`, line 488) and read by the allow-listed readers; this file reads no config. Its own parameters are constants: `TRACKED_NAMES`, the two module paths, `ALLOWED_IMPORTERS` and the 150-second spawn timeout.
+None. `board.relationships` (the mode switch) is declared in `packages/rafa/src/core/config/core-section.ts` (line 278, values in `config-sections.ts`) and read by the allow-listed readers; this file reads no config. Its own parameters are constants: `TRACKED_NAMES`, the two module paths, `ALLOWED_IMPORTERS` and the 150-second spawn timeout.
 
 ### Flows
 

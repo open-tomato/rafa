@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.packages.json",
+  // `paths` points the two libraries' entries at their source, so the demo
+  // (tsc and Bun alike) runs against them without a build first.
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": ".tsbuild",
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@open-tomato/atlas-ui": ["../ui/src/index.ts"],
+      "@open-tomato/atlas-ui/contract": ["../ui/src/contract/index.ts"],
+      "@open-tomato/charts": ["../charts/src/index.ts"],
+      "@open-tomato/charts/engine": ["../charts/src/engine/headless/index.ts"],
+      "@open-tomato/charts/theme": ["../charts/src/theme/index.ts"]
+    }
+  },
+  "include": ["index.ts", "src"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"],
+  "references": [
+    { "path": "../data" },
+    { "path": "../transport" },
+    { "path": "../charts" },
+    { "path": "../ui" },
+    { "path": "../rafa-atlas" }
+  ]
+}

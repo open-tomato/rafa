@@ -6,7 +6,11 @@
  * open and `MERGEABLE` until the fake `pr merge` runs, or merged from the
  * first read when the case says so; `gh pr checks` answers one passed
  * `fragment` row; `gh run list` answers one completed run on the merge
- * commit. The ledger, the plan and the log are real files.
+ * commit; `rafa effort collect` answers 0, the effort dashboard is a
+ * planted one holding the item's plan row, and the recheck runner, `git`
+ * and the tracker's `get` and `editable` refuse when called, since no
+ * planted bug names a runnable `Rerun`. The ledger, the plan and the log
+ * are real files.
  *
  * Controls: the log names an earlier pull request before the one read,
  * so the last line is seen to win over the first; the open case lists a
@@ -18,6 +22,7 @@ import type { StretchItemSeams } from './item.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { OpenIssue } from '@open-tomato/rafa/ports';
 import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracker/github';
+import type { Dashboard } from '@open-tomato/rafa-effort';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,6 +56,18 @@ const START = Date.parse('2026-10-07T09:00:00.000Z');
 const LOG_TIME = new Date('2026-10-07T08:30:00.000Z');
 const BODY = 'Plan for #812.\n\nCloses #812\n';
 const MERGE_LINE = ['rafa', 'pr', 'merge', String(PR), '--yes'];
+const COLLECT_LINE = ['rafa', 'effort', 'collect'];
+/** The `Effort:` line {@link plantedDashboard} renders. */
+const EFFORT_LINE = `Effort: ${STUB}: 2 tasks, p50 1.5 min against no baseline, max 3.0 min.`;
+
+/** A dashboard holding the item's plan row and no `minutes` baseline. */
+function plantedDashboard(): Dashboard {
+  const planted = {
+    trend: { metrics: [] },
+    loops: { rows: [{ key: STUB, kind: 'plan', tasks: 2, perTask: { minutes: { min: null, avg: null, p50: 1.5, max: 3 } } }] },
+  };
+  return planted as unknown as Dashboard;
+}
 
 /** An open bug filed at `createdAt`. */
 function bug(id: string, title: string, createdAt: string): OpenIssue {
@@ -159,6 +176,9 @@ function plant(options: CaseOptions = {}): Case {
     isAlive: () => false,
     gh: () => gh,
     tracker: () => ({
+      kind: 'github',
+      get: () => Promise.reject(new Error('fake tracker: get is not modelled')),
+      editable: () => Promise.reject(new Error('fake tracker: editable is not modelled')),
       openIssues: async () => Promise.resolve([...(options.bugs ?? [])]),
       filedIssues: async (_type, since) => Promise.resolve((options.bugs ?? []).flatMap(({ ref, title, body, createdAt }) => (
         createdAt !== null && Date.parse(createdAt) > since.getTime()
@@ -166,6 +186,9 @@ function plant(options: CaseOptions = {}): Case {
           : []
       ))),
     }),
+    readDashboard: () => Promise.resolve(plantedDashboard()),
+    recheck: () => Promise.reject(new Error('fake recheck: no runnable bug is planted')),
+    git: () => () => ({ ok: false, stdout: '', stderr: 'fake git: not modelled' }),
     sleep: async (ms) => {
       clock += ms;
       return Promise.resolve();
@@ -198,7 +221,7 @@ describe('rafa stretch item --resume, an open pull request', () => {
     const outcome = await run(planted);
 
     expect(outcome.exitCode).toBe(0);
-    expect(planted.rafaCalls).toEqual([MERGE_LINE]);
+    expect(planted.rafaCalls).toEqual([MERGE_LINE, COLLECT_LINE]);
     expect(planted.launches).toEqual([]);
     expect(planted.ghCalls.some((args) => args[1] === 'checks' && args[2] === String(PR))).toBe(true);
     expect(planted.ghCalls.some((args) => args.includes(String(EARLIER_PR)))).toBe(false);
@@ -216,6 +239,9 @@ describe('rafa stretch item --resume, an open pull request', () => {
     expect(outcome.stdout).toContain(`rafa pr merge ${String(PR)} --yes`);
     expect(outcome.stdout).toContain(`Filed since ${LOG_TIME.toISOString()}: 1.`);
     expect(outcome.stdout).toContain('#870 filed after the log');
+    expect(outcome.stdout).toContain('rafa effort collect ended 0 in 0.0s');
+    expect(outcome.stdout).toContain(EFFORT_LINE);
+    expect(outcome.stdout).toContain('Recheck #870: manual');
     expect(outcome.stdout).not.toContain('#869');
     expect(outcome.stdout).not.toContain('skipping the merge');
   });
@@ -228,7 +254,7 @@ describe('rafa stretch item --resume, a merged pull request', () => {
     const outcome = await run(planted);
 
     expect(outcome.exitCode).toBe(0);
-    expect(planted.rafaCalls).toEqual([]);
+    expect(planted.rafaCalls).toEqual([COLLECT_LINE]);
     expect(planted.ghCalls.some((args) => args[1] === 'checks')).toBe(false);
     expect(outcome.stdout).toContain(`#${String(PR)} is merged already at c4da2c4; skipping the merge`);
     expect(outcome.stdout).not.toContain('rafa pr merge');

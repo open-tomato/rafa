@@ -57,7 +57,8 @@
  *   4. with `--wait`, `rafa loop wait --session-id=<id>` on this
  *      terminal, then `./item-merge.ts`'s half: the waits for the pull
  *      request's mergeability and checks, the merge, the CI wait,
- *      the ledger line and the pit-stop readings once the loop opened a
+ *      the ledger line, `rafa effort collect` and the pit-stop readings
+ *      (the effort and recheck readings among them) once the loop opened a
  *      pull request, else the reason it opened none and `loop wait`'s
  *      exit code, so a caller reads the same reason codes `loop wait`
  *      documents.
@@ -94,7 +95,7 @@
  * Every process goes through {@link StretchItemSeams}, so no test runs
  * `rafa`, a planning session or a loop.
  */
-import type { ItemMergeSeams } from './item-merge.js';
+import type { ItemMergeSeams, ItemRecheckConfig } from './item-merge.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { PidProbe, SessionRecord } from '@open-tomato/rafa/core/loop';
 import type { PlansDir } from '@open-tomato/rafa/core/plan';
@@ -103,6 +104,7 @@ import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } f
 import { dirname, join, posix } from 'node:path';
 
 import { createGhRunner, createGithubTracker } from '@open-tomato/rafa-board';
+import { readDashboard } from '@open-tomato/rafa-effort';
 
 import { boardId } from '@open-tomato/rafa/board/naming';
 import {
@@ -113,11 +115,14 @@ import {
 } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
+import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { isPidAlive, readSessions } from '@open-tomato/rafa/core/loop';
 import { plansDirAt, stubOfPlanFile } from '@open-tomato/rafa/core/plan';
+import { namedSecrets } from '@open-tomato/rafa/triage/filed-text';
 
 import { stretchFolder } from '../../stretch/folder.js';
 import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
+import { recheckBug } from '../bug/recheck-run.js';
 import { STRETCH_RULES_ENV } from '../plan/stretch-rules.js';
 
 import { afterLoopWait, mergeDryRunLines } from './item-merge.js';
@@ -186,7 +191,7 @@ export function itemLogPath(root: string, n: number, issue: number): string {
   return join(stretchFolder(root, n), `loop-${String(issue)}.log`);
 }
 
-/** The stretch's working rules, as the stretch engineer writes them at the bucket's approval. */
+/** The stretch's working rules, as the person and the stretch engineer write them at the bucket's approval. */
 export const RULES_FILE = 'rules.md';
 
 /** `<root>/.rafa/stretch/<n>/rules.md`. */
@@ -448,6 +453,8 @@ interface WaitInput {
   readonly stub: string;
   readonly record: SessionRecord;
   readonly log: string;
+  /** What the recheck reading judges with. */
+  readonly recheckConfig: ItemRecheckConfig;
 }
 
 /** Step 4: `rafa loop wait` on the session, then the merge half over its exit code. */
@@ -467,6 +474,7 @@ async function waitStep(context: RafaContext, wait: WaitInput, seams: StretchIte
     startedAt: record.startedAt,
     log: wait.log,
     env,
+    recheckConfig: wait.recheckConfig,
   }, exitCode, seams);
 }
 
@@ -477,6 +485,8 @@ interface ResumeStepInput {
   readonly issue: number;
   readonly plans: PlansDir;
   readonly dryRun: boolean;
+  /** What the recheck reading judges with. */
+  readonly recheckConfig: ItemRecheckConfig;
 }
 
 /** `--resume`: the merge half on the pull request the item's log names, or its lines under `--dry-run`; see the module note. */
@@ -500,6 +510,7 @@ async function resumeStep(context: RafaContext, step: ResumeStepInput, seams: St
     plansLabel: step.plans.label,
     log,
     env: childEnv(context),
+    recheckConfig: step.recheckConfig,
   }, seams);
 }
 
@@ -512,8 +523,14 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
   const config = await resolveProjectConfig(project, COMMAND_NAME, warn);
   const n = requireStretchBase(config.prBase);
   const plans = plansDirAt(root, config.planDir);
+  const recheckConfig: ItemRecheckConfig = {
+    bugsRecheckRuns: config.bugsRecheckRuns,
+    bugsRecheckTimeoutSeconds: config.bugsRecheckTimeoutSeconds,
+    boardTrustedAuthors: config.boardTrustedAuthors,
+    secrets: namedSecrets(config, context.env),
+  };
   if (line.resume) {
-    await resumeStep(context, { root, n, plans, dryRun: line.dryRun, issue: line.issue }, seams);
+    await resumeStep(context, { root, n, plans, dryRun: line.dryRun, issue: line.issue, recheckConfig }, seams);
     return;
   }
   const kept = existingPlan(plans, line.issue);
@@ -555,7 +572,7 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
     info(`wait on it with: rafa loop wait --session-id=${record.sessionId}`);
     return;
   }
-  await waitStep(context, { root, n, issue: line.issue, stub, record, log }, seams);
+  await waitStep(context, { root, n, issue: line.issue, stub, record, log, recheckConfig }, seams);
 }
 
 /** Runs `argv` on this terminal; null when it could not start. */
@@ -593,7 +610,7 @@ function spawnDetached(argv: readonly string[], cwd: string, env: Readonly<Recor
   }
 }
 
-/** The real processes, pid probe, `gh`, tracker and clock. */
+/** The real processes, pid probe, `gh`, tracker, effort dashboard, recheck runner, git and clock. */
 export function defaultStretchItemSeams(): StretchItemSeams {
   return {
     runRafa: spawnOnTerminal,
@@ -601,6 +618,9 @@ export function defaultStretchItemSeams(): StretchItemSeams {
     isAlive: isPidAlive,
     gh: (root) => createGhRunner({ cwd: root }),
     tracker: (gh) => createGithubTracker({ gh }),
+    readDashboard,
+    recheck: recheckBug,
+    git: createGitRunner,
     sleep: (ms) => Bun.sleep(ms),
     now: () => new Date(),
     rafa: DEFAULT_RAFA_COMMAND,
@@ -622,7 +642,10 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
       + ' `rafa loop wait --session-id=<id>`; once the loop has opened a pull request it refuses one whose base'
       + ' is not a `stretch/*` branch, waits for GitHub to compute its mergeability and for its checks to pass,'
       + ' runs `rafa pr merge <pr> --yes`, waits for the run on the merge commit to end, appends the item to'
-      + ' `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop readings. A loop that opened no pull request has its reason printed, merges nothing and exits with'
+      + ' `.rafa/stretch/<n>/items.ndjson`, runs `rafa effort collect` and prints the pit-stop readings: CI on the'
+      + ' integration branch, the open bugs, the bugs filed since the last item, the item\'s effort against the'
+      + ' effort store\'s baseline, and a recheck of each bug filed since, judged as `rafa bug recheck` judges it.'
+      + ' A loop that opened no pull request has its reason printed, merges nothing and exits with'
       + ' `loop wait`\'s code. With `--resume` instead of `--wait` it starts no planning session and no loop: it'
       + ' finishes an item whose loop has ended from the last `rafa· pr #<n> opened` line of its log, skipping'
       + ' the merge of a pull request merged already, and refuses an issue the ledger holds.'

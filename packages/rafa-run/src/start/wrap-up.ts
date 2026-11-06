@@ -93,7 +93,9 @@ import { stepOnlySection } from './step-only-report.js';
  * document byte for byte (`plan/inject.ts`), so what is appended here
  * is the `full` rendering. The session titles the PR `rafa-<n>:
  * <title>` from the plan title and the `issue: <n>` its `rafa:plan`
- * block carries, closes that issue from the body with `Closes #<n>`
+ * block carries, closes that issue from the body with `Closes #<n>`,
+ * adds one `Closes #<m>` line per number of the block's `closes:` list,
+ * no number twice,
  * and summarises the work of every stage, and a `stage` or `task`
  * rendering holds one stage, or one task line.
  *
@@ -196,7 +198,7 @@ export function buildWrapUpPrompt(
 
 /**
  * The four bullets that only serve a pull request: the two that find
- * the plan's issue number, the title with its `Closes #<n>` line, and
+ * the plan's issue number, the title with its `Closes #<n>` lines, and
  * the description. None under `pr.provider: none`, where no pull
  * request is opened to carry any of them.
  */
@@ -205,7 +207,7 @@ function pullRequestNamingBullets(branch: string, provider: PrProvider): readonl
   return [
     '* Find the plan\'s issue number `<n>`: the plan below carries it in its `rafa:plan` block as `issue: <n>`.',
     `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is the \`naming.branch\` template with the plan's stub, \`feat/rafa-<n>-<slug>\` by default.`,
-    '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
+    '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. Below `Closes #<n>`, write one more `Closes #<m>` line for each number `<m>` of the plan\'s `closes:` list, in its `rafa:plan` block, never writing a number twice and writing none when the plan has no `closes:` list. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
   ];
 }

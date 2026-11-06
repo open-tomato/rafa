@@ -37,8 +37,13 @@
  * Its title is `rafa-<n>: <plan title>`, through
  * {@link pullRequestTitle} (`board/naming.ts`), the one spelling a
  * board-opened plan's pull request already has. Its body
- * ({@link runnerPullRequestBody}) opens `Closes #<n>`, so the merge
- * closes the issue as a wrap-up-opened pull request does, then carries
+ * ({@link runnerPullRequestBody}) opens with one `Closes #<n>` line for
+ * each issue {@link closedIssues} reads: the plan's own issue first, then
+ * each number of the plan's `closes:` list ({@link RunnerPrInput.closes})
+ * in its order, a duplicate or the plan's own issue written once. So the
+ * merge closes every issue the plan names, the plan's as a wrap-up-opened
+ * pull request does and a sweep's bugs beside it (#1444); a plan with no
+ * `closes:` gets the one line it always had. The body then carries
  * the release fragment's notes under a heading, and ends with
  * {@link UNFINISHED_WRAP_UP_LINE}, which tells the reviewer the wrap-up
  * did not finish and what that leaves to check. A fragment with no notes
@@ -53,15 +58,15 @@
  *
  * ## The project refresh
  *
- * Once the pull request is created, the issue its body closes is
- * refreshed on the repository's project
+ * Once the pull request is created, every issue its body closes is
+ * refreshed, in one call and in the body's order, on the repository's project
  * (`.rafa/specs/rafa-791-github-project-each-repository.md`, "Who calls
  * it": "the loop's wrap-up opening a pull request — the issues it
  * closes"), so its Stage reads the open pull request. The refresh is a
  * mirror's catch-up and never the attempt's failure: its lines come back
  * in {@link RunnerPrOpened.warnings} for the caller to print after its
  * own, and a refresh that rejects is answered by `refreshFailedWarning`'s
- * line naming the issue and `rafa board sync`. A blocked attempt opened
+ * line naming the plan's own issue and `rafa board sync`. A blocked attempt opened
  * nothing and refreshes nothing. {@link refreshClosedIssues} is the real
  * refresh: with `board.project.number` unset it opens no `gh` runner and
  * answers no line, so a repository that never opted in sees the attempt
@@ -131,8 +136,10 @@ export interface RunnerPrInput {
   readonly branch: string;
   /** The branch the pull request goes into. */
   readonly base: string;
-  /** The issue the plan implements: `rafa-<n>` in the title, `Closes #<n>` in the body. */
+  /** The issue the plan implements: `rafa-<n>` in the title, the first `Closes #<n>` in the body. */
   readonly issue: number;
+  /** The plan header's `closes:` list, each one more `Closes #<n>` line; empty for none. */
+  readonly closes: readonly number[];
   /** The plan's title, as its heading names it. */
   readonly planTitle: string;
   /** The release fragment's note lines, as {@link fragmentNotesIn} reads them. */
@@ -224,15 +231,24 @@ export function fragmentNotesIn(checkout: string, fragment: string | null): read
 }
 
 /**
- * The runner-opened pull request's body: `Closes #<n>`, the notes under
- * {@link RELEASE_NOTES_HEADING} when there are any, and
- * {@link UNFINISHED_WRAP_UP_LINE}.
+ * The issues the pull request closes: `issue` first, then each of
+ * `closes` in its order, no number twice. See the module note.
  */
-export function runnerPullRequestBody(issue: number, notes: readonly string[]): string {
+export function closedIssues(issue: number, closes: readonly number[]): readonly number[] {
+  return [...new Set([issue, ...closes])];
+}
+
+/**
+ * The runner-opened pull request's body: one `Closes #<n>` line for each
+ * of {@link closedIssues}, the notes under {@link RELEASE_NOTES_HEADING}
+ * when there are any, and {@link UNFINISHED_WRAP_UP_LINE}.
+ */
+export function runnerPullRequestBody(issue: number, closes: readonly number[], notes: readonly string[]): string {
   const section = notes.length === 0
     ? []
     : [RELEASE_NOTES_HEADING, '', ...notes, ''];
-  return [`Closes #${String(issue)}`, '', ...section, UNFINISHED_WRAP_UP_LINE].join('\n');
+  const closing = closedIssues(issue, closes).map((closed) => `Closes #${String(closed)}`);
+  return [...closing, '', ...section, UNFINISHED_WRAP_UP_LINE].join('\n');
 }
 
 /** A blocked outcome, its message composed from the branch, the step and the detail. */
@@ -252,19 +268,19 @@ function dirtyDetail(entries: readonly string[]): string {
   ].join('\n');
 }
 
-/** The refresh of `issue` through `seams`, a rejection answered as its failed line; never rejects. */
-async function refreshAfterOpen(seams: RunnerPrSeams, issue: number): Promise<readonly string[]> {
+/** The refresh of `issues`, the first the plan's own, through `seams`, a rejection answered as its failed line; never rejects. */
+async function refreshAfterOpen(seams: RunnerPrSeams, issues: readonly number[]): Promise<readonly string[]> {
   try {
-    return await seams.refreshProject([issue]);
+    return await seams.refreshProject(issues);
   } catch (error) {
-    return [refreshFailedWarning(issue, error)];
+    return [refreshFailedWarning(issues[0] ?? 0, error)];
   }
 }
 
 /**
  * Opens the run's pull request: the tree read, the branch pushed, the
  * pull request created, each only once the one before succeeded, then
- * the issue it closes refreshed on the project. See the module note.
+ * every issue it closes refreshed on the project. See the module note.
  */
 export async function openRunnerPullRequest(input: RunnerPrInput, seams: RunnerPrSeams): Promise<RunnerPrOutcome> {
   const { branch } = input;
@@ -287,10 +303,10 @@ export async function openRunnerPullRequest(input: RunnerPrInput, seams: RunnerP
       head: branch,
       base: input.base,
       title: pullRequestTitle(input.issue, input.planTitle),
-      body: runnerPullRequestBody(input.issue, input.notes),
+      body: runnerPullRequestBody(input.issue, input.closes, input.notes),
     });
   } catch (error) {
     return blocked(branch, 'create', messageOf(error));
   }
-  return { kind: 'opened', pull, warnings: await refreshAfterOpen(seams, input.issue) };
+  return { kind: 'opened', pull, warnings: await refreshAfterOpen(seams, closedIssues(input.issue, input.closes)) };
 }

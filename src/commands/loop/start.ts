@@ -55,17 +55,38 @@
  * dispatcher into the context's `flags` and left out of its `argv`, the
  * words `start` is handed, so the command refuses it before it runs
  * `start` rather than let the run go on in this runtime.
+ *
+ * Right after that refusal, and so still before `start` runs — before
+ * any config load, deferral (`--start-at`), session record, preflight
+ * or session — the command reads the `tsc` row of `rafa doctor`
+ * ({@link refuseTscCannotStart}, over `readDoctorTsc` of
+ * `../doctor-tsc.ts`) for the project root and the environment the
+ * command was handed. A tsc that exits 126 or 127 (`cannot-start`) is
+ * one the type step could not start, which would halt the loop on its
+ * first task with a changed test file, so the run is refused with exit
+ * code 1 and `doctor`'s own refusal text (`tscRefusal`), which names the
+ * interpreter the script's first line asks for. Every other reading —
+ * no `tsconfig.json`, no tsc, `ok`, another exit, a spawn that throws —
+ * goes on to `start` as before, and a context with no project skips the
+ * read and is refused by the wrapped run as before.
+ * {@link loopStartCommand} builds the
+ * command over any phase 0 function and tsc seam, so a test can stand
+ * one in for `start`.
  */
+import type { DoctorTscSeams } from '../doctor-tsc.js';
+import type { CommandDeclaration, PhaseZeroCommand } from '../wrap.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 
 import { DEFAULT_CI_ATTEMPTS, endingWith, refuseMisplacedRuntime } from '@open-tomato/rafa-run';
 
-import { DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
+import { CommandExit, DEFAULT_CI_TIMEOUT_MIN, HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
 import start from '../../start.js';
+import { readDoctorTsc, tscRefusal } from '../doctor-tsc.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
-const wrapped = wrapPhaseZeroCommand({
+/** The declaration of `loop start`: everything help and `describe` read. */
+const DECLARATION: CommandDeclaration = {
   name: 'loop start',
   subject: 'loop',
   action: 'start',
@@ -99,7 +120,9 @@ const wrapped = wrapPhaseZeroCommand({
     + ' `--force-wrap-up`, and under `--output=json` a decision the line does not name ends the run with'
     + ' exit code 21 and the decision prompt. A run holds its terminal: until'
     + ' phase 6 it refuses `--detached`. With `--runtime` the whole run goes on in that installed rafa,'
-    + ' never in a `src/` directory.',
+    + ' never in a `src/` directory. It refuses to start, before the run is deferred or recorded, when the'
+    + ' project holds a `tsconfig.json` and its `node_modules/.bin/tsc --version` exits 126 or 127,'
+    + ' as `rafa doctor` would, naming the interpreter to put on the PATH.',
   args: [],
   flags: [
     {
@@ -261,16 +284,37 @@ const wrapped = wrapPhaseZeroCommand({
       + ' repair sessions while CI is red, the sessions of up to `--retry` (`loop.retries`) more passes of the loop'
       + ' in a row after the stops it retries, and under `--continue` one read-only decision session per decision',
   },
-}, start);
+};
 
-/** The wrapped command, refusing a `--runtime` its words do not carry before `start` runs; see the module note. */
-const loopStart: RafaCommand = Object.freeze({
-  ...wrapped,
-  run: async (context: RafaContext) => {
-    refuseMisplacedRuntime(context.flags, context.argv);
-    return wrapped.run(context);
-  },
-});
+/**
+ * Refuses the run with exit code 1 and `doctor`'s refusal text when the
+ * `tsc` row for `root` under `env` reads `cannot-start`; resolves on
+ * every other reading. See the module note.
+ */
+export async function refuseTscCannotStart(
+  root: string,
+  env: Readonly<Record<string, string | undefined>>,
+  seams: DoctorTscSeams = {},
+): Promise<void> {
+  const refusal = tscRefusal(await readDoctorTsc(root, env, seams));
+  if (refusal !== null) throw new CommandExit(1, refusal);
+}
 
-const command: RafaCommand = endingWith(loopStart);
+/**
+ * `loop start` over `run`, refusing a `--runtime` its words do not carry
+ * and a tsc that cannot start before `run` is called; see the module note.
+ */
+export function loopStartCommand(run: PhaseZeroCommand, seams: DoctorTscSeams = {}): RafaCommand {
+  const wrapped = wrapPhaseZeroCommand(DECLARATION, run);
+  return Object.freeze({
+    ...wrapped,
+    run: async (context: RafaContext) => {
+      refuseMisplacedRuntime(context.flags, context.argv);
+      if (context.project !== null) await refuseTscCannotStart(context.project.root, context.env, seams);
+      return wrapped.run(context);
+    },
+  });
+}
+
+const command: RafaCommand = endingWith(loopStartCommand(start));
 export default command;

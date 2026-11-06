@@ -455,6 +455,7 @@ whose ID appears as `rafa-<n>`.
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
 | Pull request title | `rafa-<n>: <title>` | `rafa-20: Add pull-request commands` |
 | Pull request body | `Closes #<n>` | `Closes #20` |
+| `closes:` field in `rafa:plan` | a list of issue numbers, one `Closes #<m>` line each | `closes: [1444, 1479]` |
 
 The slug summarizes what the user gets, using two to four words joined
 by hyphens.
@@ -649,7 +650,9 @@ default; `--yes` allows others unasked and `--dry-run` prints without
 running. A session can be started, resumed mid-plan, or moved to the
 next issue when the roadmap advances. After every action, `next` names
 the step that follows — the merge to run, the loop to resume, or the
-loop already running — unless `--no-hint` turns off the hint.
+loop already running. `rafa next` declares no `--no-hint`, so it refuses
+the flag with `cli:unknown-flag`; the six commands that end with a hint
+take it.
 
 ### Board relationships: labels and native modes
 

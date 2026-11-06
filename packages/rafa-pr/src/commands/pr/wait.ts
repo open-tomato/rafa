@@ -20,7 +20,7 @@
  * command is READ-ONLY — the only provider members it reaches are
  * `findOpen`, for the branch that names no number, `get`, and `checks`.
  * A test reads that off the double's own call log rather than trusting
- * the sentence (`wait.test.ts`).
+ * the sentence (`src/tests/pr-coupled/commands/pr/wait.test.ts`).
  *
  * ## The grace a young head gets, which that gate does not
  *
@@ -138,9 +138,9 @@
  *
  * {@link PrWaitSeams} carries `clock` and `sleep` beside the provider
  * seams, and hands them to `waitForChecks`, so every case in
- * `wait.test.ts` — a pending poll that turns green, a deadline that
- * passes, a grace waited out — runs with no timer and no real second
- * spent. The grace is measured by the same `clock`, so a case decides
+ * `src/tests/pr-coupled/commands/pr/wait.test.ts` — a pending poll that
+ * turns green, a deadline that passes, a grace waited out — runs with no
+ * timer and no real second spent. The grace is measured by the same `clock`, so a case decides
  * how old a head is by where it starts that clock. The seams are
  * spelled as `pr triage --resolve`'s are, for the same reason.
  *
@@ -158,7 +158,7 @@ import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/comm
 import { activeServices } from '@open-tomato/rafa/core/services';
 import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 
-import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
+import { failingRows, formatRows, headTimeOf, waitForChecks } from '../../pr/index.js';
 
 import { SEPARATOR } from './current.js';
 import { PR_WAIT_DECLARATION, WAIT_TIMEOUT_FLAG } from './declarations.js';
@@ -329,22 +329,6 @@ export function renderWait(reading: PrWaitReading): string {
       ? []
       : [next],
   ].join('\n');
-}
-
-/**
- * When the head of `detail` was committed, in the clock's milliseconds,
- * or null where there is no time to give the grace: a pull request the
- * read did not find, a provider that answers no date, a date that is no
- * time.
- */
-function headTimeOf(detail: PullRequestDetail | null): number | null {
-  const committedAt = detail?.headCommittedAt ?? null;
-  const ms = committedAt === null
-    ? Number.NaN
-    : Date.parse(committedAt);
-  return Number.isNaN(ms)
-    ? null
-    : ms;
 }
 
 /**

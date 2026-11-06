@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.packages.json",
+  // Composite, for the root solution file; jsx and the DOM lib for React.
+  // Tests are left out as everywhere in the repo; stories are checked by
+  // tsconfig.stories.json, the second half of `check-types`. `paths` points
+  // `@open-tomato/charts` at its source, so tsc and Bun read the sibling
+  // package without a build first; the reference builds it ahead of this one.
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": ".tsbuild",
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@open-tomato/charts": ["../charts/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "src/stories"],
+  "references": [{ "path": "../charts" }]
+}

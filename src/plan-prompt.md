@@ -15,6 +15,7 @@ ID appears as `rafa-<n>`.
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
 | Pull request title | `rafa-<n>: <title>` | `rafa-20: Add pull-request commands` |
 | Pull request body | `Closes #<n>` | `Closes #20` |
+| `closes:` field in `rafa:plan` | a list of issue numbers, one `Closes #<m>` line each | `closes: [1444, 1479]` |
 
 The slug summarizes what the user gets, using two to four words joined by
 hyphens. The order of work lives in ONE place: the pinned "Roadmap" issue

@@ -1,0 +1,8 @@
+# Bun.serve's HTML imports run the Tailwind plugin over the stylesheet.
+[serve.static]
+plugins = ["bun-plugin-tailwind"]
+
+# `bun test` from this folder: a DOM for the page's smoke tests. The root's
+# `bun test` skips this package (the root bunfig's pathIgnorePatterns).
+[test]
+preload = ["./test/happy-dom.ts"]
