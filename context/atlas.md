@@ -43,14 +43,15 @@ host, home path or private repo name appears in their code, READMEs or
 fixtures. `charts` is scope-wide: other projects consume it on its own,
 and `ui` depends on it (`workspace:*`), never on `echarts` directly.
 
-**TSX lints through `@open-tomato/rafa-eslint-config/react`**
-(`packages/eslint-config/react.mjs`: eslint-plugin-react, react-hooks,
-jsx-a11y), laid over the base by the leaf configs of `charts`, `ui` and
-`demo`; the base parses `.tsx` and resolves `addons/atlas/*/tsconfig.json`.
+**TSX lints through `@open-tomato/eslint-config/react` and `/cva`**
+(`react`: eslint-plugin-react, react-hooks, jsx-a11y; `cva`: the
+`@open-tomato/cva-only-classname` rule), laid over the base by the leaf
+configs of `charts`, `ui` and `demo`; the base parses `.tsx`, and the root's
+`eslint.config.mjs` resolves `addons/atlas/*/tsconfig.json`.
 
 **Conventions for layer 5 live in `addons/atlas/charts/README.md`.** It
 is the authority for the folder layout (one folder per component),
-CVA variants with the `ot/cva-only-classname` rule, the token names
+CVA variants with the `@open-tomato/cva-only-classname` rule, the token names
 `charts` ships against the values the demo ships, the story rules,
 `bun test` over happy-dom, the local-only Playwright visual suite, the
 gate order, the publish shape and the privacy sweep, which lives in

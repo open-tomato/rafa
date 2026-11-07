@@ -35,10 +35,8 @@ export const SOURCE_ROOTS: readonly string[] = Object.freeze([
   'packages/rafa-effort/src',
 ]);
 
-/** The four workspace members kept out of {@link SOURCE_ROOTS}, by repo-relative directory, with why. */
+/** The two workspace members kept out of {@link SOURCE_ROOTS}, by repo-relative directory, with why. */
 export const MEMBERS_LEFT_OUT: Readonly<Record<string, string>> = Object.freeze({
   'packages/rafa-hub': 'the hub server, a bin of its own, never in the CLI',
   'packages/rafa-sync-service': 'the service sync strategy, loaded by the hub\'s users, not shipped in the CLI',
-  'packages/eslint-config': 'a config package, which holds no src/',
-  'packages/typescript-config': 'a config package, which holds no src/',
 });

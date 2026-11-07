@@ -72,10 +72,10 @@ over its composite `tsconfig.json`, which leaves its test files out as the
 root does, writes
 declarations into its own `.tsbuild/`
 (gitignored at every depth), and builds the projects it references first, so
-a service reads core's declarations from `packages/rafa/.tsbuild/`. The two
-config packages, `packages/typescript-config` and `packages/eslint-config`,
-hold no `tsconfig.json` and no `check-types` script, so no type step asks
-anything of them. `bun run lint` lints package code from the root config as
+a service reads core's declarations from `packages/rafa/.tsbuild/`. The shared
+configs, `@open-tomato/typescript-config` and `@open-tomato/eslint-config`,
+come from npmjs and are not members, so no type step asks anything of them.
+`bun run lint` lints package code from the root config as
 it lints `src/`, and each member's own `lint` script runs `eslint .` from its
 directory, so a changed package file belongs in the scoped
 `bunx eslint <changed files>` run too.
@@ -709,10 +709,8 @@ does one where the walk finds no `node_modules/.bin/tsc`; a run whose suite
 steps are off (no baseline) still gets it. To check one by hand, point a
 tsconfig outside the repo at it — `extends` this repo's `tsconfig.json` by
 absolute path (a bare `tsconfig.json` is looked up as a package, the repo's
-options are never applied, and hundreds of TS2802 errors follow), never the
-shared base `packages/typescript-config/base.json`, which leaves `module`
-unset and fails `src/plan.ts` and `src/start.ts` on `import.meta` (TS1343),
-`files` holding the test's absolute path, `include` empty,
+options are never applied, and hundreds of TS2802 errors follow), `files`
+holding the test's absolute path, `include` empty,
 `compilerOptions.typeRoots` naming `<repo>/node_modules/@types` absolutely
 (left out, every file reports `Cannot find module 'bun:test'`) — and run
 `./node_modules/.bin/tsc -p` on it. Test files already carry errors no gate

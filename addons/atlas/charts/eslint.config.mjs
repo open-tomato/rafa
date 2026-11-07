@@ -1,5 +1,6 @@
-import baseConfig from '@open-tomato/rafa-eslint-config';
-import reactConfig from '@open-tomato/rafa-eslint-config/react';
+import baseConfig from '@open-tomato/eslint-config';
+import cvaConfig from '@open-tomato/eslint-config/cva';
+import reactConfig from '@open-tomato/eslint-config/react';
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -15,4 +16,5 @@ export default [
   },
   ...baseConfig,
   ...reactConfig,
+  ...cvaConfig,
 ];

@@ -61,12 +61,10 @@ describe('SOURCE_ROOTS', () => {
 });
 
 describe('MEMBERS_LEFT_OUT', () => {
-  it('names the four members kept out, each with a reason', () => {
+  it('names the two members kept out, each with a reason', () => {
     expect(Object.keys(MEMBERS_LEFT_OUT).sort()).toEqual([
-      'packages/eslint-config',
       'packages/rafa-hub',
       'packages/rafa-sync-service',
-      'packages/typescript-config',
     ]);
     expect(Object.values(MEMBERS_LEFT_OUT).filter((reason) => reason.trim() === '')).toEqual([]);
   });

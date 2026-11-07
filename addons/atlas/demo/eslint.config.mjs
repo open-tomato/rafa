@@ -1,11 +1,13 @@
-import baseConfig from '@open-tomato/rafa-eslint-config';
-import reactConfig from '@open-tomato/rafa-eslint-config/react';
+import baseConfig from '@open-tomato/eslint-config';
+import cvaConfig from '@open-tomato/eslint-config/cva';
+import reactConfig from '@open-tomato/eslint-config/react';
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
   { ignores: ['node_modules/**', '.tsbuild/**'] },
   ...baseConfig,
   ...reactConfig,
+  ...cvaConfig,
   {
     // The libraries' exports name their built dist/, and this package reads
     // their source through tsconfig `paths`, which the import resolver does

@@ -150,10 +150,10 @@ The `Engine/Formats` stories draw one series under each kind.
   `cn(chartRootVariants({ cursor }), className)`. `cn` (`src/lib/cn.ts`)
   is clsx plus tailwind-merge, so the later class wins a conflict.
 - No inline `style`, and no class string written on an element. The lint
-  rule `ot/cva-only-classname` (in `@open-tomato/rafa-eslint-config/react`)
-  allows a `className` value only as a variants call, a `cn(...)` over
-  variants calls and the passthrough, or the passthrough alone. Stories and
-  tests are exempt.
+  rule `@open-tomato/cva-only-classname` (in `@open-tomato/eslint-plugin`,
+  enabled by `@open-tomato/eslint-config/cva`) allows a `className` value
+  only as a variants call, a `cn(...)` over variants calls and the
+  passthrough, or the passthrough alone. Stories and tests are exempt.
 - The repo compiles with `isolatedDeclarations`, so an exported `cva` call
   carries an explicit function type, as `chartRootVariants` does.
 

@@ -59,8 +59,8 @@ export const FORBIDDEN_BYTES: ReadonlySet<number> = new Set([
  * see them — a Trojan Source payload (CVE-2021-42574) is entirely in
  * this set.
  *
- * Kept deliberately in sync with `ar/no-unsafe-unicode` in
- * `packages/eslint-config/rules/unsafe-unicode.mjs`;
+ * Kept deliberately in sync with `@open-tomato/no-unsafe-unicode` in
+ * `@open-tomato/eslint-plugin` (`rules/no-unsafe-unicode`);
  * control-byte-gate.test.ts asserts the two agree. The duplication is on
  * purpose: this gate imports nothing, so it runs on a bare checkout with
  * no install.
