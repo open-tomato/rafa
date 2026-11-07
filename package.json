@@ -141,8 +141,6 @@
     "device:check": "bash scripts/device/check.sh"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "@eslint/markdown": "^8.0.3",
     "@open-tomato/define-config": "0.5.0",
     "@open-tomato/eslint-config": "^0.1.0",
     "@open-tomato/eslint-plugin": "^0.1.0",
@@ -154,18 +152,10 @@
     "@open-tomato/rafa-release": "workspace:*",
     "@open-tomato/rafa-run": "workspace:*",
     "@open-tomato/typescript-config": "^0.1.0",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/bun": "^1.4.0",
     "@types/node": "^26.4.1",
-    "@typescript-eslint/parser": "^8.69.0",
     "eslint": "^9.39.4",
-    "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-jsonc": "^3.4.2",
-    "globals": "^17.12.0",
-    "jsonc-eslint-parser": "^3.1.0",
     "turbo": "^2.11.8",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.69.0"
+    "typescript": "^5.9.3"
   }
 }

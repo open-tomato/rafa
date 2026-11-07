@@ -32,6 +32,11 @@ export default [
   },
   ...baseConfig,
   {
+    // The shared base ignores every `build/` folder, and these two hold
+    // source: the bundle script and the Atlas build module.
+    ignores: ['!scripts/build/**', '!addons/atlas/rafa-atlas/src/build/**'],
+  },
+  {
     // The shared base resolves imports through the tsconfig of each folder
     // under packages/, apps/ and services/; this repository also has the
     // Atlas add-ons under addons/atlas/.
