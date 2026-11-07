@@ -41,8 +41,12 @@ import type { InstinctRecord, MergeDecision, MergeResult, MergeRule } from '@ope
 
 import { sameActionGroups, triggerKey } from '../../learning/index.js';
 
-/** The rule a push-log line names: the merge's, or a joined group. */
-export type PushLogRule = MergeRule | 'same-action-group';
+/**
+ * The rule a push-log line names: the merge's, a joined group, or
+ * `bug-fix-pair` for each decision of a bug-fix pair's push, which
+ * `./bug-fix-push.js` writes in place of either.
+ */
+export type PushLogRule = MergeRule | 'same-action-group' | 'bug-fix-pair';
 
 /** The rules a decision may log as `same-action-group` in place of. */
 const GROUPABLE: ReadonlySet<MergeRule> = new Set<MergeRule>(['new-trigger', 'same-action']);

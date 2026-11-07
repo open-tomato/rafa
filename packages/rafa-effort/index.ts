@@ -9,6 +9,8 @@ export {
   resolvePlanStub,
 } from './src/effort/attribution.js';
 
+export { readBugFixRows } from './src/effort/bug-fix-rows.js';
+
 export {
   default as collect,
   collectSessionRow,

@@ -9,7 +9,7 @@
  * `cleanup`, `describe`, `doctor`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `init`, `next`, `roadmap`, `self-update`, `status`, `switch`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
- * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`, `instinct groups`,
+ * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`, `instinct groups`, `instinct pairs`,
  * `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release fragment`, `release list`, `board list`, `board sync`,
  * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `bug recheck`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
@@ -173,6 +173,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'instinct flag': ['text', 'json'],
   'instinct promote': ['text', 'json'],
   'instinct groups': ['text', 'json'],
+  'instinct pairs': ['text', 'json'],
   'status': ['text', 'json'],
   'next': ['text', 'json'],
   'roadmap': ['text', 'json'],
@@ -274,6 +275,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'instinct flag': [['id', 'reason'], []],
   'instinct promote': [[], []],
   'instinct groups': [[], []],
+  'instinct pairs': [[], ['unpaired']],
   'release status': [[], ['plan']],
   'release settle': [[], ['dry-run']],
   'release tag': [[], ['push']],
@@ -410,6 +412,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['instincts flag gate-order superseded', 'instinct flag', ['gate-order', 'superseded'], ''],
   ['instinct promote', 'instinct promote', [], ''],
   ['instinct groups', 'instinct groups', [], ''],
+  ['instinct pairs --unpaired', 'instinct pairs', ['--unpaired'], ''],
   ['init --root=. --yes', 'init', ['--root=.', '--yes'], ''],
   ['doctor --plan=.plans/PLAN-a.md', 'doctor', ['--plan=.plans/PLAN-a.md'], ''],
   ['status', 'status', [], ''],
@@ -607,6 +610,7 @@ describe('the core roster', () => {
       'instinct flag',
       'instinct promote',
       'instinct groups',
+      'instinct pairs',
       'update current',
       'update self',
       'update project',
@@ -723,8 +727,8 @@ describe('the module note\'s count word', () => {
 
   it('reads a planted wrong word as a count the roster does not match, the control', () => {
     expect(numberWord('forty-two')).not.toBe(ROSTER_COMMANDS.length);
-    expect(numberWord('sixty-seven')).toBe(CORE_COMMANDS.length);
-    expect(numberWord('sixty-seven')).not.toBe(ROSTER_COMMANDS.length);
+    expect(numberWord('sixty-eight')).toBe(CORE_COMMANDS.length);
+    expect(numberWord('sixty-eight')).not.toBe(ROSTER_COMMANDS.length);
   });
 });
 
@@ -740,13 +744,13 @@ describe('createRosterRegistry', () => {
       .toEqual([0, 1, 2, 3]);
   });
 
-  it('holds the 106 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
+  it('holds the 107 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
     const registry = createRosterRegistry();
 
-    expect(registry.commands({ includeHidden: true })).toHaveLength(106);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(107);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(ROSTER_COMMANDS.map((_command, index) => index));
     expect(registry.subjects()).toEqual([...ROSTER_SUBJECTS]);
-    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(106);
+    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(107);
   });
 
   it('drops the pr subject and its ten commands under off: [\'pr\'], keeping the rest in order', () => {
@@ -755,7 +759,7 @@ describe('createRosterRegistry', () => {
 
     expect(ROSTER_COMMANDS.filter((command) => command.subject === 'pr')).toHaveLength(PR_FEATURE.commands.length);
     expect(PR_FEATURE.commands).toHaveLength(10);
-    expect(registry.commands({ includeHidden: true })).toHaveLength(96);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(97);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(kept));
     expect(registry.subjects().map((subject) => subject.name))
       .toEqual(ROSTER_SUBJECTS.map((subject) => subject.name).filter((name) => name !== 'pr'));
@@ -791,7 +795,7 @@ function unregisteredNamed(source: string): readonly string[] {
 }
 
 describe('the instinct actions', () => {
-  it('registers instinct flag, instinct promote and instinct groups on the instinct subject, after its three readers', () => {
+  it('registers instinct flag, instinct promote, instinct groups and instinct pairs on the instinct subject, after its three readers', () => {
     expect(CORE_REGISTRY.actionsOf('instinct').map(commandSpelling)).toEqual([
       'instinct check',
       'instinct list',
@@ -799,13 +803,14 @@ describe('the instinct actions', () => {
       'instinct flag',
       'instinct promote',
       'instinct groups',
+      'instinct pairs',
     ]);
   });
 
-  it('names the six actions when instinct is typed alone, running nothing', async () => {
+  it('names the seven actions when instinct is typed alone, running nothing', async () => {
     const run = await dispatchRecorded('instinct');
 
-    expect(run.stderr).toBe('rafa: "instinct" needs an action; one of: check, list, show, flag, promote, groups\n');
+    expect(run.stderr).toBe('rafa: "instinct" needs an action; one of: check, list, show, flag, promote, groups, pairs\n');
     expect(run.outcome.exitCode).toBe(1);
     expect(run.ran).toEqual([]);
   });
@@ -849,7 +854,7 @@ describe('how the command tree routes', () => {
     expect(run.outcome.exitCode).toBe(0);
   });
 
-  it.each(['--help', 'start --help', 'plan --help', 'plan show --help', 'loop --help', 'loop stop --help', 'issue --help', 'issue move --help', 'effort report --help', 'instinct flag --help', 'instinct promote --help', 'instinct groups --help'])('answers rafa %s with help, running nothing', async (line) => {
+  it.each(['--help', 'start --help', 'plan --help', 'plan show --help', 'loop --help', 'loop stop --help', 'issue --help', 'issue move --help', 'effort report --help', 'instinct flag --help', 'instinct promote --help', 'instinct groups --help', 'instinct pairs --help'])('answers rafa %s with help, running nothing', async (line) => {
     const run = await dispatchRecorded(line);
 
     expect(run.ran).toEqual([]);

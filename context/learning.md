@@ -101,6 +101,37 @@ A finding with no `resolution` remains a finding only. Once a task's
 report is recorded, the loop pushes that session's lessons to the adapter
 with `source_id` set to the session id.
 
+A bug a loop files is a finding with a `tracker_ref` and no `resolution`, so
+the table above converts it to nothing. `rafa effort collect` runs the
+bug-fix pass after it collects, and so does each loop task, once its report
+is stored (`storeReport` in `src/start.ts`, after the hub contact). The pass
+pairs each bug with the loop that fixed it, so the two become one lesson with
+two sources. The join is
+exact, never by similarity, and only a `github` reference is joined. Two
+links count: a plan whose stub is `rafa-<n>`, which on this clone never
+names a filed bug, or a stage of a plan file in `plan.dir` whose
+`rafa:stage-context` names `#<n>`. The stage-context link is the common
+case, and the one that pairs here. Inside a linked stage (or across the
+whole plan, for a stub link) the fixing task is the one whose own line names
+`#<n>`, else the only task, else the one holding a resolved finding whose
+artifact is the bug's. Its fixing loop is its earliest `done` report
+recorded after the filing. The bug's words come from the `out_of_scope_bugs`
+row of the filing session whose artifact the bug's key ends with, the
+longest such row; with none, the key itself stands for them. The lesson
+takes those words as its trigger, its cause and its artifact, and the fix as
+its action: the matching resolution, else the fixing task's own line with
+its declaration stripped. It is `kind: gotcha`, `signal: loud`, confidence
+0.5, `usage_count` 2, with both sessions as its `sources` and its evidence.
+Each pair is logged under the rule `bug-fix-pair`, its `pair` key holding
+the `ref` and the `filed_by`, and a pair already logged is not pushed again;
+see "Held set and logs". A bug with no pair is listed once, with its reason:
+`local-ref` (not a `github` reference), `no-link` (no stage or plan names
+the issue), `no-plan-file` (a `done` report from a plan with no file here
+that the store alone would have linked), `ambiguous-stage` (no rule names
+exactly one task), `no-done-report`, or `fixed-before-filed` (its reports
+all predate the filing). `rafa instinct pairs --unpaired` lists each one
+with its issue, plan and reason. Nothing is guessed.
+
 ## The local adapter
 
 Located at `packages/rafa-inventory/src/adapters/learning/local.ts`. Runs the library on every push and pull.
@@ -119,12 +150,18 @@ Three files under `.rafa/instincts/`:
    - `rule` — Which merge rule applied, or `same-action-group` when a
      `new-trigger` or `same-action` decision left its record `active`
      beside an unflagged record taking its action on another trigger
-     (`group-rule.ts`, read over the held set after the push).
+     (`group-rule.ts`, read over the held set after the push), or
+     `bug-fix-pair` for every decision of a bug-fix pair's push
+     (`bug-fix-push.ts`).
    - `incoming` — The record as it was pushed, with its `description` if
      any.
    - `produced` — The ids the trigger is now held as after this decision.
    - `discarded` — The ids a higher-confidence action displaced.
-   - Nothing reads it back; it is the record of what each push did.
+   - `pair` — On a `bug-fix-pair` line only: `{ ref, filed_by }`, the
+     issue's URL and the session that filed the bug.
+   - Only `bug-fix-push.ts` reads it back, for the `pair` keys of its
+     `bug-fix-pair` lines, so a pair already logged is not pushed again;
+     otherwise it is the record of what each push did.
 
 3. **`flags.ndjson`** — One line per `flag`, holding `id`, `reason`, and
    `flagged_at` (read off `now`).
@@ -283,6 +320,7 @@ might disagree.
 | Invalid lesson file. | `rafa instinct check` names it; warning. | Fix the file or remove it. |
 | Library and port drift. | Each declares the seven types the port passes and the two confidence bounds; `src/tests/learning-contract.test.ts` holds them equal. | Change both sides in one commit. |
 | Merge depends on order. | Property test runs in every order, over actions within `GAP`. | A failure there is a library bug; a discard followed by a confirmation is order-dependent by design. |
+| A sweep fixes bugs but names no issue. | Pairs are exact: the stage context must name `#<n>`, else nothing is guessed. | Name the issue in the stage context, then run `rafa effort collect`; `rafa instinct pairs --unpaired` lists them with `no-link`. |
 
 ## Ordered by confidence, then usage, then id
 

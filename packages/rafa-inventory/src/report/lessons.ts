@@ -112,16 +112,32 @@ export function lessonId(trigger: string, action: string): string {
     : slug}-${digest}`;
 }
 
-/** The one evidence entry every lesson of a dispatch carries. */
-function lessonEvidence(context: LessonContext): InstinctEvidence {
-  const { dispatch, outcome } = context;
+/**
+ * One session a lesson came from, as its evidence entry names it: the
+ * dispatch's plan stub, task line and session id, and the loop's outcome.
+ */
+export interface LessonSession {
+  readonly sessionId: string;
+  readonly planStub: string | null;
+  readonly taskLine: string;
+  readonly outcome: string;
+}
+
+/**
+ * The evidence entry of one session: `plan`, `task`, `session` and
+ * `outcome`, with `plan` left out when the dispatch resolved none, since
+ * an evidence value is a scalar and null is not one. Every lesson of a
+ * dispatch carries its session's entry, and a bug-fix pair one per
+ * session (`./bug-fix-pairs.ts`).
+ */
+export function lessonEvidence(session: LessonSession): InstinctEvidence {
   return {
-    ...dispatch.planStub === null
+    ...session.planStub === null
       ? {}
-      : { plan: dispatch.planStub },
-    task: dispatch.taskLine,
-    session: dispatch.sessionId,
-    outcome,
+      : { plan: session.planStub },
+    task: session.taskLine,
+    session: session.sessionId,
+    outcome: session.outcome,
   };
 }
 
@@ -159,7 +175,7 @@ function toLesson(
       domain: finding.domain ?? DEFAULT_LESSON_DOMAIN,
       scope: 'project',
       source: 'task-report',
-      evidence: [lessonEvidence(context)],
+      evidence: [lessonEvidence({ ...context.dispatch, outcome: context.outcome })],
       cause,
       projectId: null,
     },

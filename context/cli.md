@@ -32,7 +32,7 @@ module's note is the long form.
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
 | `src/commands/skill/` | `skill check`, the checker over a skills directory, with `--fix` and `--project`; `skill list`, the skills the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `skill show`, one skill whole through the show view; `skill search`, the skills that answer a question; `skill demote`, the demotion pass of `packages/rafa-inventory/src/demote/` over one directory; and `skill backfill`, the plan, the proposal pass and the apply of `packages/rafa-inventory/src/backfill/` over one directory |
-| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory; `instinct list` and `instinct show`, the records the two scopes hold, `list` with its `--blessed` and `--conflicts` views; `instinct flag`, one held lesson flagged through the Learning adapter so no later bundle blesses it; `instinct promote`, the lessons that recurred enough to promote under `learning.promote.*`, writing nothing; and `instinct groups`, the gold-set export: each same-action group of two or more records the project scope holds, writing nothing |
+| `src/commands/instinct/` | `instinct check`, the checker over an instincts directory; `instinct list` and `instinct show`, the records the two scopes hold, `list` with its `--blessed` and `--conflicts` views; `instinct flag`, one held lesson flagged through the Learning adapter so no later bundle blesses it; `instinct promote`, the lessons that recurred enough to promote under `learning.promote.*`, writing nothing; `instinct groups`, the gold-set export: each same-action group of two or more records the project scope holds, writing nothing; and `instinct pairs`, each filed bug paired with the loop that fixed it and, with `--unpaired`, each bug that found none, writing nothing |
 | `src/commands/instinct/instinct-records.ts` | what only `instinct list` and `instinct show` use: the id lookup and the project a command context carries |
 | `packages/rafa-inventory/src/schema/scope-records.ts` | the two instinct scopes read as records: which files in a scope are records, what one file reads as, `readScope` and `readScopes`; read by both commands, the local Learning adapter and the skills report |
 | `packages/rafa-release/src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag, the change notes pending for the current plan and the fragments waiting on `origin/<pr.base>` as last fetched with their settle forecast (`status-fragments.ts`) and the publishable workspace packages with their versions, waiting counts and newest tags (`status-packages.ts`) and the audit of the changelog's released history (`packages/rafa-release/src/release/audit.ts`) and the count of open stale-docs lines on the tracker the chain lands on (`status-stale-docs.ts`; `none` at zero, `?` when unread, never the exit code), writing nothing; `release settle`, below; `release tag [--push]`, which puts `v<version>` for the root and `<name>@<version>` for each publishable workspace package (`tag-units.ts`) on the commit of the release branch that set that unit's version, once every unit is decided, skipping a unit a tag already names and refusing `tagged` only when every unit is skipped, and prints the push and publish lines rather than running them, a package's publish in its folder, the publish line replaced under `release.publish: ci` by a sentence naming `.github/workflows/release-publish.yml` and json's `publish: "ci"` on the unit; with `--push` it pushes each tag to the remote the release branch tracks (`origin` when it tracks none) through `packages/rafa-release/src/release/tag-push.ts` and drops its push line, and a push that fails exits 1 with git's words and keeps the local tags |
@@ -541,7 +541,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `effort dashboard`, `effort fix-schema`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `instinct groups`, `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release list`, `board list`, `board sync`, `epic show`, aliased
+  `instinct show`, `instinct flag`, `instinct promote`, `instinct groups`, `instinct pairs`, `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release list`, `board list`, `board sync`, `epic show`, aliased
   `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `claim release`,
   `claim hand`, `claim accept`, `claim take`, `update current` with the
   stubs `update self`, `update project`, `update board`, `update next`,
@@ -893,7 +893,7 @@ New; it replaces no earlier text. What a row or an action added to
   `loop` session actions, the `issue` actions, the remaining `effort` commands, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`, `skill list`, `skill show`,
   `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
-  `instinct flag`, `instinct promote`, `instinct groups`, the `release` commands, `board list`, the `epic` commands, the
+  `instinct flag`, `instinct promote`, `instinct groups`, `instinct pairs`, the `release` commands, `board list`, the `epic` commands, the
   `claim` commands, the `update` commands, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `bug recheck`, `docs plan`, `next`, `roadmap`, `switch` and the `pr` actions wrap none:
   `describe` reads the registry off its context, and `init`, `doctor`, `status`, `cleanup`,
   `self-update`, each plan reader, each `loop` session action, each `issue` action, each remaining
@@ -2063,6 +2063,25 @@ New; it replaces no earlier text. What a row or an action added to
   result's `data` is `{ groups: [{ action_hash, triggers, sources,
   confidence }] }`, `sources` the count: what the hub's member D
   calibrates its similarity against.
+- **`instinct pairs [--unpaired]` reads the bug-fix join and pushes
+  nothing** (`src/commands/instinct/pairs.ts`). It runs the bug-fix
+  pass's join up to its push: `readBugFixRows` over the store under the
+  project root (`RAFA_EFFORT_DIR` when set), `readPlanStageLinks` over
+  the `plan.dir` the config names, and `pairBugFixes`, then reads the
+  pair keys the `local` library's push log holds (`readLoggedPairs`
+  over `.rafa/instincts/`). It prints how many of the bug findings
+  paired out of the total and how many of those the log already holds
+  under `bug-fix-pair`, then each pair as its issue, its filing and its
+  fixing plan, and its lesson's trigger and action; `--unpaired` adds
+  each unpaired bug as its issue, its filing plan and its reason. A
+  store with no `effort.sqlite` is one info line naming it, every count
+  0. It writes nothing and starts no session; exit code 1 is kept for a
+  positional word, a value typed with `--unpaired` and a config that
+  does not load, and unpaired bugs are exit code 0. In json mode the
+  result's `data` is `{ total, paired, logged, pairs: [{ issue,
+  filing_plan, fixing_plan, trigger, action, logged }], unpaired: [{
+  issue, plan, reason }] }`, both lists given with or without
+  `--unpaired`.
 - **`issue` acts on the tracker the chain lands on**
   (`packages/rafa-board/src/commands/issue/`). Each action reads its line first,
   then the config as `loop start` resolves it, then hands `tracker.default` and

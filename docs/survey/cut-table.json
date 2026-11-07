@@ -5902,8 +5902,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 176,
-        "test": 606,
+        "source": 178,
+        "test": 609,
         "testSupport": 22
       },
       "files": [
@@ -6200,6 +6200,11 @@
         "src/index.ts",
         "src/inventory/browse.test.ts",
         "src/inventory/browse.ts",
+        "src/learning/bug-fix-join.test.ts",
+        "src/learning/bug-fix-pass.test.ts",
+        "src/learning/bug-fix-pass.ts",
+        "src/learning/plan-stage-links.test.ts",
+        "src/learning/plan-stage-links.ts",
         "src/loop/awake-clock.test.ts",
         "src/loop/awake-clock.ts",
         "src/loop/blocked-tasks.test.ts",

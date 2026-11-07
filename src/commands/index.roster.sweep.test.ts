@@ -11,8 +11,9 @@
  * `release list` since after `release tag`, `release publish` since
  * between those two, `release workflows` since between `release
  * publish` and `release list` and `release fragment` since between
- * `release workflows` and `release list`, and `bug recheck` since after
- * `bug codes`.
+ * `release workflows` and `release list`, `bug recheck` since after
+ * `bug codes`, `instinct groups` since after `instinct promote`, and
+ * `instinct pairs` since after `instinct groups`.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -35,7 +36,7 @@ const FACADE_IMPORT = /^import \{ ([\w, ]+) \} from '(@open-tomato\/rafa-[a-z]+(
 /** One binding of a facade import taken under an alias, as `command as switchCommand` comes from run's facade. */
 const ALIASED_BINDING = /^(\w+) as (\w+)$/;
 
-/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan`, `config show`, `release list`, `release publish`, `release workflows`, `release fragment` and `bug recheck` added: `<subject> <action>`, then top-level names. */
+/** Command names `bun src/rafa.ts describe` listed at `origin/stretch/102`, `docs plan`, `config show`, `release list`, `release publish`, `release workflows`, `release fragment`, `bug recheck`, `instinct groups` and `instinct pairs` added:`<subject> <action>`, then top-level names. */
 const BASE_NAMES: readonly string[] = [
   'plan create',
   'plan list',
@@ -97,6 +98,7 @@ const BASE_NAMES: readonly string[] = [
   'instinct flag',
   'instinct promote',
   'instinct groups',
+  'instinct pairs',
   'release status',
   'release settle',
   'release tag',
