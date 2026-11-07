@@ -103,8 +103,10 @@ with `source_id` set to the session id.
 
 A bug a loop files is a finding with a `tracker_ref` and no `resolution`, so
 the table above converts it to nothing. `rafa effort collect` runs the
-bug-fix pass after it collects, and the pass pairs each bug with the loop
-that fixed it, so the two become one lesson with two sources. The join is
+bug-fix pass after it collects, and so does each loop task, once its report
+is stored (`storeReport` in `src/start.ts`, after the hub contact). The pass
+pairs each bug with the loop that fixed it, so the two become one lesson with
+two sources. The join is
 exact, never by similarity, and only a `github` reference is joined. Two
 links count: a plan whose stub is `rafa-<n>`, which on this clone never
 names a filed bug, or a stage of a plan file in `plan.dir` whose
