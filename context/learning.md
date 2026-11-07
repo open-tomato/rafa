@@ -116,7 +116,10 @@ Three files under `.rafa/instincts/`:
 2. **`instincts.ndjson`** — The push log. One `PushLogLine` per merge
    decision, in the payload's order, holding:
    - `source_id` — The pushing session.
-   - `rule` — Which merge rule applied.
+   - `rule` — Which merge rule applied, or `same-action-group` when a
+     `new-trigger` or `same-action` decision left its record `active`
+     beside an unflagged record taking its action on another trigger
+     (`group-rule.ts`, read over the held set after the push).
    - `incoming` — The record as it was pushed, with its `description` if
      any.
    - `produced` — The ids the trigger is now held as after this decision.

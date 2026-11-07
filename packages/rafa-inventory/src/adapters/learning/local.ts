@@ -25,8 +25,10 @@
  *     one of them like any other.
  *   - `instincts.ndjson`, the push log: one {@link PushLogLine} per
  *     merge decision, in the payload's order, holding the payload's
- *     `source_id`, the rule, the incoming record as it was pushed, and
- *     the ids of the records its trigger is now held as (`produced`) and
+ *     `source_id`, the rule (the merge's, or `same-action-group` when
+ *     the record joined one action held under another trigger, as
+ *     `./group-rule.js` reads it), the incoming record as it was
+ *     pushed, and the ids of the records its trigger is now held as (`produced`) and
  *     of those a higher-confidence action displaced on it (`discarded`).
  *     Nothing reads it back; it is the record of what each push did.
  *   - `flags.ndjson`: one line per `flag`, holding the `id`, the
@@ -145,6 +147,7 @@
  * append writes a newline ahead of its own lines, so the fragment stays
  * one unreadable line and the new lines are read.
  */
+import type { PushLogRule } from './group-rule.js';
 import type { HeldDescription } from './held.js';
 import type { Instinct } from '../../schema/instinct.js';
 import type {
@@ -152,7 +155,6 @@ import type {
   InstinctRecord,
   Learning,
   MergeResult,
-  MergeRule,
   SyncPayload,
 } from '@open-tomato/rafa/ports';
 import type { InstinctScope } from '@open-tomato/rafa/schema/tiers';
@@ -175,6 +177,7 @@ import {
 } from '../../schema/instinct.js';
 import { readScope } from '../../schema/scope-records.js';
 
+import { heldAfterPush, loggedRule } from './group-rule.js';
 import { toHeldInstinct, toHeldRecords } from './held.js';
 
 /** What every refusal and report opens with. */
@@ -216,7 +219,8 @@ export interface DescribedInstinctRecord extends InstinctRecord {
 /** One line of the push log: one merge decision. */
 export interface PushLogLine {
   readonly source_id: string;
-  readonly rule: MergeRule;
+  /** The merge's rule, or `same-action-group`, as `./group-rule.js` reads it. */
+  readonly rule: PushLogRule;
   /** The record as it was pushed, its `description` included. */
   readonly incoming: DescribedInstinctRecord;
   /** The ids its trigger is held as once the rule has applied. */
@@ -606,17 +610,19 @@ function heldChanges(
   return { writes, removals };
 }
 
-/** One push-log line per decision, in the payload's order. */
+/** One push-log line per decision, in the payload's order, over the held set `before` it. */
 function pushLogLines(
   sourceId: string,
   described: readonly DescribedInstinctRecord[],
   result: MergeResult,
+  before: readonly InstinctRecord[],
 ): string[] {
+  const after = heldAfterPush(before, result);
   return result.decisions.map((decision, index) => {
     const key = triggerKey(decision.incoming.trigger);
     const line: PushLogLine = {
       source_id: sourceId,
-      rule: decision.rule,
+      rule: loggedRule(decision, after),
       incoming: loggedIncoming(described[index]!),
       produced: decision.produced.map((record) => record.id),
       discarded: result.discarded
@@ -695,13 +701,14 @@ export function createLocalLearning(options: LocalLearningOptions): Learning {
       // Checked by `payloadProblem`, a `description` included.
       const described = payload.instincts as readonly DescribedInstinctRecord[];
       const held = heldSet();
+      const before = toHeldRecords(held.files.map((file) => file.instinct));
       const result = merge(
-        toHeldRecords(held.files.map((file) => file.instinct)),
+        before,
         { source_id: payload.source_id, instincts: described.map(copyInstinct) },
         now(),
       );
       const changes = heldChanges(instinctsDir, held, result, described);
-      const lines = pushLogLines(payload.source_id, described, result);
+      const lines = pushLogLines(payload.source_id, described, result, before);
       if (lines.length > 0) {
         await mkdir(instinctsDir, { recursive: true });
         await appendLines(instinctsPath, lines);
