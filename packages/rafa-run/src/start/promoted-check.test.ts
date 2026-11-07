@@ -6,10 +6,11 @@
  * answers from a table and records every call. Gh is the recorded fake
  * (`pr/gh-fake.ts`) behind the real provider, so the body edit that
  * reaches it is the `gh pr edit` argument list the provider builds. The
- * learning adapter is a stub recording each push, apart from one case
- * that runs the real `local` adapter over a scratch directory, where
- * the lesson's `promoted_to` and its leaving the blessed set are read
- * back from disk.
+ * learning adapter is a stub recording each push and answering a
+ * planted blessed set, apart from two cases that run the real `local`
+ * adapter over a scratch directory, where `promoted_to` and leaving the
+ * blessed set are read back from disk: one lesson alone, and one
+ * action held under three triggers, whose every member leaves.
  *
  * Every case that asserts something present has a control where the
  * same input moves across the line: a changed path beside an unchanged
@@ -113,9 +114,16 @@ function changed(...paths: string[]): ReturnType<typeof changedSince> {
   return changedSince(stubGit(diffOf(...paths)).git, HEAD);
 }
 
-/** A learning adapter recording each push, refusing the ids in `refused`. */
-function stubLearning(refused: readonly string[] = []): { learning: Learning; pushes: SyncPayload[] } {
+/**
+ * A learning adapter recording each push, refusing the ids in `refused`,
+ * whose pull answers `blessed`, or is refused when `blessed` is null.
+ */
+function stubLearning(
+  refused: readonly string[] = [],
+  blessed: readonly InstinctRecord[] | null = [],
+): { learning: Learning; pushes: SyncPayload[]; pulls: () => number } {
   const pushes: SyncPayload[] = [];
+  let pulled = 0;
   const learning: Learning = {
     push: (payload) => {
       pushes.push(payload);
@@ -124,10 +132,15 @@ function stubLearning(refused: readonly string[] = []): { learning: Learning; pu
         ? Promise.reject(new Error(`no held member describes ${id}`))
         : Promise.resolve({ decisions: [], discarded: [] } as never);
     },
-    pullBlessed: () => Promise.reject(new Error('the check pulls nothing')),
+    pullBlessed: () => {
+      pulled += 1;
+      return blessed === null
+        ? Promise.reject(new Error('the store could not be read'))
+        : Promise.resolve({ version: 'stub', instincts: [...blessed] });
+    },
     flag: () => Promise.reject(new Error('the check flags nothing')),
   };
-  return { learning, pushes };
+  return { learning, pushes, pulls: () => pulled };
 }
 
 describe('readHead and changedSince', () => {
@@ -315,6 +328,97 @@ describe('recordPromotions', () => {
   });
 });
 
+describe('recordPromotions over a same-action group', () => {
+  /** One action, learned under three wordings from three sources. */
+  const ACTION = 'write the list to a file and pipe it through xargs';
+  const named = lesson('xargs-a', { action: ACTION, confidence: 0.8, sources: ['session-a'] });
+  const second = lesson('xargs-b', { action: ACTION, confidence: 0.7, sources: ['session-b'] });
+  const third = lesson('xargs-c', { action: ACTION, confidence: 0.6, sources: ['session-c', 'session-d'] });
+  const stranger = lesson('another-action');
+
+  /** The id, source and `promoted_to` of each push, in order. */
+  function pushed(pushes: readonly SyncPayload[]): (string | undefined)[][] {
+    return pushes.map((each) => [each.instincts[0]?.id, each.source_id, each.instincts[0]?.promoted_to]);
+  }
+
+  test('pushes promoted_to to every blessed member of the group, each from a source it holds', async () => {
+    const { learning, pushes, pulls } = stubLearning([], [stranger, third, named, second]);
+
+    const problems = await recordPromotions(learning, [{ lesson: named, path: 'context/source.md' }]);
+
+    expect(problems).toEqual([]);
+    expect(pulls()).toBe(1);
+    expect(pushed(pushes)).toEqual([
+      ['xargs-a', 'session-a', 'context/source.md'],
+      ['xargs-b', 'session-b', 'context/source.md'],
+      ['xargs-c', 'session-c', 'context/source.md'],
+    ]);
+    // Each member is pushed as it is held, only promoted_to added.
+    expect(pushes[2]?.instincts).toEqual([{ ...third, promoted_to: 'context/source.md' }]);
+    // The control: the blessed record taking another action is not pushed.
+    expect(pushes.map((each) => each.instincts[0]?.id)).not.toContain('another-action');
+  });
+
+  test('pushes no flagged record taking the action', async () => {
+    const flagged = lesson('xargs-flagged', { action: ACTION, status: 'flagged', sources: ['session-e'] });
+    const { learning, pushes } = stubLearning([], [named, second, flagged]);
+
+    await recordPromotions(learning, [{ lesson: named, path: 'context/source.md' }]);
+
+    expect(pushes.map((each) => each.instincts[0]?.id)).toEqual(['xargs-a', 'xargs-b']);
+  });
+
+  test('answers one problem line for a refused member and still records the rest', async () => {
+    const { learning, pushes } = stubLearning(['xargs-b'], [named, second, third, stranger]);
+
+    const problems = await recordPromotions(learning, [
+      { lesson: named, path: 'context/source.md' },
+      { lesson: stranger, path: 'context/cli.md' },
+    ]);
+
+    expect(pushes.map((each) => each.instincts[0]?.id)).toEqual(['xargs-a', 'xargs-b', 'xargs-c', 'another-action']);
+    expect(problems).toEqual([
+      '`xargs-b` (same action as `xargs-a`) is in context/source.md, but its promoted_to could not be recorded: '
+      + 'no held member describes xargs-b',
+    ]);
+  });
+
+  test('pushes a member once when two confirmed lessons share its group', async () => {
+    const { learning, pushes } = stubLearning([], [named, second, third]);
+
+    await recordPromotions(learning, [
+      { lesson: named, path: 'context/source.md' },
+      { lesson: second, path: 'context/cli.md' },
+    ]);
+
+    expect(pushed(pushes)).toEqual([
+      ['xargs-a', 'session-a', 'context/source.md'],
+      ['xargs-b', 'session-b', 'context/source.md'],
+      ['xargs-c', 'session-c', 'context/source.md'],
+    ]);
+  });
+
+  test('pushes the lesson alone, with one problem line, when the blessed set cannot be pulled', async () => {
+    const { learning, pushes } = stubLearning([], null);
+
+    const problems = await recordPromotions(learning, [{ lesson: named, path: 'context/source.md' }]);
+
+    expect(pushed(pushes)).toEqual([['xargs-a', 'session-a', 'context/source.md']]);
+    expect(problems).toEqual([
+      '`xargs-a` is in context/source.md, but the rest of its same-action group was not recorded, '
+      + 'as the blessed set could not be read: the store could not be read',
+    ]);
+  });
+
+  test('pulls nothing when no lesson was confirmed', async () => {
+    const { learning, pushes, pulls } = stubLearning([], null);
+
+    expect(await recordPromotions(learning, [])).toEqual([]);
+    expect(pulls()).toBe(0);
+    expect(pushes).toEqual([]);
+  });
+});
+
 describe('recordPromotions through the local adapter', () => {
   const scratch = mkdtempSync(join(tmpdir(), 'rafa-promoted-check-'));
 
@@ -322,9 +426,9 @@ describe('recordPromotions through the local adapter', () => {
     rmSync(scratch, { recursive: true, force: true });
   });
 
-  /** A held `.md` lesson from three task reports at 0.8. */
-  function held(id: string): Instinct {
-    const action = `the action of ${id}`;
+  /** A held `.md` lesson from three task reports at 0.8, with any field replaced. */
+  function held(id: string, overrides: Partial<Instinct> = {}): Instinct {
+    const action = overrides.action ?? `the action of ${id}`;
     return {
       id,
       trigger: `the trigger of ${id}`,
@@ -345,6 +449,7 @@ describe('recordPromotions through the local adapter', () => {
       action,
       cause: 'it recurred',
       actionHash: actionHash(action),
+      ...overrides,
     };
   }
 
@@ -378,6 +483,42 @@ describe('recordPromotions through the local adapter', () => {
     expect(parsed.instinct).toMatchObject({ promotedTo: 'context/source.md', usageCount: 3, confidence: 0.8 });
     const untouched = parseInstinct(readFileSync(join(dir, 'left-alone.md'), 'utf8'));
     expect(untouched.instinct?.promotedTo).toBeNull();
+  });
+
+  test('takes every member of the group out of the blessed set, and leaves the other lesson', async () => {
+    const root = join(scratch, 'group-repo');
+    const dir = localInstinctsDir(root);
+    mkdirSync(dir, { recursive: true });
+    const action = 'write the list to a file and pipe it through xargs';
+    const wordings = [
+      held('xargs-a', { action, confidence: 0.5, usageCount: 1, sources: ['session-a'] }),
+      held('xargs-b', { action, confidence: 0.5, usageCount: 1, sources: ['session-b'] }),
+      held('xargs-c', { action, confidence: 0.5, usageCount: 1, sources: ['session-c'] }),
+      held('left-alone'),
+    ];
+    for (const each of wordings) writeFileSync(join(dir, `${each.id}.md`), writeInstinct(each));
+    setActiveOutput(sinkOutput({}));
+    const adapter = createLocalLearning({
+      instinctsDir: dir,
+      home: join(scratch, 'group-home'),
+      minConfidence: 0.5,
+      now: () => '2026-11-07T10:00:00.000Z',
+    });
+
+    const before = await adapter.pullBlessed();
+    const target = before.instincts.find((each) => each.id === 'xargs-a');
+    if (target === undefined) throw new Error('the planted lesson was not blessed');
+    const problems = await recordPromotions(adapter, [{ lesson: target, path: 'context/source.md' }]);
+    const after = await adapter.pullBlessed();
+    setActiveOutput(null);
+
+    expect(problems).toEqual([]);
+    expect(before.instincts.map((each) => each.id).sort()).toEqual(['left-alone', 'xargs-a', 'xargs-b', 'xargs-c']);
+    expect(after.instincts.map((each) => each.id)).toEqual(['left-alone']);
+    for (const id of ['xargs-a', 'xargs-b', 'xargs-c']) {
+      const parsed = parseInstinct(readFileSync(join(dir, `${id}.md`), 'utf8'));
+      expect(parsed.instinct).toMatchObject({ promotedTo: 'context/source.md', usageCount: 1, confidence: 0.5 });
+    }
   });
 });
 

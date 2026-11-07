@@ -187,10 +187,14 @@ being asked to read `progress.txt` and decide.
      `packages/rafa-run/src/start/promoted-check.ts` pushes the blessed
      record back with `promoted_to` set, from a source it already holds,
      so `merge` collapses it as `same-action` with `usage_count` and
-     confidence unchanged. A user-scope lesson has no held member to take
-     a description from, so that push is refused with a warning.
-   - A promoted lesson leaves every blessed bundle, because the page now
-     carries it.
+     confidence unchanged. Every other blessed member of the lesson's
+     same-action group is pushed the same way, each from a source it
+     holds, with the lesson's path. Each push is its own, so a refused
+     member costs one warning and the rest are still recorded. A
+     user-scope lesson has no held member to take a description from,
+     so its push is refused with a warning.
+   - A promoted lesson and its group leave every blessed bundle, because
+     the page now carries them.
 
 5. A missing answer is reported in the PR body, but does not block the PR.
    Under `pr.provider: none` no pull request is looked up: the line is
