@@ -1,12 +1,12 @@
 /**
- * The learning contract: core's declaration of the six records the
+ * The learning contract: core's declaration of the seven types the
  * `Learning` port passes, and the two confidence bounds the `confidence`
  * reader reads, held to the learning library's own.
  *
  * Neither side may import the other. The library under
  * `packages/rafa-inventory/src/learning/` imports nothing outside its folder
  * (`learning-boundary.test.ts`), and core imports nothing above it, so core
- * declares the six types in `packages/rafa/src/ports/learning.ts` and the two
+ * declares the seven types in `packages/rafa/src/ports/learning.ts` and the two
  * bounds in `packages/rafa/src/core/config/config-sections.ts`, and the
  * library keeps its own in `packages/rafa-inventory/src/learning/types.ts` and
  * `packages/rafa-inventory/src/learning/identity.ts`. This file imports both
@@ -36,6 +36,7 @@ import type {
   MergeDecision as CoreMergeDecision,
   MergeResult as CoreMergeResult,
   MergeRule as CoreMergeRule,
+  SameActionGroup as CoreSameActionGroup,
   SyncPayload as CoreSyncPayload,
 } from '@open-tomato/rafa/ports';
 import type {
@@ -44,6 +45,7 @@ import type {
   MergeDecision as LibraryMergeDecision,
   MergeResult as LibraryMergeResult,
   MergeRule as LibraryMergeRule,
+  SameActionGroup as LibrarySameActionGroup,
   SyncPayload as LibrarySyncPayload,
 } from '@open-tomato/rafa-inventory/learning/index';
 
@@ -145,6 +147,22 @@ describe('the learning records core declares', () => {
     const library: LibraryMergeResult = fromCore;
     const core: CoreMergeResult = library;
     const sameKeys: SameKeys<CoreMergeResult, LibraryMergeResult> = true;
+
+    expect(core).toBe(fromCore);
+    expect(sameKeys).toBe(true);
+  });
+
+  test('SameActionGroup is mutually assignable with the library\'s, key for key', () => {
+    const fromCore: CoreSameActionGroup = {
+      action_hash: CORE_RECORD.action_hash,
+      members: [CORE_RECORD],
+      sources: ['session-a', 'session-b'],
+      confidence: 0.55,
+      named: CORE_RECORD,
+    };
+    const library: LibrarySameActionGroup = fromCore;
+    const core: CoreSameActionGroup = library;
+    const sameKeys: SameKeys<CoreSameActionGroup, LibrarySameActionGroup> = true;
 
     expect(core).toBe(fromCore);
     expect(sameKeys).toBe(true);

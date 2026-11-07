@@ -3,11 +3,11 @@
  *
  * The library keeps its own declaration of each. Like the rest of
  * this folder, this module imports nothing outside it, and core imports
- * nothing above it, so the `Learning` port declares the six records it
+ * nothing above it, so the `Learning` port declares the seven types it
  * passes again in `packages/rafa/src/ports/learning.ts`.
  * `src/tests/learning-contract.test.ts` holds every such pair mutually
  * assignable, so the port passes exactly what the library takes and
- * answers. {@link SameActionGroup}, the seventh, has no port pair yet.
+ * answers.
  *
  * The fields are snake case, as the distributed-learning spec spells the
  * record a sync payload carries. Every type here is erased at build, so
