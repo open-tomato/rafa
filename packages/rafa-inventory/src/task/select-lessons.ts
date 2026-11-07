@@ -56,10 +56,22 @@
  *
  * ## The order and the cap
  *
- * The kept lessons are ordered by `confidence`, highest first; a tie
- * keeps the bundle's order. The first {@link LESSON_LIMIT} are
- * returned, so a bundle of many matching lessons cannot flood the
- * prompt.
+ * The kept lessons are ordered by how strongly they match the task, by
+ * four keys in this priority:
+ *
+ *   1. **Artifact match first.** A lesson kept by its artifact path ranks
+ *      above every lesson kept by its trigger alone.
+ *   2. **Distinct trigger words matched, most first.** The same count the
+ *      floor reads, `scoreCandidate(...).words.length`, never the weighted
+ *      score, so `FIELD_WEIGHTS` stays out of the order too.
+ *   3. **`confidence`, highest first.**
+ *   4. **`id` in code-unit order**, compared with `<` and `>` on the
+ *      strings and never `localeCompare`, so every machine agrees on the
+ *      order whatever its locale, and the bundle's own order never decides
+ *      it.
+ *
+ * The first {@link LESSON_LIMIT} are returned, so a bundle of many
+ * matching lessons cannot flood the prompt.
  */
 import type { TaskInput } from './resolve-skills.js';
 import type { InventoryRecord } from '../inventory/record.js';
@@ -128,22 +140,54 @@ function triggerCandidate(lesson: InstinctRecord): RankCandidate {
   return { record, description: null, body: '' };
 }
 
-/** Whether `lesson`'s trigger matches at least {@link TRIGGER_WORD_FLOOR} of `words`. */
-function triggerMatches(lesson: InstinctRecord, words: readonly string[]): boolean {
-  return scoreCandidate(triggerCandidate(lesson), words).words.length >= TRIGGER_WORD_FLOOR;
+/** How many distinct question words of `words` `lesson`'s trigger matches. */
+function triggerWordCount(lesson: InstinctRecord, words: readonly string[]): number {
+  return scoreCandidate(triggerCandidate(lesson), words).words.length;
+}
+
+/** A lesson with the two readings its keeping and its order are taken from. */
+interface Match {
+  readonly lesson: InstinctRecord;
+  readonly byArtifact: boolean;
+  readonly triggerWords: number;
+}
+
+/** `a` against `b` by `id` in code-unit order; see "The order and the cap". */
+function compareIds(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+/** `a` against `b` by the four keys of "The order and the cap". */
+function compareMatches(a: Match, b: Match): number {
+  if (a.byArtifact !== b.byArtifact) {
+    return a.byArtifact
+      ? -1
+      : 1;
+  }
+  if (a.triggerWords !== b.triggerWords) return b.triggerWords - a.triggerWords;
+  if (a.lesson.confidence !== b.lesson.confidence) return b.lesson.confidence - a.lesson.confidence;
+  return compareIds(a.lesson.id, b.lesson.id);
 }
 
 /**
  * The lessons of `bundle` to offer `task`: kept by artifact path or by
- * trigger, highest confidence first, at most {@link LESSON_LIMIT}.
- * Pure; see the module note.
+ * trigger, artifact matches first, then most trigger words matched, then
+ * highest confidence, then `id` in code-unit order, at most
+ * {@link LESSON_LIMIT}. Pure; see the module note.
  */
 export function selectLessons(task: TaskInput, bundle: BlessedBundle): readonly InstinctRecord[] {
   const words = questionWords(task.text);
-  const kept = bundle.instincts
-    .filter((lesson) => artifactMatches(lesson, task) || triggerMatches(lesson, words));
+  const matches: Match[] = bundle.instincts.map((lesson) => ({
+    lesson,
+    byArtifact: artifactMatches(lesson, task),
+    triggerWords: triggerWordCount(lesson, words),
+  }));
 
-  return [...kept]
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, LESSON_LIMIT);
+  return matches
+    .filter((match) => match.byArtifact || match.triggerWords >= TRIGGER_WORD_FLOOR)
+    .sort(compareMatches)
+    .slice(0, LESSON_LIMIT)
+    .map((match) => match.lesson);
 }

@@ -1,8 +1,8 @@
 /**
  * Unit tests for `selectLessons`: the artifact-path match in the task
  * text and the stage context, the trigger's matched words against the
- * floor in the task text, the cap of 5, and highest confidence first. Every
- * keeping case is paired with a lesson in the same bundle that must be
+ * floor in the task text, the cap of 5, and the order: artifact match,
+ * then trigger words matched, then confidence, then `id`. Every keeping case is paired with a lesson in the same bundle that must be
  * dropped, so a filter that kept everything would fail it.
  */
 import type { TaskInput } from './resolve-skills.js';
@@ -169,19 +169,48 @@ describe('selectLessons: the cap and the order', () => {
     expect(kept.map((one) => one.confidence)).toEqual([0.9, 0.8, 0.7, 0.6, 0.5]);
   });
 
-  it('keeps the bundle order on a confidence tie', () => {
-    const lessons = ['b', 'a', 'c'].map((id) => lesson(id, { artifact: 'src/a.ts', confidence: 0.7 }));
+  it('breaks a full tie by id in code-unit order, never the bundle order', () => {
+    const lessons = ['b', 'a', 'B', 'c'].map((id) => lesson(id, { artifact: 'src/a.ts', confidence: 0.7 }));
 
-    expect(ids(selectLessons(task('Edit src/a.ts'), bundle(...lessons)))).toEqual(['b', 'a', 'c']);
+    expect(ids(selectLessons(task('Edit src/a.ts'), bundle(...lessons)))).toEqual(['B', 'a', 'b', 'c']);
   });
 
-  it('orders across both readings together', () => {
+  it('ranks an artifact match above a trigger match of higher confidence', () => {
     const byPath = lesson('by-path', { artifact: 'src/a.ts', confidence: 0.4 });
     const byTrigger = lesson('by-trigger', { trigger: 'when editing the renderer', confidence: 0.8 });
 
-    const kept = selectLessons(task('Edit the renderer in src/a.ts'), bundle(byPath, byTrigger));
+    const kept = selectLessons(task('Edit the renderer in src/a.ts'), bundle(byTrigger, byPath));
 
-    expect(ids(kept)).toEqual(['by-trigger', 'by-path']);
+    expect(ids(kept)).toEqual(['by-path', 'by-trigger']);
+  });
+
+  it('ranks an artifact match above a five-word trigger match', () => {
+    const fiveWords = lesson('five-words', { trigger: 'when a ballot quorum vote fails during leader election', confidence: 0.9 });
+    const byPath = lesson('z-path', { artifact: 'src/ballot.ts', confidence: 0.3 });
+
+    const kept = selectLessons(task('Retry the ballot quorum vote in src/ballot.ts when the leader election times out'), bundle(fiveWords, byPath));
+
+    expect(ids(kept)).toEqual(['z-path', 'five-words']);
+  });
+
+  it('offers the four-word match before an alphabetically first two-word match at one confidence', () => {
+    const twoWords = ['a-two', 'b-two', 'c-two', 'd-two', 'e-two']
+      .map((id) => lesson(id, { trigger: 'when the ballot quorum is lost' }));
+    const fourWords = lesson('z-four', { trigger: 'when the quorum vote retries after leader election timeouts' });
+
+    const kept = selectLessons(task('Retry the ballot quorum vote when the leader election times out'), bundle(...twoWords, fourWords));
+
+    expect(ids(kept)).toEqual(['z-four', 'a-two', 'b-two', 'c-two', 'd-two']);
+  });
+
+  it('ranks by confidence only between lessons matching as many trigger words', () => {
+    const low = lesson('a-low', { trigger: 'when the ballot quorum is lost', confidence: 0.3 });
+    const high = lesson('b-high', { trigger: 'when the leader election stalls', confidence: 0.8 });
+    const more = lesson('c-more', { trigger: 'when the quorum vote retries after leader election timeouts', confidence: 0.2 });
+
+    const kept = selectLessons(task('Retry the ballot quorum vote when the leader election times out'), bundle(low, high, more));
+
+    expect(ids(kept)).toEqual(['c-more', 'b-high', 'a-low']);
   });
 
   it('answers nothing for an empty bundle and leaves the bundle as it was', () => {
