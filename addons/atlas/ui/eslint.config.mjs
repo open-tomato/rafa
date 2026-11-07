@@ -1,5 +1,6 @@
-import baseConfig from '@open-tomato/rafa-eslint-config';
-import reactConfig from '@open-tomato/rafa-eslint-config/react';
+import baseConfig from '@open-tomato/eslint-config';
+import cvaConfig from '@open-tomato/eslint-config/cva';
+import reactConfig from '@open-tomato/eslint-config/react';
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -16,10 +17,11 @@ export default [
   },
   ...baseConfig,
   ...reactConfig,
+  ...cvaConfig,
   {
     // Story fixtures are story code: a layout class on a demo tile is the point.
     files: ['src/stories/**'],
-    rules: { 'ot/cva-only-classname': 'off' },
+    rules: { '@open-tomato/cva-only-classname': 'off' },
   },
   {
     // `@open-tomato/charts` exports its built dist/, and this package reads

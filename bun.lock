@@ -8,15 +8,16 @@
         "@eslint/js": "^9.39.4",
         "@eslint/markdown": "^8.0.3",
         "@open-tomato/define-config": "0.5.0",
+        "@open-tomato/eslint-config": "^0.1.0",
+        "@open-tomato/eslint-plugin": "^0.1.0",
         "@open-tomato/rafa-board": "workspace:*",
         "@open-tomato/rafa-core": "workspace:*",
         "@open-tomato/rafa-effort": "workspace:*",
-        "@open-tomato/rafa-eslint-config": "workspace:*",
         "@open-tomato/rafa-inventory": "workspace:*",
         "@open-tomato/rafa-pr": "workspace:*",
         "@open-tomato/rafa-release": "workspace:*",
         "@open-tomato/rafa-run": "workspace:*",
-        "@open-tomato/rafa-typescript-config": "workspace:*",
+        "@open-tomato/typescript-config": "^0.1.0",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@types/bun": "^1.4.0",
         "@types/node": "^26.4.1",
@@ -44,7 +45,7 @@
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^21.0.4",
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "@playwright/test": "1.63.0",
         "@storybook/addon-docs": "^10.6.5",
         "@storybook/react-vite": "^10.6.5",
@@ -76,7 +77,7 @@
         "zod": "^4.1.0",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -97,7 +98,7 @@
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^21.0.4",
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "@testing-library/dom": "^10.4.2",
         "@testing-library/react": "^16.3.3",
         "@types/bun": "^1.4.4",
@@ -121,7 +122,7 @@
         "@open-tomato/rafa-effort": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -133,7 +134,7 @@
         "@open-tomato/atlas-data": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -149,7 +150,7 @@
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^21.0.4",
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "@playwright/test": "1.63.0",
         "@storybook/addon-docs": "^10.6.5",
         "@storybook/react-vite": "^10.6.5",
@@ -174,29 +175,6 @@
         "react-dom": "^19.0.0",
       },
     },
-    "packages/eslint-config": {
-      "name": "@open-tomato/rafa-eslint-config",
-      "version": "0.0.0",
-      "dependencies": {
-        "@eslint/js": "^9.39.4",
-        "@eslint/markdown": "^8.0.3",
-        "@stylistic/eslint-plugin": "^5.10.0",
-        "@typescript-eslint/parser": "^8.69.0",
-        "eslint": "^9.39.4",
-        "eslint-import-resolver-typescript": "^4.4.4",
-        "eslint-plugin-import": "^2.32.0",
-        "eslint-plugin-jsonc": "^3.4.2",
-        "eslint-plugin-jsx-a11y": "^6.10.2",
-        "eslint-plugin-react": "^7.37.5",
-        "eslint-plugin-react-hooks": "^7.1.1",
-        "globals": "^17.12.0",
-        "jsonc-eslint-parser": "^3.1.0",
-        "typescript-eslint": "^8.69.0",
-      },
-      "devDependencies": {
-        "typescript": "^5.9.3",
-      },
-    },
     "packages/rafa": {
       "name": "@open-tomato/rafa-core",
       "version": "0.45.0",
@@ -204,7 +182,7 @@
         "@open-tomato/define-config": "0.5.0",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -217,7 +195,7 @@
         "@open-tomato/rafa-effort": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -230,7 +208,7 @@
         "@open-tomato/rafa-inventory": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -245,7 +223,7 @@
         "@open-tomato/rafa-core": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -257,7 +235,7 @@
         "@open-tomato/rafa-core": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -272,7 +250,7 @@
         "@open-tomato/rafa-release": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -286,7 +264,7 @@
         "@open-tomato/rafa-effort": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -303,7 +281,7 @@
         "@open-tomato/rafa-release": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -315,16 +293,7 @@
         "@open-tomato/rafa-core": "workspace:*",
       },
       "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
-        "eslint": "^9.39.4",
-        "typescript": "^5.9.3",
-      },
-    },
-    "packages/typescript-config": {
-      "name": "@open-tomato/rafa-typescript-config",
-      "version": "0.0.0",
-      "devDependencies": {
-        "@open-tomato/rafa-eslint-config": "workspace:*",
+        "@open-tomato/eslint-config": "^0.1.0",
         "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
@@ -485,6 +454,10 @@
 
     "@open-tomato/define-config": ["@open-tomato/define-config@0.5.0", "", {}, "sha512-7HVT/Up9GAen9djjeBaN4n671QYotDBe1uWhrr2+X7zfNi9cyKxFoy6zFDGamQ6yMTSzb6YKApqleMXgUMcsfw=="],
 
+    "@open-tomato/eslint-config": ["@open-tomato/eslint-config@0.1.0", "", { "dependencies": { "@eslint/js": "^9.39.4", "@eslint/markdown": "^8.0.3", "@open-tomato/eslint-plugin": "^0.1.0", "@stylistic/eslint-plugin": "^5.10.0", "@typescript-eslint/parser": "^8.72.0", "eslint-import-resolver-typescript": "^4.4.4", "eslint-plugin-import": "^2.32.0", "eslint-plugin-jsonc": "^3.4.2", "eslint-plugin-jsx-a11y": "^6.10.2", "eslint-plugin-react": "^7.37.5", "eslint-plugin-react-hooks": "^7.1.1", "eslint-plugin-react-refresh": "^0.5.7", "globals": "^17.12.0", "jsonc-eslint-parser": "^3.1.0", "typescript-eslint": "^8.72.0" }, "peerDependencies": { "eslint": "^9.39.0", "typescript": ">=5.8.0" } }, "sha512-sGmwNHs7YsR7kxPkmfOJkBSkPoZqg7E2exgK1Aoud1wmjatLA1Vp3yjsvmKErETNEHtSCwtu46rWPR/y6oyZeg=="],
+
+    "@open-tomato/eslint-plugin": ["@open-tomato/eslint-plugin@0.1.0", "", { "peerDependencies": { "eslint": "^9.39.0" } }, "sha512-oQ6OOv6WX/COoTcKLjaV2r+Jm0cjyzBM6Jh40g+J8gO8VapzOrnVmGftNDngd/4BI/VN5wi4+Zv0eFpwpGNWfA=="],
+
     "@open-tomato/rafa-atlas": ["@open-tomato/rafa-atlas@workspace:addons/atlas/rafa-atlas"],
 
     "@open-tomato/rafa-board": ["@open-tomato/rafa-board@workspace:packages/rafa-board"],
@@ -492,8 +465,6 @@
     "@open-tomato/rafa-core": ["@open-tomato/rafa-core@workspace:packages/rafa"],
 
     "@open-tomato/rafa-effort": ["@open-tomato/rafa-effort@workspace:packages/rafa-effort"],
-
-    "@open-tomato/rafa-eslint-config": ["@open-tomato/rafa-eslint-config@workspace:packages/eslint-config"],
 
     "@open-tomato/rafa-hub": ["@open-tomato/rafa-hub@workspace:packages/rafa-hub"],
 
@@ -507,7 +478,7 @@
 
     "@open-tomato/rafa-sync-service": ["@open-tomato/rafa-sync-service@workspace:packages/rafa-sync-service"],
 
-    "@open-tomato/rafa-typescript-config": ["@open-tomato/rafa-typescript-config@workspace:packages/typescript-config"],
+    "@open-tomato/typescript-config": ["@open-tomato/typescript-config@0.1.0", "", { "peerDependencies": { "typescript": ">=5.8.0" } }, "sha512-Vj7i7jIW9ZFNSTJK/BLX93Tzk9pk9t+j6J3Q5Z78Lb9Fq+SAJdauUhbISl5H4wraYIA6HlkSddkX+1jI/jbSSg=="],
 
     "@ota-meshi/ast-token-store": ["@ota-meshi/ast-token-store@0.3.0", "", {}, "sha512-XRO0zi2NIUKq2lUk3T1ecFSld1fMWRKE6naRFGkgkdeosx7IslyUKNv5Dcb5PJTja9tHJoFu0v/7yEpAkrkrTg=="],
 
@@ -1048,6 +1019,8 @@
     "eslint-plugin-react": ["eslint-plugin-react@7.37.5", "", { "dependencies": { "array-includes": "^3.1.8", "array.prototype.findlast": "^1.2.5", "array.prototype.flatmap": "^1.3.3", "array.prototype.tosorted": "^1.1.4", "doctrine": "^2.1.0", "es-iterator-helpers": "^1.2.1", "estraverse": "^5.3.0", "hasown": "^2.0.2", "jsx-ast-utils": "^2.4.1 || ^3.0.0", "minimatch": "^3.1.2", "object.entries": "^1.1.9", "object.fromentries": "^2.0.8", "object.values": "^1.2.1", "prop-types": "^15.8.1", "resolve": "^2.0.0-next.5", "semver": "^6.3.1", "string.prototype.matchall": "^4.0.12", "string.prototype.repeat": "^1.0.0" }, "peerDependencies": { "eslint": "^3 || ^4 || ^5 || ^6 || ^7 || ^8 || ^9.7" } }, "sha512-Qteup0SqU15kdocexFNAJMvCJEfa2xUKNV4CC1xsVMrIIqEy3SQ/rqyxCWNzfrd3/ldy6HMlD2e0JDVpDg2qIA=="],
 
     "eslint-plugin-react-hooks": ["eslint-plugin-react-hooks@7.1.1", "", { "dependencies": { "@babel/core": "^7.24.4", "@babel/parser": "^7.24.4", "hermes-parser": "^0.25.1", "zod": "^3.25.0 || ^4.0.0", "zod-validation-error": "^3.5.0 || ^4.0.0" }, "peerDependencies": { "eslint": "^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0 || ^10.0.0" } }, "sha512-f2I7Gw6JbvCexzIInuSbZpfdQ44D7iqdWX01FKLvrPgqxoE7oMj8clOfto8U6vYiz4yd5oKu39rRSVOe1zRu0g=="],
+
+    "eslint-plugin-react-refresh": ["eslint-plugin-react-refresh@0.5.7", "", { "peerDependencies": { "eslint": "^9 || ^10" } }, "sha512-XhJSzLljuYD4UjNuFGJu2v7aD3sqNVK12w5/DCUfrNfHWegZo2+TsavNx8MuxMwEquuFAzNbNfXKU0WoZ+YUIg=="],
 
     "eslint-scope": ["eslint-scope@8.4.0", "", { "dependencies": { "esrecurse": "^4.3.0", "estraverse": "^5.2.0" } }, "sha512-sNXOfKCn74rt8RICKMvJS7XKV/Xk9kA7DyJr8mJik3S7Cwgy3qlkkmyS2uQB3jiJg6VNdZd/pDBJu0nvG2NlTg=="],
 

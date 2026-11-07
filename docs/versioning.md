@@ -24,8 +24,6 @@ none publishes yet:
 - `packages/rafa`, `@open-tomato/rafa-core`
 - `packages/rafa-hub`, `@open-tomato/rafa-hub`
 - `packages/rafa-sync-service`, `@open-tomato/rafa-sync-service`
-- `packages/typescript-config`, `@open-tomato/rafa-typescript-config`
-- `packages/eslint-config`, `@open-tomato/rafa-eslint-config`
 
 A member that publishes has its own changelog, tag and publish line,
 settled by `rafa release settle` beside the root's. Its `version` then

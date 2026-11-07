@@ -116,10 +116,11 @@ form over the spec's descriptor.
   exception is a measured number the browser hands back or a column's
   own width (a tip's coordinates, a `<col>` track, a body height cap, a
   clamp's line count), set at the site with a comment saying so. The lint
-  rule `ot/cva-only-classname` (in `@open-tomato/rafa-eslint-config/react`)
-  allows a `className` value only as a variants call, a `cn(...)` over
-  variants calls and the passthrough, or the passthrough alone. Files under
-  `templates/` and `pages/`, stories and tests are exempt.
+  rule `@open-tomato/cva-only-classname` (in `@open-tomato/eslint-plugin`,
+  enabled by `@open-tomato/eslint-config/cva`) allows a `className` value
+  only as a variants call, a `cn(...)` over variants calls and the
+  passthrough, or the passthrough alone. Files under `templates/` and
+  `pages/`, stories and tests are exempt.
 - The repo compiles with `isolatedDeclarations`, so an exported `cva` call
   carries an explicit function type, as `swatchVariants` does.
 

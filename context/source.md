@@ -30,7 +30,7 @@ spells out, and the shapes the lint config forces.
   `writeReleaseWorkflow` from `packages/rafa-release/src/release/templates.ts`,
   so the command and the doctor row read one set of files.
 - **Every `import type` line forms one `import/order` group**
-  (`packages/eslint-config/sharedRules.mjs`), and no short rule predicts its
+  (`@open-tomato/eslint-config/shared-rules`), and no short rule predicts its
   order: neither plain name order, "every sibling before every parent", nor path
   depth first, as this bullet read until 2026-09-24.
   `packages/rafa-pr/src/plan/risk.ts` puts its two `./risk/` lines first and its
@@ -77,16 +77,15 @@ spells out, and the shapes the lint config forces.
 
 ### Explicit types on exports
 
-**`base.json` of `packages/typescript-config` sets `isolatedDeclarations`
+**`@open-tomato/typescript-config/base` sets `isolatedDeclarations`
 and `erasableSyntaxOnly`**. Every tsconfig reaches it by one chain: the
 root `tsconfig.json` and each composite member's `tsconfig.json` extend
-`tsconfig.packages.json`, which extends
-`@open-tomato/rafa-typescript-config/base`, the name the root's
-`workspace:*` line links into `node_modules`. So the root config and the
-nine composite members are held to both flags by `bun run check-types`, with
-no flag on the command line. The package's `base.test.ts` holds both flags and
-`declaration`. `declaration` sits beside them because `tsc` refuses
-`isolatedDeclarations` without it; under the base's `noEmit` it writes no
+`tsconfig.packages.json`, which extends `@open-tomato/typescript-config/base`,
+the name the root's `^0.1.0` line installs into `node_modules`. So the root
+config and the nine composite members are held to both flags by
+`bun run check-types`, with no flag on the command line. The base also sets
+`declaration`, because `tsc` refuses `isolatedDeclarations` without it; under
+the base's `noEmit` it writes no
 file. The root `tsconfig.json` excludes `**/*.test.ts`,
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
 runner's type step does, for the test files a task adds or edits: its scratch
@@ -704,13 +703,11 @@ the first line.
 
 **Core's rule is its package folder.** `CUT_RULES` gives core the folder
 `packages/rafa/` and no named file, so every file under the package is core's,
-and the folder's closing `/` keeps `packages/rafa-hub/` out of it. The hub,
-the sync service and the two shared-config packages
-(`packages/eslint-config/`, `packages/typescript-config/`) follow the same
-one-folder rule. A facade folder is its package's too: `packages/rafa-effort/`
-is the `rafa-effort` row's one folder, since pass 4b dropped `src/effort/` from
-the rule, and the table lists its `src/` files there but not its facade
-`index.ts`, which the graph does not read.
+and the folder's closing `/` keeps `packages/rafa-hub/` out of it. The hub and
+the sync service follow the same one-folder rule. A facade folder is its
+package's too: `packages/rafa-effort/` is the `rafa-effort` row's one folder,
+since pass 4b dropped `src/effort/` from the rule, and the table lists its
+`src/` files there but not its facade `index.ts`, which the graph does not read.
 
 **The counts rank options and do not certify a cut.** An upward edge from
 `packages/rafa/src/core/config/` into a `config-schema-<section>.ts` file is
@@ -749,13 +746,11 @@ names come from, and the facade entry is no node.
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with eleven members, all `private`: the five that
+  `package.json`) with nine members, all `private`: the three that
   predate the facades, `packages/rafa/` (`@open-tomato/rafa-core`, core, the
   name for good), `packages/rafa-hub/` (`@open-tomato/rafa-hub`),
-  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`) and the
-  two config packages, `packages/typescript-config/`
-  (`@open-tomato/rafa-typescript-config`) and `packages/eslint-config/`
-  (`@open-tomato/rafa-eslint-config`); and the six feature packages that
+  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`); and the
+  six feature packages that
   `docs/survey/facade-pile.md` lists as passing, `packages/rafa-effort/`,
   `packages/rafa-inventory/`, `packages/rafa-board/`,
   `packages/rafa-release/`, `packages/rafa-pr/` and `packages/rafa-run/`,
@@ -1134,19 +1129,14 @@ names come from, and the facade entry is no node.
   one line per bundle, `<label> built with externals: <names>`, or `none`.
   `--no-externals`, which the tests alone pass, builds with no `--external`,
   so the guard's failure has a planted-tree control.
-- **The config packages are the shared configs every member extends.**
-  `packages/typescript-config/base.json` is the strict tsconfig base, reached
-  as `@open-tomato/rafa-typescript-config/base`; the root declares it with
-  `workspace:*` so the chain resolves from the root, as "Explicit types on
-  exports" above sets out. `packages/eslint-config/base.mjs` is the flat ESLint
-  config, with `sharedRules.mjs` and `rules/` beside it, reached as
-  `@open-tomato/rafa-eslint-config`; a member's `eslint.config.mjs` imports it
-  and adds only its own ignores. Neither package holds a `tsconfig.json` or a
-  `check-types` script; each has its own `lint` and `test` scripts. Each
-  manifest declares `openTomato.team` (`@open-tomato/maintainers`), which
-  `scripts/codeowners.ts` reads to derive `.github/CODEOWNERS`. `bun run
-  codeowners --check` refuses a file that differs from the manifests, but no
-  check confirms that a team exists on GitHub.
+- **The shared configs are installed, not kept under `packages/`.**
+  `@open-tomato/typescript-config` is the strict tsconfig base, reached as
+  `@open-tomato/typescript-config/base`; the root declares it at `^0.1.0` so
+  the chain resolves from the root, as "Explicit types on exports" above sets
+  out. `@open-tomato/eslint-config` is the flat ESLint config, with flavors
+  `/react`, `/cva`, `/files` and `/shared-rules`; a member's
+  `eslint.config.mjs` imports it and adds only its own ignores. Both come from
+  npmjs, so `packages/` holds neither.
 - **The import name resolves through `paths`, not `node_modules`.**
   `tsconfig.packages.json` maps four entries, longest prefix first:
   `@open-tomato/rafa/store` and `@open-tomato/rafa/ports` to the two barrels,
@@ -1207,19 +1197,20 @@ names come from, and the facade entry is no node.
   folders included, and so does the runner's lint step on a task's diff; the
   root `eslint.config.mjs` ignores `**/.tsbuild/**`, so the root `eslint .`
   never lints the declarations a `check-types` run left behind. Each member's
-  own `eslint.config.mjs` is a leaf on `@open-tomato/rafa-eslint-config` that
+  own `eslint.config.mjs` is a leaf on `@open-tomato/eslint-config` that
   adds only `.tsbuild/**` and `node_modules/**` to the ignores, and its `lint`
   script, `eslint .` run from the package directory, lints that package alone.
-  The import names resolve for `import/no-unresolved` because the resolver of
-  `packages/eslint-config/base.mjs`, the shared config the root
-  `eslint.config.mjs` imports, lists `./packages/*/tsconfig.json` beside the
-  root `tsconfig.json`; without that entry, `bunx eslint packages` reported 21
-  `import/no-unresolved` errors (measured on ESLint 9.39.5). Two globs make
+  The import names resolve for `import/no-unresolved` because the resolver
+  lists `./packages/*/tsconfig.json` beside the root `tsconfig.json`: the
+  shared base sets that entry, and the root `eslint.config.mjs` adds
+  `./addons/atlas/*/tsconfig.json`. Without the `packages` entry, `bunx eslint
+  packages` reported 21 `import/no-unresolved` errors (measured on ESLint
+  9.39.5, before the configs moved out of `packages/`). Two globs make
   several projects, so the resolver also sets `noWarnOnMultipleProjects`, or
   every run prints `Multiple projects found` to stderr. Before a feature
   package's move, its facade over `src/` held no `tsconfig.json`, so the graph
-  check asked it no `check-types` script and the references build skipped it,
-  as it skips the config packages. Now each feature package holds its own files
+  check asked it no `check-types` script and the references build skipped it.
+  Now each feature package holds its own files
   and a composite `tsconfig.json`: `packages/rafa-inventory`, for one,
   references `../rafa`, has a `check-types` script and an entry in the solution
   file, and its `bunfig.toml` preloads `test-preload.ts`, which registers
@@ -1241,10 +1232,9 @@ names come from, and the facade entry is no node.
   declarations, and is a no-op on a second run. `.tsbuild/` is gitignored at
   every depth. Each of the three code packages' `turbo.json` extends the root's
   (`"extends": ["//"]`) and declares `check-types.outputs` as `.tsbuild/**`, so
-  a cache hit restores the declarations a dependent's build reads. The two
-  config packages emit nothing and carry no override. The six feature packages
-  have no `turbo.json` either, so their `check-types` runs under the root's
-  definition, which declares no outputs. A service with its
+  a cache hit restores the declarations a dependent's build reads. The six
+  feature packages have no `turbo.json`, so their `check-types` runs under
+  the root's definition, which declares no outputs. A service with its
   reference to core dropped fails with `TS6307` and `TS6059` on core's files,
   and still writes their `.d.ts` files beside core's sources, so a run that
   fails that way leaves stray files under `packages/rafa/src/` to remove; list
@@ -1284,17 +1274,14 @@ names come from, and the facade entry is no node.
 - **Bun links each member in isolation, so a member declares what its files
   import.** A member's own `node_modules/` holds only what its manifest
   declares, so a bare import resolves from its manifest and not from the
-  root's. Each member but the eslint-config package declares
-  `@open-tomato/rafa-eslint-config` (`workspace:*`) and `eslint` in its
-  `devDependencies`, the last at the root's range, so one install serves its
-  scripts; the members with a `check-types` script and the typescript-config
-  package also declare `typescript` at the root's range, and the two services
-  also declare `@open-tomato/rafa-core` (`workspace:*`). The graph check's
-  fourth refusal holds the `@open-tomato/*` imports to those declarations and
-  reads no `eslint` or `typescript` import, which the scripts name. The
-  eslint-config package lists `eslint` in its `dependencies`, declares
-  `typescript` as a `devDependency`, and imports itself by name through its
-  own `exports`. After a manifest edit, `bun install` refreshes `bun.lock` and
+  root's. Each member declares `@open-tomato/eslint-config` (`^0.1.0`) and
+  `eslint` in its `devDependencies`, the last at the root's range, so one
+  install serves its scripts; the members with a `check-types` script also
+  declare `typescript` at the root's range, and the two services also declare
+  `@open-tomato/rafa-core` (`workspace:*`). The graph check's fourth refusal
+  holds the `@open-tomato/*` imports to those declarations and reads no
+  `eslint` or `typescript` import, which the scripts name. After a manifest
+  edit, `bun install` refreshes `bun.lock` and
   the links.
 - **The build reads core from its source and names it through two shims.** The
   root `build` script runs `scripts/build/bundle.ts`, which bun-builds
@@ -1365,9 +1352,9 @@ names come from, and the facade entry is no node.
 ### The size cap no gate reads
 
 **The 800-line cap is a convention only.** The root `eslint.config.mjs` and the
-`base.mjs` and `sharedRules.mjs` of `packages/eslint-config` carry no
-`max-lines` rule, so nothing refuses an oversized module and a file crosses the
-cap without any capture going red. Count the file with `wc -l` when a task adds
+`@open-tomato/eslint-config` carries no `max-lines` rule, so nothing refuses
+an oversized module and a file crosses the cap without any capture going red.
+Count the file with `wc -l` when a task adds
 to one already near the cap; a module that has to grow puts the new concern in a
 new file, and a note that has outgrown its module can move to the `context/`
 page that owns the subject. Some modules including
