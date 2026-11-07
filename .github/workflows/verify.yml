@@ -84,7 +84,6 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - addons/atlas/charts
           - addons/atlas/ui
     defaults:
       run:

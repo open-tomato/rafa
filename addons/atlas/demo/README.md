@@ -2,8 +2,8 @@
 
 Bun.serve demo, never published: the four lens dashboards over a local
 Atlas replica. It holds what the two libraries, `@open-tomato/charts`
-and `@open-tomato/atlas-ui`, leave to their consumer: the theme values,
-the mock data and the four lens pages. The server will
+(from npm) and `@open-tomato/atlas-ui` (`../ui`), leave to their consumer:
+the theme values, the mock data and the four lens pages. The server will
 mount the fetch adapter under `/api/atlas`; `atlas.config.json` will point
 it at a rafa project (relative paths only), and `ATLAS_PROJECT_ROOT`
 overrides it, which a worktree needs because the store and the board
@@ -46,20 +46,23 @@ values. A card's `info` and `table` feed the registry's `info` and
 the light values in Tailwind's `@theme` block, the dark re-step under
 `:root[data-theme="dark"]`, and `@custom-variant dark` on that attribute.
 Dark mode is `data-theme="dark"` on `<html>`. The stylesheet's two
-`@source` lines make Tailwind scan both libraries' source for the classes
-their components use. Both libraries' Storybooks import this same file,
-so a story and the demo paint the same values.
+`@source` lines make Tailwind scan charts' published `dist/` (under
+`node_modules`) and ui's `src/` for the classes their components use. ui's
+Storybook imports this same file, so a story and the demo paint the same
+values.
 `src/theme-values.test.ts` holds the file to the token list of
 `@open-tomato/charts/theme`.
 
 ## Reading the libraries
 
-`tsconfig.json` maps the libraries' entries (`@open-tomato/charts` with
-`./theme` and `./engine`, `@open-tomato/atlas-ui` with `./contract`) to
-their source through `paths`, which both `tsc` and Bun follow, so the demo
-runs without building either first. The import resolver
-of the lint does not follow `paths`, so the lint config skips
-`import/no-unresolved` for those imports and leaves them to `tsc`.
+`@open-tomato/charts` (with `./theme` and `./engine`) resolves from
+`node_modules` like any npm dependency, through its published declarations,
+and `tsconfig.json` has no `paths` entry for it. `tsconfig.json` maps
+`@open-tomato/atlas-ui` (with `./contract`) to its source through `paths`,
+which both `tsc` and Bun follow, so the demo runs without building ui first.
+The import resolver of the lint does not follow `paths`, so the lint config
+skips `import/no-unresolved` for the `@open-tomato/atlas-ui` imports and
+leaves them to `tsc`.
 
 ## Gates
 
@@ -75,4 +78,4 @@ tests draw with a stub engine, since happy-dom has no canvas, and
 
 Like every file under `addons/atlas/`, nothing here names a host, a home
 path or a private repository; `privacy.sweep.test.ts` in
-`@open-tomato/charts` reads this folder too.
+`addons/atlas/ui` reads this folder too.

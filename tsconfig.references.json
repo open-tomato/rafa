@@ -15,7 +15,6 @@
     { "path": "./packages/rafa-sync-service" },
     { "path": "./addons/atlas/data" },
     { "path": "./addons/atlas/transport" },
-    { "path": "./addons/atlas/charts" },
     { "path": "./addons/atlas/ui" },
     { "path": "./addons/atlas/rafa-atlas" },
     { "path": "./addons/atlas/demo" }
