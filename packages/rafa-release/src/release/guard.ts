@@ -93,6 +93,18 @@
  * root fragment a package's, and one left out this way is not a problem
  * line.
  *
+ * A stamp that merges in moves where the root's fold starts. When the
+ * branch moved the version file since the merge base and the base did
+ * not, the merge takes the branch's version, and settle folds from that
+ * one (measured on 2026-11-06: a branch setting 0.1.0 back to 0.0.0
+ * with a minor fragment forecast 0.2.0 and settled 0.1.0, #1517). The
+ * root's fold then starts from the branch's version, which
+ * `mergedRootVersion` (`./guard-merged-version.ts`) names and
+ * `BranchForecast.mergedVersion` carries beside the base's, so "if
+ * merged now" is what settle writes. A base that moved its version file
+ * too is a conflict the merge cannot hand the branch, and the fold
+ * starts from the base's.
+ *
  * The base version is the unit's at the base commit: the root's from
  * `release.versionFile`, asking nothing of the workspace, and a
  * package's from its own manifest, the member
@@ -156,6 +168,7 @@ import { readPlanChanges } from '@open-tomato/rafa/store/changes';
 import { forecastLine } from './branch-forecast.js';
 import { forecastRelease } from './forecast.js';
 import { readFragmentTree } from './fragment-tree.js';
+import { mergedRootVersion } from './guard-merged-version.js';
 import { highestChangeLevel, RELEASE_LEVEL_RANK } from './level.js';
 import { packageBaseVersionAt } from './package-base-version.js';
 import { readReceipt } from './receipt.js';
@@ -522,23 +535,36 @@ function slotOf(branch: readonly FoldFragment[]): { readonly slot: FoldFragment 
   return { slot: branch[last] ?? null, others: branch.filter((_, index) => index !== last) };
 }
 
+/** The base a dry fold reads: its ref and commit, the root's version there, and the one a merge leaves. */
+interface DryFoldBase {
+  readonly ref: string;
+  readonly commit: string;
+  readonly rootVersion: string | null;
+  /** The root version the merge leaves when it is the branch's; see `./guard-merged-version.ts`. */
+  readonly mergedRootVersion: string | null;
+}
+
 /**
- * The version the slot's unit declares at the base: `release.versionFile`'s
- * for the root (`rootVersion`, already read), the member manifest's for a
- * package, read through {@link packageBaseVersionAt}; or the problem
+ * The version the slot's unit folds from: for the root, the version the
+ * merge leaves (`mergedRootVersion`) or else `release.versionFile`'s at
+ * the base (`rootVersion`, already read); for a package, the member
+ * manifest's, read through {@link packageBaseVersionAt}; or the problem
  * line saying why no forecast was folded.
  */
 function slotBaseVersion(
   git: GitRunner,
   input: GuardInput,
-  base: { readonly ref: string; readonly commit: string; readonly rootVersion: string | null },
+  base: DryFoldBase,
   pkg: string | null,
-): { readonly version: string } | { readonly problem: string } {
+): { readonly version: string; readonly merged?: string } | { readonly problem: string } {
   const unfolded = 'so no forecast was folded';
   if (pkg === null) {
-    return base.rootVersion === null
-      ? { problem: `${base.ref} declares no version in ${input.settings.releaseVersionFile}, ${unfolded}` }
-      : { version: base.rootVersion };
+    if (base.rootVersion === null) {
+      return { problem: `${base.ref} declares no version in ${input.settings.releaseVersionFile}, ${unfolded}` };
+    }
+    return base.mergedRootVersion === null
+      ? { version: base.rootVersion }
+      : { version: base.rootVersion, merged: base.mergedRootVersion };
   }
   return packageBaseVersionAt({ git, base, package: pkg });
 }
@@ -547,7 +573,7 @@ function slotBaseVersion(
 function dryFold(
   git: GitRunner,
   input: GuardInput,
-  base: { readonly ref: string; readonly commit: string; readonly rootVersion: string | null },
+  base: DryFoldBase,
   branch: readonly FoldFragment[],
 ): { readonly forecast: BranchForecast | null; readonly problems: readonly string[] } {
   const { slot, others } = slotOf(branch);
@@ -570,9 +596,20 @@ function dryFold(
     }
   }
   const strategy = releaseStrategyFor(input.settings.releaseStrategy, { heading: input.settings.releaseHeading });
-  const forecast = forecastRelease({ strategy, baseVersion: baseVersion.version, waiting: [...waiting, ...before], branch: slot });
+  const merged = 'merged' in baseVersion
+    ? baseVersion.merged
+    : undefined;
+  const forecast = forecastRelease({
+    strategy,
+    baseVersion: merged ?? baseVersion.version,
+    waiting: [...waiting, ...before],
+    branch: slot,
+  });
+  const read = { ok: true, ref: base.ref, baseVersion: baseVersion.version, waiting: waiting.map((each) => each.id), forecast, problems } as const;
   return {
-    forecast: { ok: true, ref: base.ref, baseVersion: baseVersion.version, waiting: waiting.map((each) => each.id), forecast, problems },
+    forecast: merged === undefined
+      ? read
+      : { ...read, mergedVersion: merged },
     problems,
   };
 }
@@ -646,7 +683,8 @@ export function readGuard(input: GuardInput): GuardReading {
   };
   const verdict = nameVerdict(git, baseCommit, settings, judgeGuard(facts));
   const base = { ref: input.base, commit: baseCommit };
-  const dry = dryFold(git, input, { ...base, rootVersion: baseSide.version }, own.folded);
+  const mergedRoot = mergedRootVersion({ mergeBase: facts.mergeBase.version, branch: facts.branch.version, base: baseSide.version });
+  const dry = dryFold(git, input, { ...base, rootVersion: baseSide.version, mergedRootVersion: mergedRoot }, own.folded);
   const level = localLevelReport(own.folded, input.readNotes);
   return {
     ok: true,

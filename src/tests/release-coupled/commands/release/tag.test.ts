@@ -75,6 +75,7 @@ import {
   pastReleaseWarning,
   renderTagged,
 } from '@open-tomato/rafa-release/commands/release/tag';
+import { readBehind } from '@open-tomato/rafa-release/commands/release/tag-behind';
 import { DEFAULT_REGISTRY, followUpsFor } from '@open-tomato/rafa-release/commands/release/tag-follow-ups';
 import { parseSemanticVersion, RELEASE_REMOTE } from '@open-tomato/rafa-release/release/version';
 
@@ -478,6 +479,59 @@ describe('the decision one run makes', () => {
 
     expect(refusal.reason).toBe('version');
   });
+
+  it('refuses when the release branch is behind its upstream, naming the fast-forward to run', () => {
+    const refusal = refusalOf(decideTag(inputs({
+      branch: { branch: DEFAULT_RELEASE_BRANCH, problem: null, behind: { upstream: 'origin/main', commits: 2 } },
+    })));
+
+    expect(refusal.reason).toBe('behind');
+    expect(refusal.message).toContain('main is 2 commits behind origin/main');
+    expect(refusal.message).toContain('git merge --ff-only origin/main');
+  });
+
+  it('refuses behind before tagged, so a release settle just pushed is not read as already tagged', () => {
+    const refusal = refusalOf(decideTag(inputs({
+      branch: { branch: DEFAULT_RELEASE_BRANCH, problem: null, behind: { upstream: 'origin/main', commits: 1 } },
+      tags: { tags: [tag(TAG)], latest: tag(TAG), problem: null },
+    })));
+
+    expect(refusal.reason).toBe('behind');
+    expect(refusal.message).toContain('1 commit behind');
+  });
+
+  it('tags a release branch level with its upstream, or one whose upstream was not read', () => {
+    const level = inputs({ branch: { branch: DEFAULT_RELEASE_BRANCH, problem: null, behind: { upstream: 'origin/main', commits: 0 } } });
+    const unread = inputs({ branch: { branch: DEFAULT_RELEASE_BRANCH, problem: null, behind: null } });
+
+    expect(decideTag(level)).toEqual(READY);
+    expect(decideTag(unread)).toEqual(READY);
+  });
+});
+
+describe('the upstream reading', () => {
+  /** A git answering the two upstream reads from `upstream` and `count`, refusing anything else. */
+  function upstreamGit(upstream: GitResult, count: GitResult): GitRunner {
+    return (args) => {
+      const words = args.join(' ');
+      if (words === 'rev-parse --abbrev-ref --symbolic-full-name @{upstream}') return upstream;
+      if (words === 'rev-list --count HEAD..@{upstream}') return count;
+      return refused(`the case planted no answer for git ${words}`);
+    };
+  }
+
+  it('answers the upstream git names and how many of its commits HEAD lacks', () => {
+    expect(readBehind(upstreamGit(said('origin/main\n'), said('3\n')))).toEqual({ upstream: 'origin/main', commits: 3 });
+  });
+
+  it('answers null for a branch that tracks nothing, which no refusal follows from', () => {
+    expect(readBehind(upstreamGit(refused('fatal: no upstream configured for branch'), said('0\n')))).toBeNull();
+  });
+
+  it('answers null when the count could not be read or is no number', () => {
+    expect(readBehind(upstreamGit(said('origin/main\n'), refused('fatal: bad revision')))).toBeNull();
+    expect(readBehind(upstreamGit(said('origin/main\n'), said('many\n')))).toBeNull();
+  });
 });
 
 /** A unit of a run that tagged: the root's, ready on HEAD, narrowed by `over`. */
@@ -650,6 +704,21 @@ describe('the dispatched action', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain(`${TAG} already names ${VERSION}`);
+    expect(seams.calls.filter((call) => call.startsWith('tag v'))).toEqual([]);
+  });
+
+  it('refuses a release branch behind its upstream with exit code 1, and sends no git tag', async () => {
+    const seams = recorded({
+      ...gitTable(),
+      'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': said('origin/main\n'),
+      'rev-list --count HEAD..@{upstream}': said('1\n'),
+    });
+
+    const run = await ran(seams.seams, releaseProject());
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('main is 1 commit behind origin/main');
+    expect(run.stderr).toContain('git merge --ff-only origin/main');
     expect(seams.calls.filter((call) => call.startsWith('tag v'))).toEqual([]);
   });
 
@@ -1202,5 +1271,47 @@ describe('what the default seams reach', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('feat/rafa-21-changelog-and-release');
     expect(gitIn(repo.repo, repo.home, ['tag', '--list']).trim()).toBe('');
+  });
+
+  it('refuses behind right after a release lands on the remote only, then tags it once fast-forwarded', async () => {
+    // Arrange: main released 0.4.0 and tracks a bare remote.
+    const repo = plantScratchRepo(scratch());
+    const remote = join(scratch(), 'remote.git');
+    gitIn(repo.repo, repo.home, ['init', '-q', '--bare', remote]);
+    writeFileSync(join(repo.repo, 'package.json'), MANIFEST.replace(VERSION, '0.4.0'), 'utf8');
+    writeFileSync(join(repo.repo, 'CHANGELOG.md'), '# Changelog\n\n## 0.4.0 — 2026-09-01, rafa-20: the pull request commands\n', 'utf8');
+    gitIn(repo.repo, repo.home, ['checkout', '-q', '-B', DEFAULT_RELEASE_BRANCH]);
+    gitIn(repo.repo, repo.home, ['add', '-A']);
+    gitIn(repo.repo, repo.home, ['commit', '-q', '-m', 'chore: release 0.4.0']);
+    gitIn(repo.repo, repo.home, ['tag', 'v0.4.0']);
+    gitIn(repo.repo, repo.home, ['remote', 'add', 'origin', remote]);
+    gitIn(repo.repo, repo.home, ['push', '-q', '-u', 'origin', DEFAULT_RELEASE_BRANCH]);
+    // The release commit reaches origin/main the way settle's scratch worktree pushes it:
+    // built off the local branch, pushed, and never checked out on main.
+    gitIn(repo.repo, repo.home, ['switch', '-q', '-c', 'scratch']);
+    writeFileSync(join(repo.repo, 'package.json'), MANIFEST, 'utf8');
+    writeFileSync(join(repo.repo, 'CHANGELOG.md'), CHANGELOG, 'utf8');
+    gitIn(repo.repo, repo.home, ['commit', '-q', '-am', 'chore: release 0.5.0']);
+    gitIn(repo.repo, repo.home, ['push', '-q', 'origin', `scratch:${DEFAULT_RELEASE_BRANCH}`]);
+    gitIn(repo.repo, repo.home, ['switch', '-q', DEFAULT_RELEASE_BRANCH]);
+    gitIn(repo.repo, repo.home, ['branch', '-q', '-D', 'scratch']);
+    const project: PlantedProject = { root: repo.repo, home: repo.home };
+
+    // Act: the tag right after the push, with main still at 0.4.0.
+    const behind = await ran({}, project);
+
+    // Assert: the stale checkout is named, not read as a release already tagged.
+    expect(behind.exitCode).toBe(1);
+    expect(behind.stderr).toContain(`${DEFAULT_RELEASE_BRANCH} is 1 commit behind origin/${DEFAULT_RELEASE_BRANCH}`);
+    expect(behind.stderr).not.toContain('already names');
+    expect(gitIn(repo.repo, repo.home, ['tag', '--list']).trim()).toBe('v0.4.0');
+
+    // Act again: the fast-forward the refusal names, then the tag.
+    gitIn(repo.repo, repo.home, ['merge', '-q', '--ff-only', `origin/${DEFAULT_RELEASE_BRANCH}`]);
+    const tagged = await ran({}, project);
+
+    expect(tagged.exitCode).toBe(0);
+    const listed = gitIn(repo.repo, repo.home, ['tag', '--list']).trim();
+    expect(listed.split('\n')).toEqual(['v0.4.0', TAG]);
   });
 });
