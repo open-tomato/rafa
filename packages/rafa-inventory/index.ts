@@ -184,6 +184,8 @@ export {
 
 export { promotable } from './src/learning/bless.js';
 
+export { sameActionGroups } from './src/learning/groups.js';
+
 export { triggerKey } from './src/learning/identity.js';
 
 export type {
