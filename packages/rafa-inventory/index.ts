@@ -4,7 +4,11 @@
  * Written by `bun scripts/survey/facade-names.ts --package=rafa-inventory --entry`.
  */
 
-export { pushBugFixPairs } from './src/adapters/learning/bug-fix-push.js';
+export {
+  bugFixPairKey,
+  pushBugFixPairs,
+  readLoggedPairs,
+} from './src/adapters/learning/bug-fix-push.js';
 
 export { toHeldRecords } from './src/adapters/learning/held.js';
 
@@ -209,12 +213,15 @@ export { readLongRuns } from './src/plan/risk/long-runs.js';
 
 export type {
   BugFindingRow,
+  BugFixPair,
   BugFixRows,
   BugTrackerRef,
   DoneReportRow,
   OutOfScopeBugRow,
   PlanStageLink,
   ResolvedFindingRow,
+  UnpairedBug,
+  UnpairedReason,
 } from './src/report/bug-fix-pairs.js';
 export { pairBugFixes } from './src/report/bug-fix-pairs.js';
 

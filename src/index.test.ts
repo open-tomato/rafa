@@ -825,6 +825,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
     ['./instinct-records.js', ['instinctProject']],
   ]],
+  ['./commands/instinct/pairs.js', [
+    ['@open-tomato/rafa-effort', ['readBugFixRows']],
+    ['@open-tomato/rafa-inventory', ['bugFixPairKey', 'localInstinctsDir', 'pairBugFixes', 'readLoggedPairs']],
+    ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'resolveProjectConfig']],
+    ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/plan', ['plansDirAt']],
+    ['../../learning/plan-stage-links.js', ['readPlanStageLinks']],
+    ['./instinct-records.js', ['instinctProject']],
+  ]],
   ['./commands/update/current.js', [
     ['@open-tomato/rafa-board', ['createGhRunner']],
     ['@open-tomato/rafa-pr', ['resolvePrProvider']],
@@ -1323,6 +1332,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/instinct/flag.js',
       './commands/instinct/promote.js',
       './commands/instinct/groups.js',
+      './commands/instinct/pairs.js',
       './commands/update/current.js',
       './commands/update/self.js',
       './commands/update/project.js',
