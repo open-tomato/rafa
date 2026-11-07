@@ -812,7 +812,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
   ]],
   ['./commands/instinct/promote.js', [
-    ['@open-tomato/rafa-inventory', ['promotable']],
+    ['@open-tomato/rafa-inventory', ['promotable', 'sameActionGroups']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/adapters', ['CORE_ADAPTER_REGISTRY']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
