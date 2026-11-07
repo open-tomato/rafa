@@ -5,10 +5,10 @@
  * the contract. {@link selectLessons} takes one task, as the skill
  * resolvers read it ({@link TaskInput} in `task/resolve-skills.ts`), and
  * the blessed bundle the learning adapter's `pullBlessed` answers, and
- * returns the lessons to offer, in the order the section lists them. It
- * runs the same under every resolver, so the arms differ only in skills,
- * and it takes no argv and no config object, so #71's layer 2 can move
- * it onto #119's step contract as `task/select-lessons` unchanged.
+ * returns the lessons to offer, in the order of "The order and the cap".
+ * It runs the same under every resolver, so the arms differ only in
+ * skills, and it takes no argv and no config object, so #71's layer 2 can
+ * move it onto #119's step contract as `task/select-lessons` unchanged.
  * Whether it runs at all is `task.lessons`, read by its caller.
  *
  * ## What is kept

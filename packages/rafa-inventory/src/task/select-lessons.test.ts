@@ -2,8 +2,9 @@
  * Unit tests for `selectLessons`: the artifact-path match in the task
  * text and the stage context, the trigger's matched words against the
  * floor in the task text, the cap of 5, and the order: artifact match,
- * then trigger words matched, then confidence, then `id`. Every keeping case is paired with a lesson in the same bundle that must be
- * dropped, so a filter that kept everything would fail it.
+ * then trigger words matched, then confidence, then `id`. Every keeping
+ * case is paired with a lesson in the same bundle that must be dropped,
+ * so a filter that kept everything would fail it.
  */
 import type { TaskInput } from './resolve-skills.js';
 import type { BlessedBundle, InstinctRecord } from '../learning/index.js';
