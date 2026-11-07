@@ -119,12 +119,18 @@ Three files under `.rafa/instincts/`:
    - `rule` — Which merge rule applied, or `same-action-group` when a
      `new-trigger` or `same-action` decision left its record `active`
      beside an unflagged record taking its action on another trigger
-     (`group-rule.ts`, read over the held set after the push).
+     (`group-rule.ts`, read over the held set after the push), or
+     `bug-fix-pair` for every decision of a bug-fix pair's push
+     (`bug-fix-push.ts`).
    - `incoming` — The record as it was pushed, with its `description` if
      any.
    - `produced` — The ids the trigger is now held as after this decision.
    - `discarded` — The ids a higher-confidence action displaced.
-   - Nothing reads it back; it is the record of what each push did.
+   - `pair` — On a `bug-fix-pair` line only: `{ ref, filed_by }`, the
+     issue's URL and the session that filed the bug.
+   - Only `bug-fix-push.ts` reads it back, for the `pair` keys of its
+     `bug-fix-pair` lines, so a pair already logged is not pushed again;
+     otherwise it is the record of what each push did.
 
 3. **`flags.ndjson`** — One line per `flag`, holding `id`, `reason`, and
    `flagged_at` (read off `now`).

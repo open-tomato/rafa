@@ -620,6 +620,36 @@ describe('push', () => {
     await expect(localLearning(path).pullBlessed()).rejects.toThrow('ENOTDIR');
     expect(readFileSync(path, 'utf8')).toBe('not a directory\n');
   });
+
+  it('appends each line as logLine rewrites it, with its decision index, writing the files as without it', async () => {
+    const plainDir = freshDir('log-line-control');
+    const taggedDir = freshDir('log-line');
+    const records = [lesson({ id: 'first' }), lesson({ id: 'second', trigger: 'a gate is run in the background' })];
+    const seen: [rule: string, index: number][] = [];
+    const keys = [
+      { ref: 'https://github.com/o/r/issues/42', filed_by: 'filer-1' },
+      { ref: 'https://github.com/o/r/issues/43', filed_by: 'filer-2' },
+    ];
+    const tagged = localLearning(taggedDir, [], {
+      logLine: (line, index) => {
+        seen.push([line.rule, index]);
+        return { ...line, rule: 'bug-fix-pair', pair: keys[index]! };
+      },
+    });
+
+    await localLearning(plainDir).push(payload(records, 'fixer-1'));
+    const result = await tagged.push(payload(records, 'fixer-1'));
+
+    // The line as it would be logged: one action on two triggers is a group.
+    expect(seen).toEqual([['same-action-group', 0], ['same-action-group', 1]]);
+    expect(result.decisions.map((decision) => decision.rule)).toEqual(['new-trigger', 'new-trigger']);
+    expect(logOf(taggedDir)).toEqual(logOf(plainDir).map((line, index) => ({
+      ...line, rule: 'bug-fix-pair', pair: keys[index]!,
+    })));
+    expect(logOf(plainDir).map((line) => line.pair)).toEqual([undefined, undefined]);
+    expect(snapshot(taggedDir).filter(([name]) => name !== INSTINCTS_FILE))
+      .toEqual(snapshot(plainDir).filter(([name]) => name !== INSTINCTS_FILE));
+  });
 });
 
 describe('pullBlessed', () => {
