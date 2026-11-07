@@ -20,6 +20,9 @@ adapter, so types are declared once.
   not flagged and above the confidence floor, ordered by trust.
 - `promotable(held, { after, minConfidence }) → InstinctRecord[]` — The
   blessed records recurred enough to promote, by trust order.
+- `sameActionGroups(held) → SameActionGroup[]` — The unflagged records
+  sharing one `action_hash` across triggers, one group per action, its
+  sources the union and its confidence by the same-action arithmetic.
 - `actionHash(action)` — `sha256(trim(lower(action)))`, the key two
   records are merged by.
 - `triggerKey(trigger)` — Text trimmed, lower-cased, and each whitespace
@@ -230,7 +233,7 @@ might disagree.
 | One task inflates its lesson. | `usage_count` counts distinct sources. | No action needed. |
 | Wrap-up ignores the list. | `rafa:promoted` check reports in PR body. | Sessions must answer every id. |
 | Invalid lesson file. | `rafa instinct check` names it; warning. | Fix the file or remove it. |
-| Library and port drift. | Each declares the six types and the two confidence bounds; `src/tests/learning-contract.test.ts` holds them equal. | Change both sides in one commit. |
+| Library and port drift. | Each declares the six types the port passes and the two confidence bounds; `src/tests/learning-contract.test.ts` holds them equal. | Change both sides in one commit. |
 | Merge depends on order. | Property test runs in every order, over actions within `GAP`. | A failure there is a library bug; a discard followed by a confirmation is order-dependent by design. |
 
 ## Ordered by confidence, then usage, then id

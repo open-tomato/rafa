@@ -4,8 +4,10 @@
  *
  * The library settles lessons pushed from task reports: {@link merge}
  * folds one source's payload into the held set by fixed rules,
- * {@link bless} picks the records a task may use, and
- * {@link promotable} names the ones that recurred enough to promote.
+ * {@link bless} picks the records a task may use,
+ * {@link promotable} names the ones that recurred enough to promote, and
+ * {@link sameActionGroups} reads the records taking one action across
+ * triggers as one group.
  * {@link actionHash} and {@link triggerKey} are the identities the rules
  * compare by, and {@link GAP}, {@link SOURCE_STEP},
  * {@link CONFIDENCE_MIN} and {@link CONFIDENCE_MAX} the constants they
@@ -13,9 +15,10 @@
  *
  * The record and result types are declared in `./types.js` and
  * re-exported here as types, so importing the entry adds no value for
- * them. `packages/rafa/src/ports/index.ts` exports core's declaration of the same six,
- * from `packages/rafa/src/ports/learning.ts`, and `src/tests/learning-contract.test.ts`
- * holds each pair mutually assignable, so a service typing a `Learning`
+ * them. `packages/rafa/src/ports/index.ts` exports core's declaration of
+ * the six the port passes, from `packages/rafa/src/ports/learning.ts`,
+ * and `src/tests/learning-contract.test.ts` holds each pair mutually
+ * assignable, so a service typing a `Learning`
  * adapter against `./ports` and one calling the library through
  * `./learning` read the same shapes.
  *
@@ -30,10 +33,12 @@ export type {
   MergeDecision,
   MergeResult,
   MergeRule,
+  SameActionGroup,
   SyncPayload,
 } from './types.js';
 
 export { bless, promotable } from './bless.js';
+export { sameActionGroups } from './groups.js';
 export {
   actionHash,
   CONFIDENCE_MAX,
