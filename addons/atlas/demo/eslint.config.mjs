@@ -9,11 +9,11 @@ export default [
   ...reactConfig,
   ...cvaConfig,
   {
-    // The libraries' exports name their built dist/, and this package reads
-    // their source through tsconfig `paths`, which the import resolver does
-    // not follow. `tsc --build` holds those imports; the lint skips them.
+    // atlas-ui's exports name its built dist/, and this package reads its
+    // source through tsconfig `paths`, which the import resolver does not
+    // follow. `tsc --build` holds those imports; the lint skips them.
     rules: {
-      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/(atlas-ui|charts)(/|$)'] }],
+      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/atlas-ui(/|$)'] }],
     },
   },
 ];

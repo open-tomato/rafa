@@ -7,9 +7,10 @@ the tones, the formatters, `cn` and the theme token names. Nothing here
 imports `echarts`. The consuming app brings the token values and its own
 transport; `@open-tomato/atlas-demo` is the reference consumer.
 
-`@open-tomato/charts`'s README is the authority for the conventions both
+The `@open-tomato/charts` README, in the public `open-tomato/components`
+repository (`packages/charts`), is the authority for the conventions both
 packages share: CVA variants, theming, stories, tests, the visual suite,
-the gate order and the privacy sweep. This README repeats what a reader of
+the gate order and the privacy rules. This README repeats what a reader of
 this package needs at hand and adds what is its own.
 
 ## Layout
@@ -129,23 +130,19 @@ form over the spec's descriptor.
 This package reads the token names `@open-tomato/charts` lists in its
 `src/theme/` and ships no values. The consuming app defines every name
 (the demo's `src/styles.css` is the reference set) and adds an `@source`
-line for this package's files as well as for `charts`', so Tailwind
+line for this package's files as well as for charts' published `dist/`,
+so Tailwind
 generates the classes both use. Dark mode is `data-theme="dark"` on
 `<html>`.
 
 ## Reading `@open-tomato/charts`
 
-`tsconfig.json` maps `@open-tomato/charts` to the sibling's source through
-`paths` and references the sibling project, so `tsc --build` builds it
-first and Bun's tests read its source with no build of it. The Storybook
-reaches the same source through a Vite alias (`.storybook/main.ts`). The
-lint config skips `import/no-unresolved` for the import, since the
-resolver does not follow `paths` and the package's exports name a dist/
-the lint never builds. `bun run build` keeps it external with a resolve
-hook in `scripts/build.ts`: bun follows `paths` ahead of
-`--packages external`, so the CLI flags alone would bundle `charts` in.
-`tsc -p tsconfig.build.json` reads it from the declarations
-`check-types` wrote.
+`@open-tomato/charts` is an npm dependency (`^0.1.0`), not a folder beside
+this package: no `paths` entry and no project reference name it.
+`tsc --build` and `tsc -p tsconfig.build.json` read its published
+declarations, the Storybook has no alias for it, and `bun run build` keeps
+it external through `packages: 'external'`, so `scripts/build.ts` needs no
+resolve hook.
 
 ## Stories
 
@@ -180,7 +177,8 @@ with `@testing-library/react`.
 
 ## Visual regression
 
-The same native Playwright suite as `@open-tomato/charts` (`visual/`):
+The same native Playwright suite as `@open-tomato/charts` (`visual/` in the
+components repository):
 every story in light and in dark against this machine's untracked
 baselines in `visual/__image_snapshots__/`. `bun run test:visual:update`
 writes them, `bun run test:visual` compares. It serves the built
@@ -201,7 +199,7 @@ is held to; the other build's path is an argument, never written here.
 Run from this folder, in this order:
 
 ```bash
-bun run check-types       # tsc --build (charts first), then tsconfig.stories.json
+bun run check-types       # tsc --build, then tsconfig.stories.json
 bun test
 bun run lint
 bun run build             # dist/: scripts/build.ts (ESM, browser) + tsc declarations
@@ -211,7 +209,7 @@ bun run test:visual       # local only, against this machine's baselines
 ```
 
 CI's `atlas` job in `.github/workflows/verify.yml` runs all but the last
-on `ubuntu-latest`, as one matrix leg per package.
+on `ubuntu-latest`, as its one matrix leg, `addons/atlas/ui`.
 
 ## Contract and CLI help
 
@@ -254,7 +252,7 @@ copying its words:
 - `publishConfig` names npmjs for the registry and for the
   `@open-tomato` scope, and `access: public`.
 - Peers: `react` and `react-dom` ^19. Dependencies: `@open-tomato/charts`
-  (`workspace:*`, public), `class-variance-authority`, `lucide-react`,
+  (`^0.1.0`, from npm), `class-variance-authority`, `lucide-react`,
   `zod`, all from the public npm registry. No dependency on a private
   workspace member: the graph check refuses one for a publishable member.
 
@@ -262,6 +260,5 @@ copying its words:
 
 This package is public, and nothing under `addons/atlas/` names a host, a
 home path, an IP, a LAN name, a private registry, a self-hosted runner or
-a private repository. The sweep that enforces it lives once, in
-`@open-tomato/charts` (`privacy.sweep.test.ts`), and reads this folder
-too.
+a private repository. The sweep that enforces it is
+`privacy.sweep.test.ts` in this package, and it reads all of `addons/atlas/`.

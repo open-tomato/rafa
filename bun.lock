@@ -33,42 +33,6 @@
         "typescript-eslint": "^8.69.0",
       },
     },
-    "addons/atlas/charts": {
-      "name": "@open-tomato/charts",
-      "version": "0.0.0",
-      "dependencies": {
-        "class-variance-authority": "^0.7.1",
-        "clsx": "^2.1.1",
-        "echarts": "^6.1.0",
-        "tailwind-merge": "^3.7.0",
-        "zod": "^4.1.0",
-      },
-      "devDependencies": {
-        "@happy-dom/global-registrator": "^21.0.4",
-        "@open-tomato/eslint-config": "^0.1.0",
-        "@playwright/test": "1.63.0",
-        "@storybook/addon-docs": "^10.6.5",
-        "@storybook/react-vite": "^10.6.5",
-        "@tailwindcss/vite": "^4.3.4",
-        "@testing-library/dom": "^10.4.2",
-        "@testing-library/react": "^16.3.3",
-        "@types/bun": "^1.4.4",
-        "@types/react": "^19.3.0",
-        "@types/react-dom": "^19.3.0",
-        "eslint": "^9.39.4",
-        "happy-dom": "^21.0.4",
-        "playwright": "1.63.0",
-        "react": "^19.3.1",
-        "react-dom": "^19.3.1",
-        "storybook": "^10.6.5",
-        "tailwindcss": "^4.3.4",
-        "typescript": "^5.9.3",
-        "vite": "^8.3.5",
-      },
-      "peerDependencies": {
-        "react": "^19.0.0",
-      },
-    },
     "addons/atlas/data": {
       "name": "@open-tomato/atlas-data",
       "version": "0.0.0",
@@ -89,7 +53,7 @@
         "@open-tomato/atlas-data": "workspace:*",
         "@open-tomato/atlas-transport": "workspace:*",
         "@open-tomato/atlas-ui": "workspace:*",
-        "@open-tomato/charts": "workspace:*",
+        "@open-tomato/charts": "^0.1.0",
         "@open-tomato/rafa-atlas": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "lucide-react": "^1.67.0",
@@ -143,7 +107,7 @@
       "name": "@open-tomato/atlas-ui",
       "version": "0.0.0",
       "dependencies": {
-        "@open-tomato/charts": "workspace:*",
+        "@open-tomato/charts": "^0.1.0",
         "class-variance-authority": "^0.7.1",
         "lucide-react": "^1.67.0",
         "zod": "^4.1.0",
@@ -450,7 +414,7 @@
 
     "@open-tomato/atlas-ui": ["@open-tomato/atlas-ui@workspace:addons/atlas/ui"],
 
-    "@open-tomato/charts": ["@open-tomato/charts@workspace:addons/atlas/charts"],
+    "@open-tomato/charts": ["@open-tomato/charts@0.1.0", "", { "dependencies": { "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "echarts": "^6.1.0", "tailwind-merge": "^3.7.0", "zod": "^4.1.0" }, "peerDependencies": { "react": "^19.0.0" } }, "sha512-OW8wb68XygGaiS0cDBTdmYrQ02ORyRSfv8j2EOr7bmPyjdt1HImkhAjNG79dvPl/+dNGJmNUrAW7kyYKbVZ2nQ=="],
 
     "@open-tomato/define-config": ["@open-tomato/define-config@0.5.0", "", {}, "sha512-7HVT/Up9GAen9djjeBaN4n671QYotDBe1uWhrr2+X7zfNi9cyKxFoy6zFDGamQ6yMTSzb6YKApqleMXgUMcsfw=="],
 
@@ -1642,8 +1606,6 @@
 
     "@open-tomato/atlas-ui/@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
 
-    "@open-tomato/charts/@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
-
     "@oxc-parser/binding-wasm32-wasi/@emnapi/core": ["@emnapi/core@1.9.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-UC+ZhH3XtczQYfOlu3lNEkdW/p4dsJ1r/bP7H8+rhao3TTTMO1ATq/4DdIi23XuGoFY+Cz0JmCbdVl0hz9jZcA=="],
 
     "@oxc-parser/binding-wasm32-wasi/@emnapi/runtime": ["@emnapi/runtime@1.9.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-3U4+MIWHImeyu1wnmVygh5WlgfYDtyf0k8AbLhMFxOipihf6nrWC4syIm/SwEeec0mNSafiiNnMJwbza/Is6Lw=="],
@@ -1743,8 +1705,6 @@
     "@open-tomato/atlas-demo/@types/bun/bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
     "@open-tomato/atlas-ui/@types/bun/bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
-
-    "@open-tomato/charts/@types/bun/bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
     "@oxc-parser/binding-wasm32-wasi/@emnapi/core/tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 
