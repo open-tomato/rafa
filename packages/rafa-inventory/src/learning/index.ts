@@ -16,7 +16,7 @@
  * The record and result types are declared in `./types.js` and
  * re-exported here as types, so importing the entry adds no value for
  * them. `packages/rafa/src/ports/index.ts` exports core's declaration of
- * the six the port passes, from `packages/rafa/src/ports/learning.ts`,
+ * the seven the port passes, from `packages/rafa/src/ports/learning.ts`,
  * and `src/tests/learning-contract.test.ts` holds each pair mutually
  * assignable, so a service typing a `Learning`
  * adapter against `./ports` and one calling the library through
