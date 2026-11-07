@@ -411,6 +411,52 @@ describe('readGuard over a bare origin and a clone', () => {
     expect(root.section).toBe(forecast.forecast.section);
   });
 
+  it('folds from the version a stale stamp merges in when only the branch moved it, as settle then folds', () => {
+    // A first release cut by setting the version back: the base never moved its version file.
+    const w = world();
+    w.git(['switch', '-q', '-c', 'chore/first-release']);
+    w.commit({
+      'package.json': manifest('0.0.0'),
+      '.changes/rafa-1.md': fragmentText('rafa-1', 'minor', '- Library: the first release'),
+    }, 'reset the version and add the fragment');
+    w.git(['switch', '-q', 'main']);
+
+    const reading = read(guard(w, 'chore/first-release'));
+    expect(reading.verdict).toMatchObject({ answer: 'stale', relation: 'passed' });
+    const forecast = reading.forecast;
+    if (forecast === null || !forecast.ok || forecast.forecast.kind !== 'ships') throw new Error('no shipping forecast');
+    expect(forecast.baseVersion).toBe('0.24.0');
+    expect(forecast.mergedVersion).toBe('0.0.0');
+    expect(forecast.forecast.version).toBe('0.1.0');
+    expect(guardLines(reading, 'package.json')).toContain(
+      'Release forecast: this branch ships as the next minor, 0.1.0 if merged now (semver-by-level, origin/main at 0.24.0,'
+      + ' 0.0.0 once this branch\'s version file merges, no fragment waiting)',
+    );
+
+    w.git(['merge', '-q', '--no-ff', '-m', 'Merge chore/first-release', 'chore/first-release'], '2026-09-29T15:00:00Z');
+    const settled = readSettle(createGitRunner(w.clone), 'HEAD', SETTINGS);
+    if (settled.outcome !== 'folded') throw new Error(`settle did not fold: ${settled.outcome}`);
+    expect(settled.units[0]?.version).toBe(forecast.forecast.version);
+  });
+
+  it('folds from the base when the base moved its version file too, which the merge cannot hand the branch', () => {
+    const w = world();
+    w.git(['switch', '-q', '-c', 'feat/old-stamp']);
+    w.commit({
+      'package.json': manifest('0.25.0'),
+      '.changes/rafa-3.md': fragmentText('rafa-3', 'patch', '- Loop: a fix'),
+    }, 'a stamp and a fragment');
+    w.git(['switch', '-q', 'main']);
+    w.commit({ 'package.json': manifest('0.26.0') }, 'chore: release 0.26.0');
+    w.git(['push', '-q', 'origin', 'main']);
+
+    const forecast = read(guard(w, 'feat/old-stamp')).forecast;
+    if (forecast === null || !forecast.ok || forecast.forecast.kind !== 'ships') throw new Error('no shipping forecast');
+    expect(forecast.baseVersion).toBe('0.26.0');
+    expect(forecast.mergedVersion).toBeUndefined();
+    expect(forecast.forecast.version).toBe('0.26.1');
+  });
+
   it('answers missing for a branch with no fragment, and reads a malformed fragment as none, saying why', () => {
     const w = world();
     w.git(['switch', '-q', '-c', 'feat/bare']);

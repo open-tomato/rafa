@@ -110,6 +110,12 @@ export interface BranchForecastRead {
   readonly ref: string;
   /** The version the slot declared at the read commit: the version file's, or the member's. */
   readonly baseVersion: string;
+  /**
+   * The root version the merge leaves when it is the branch's stamp, not
+   * {@link baseVersion}; the fold started from it. Left out when the
+   * fold started from the base's. Only the merge guard sets it.
+   */
+  readonly mergedVersion?: string;
   /** The ids of the waiting fragments folded before the branch's, in order. */
   readonly waiting: readonly string[];
   /** What the fold answered; see `./forecast.ts`. */
@@ -246,8 +252,11 @@ export function forecastLine(read: BranchForecast): string {
   const by = strategy === null
     ? ''
     : `${strategy}, `;
+  const merged = read.mergedVersion === undefined
+    ? ''
+    : `, ${read.mergedVersion} once this branch's version file merges`;
   return `Release forecast: this branch ${read.forecast.sentence}`
-    + ` (${by}${read.ref} at ${read.baseVersion}, ${waitingClause(read.waiting.length)})`;
+    + ` (${by}${read.ref} at ${read.baseVersion}${merged}, ${waitingClause(read.waiting.length)})`;
 }
 
 /** The opening marker, with the basis when the forecast was folded. */
