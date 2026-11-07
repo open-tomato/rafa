@@ -636,6 +636,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/collect.js', [
     ['@open-tomato/rafa-effort', ['collect']],
+    ['@open-tomato/rafa/core/output', ['activeOutput']],
+    ['../../learning/bug-fix-pass.js', ['runBugFixPass']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
   ['./commands/effort/report.js', [
