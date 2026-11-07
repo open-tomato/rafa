@@ -378,6 +378,40 @@ describe('pairBugFixes pairs a bug', () => {
 
     expect(answer.pairs.map(({ fix }) => fix.sessionId)).toEqual(['fixer-early']);
   });
+
+  it('when the plan line carries its declaration block and the stored report line does not', () => {
+    const planLine = 'Fix the doctor  {agent=loop-implementer effort=high tests=module}';
+    const linked = stage('rafa-1300-sweep', 'Fixes #42.', [planLine]);
+    const answer = pairBugFixes(rows({ reports: [done('rafa-1300-sweep', 'Fix the doctor')] }), [linked], NOW);
+
+    expect(answer.unpaired).toEqual([]);
+    expect(answer.pairs.map(({ fix }) => fix.sessionId)).toEqual(['fixer-1']);
+    expect(answer.pairs.map(({ lesson }) => lesson.action)).toEqual(['Fix the doctor']);
+  });
+
+  it('with the resolution of a stored finding whose line has no declaration block', () => {
+    const planLine = 'Fix the doctor  {agent=loop-implementer}';
+    const other = 'Fix the reader  {agent=loop-implementer}';
+    const linked = stage('rafa-1300-sweep', 'Fixes #42.', [planLine, other]);
+    const answer = pairBugFixes(
+      rows({
+        resolved: [resolved('rafa-1300-sweep', 'Fix the doctor')],
+        reports: [done('rafa-1300-sweep', 'Fix the doctor')],
+      }),
+      [linked],
+      NOW,
+    );
+
+    expect(answer.pairs.map(({ lesson }) => lesson.action)).toEqual(['read env through the seam']);
+  });
+
+  it('never when the stored line differs from the plan line beyond the declaration block', () => {
+    const linked = stage('rafa-1300-sweep', 'Fixes #42.', ['Fix the doctor  {agent=loop-implementer}']);
+    const answer = pairBugFixes(rows({ reports: [done('rafa-1300-sweep', 'Fix the doctor again')] }), [linked], NOW);
+
+    expect(answer.pairs).toEqual([]);
+    expect(answer.unpaired.map(({ reason }) => reason)).toEqual(['no-done-report']);
+  });
 });
 
 describe('the lesson of a pair', () => {

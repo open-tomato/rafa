@@ -56,6 +56,10 @@
  *      matched by plan stub and task line) whose artifact equals the
  *      bug's, both with whitespace runs collapsed.
  *
+ * A task line is matched with its declaration block stripped from both
+ * sides: the plan file's line carries the block, the store's `task_line`
+ * does not. Nothing else about the line is loosened.
+ *
  * A unit no rule decides is `ambiguous-stage`. The fixing task's loop is
  * its earliest `done` report ({@link DoneReportRow}, matched by plan stub
  * and task line) recorded after the filing, the bug row's `collected_at`.
@@ -164,8 +168,9 @@ export interface PlanStageLink {
   /** The body of its `rafa:stage-context` block, or null without one. */
   readonly context: string | null;
   /**
-   * Its task lines as the dispatch quotes them, the store's `task_line`:
-   * the text after the checkbox, declaration included.
+   * Its task lines: the text after the checkbox, declaration included.
+   * The store's `task_line` holds the line without the declaration, so
+   * the join compares the two with the block stripped from each.
    */
   readonly tasks: readonly string[];
 }
@@ -300,6 +305,16 @@ function unlinkedReason(issue: string, links: readonly PlanStageLink[], rows: Bu
     : 'no-link';
 }
 
+/**
+ * True when a stored task line and a plan's task line are one task: equal
+ * once each has its declaration block stripped. The store writes the line
+ * without the block, the plan file holds it with one; a line differing in
+ * anything else is another task.
+ */
+function sameTaskLine(stored: string, planned: string): boolean {
+  return stripTaskDeclaration(stored) === stripTaskDeclaration(planned);
+}
+
 /** The resolved findings of one task whose artifact is the bug's. */
 function matchingResolutions(
   rows: BugFixRows,
@@ -308,7 +323,7 @@ function matchingResolutions(
   artifact: string,
 ): ResolvedFindingRow[] {
   return rows.resolved.filter((row) => row.planStub === stub
-    && row.taskLine === line
+    && sameTaskLine(row.taskLine, line)
     && sameArtifact(row.artifact, artifact));
 }
 
@@ -338,7 +353,7 @@ function fixingReport(
 ): DoneReportRow | UnpairedReason {
   const filedAt = Date.parse(bug.collectedAt);
   const own = reports.filter((report) => report.planStub === stub
-    && report.taskLine === line
+    && sameTaskLine(report.taskLine, line)
     && report.sessionId !== bug.sessionId);
   if (own.length === 0) return 'no-done-report';
   const after = own

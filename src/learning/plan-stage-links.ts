@@ -11,10 +11,11 @@
  *     carries (`planStubFromPath`);
  *   - `stage` is the heading's name and `context` the body of the
  *     stage's `rafa:stage-context` block, or null without one;
- *   - `tasks` are its task lines, whatever their checkbox, as the
- *     dispatch quotes them and the store's `task_line` holds them: the
- *     text after the checkbox, declaration included, with the trailing
- *     `<!-- blocked: ... -->` comment the tracker adds taken off.
+ *   - `tasks` are its task lines, whatever their checkbox: the text
+ *     after the checkbox, declaration included, with the trailing
+ *     `<!-- blocked: ... -->` comment the tracker adds taken off. The
+ *     store's `task_line` holds the line without the declaration, so the
+ *     join strips it from both sides before it compares them.
  *
  * A `PLAN_TRACKER-*.md` is not read: the plan file is the one the
  * stage contexts are written in, and the tracker is the loop's copy.
