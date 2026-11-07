@@ -274,6 +274,44 @@ describe('the lessons the local adapter lists', () => {
     }) as unknown);
   });
 
+  it('lists a one-action group once at the default keys, its flagged fourth wording neither counted nor listed', async () => {
+    const wording = (id: string, trigger: string, source: string): InstinctRecord => ({
+      ...record(id, 0.5, 1),
+      trigger,
+      action: 'Pipe the list through xargs.',
+      action_hash: actionHash('Pipe the list through xargs.'),
+      sources: [source],
+    });
+    const flagged: InstinctRecord = { ...wording('xargs-d', 'when a list is long', 's4'), confidence: 0.9, status: 'flagged' };
+    const bundle = {
+      version: 'v',
+      instincts: [
+        wording('xargs-a', 'when listing files', 's1'),
+        wording('xargs-b', 'when passing many paths', 's2'),
+        wording('xargs-c', 'when a command line is too long', 's3'),
+        flagged,
+      ],
+    };
+    const tree = plant({}, `${projectConfigText()}\nlearning:\n  adapter: pulling\n`);
+    const adapters = [pullingAdapter('pulling', () => Promise.resolve(bundle), [])];
+
+    const text = await run(['instinct', 'promote'], tree, adapters);
+    const json = await run(['instinct', 'promote', '--output=json'], tree, adapters);
+    const result = eventsOf(json.stdout).find((event) => event.type === 'result');
+
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toContain('1 lesson(s) to promote');
+    expect(text.stdout).toContain('  xargs-a  0.60  used 1  from 3 source(s)  when listing files');
+    expect(text.stdout.match(/Pipe the list through xargs\./g)).toHaveLength(1);
+    expect(text.stdout).not.toContain('xargs-b');
+    expect(text.stdout).not.toContain('xargs-c');
+    expect(text.stdout).not.toContain('xargs-d');
+    expect(resultIds(json.stdout)).toEqual(['xargs-a']);
+    expect(result?.data).toEqual(expect.objectContaining({
+      lessons: [expect.objectContaining({ id: 'xargs-a', pooled_confidence: 0.6, pooled_sources: 3 }) as unknown],
+    }) as unknown);
+  });
+
   it('says none is promotable when nothing recurred, and exits 0', async () => {
     const tree = plant(projectFile(TWO_SOURCES));
 
