@@ -207,7 +207,7 @@ All four are local policy, allowed at every layer, merged by key in a
 | `learning.adapter` | `local` | The adapter type (`local` is the only one today). |
 | `learning.bless.minConfidence` | `0.5` | The lowest confidence a lesson can have and still be blessed for injection. |
 | `learning.promote.after` | `3` | How many distinct sources must confirm a lesson before it can be promoted. |
-| `learning.promote.minConfidence` | `0.7` | The lowest confidence a lesson can have and still be promoted; meant to sit above the blessing floor. |
+| `learning.promote.minConfidence` | `0.6` | The lowest confidence a lesson, or its same-action group, can have and still be promoted; meant to sit above the blessing floor. |
 
 ## Trigger identity: two wordings never meet
 

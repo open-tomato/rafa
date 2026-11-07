@@ -107,7 +107,7 @@ const DEFAULTS: Readonly<Record<string, unknown>> = {
   learningAdapter: 'local',
   learningBlessMinConfidence: 0.5,
   learningPromoteAfter: 3,
-  learningPromoteMinConfidence: 0.7,
+  learningPromoteMinConfidence: 0.6,
   outputMode: 'text',
   prerequisitesRequired: [],
   prerequisitesOptional: [],

@@ -100,8 +100,8 @@ const RECURRED: Lesson = { id: 'bun-install', trigger: 'when testing', action: '
 /** Left out at the default keys: two sources, one short of `after`. */
 const TWO_SOURCES: Lesson = { id: 'gate-order', trigger: 'when verifying', action: 'Run lint last.', confidence: 0.8, sources: ['s1', 's2'] };
 
-/** Left out at the default keys: blessed at 0.6, below the promote floor of 0.7. */
-const BELOW_FLOOR: Lesson = { id: 'help-snapshots', trigger: 'when adding a flag', action: 'Regenerate the help.', confidence: 0.6, sources: THREE };
+/** Left out at the default keys: blessed at 0.55, below the promote floor of 0.6. */
+const BELOW_FLOOR: Lesson = { id: 'help-snapshots', trigger: 'when adding a flag', action: 'Regenerate the help.', confidence: 0.55, sources: THREE };
 
 /** Left out at every key: already promoted. */
 const PROMOTED: Lesson = {
@@ -214,7 +214,7 @@ describe('the lessons the local adapter lists', () => {
     expect(answered.exitCode).toBe(0);
     expect(answered.stderr).toBe('');
     expect(answered.stdout).toContain('1 lesson(s) to promote from the `local` learning adapter,'
-      + ' at learning.promote.after 3, learning.promote.minConfidence 0.70:');
+      + ' at learning.promote.after 3, learning.promote.minConfidence 0.60:');
     expect(answered.stdout).toContain('  bun-install  0.80  used 3  from 3 source(s)  when testing');
     expect(answered.stdout).toContain('      Run `bun install` first.');
     expect(answered.stdout).not.toContain('gate-order');
@@ -223,7 +223,7 @@ describe('the lessons the local adapter lists', () => {
   });
 
   it('lists the left-out lessons once the project lowers learning.promote.after and minConfidence', async () => {
-    const lowered = `${projectConfigText()}\nlearning:\n  promote:\n    after: 2\n    minConfidence: 0.6\n`;
+    const lowered = `${projectConfigText()}\nlearning:\n  promote:\n    after: 2\n    minConfidence: 0.5\n`;
     const tree = plant({ ...projectFile(RECURRED), ...projectFile(TWO_SOURCES), ...projectFile(BELOW_FLOOR), ...projectFile(PROMOTED) }, lowered);
 
     const answered = await run(['instinct', 'promote', '--output=json'], tree);
@@ -281,7 +281,7 @@ describe('the lessons the local adapter lists', () => {
 
     expect(answered.exitCode).toBe(0);
     expect(answered.stdout).toContain('No lesson the `local` learning adapter holds is promotable at'
-      + ' learning.promote.after 3, learning.promote.minConfidence 0.70.');
+      + ' learning.promote.after 3, learning.promote.minConfidence 0.60.');
   });
 
   it('gives the adapter kind, both keys and the lessons as the data of the terminal result event', async () => {
@@ -294,7 +294,7 @@ describe('the lessons the local adapter lists', () => {
     expect(result?.data).toEqual({
       adapter: 'local',
       after: 3,
-      minConfidence: 0.7,
+      minConfidence: 0.6,
       lessons: [expect.objectContaining({ id: 'bun-install', confidence: 0.8, usage_count: 3, sources: THREE }) as unknown],
     });
   });
