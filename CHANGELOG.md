@@ -9,6 +9,12 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.52.1 — 2026-11-07, Tag after settle, and the forecast of a stamp that merges in
+<!-- rafa:fragments rafa-1516-release-tag-and-forecast adopt-shared-configs charts-from-npm open-tomato-shared-configs -->
+
+- release: `rafa release tag` on a release branch behind the ref it tracks now refuses with the `behind` reason and names the `git merge --ff-only` to run, so `rafa release settle && rafa release tag` no longer reads the release settle just pushed as already tagged (#1516).
+- release: The release forecast `rafa pr merge` prints now folds from the version the merge leaves when only the branch moved the version file, so a branch that sets the version back forecasts what settle will write (#1517).
+
 ## 0.52.0 — 2026-11-06, `rafa stretch item` prints all five pit-stop readings; `rafa loop start` refuses a loop whose `tsc` cannot start; Bug sweep 45 — a flag the skill says to pass, a CI poll read too early, and the stale-docs lines; Bug sweep 46 — the stretch's rules reach every planner and every task; Bug sweep 47 — a plan names every issue it closes, and a bug's reproduce is a command
 <!-- rafa:fragments rafa-1438 drop-three-parked-duplicates rafa-1477-spec-stretch-item-prints rafa-1478-spec-loop-start-refuses rafa-1482-bug-sweep-45 rafa-1483-bug-sweep-46 rafa-1484-bug-sweep-47 rafa-1509-spec-full-suite-drops -->
 
