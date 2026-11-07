@@ -19,7 +19,12 @@ adapter, so types are declared once.
 - `bless(held, { minConfidence }) → BlessedBundle` — The active records
   not flagged and above the confidence floor, ordered by trust.
 - `promotable(held, { after, minConfidence }) → InstinctRecord[]` — The
-  blessed records recurred enough to promote, by trust order.
+  named record of each same-action group of the active, unpromoted
+  records whose source union reaches `after` and whose pooled confidence
+  reaches `minConfidence`, once per group, in the groups' order.
+- `sameActionGroups(held) → SameActionGroup[]` — The unflagged records
+  sharing one `action_hash` across triggers, one group per action, its
+  sources the union and its confidence by the same-action arithmetic.
 - `actionHash(action)` — `sha256(trim(lower(action)))`, the key two
   records are merged by.
 - `triggerKey(trigger)` — Text trimmed, lower-cased, and each whitespace
@@ -111,7 +116,10 @@ Three files under `.rafa/instincts/`:
 2. **`instincts.ndjson`** — The push log. One `PushLogLine` per merge
    decision, in the payload's order, holding:
    - `source_id` — The pushing session.
-   - `rule` — Which merge rule applied.
+   - `rule` — Which merge rule applied, or `same-action-group` when a
+     `new-trigger` or `same-action` decision left its record `active`
+     beside an unflagged record taking its action on another trigger
+     (`group-rule.ts`, read over the held set after the push).
    - `incoming` — The record as it was pushed, with its `description` if
      any.
    - `produced` — The ids the trigger is now held as after this decision.
@@ -179,10 +187,14 @@ being asked to read `progress.txt` and decide.
      `packages/rafa-run/src/start/promoted-check.ts` pushes the blessed
      record back with `promoted_to` set, from a source it already holds,
      so `merge` collapses it as `same-action` with `usage_count` and
-     confidence unchanged. A user-scope lesson has no held member to take
-     a description from, so that push is refused with a warning.
-   - A promoted lesson leaves every blessed bundle, because the page now
-     carries it.
+     confidence unchanged. Every other blessed member of the lesson's
+     same-action group is pushed the same way, each from a source it
+     holds, with the lesson's path. Each push is its own, so a refused
+     member costs one warning and the rest are still recorded. A
+     user-scope lesson has no held member to take a description from,
+     so its push is refused with a warning.
+   - A promoted lesson and its group leave every blessed bundle, because
+     the page now carries them.
 
 5. A missing answer is reported in the PR body, but does not block the PR.
    Under `pr.provider: none` no pull request is looked up: the line is
@@ -202,12 +214,13 @@ All four are local policy, allowed at every layer, merged by key in a
 | `learning.adapter` | `local` | The adapter type (`local` is the only one today). |
 | `learning.bless.minConfidence` | `0.5` | The lowest confidence a lesson can have and still be blessed for injection. |
 | `learning.promote.after` | `3` | How many distinct sources must confirm a lesson before it can be promoted. |
-| `learning.promote.minConfidence` | `0.7` | The lowest confidence a lesson can have and still be promoted; meant to sit above the blessing floor. |
+| `learning.promote.minConfidence` | `0.6` | The lowest confidence a lesson, or its same-action group, can have and still be promoted; meant to sit above the blessing floor. |
 
-## Trigger identity: two wordings never meet
+## Trigger identity: the same-action group joins wordings
 
 A trigger's identity is its text: trimmed, lower-cased, and whitespace
-runs collapsed to one space.
+runs collapsed to one space. Two triggers with different text are
+different triggers to `merge`, which settles each one alone:
 
 - `if the test fails` and `if the test fails` are the same trigger.
 - `if the test fails` and `If The Test Fails` are the same trigger.
@@ -218,6 +231,44 @@ runs collapsed to one space.
 - `if the test fails` and `when the test fails` are **different
   triggers**.
 
+The first way across them is the same-action group. `sameActionGroups`
+(`packages/rafa-inventory/src/learning/groups.ts`) reads the held set
+once per `action_hash`, across triggers. It is computed, never stored,
+and `merge` is unchanged:
+
+- Its members are the held records sharing one `action_hash`, on any
+  trigger, with `flagged` records left out.
+- Its sources are the union of the members' `sources`. A record that
+  names none counts as its own `id`.
+- Its confidence is the usage-weighted mean of the members' confidences,
+  each member's own source step taken off first, plus `SOURCE_STEP`
+  (0.05) per distinct source beyond the first, capped at
+  `CONFIDENCE_MAX` and taken in whole hundredths. Three sources at 0.5
+  read 0.6.
+- It names one record: the member with the highest confidence, then the
+  highest `usage_count`, then the lowest `id` in code-unit order.
+
+Joining on the action is a line with no judgement in it: the hash is the
+same or it is not. Wordings whose actions differ stay apart here.
+
+A flagged member is the edge case the group leaves out entirely. It adds
+no source and no weight to its group's confidence, and it is never
+promoted with the group, so a wrong lesson cannot lift a right one. A
+lesson held only by flagged records answers no group. `bless` is
+unchanged: a flagged record stays out of every blessed bundle.
+
+The push log names a decision `same-action-group` when a `new-trigger` or
+`same-action` decision leaves its record `active` beside an unflagged
+record taking its action on another trigger. The merge rule itself is
+not changed; see "Held set and logs" above.
+
+Illustration: a lesson pushed under three wordings by three plans is one
+group with three sources, named once by its record. Lessons are loose
+dots, and the same-action group is the first line that joins them.
+Pairing wordings whose actions differ is left to member D, on the hub,
+which reads this plan's gold-set export (`rafa instinct groups`); no
+part of the local adapter pairs them.
+
 Fuzzy matching is rejected because its answer is not stable: two machines
 might disagree.
 
@@ -226,22 +277,27 @@ might disagree.
 | Problem | Prevention | Fix |
 |---------|-----------|-----|
 | A wrong lesson gets blessed. | `rafa instinct flag` removes it. | `rafa instinct flag <id>` |
-| Two wordings never meet. | Accepted; #57's assess can pair them. | Pair them in assess. |
+| Two wordings never meet. | Same-action wordings join in a group (`sameActionGroups`); wordings with different actions stay apart. | Pairing other wordings is member D's, on the hub. |
 | One task inflates its lesson. | `usage_count` counts distinct sources. | No action needed. |
 | Wrap-up ignores the list. | `rafa:promoted` check reports in PR body. | Sessions must answer every id. |
 | Invalid lesson file. | `rafa instinct check` names it; warning. | Fix the file or remove it. |
-| Library and port drift. | Each declares the six types and the two confidence bounds; `src/tests/learning-contract.test.ts` holds them equal. | Change both sides in one commit. |
+| Library and port drift. | Each declares the seven types the port passes and the two confidence bounds; `src/tests/learning-contract.test.ts` holds them equal. | Change both sides in one commit. |
 | Merge depends on order. | Property test runs in every order, over actions within `GAP`. | A failure there is a library bug; a discard followed by a confirmation is order-dependent by design. |
 
 ## Ordered by confidence, then usage, then id
 
-Every list the library answers — blessed records, promotable lessons,
-discarded actions — is ordered by these three fields in this priority:
+Every list of records the library answers — blessed records, discarded
+actions, a group's members — is ordered by these three fields in this
+priority:
 
 1. Highest confidence first.
 2. When confidence is tied (at two decimals), highest `usage_count` first.
 3. When both are tied, `id` in code-unit order (the order every machine
    agrees on).
+
+Same-action groups, and the promotable lessons named by them, are ordered
+by the group's pooled confidence, then its source count, both highest
+first, then the named record's `id`.
 
 The offers to one task are the one list re-ordered after the library
 answers it. `selectLessons`

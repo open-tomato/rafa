@@ -361,6 +361,38 @@ describe('push', () => {
     expect(logOf(dir)[1]).toMatchObject({ rule: 'same-action', produced: ['first'], discarded: [] });
   });
 
+  it('logs a third wording of a held action as same-action-group, its merge rule new-trigger', async () => {
+    const dir = freshDir('same-action-group');
+    const learning = localLearning(dir);
+    await learning.push(payload([lesson({ id: 'first' })], 'session-1'));
+    await learning.push(payload([lesson({ id: 'second', trigger: 'a gate is run in the background' })], 'session-2'));
+
+    const third = lesson({ id: 'third', trigger: 'a long test run is polled with sleep' });
+    const result = await learning.push(payload([third], 'session-3'));
+
+    expect(result.decisions.map((decision) => decision.rule)).toEqual(['new-trigger']);
+    expect(logOf(dir).map((line) => line.rule)).toEqual(['new-trigger', 'same-action-group', 'same-action-group']);
+    expect(logOf(dir)[2]).toEqual({
+      source_id: 'session-3', rule: 'same-action-group', incoming: third, produced: ['third'], discarded: [],
+    });
+    expect(readdirSync(dir).sort()).toEqual(['first.md', INSTINCTS_FILE, 'second.md', 'third.md']);
+  });
+
+  it('logs the merge rule for a push onto a group whose other wording is flagged', async () => {
+    const dir = freshDir('flagged-only-group');
+    const learning = localLearning(dir);
+    const flaggedTrigger = 'a gate is run in the background';
+    await learning.push(payload([lesson({ id: 'second', trigger: flaggedTrigger })], 'session-1'));
+    await learning.push(payload([
+      lesson({ id: 'second-rival', trigger: flaggedTrigger, action: RIVAL, confidence: 0.55 }),
+    ], 'session-2'));
+
+    await learning.push(payload([lesson({ id: 'third', trigger: 'a long test run is polled with sleep' })], 'session-3'));
+
+    expect(logOf(dir).map((line) => line.rule)).toEqual(['new-trigger', 'flagged', 'new-trigger']);
+    expect(readdirSync(dir).sort()).toEqual([INSTINCTS_FILE, 'second-rival.md', 'second.md', 'third.md']);
+  });
+
   it('removes a collapsed member filed under the later id, keeping the record under the earlier', async () => {
     const dir = freshDir('collapse-later-id');
     const learning = localLearning(dir);

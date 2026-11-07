@@ -42,7 +42,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the hundred and five registered so far
+ * of each is its command. Four of the hundred and six registered so far
  * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
  * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -85,6 +85,8 @@
  * instinct scopes hold through `schema/scope-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
+ * `instinct groups`, which groups the project scope's held set through
+ * the library's `sameActionGroups`, nor
  * the ten `pr` actions, which read, open, retarget, close, wait on,
  * merge and triage one repository's pull requests through the
  * PullRequests port and share `pr/pr-context.ts`, nor `release status`, `release tag` and `release list`, which
@@ -249,7 +251,8 @@
  *     Learning adapter so no later bundle blesses it, refusing an id no
  *     held record carries, and `instinct promote`, the lessons that
  *     recurred enough to promote under `learning.promote.*`, writing
- *     nothing.
+ *     nothing, and `instinct groups`, each lesson the project scope
+ *     holds under two or more records with one action, writing nothing.
  *   - `skill show <name> [--full]`, the skill a name resolves to: its
  *     record, its frontmatter, every other holder of the name and its
  *     headings, or its whole file under `--full`, refusing a name no
@@ -521,6 +524,7 @@ import effortSchema from './effort/schema.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
+import instinctGroups from './instinct/groups.js';
 import instinctList from './instinct/list.js';
 import instinctPromote from './instinct/promote.js';
 import instinctShow from './instinct/show.js';
@@ -657,6 +661,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   instinctShow,
   instinctFlag,
   instinctPromote,
+  instinctGroups,
   updateCurrent,
   updateSelf,
   updateProject,

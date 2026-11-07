@@ -102,6 +102,9 @@
  * path left at `packages/rafa-inventory/src/learning/types.ts` reddened the six cases and
  * nothing else.
  *
+ * On 2026-11-07 `SameActionGroup` joined them as the seventh, declared
+ * in the same leaf and held to it by the same cases.
+ *
  * The `Sync` port arrived on 2026-09-29 with its four refusals. Six
  * mutations of the entry were driven that day against this file,
  * `packages/rafa/src/core/adapters/registry.test.ts`,
@@ -243,6 +246,7 @@ const TYPE_EXPORTS = [
   'PortType',
   'PortVersions',
   'PreflightResult',
+  'SameActionGroup',
   'SessionEffortRow',
   'SessionMode',
   'Store',
@@ -274,6 +278,7 @@ const LEARNING_EXPORTS = [
   'MergeDecision',
   'MergeResult',
   'MergeRule',
+  'SameActionGroup',
   'SyncPayload',
 ];
 

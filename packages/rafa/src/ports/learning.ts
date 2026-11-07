@@ -1,8 +1,8 @@
 /**
  * The records the Learning port passes, and the answers it gives: core's
- * declaration of the six types `packages/rafa/src/ports/index.ts` names for it.
+ * declaration of the seven types `packages/rafa/src/ports/index.ts` names for it.
  *
- * The learning library declares the same six in
+ * The learning library declares the same seven in
  * `packages/rafa-inventory/src/learning/types.ts` and keeps them there. That
  * folder imports nothing outside itself, and core imports nothing above it,
  * so neither side can take the other's declaration: each declares its own,
@@ -105,4 +105,31 @@ export interface MergeResult {
   decisions: MergeDecision[];
   /** The records a higher-confidence action displaced; none is deleted. */
   discarded: InstinctRecord[];
+}
+
+/**
+ * Every unflagged held record taking one action, across triggers: what
+ * the library's `sameActionGroups` answers, derived from the held set and
+ * never stored.
+ */
+export interface SameActionGroup {
+  /** The `action_hash` every member shares. */
+  action_hash: string;
+  /**
+   * The group's records, `flagged` ones left out, by confidence, then
+   * `usage_count`, both highest first, then `id`.
+   */
+  members: InstinctRecord[];
+  /**
+   * The union of the members' sources, in code-unit order; a member
+   * naming none counts as its own `id`.
+   */
+  sources: string[];
+  /**
+   * The members' pooled confidence, by `merge`'s same-action
+   * arithmetic, at two decimals: three sources at 0.5 read 0.6.
+   */
+  confidence: number;
+  /** The record the group is named by: the first of `members`. */
+  named: InstinctRecord;
 }
