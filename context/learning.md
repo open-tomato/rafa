@@ -19,7 +19,9 @@ adapter, so types are declared once.
 - `bless(held, { minConfidence }) → BlessedBundle` — The active records
   not flagged and above the confidence floor, ordered by trust.
 - `promotable(held, { after, minConfidence }) → InstinctRecord[]` — The
-  blessed records recurred enough to promote, by trust order.
+  named record of each same-action group of the active, unpromoted
+  records whose source union reaches `after` and whose pooled confidence
+  reaches `minConfidence`, once per group, by trust order.
 - `sameActionGroups(held) → SameActionGroup[]` — The unflagged records
   sharing one `action_hash` across triggers, one group per action, its
   sources the union and its confidence by the same-action arithmetic.
@@ -238,13 +240,18 @@ might disagree.
 
 ## Ordered by confidence, then usage, then id
 
-Every list the library answers — blessed records, promotable lessons,
-discarded actions — is ordered by these three fields in this priority:
+Every list of records the library answers — blessed records, discarded
+actions, a group's members — is ordered by these three fields in this
+priority:
 
 1. Highest confidence first.
 2. When confidence is tied (at two decimals), highest `usage_count` first.
 3. When both are tied, `id` in code-unit order (the order every machine
    agrees on).
+
+Same-action groups, and the promotable lessons named by them, are ordered
+by the group's pooled confidence, then its source count, both highest
+first, then the named record's `id`.
 
 The offers to one task are the one list re-ordered after the library
 answers it. `selectLessons`

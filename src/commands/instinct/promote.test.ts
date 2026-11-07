@@ -168,7 +168,7 @@ function resultIds(stdout: string): unknown {
   return (result?.data as { lessons: InstinctRecord[] } | undefined)?.lessons.map((lesson) => lesson.id);
 }
 
-/** A record as a learning adapter answers it. */
+/** A record as a learning adapter answers it, `usage` distinct sources confirming it. */
 function record(id: string, confidence: number, usage: number): InstinctRecord {
   const action = `Do ${id}.`;
   return {
@@ -178,6 +178,7 @@ function record(id: string, confidence: number, usage: number): InstinctRecord {
     action_hash: actionHash(action),
     confidence,
     usage_count: usage,
+    sources: Array.from({ length: usage }, (_, index) => `${id}-session-${String(index + 1)}`),
     signal: 'loud',
     status: 'active',
     created_at: '2026-09-11T10:00:00Z',
