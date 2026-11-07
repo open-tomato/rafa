@@ -242,3 +242,15 @@ discarded actions — is ordered by these three fields in this priority:
 2. When confidence is tied (at two decimals), highest `usage_count` first.
 3. When both are tied, `id` in code-unit order (the order every machine
    agrees on).
+
+The offers to one task are the one list re-ordered after the library
+answers it. `selectLessons`
+(`packages/rafa-inventory/src/task/select-lessons.ts`) orders the lessons
+it keeps by four keys in this priority: a lesson kept by its artifact path
+ranks above one kept by its trigger alone; then the distinct trigger words
+matched, most first, counted as the floor counts them and never by
+weighted score; then `confidence`, highest first; then `id` in code-unit
+order. The floor (`TRIGGER_WORD_FLOOR`, 2) and the cap (`LESSON_LIMIT`, 5)
+are unchanged: the floor decides what is kept, and the cap cuts the
+ordered list to its first five. A lesson cut from the five is still held,
+and it still matches the tasks whose words it shares.
