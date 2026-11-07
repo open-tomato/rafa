@@ -41,7 +41,7 @@
  * plan and answers the empty list without a warning.
  */
 import type { PlanModel } from '@open-tomato/rafa/core/plan';
-import type { PlanStageLink } from '@open-tomato/rafa-inventory/report/bug-fix-pairs';
+import type { PlanStageLink } from '@open-tomato/rafa-inventory';
 
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';

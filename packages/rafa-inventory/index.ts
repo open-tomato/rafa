@@ -205,6 +205,16 @@ export {
 
 export { readLongRuns } from './src/plan/risk/long-runs.js';
 
+export type {
+  BugFindingRow,
+  BugFixRows,
+  BugTrackerRef,
+  DoneReportRow,
+  OutOfScopeBugRow,
+  PlanStageLink,
+  ResolvedFindingRow,
+} from './src/report/bug-fix-pairs.js';
+
 export { reportLessons } from './src/report/lessons.js';
 
 export type {
