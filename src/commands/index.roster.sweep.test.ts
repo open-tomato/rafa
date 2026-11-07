@@ -96,6 +96,7 @@ const BASE_NAMES: readonly string[] = [
   'instinct show',
   'instinct flag',
   'instinct promote',
+  'instinct groups',
   'release status',
   'release settle',
   'release tag',
