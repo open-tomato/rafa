@@ -21,7 +21,7 @@ adapter, so types are declared once.
 - `promotable(held, { after, minConfidence }) → InstinctRecord[]` — The
   named record of each same-action group of the active, unpromoted
   records whose source union reaches `after` and whose pooled confidence
-  reaches `minConfidence`, once per group, by trust order.
+  reaches `minConfidence`, once per group, in the groups' order.
 - `sameActionGroups(held) → SameActionGroup[]` — The unflagged records
   sharing one `action_hash` across triggers, one group per action, its
   sources the union and its confidence by the same-action arithmetic.
@@ -216,10 +216,11 @@ All four are local policy, allowed at every layer, merged by key in a
 | `learning.promote.after` | `3` | How many distinct sources must confirm a lesson before it can be promoted. |
 | `learning.promote.minConfidence` | `0.6` | The lowest confidence a lesson, or its same-action group, can have and still be promoted; meant to sit above the blessing floor. |
 
-## Trigger identity: two wordings never meet
+## Trigger identity: the same-action group joins wordings
 
 A trigger's identity is its text: trimmed, lower-cased, and whitespace
-runs collapsed to one space.
+runs collapsed to one space. Two triggers with different text are
+different triggers to `merge`, which settles each one alone:
 
 - `if the test fails` and `if the test fails` are the same trigger.
 - `if the test fails` and `If The Test Fails` are the same trigger.
@@ -230,6 +231,44 @@ runs collapsed to one space.
 - `if the test fails` and `when the test fails` are **different
   triggers**.
 
+The first way across them is the same-action group. `sameActionGroups`
+(`packages/rafa-inventory/src/learning/groups.ts`) reads the held set
+once per `action_hash`, across triggers. It is computed, never stored,
+and `merge` is unchanged:
+
+- Its members are the held records sharing one `action_hash`, on any
+  trigger, with `flagged` records left out.
+- Its sources are the union of the members' `sources`. A record that
+  names none counts as its own `id`.
+- Its confidence is the usage-weighted mean of the members' confidences,
+  each member's own source step taken off first, plus `SOURCE_STEP`
+  (0.05) per distinct source beyond the first, capped at
+  `CONFIDENCE_MAX` and taken in whole hundredths. Three sources at 0.5
+  read 0.6.
+- It names one record: the member with the highest confidence, then the
+  highest `usage_count`, then the lowest `id` in code-unit order.
+
+Joining on the action is a line with no judgement in it: the hash is the
+same or it is not. Wordings whose actions differ stay apart here.
+
+A flagged member is the edge case the group leaves out entirely. It adds
+no source and no weight to its group's confidence, and it is never
+promoted with the group, so a wrong lesson cannot lift a right one. A
+lesson held only by flagged records answers no group. `bless` is
+unchanged: a flagged record stays out of every blessed bundle.
+
+The push log names a decision `same-action-group` when a `new-trigger` or
+`same-action` decision leaves its record `active` beside an unflagged
+record taking its action on another trigger. The merge rule itself is
+not changed; see "Held set and logs" above.
+
+Illustration: a lesson pushed under three wordings by three plans is one
+group with three sources, named once by its record. Lessons are loose
+dots, and the same-action group is the first line that joins them.
+Pairing wordings whose actions differ is left to member D, on the hub,
+which reads this plan's gold-set export (`rafa instinct groups`); no
+part of the local adapter pairs them.
+
 Fuzzy matching is rejected because its answer is not stable: two machines
 might disagree.
 
@@ -238,7 +277,7 @@ might disagree.
 | Problem | Prevention | Fix |
 |---------|-----------|-----|
 | A wrong lesson gets blessed. | `rafa instinct flag` removes it. | `rafa instinct flag <id>` |
-| Two wordings never meet. | Accepted; #57's assess can pair them. | Pair them in assess. |
+| Two wordings never meet. | Same-action wordings join in a group (`sameActionGroups`); wordings with different actions stay apart. | Pairing other wordings is member D's, on the hub. |
 | One task inflates its lesson. | `usage_count` counts distinct sources. | No action needed. |
 | Wrap-up ignores the list. | `rafa:promoted` check reports in PR body. | Sessions must answer every id. |
 | Invalid lesson file. | `rafa instinct check` names it; warning. | Fix the file or remove it. |
