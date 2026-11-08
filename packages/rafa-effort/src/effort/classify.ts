@@ -59,6 +59,7 @@
 import type { SessionKind } from '@open-tomato/rafa/store/session-row-types';
 
 import { readLines } from '@open-tomato/rafa/effort/session-log';
+import { resolveSessionLogPath } from '@open-tomato/rafa/effort/session-log-path';
 
 export type { SessionKind } from '@open-tomato/rafa/store/session-row-types';
 
@@ -288,4 +289,72 @@ export async function classifySessionLog(
   scanWindow: number = ENQUEUE_SCAN_WINDOW,
 ): Promise<SessionClassification> {
   return classifySessionLines(readLines(filePath), scanWindow);
+}
+
+/**
+ * Error codes that mean the resolved log is not a file on this machine:
+ * nothing at the path, or a path segment that is a file, not a folder.
+ */
+const ABSENT_LOG_CODES: ReadonlySet<string> = new Set(['ENOENT', 'ENOTDIR']);
+
+/**
+ * What {@link classifyStoredSessionLog} answers for one stored path.
+ *
+ * `onMachine: false` is a reading, not a fault: a row synced from another
+ * machine names a log only that machine holds, and a stored value that
+ * cannot be resolved (empty, holding `\`, or climbing out of the projects
+ * root) names no file at all, which `path: null` marks.
+ */
+export type StoredSessionClassification =
+  | {
+    /** The log was found and classified. */
+    onMachine: true;
+    /** The absolute path the stored value resolved to. */
+    path: string;
+    /** The classification of the file at `path`. */
+    classification: SessionClassification;
+  }
+  | {
+    /** The log is not on this machine. */
+    onMachine: false;
+    /** The absolute path looked at, or null when the value is refused. */
+    path: string | null;
+  };
+
+/** Whether an error is the read of a log that is not on this machine. */
+function isAbsentLogError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && ABSENT_LOG_CODES.has(code);
+}
+
+/**
+ * Classifies a session log by the path its row stores, on this machine.
+ *
+ * The stored form is `<folder>/<file>` under `~/.claude/projects/`, or an
+ * absolute path for an old row or a `logDir` override (#1489); it is
+ * resolved against `home` with `resolveSessionLogPath`. A file that is not
+ * there answers `onMachine: false` rather than the throw
+ * {@link classifySessionLog} raises for it; any other read error still
+ * throws.
+ *
+ * @param stored - The row's stored `filePath`.
+ * @param home - The reading machine's home directory.
+ * @param scanWindow - Non-empty lines to scan for the enqueue record.
+ * @returns The classification, or a reading that the log is absent.
+ */
+export async function classifyStoredSessionLog(
+  stored: string,
+  home: string,
+  scanWindow: number = ENQUEUE_SCAN_WINDOW,
+): Promise<StoredSessionClassification> {
+  const path = resolveSessionLogPath(stored, home);
+  if (path === null) return { onMachine: false, path: null };
+
+  try {
+    const classification = await classifySessionLog(path, scanWindow);
+    return { onMachine: true, path, classification };
+  } catch (error) {
+    if (isAbsentLogError(error)) return { onMachine: false, path };
+    throw error;
+  }
 }
