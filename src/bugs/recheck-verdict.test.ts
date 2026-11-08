@@ -3,7 +3,7 @@ import type { JunitCase, SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { describe, expect, it } from 'bun:test';
 
-import { runOutcomeOf, verdictOf } from './recheck-verdict.js';
+import { hasTriggerRemoved, runOutcomeOf, triggerRemovedOf, verdictOf } from './recheck-verdict.js';
 
 /** The file every reference below names. */
 const FILE = 'src/x/x.test.ts';
@@ -138,5 +138,44 @@ describe('verdictOf', () => {
     [[], { verdict: 'stale' }],
   ])('reads %p as %p', (outcomes, expected) => {
     expect(verdictOf(outcomes)).toEqual(expected);
+  });
+});
+
+describe('triggerRemovedOf', () => {
+  /** A record body with `extra` after its sections. */
+  function body(extra = ''): string {
+    return `## What\n\n\`\`\`\nit fails\n\`\`\`\n\n## Rerun\n\n\`\`\`\nbun test ${FILE}\n\`\`\`\n${extra}`;
+  }
+
+  /** The section, as an append adds it below the record. */
+  const SECTION = '\n**Updated 2026-11-08, trigger:**\n\n## Trigger removed\n\nthe sideEffects field, in #1214\n';
+
+  it('reads a body without the section as unmarked, gone or not', () => {
+    expect(hasTriggerRemoved(body())).toBe(false);
+    expect(triggerRemovedOf('gone', body())).toBe(false);
+  });
+
+  it('reads a gone bug whose body holds the section anywhere as marked', () => {
+    expect(triggerRemovedOf('gone', body(SECTION))).toBe(true);
+    expect(triggerRemovedOf('gone', `### Trigger removed\n\nx\n\n${body()}`)).toBe(true);
+  });
+
+  it('never marks another verdict, the section present', () => {
+    for (const verdict of ['reproduces', 'flaky', 'stale', 'manual', 'skipped'] as const) {
+      expect(triggerRemovedOf(verdict, body(SECTION))).toBe(false);
+    }
+  });
+
+  it('reads the heading inside a fence as text, and the same heading outside it as the section', () => {
+    const fenced = body('\n## Artifact\n\n````\n## Trigger removed\n```\nstill inside\n````\n');
+    expect(hasTriggerRemoved(fenced)).toBe(false);
+    // The control: the same body with the section below the fence is marked.
+    expect(hasTriggerRemoved(`${fenced}${SECTION}`)).toBe(true);
+  });
+
+  it('reads a heading that only opens with the words, or a level-one heading, as no section', () => {
+    expect(hasTriggerRemoved('## Trigger removed later\n')).toBe(false);
+    expect(hasTriggerRemoved('# Trigger removed\n')).toBe(false);
+    expect(hasTriggerRemoved('the trigger removed\n')).toBe(false);
   });
 });

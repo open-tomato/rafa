@@ -27,6 +27,13 @@ const UNASSIGNED_FOLDERS = ['src/ci/', 'src/commands/stretch/', 'src/stretch/'];
 const PACKAGES_DIR = join(ROOT, 'packages');
 
 /**
+ * Folders the survey assigned that left the tree after it. The two config
+ * packages gave way to the published `@open-tomato/eslint-config` and
+ * `@open-tomato/typescript-config`; the table stays as the survey wrote it.
+ */
+const RETIRED_FOLDERS: ReadonlySet<string> = new Set(['packages/eslint-config/', 'packages/typescript-config/']);
+
+/**
  * A folder moved into a workspace package (pass 4a on) is present when it
  * sits below `packages/<name>/` at the same path.
  */
@@ -55,11 +62,17 @@ describe('docs/survey/cut-table.json', () => {
     expect(new Set(names).size).toBe(PACKAGE_COUNT);
   });
 
-  test('every assigned folder is present in the tree', () => {
+  test('every assigned folder is present in the tree, or retired since', () => {
     const missing = table.packages
       .flatMap((pkg) => pkg.folders)
-      .filter((folder) => !folderPresent(folder));
+      .filter((folder) => !RETIRED_FOLDERS.has(folder) && !folderPresent(folder));
     expect(missing).toEqual([]);
+  });
+
+  test('retires only folders the table assigns and the tree no longer holds', () => {
+    const assigned = new Set(table.packages.flatMap((pkg) => pkg.folders));
+    const wrong = [...RETIRED_FOLDERS].filter((folder) => !assigned.has(folder) || folderPresent(folder));
+    expect(wrong).toEqual([]);
   });
 
   test('lists the three unassigned folders', () => {

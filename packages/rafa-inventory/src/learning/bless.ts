@@ -5,8 +5,11 @@
  * {@link bless} answers the records a pull injects: `active`, not
  * promoted, and at or above the confidence floor, ordered so the most
  * trusted lesson comes first. {@link promotable} narrows that list to
- * the lessons the wrap-up session is asked to write into a page: the
- * ones enough distinct sources confirmed, at a higher floor.
+ * the lessons the wrap-up session is asked to write into a page: it
+ * reads the records as same-action groups (`groups.ts`), so a lesson
+ * learned under several triggers counts its sources once, and names one
+ * record for each group enough distinct sources confirmed, at a higher
+ * floor.
  *
  * ## Readings the rules leave open
  *
@@ -23,11 +26,23 @@
  *     in order, rather than a time: the library reads no clock, and two
  *     machines holding one set answer one version. An adapter that wants
  *     a time stamps its own.
- *   - **`promotable` takes one floor.** Its `minConfidence` is the only
- *     confidence it reads, so a record is blessed for it when it meets
- *     that floor; the promotion floor is meant to sit above the blessing
- *     one, and a caller configured the other way round should bless first
- *     and pass the higher of the two.
+ *   - **`promotable` floors the group, not its members.** It reads
+ *     the records {@link bless} would keep at any floor (`active` and not
+ *     promoted), groups them by `action_hash` with
+ *     {@link sameActionGroups}, and compares each group's source union
+ *     with `after` and its pooled confidence with `minConfidence`: three
+ *     wordings from three sources at 0.5 pool to 0.6, so they pass a
+ *     floor of 0.6 that none of them meets alone. A caller hands it a
+ *     blessed set (the wrap-up and `rafa instinct promote` pass the
+ *     adapter's `pullBlessed` bundle), so the blessing floor still keeps
+ *     out the members tasks may not use.
+ *   - **One record per group.** A passing group answers its named record
+ *     (its most trusted member) once, whatever its member count; the
+ *     answers come in the groups' order: pooled confidence, then source
+ *     count, both highest first, then the named record's `id`.
+ *   - **A flagged member never counts.** It is left out before grouping,
+ *     so it neither lifts its group's sources or confidence nor is
+ *     answered.
  *
  * Like the rest of `src/learning/`, this module imports nothing from
  * the rest of `src/`, reads no clock and uses no randomness; no record
@@ -37,6 +52,8 @@
 import type { BlessedBundle, InstinctRecord } from './types.js';
 
 import { createHash } from 'node:crypto';
+
+import { sameActionGroups } from './groups.js';
 
 /** The scale a confidence is compared at: whole hundredths. */
 const HUNDREDTHS = 100;
@@ -49,9 +66,9 @@ export interface BlessOptions {
 
 /** What {@link promotable} reads. */
 export interface PromoteOptions {
-  /** The fewest distinct sources a promotable record has, inclusive. */
+  /** The fewest distinct sources a promotable group has, inclusive. */
   after: number;
-  /** The lowest confidence a promotable record may carry, inclusive. */
+  /** The lowest pooled confidence a promotable group may carry, inclusive. */
   minConfidence: number;
 }
 
@@ -78,13 +95,16 @@ function byTrust(left: InstinctRecord, right: InstinctRecord): number {
     || compareText(left.id, right.id);
 }
 
+/** Whether a record is `active` and not promoted: bless's exclusions. */
+function isUsable(record: InstinctRecord): boolean {
+  return record.status === 'active' && record.promoted_to === undefined;
+}
+
 /** The records a task may use at `minConfidence`, most trusted first. */
 function blessedRecords(held: readonly InstinctRecord[], minConfidence: number): InstinctRecord[] {
   const floor = hundredths(minConfidence);
   return held
-    .filter((each) => each.status === 'active'
-      && each.promoted_to === undefined
-      && hundredths(each.confidence) >= floor)
+    .filter((each) => isUsable(each) && hundredths(each.confidence) >= floor)
     .sort(byTrust);
 }
 
@@ -105,11 +125,16 @@ export function bless(held: readonly InstinctRecord[], options: BlessOptions): B
 }
 
 /**
- * The blessed records that recurred enough to promote: a `usage_count`
- * of at least `after` and a confidence of at least `minConfidence`, in
- * {@link bless}'s order.
+ * The lessons that recurred enough to promote: the `active`, unpromoted
+ * records read as same-action groups, each group whose source union
+ * holds at least `after` sources and whose pooled confidence is at least
+ * `minConfidence` answering its named record once, in the groups' order.
+ * See the module note for the readings.
  */
 export function promotable(held: readonly InstinctRecord[], options: PromoteOptions): InstinctRecord[] {
-  return blessedRecords(held, options.minConfidence)
-    .filter((each) => each.usage_count >= options.after);
+  const floor = hundredths(options.minConfidence);
+  return sameActionGroups(held.filter(isUsable))
+    .filter((group) => group.sources.length >= options.after
+      && hundredths(group.confidence) >= floor)
+    .map((group) => group.named);
 }

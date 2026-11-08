@@ -313,7 +313,8 @@ export interface CollectOptions {
   sinceEpochMs?: number | null;
   /**
    * The home the user scope's config is read under, and the session
-   * logs are derived under when no `logDir` is passed. No default: the
+   * logs are derived under when no `logDir` is passed, and the one a
+   * session row's stored `filePath` is cut against. No default: the
    * command passes `homedir()`, so a caller cannot reach the real home by
    * leaving it out. Its config is unread when a store and `plansDir` are
    * both passed.
@@ -349,6 +350,8 @@ export interface CollectOptions {
 /** Everything the two halves share, resolved once. */
 interface HalfContext {
   repoRoot: string;
+  /** The home a session row's stored `filePath` is cut against. */
+  home: string;
   /** The folders the session half reads, the first being the summary's `logDir`. */
   logDirs: ProjectLogDir[];
   plansDir: string;
@@ -430,14 +433,18 @@ export function readPlanStubs(plansDir: string): string[] {
  * and mtime rather than a second stat, so the row describes the file
  * as the walk saw it. The mode is read from neither pass; see the
  * module note on why it is the phase's constant. The worktree is the
- * candidate's, null when it names none.
+ * candidate's, null when it names none. The row's `filePath` is the
+ * stored form `readSessionLog` answers under `home`, which defaults to
+ * `homedir()` so a caller passing two arguments, `rafa skill search`
+ * among them, keeps its call shape.
  */
 export async function collectSessionRow(
   candidate: SessionLogCandidate,
   planStubs: readonly string[],
+  home: string = homedir(),
 ): Promise<SessionEffortRow> {
   const enqueue = await findFirstEnqueue(readLines(candidate.path));
-  const stats = await readSessionLog(candidate.path);
+  const stats = await readSessionLog(candidate.path, home);
   const attribution = attributeSession(stats, enqueue.content, planStubs);
 
   return {
@@ -493,7 +500,7 @@ async function collectSessionHalf(context: HalfContext): Promise<SessionHalf> {
   let failed = 0;
   for (const candidate of selection.pending) {
     try {
-      rows.push(await collectSessionRow(candidate, planStubs));
+      rows.push(await collectSessionRow(candidate, planStubs, context.home));
       read.push(candidate);
       context.note(`sessions: read ${candidate.sessionId}`);
     } catch (error) {
@@ -611,6 +618,7 @@ export async function collectEffort(
   const { worktreeDir, ...sources } = await resolveSources(options, log);
   const context: HalfContext = {
     repoRoot,
+    home: options.home,
     logDirs: logDirsOf(options, worktreeDir),
     ...sources,
     sinceEpochMs: options.sinceEpochMs ?? null,

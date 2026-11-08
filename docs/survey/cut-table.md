@@ -21,7 +21,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 9 | `rafa-effort` | 51 | 32 | 19 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 12 | `@open-tomato/rafa` | 804 | 176 | 606 | 22 | 0 | 0 | 0 |
+| 12 | `@open-tomato/rafa` | 809 | 178 | 609 | 22 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 

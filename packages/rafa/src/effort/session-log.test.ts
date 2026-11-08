@@ -7,7 +7,7 @@
  * grow with every run, and a test keyed on them would assert a
  * snapshot rather than a behaviour.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -416,6 +416,30 @@ describe('readSessionLog', () => {
     expect(lines.join('\n').length).toBeGreaterThan(64 * 1024);
     expect(row.recordCount).toBe(400);
     expect(row.usage.outputTokens).toBe(800);
+  });
+
+  it('stores the relative form of a log under the fixture home, reading the absolute path', async () => {
+    const home = join(tempRoot, 'home-stored');
+    const folder = join(home, '.claude', 'projects', '-srv-repo');
+    mkdirSync(folder, { recursive: true });
+    const path = join(folder, 'stored-1.jsonl');
+    writeFileSync(path, FIXTURE_LINES.join('\n'), 'utf8');
+
+    const row = await readSessionLog(path, home);
+
+    expect(row.filePath).toBe('-srv-repo/stored-1.jsonl');
+    expect(row.sessionId).toBe('stored-1');
+    expect(row.recordCount).toBeGreaterThan(0);
+  });
+
+  it('keeps the absolute path of a log outside the fixture home projects root', async () => {
+    // The control of the case above: the same home, a log beside it.
+    const home = join(tempRoot, 'home-stored');
+    const path = plantLog('outside-1.jsonl', FIXTURE_LINES);
+
+    const row = await readSessionLog(path, home);
+
+    expect(row.filePath).toBe(path);
   });
 
   it('counts a half-written trailing line instead of throwing', async () => {

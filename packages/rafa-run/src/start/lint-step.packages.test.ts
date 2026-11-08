@@ -11,9 +11,9 @@
  * The scratch repository copies the root `eslint.config.mjs` alone, not
  * the shared config it builds on, and lives under the checkout's
  * gitignored `.tmp/` so that Node resolution finds the installed
- * `node_modules` above it: `@open-tomato/rafa-eslint-config`, the shared
+ * `node_modules` above it: `@open-tomato/eslint-config`, the shared
  * config the copied leaf imports, with the plugins it declares, and
- * `@open-tomato/rafa-typescript-config`, the base the copied
+ * `@open-tomato/typescript-config`, the base the copied
  * `tsconfig.packages.json` extends.
  */
 import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';

@@ -1,4 +1,4 @@
-import baseConfig from '@open-tomato/rafa-eslint-config';
+import baseConfig from '@open-tomato/eslint-config';
 
 /**
  * Add-on leaf: `eslint .` run from this folder lints the add-on alone on

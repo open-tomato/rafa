@@ -25,10 +25,16 @@
  *     one of them like any other.
  *   - `instincts.ndjson`, the push log: one {@link PushLogLine} per
  *     merge decision, in the payload's order, holding the payload's
- *     `source_id`, the rule, the incoming record as it was pushed, and
- *     the ids of the records its trigger is now held as (`produced`) and
+ *     `source_id`, the rule (the merge's, or `same-action-group` when
+ *     the record joined one action held under another trigger, as
+ *     `./group-rule.js` reads it), the incoming record as it was
+ *     pushed, and the ids of the records its trigger is now held as (`produced`) and
  *     of those a higher-confidence action displaced on it (`discarded`).
- *     Nothing reads it back; it is the record of what each push did.
+ *     The adapter's `logLine` option rewrites each line before it is
+ *     appended: `./bug-fix-push.js` names a bug-fix pair's decisions
+ *     `bug-fix-pair` there and adds the pair's key (`pair`), and reads
+ *     those lines back to push no pair twice. Nothing else reads the
+ *     log; it is the record of what each push did.
  *   - `flags.ndjson`: one line per `flag`, holding the `id`, the
  *     `reason` and the `flagged_at` read off `now`.
  *
@@ -145,6 +151,7 @@
  * append writes a newline ahead of its own lines, so the fragment stays
  * one unreadable line and the new lines are read.
  */
+import type { PushLogRule } from './group-rule.js';
 import type { HeldDescription } from './held.js';
 import type { Instinct } from '../../schema/instinct.js';
 import type {
@@ -152,7 +159,6 @@ import type {
   InstinctRecord,
   Learning,
   MergeResult,
-  MergeRule,
   SyncPayload,
 } from '@open-tomato/rafa/ports';
 import type { InstinctScope } from '@open-tomato/rafa/schema/tiers';
@@ -175,6 +181,7 @@ import {
 } from '../../schema/instinct.js';
 import { readScope } from '../../schema/scope-records.js';
 
+import { heldAfterPush, loggedRule } from './group-rule.js';
 import { toHeldInstinct, toHeldRecords } from './held.js';
 
 /** What every refusal and report opens with. */
@@ -184,7 +191,7 @@ const PREFIX = 'local learning';
 const PUSH_REFUSAL = `${PREFIX}: refused to store a push`;
 
 /** The push log, under the directory. */
-const INSTINCTS_FILE = 'instincts.ndjson';
+export const PUSH_LOG_FILE = 'instincts.ndjson';
 
 /** The file flags are appended to, under the directory. */
 const FLAGS_FILE = 'flags.ndjson';
@@ -216,13 +223,19 @@ export interface DescribedInstinctRecord extends InstinctRecord {
 /** One line of the push log: one merge decision. */
 export interface PushLogLine {
   readonly source_id: string;
-  readonly rule: MergeRule;
+  /** The merge's rule, or `same-action-group`, as `./group-rule.js` reads it. */
+  readonly rule: PushLogRule;
   /** The record as it was pushed, its `description` included. */
   readonly incoming: DescribedInstinctRecord;
   /** The ids its trigger is held as once the rule has applied. */
   readonly produced: readonly string[];
   /** The ids a higher-confidence action displaced on its trigger. */
   readonly discarded: readonly string[];
+  /**
+   * The bug-fix pair a `bug-fix-pair` line pushed: the issue's reference
+   * and the session that filed the bug. See `./bug-fix-push.js`.
+   */
+  readonly pair?: { readonly ref: string; readonly filed_by: string };
 }
 
 /** One line of the flags file. */
@@ -250,6 +263,12 @@ export interface LocalLearningOptions {
   readonly now?: () => string;
   /** Reports a held file skipped. The active output's `warn` when left out. */
   readonly warn?: (message: string) => void;
+  /**
+   * Rewrites each push-log line before it is appended, given the line and
+   * its decision's index in the payload. Each line as the merge decided
+   * it when left out.
+   */
+  readonly logLine?: (line: PushLogLine, index: number) => PushLogLine;
 }
 
 /** Whether a field's value is acceptable, and what an acceptable one is. */
@@ -606,24 +625,30 @@ function heldChanges(
   return { writes, removals };
 }
 
-/** One push-log line per decision, in the payload's order. */
+/**
+ * One push-log line per decision, in the payload's order, over the held
+ * set `before` it, each as `logLine` rewrites it.
+ */
 function pushLogLines(
   sourceId: string,
   described: readonly DescribedInstinctRecord[],
   result: MergeResult,
+  before: readonly InstinctRecord[],
+  logLine: (line: PushLogLine, index: number) => PushLogLine,
 ): string[] {
+  const after = heldAfterPush(before, result);
   return result.decisions.map((decision, index) => {
     const key = triggerKey(decision.incoming.trigger);
     const line: PushLogLine = {
       source_id: sourceId,
-      rule: decision.rule,
+      rule: loggedRule(decision, after),
       incoming: loggedIncoming(described[index]!),
       produced: decision.produced.map((record) => record.id),
       discarded: result.discarded
         .filter((record) => triggerKey(record.trigger) === key)
         .map((record) => record.id),
     };
-    return JSON.stringify(line);
+    return JSON.stringify(logLine(line, index));
   });
 }
 
@@ -643,7 +668,8 @@ export function createLocalLearning(options: LocalLearningOptions): Learning {
   const userDir = userInstinctsDir(options.home);
   const now = options.now ?? ((): string => new Date().toISOString());
   const warn = options.warn ?? warnThroughActiveOutput;
-  const instinctsPath = join(instinctsDir, INSTINCTS_FILE);
+  const logLine = options.logLine ?? ((line: PushLogLine): PushLogLine => line);
+  const instinctsPath = join(instinctsDir, PUSH_LOG_FILE);
   const flagsPath = join(instinctsDir, FLAGS_FILE);
 
   /** One scope's `.md` records, each file that cannot be read reported and left out. */
@@ -695,13 +721,14 @@ export function createLocalLearning(options: LocalLearningOptions): Learning {
       // Checked by `payloadProblem`, a `description` included.
       const described = payload.instincts as readonly DescribedInstinctRecord[];
       const held = heldSet();
+      const before = toHeldRecords(held.files.map((file) => file.instinct));
       const result = merge(
-        toHeldRecords(held.files.map((file) => file.instinct)),
+        before,
         { source_id: payload.source_id, instincts: described.map(copyInstinct) },
         now(),
       );
       const changes = heldChanges(instinctsDir, held, result, described);
-      const lines = pushLogLines(payload.source_id, described, result);
+      const lines = pushLogLines(payload.source_id, described, result, before, logLine);
       if (lines.length > 0) {
         await mkdir(instinctsDir, { recursive: true });
         await appendLines(instinctsPath, lines);

@@ -1,4 +1,5 @@
-import baseConfig from '@open-tomato/rafa-eslint-config';
+import baseConfig from '@open-tomato/eslint-config';
+import { CODE_FILES } from '@open-tomato/eslint-config/files';
 
 /**
  * Root leaf: lints src/, scripts/, packages/ and root-level files.
@@ -15,6 +16,8 @@ export default [
       // carry no language, which says nothing about this package's sources.
       '.rafa/**',
       '.tmp/**',
+      // Gitignored local scratch (bake-offs, session notes): never in CI's tree.
+      '.local/**',
       '.docs/**',
       // The declarations each code package's `tsc --build` writes, which
       // `eslint .` from the root otherwise lints after a `check-types` run.
@@ -29,14 +32,32 @@ export default [
   },
   ...baseConfig,
   {
-    // The demo reads `@open-tomato/charts` and `@open-tomato/atlas-ui`, and
-    // `ui` reads `charts`, through tsconfig `paths`, which the import
-    // resolver does not follow, and the libraries' exports name a dist/
-    // that CI's lint step never builds. `tsc --build` holds these imports;
-    // the two packages' own leaf configs skip them the same way.
-    files: ['addons/atlas/demo/**', 'addons/atlas/ui/**'],
+    // The shared base ignores every `build/` folder, and these two hold
+    // source: the bundle script and the Atlas build module.
+    ignores: ['!scripts/build/**', '!addons/atlas/rafa-atlas/src/build/**'],
+  },
+  {
+    // The shared base resolves imports through the tsconfig of each folder
+    // under packages/, apps/ and services/; this repository also has the
+    // Atlas add-ons under addons/atlas/.
+    files: CODE_FILES,
+    settings: {
+      'import/resolver': {
+        typescript: {
+          noWarnOnMultipleProjects: true,
+          project: ['./tsconfig.json', './packages/*/tsconfig.json', './addons/atlas/*/tsconfig.json'],
+        },
+      },
+    },
+  },
+  {
+    // The demo reads `@open-tomato/atlas-ui` through tsconfig `paths`, which
+    // the import resolver does not follow, and the library's exports name a
+    // dist/ that CI's lint step never builds. `tsc --build` holds these
+    // imports; the demo's own leaf config skips them the same way.
+    files: ['addons/atlas/demo/**'],
     rules: {
-      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/(atlas-ui|charts)(/|$)'] }],
+      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/atlas-ui(/|$)'] }],
     },
   },
   {

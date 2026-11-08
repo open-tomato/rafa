@@ -100,8 +100,8 @@ const RECURRED: Lesson = { id: 'bun-install', trigger: 'when testing', action: '
 /** Left out at the default keys: two sources, one short of `after`. */
 const TWO_SOURCES: Lesson = { id: 'gate-order', trigger: 'when verifying', action: 'Run lint last.', confidence: 0.8, sources: ['s1', 's2'] };
 
-/** Left out at the default keys: blessed at 0.6, below the promote floor of 0.7. */
-const BELOW_FLOOR: Lesson = { id: 'help-snapshots', trigger: 'when adding a flag', action: 'Regenerate the help.', confidence: 0.6, sources: THREE };
+/** Left out at the default keys: blessed at 0.55, below the promote floor of 0.6. */
+const BELOW_FLOOR: Lesson = { id: 'help-snapshots', trigger: 'when adding a flag', action: 'Regenerate the help.', confidence: 0.55, sources: THREE };
 
 /** Left out at every key: already promoted. */
 const PROMOTED: Lesson = {
@@ -168,7 +168,7 @@ function resultIds(stdout: string): unknown {
   return (result?.data as { lessons: InstinctRecord[] } | undefined)?.lessons.map((lesson) => lesson.id);
 }
 
-/** A record as a learning adapter answers it. */
+/** A record as a learning adapter answers it, `usage` distinct sources confirming it. */
 function record(id: string, confidence: number, usage: number): InstinctRecord {
   const action = `Do ${id}.`;
   return {
@@ -178,6 +178,7 @@ function record(id: string, confidence: number, usage: number): InstinctRecord {
     action_hash: actionHash(action),
     confidence,
     usage_count: usage,
+    sources: Array.from({ length: usage }, (_, index) => `${id}-session-${String(index + 1)}`),
     signal: 'loud',
     status: 'active',
     created_at: '2026-09-11T10:00:00Z',
@@ -213,8 +214,8 @@ describe('the lessons the local adapter lists', () => {
     expect(answered.exitCode).toBe(0);
     expect(answered.stderr).toBe('');
     expect(answered.stdout).toContain('1 lesson(s) to promote from the `local` learning adapter,'
-      + ' at learning.promote.after 3, learning.promote.minConfidence 0.70:');
-    expect(answered.stdout).toContain('  bun-install  0.80  used 3  when testing');
+      + ' at learning.promote.after 3, learning.promote.minConfidence 0.60:');
+    expect(answered.stdout).toContain('  bun-install  0.80  used 3  from 3 source(s)  when testing');
     expect(answered.stdout).toContain('      Run `bun install` first.');
     expect(answered.stdout).not.toContain('gate-order');
     expect(answered.stdout).not.toContain('help-snapshots');
@@ -222,7 +223,7 @@ describe('the lessons the local adapter lists', () => {
   });
 
   it('lists the left-out lessons once the project lowers learning.promote.after and minConfidence', async () => {
-    const lowered = `${projectConfigText()}\nlearning:\n  promote:\n    after: 2\n    minConfidence: 0.6\n`;
+    const lowered = `${projectConfigText()}\nlearning:\n  promote:\n    after: 2\n    minConfidence: 0.5\n`;
     const tree = plant({ ...projectFile(RECURRED), ...projectFile(TWO_SOURCES), ...projectFile(BELOW_FLOOR), ...projectFile(PROMOTED) }, lowered);
 
     const answered = await run(['instinct', 'promote', '--output=json'], tree);
@@ -250,6 +251,67 @@ describe('the lessons the local adapter lists', () => {
     expect(resultIds(answered.stdout)).toEqual(['bun-install', 'user-lesson']);
   });
 
+  it('prints a three-wording group\'s pooled 0.60 and three sources, not its named record\'s own 0.50 and one', async () => {
+    const pooledFloor = `${projectConfigText()}\nlearning:\n  promote:\n    minConfidence: 0.6\n`;
+    const wording = (id: string, trigger: string, source: string): Lesson => ({
+      id, trigger, action: 'Pipe the list through xargs.', confidence: 0.5, sources: [source],
+    });
+    const tree = plant({
+      ...projectFile(wording('xargs-a', 'when listing files', 's1')),
+      ...projectFile(wording('xargs-b', 'when passing many paths', 's2')),
+      ...projectFile(wording('xargs-c', 'when a command line is too long', 's3')),
+    }, pooledFloor);
+
+    const text = await run(['instinct', 'promote'], tree);
+    const json = await run(['instinct', 'promote', '--output=json'], tree);
+    const result = eventsOf(json.stdout).find((event) => event.type === 'result');
+
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toContain('  xargs-a  0.60  used 1  from 3 source(s)  when listing files');
+    expect(text.stdout).not.toContain('0.50');
+    expect(result?.data).toEqual(expect.objectContaining({
+      lessons: [expect.objectContaining({ id: 'xargs-a', confidence: 0.5, pooled_confidence: 0.6, pooled_sources: 3 }) as unknown],
+    }) as unknown);
+  });
+
+  it('lists a one-action group once at the default keys, its flagged fourth wording neither counted nor listed', async () => {
+    const wording = (id: string, trigger: string, source: string): InstinctRecord => ({
+      ...record(id, 0.5, 1),
+      trigger,
+      action: 'Pipe the list through xargs.',
+      action_hash: actionHash('Pipe the list through xargs.'),
+      sources: [source],
+    });
+    const flagged: InstinctRecord = { ...wording('xargs-d', 'when a list is long', 's4'), confidence: 0.9, status: 'flagged' };
+    const bundle = {
+      version: 'v',
+      instincts: [
+        wording('xargs-a', 'when listing files', 's1'),
+        wording('xargs-b', 'when passing many paths', 's2'),
+        wording('xargs-c', 'when a command line is too long', 's3'),
+        flagged,
+      ],
+    };
+    const tree = plant({}, `${projectConfigText()}\nlearning:\n  adapter: pulling\n`);
+    const adapters = [pullingAdapter('pulling', () => Promise.resolve(bundle), [])];
+
+    const text = await run(['instinct', 'promote'], tree, adapters);
+    const json = await run(['instinct', 'promote', '--output=json'], tree, adapters);
+    const result = eventsOf(json.stdout).find((event) => event.type === 'result');
+
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toContain('1 lesson(s) to promote');
+    expect(text.stdout).toContain('  xargs-a  0.60  used 1  from 3 source(s)  when listing files');
+    expect(text.stdout.match(/Pipe the list through xargs\./g)).toHaveLength(1);
+    expect(text.stdout).not.toContain('xargs-b');
+    expect(text.stdout).not.toContain('xargs-c');
+    expect(text.stdout).not.toContain('xargs-d');
+    expect(resultIds(json.stdout)).toEqual(['xargs-a']);
+    expect(result?.data).toEqual(expect.objectContaining({
+      lessons: [expect.objectContaining({ id: 'xargs-a', pooled_confidence: 0.6, pooled_sources: 3 }) as unknown],
+    }) as unknown);
+  });
+
   it('says none is promotable when nothing recurred, and exits 0', async () => {
     const tree = plant(projectFile(TWO_SOURCES));
 
@@ -257,7 +319,7 @@ describe('the lessons the local adapter lists', () => {
 
     expect(answered.exitCode).toBe(0);
     expect(answered.stdout).toContain('No lesson the `local` learning adapter holds is promotable at'
-      + ' learning.promote.after 3, learning.promote.minConfidence 0.70.');
+      + ' learning.promote.after 3, learning.promote.minConfidence 0.60.');
   });
 
   it('gives the adapter kind, both keys and the lessons as the data of the terminal result event', async () => {
@@ -270,7 +332,7 @@ describe('the lessons the local adapter lists', () => {
     expect(result?.data).toEqual({
       adapter: 'local',
       after: 3,
-      minConfidence: 0.7,
+      minConfidence: 0.6,
       lessons: [expect.objectContaining({ id: 'bun-install', confidence: 0.8, usage_count: 3, sources: THREE }) as unknown],
     });
   });
@@ -351,19 +413,22 @@ describe('the refusals', () => {
 });
 
 describe('renderPromotable', () => {
-  it('writes each lesson as its line and its action beneath, in the order given', () => {
+  it('writes each lesson as its line, its group\'s pooled readings in it, and its action beneath, in the order given', () => {
     const lines = renderPromotable({
       adapter: 'local',
       after: 3,
       minConfidence: 0.7,
-      lessons: [record('first', 0.9, 4), record('second', 0.75, 3)],
+      lessons: [
+        { ...record('first', 0.9, 4), pooled_confidence: 0.9, pooled_sources: 4 },
+        { ...record('second', 0.5, 1), pooled_confidence: 0.6, pooled_sources: 3 },
+      ],
     });
 
     expect(lines).toEqual([
       '2 lesson(s) to promote from the `local` learning adapter, at learning.promote.after 3, learning.promote.minConfidence 0.70:',
-      '  first  0.90  used 4  when first',
+      '  first  0.90  used 4  from 4 source(s)  when first',
       '      Do first.',
-      '  second  0.75  used 3  when second',
+      '  second  0.60  used 1  from 3 source(s)  when second',
       '      Do second.',
     ]);
   });

@@ -443,6 +443,7 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 import { parseTaskDeclaration , planStubFromPath , trackerPathFor } from '@open-tomato/rafa/core/plan';
 import { findNextTask, updateTrackerLine } from '@open-tomato/rafa/utils/tracker';
 
+import { runBugFixPass } from './learning/bug-fix-pass.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { deferUntil } from './utils/schedule.js';
 
@@ -825,12 +826,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // dispatch row takes the resolver and what the prompt offered off
       // `dispatch` (`start/dispatch.ts`). Triage follows
       // the store and the mark, and stops nothing (`start/triage.ts`).
-      // Last, the task's rows are pushed and the other devices' pulled.
+      // Last, the rows are pushed, the other devices' pulled, then the bug-fix pairs.
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
         await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
         await staleDocs.afterTask({ planStub, dispatch, outcome });
         await hubContact.pushThenPull();
+        await runBugFixPass({ root: repoRoot, home: homedir() }, { config: runConfig.config });
         return stored;
       };
 

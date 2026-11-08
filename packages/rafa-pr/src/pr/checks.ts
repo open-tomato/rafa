@@ -27,8 +27,10 @@
  * rows on a head younger than {@link FIRST_CHECK_GRACE_MS} is polled
  * again like a pending reading. A caller that hands over no time gets
  * `none` on the first poll, as every caller did before the grace
- * existed: `pr wait` and the loop's CI gate hand a time over, while
- * `pr triage --resolve` hands over none.
+ * existed. `pr wait`, the loop's CI gate and `pr triage --resolve`'s CI
+ * wait after each attempt all hand a time over, each read off the pull
+ * request's detail ahead of the first poll and left out when it reads
+ * null.
  *
  * The time is the head commit's COMMITTED date, which is not the push
  * time: a commit made an hour ago and pushed just now reads as old and

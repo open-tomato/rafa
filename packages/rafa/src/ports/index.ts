@@ -64,10 +64,10 @@
  *   - {@link Learning}: `distributed-learning-library.md`, "rafa's
  *     Learning port", with the records it passes taken from that spec's
  *     package shape. {@link InstinctRecord}, {@link SyncPayload},
- *     {@link BlessedBundle}, {@link MergeRule}, {@link MergeDecision} and
- *     {@link MergeResult} are declared in `./learning.ts` and re-exported
- *     here under the same names. The learning library declares its own
- *     six in `packages/rafa-inventory/src/learning/types.ts`, since neither side may import the
+ *     {@link BlessedBundle}, {@link MergeRule}, {@link MergeDecision},
+ *     {@link MergeResult} and {@link SameActionGroup} are declared in
+ *     `./learning.ts` and re-exported here under the same names. The
+ *     learning library declares its own seven in `packages/rafa-inventory/src/learning/types.ts`, since neither side may import the
  *     other, and `src/tests/learning-contract.test.ts` holds each pair
  *     mutually assignable.
  *   - {@link Output}: open-tomato's `packages/shared/cli-core`, the
@@ -125,6 +125,7 @@ export type {
   MergeDecision,
   MergeResult,
   MergeRule,
+  SameActionGroup,
   SyncPayload,
 } from './learning.js';
 export type {

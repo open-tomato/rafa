@@ -69,6 +69,7 @@
     "./cli/registry": "./src/cli/registry.ts",
     "./effort/session-log": "./src/effort/session-log.ts",
     "./effort/session-log-dirs": "./src/effort/session-log-dirs.ts",
+    "./effort/session-log-path": "./src/effort/session-log-path.ts",
     "./pr/ci-poll": "./src/pr/ci-poll.ts",
     "./pr/provider": "./src/pr/provider.ts",
     "./pr/pull-requests-double": "./src/pr/pull-requests-double.ts",
@@ -99,7 +100,7 @@
     "@open-tomato/define-config": "0.5.0"
   },
   "devDependencies": {
-    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "@open-tomato/eslint-config": "^0.1.0",
     "eslint": "^9.39.4",
     "typescript": "^5.9.3"
   }

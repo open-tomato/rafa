@@ -24,7 +24,7 @@
  * read, and every unit is decided before the first tag is written, so a
  * refused run leaves the repository exactly as it found it.
  *
- * ## Units, and the one skip
+ * ## Units, and the two skips
  *
  * The root is read off `release.versionFile` and `release.changelog`;
  * a package off `<dir>/package.json` and `<dir>/CHANGELOG.md`
@@ -33,10 +33,12 @@
  * over its own readings, in unit order: the root first, then the
  * packages by manifest path. A unit whose version a tag already names is
  * `skipped`, not refused, so a run after a hand-tagged root still tags
- * the package; the run refuses `tagged` only when every unit is
- * skipped, which is the one refusal a one-package project had before.
- * Any other refusal of any unit stops the run with exit 1 before the
- * first write, one line per refused unit.
+ * the package. A unit never released — at `0.0.0`, with no changelog
+ * file and no tag of its own (#1515) — is `skipped` too, rather than
+ * refused for the changelog it has not got yet. The run refuses
+ * `tagged` only when every unit is skipped, which is the one refusal a
+ * one-package project had before. Any other refusal of any unit stops
+ * the run with exit 1 before the first write, one line per refused unit.
  *
  * ## The three refusals, and the two readings that must not pass
  *
@@ -63,6 +65,21 @@
  * tag), then the disagreement between the two files. A run that is on
  * the wrong branch is told that and nothing else, because every
  * reading after it would be about the wrong tree.
+ *
+ * ## A branch behind the release settle pushed
+ *
+ * Settle builds and pushes the release commit from a scratch worktree
+ * and leaves the caller's checkout as it was (`../../release/settle-worktree.ts`),
+ * so right after it the release branch is behind its upstream and its
+ * files still name the version before. Read as they stand they refuse
+ * `tagged`, which is true of that old version and says nothing of the
+ * one just pushed (measured on 2026-11-06, `rafa release settle &&
+ * rafa release tag --push`, #1516). So once the branch check passes,
+ * the run reads how far the branch is behind the ref it tracks, off the
+ * remote-tracking ref settle's push updated, with no network, and
+ * refuses with the `behind` reason, naming the `git merge --ff-only` to
+ * run. A branch that tracks nothing, or a count git did not answer, is
+ * not read, and no refusal follows from it.
  *
  * ## Which branch a release is tagged on
  *
@@ -198,6 +215,7 @@
  */
 import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams } from './status.js';
+import type { BehindReading } from './tag-behind.js';
 import type { ReleaseFollowUp } from './tag-follow-ups.js';
 import type { ChangelogReading, UnitDecision, UnitReadings, VersionReading } from './tag-units.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
@@ -222,6 +240,7 @@ import { packageTag, versionTag } from '../../release/version-tag.js';
 import { RELEASE_TAG_DECLARATION, RELEASE_TAG_PUSH_FLAG } from './declarations.js';
 import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
+import { commitsOf, readBehind } from './tag-behind.js';
 import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
 import {
   readNewestRelease,
@@ -249,12 +268,20 @@ export interface BranchReading {
   readonly branch: string | null;
   /** Why there is none, or null when there is one. */
   readonly problem: string | null;
+  /**
+   * How far the release branch is behind its upstream; null or left out
+   * when it was not read: another branch, no upstream, or a git that did
+   * not answer. See the module note on settle's push.
+   */
+  readonly behind?: BehindReading | null;
 }
 
 /** Why a run refused; see the module note for the five, and the receipt. */
 export type TagRefusalReason =
   /** The release branch is not the one checked out, or none is. */
   | 'branch'
+  /** The release branch is behind the ref it tracks, which may hold a release settle pushed. */
+  | 'behind'
   /** The version file could not be read, or declares no version. */
   | 'version'
   /** A tag of the unit already names that version; another unit's tag of the same version does not count. */
@@ -379,9 +406,13 @@ function branchRefusal(inputs: TagInputs): TagRefused | null {
     return refuse('branch', `${problem ?? 'no branch is checked out'}, and a release is tagged`
       + ` on ${inputs.releaseBranch}`);
   }
-  return branch === inputs.releaseBranch
-    ? null
-    : refuse('branch', `a release is tagged on ${inputs.releaseBranch}, and ${branch} is checked out`);
+  if (branch !== inputs.releaseBranch) {
+    return refuse('branch', `a release is tagged on ${inputs.releaseBranch}, and ${branch} is checked out`);
+  }
+  const behind = inputs.branch.behind ?? null;
+  if (behind === null || behind.commits === 0) return null;
+  return refuse('behind', `${branch} is ${commitsOf(behind.commits)} behind ${behind.upstream}, which may hold`
+    + ` a release rafa release settle pushed there; run git merge --ff-only ${behind.upstream}, then tag again`);
 }
 
 /** The changelog check: its newest section has to name `version`. */
@@ -490,7 +521,10 @@ async function tagConfig(project: ProjectFound, warn: (message: string) => void)
  * walks is HEAD's.
  */
 export function readTagInputs(root: string, git: GitRunner, config: TagSettings): TagInputs {
-  const branch = readBranch(git);
+  const read = readBranch(git);
+  const branch: BranchReading = read.branch === config.releaseBranch
+    ? { ...read, behind: readBehind(git) }
+    : read;
   const version = readVersion(root, config.versionFile);
   const walkable = version.version !== null && branch.branch === config.releaseBranch;
   return {
@@ -538,9 +572,9 @@ function decideUnits(projectRoot: string, git: GitRunner, root: TagInputs): read
   const members = packages.packages.map((member): DecidedUnit => {
     const readings: UnitReadings = readUnitInputs(projectRoot, git, member);
     const inputs: TagInputs = { ...run, ...readings };
-    return { package: member.name, dir: member.dir, inputs, decision: unitDecisionOf(decideTag(inputs)) };
+    return { package: member.name, dir: member.dir, inputs, decision: unitDecisionOf(decideTag(inputs), inputs) };
   });
-  return [{ package: null, dir: null, inputs: root, decision: unitDecisionOf(decideTag(root)) }, ...members];
+  return [{ package: null, dir: null, inputs: root, decision: unitDecisionOf(decideTag(root), root) }, ...members];
 }
 
 /**

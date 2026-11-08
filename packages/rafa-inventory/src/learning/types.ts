@@ -3,9 +3,9 @@
  *
  * The library keeps its own declaration of each. Like the rest of
  * this folder, this module imports nothing outside it, and core imports
- * nothing above it, so the `Learning` port declares
- * the same six again in `packages/rafa/src/ports/learning.ts`.
- * `src/tests/learning-contract.test.ts` holds every pair mutually
+ * nothing above it, so the `Learning` port declares the seven types it
+ * passes again in `packages/rafa/src/ports/learning.ts`.
+ * `src/tests/learning-contract.test.ts` holds every such pair mutually
  * assignable, so the port passes exactly what the library takes and
  * answers.
  *
@@ -101,4 +101,31 @@ export interface MergeResult {
   decisions: MergeDecision[];
   /** The records a higher-confidence action displaced; none is deleted. */
   discarded: InstinctRecord[];
+}
+
+/**
+ * Every unflagged held record taking one action, across triggers: what
+ * `sameActionGroups` answers, derived from the held set and never
+ * stored.
+ */
+export interface SameActionGroup {
+  /** The `action_hash` every member shares. */
+  action_hash: string;
+  /**
+   * The group's records, `flagged` ones left out, by confidence, then
+   * `usage_count`, both highest first, then `id`.
+   */
+  members: InstinctRecord[];
+  /**
+   * The union of the members' sources, in code-unit order; a member
+   * naming none counts as its own `id`.
+   */
+  sources: string[];
+  /**
+   * The members' pooled confidence, by `merge`'s same-action
+   * arithmetic, at two decimals: three sources at 0.5 read 0.6.
+   */
+  confidence: number;
+  /** The record the group is named by: the first of `members`. */
+  named: InstinctRecord;
 }

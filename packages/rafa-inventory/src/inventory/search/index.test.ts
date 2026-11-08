@@ -557,10 +557,12 @@ describe.each(BACKENDS)('%s: the search effort row', (name, open) => {
     ]);
     const plain = await plantedCollector(collected[0]!.candidate, []);
     expect(plain.kind).toBe('other');
+    // The store's read answers the log's path in its stored form, cut after the projects root.
+    const storedPath = relative(join(home, '.claude', 'projects'), logPath);
     const rows = store.read('sessions') as SessionEffortRow[];
-    expect(rows).toEqual([{ ...plain, kind: 'search' }]);
+    expect(rows).toEqual([{ ...plain, kind: 'search', filePath: storedPath }]);
     expect(rows.map((row) => [row.kind, row.branch, row.modelCounts, row.filePath])).toEqual([
-      ['search', PLANTED_BRANCH, PLANTED_MODELS, logPath],
+      ['search', PLANTED_BRANCH, PLANTED_MODELS, storedPath],
     ]);
   });
 });

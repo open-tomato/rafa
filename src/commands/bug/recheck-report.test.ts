@@ -80,3 +80,27 @@ describe('recheckComment', () => {
     expect(recheckComment({ ...ROW, verdict: 'reproduces' }, report([]))).toBeNull();
   });
 });
+
+describe('a removed trigger (#1521)', () => {
+  test('a gone row without the mark prints gone alone, and its comment says passed', () => {
+    expect(renderRecheck(report([ROW])).split('\n')[1]).toBe('#7 gone src/a.test.ts (3 runs passed)');
+    expect(recheckComment(ROW, report([ROW]))).not.toContain('trigger');
+  });
+
+  test('a gone row with the mark prints gone (trigger removed?)', () => {
+    const row: RecheckRow = { ...ROW, triggerRemoved: true };
+    expect(renderRecheck(report([row])).split('\n')[1]).toBe('#7 gone (trigger removed?) src/a.test.ts (3 runs passed)');
+  });
+
+  test('its comment says the rerun passes because the trigger was removed, not that the bug is fixed', () => {
+    const row: RecheckRow = { ...ROW, triggerRemoved: true };
+    expect(recheckComment(row, report([row]))).toBe('gone (trigger removed?) at rafa 1.2.3, `abc123-dirty`: `src/a.test.ts` passed 3 runs '
+      + 'because the bug\'s trigger was removed, not because the bug is fixed');
+  });
+
+  test('json mode carries the field as written', () => {
+    const row: RecheckRow = { ...ROW, triggerRemoved: true };
+    expect(JSON.parse(JSON.stringify(report([row]))).rows[0].triggerRemoved).toBe(true);
+    expect(JSON.parse(JSON.stringify(report([ROW]))).rows[0]).not.toHaveProperty('triggerRemoved');
+  });
+});

@@ -369,7 +369,7 @@ describe('the bugs filed since', () => {
   it('reads no bug as filed since when the listing holds none after the cut-off', async () => {
     const reading = await readPitReadings(seams(caseGh([]).gh, [OLD, OLDER], []), { branch: BRANCH, since: SINCE, ...ITEM });
 
-    expect(reading.filedSince).toEqual({ ok: true, value: { since: SINCE.toISOString(), bugs: [] } });
+    expect(reading.filedSince).toEqual({ ok: true, value: { since: SINCE.toISOString(), stub: STUB, bugs: [] } });
     expect(reading.openBugs).toEqual({ ok: true, value: 2 });
   });
 
@@ -467,6 +467,54 @@ describe('the first line of a filed bug', () => {
   });
 });
 
+/** A bug body as the loop files it: a first line, then a `## Plan` section holding `plan` in a fence. */
+function planBody(plan: string): string {
+  return `A gate failed.\n\n## What\n\n\`\`\`\nthe gate\n\`\`\`\n\n## Plan\n\n\`\`\`\n${plan}\n\`\`\`\n\n## Task\n\n\`\`\`\nthe task\n\`\`\`\n`;
+}
+
+describe('the plan of a filed bug (#1522)', () => {
+  it('counts a body whose ## Plan heading holds no value among the other sessions, not the item\'s loop', async () => {
+    const blank = bug('840', 'a plan heading with a blank fence', '2026-10-07T11:00:00Z', planBody('   '));
+    const unfenced = bug('841', 'a plan heading with no fence', '2026-10-07T11:01:00Z', 'Seen.\n\n## Plan\n\n## Task\n\n```\nthe task\n```\n');
+
+    const reading = await readPitReadings(seams(caseGh([]).gh, [], [blank, unfenced]), { branch: BRANCH, since: SINCE, ...ITEM });
+
+    if (!reading.filedSince.ok) throw new Error(reading.filedSince.reason);
+    expect(reading.filedSince.value.bugs.map((filed) => filed.plan)).toEqual([null, null]);
+    expect(bugLines(renderPitReadings(reading)).slice(-5)).toEqual([
+      `Filed since ${SINCE.toISOString()}: 2.`,
+      `Filed by this item's loop (${STUB}): 0.`,
+      'Filed by other sessions: 2.',
+      '   #840 a plan heading with a blank fence: A gate failed.',
+      '   #841 a plan heading with no fence: Seen.',
+    ]);
+  });
+
+  it('prints three filed bugs in two groups: the one naming the item\'s stub, then the one naming another stub and the one with none', async () => {
+    const own = bug('850', 'filed by the item\'s loop', '2026-10-07T11:02:00Z', planBody(`  ${STUB}  `));
+    const other = bug('851', 'filed by another plan', '2026-10-07T11:00:00Z', planBody('rafa-900-other-plan'));
+    const none = bug('852', 'filed by hand', '2026-10-07T11:01:00Z', 'Seen on the board.');
+    const planted = plantedSeams();
+
+    const reading = await readPitReadings(
+      { gh: caseGh([]).gh, tracker: caseTracker([], [own, other, none]).tracker, ...planted.seams },
+      { branch: BRANCH, since: SINCE, ...ITEM },
+    );
+
+    if (!reading.filedSince.ok) throw new Error(reading.filedSince.reason);
+    expect(reading.filedSince.value.bugs.map((filed) => filed.plan)).toEqual(['rafa-900-other-plan', null, STUB]);
+    expect(bugLines(renderPitReadings(reading)).slice(-6)).toEqual([
+      `Filed since ${SINCE.toISOString()}: 3.`,
+      `Filed by this item's loop (${STUB}): 1.`,
+      '   #850 filed by the item\'s loop: A gate failed.',
+      'Filed by other sessions: 2.',
+      '   #851 filed by another plan: A gate failed.',
+      '   #852 filed by hand: Seen on the board.',
+    ]);
+    expect(planted.log.judged.map((call) => call.map((judged) => judged.issue))).toEqual([[851, 852, 850]]);
+  });
+});
+
 describe('stretch 7: a bug filed after the cut-off and closed before the reading', () => {
   it('lists the closed bug from the filed listing, and keeps the open count', async () => {
     // Stretch 7: #1084 was filed at 03:04:38Z, after the cut-off, and closed
@@ -482,9 +530,11 @@ describe('stretch 7: a bug filed after the cut-off and closed before the reading
 
     const lines = renderPitReadings(await readPitReadings(seams(caseGh([]).gh, open, [closed]), { branch: 'stretch/7', since: cutoff, ...ITEM }));
 
-    expect(bugLines(lines).slice(-3)).toEqual([
+    expect(bugLines(lines).slice(-5)).toEqual([
       'Bugs: 3 open.',
       'Filed since 2026-10-14T01:29:39.610Z: 1.',
+      `Filed by this item's loop (${STUB}): 0.`,
+      'Filed by other sessions: 1.',
       '   #1084 the bug the loop filed: A gate failed on the stretch branch.',
     ]);
   });
@@ -501,9 +551,11 @@ describe('the rendered lines', () => {
       `   ❌ ${WORKFLOW} run 37190089292 is failure.`,
       `     ${GATE_FILE}`,
     ]);
-    expect(bugLines(lines).slice(-3)).toEqual([
+    expect(bugLines(lines).slice(-5)).toEqual([
       'Bugs: 2 open.',
       `Filed since ${SINCE.toISOString()}: 1.`,
+      `Filed by this item's loop (${STUB}): 0.`,
+      'Filed by other sessions: 1.',
       '   #812 a bug from this item: The gate read red.',
     ]);
   });
@@ -550,6 +602,8 @@ describe('the effort and recheck readings beside the three others', () => {
       `   ✅ ${WORKFLOW} run 37190089292 is success.`,
       'Bugs: 2 open.',
       `Filed since ${SINCE.toISOString()}: 2.`,
+      `Filed by this item's loop (${STUB}): 0.`,
+      'Filed by other sessions: 2.',
       '   #813 another bug from this item',
       '   #812 a bug from this item: The gate read red.',
       EFFORT_LINE,
@@ -576,6 +630,8 @@ describe('the effort and recheck readings beside the three others', () => {
       `CI: ⚪ No run on ${BRANCH}.`,
       'Bugs: 1 open.',
       `Filed since ${SINCE.toISOString()}: 1.`,
+      `Filed by this item's loop (${STUB}): 0.`,
+      'Filed by other sessions: 1.',
       '   #812 a bug from this item: The gate read red.',
       'Effort: not read (the effort store is locked).',
       'Recheck #812: gone',

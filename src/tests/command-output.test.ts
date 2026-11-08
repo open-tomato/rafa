@@ -28,8 +28,11 @@
  *
  *   - `effort collect --no-sessions` over a repository one commit deep,
  *     its json run beside a text run over the store a first run filled,
- *     and its refusal of a `--since` that is no date: on stderr in text
- *     mode, in the terminal result in json mode.
+ *     the bug-fix pass's line last, and its refusal of a `--since` that
+ *     is no date: on stderr in text mode, in the terminal result in json
+ *     mode. A config whose `learning.adapter` is not `local` fails the
+ *     pass, and the run still prints the line and exits 0, the failure
+ *     its one warning, written to stdout as text mode writes a warning.
  *   - `effort report` over an empty store: the report as the result's
  *     `data` with `--output=json` typed after the action, ahead of the
  *     subject and as two words, and its refusal of a `--kind` that is no
@@ -62,6 +65,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+
+import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { consoleAndExitUses } from './source-uses.js';
@@ -193,9 +198,23 @@ describe('rafa effort collect', () => {
       '  sessions  skipped (--no-sessions)',
       '  commits   1 parsed, 1 already stored, +0 rows',
       '  skills    skipped (--no-sessions)',
+      '  bug-fix   0 pairs pushed',
     ]);
     expect([json.exitCode, json.stderr]).toEqual([0, '']);
     expect(infoMessages(eventsOf(json))).toEqual(linesOf(text.stdout));
+  }, RUN_TIMEOUT);
+
+  it('prints the bug-fix line and exits 0 when the bug-fix pass fails, its failure one warning', () => {
+    const scratch = plant();
+    plantProjectConfig(scratch.repo, `${projectConfigText()}learning:\n  adapter: elsewhere\n`);
+
+    const text = rafa(scratch, ['effort', 'collect', '--no-sessions']);
+
+    expect([text.exitCode, text.stderr]).toEqual([0, '']);
+    expect(linesOf(text.stdout).slice(-2)).toEqual([
+      'warn: bug-fix pass: nothing was pushed: learning.adapter is `elsewhere`, and the pass pushes through `local` only',
+      '  bug-fix   0 pairs pushed',
+    ]);
   }, RUN_TIMEOUT);
 
   it('refuses a --since that is no date on stderr in text mode, and in the terminal result in json mode', () => {

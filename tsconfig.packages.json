@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Workspace packages and the root: core's subpaths mapped to packages/rafa/src, see context/source.md",
-  "extends": "@open-tomato/rafa-typescript-config/base",
+  "extends": "@open-tomato/typescript-config/base",
   "compilerOptions": {
     "lib": ["ES2022"],
     "module": "ESNext",

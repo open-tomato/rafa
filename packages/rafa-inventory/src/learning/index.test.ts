@@ -7,10 +7,15 @@
  * agreeing with itself. The binding case compares each name with the
  * module that declares it, so an entry wrapping a function in one of its
  * own fails too.
+ *
+ * `pool.ts` is read by `merge.ts` and `groups.ts` and offered by
+ * neither the entry nor this list: the arithmetic it holds is reached
+ * through them.
  */
 import { describe, expect, it } from 'bun:test';
 
 import * as blessModule from './bless.js';
+import * as groupsModule from './groups.js';
 import * as identityModule from './identity.js';
 import * as mergeModule from './merge.js';
 
@@ -26,6 +31,7 @@ const RUNTIME_NAMES: [string, Record<string, unknown>][] = [
   ['bless', blessModule],
   ['merge', mergeModule],
   ['promotable', blessModule],
+  ['sameActionGroups', groupsModule],
   ['triggerKey', identityModule],
 ];
 
@@ -37,6 +43,7 @@ describe('the learning entry', () => {
   it('exports every runtime name its modules do', () => {
     const declared = [
       ...Object.keys(blessModule),
+      ...Object.keys(groupsModule),
       ...Object.keys(identityModule),
       ...Object.keys(mergeModule),
     ].sort();

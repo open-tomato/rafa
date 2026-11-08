@@ -378,11 +378,17 @@ branch that set that unit's version: `v<version>` for the root, read off
 publishable workspace package, read off `<dir>/package.json` and
 `<dir>/CHANGELOG.md`
 (`packages/rafa-release/src/commands/release/tag-units.ts`). The branch is
-checked once for the run, and every unit is decided before the first tag is
-written: a unit whose version a tag already names is skipped, the run refuses
-`tagged` only when every unit is skipped, and any other refusal of any unit
-exits 1 with nothing written. It prints one `✅ Tagged <tag> at …` line per tag
-in unit order, then what to run next: per tag, its push and its publish line, a
+checked once for the run: a release branch behind the ref it tracks refuses
+`behind`, naming the `git merge --ff-only` to run, since settle pushes the
+release commit without touching the checkout (#1516). Every unit is decided
+before the first tag is written: a unit whose version a tag already names is
+skipped, and so is a unit never released (version `0.0.0`, no changelog file,
+no tag of its own; #1515), printed as one `Skipped:` line naming the package;
+the run refuses `tagged` only when every unit is skipped, and any other refusal
+of any unit exits 1 with nothing written. A `0.0.0` unit with a changelog or a
+tag still refuses. It prints one
+`✅ Tagged <tag> at …` line per tag in unit order, then what to run next: per
+tag, its push and its publish line, a
 package's as `(cd <dir> && <publishCommand>)`. Under `release.publish: ci` the
 publish line is replaced by one sentence in the form `Once pushed, <tag>
 publishes <name>@<version> to <registry> through

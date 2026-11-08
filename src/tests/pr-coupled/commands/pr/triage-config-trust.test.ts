@@ -273,7 +273,8 @@ async function dispatched(name: string, extra: readonly string[]): Promise<Dispa
     permissions: () => createGhPermissions({ gh: fake.run }),
     git: () => conflictingMergeTree(planted.git),
     now: () => NOW,
-    clock: () => 0,
+    // Held at NOW, so a head the fake commits at its default date reads older than the grace.
+    clock: () => Date.parse(NOW),
     sleep: async () => undefined,
     runLoop: async () => {
       loops += 1;

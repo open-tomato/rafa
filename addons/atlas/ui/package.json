@@ -47,7 +47,7 @@
     "test:visual:update": "playwright test --config visual/playwright.config.ts --update-snapshots"
   },
   "dependencies": {
-    "@open-tomato/charts": "workspace:*",
+    "@open-tomato/charts": "^0.1.0",
     "class-variance-authority": "^0.7.1",
     "lucide-react": "^1.67.0",
     "zod": "^4.1.0"
@@ -58,7 +58,7 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",
-    "@open-tomato/rafa-eslint-config": "workspace:*",
+    "@open-tomato/eslint-config": "^0.1.0",
     "@playwright/test": "1.63.0",
     "@storybook/addon-docs": "^10.6.5",
     "@storybook/react-vite": "^10.6.5",

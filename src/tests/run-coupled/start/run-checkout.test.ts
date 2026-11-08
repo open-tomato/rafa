@@ -11,7 +11,9 @@
  * worktree both redden.
  *
  * The base is its own reading, stubbed by the `base` seam and recorded
- * with the `pr.base` it was handed. The branch the run was started on is
+ * with the `pr.base` it was handed. Without the flag it is read once on
+ * every standing and handed to the offer as `runBase`, so a run on a
+ * configured base outside `main` and `master` is offered its branch. The branch the run was started on is
  * read through the `checkedOutBranch` seam on both routes, which answers
  * null on a detached HEAD. Under the flag it never reaches the worktree,
  * and only the one line naming the base is built from it: each case that
@@ -164,7 +166,9 @@ describe('settleRunCheckout without --as-worktree', () => {
     const settled = await settleRunCheckout(request(['--create-branch']), seams);
 
     expect(settled).toEqual({ projectRoot: ROOT, checkout: ROOT, branch: OFFERED });
-    expect(calls.offers).toEqual([{ checkout: ROOT, planStub: STUB, base: 'main', args: ['--create-branch'] }]);
+    expect(calls.offers).toEqual([
+      { checkout: ROOT, planStub: STUB, base: 'main', args: ['--create-branch'], runBase: 'main' },
+    ]);
     expect(calls.worktrees).toEqual([]);
   });
 
@@ -179,19 +183,31 @@ describe('settleRunCheckout without --as-worktree', () => {
     expect(calls.offers[0]?.checkout).toBe(started);
   });
 
-  it('reads no base and prints no line, started on a branch that is not the base', async () => {
+  it('hands the offer the started branch and the base read beside it, printing no line', async () => {
     // The control of the worktree cases below, and of the detached ones:
     // the same started branch and the same base, less the flag, and the
-    // branch is the one the offer is handed, on no standing of its own.
+    // branch is the one the offer is handed, on no standing of its own,
+    // with the run's base beside it for the offer to tell the two apart.
     const { infos } = collectLines();
     const { seams, calls } = stubbed(ROOT, 'feat/local-only');
     await settleRunCheckout(request(['--any-branch']), seams);
 
     expect(calls.offers[0]?.base).toBe('feat/local-only');
     expect(calls.offers[0]?.standing).toBeUndefined();
-    expect(calls.baseReads).toEqual([]);
+    expect(calls.offers[0]?.runBase).toBe('main');
+    expect(calls.baseReads).toEqual([{ projectRoot: ROOT, prBase: null }]);
     expect(calls.startedReads).toEqual([ROOT]);
     expect(infos).toEqual([]);
+  });
+
+  it('hands the offer a configured base `integration` as runBase, started on it', async () => {
+    const { seams, calls } = stubbed(ROOT, 'integration', 'integration');
+    await settleRunCheckout({ ...request(['--create-branch']), prBase: 'integration' }, seams);
+
+    expect(calls.baseReads).toEqual([{ projectRoot: ROOT, prBase: 'integration' }]);
+    expect(calls.offers).toEqual([
+      { checkout: ROOT, planStub: STUB, base: 'integration', args: ['--create-branch'], runBase: 'integration' },
+    ]);
   });
 });
 
@@ -218,7 +234,7 @@ describe('settleRunCheckout on a detached HEAD', () => {
     expect(settled).toEqual({ projectRoot: ROOT, checkout: ROOT, branch: OFFERED });
     expect(calls.baseReads).toEqual([{ projectRoot: ROOT, prBase: null }]);
     expect(calls.offers).toEqual([
-      { checkout: ROOT, planStub: STUB, base: 'main', standing: 'no-branch', args: ['--create-branch'] },
+      { checkout: ROOT, planStub: STUB, base: 'main', standing: 'no-branch', args: ['--create-branch'], runBase: 'main' },
     ]);
     expect(calls.worktrees).toEqual([]);
   });
@@ -231,7 +247,7 @@ describe('settleRunCheckout on a detached HEAD', () => {
     expect(calls.startedReads).toEqual([started]);
     expect(calls.baseReads).toEqual([{ projectRoot: ROOT, prBase: 'stretch/21' }]);
     expect(calls.offers).toEqual([
-      { checkout: started, planStub: STUB, base: 'stretch/21', standing: 'no-branch', args: [] },
+      { checkout: started, planStub: STUB, base: 'stretch/21', standing: 'no-branch', args: [], runBase: 'stretch/21' },
     ]);
   });
 
