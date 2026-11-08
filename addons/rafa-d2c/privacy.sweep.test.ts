@@ -3,9 +3,6 @@
  * track, names a private host, a home path, a private repository or the
  * maintainer's local baselines folder. The terms are sha256 hashes; see
  * `src/tests/privacy-sweep.ts` for how to add one without spelling it.
- *
- * `loki` stays off this list: it is also a public visual-testing tool,
- * and the add-on's detection names it.
  */
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

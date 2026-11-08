@@ -43,8 +43,7 @@ runner, and the `local-dir` and `side-repo` stores. `container`,
 **The add-on is private and public at once.** Its package is `private`
 until the review page moves in, and its source is in a public repo, so
 `privacy.sweep.test.ts` sweeps the folder with the shared helper in
-`src/tests/privacy-sweep.ts`. `loki` stays off its list: it is also a
-public visual-testing tool.
+`src/tests/privacy-sweep.ts`.
 
 Test it at its own scope: `bun test addons/rafa-d2c/` and
 `bun test src/tests/d2c-module-mount.test.ts`, then `check-types` and
