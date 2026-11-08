@@ -335,7 +335,7 @@ const CORE_DEFAULTS: CoreSection['defaults'] = Object.freeze({
   learningAdapter: 'local',
   learningBlessMinConfidence: 0.5,
   learningPromoteAfter: 3,
-  learningPromoteMinConfidence: 0.7,
+  learningPromoteMinConfidence: 0.6,
   outputMode: 'text',
   prerequisitesRequired: Object.freeze<PrerequisiteItem[]>([]),
   prerequisitesOptional: Object.freeze<OptionalPrerequisiteItem[]>([]),

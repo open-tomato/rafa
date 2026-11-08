@@ -38,14 +38,14 @@ import { activeOutput, setActiveOutput } from '@open-tomato/rafa/core/output';
 import { createPullRequestsDouble } from '@open-tomato/rafa/pr/pull-requests-double';
 import { writeChanges } from '@open-tomato/rafa/store/changes';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-import { localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
+import { createLocalLearning, localInstinctsDir } from '@open-tomato/rafa-inventory/adapters/learning/local';
 import { actionHash } from '@open-tomato/rafa-inventory/learning/index';
 import { writeInstinct } from '@open-tomato/rafa-inventory/schema/instinct';
 import { createFakePrGh } from '@open-tomato/rafa-pr/pr/gh-fake';
 import { createGhPullRequests, createGitRunner } from '@open-tomato/rafa-pr/pr/index';
 import { retargetedLine, retargetPullRequest } from '@open-tomato/rafa-pr/start/pr-retarget';
 import { resolveBaseBranch } from '@open-tomato/rafa-run/cleanup/index';
-import { checkWrapUpAnswer, readHead } from '@open-tomato/rafa-run/start/promoted-check';
+import { checkWrapUpAnswer, readHead, recordPromotions } from '@open-tomato/rafa-run/start/promoted-check';
 import { finishRelease, prepareReleaseStage } from '@open-tomato/rafa-run/start/release-stage';
 import { buildWrapUpPrompt, lessonsToPromote } from '@open-tomato/rafa-run/start/wrap-up';
 import { deliverPullRequest } from '@open-tomato/rafa-run/start/wrap-up-run';
@@ -153,6 +153,62 @@ describe('wrap-up over a scratch repository', () => {
       'Lessons listed for promotion that this pull request does not carry: `held-three` (no answer in the `rafa:promoted` block).',
     );
     expect(body.startsWith('What this pull request does.\n\n')).toBe(true);
+  });
+});
+
+describe('wrap-up over a same-action group in a fixture library', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'rafa-wrap-up-group-it-'));
+  const root = join(scratch, 'repo');
+  const home = join(scratch, 'home');
+  const PAGE = 'docs/lesson.md';
+  const SHARED_ACTION = 'the one action three triggers share';
+
+  /** A held lesson from one source of its own, on a trigger of its own, with the shared action. */
+  function groupMember(id: string): Instinct {
+    return {
+      ...held(id, 0.7),
+      sources: [`session-${id}`],
+      action: SHARED_ACTION,
+      actionHash: actionHash(SHARED_ACTION),
+    };
+  }
+
+  const memberIds = ['group-a', 'group-b', 'group-c'];
+
+  beforeAll(() => {
+    const dir = localInstinctsDir(root);
+    mkdirSync(dir, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    for (const id of memberIds) writeFileSync(join(dir, `${id}.md`), writeInstinct(groupMember(id)));
+  });
+
+  afterAll(() => {
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  test('lists the group once, and after its page is confirmed pullBlessed answers no member', async () => {
+    const settings = {
+      kind: 'local' as const,
+      home,
+      blessMinConfidence: 0.5,
+      repoRoot: root,
+      promoteAfter: 3,
+      promoteMinConfidence: 0.7,
+    };
+
+    const lessons = await lessonsToPromote(settings);
+    const [listed] = lessons;
+    if (lessons.length !== 1 || listed === undefined) throw new Error(`expected one listed lesson, got ${lessons.length}`);
+    expect(memberIds).toContain(listed.id);
+
+    const learning = createLocalLearning({ instinctsDir: localInstinctsDir(root), home, minConfidence: 0.5 });
+    const before = await learning.pullBlessed();
+    expect(before.instincts.filter((each) => memberIds.includes(each.id))).toHaveLength(memberIds.length);
+    const problems = await recordPromotions(learning, [{ lesson: listed, path: PAGE }]);
+
+    expect(problems).toEqual([]);
+    const after = await learning.pullBlessed();
+    expect(after.instincts.filter((each) => memberIds.includes(each.id))).toEqual([]);
   });
 });
 

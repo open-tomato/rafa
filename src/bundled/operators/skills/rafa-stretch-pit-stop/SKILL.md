@@ -32,7 +32,7 @@ step left for you. Read them there; do not run the checks again.
 | Check | Line | What is wrong |
 |---|---|---|
 | Effort | the `Effort:` line of the item's closing output | cost per task drifting up against the baseline, not explained by the item's size |
-| Bugs | the `Bugs:`, `Filed since` and `Recheck` lines of the item's closing output | the open count rising, a bug filed during this loop that repeats an open one (a `Recheck` line that says `reproduces`) |
+| Bugs | the `Bugs:`, `Filed since`, `Filed by` and `Recheck` lines of the item's closing output | the open count rising, a bug the item's loop filed (the `Filed by this item's loop` group) that repeats an open one (its `Recheck` line says `reproduces`) |
 | Delivery | `rafa loop status`, `rafa pr list` | the run is done with no pull request, or its pull request did not merge |
 | Conflicts | `rafa pr show <pr>` | the pull request conflicts with the integration branch |
 | CI | the `CI:` line of the item's closing output (`rafa ci status --branch=stretch/<n>` gives the same verdict) | the run failed (use `gh run view <id> --log-failed` to see why), or is still running |
@@ -48,11 +48,17 @@ The readings in the closing output decide nothing; you do. The shapes:
   it reads `against no baseline`. `Effort: <stub>: no task sessions stored.`
   is a plan with no task sessions in the store. `Effort: not read (<reason>).`
   is a reading that failed.
-- `Bugs: <n> open.`, then `Filed since <time>: <n>.` with one indented line
-  per bug filed after the last item, `#<n> <title>: <first line>`. `none` is
-  a reading, not a failure. `Filed since the last item: not read: <reason>`
-  is one that failed.
-- One `Recheck #<n>: <verdict>` line per bug in that list, judged as
+- `Bugs: <n> open.`, then `Filed since <time>: <n>.` and the bugs filed
+  after the last item in two groups, each a count line and one indented
+  line per bug, `#<n> <title>: <first line>`.
+  `Filed by this item's loop (<stub>): <n>.` comes first: the bugs whose
+  `## Plan` section names the item's plan, the only ones you read as the
+  item's filings. `Filed by other sessions: <n>.` comes second: bugs that
+  name another plan or none, filed by other sessions on the same account.
+  They are board weather and say nothing about the item. `none` is a reading,
+  not a failure. `Filed since the last item: not read: <reason>` is one
+  that failed.
+- One `Recheck #<n>: <verdict>` line per bug in both groups, judged as
   `rafa bug recheck` judges it, with no comment posted. The verdict is
   `reproduces`, `gone`, `flaky` (with its failed runs), `stale` or `skipped`
   (each with its reason), or `manual`. A `manual` line is followed by the
@@ -62,8 +68,8 @@ The readings in the closing output decide nothing; you do. The shapes:
 
 A line that says `not read` is the only time you type a command by hand:
 `rafa effort dashboard` for an `Effort: not read` line, and
-`rafa bug recheck <n>` for each bug in the `Filed since` list when the
-`Recheck` lines say `not read`. Read the bugs with
+`rafa bug recheck <n>` for each bug in the `Filed by this item's loop`
+group when the `Recheck` lines say `not read`. Read the bugs with
 `rafa issue list --type=bug --limit=200` when a bug reading is not read
 and no recheck can be run.
 

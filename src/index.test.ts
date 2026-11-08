@@ -636,6 +636,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/collect.js', [
     ['@open-tomato/rafa-effort', ['collect']],
+    ['@open-tomato/rafa/core/output', ['activeOutput']],
+    ['../../learning/bug-fix-pass.js', ['runBugFixPass']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
   ['./commands/effort/report.js', [
@@ -812,11 +814,25 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
   ]],
   ['./commands/instinct/promote.js', [
-    ['@open-tomato/rafa-inventory', ['promotable']],
+    ['@open-tomato/rafa-inventory', ['promotable', 'sameActionGroups']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/adapters', ['CORE_ADAPTER_REGISTRY']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/sections', ['messageOf']],
+  ]],
+  ['./commands/instinct/groups.js', [
+    ['@open-tomato/rafa-inventory', ['readScopes', 'sameActionGroups', 'toHeldRecords', 'triggerKey']],
+    ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
+    ['./instinct-records.js', ['instinctProject']],
+  ]],
+  ['./commands/instinct/pairs.js', [
+    ['@open-tomato/rafa-effort', ['readBugFixRows']],
+    ['@open-tomato/rafa-inventory', ['bugFixPairKey', 'localInstinctsDir', 'pairBugFixes', 'readLoggedPairs']],
+    ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'resolveProjectConfig']],
+    ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/plan', ['plansDirAt']],
+    ['../../learning/plan-stage-links.js', ['readPlanStageLinks']],
+    ['./instinct-records.js', ['instinctProject']],
   ]],
   ['./commands/update/current.js', [
     ['@open-tomato/rafa-board', ['createGhRunner']],
@@ -1315,6 +1331,8 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/instinct/show.js',
       './commands/instinct/flag.js',
       './commands/instinct/promote.js',
+      './commands/instinct/groups.js',
+      './commands/instinct/pairs.js',
       './commands/update/current.js',
       './commands/update/self.js',
       './commands/update/project.js',

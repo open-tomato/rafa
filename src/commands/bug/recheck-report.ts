@@ -3,12 +3,22 @@
  * {@link RecheckRow} per bug, the {@link RecheckReport} json mode gives as
  * the terminal result's data, the text {@link renderRecheck} prints, and
  * the comment {@link recheckComment} writes on a `gone` or `flaky` bug.
+ *
+ * A `gone` row whose bug body holds a `## Trigger removed` section
+ * (`triggerRemovedOf`, `../../bugs/recheck-verdict.ts`) carries
+ * `triggerRemoved: true`, which json mode gives as written. Its verdict
+ * stays `gone`; the text prints it `gone (trigger removed?)`, and its
+ * comment says the rerun passes because the trigger was removed, not
+ * that the bug is fixed (#1521).
  * Pure: nothing here spawns, reads a file or redacts; the caller passes
  * the comment through the record's redaction before it posts it.
  */
 import type { RecheckVerdict } from '../../bugs/recheck-verdict.js';
 import type { RunnableReference } from '../../bugs/test-reference.js';
 import type { IssueTrackerData } from '@open-tomato/rafa-board';
+
+/** What a `gone` row whose trigger was removed prints after its verdict. */
+export const TRIGGER_REMOVED_MARK = '(trigger removed?)';
 
 /** The indent of the reproduce text under a `manual` row. */
 const REPRODUCE_INDENT = '    ';
@@ -30,6 +40,8 @@ export interface RecheckRow {
   readonly reproduce: string | null;
   /** True when a comment was posted on the bug. */
   readonly commented: boolean;
+  /** Set on a `gone` row whose bug body holds a `## Trigger removed` section, left out otherwise. */
+  readonly triggerRemoved?: true;
 }
 
 /** What a recheck answers, as json mode gives it. */
@@ -64,7 +76,10 @@ function rowLines(row: RecheckRow): string[] {
   const detail = row.reason ?? (row.reference === null
     ? null
     : referenceText(row.reference));
-  const head = `#${row.issue} ${row.verdict}${detail === null
+  const verdict = row.triggerRemoved === true
+    ? `${row.verdict} ${TRIGGER_REMOVED_MARK}`
+    : row.verdict;
+  const head = `#${row.issue} ${verdict}${detail === null
     ? ''
     : ` ${detail}`}${runsNote(row)}`;
   if (row.verdict !== 'manual' || row.reproduce === null) return [head];
@@ -86,6 +101,10 @@ export function renderRecheck(report: RecheckReport): string {
 export function recheckComment(row: RecheckRow, report: RecheckReport): string | null {
   if (row.reference === null) return null;
   const reference = referenceText(row.reference);
+  if (row.verdict === 'gone' && row.triggerRemoved === true) {
+    return `gone ${TRIGGER_REMOVED_MARK} at rafa ${report.rafa}, \`${report.code}\`: \`${reference}\` passed ${row.runs} runs `
+      + 'because the bug\'s trigger was removed, not because the bug is fixed';
+  }
   if (row.verdict === 'gone') {
     return `gone at rafa ${report.rafa}, \`${report.code}\`: \`${reference}\` passed ${row.runs} runs`;
   }

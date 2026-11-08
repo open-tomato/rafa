@@ -38,16 +38,26 @@
  * ## What a clean run answers
  *
  * A heading naming the adapter and the two keys' values, then one line
- * per lesson — its id, confidence, `usage_count` and trigger, with its
- * action beneath — most trusted first, or one line saying none is
- * promotable. With `--output=json`, {@link InstinctPromoteResult} is the
- * data of the terminal result event.
+ * per lesson — its id, confidence, `usage_count`, source count and
+ * trigger, with its action beneath — most trusted first, or one line
+ * saying none is promotable. With `--output=json`,
+ * {@link InstinctPromoteResult} is the data of the terminal result event.
+ *
+ * ## The confidence and sources printed are the group's
+ *
+ * `promotable` floors a lesson's same-action group, not the record it
+ * names (`learning/groups.ts`): three wordings from three sources at
+ * 0.50 each pool to 0.60 and pass a floor of 0.60 that none meets alone.
+ * So each listed lesson carries its group's pooled confidence and source
+ * count ({@link PromotableLesson}), and the line prints those, the two
+ * readings the keys were compared with; the record's own `confidence`
+ * and `sources` stay as the adapter answered them.
  */
 import type { AdapterRegistry } from '@open-tomato/rafa/core/adapters';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { InstinctRecord, Learning } from '@open-tomato/rafa/ports';
 
-import { promotable } from '@open-tomato/rafa-inventory';
+import { promotable, sameActionGroups } from '@open-tomato/rafa-inventory';
 
 import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
@@ -63,6 +73,14 @@ const USAGE = 'rafa instinct promote';
 /** How many digits a confidence is written with. */
 const CONFIDENCE_DIGITS = 2;
 
+/** A promotable lesson: its named record, with the same-action group's readings the keys were compared with. */
+export interface PromotableLesson extends InstinctRecord {
+  /** The group's pooled confidence, at two decimals: the reading `learning.promote.minConfidence` floors. */
+  readonly pooled_confidence: number;
+  /** How many distinct sources the group's members hold together: the reading `learning.promote.after` floors. */
+  readonly pooled_sources: number;
+}
+
 /** What json mode gives as the terminal result's `data`. */
 export interface InstinctPromoteResult {
   /** The learning adapter kind the lessons were read from: the project's `learning.adapter`. */
@@ -71,8 +89,8 @@ export interface InstinctPromoteResult {
   readonly after: number;
   /** The project's `learning.promote.minConfidence`: the lowest confidence a listed lesson carries. */
   readonly minConfidence: number;
-  /** The promotable lessons, most trusted first. */
-  readonly lessons: readonly InstinctRecord[];
+  /** The promotable lessons, most trusted first, each with its group's pooled readings. */
+  readonly lessons: readonly PromotableLesson[];
 }
 
 /** What the command resolves its adapter through. */
@@ -132,7 +150,28 @@ export async function promotableLessons(
   } catch (error) {
     throw new CommandExit(1, refusedPullMessage(kind, messageOf(error)));
   }
-  return { adapter: kind, after, minConfidence, lessons: promotable(blessed, { after, minConfidence }) };
+  return { adapter: kind, after, minConfidence, lessons: withPooledReadings(blessed, promotable(blessed, { after, minConfidence })) };
+}
+
+/**
+ * Each of `lessons` with the pooled readings of the same-action group it
+ * names, grouped over `blessed` as `promotable` groups it: `active` and
+ * unpromoted records only.
+ */
+function withPooledReadings(
+  blessed: readonly InstinctRecord[],
+  lessons: readonly InstinctRecord[],
+): PromotableLesson[] {
+  const usable = blessed.filter((each) => each.status === 'active' && each.promoted_to === undefined);
+  const byNamed = new Map(sameActionGroups(usable).map((group) => [group.named.id, group]));
+  return lessons.map((lesson) => {
+    const group = byNamed.get(lesson.id);
+    return {
+      ...lesson,
+      pooled_confidence: group?.confidence ?? lesson.confidence,
+      pooled_sources: group?.sources.length ?? Math.max(lesson.sources?.length ?? 0, 1),
+    };
+  });
 }
 
 /** Every line text mode writes: the heading, then each lesson or the line saying there is none. */
@@ -145,7 +184,8 @@ export function renderPromotable(result: InstinctPromoteResult): readonly string
   return [
     `${String(result.lessons.length)} lesson(s) to promote from the \`${result.adapter}\` learning adapter, at ${keys}:`,
     ...result.lessons.flatMap((lesson) => [
-      `  ${lesson.id}  ${lesson.confidence.toFixed(CONFIDENCE_DIGITS)}  used ${String(lesson.usage_count)}  ${lesson.trigger}`,
+      `  ${lesson.id}  ${lesson.pooled_confidence.toFixed(CONFIDENCE_DIGITS)}  used ${String(lesson.usage_count)}`
+        + `  from ${String(lesson.pooled_sources)} source(s)  ${lesson.trigger}`,
       `      ${lesson.action}`,
     ]),
   ];

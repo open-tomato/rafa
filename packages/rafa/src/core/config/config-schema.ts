@@ -79,7 +79,7 @@ export interface RafaConfig {
   learningBlessMinConfidence: number;
   /** The distinct sources a lesson needs to be promotable. `learning.promote.after`. */
   learningPromoteAfter: number;
-  /** The least confidence of a promotable lesson. `learning.promote.minConfidence`. */
+  /** The least pooled confidence of a promotable same-action group, 0.6 by default. `learning.promote.minConfidence`. */
   learningPromoteMinConfidence: number;
   /** How commands write their output. `output.mode`. */
   outputMode: OutputMode;

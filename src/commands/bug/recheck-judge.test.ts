@@ -203,3 +203,35 @@ describe('judgeBugs', () => {
     expect(existsSync(root)).toBe(false);
   });
 });
+
+describe('judgeBugs over a removed trigger (#1521)', () => {
+  /** The section a bug body gains when its trigger was removed. */
+  const TRIGGER_SECTION = '## Trigger removed\n\nthe sideEffects field, removed in #1214';
+
+  it('leaves a passing bug whose body holds no Trigger removed section unmarked gone', async () => {
+    const judged = await judgeBugs([bug(20, `bun test ${TEST_FILE}`)], options());
+
+    expect(judged.rows[0]).toMatchObject({ issue: 20, verdict: 'gone' });
+    expect(judged.rows[0]).not.toHaveProperty('triggerRemoved');
+  });
+
+  it('marks a passing bug whose body holds the section, appended below an update, gone with triggerRemoved', async () => {
+    const plain = bug(21, `bun test ${TEST_FILE}`);
+    // The body ends with a section the judge does not read, as a filed record's `Versions` does.
+    const appended = { ...plain, body: `${plain.body}\n## Versions\n\nrafa 1.2.3\n\n**Updated 2026-11-08, trigger:**\n\n${TRIGGER_SECTION}\n` };
+
+    const judged = await judgeBugs([appended], options());
+
+    expect(judged.rows[0]).toMatchObject({ issue: 21, verdict: 'gone', triggerRemoved: true });
+  });
+
+  it('leaves a reproducing bug whose body holds the section unmarked', async () => {
+    const runner = plantedRunner({ verdict: 'reproduces', runs: 1, failedRuns: null, timedOutRuns: 0 });
+    const plain = bug(22, `bun test ${TEST_FILE}`);
+
+    const judged = await judgeBugs([{ ...plain, body: `${plain.body}\n\n${TRIGGER_SECTION}\n` }], options({ recheck: runner.recheck }));
+
+    expect(judged.rows[0]).toMatchObject({ issue: 22, verdict: 'reproduces' });
+    expect(judged.rows[0]).not.toHaveProperty('triggerRemoved');
+  });
+});

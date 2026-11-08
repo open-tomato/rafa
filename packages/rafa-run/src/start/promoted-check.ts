@@ -69,11 +69,27 @@
  * such a record comes back with `usage_count` 1. Only a hand-planted or
  * demoted record can lack sources.
  *
- * Each lesson is its own push, so one refusal costs one lesson and
- * not the rest. A record from the user scope is refused, because its
- * trigger has no held member in the project to take a description from,
- * and the user scope is never written. The refusal is a warning, and
- * the page still carries the lesson.
+ * A confirmed lesson is the named record of its same-action group
+ * (`promotable` answers one per group), and the page carries the whole
+ * group. So the blessed set is pulled once, before any push, and every
+ * other member of the lesson's group in it (read with
+ * `sameActionGroups`, so a `flagged` record is never one) is pushed the
+ * same way, each from a source it holds itself, with the lesson's path.
+ * Its trigger is its own, so each push collapses into that member alone.
+ * Once they are all recorded, `pullBlessed` answers no member of the
+ * group, and the next wrap-up cannot list a second wording of it. A
+ * member reached through an earlier lesson is not pushed twice.
+ *
+ * Each member is its own push, so one refusal costs one record and not
+ * the rest of its group or the other lessons. A record from the user
+ * scope is refused, because its trigger has no held member in the
+ * project to take a description from, and the user scope is never
+ * written. Each refusal is one problem line, naming the member and, for
+ * a member other than the lesson, the lesson it shares an action with;
+ * the wrap-up prints it as a warning, and the page still carries the
+ * lesson. A blessed set that cannot be pulled is one problem line too:
+ * the lesson alone is pushed, and its group's other members stay
+ * blessed.
  *
  * ## The pull request line
  *
@@ -103,6 +119,7 @@ import { isAbsolute, posix, relative } from 'node:path';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { activeOutput } from '@open-tomato/rafa/core/output';
+import { sameActionGroups } from '@open-tomato/rafa-inventory';
 import { gitSaid } from '@open-tomato/rafa-pr';
 
 import { parsePromoted } from './promoted.js';
@@ -250,22 +267,62 @@ export function unpromotedLine(check: PromotedCheck, head: string | null): strin
   return `Lessons listed for promotion that this pull request does not carry: ${named}.`;
 }
 
+/** The problem line for a push of `member` that was refused. */
+function refusedLine(member: InstinctRecord, named: InstinctRecord, path: string, error: unknown): string {
+  const who = member.id === named.id
+    ? `\`${member.id}\``
+    : `\`${member.id}\` (same action as \`${named.id}\`)`;
+  return `${who} is in ${path}, but its promoted_to could not be recorded: ${messageOf(error)}`;
+}
+
 /**
- * Sets `promoted_to` on each confirmed lesson by pushing it back from a
- * source it already holds; see the module note. Answers one problem per
- * lesson whose push was refused, and never throws.
+ * The blessed members of `lesson`'s same-action group other than
+ * `lesson` itself, most trusted first: none when `blessed` holds no
+ * other record taking its action.
+ */
+function groupMates(lesson: InstinctRecord, blessed: readonly InstinctRecord[]): readonly InstinctRecord[] {
+  const group = sameActionGroups(blessed).find((each) => each.action_hash === lesson.action_hash);
+  return (group?.members ?? []).filter((member) => member.id !== lesson.id);
+}
+
+/** The blessed set the group members are read from, or why it could not be read. */
+async function blessedOrProblem(learning: Learning): Promise<{ readonly blessed: readonly InstinctRecord[]; readonly problem: string | null }> {
+  try {
+    return { blessed: (await learning.pullBlessed()).instincts, problem: null };
+  } catch (error) {
+    return { blessed: [], problem: messageOf(error) };
+  }
+}
+
+/**
+ * Sets `promoted_to` on each confirmed lesson and on every other
+ * blessed member of its same-action group, pushing each back from a
+ * source it already holds; see the module note. The blessed set is
+ * pulled once, before any push. Answers one problem per member whose
+ * push was refused, and one per confirmed lesson whose group could not
+ * be read, and never throws.
  */
 export async function recordPromotions(
   learning: Learning,
   promoted: readonly ConfirmedPromotion[],
 ): Promise<readonly string[]> {
   const problems: string[] = [];
+  if (promoted.length === 0) return problems;
+  const { blessed, problem } = await blessedOrProblem(learning);
+  const pushed = new Set<string>();
   for (const { lesson, path } of promoted) {
-    const sourceId = lesson.sources?.[0] ?? lesson.id;
-    try {
-      await learning.push({ source_id: sourceId, instincts: [{ ...lesson, promoted_to: path }] });
-    } catch (error) {
-      problems.push(`\`${lesson.id}\` is in ${path}, but its promoted_to could not be recorded: ${messageOf(error)}`);
+    if (problem !== null) {
+      problems.push(`\`${lesson.id}\` is in ${path}, but the rest of its same-action group was not recorded, as the blessed set could not be read: ${problem}`);
+    }
+    for (const member of [lesson, ...groupMates(lesson, blessed)]) {
+      if (pushed.has(member.id)) continue;
+      pushed.add(member.id);
+      const sourceId = member.sources?.[0] ?? member.id;
+      try {
+        await learning.push({ source_id: sourceId, instincts: [{ ...member, promoted_to: path }] });
+      } catch (error) {
+        problems.push(refusedLine(member, lesson, path, error));
+      }
     }
   }
   return problems;

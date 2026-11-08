@@ -187,6 +187,7 @@ export {
   causeSignalOf,
   issueWordsOf,
   jaccard,
+  sectionValueOf,
   sharesBoundary,
   wordSetOf,
 } from './src/triage/similarity.js';

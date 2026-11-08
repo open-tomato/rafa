@@ -85,6 +85,15 @@ record does not read is kept as written, after the record's own
 sections: that text beside a `What` section, a section that is no field
 (`Expected`, `Refs`), and the second section under one heading.
 
+One section beside the fields is read by `rafa bug recheck` alone:
+
+- **`## Trigger removed`**, optional: one line naming what was removed
+  and the commit or pull request that removed it, for a bug whose test
+  passes because the thing that set it off is gone, not because the bug
+  is fixed. No flag writes it; it is written in the body, or appended
+  with `rafa issue edit <n> --append-file=<file> --reason=<text>`. The
+  record keeps it as a section that is no field. See Recheck below.
+
 A record with a problem is refused before any tracker is resolved, every
 problem on a line of its own, each opening with the field it names
 (`bugProblems`, `packages/rafa/src/bugs/record.ts`).
@@ -235,6 +244,13 @@ no test of the file, or named a case the file does not hold. The six
 verdicts are `reproduces`, `gone`, `flaky`, `stale`, `manual` and
 `skipped`.
 
+A `gone` bug whose body holds a `## Trigger removed` heading, anywhere
+in the body and so below an appended update too, and outside a fence,
+prints `gone (trigger removed?)` (`triggerRemovedOf`,
+`src/bugs/recheck-verdict.ts`). The verdict stays `gone`: the mark is
+the row's `triggerRemoved: true`, which `--output=json` carries, and a
+row of any other verdict is never marked. Such a bug stays open.
+
 Runs go in the directory rafa runs in, so a machine-dependent test can
 read `gone` here and fail elsewhere. The report names where it ran, and
 `--comment` names the rafa version and the short commit, with
@@ -243,7 +259,10 @@ read `gone` here and fail elsewhere. The report names where it ran, and
 `--comment` writes only on `gone` and `flaky`, one line through the
 record's redaction, and never closes a bug. A `gone` comment reads
 "gone at rafa <version>, `<commit>`: `<reference>` passed <n> runs";
-a `flaky` one reads "flaky at rafa ..." with the failed count. A
+a `flaky` one reads "flaky at rafa ..." with the failed count. On a
+`gone (trigger removed?)` row it reads "gone (trigger removed?) at rafa
+<version>, `<commit>`: `<reference>` passed <n> runs because the bug's
+trigger was removed, not because the bug is fixed". A
 degraded issue chain (`resolveIssueTracker`) exits 1 before any issue
 is read.
 

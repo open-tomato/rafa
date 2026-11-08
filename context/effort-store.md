@@ -32,6 +32,27 @@ passed to `collectEffort` replaces the whole set with that one folder.
 `loop.worktreeDir` from the config, or `.rafa/worktrees` when it reads
 none (a store and `plansDir` both passed).
 
+**A session row stores its log's path as `<folder>/<file>`, not as an
+absolute path.** A fresh collect cuts a log under `<home>/.claude/projects/`
+to the part after that root (`storedLogPath`, `session-log-path.ts`), so
+`filePath` holds `<folder>/<file>.jsonl` with no leading `/` and carries no
+home directory across sync. A log outside that root, a `logDir` override's
+among them, stays absolute as written. A row written before this form
+(#1489) keeps its absolute path in the store's bytes, and `read` rewrites it
+on the way out (`storedLogPathOf`, through `answeredRows`): an absolute value
+holding `/.claude/projects/` is cut after that marker whatever home precedes
+it, so a macOS and a Linux row read alike. No migration carries the rewrite,
+because both backends never rewrite a stored row's bytes, and `row_json`,
+`keys` and the NDJSON files a move copies keep what was written. The old
+absolute values therefore stay in store files and in any export a hub takes
+from cursor zero. `resolveSessionLogPath` joins a stored relative value under
+the reading machine's home, and `classifyStoredSessionLog` (`rafa-effort`,
+`classify.ts`) reads a log absent there as `onMachine: false`, a reading and
+not a fault, since a row synced from another machine names a log only that
+machine holds. `sessions.row_json` compares with `filePath` taken in stored
+form, so two rows that differ only in that form are one row to the merge
+(`RECOMPUTED`, `store/merge-rules.ts`).
+
 ### Where it lives
 
 **Both backends write under `.rafa/effort/` in the project root, unless
@@ -78,7 +99,12 @@ is copied there as well.
 filled through the kind's `fieldColumns` in `KIND_TABLES`
 (`store/sqlite.ts`).** `row_json` still holds the field and `read`
 answers from it, so both backends' rows stay byte-identical; the column
-only repeats it. `sessions.worktree`, added by migration
+only repeats it. What `read` answers passes through `answeredRows`
+(`store/answered-rows.ts`), one function both backends call: an old
+session row's absolute `filePath` under a `/.claude/projects/` root is
+answered as `<folder>/<file>` (#1489), while `row_json`, the NDJSON
+bytes, `keys` and the NDJSON `readRows` a move copies keep what was
+written. `sessions.worktree`, added by migration
 `session-worktree`, is the one such column today: the row's `worktree`
 field, NULL for a session of the main checkout, for a row collected
 before the field and for a row an older runtime inserts. Such a column
@@ -851,8 +877,8 @@ commit:**
   through every migration and fails on a table with no entry, an entry
   with no table, a merged table without both origin columns and that
   index, and an `UPDATE <table> SET <column>` in a production module
-  under `src/` whose column has no rule; a new edit of an existing
-  table's column needs its rule the same way;
+  under `src/` or `packages/rafa/src/` whose column has no rule; a new
+  edit of an existing table's column needs its rule the same way;
 - for a merged table, **one fixture row in each builder that plants
   every merged table**: `FIXTURES` in `merge-union.test.ts` and in
   `fixture-extract.test.ts`, and `taskRows` in

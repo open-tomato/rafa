@@ -21,10 +21,14 @@
  *   `field` naming the column. Under {@link RECOMPUTED} the two values
  *   are compared without the part the merge recomputes, through the
  *   field's entry in {@link RECOMPUTED_COMPARISONS}: `commits.row_json`
- *   without its `minutesSincePrevious` (`merge-commit-gaps.ts`). Equal
- *   so, the pair is skipped and the row here kept; the gap of a commit
- *   brought in is the merge's to rewrite, not a matched one's. Unequal,
- *   the rows differ outside every edited field, below.
+ *   without its `minutesSincePrevious` (`merge-commit-gaps.ts`), and
+ *   `sessions.row_json` with its `filePath` passed through
+ *   `storedLogPathOf` (`session-log-path.ts`), so an old row's absolute
+ *   path and a fresh row's `<folder>/<file>` compare alike. Equal so, the
+ *   pair is skipped and the row here kept: the gap of a commit brought in
+ *   is the merge's to rewrite, not a matched one's, and a session's path
+ *   is answered in its stored form by `read` whichever form the row here
+ *   holds. Unequal, the rows differ outside every edited field, below.
  * - **Any other difference**: the incoming row is recorded with `field`
  *   NULL, and the row here is left as it is, edited fields included. The
  *   same `(origin_store, origin_seq)` holding different content can only
@@ -50,6 +54,8 @@
  */
 import type { TableUnion, UnionMatch } from './merge-union.js';
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
+
+import { storedLogPathOf } from '../session-log-path.js';
 
 import { withoutGap } from './merge-commit-gaps.js';
 import { MERGE_RULES, RECOMPUTED, SET_ONCE } from './merge-rules.js';
@@ -93,8 +99,31 @@ export const SET_ONCE_FILLS: Readonly<Record<string, string>> = {
   'findings.tracker_ref': 'UPDATE findings SET tracker_ref = ? WHERE seq = ? AND tracker_ref IS NULL',
 };
 
+/** The key of `sessions.row_json` that holds the log's path, in one of two forms. */
+const LOG_PATH_FIELD = 'filePath';
+
+/**
+ * A session's `row_json` with its `filePath` in the stored form, the
+ * other keys and their order kept, or the text unchanged when it is not
+ * a JSON object or holds no `filePath`.
+ */
+function withStoredLogPath(rowJson: string): string {
+  let row: unknown;
+  try {
+    row = JSON.parse(rowJson);
+  } catch {
+    return rowJson;
+  }
+  if (typeof row !== 'object' || row === null || Array.isArray(row) || !Object.hasOwn(row, LOG_PATH_FIELD)) return rowJson;
+  const entries = Object.entries(row).map(([key, value]: [string, unknown]) => key === LOG_PATH_FIELD
+    ? [key, storedLogPathOf(value)]
+    : [key, value]);
+  return JSON.stringify(Object.fromEntries(entries));
+}
+
 /** The comparable form of one recomputed field's value, by `<table>.<column>`. */
 export const RECOMPUTED_COMPARISONS: Readonly<Record<string, (value: string) => string>> = {
+  'sessions.row_json': withStoredLogPath,
   'commits.row_json': withoutGap,
 };
 

@@ -61,6 +61,15 @@
  * appended under the wrong kind is keyless there and refuses its whole
  * batch. A mismatch that got past the caller's types still writes
  * nothing.
+ *
+ * ## What `read` answers
+ *
+ * `read` answers the parsed rows through `answeredRows`
+ * (`answered-rows.ts`), the function the SQLite backend's `read` calls
+ * too, which answers an old session row's absolute `filePath` in its
+ * stored form. The file keeps the bytes it was written with, and
+ * `readRows`, the raw reading a store move copies, answers them as
+ * they are.
  */
 import type { StoreReadResult } from './ndjson-files.js';
 import type {
@@ -72,6 +81,7 @@ import type {
 
 import { join } from 'node:path';
 
+import { answeredRows } from './answered-rows.js';
 import { effortStoreDir, guardTestProcess } from './location.js';
 import {
   appendRows,
@@ -115,7 +125,8 @@ export interface NdjsonEffortStore extends EffortStore {
    * line is one of the unparsed, as is a blank line, a malformed one,
    * and one that parses to anything but a plain object. The row type
    * is the port's assertion, as the sibling's was: a line is checked
-   * only for being a plain JSON object.
+   * only for being a plain JSON object. The rows are the file's as
+   * written, without the rewrite `read` applies.
    */
   readRows: <K extends EffortRowKind>(
     kind: K,
@@ -179,7 +190,7 @@ export function openNdjsonStore(repoRoot: string): NdjsonEffortStore {
   return {
     append: (kind, rows) => appendKind(repoRoot, kind, rows),
     keys: (kind) => keysOfKind(repoRoot, kind),
-    read: (kind) => readKind(repoRoot, kind).rows,
+    read: (kind) => answeredRows(kind, readKind(repoRoot, kind).rows),
     path: (kind) => kindPath(repoRoot, kind),
     readRows: (kind) => readKind(repoRoot, kind),
   };

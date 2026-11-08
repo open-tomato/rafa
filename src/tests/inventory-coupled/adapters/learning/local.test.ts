@@ -361,6 +361,38 @@ describe('push', () => {
     expect(logOf(dir)[1]).toMatchObject({ rule: 'same-action', produced: ['first'], discarded: [] });
   });
 
+  it('logs a third wording of a held action as same-action-group, its merge rule new-trigger', async () => {
+    const dir = freshDir('same-action-group');
+    const learning = localLearning(dir);
+    await learning.push(payload([lesson({ id: 'first' })], 'session-1'));
+    await learning.push(payload([lesson({ id: 'second', trigger: 'a gate is run in the background' })], 'session-2'));
+
+    const third = lesson({ id: 'third', trigger: 'a long test run is polled with sleep' });
+    const result = await learning.push(payload([third], 'session-3'));
+
+    expect(result.decisions.map((decision) => decision.rule)).toEqual(['new-trigger']);
+    expect(logOf(dir).map((line) => line.rule)).toEqual(['new-trigger', 'same-action-group', 'same-action-group']);
+    expect(logOf(dir)[2]).toEqual({
+      source_id: 'session-3', rule: 'same-action-group', incoming: third, produced: ['third'], discarded: [],
+    });
+    expect(readdirSync(dir).sort()).toEqual(['first.md', INSTINCTS_FILE, 'second.md', 'third.md']);
+  });
+
+  it('logs the merge rule for a push onto a group whose other wording is flagged', async () => {
+    const dir = freshDir('flagged-only-group');
+    const learning = localLearning(dir);
+    const flaggedTrigger = 'a gate is run in the background';
+    await learning.push(payload([lesson({ id: 'second', trigger: flaggedTrigger })], 'session-1'));
+    await learning.push(payload([
+      lesson({ id: 'second-rival', trigger: flaggedTrigger, action: RIVAL, confidence: 0.55 }),
+    ], 'session-2'));
+
+    await learning.push(payload([lesson({ id: 'third', trigger: 'a long test run is polled with sleep' })], 'session-3'));
+
+    expect(logOf(dir).map((line) => line.rule)).toEqual(['new-trigger', 'flagged', 'new-trigger']);
+    expect(readdirSync(dir).sort()).toEqual([INSTINCTS_FILE, 'second-rival.md', 'second.md', 'third.md']);
+  });
+
   it('removes a collapsed member filed under the later id, keeping the record under the earlier', async () => {
     const dir = freshDir('collapse-later-id');
     const learning = localLearning(dir);
@@ -587,6 +619,36 @@ describe('push', () => {
     await expect(localLearning(path).push(payload([lesson()]))).rejects.toThrow('ENOTDIR');
     await expect(localLearning(path).pullBlessed()).rejects.toThrow('ENOTDIR');
     expect(readFileSync(path, 'utf8')).toBe('not a directory\n');
+  });
+
+  it('appends each line as logLine rewrites it, with its decision index, writing the files as without it', async () => {
+    const plainDir = freshDir('log-line-control');
+    const taggedDir = freshDir('log-line');
+    const records = [lesson({ id: 'first' }), lesson({ id: 'second', trigger: 'a gate is run in the background' })];
+    const seen: [rule: string, index: number][] = [];
+    const keys = [
+      { ref: 'https://github.com/o/r/issues/42', filed_by: 'filer-1' },
+      { ref: 'https://github.com/o/r/issues/43', filed_by: 'filer-2' },
+    ];
+    const tagged = localLearning(taggedDir, [], {
+      logLine: (line, index) => {
+        seen.push([line.rule, index]);
+        return { ...line, rule: 'bug-fix-pair', pair: keys[index]! };
+      },
+    });
+
+    await localLearning(plainDir).push(payload(records, 'fixer-1'));
+    const result = await tagged.push(payload(records, 'fixer-1'));
+
+    // The line as it would be logged: one action on two triggers is a group.
+    expect(seen).toEqual([['same-action-group', 0], ['same-action-group', 1]]);
+    expect(result.decisions.map((decision) => decision.rule)).toEqual(['new-trigger', 'new-trigger']);
+    expect(logOf(taggedDir)).toEqual(logOf(plainDir).map((line, index) => ({
+      ...line, rule: 'bug-fix-pair', pair: keys[index]!,
+    })));
+    expect(logOf(plainDir).map((line) => line.pair)).toEqual([undefined, undefined]);
+    expect(snapshot(taggedDir).filter(([name]) => name !== INSTINCTS_FILE))
+      .toEqual(snapshot(plainDir).filter(([name]) => name !== INSTINCTS_FILE));
   });
 });
 

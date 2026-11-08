@@ -42,7 +42,10 @@
  * because the uniqueness constraint on it is what deduplicates.
  * `worktree` is repeated beside it only so a query can read it; `read`
  * still answers the row from `row_json`, so both backends' rows stay
- * byte-identical.
+ * byte-identical. Both pass what they parsed through `answeredRows`
+ * (`answered-rows.ts`) on its way out of `read`, which answers an old
+ * session row's absolute `filePath` in its stored form and leaves
+ * `row_json` as it was written.
  *
  * `seq` is an `INTEGER PRIMARY KEY`, SQLite's alias for the rowid, so
  * the append order is a column the schema declares rather than an
@@ -237,6 +240,7 @@ import { dirname, join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
+import { answeredRows } from './answered-rows.js';
 import { bringForward } from './bring-forward.js';
 import { effortStoreDir, guardTestProcess } from './location.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
@@ -616,7 +620,11 @@ function rowOf<K extends EffortRowKind>(
   return value as EffortRow<K>;
 }
 
-/** Every row one kind holds, in append order. */
+/**
+ * Every row one kind holds, in append order, as `read` answers it:
+ * through `answeredRows` (`answered-rows.ts`), which `row_json` itself
+ * never sees.
+ */
 function readKind<K extends EffortRowKind>(
   path: string,
   kind: K,
@@ -629,10 +637,10 @@ function readKind<K extends EffortRowKind>(
       `SELECT seq, row_json AS body FROM ${name} ORDER BY seq`,
     )
     .all());
-  return stored.map(({ seq, body }) => rowOf<K>(
+  return answeredRows(kind, stored.map(({ seq, body }) => rowOf<K>(
     body,
     `${path}: ${name} row ${seq}`,
-  ));
+  )));
 }
 
 /**

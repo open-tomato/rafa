@@ -180,9 +180,9 @@ describe('the config files', () => {
       '#     minConfidence: 0.5',
       '#   promote:',
       '#     after: 3',
-      '#     minConfidence: 0.7',
+      '#     minConfidence: 0.6',
     ]);
-    expect(settings.map((setting) => resolved.config[setting])).toEqual([0.5, 3, 0.7]);
+    expect(settings.map((setting) => resolved.config[setting])).toEqual([0.5, 3, 0.6]);
     expect(settings.map((setting) => resolved.sources[setting])).toEqual(['file', 'file', 'file']);
   });
 

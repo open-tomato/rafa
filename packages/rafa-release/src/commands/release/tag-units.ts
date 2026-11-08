@@ -24,11 +24,22 @@
  *
  * ## Skipped
  *
- * A unit whose version a tag already names is done, not wrong: the run
- * passes over it ({@link unitDecisionOf} turns `decideTag`'s `tagged`
- * refusal into `skipped`) and tags the others. `./tag.ts` refuses
- * `tagged` only when every unit is skipped, so a one-package project
- * reads exactly as it did before units.
+ * Two units are passed over, not refused, and the run tags the others
+ * ({@link unitDecisionOf} turns the refusal `decideTag` answered into
+ * `skipped`, printed as one `Skipped:` line):
+ *
+ * - a unit whose version a tag already names is done, not wrong: its
+ *   `tagged` refusal is a skip;
+ * - a unit never released ({@link isNeverReleased}): its version is
+ *   {@link UNRELEASED_VERSION}, its changelog file is absent and no tag
+ *   of the unit is held, as `rafa release status` reads it (`0.0.0
+ *   untagged`) and settle passes over it (#1515). Its `changelog`
+ *   refusal is a skip naming the package. A changelog that exists and
+ *   disagrees with the version still refuses, and so does a `0.0.0`
+ *   unit with a changelog or with a tag: something says it was released.
+ *
+ * `./tag.ts` refuses `tagged` only when every unit is skipped, so a
+ * one-package project reads exactly as it did before units.
  *
  * ## Why the readers live here
  *
@@ -57,6 +68,9 @@ const PACKAGE_MANIFEST = 'package.json';
 /** The changelog a workspace package's releases are read from, in its folder, as settle writes it. */
 const PACKAGE_CHANGELOG = 'CHANGELOG.md';
 
+/** The version a unit declares before its first release; see the module note. */
+export const UNRELEASED_VERSION = '0.0.0';
+
 /** What the version file declared, and the text it declared it in. */
 export interface VersionReading {
   /** The path as `release.versionFile` spells it, or `<dir>/package.json` for a package. */
@@ -77,16 +91,18 @@ export interface ChangelogReading {
   readonly version: string | null;
   /** Why the file could not be read, or null when it was. */
   readonly problem: string | null;
+  /** True when no file is there at all, which a never-released unit reads; left out when one is. */
+  readonly absent?: boolean;
 }
 
 /** A unit's own readings: every one of {@link TagInputs} but the branch, which is read once for the run. */
 export type UnitReadings = Omit<TagInputs, 'releaseBranch' | 'branch'>;
 
-/** A unit whose version a tag already names: passed over, not refused; see the module note. */
+/** A unit whose version a tag already names, or one never released: passed over, not refused; see the module note. */
 export interface TagSkipped {
   /** Tells this apart from a ready or a refused decision. */
   readonly kind: 'skipped';
-  /** The sentence naming the tag that holds the version, with no marker on the front. */
+  /** The sentence naming the tag that holds the version, or the unit never released, with no marker on the front. */
   readonly message: string;
 }
 
@@ -130,7 +146,10 @@ export function readNewestRelease(root: string, configured: string): ChangelogRe
   const resolved = join(root, configured);
   const text = textOf(resolved);
   if (text === null) {
-    return { path: configured, version: null, problem: `the changelog could not be read at ${resolved}` };
+    const problem = `the changelog could not be read at ${resolved}`;
+    return existsSync(resolved)
+      ? { path: configured, version: null, problem }
+      : { path: configured, version: null, problem, absent: true };
   }
   return { path: configured, version: changelogVersions(text)[0] ?? null, problem: null };
 }
@@ -177,9 +196,33 @@ export function readUnitInputs(root: string, git: GitRunner, member: WorkspacePa
   };
 }
 
-/** `decision` as one unit's: a `tagged` refusal is a skip; see the module note. */
-export function unitDecisionOf(decision: TagDecision): UnitDecision {
-  return decision.kind === 'refused' && decision.reason === 'tagged'
-    ? { kind: 'skipped', message: decision.message }
+/**
+ * True for a unit never released: version {@link UNRELEASED_VERSION}, no
+ * changelog file, and no tag of the unit's own; see the module note.
+ */
+export function isNeverReleased(inputs: UnitReadings): boolean {
+  return inputs.version.version === UNRELEASED_VERSION
+    && inputs.changelog.absent === true
+    && inputs.tags.problem === null
+    && !inputs.tags.tags.some((tag) => tag.package === inputs.package);
+}
+
+/** The `Skipped` sentence of a never-released unit, naming the package, or the version file for the root. */
+function neverReleasedMessage(inputs: UnitReadings): string {
+  const name = inputs.package ?? inputs.version.path;
+  return `${name} has never been released: it is at ${UNRELEASED_VERSION} with no ${inputs.changelog.path}`
+    + ' and no tag, so it is passed over';
+}
+
+/**
+ * `decision` as one unit's, `inputs` its readings: a `tagged` refusal is
+ * a skip, and so is the `changelog` refusal of a unit never released;
+ * see the module note.
+ */
+export function unitDecisionOf(decision: TagDecision, inputs: UnitReadings): UnitDecision {
+  if (decision.kind !== 'refused') return decision;
+  if (decision.reason === 'tagged') return { kind: 'skipped', message: decision.message };
+  return decision.reason === 'changelog' && isNeverReleased(inputs)
+    ? { kind: 'skipped', message: neverReleasedMessage(inputs) }
     : decision;
 }
