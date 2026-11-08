@@ -6,8 +6,9 @@
 import type { RafaCommand } from '@open-tomato/rafa-core/core/command';
 
 import { checkCommand } from './check.js';
+import { placeCommand } from './place.js';
 import { seedCommand } from './seed.js';
 
-const commands: RafaCommand[] = [checkCommand, seedCommand];
+const commands: RafaCommand[] = [checkCommand, seedCommand, placeCommand];
 
 export default commands;

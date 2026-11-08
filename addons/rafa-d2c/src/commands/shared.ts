@@ -12,13 +12,14 @@ import type { LoadedConfig } from '../config/load.js';
 import type { HostFacts } from '../host.js';
 import type { ProcessRunner } from '../process.js';
 import type { CheckReport } from '../steps/check.js';
-import type { RafaContext } from '@open-tomato/rafa-core/core/command';
+import type { RafaContext, RafaFlagSpec } from '@open-tomato/rafa-core/core/command';
 
 import { loadD2cConfig } from '../config/load.js';
 import { D2cConfigError } from '../config/read.js';
 import { readHostFacts } from '../host.js';
 import { spawnProcess } from '../process.js';
 import { projectRootOf } from '../project.js';
+import { hostRunnerKey } from '../store/key.js';
 
 /** What a command works with. */
 export interface CommandEnv {
@@ -80,3 +81,29 @@ export function printCheck(context: RafaContext, report: CheckReport): void {
   }
   context.output.info(report.runLine);
 }
+
+/**
+ * The runner key of a run, without the whole check: place and promote
+ * run after the suite, so an unreachable remote must not stop them.
+ * Refuses a runner this version does not run.
+ */
+export function runnerKeyOf(env: CommandEnv): string {
+  const { runner } = env.loaded.config.visual;
+  if (runner.kind !== 'host') throw new Error(`visual.runner.kind is ${runner.kind}; this version runs the host runner only`);
+  return hostRunnerKey(env.host.platform, env.host.arch);
+}
+
+/** The `--run` flag's value, or undefined when absent; refuses a bare `--run`. */
+export function runFlagOf(context: RafaContext): string | undefined {
+  const value = context.flags['run'];
+  if (value === undefined || value === false) return undefined;
+  if (value === true || value.trim() === '') throw new Error('--run needs a run id, as place and seed print it');
+  return value;
+}
+
+/** The `--run` flag every staging verb takes. */
+export const RUN_FLAG: Readonly<RafaFlagSpec> = Object.freeze({
+  name: 'run',
+  description: 'the run id, as seed prints it; the newest waiting run when left out',
+  type: 'string',
+});

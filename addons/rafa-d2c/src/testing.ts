@@ -160,3 +160,26 @@ export async function writeConfigFile(project: TestProject): Promise<void> {
   await mkdir(join(project.root, '.rafa'), { recursive: true });
   await writeFile(project.loaded.file, Bun.YAML.stringify(project.loaded.config));
 }
+
+/** Snapshot counts with every field zero, for spreading. */
+export const ZERO_COUNTS = Object.freeze({ matched: 0, added: 0, updated: 0, unmatched: 0, total: 0 });
+
+/** Writes the jest report the test project's suite reads, holding `counts` and one passed test per story pair. */
+export async function writeReport(
+  project: TestProject,
+  counts: Partial<Record<'matched' | 'added' | 'updated' | 'unmatched' | 'total', number>>,
+  stories: readonly (readonly [string, string, string])[] = [],
+): Promise<void> {
+  const assertionResults = stories.map(([title, name, status]) => ({ ancestorTitles: [title, name], title: 'smoke-test', status }));
+  await writeFile(
+    join(project.packageDir, 'visual-report.json'),
+    JSON.stringify({ snapshot: { ...ZERO_COUNTS, ...counts }, testResults: [{ assertionResults }] }),
+  );
+}
+
+/** Writes the story index the test project's suite reads, one story per `[title, name, id]`. */
+export async function writeIndex(project: TestProject, stories: readonly (readonly [string, string, string])[]): Promise<void> {
+  await mkdir(join(project.packageDir, 'storybook-static'), { recursive: true });
+  const entries = Object.fromEntries(stories.map(([title, name, id]) => [id, { type: 'story', id, title, name }]));
+  await writeFile(join(project.packageDir, 'storybook-static', 'index.json'), JSON.stringify({ v: 5, entries }));
+}
