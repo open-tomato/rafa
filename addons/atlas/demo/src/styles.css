@@ -3,10 +3,10 @@
 /*
  * The theme VALUES for @open-tomato/charts, which ships the token names
  * only (src/theme/ there), and for @open-tomato/atlas-ui, which paints with
- * them. Both libraries' classes live in their source, outside this
- * package, so Tailwind is told to scan both.
+ * them. Tailwind is told to scan both libraries for their classes: the
+ * charts build this package installs from npm, and atlas-ui's source.
  */
-@source "../../charts/src";
+@source "../node_modules/@open-tomato/charts/dist";
 @source "../../ui/src";
 
 /* The viewer's toggle wins: data-theme on <html>. */

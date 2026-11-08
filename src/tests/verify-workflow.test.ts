@@ -248,7 +248,7 @@ describe('the job atlas, the libraries\' own gates', () => {
   it('runs one leg per publishable Atlas library, from that folder', () => {
     const job = WORKFLOW.jobs['atlas'] as (Job & { readonly strategy?: { readonly matrix?: { readonly package?: readonly string[] } }; readonly defaults?: { readonly run?: { readonly 'working-directory'?: string } } }) | undefined;
 
-    expect(job?.strategy?.matrix?.package).toEqual(['addons/atlas/charts', 'addons/atlas/ui']);
+    expect(job?.strategy?.matrix?.package).toEqual(['addons/atlas/ui']);
     expect(job?.defaults?.run?.['working-directory']).toBe('${{ matrix.package }}');
   });
 
