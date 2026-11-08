@@ -183,3 +183,17 @@ export async function writeIndex(project: TestProject, stories: readonly (readon
   const entries = Object.fromEntries(stories.map(([title, name, id]) => [id, { type: 'story', id, title, name }]));
   await writeFile(join(project.packageDir, 'storybook-static', 'index.json'), JSON.stringify({ v: 5, entries }));
 }
+
+/** Makes `dir` a git repository with a local identity, so commits need no global config. */
+export function initGitStore(dir: string): void {
+  for (const args of [['init', '-q', '-b', 'main'], ['config', 'user.name', 'd2c test'], ['config', 'user.email', 'd2c@example.com'], ['config', 'commit.gpgsign', 'false']]) {
+    const result = Bun.spawnSync(['git', ...args], { cwd: dir });
+    if (result.exitCode !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr.toString()}`);
+  }
+}
+
+/** The output of one git command in `dir`, trimmed. */
+export function gitOut(dir: string, ...args: string[]): string {
+  return Bun.spawnSync(['git', ...args], { cwd: dir }).stdout.toString()
+    .trim();
+}
