@@ -96,6 +96,43 @@ export interface HubStoreStatus {
   readonly devices: readonly HubDevice[];
 }
 
+/**
+ * What a store can answer beyond the port's push, pull and status, by
+ * capability name. Every name is a boolean, `false` for a store that
+ * cannot: the names are the contract version's, so a new one comes with
+ * a new {@link HubContract.contractVersion}, and a store only says
+ * whether it has each.
+ */
+export type HubCapabilities = Readonly<{
+  /** Full-text search over the rows it holds. */
+  fts: boolean;
+  /** Vector search over the rows it holds. */
+  vector: boolean;
+  /** Graph queries over the rows it holds. */
+  graph: boolean;
+  /** Projected rows answered to a device whose schema is behind the hub's. */
+  projection: boolean;
+}>;
+
+/**
+ * The wire contract a store speaks: two numbers, never one.
+ *
+ * `contractVersion` names the grammar and the semantics, the payload
+ * shape, the cursor rules, the request fields, the capability names,
+ * the refusal codes and the skew rules, as `WIRE_CONTRACT_VERSION`
+ * does on a device; inside one version they evolve additively only.
+ * `migrations` names the schema inside that version, the ordered
+ * migration ids the store holds, which grow under the same version.
+ */
+export interface HubContract {
+  /** The wire contract version the store speaks, a whole number above zero. */
+  readonly contractVersion: number;
+  /** The migration ids the store holds, in apply order, as `status()` answers them. */
+  readonly migrations: readonly string[];
+  /** Which capabilities the store has. */
+  readonly capabilities: HubCapabilities;
+}
+
 /** The hub's store: where every device's pushed rows are kept and pulled from. */
 export interface HubStore {
   /** Takes a device's rows; see the module note on idempotence. */
@@ -104,6 +141,8 @@ export interface HubStore {
   readonly pull: (request: HubPullRequest) => Promise<WirePayload>;
   /** Row counts, the schema and every device's last push. */
   readonly status: () => Promise<HubStoreStatus>;
+  /** The wire contract the store speaks; its `migrations` are the ones `status()` answers. */
+  readonly contract: () => HubContract;
   /** Releases whatever the adapter holds open; the store is not used after. */
   readonly close: () => Promise<void>;
 }

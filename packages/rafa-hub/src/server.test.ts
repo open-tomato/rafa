@@ -56,6 +56,7 @@ interface Calls {
   pull: number;
   status: number;
   close: number;
+  contract: number;
 }
 
 /** `store` with each call counted into `calls`. */
@@ -76,6 +77,10 @@ function counted(store: HubStore, calls: Calls): HubStore {
     close: () => {
       calls.close += 1;
       return store.close();
+    },
+    contract: () => {
+      calls.contract += 1;
+      return store.contract();
     },
   };
 }
@@ -112,7 +117,7 @@ interface Started {
 /** Starts a hub over stand-ins, `overrides` replacing any option. */
 function start(overrides: Partial<HubServerOptions> = {}): Started {
   const lines: string[] = [];
-  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0 };
+  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0, contract: 0 };
   const server = startHubServer({
     port: 0,
     hostname: '127.0.0.1',
