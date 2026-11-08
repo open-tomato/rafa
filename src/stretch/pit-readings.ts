@@ -46,6 +46,21 @@
  *   ref and its whole body, which no line prints: the recheck reading
  *   hands them to the judge.
  *
+ *   Each bug also carries its plan (#1522): the fenced value under its
+ *   body's `## Plan` heading, trimmed, read by `sectionValueOf`
+ *   (`packages/rafa-pr/src/triage/similarity.ts`), the section the loop
+ *   writes into every bug it files; null for a body with no such section,
+ *   or one whose section holds no fence or a blank one. The lines sort the
+ *   bugs by it into two groups under the `Filed since <time>: <n>.` line:
+ *   `Filed by this item's loop (<stub>): <n>.` first, the bugs whose plan
+ *   is the query's `stub`, then `Filed by other sessions: <n>.`, the bugs
+ *   naming another plan or none, each group oldest first and each line
+ *   printed with its count even at 0. Every filing uses the same account,
+ *   so the author cannot tell the loop's filings from another session's;
+ *   the plan can. The pit stop reads only the first group as news about
+ *   the item. The rechecks still judge every bug, both groups, in filing
+ *   order.
+ *
  *   The GitHub adapter lists through `gh issue list --search`, which goes
  *   through GitHub's search API and its index, seconds behind a filing: a
  *   bug filed in the last moments before a reading can be missing from
@@ -98,6 +113,8 @@ import type { CiBranchReading } from '../ci/status-reading.js';
 import type { FiledIssue, IssueRef, OpenIssue, Tracker } from '@open-tomato/rafa/ports';
 import type { GhRunner } from '@open-tomato/rafa-board';
 
+import { sectionValueOf } from '@open-tomato/rafa-pr';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 
 import { readHeadRuns, readNewestRun } from '../ci/runs.js';
@@ -126,7 +143,7 @@ export interface PitQuery {
   readonly since: Date;
   /** The project root the effort store and the session records are read under. */
   readonly root: string;
-  /** The item's plan stub, the key of its effort row. */
+  /** The item's plan stub, the key of its effort row and the `## Plan` value its loop's bugs carry. */
   readonly stub: string;
 }
 
@@ -152,14 +169,26 @@ export interface FiledBug {
   readonly ref: IssueRef;
   /** The whole body, which the judge reads the `Rerun` section of; no line prints it. */
   readonly body: string;
+  /** The fenced value under the body's `## Plan` heading, trimmed; null for none or a blank one. */
+  readonly plan: string | null;
+}
+
+/** The bugs filed after a cut-off, and the item's stub they are sorted by. */
+export interface FiledSince {
+  /** The cut-off, ISO 8601. */
+  readonly since: string;
+  /** The item's plan stub: a bug whose {@link FiledBug.plan} is this one was filed by the item's loop. */
+  readonly stub: string;
+  /** Every bug filed after the cut-off, oldest first, in both groups. */
+  readonly bugs: readonly FiledBug[];
 }
 
 /** Every pit-stop reading. */
 export interface PitReadings {
   readonly ci: Reading<CiBranchReading>;
   readonly openBugs: Reading<number>;
-  /** The cut-off, ISO 8601, and the bugs filed after it, oldest first. */
-  readonly filedSince: Reading<{ readonly since: string; readonly bugs: readonly FiledBug[] }>;
+  /** The cut-off, the item's stub, and the bugs filed after it, oldest first. */
+  readonly filedSince: Reading<FiledSince>;
   /** The item's effort, and the collect it was read after. */
   readonly effort: PitEffort;
   /** One judged row per bug filed since, in filing order. */
@@ -185,7 +214,7 @@ export async function readPitReadings(seams: PitSeams, query: PitQuery): Promise
   const openBugs: Reading<number> = bugs.ok
     ? { ok: true, value: bugs.value.length }
     : bugs;
-  const filedSince = await readFiledSince(seams.tracker, query.since);
+  const filedSince = await readFiledSince(seams.tracker, query.since, query.stub);
   const effort = await readPitEffort(seams, { root: query.root, stub: query.stub });
   const rechecks = await readPitRechecks(seams.judge, judgedReading(filedSince));
   return { ci, openBugs, filedSince, effort, rechecks };
@@ -236,8 +265,16 @@ function firstLineOf(body: string): string | null {
   return chars.join('');
 }
 
-/** The bugs filed after `since`, oldest first, each dated by its own `createdAt`. */
-async function readFiledSince(tracker: PitSeams['tracker'], since: Date): Promise<PitReadings['filedSince']> {
+/** The trimmed fenced value under the `## Plan` heading of `body`, null for none or a blank one. */
+function planOf(body: string): string | null {
+  const plan = sectionValueOf(body, 'Plan')?.trim() ?? '';
+  return plan === ''
+    ? null
+    : plan;
+}
+
+/** The bugs filed after `since`, oldest first, each dated by its own `createdAt` and read for its plan. */
+async function readFiledSince(tracker: PitSeams['tracker'], since: Date, stub: string): Promise<PitReadings['filedSince']> {
   if (Number.isNaN(since.getTime())) return { ok: false, reason: INVALID_CUT_OFF };
   const bugs = await attempt(() => readFiledBugs(tracker, since));
   if (!bugs.ok) return bugs;
@@ -255,8 +292,9 @@ async function readFiledSince(tracker: PitSeams['tracker'], since: Date): Promis
       firstLine: firstLineOf(bug.body),
       ref: bug.ref,
       body: bug.body,
+      plan: planOf(bug.body),
     }));
-  return { ok: true, value: { since: since.toISOString(), bugs: filed } };
+  return { ok: true, value: { since: since.toISOString(), stub, bugs: filed } };
 }
 
 /** `read()`'s value, or the reason it threw. */
@@ -298,9 +336,21 @@ function filedBugLine(bug: FiledBug): string {
     : `   #${bug.id} ${bug.title}: ${bug.firstLine}`;
 }
 
+/** A group's count line, then one line per bug in it. */
+function groupLines(label: string, bugs: readonly FiledBug[]): string[] {
+  return [`${label}: ${String(bugs.length)}.`, ...bugs.map(filedBugLine)];
+}
+
+/** The `Filed since` line, then the item's loop's group and the other sessions' group; see the module note. */
 function filedSinceLines(filed: PitReadings['filedSince']): string[] {
   if (!filed.ok) return [`Filed since the last item: not read: ${filed.reason}`];
-  const { since, bugs } = filed.value;
+  const { since, stub, bugs } = filed.value;
   if (bugs.length === 0) return [`Filed since ${since}: none.`];
-  return [`Filed since ${since}: ${String(bugs.length)}.`, ...bugs.map(filedBugLine)];
+  const own = bugs.filter((bug) => bug.plan === stub);
+  const other = bugs.filter((bug) => bug.plan !== stub);
+  return [
+    `Filed since ${since}: ${String(bugs.length)}.`,
+    ...groupLines(`Filed by this item's loop (${stub})`, own),
+    ...groupLines('Filed by other sessions', other),
+  ];
 }
