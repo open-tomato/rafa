@@ -196,7 +196,7 @@ import { CommandExit, DEFAULT_CI_TIMEOUT_MIN } from '@open-tomato/rafa/core/comm
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { CI_POLL_INTERVAL_MS } from '@open-tomato/rafa/pr/ci-poll';
 
-import { waitForChecks } from '../../pr/index.js';
+import { headTimeOf, waitForChecks } from '../../pr/index.js';
 import { withTaskBudget } from '../../pr/plans/budget.js';
 import { hasPinnedPlan, loadPinnedPlan } from '../../pr/plans/load.js';
 import { readAttemptRepeat, readAttemptStart, spentAttempts } from '../../pr/triage/attempts.js';
@@ -447,8 +447,21 @@ function planFor(run: ResolveRun, detail: PullRequestDetail, assessed: AssessedL
   });
 }
 
-/** The CI wait after one attempt: the same poll the loop's own gate runs. */
-async function waitForCi(run: ResolveRun): Promise<ReturnType<typeof waitForChecks>> {
+/** What the CI wait after one attempt reads off a run: the provider, the clock, the sleep and the output. */
+export type CiWaitRun = Pick<ResolveRun, 'number' | 'output' | 'clock' | 'sleep'> & {
+  /** The two provider members the wait reaches: the detail for the head's time, and the checks. */
+  readonly pulls: Pick<PullRequests, 'get' | 'checks'>;
+};
+
+/**
+ * The CI wait after one attempt: the same poll the loop's own gate runs,
+ * handed the head's committed time as `pr wait` hands it. The detail is
+ * read here, after the attempt's push, so the time is the new head's;
+ * a detail with no time leaves `headCommittedAtMs` unset, which is the
+ * wait with no grace (`packages/rafa-pr/src/pr/checks.ts`).
+ */
+export async function waitForCi(run: CiWaitRun): Promise<Awaited<ReturnType<typeof waitForChecks>>> {
+  const headCommittedAtMs = headTimeOf(await run.pulls.get(run.number));
   return waitForChecks({
     probe: async () => (await run.pulls.checks(run.number)).rows,
     timeoutMs: RESOLVE_CI_TIMEOUT_MS,
@@ -459,6 +472,9 @@ async function waitForCi(run: ResolveRun): Promise<ReturnType<typeof waitForChec
     ...run.sleep === undefined
       ? {}
       : { sleep: run.sleep },
+    ...headCommittedAtMs === null
+      ? {}
+      : { headCommittedAtMs },
     onPoll: (_rows, verdict, elapsedMs) => {
       run.output.info(`   Checks are ${verdict} after ${Math.round(elapsedMs / 1000)}s`);
     },

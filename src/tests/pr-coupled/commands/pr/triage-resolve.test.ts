@@ -306,7 +306,8 @@ async function resolved(options: CaseOptions): Promise<Ran> {
     git: () => git.runner,
     now: () => NOW,
     permissions: () => createGhPermissions({ gh: fake.run }),
-    clock: () => 0,
+    // Held at NOW, so a head the fake commits at its default date reads older than the grace.
+    clock: () => Date.parse(NOW),
     sleep: async () => {
       slept += 1;
       options.onSleep?.(fake, slept);
