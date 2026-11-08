@@ -61,6 +61,7 @@ import {
   encodeWirePayload,
   exportWirePayload,
   openSqliteStore,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
 } from '@open-tomato/rafa/store';
@@ -410,6 +411,37 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
 
         expect(decodeWirePayload(encodeWirePayload(pulled))).toEqual(pulled);
         expect(rowsIn(pulled)).toBe(2);
+      });
+    });
+
+    describe('contract', () => {
+      it('speaks the wire contract version the codec names', () => {
+        const { contractVersion } = hub().contract();
+
+        expect(contractVersion).toBe(WIRE_CONTRACT_VERSION);
+      });
+
+      it('names the migrations status answers on an empty store', async () => {
+        const { migrations } = hub().contract();
+        const status = await hub().status();
+
+        expect(migrations).toEqual(status.migrations);
+      });
+
+      it('names the migrations status answers on a pushed store', async () => {
+        await hub().push({ device: A, payload: payload({ [COMMITS]: [commit(A, 1)] }) });
+        const { migrations } = hub().contract();
+        const status = await hub().status();
+
+        expect(migrations).toEqual(status.migrations);
+        expect(migrations.length).toBeGreaterThan(0);
+      });
+
+      it('answers every capability as a boolean', () => {
+        const { capabilities } = hub().contract();
+        const values = Object.values(capabilities);
+
+        expect(values.every((value) => typeof value === 'boolean')).toBe(true);
       });
     });
 
