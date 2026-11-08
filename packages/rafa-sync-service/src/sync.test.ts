@@ -17,7 +17,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { openSqliteStore } from '@open-tomato/rafa/store';
+import { openSqliteStore, WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
@@ -240,7 +240,7 @@ describe('push', () => {
     const a = device(2);
     const answer = await serviceOf(a, over).push({ to: null });
     expect(answer).toEqual({ status: 'pushed', path: null });
-    expect(over.requests).toEqual([{ method: 'POST', path: '/v1/effort/push', device: originOf(a), since: null, authorization: `Bearer ${TOKEN}`, rows: 2 }]);
+    expect(over.requests).toEqual([{ method: 'POST', path: '/v1/effort/push', device: originOf(a), since: null, authorization: `Bearer ${TOKEN}`, rows: 2, contractVersion: String(WIRE_CONTRACT_VERSION) }]);
     expect(over.held('commits').map((row) => `${String(row['origin_store'])}:${String(row['origin_seq'])}`)).toEqual(commitPairs(a));
     const { stores } = stateOf(a);
     expect(Object.keys(stores)).toEqual([originOf(a)]);

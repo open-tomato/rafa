@@ -13,13 +13,21 @@
  *     is not the caller's, and a cursor naming each table's highest hub
  *     `seq`, past the caller's own rows too.
  *
+ *   - A status read answers the hub's status shape with the contract
+ *     core's `WIRE_CONTRACT_VERSION` names and no capability, so the
+ *     hub client sends `contractVersion` on push and pull.
+ *
  * It merges nothing: a row is matched by its origin pair alone. Every
- * request is recorded, and {@link StandInHub.setFault} answers every
- * request with a response of the case's own instead.
+ * push and pull is recorded in {@link StandInHub.requests}, and
+ * {@link StandInHub.setFault} answers each with a response of the
+ * case's own instead. A status read is counted in
+ * {@link StandInHub.statusReads} alone and never faulted, so a case
+ * reads its push and pull requests as it did before the client read
+ * the status first.
  */
 import type { WireCursor, WirePayload, WireRow } from '@open-tomato/rafa/store';
 
-import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { decodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 
 /** One request the stand-in saw. */
 export interface SeenRequest {
@@ -32,13 +40,17 @@ export interface SeenRequest {
   readonly authorization: string | null;
   /** The rows a push carried, across its tables; 0 for a pull. */
   readonly rows: number;
+  /** The `contractVersion` query parameter, or null when it was left out. */
+  readonly contractVersion: string | null;
 }
 
 /** A running stand-in. */
 export interface StandInHub {
   readonly url: string;
-  /** Every request seen, in order. */
+  /** Every push and pull seen, in order. */
   readonly requests: readonly SeenRequest[];
+  /** How many status reads were answered. */
+  readonly statusReads: () => number;
   /** The rows held in `table`, in hub `seq` order. */
   readonly held: (table: string) => readonly WireRow[];
   /** Answers every request with `answer` from now on; null goes back to serving. */
@@ -70,6 +82,19 @@ export function startStandInHub(): StandInHub {
   let migrations: readonly string[] = [];
   let extra: readonly string[] = [];
   let fault: (() => Response) | null = null;
+  let statusReads = 0;
+
+  const status = (): Response => {
+    statusReads += 1;
+    return success({
+      version: '0.0.0-stand-in',
+      migrations,
+      rows: Object.fromEntries([...tables].map(([table, rows]) => [table, rows.length])),
+      devices: [],
+      contractVersion: WIRE_CONTRACT_VERSION,
+      capabilities: { fts: false, vector: false, graph: false, projection: false },
+    });
+  };
 
   const push = (payload: WirePayload): Response => {
     migrations = payload.migrations;
@@ -111,6 +136,7 @@ export function startStandInHub(): StandInHub {
     hostname: '127.0.0.1',
     fetch: async (request) => {
       const url = new URL(request.url);
+      if (url.pathname.endsWith('/v1/status')) return status();
       const sinceText = url.searchParams.get('since');
       const body = await request.text();
       const payload = request.method === 'POST'
@@ -127,6 +153,7 @@ export function startStandInHub(): StandInHub {
         rows: payload === null
           ? 0
           : Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0),
+        contractVersion: url.searchParams.get('contractVersion'),
       });
       if (fault !== null) return fault();
       if (payload !== null) return push(payload);
@@ -139,6 +166,7 @@ export function startStandInHub(): StandInHub {
   return {
     url: `http://127.0.0.1:${String(server.port)}`,
     requests,
+    statusReads: () => statusReads,
     held: (table) => tables.get(table) ?? [],
     setFault: (answer) => {
       fault = answer;
