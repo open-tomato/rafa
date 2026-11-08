@@ -10,7 +10,8 @@
  * itself. Every other case reads a build: the suite copies the package
  * (its manifest and lockfile, its tsconfig files, the README, the bundle
  * script `scripts/build/bundle.ts`, `src/`,
- * and core's workspace package `packages/rafa/`) into a scratch directory,
+ * and core's workspace package `packages/rafa/`, each without its
+ * `node_modules`) into a scratch directory,
  * links the installed packages the declaration step reads, and runs
  * `bun run build` there,
  * the script as the manifest holds it, so nothing is written into the
@@ -490,7 +491,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, relative } from 'node:path';
+import { basename, delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -694,6 +695,22 @@ const PACKAGE_FILES = [
   'scripts/build/bundle.ts',
 ];
 
+/**
+ * How a source tree of the checkout is copied into the scratch package:
+ * whole, but without any `node_modules` folder in it. An install puts one
+ * in each workspace package and fills it with links relative to the
+ * checkout (`../../../../node_modules/.bun/...`); `cpSync` copies a link
+ * with its target unchanged, so in the scratch package it names a store
+ * that is not there. The build reads the link and stops on it: bun stops
+ * on a dangling `packages/rafa/node_modules/@open-tomato/define-config`
+ * with `File not found` instead of looking in the scratch root's
+ * `node_modules`, which links what the build needs (see the module note).
+ */
+const COPY_SOURCE_TREE = {
+  recursive: true,
+  filter: (source: string): boolean => basename(source) !== 'node_modules',
+} as const;
+
 /** Core's workspace package, which the build reads core's source and first declarations pass from. */
 const CORE_PACKAGE_DIR = 'packages/rafa';
 
@@ -856,8 +873,8 @@ let plantedBeforeBuild = false;
 beforeAll(() => {
   mkdirSync(DIST, { recursive: true });
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
-  cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
-  cpSync(join(REPO_ROOT, CORE_PACKAGE_DIR), join(PACKAGE_DIR, CORE_PACKAGE_DIR), { recursive: true });
+  cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), COPY_SOURCE_TREE);
+  cpSync(join(REPO_ROOT, CORE_PACKAGE_DIR), join(PACKAGE_DIR, CORE_PACKAGE_DIR), COPY_SOURCE_TREE);
   linkFacades(PACKAGE_DIR);
   linkDefineConfig(PACKAGE_DIR);
   linkTypeScript(PACKAGE_DIR);
@@ -908,7 +925,7 @@ function linkDefineConfig(dir: string): void {
 function linkFacades(dir: string): void {
   for (const name of FACADE_NAMES) {
     const packageDir = join('packages', `rafa-${name}`);
-    cpSync(join(REPO_ROOT, packageDir), join(dir, packageDir), { recursive: true });
+    cpSync(join(REPO_ROOT, packageDir), join(dir, packageDir), COPY_SOURCE_TREE);
     const link = join(dir, 'node_modules', facadePackageName(name));
     mkdirSync(dirname(link), { recursive: true });
     symlinkSync(relative(dirname(link), join(dir, packageDir)), link, 'dir');
