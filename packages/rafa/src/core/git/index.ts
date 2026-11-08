@@ -1,6 +1,6 @@
 /**
- * The barrel over git: every name `git.ts`, `commit.ts` and
- * `gh-runner.ts` export but one, and nothing else.
+ * The barrel over git: every name `git.ts`, `commit.ts`,
+ * `gh-runner.ts` and `placed-line.ts` export but one, and nothing else.
  *
  * A file outside `packages/rafa/src/core/` imports this file and never the two behind
  * it (`scripts/survey/core-barrels.ts` measures that, and
@@ -19,7 +19,12 @@
  *     each step;
  *   - `gh-runner.ts`: the type of the runner every `gh` command goes
  *     through and what one command answers, types alone, imported by
- *     nothing.
+ *     nothing;
+ *   - `placed-line.ts`: a printed step placed where it must run, the
+ *     command alone in its own checkout and `cd <checkout> && <command>`
+ *     elsewhere, with the top-level read it is placed by. It imports
+ *     `git.ts` for a type and `packages/rafa/src/utils/shell.ts`, which
+ *     imports nothing, for `shellQuote`.
  *
  * ## The one name the two files share
  *
@@ -79,12 +84,13 @@
  * barrels spell theirs. No name here is part of the published surface:
  * `src/index.ts` re-exports nothing from this file.
  *
- * `index.test.ts` holds the list to the two files: every name either
- * exports is here once, as the same binding, `GitRunner` as the type
+ * `index.test.ts` holds the list to the files behind it: every name one
+ * of them exports is here once, as the same binding, `GitRunner` as the type
  * `git.ts` declares, and no other name is here.
  */
 export type { GhResult, GhRunner } from './gh-runner.js';
 export type { GitResult, GitRunner, WorkingTreeStatus } from './git.js';
+export type { PlaceAnswer, PlacedLine, PlaceSeams, UnplacedLine } from './placed-line.js';
 export type {
   CommitAttempt,
   CommitMessage,
@@ -99,6 +105,7 @@ export type {
 } from './commit.js';
 
 export { createGitRunner, gitSaid, parseWorkingTree, unquoteGitPath } from './git.js';
+export { placeLine, readTopLevel } from './placed-line.js';
 export {
   buildCommitMessage,
   COMMIT_TYPE_RULES,

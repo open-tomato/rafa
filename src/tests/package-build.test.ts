@@ -598,6 +598,8 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * no lazy command module entered a library entry. It has
  * `core/command/global-flags.d.ts` since the root help's global flags
  * moved out of `src/cli/help.ts` into core, for board's reference check.
+ * It has `core/git/placed-line.d.ts`, the placed-line helper the git
+ * barrel exports, and `utils/shell.d.ts`, the `shellQuote` it imports.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1324,7 +1326,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(167);
+    expect(before).toHaveLength(169);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

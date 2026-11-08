@@ -140,8 +140,10 @@ subject folders. `config/` holds the value readers, core's keys of the schema,
 the section contract, core's own section and the loader; `command/` the command
 contract (`RafaCommand`, `RafaContext`, `CommandExit`), the version and the
 confirm prompt; `output/` the active output; `adapters/` the adapter registry;
-`git/` the git runner and the commit helpers; `plan/` the block reader, the plan
-parser and the plan-file readers; `loop/` the loop's session helpers, its
+`git/` the git runner, the commit helpers and the placed-line helper
+(`placed-line.ts`, a printed step with `cd <checkout> &&` in front only when it
+runs elsewhere); `plan/` the block reader, the plan parser and the plan-file
+readers; `loop/` the loop's session helpers, its
 session readings and the Claude spawner; `runtime/` the reading of which build
 is running. The ninth, `services/`, moved nothing in: it was written there
 (#1336) and holds the service registry, the functions of run, pr and release
