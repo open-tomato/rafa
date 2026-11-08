@@ -9,6 +9,29 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.53.0 — 2026-11-08, Offer a task's lessons by how strongly they match it; Same-action groups count a lesson's wordings once; A filed bug and the loop that fixed it become one lesson; Session rows store their log path relative to the log root; Bug sweep 48: a merged plan, a release tag, a triage wait, and two pit-stop readings
+<!-- rafa:fragments rafa-1468-spec-offers-match-strength rafa-1469-spec-same-action-groups rafa-1470-spec-bug-finding-fix rafa-1523-bug-sweep rafa-1524-bug-sweep-48 -->
+
+- Loop: a task's lessons are now offered by how strongly they match it: lessons naming a path the task touches come first, then those sharing the most trigger words, then by confidence and id, so the five offers no longer favour ids early in the alphabet.
+- learning: A lesson learned under several wordings now counts its sources once: the library and the Learning port gain same-action groups, `promotable` names one record per group by its pooled confidence, `learning.promote.minConfidence` defaults to 0.6, the wrap-up records `promoted_to` on every wording of a promoted lesson, and the local adapter's push log names a new wording of a held action `same-action-group`.
+- learning: Bugs are paired by issue id only, through a `rafa-<n>` plan or a stage context naming `#<n>`, matching task lines with or without their declaration block; nothing is guessed, and a pair already logged as `bug-fix-pair` is never pushed twice.
+- instinct: New `rafa instinct groups` lists each lesson held under several wordings with its action hash, triggers, source count and pooled confidence (`--output=json` gives the gold set), and `rafa instinct promote` shows each lesson's pooled confidence and source count.
+- instinct: New `rafa instinct pairs [--unpaired]` shows which filed bugs paired with their fix, how many are already logged as lessons, and with `--unpaired` why each other bug found none; `--output=json` gives the counts and both lists.
+- docs: The learning page describes the same-action group as the first way across trigger wordings.
+- docs: The learning page describes how bug findings become lessons, when the pass runs, the unpaired reasons and the sweep that names no issue.
+- docs: The merge page names the two edited-field rules, set-once and recomputed, and the full scope of the merge-rules sweep.
+- effort: `rafa effort collect` now pairs each filed bug with the loop that fixed it, pushes every new pair as one lesson with both sessions as sources, and prints how many pairs it pushed; a failing pass warns and never changes the exit code.
+- effort: Collected session rows store their log path as `<folder>/<file>` under `~/.claude/projects/` rather than an absolute path holding the home directory, and a stored path can be classified with a "not on this machine" answer instead of an error.
+- loop: Each loop task runs the same bug-fix pass after its store sync, so a fix becomes a lesson without a separate collect.
+- loop: `rafa loop start` offers the plan's branch on the project's configured base, not only on `main` or `master`, and `--create-branch` refuses, naming the plan and the base, rather than run on the base.
+- rafa-effort: New `readBugFixRows` export reads the bug findings, their reported words, resolved findings and done task reports from the effort store.
+- effort store: Reading a session row written with an older absolute log path answers the relative form, for Linux and macOS homes alike, while the stored row stays as written; merging two stores no longer records a conflict for a session held in the two forms.
+- next: `rafa next` no longer offers a plan whose branch already has a merged pull request and moves on to the next unstarted plan; when the merged pull requests cannot be read, it keeps its answer and says so.
+- release: `rafa release tag` passes over a never-released package (version `0.0.0`, no changelog, no tag) with one Skipped line naming it, and tags the other units.
+- pr: `rafa pr triage --resolve` gives a freshly pushed head the same grace for its first check as `rafa pr wait`, instead of ending with no checks on the first empty poll.
+- bug: `rafa bug recheck` prints `gone (trigger removed?)` for a bug whose record holds a `## Trigger removed` section, carries `triggerRemoved: true` in JSON, and its comment says the trigger was removed rather than the bug fixed.
+- stretch: the pit stop splits the bugs filed since the last item into those filed by the item's own loop, read from their `## Plan` section, and those filed by other sessions.
+
 ## 0.52.1 — 2026-11-07, Tag after settle, and the forecast of a stamp that merges in
 <!-- rafa:fragments rafa-1516-release-tag-and-forecast adopt-shared-configs charts-from-npm open-tomato-shared-configs -->
 
