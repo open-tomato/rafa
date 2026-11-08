@@ -25,17 +25,17 @@ are local.
 with NULL origin), the columns that can change after insert (each with
 its rule), and `origin_store` and `origin_seq` columns with a partial
 unique index `<table>_by_origin` covering just these two and the
-identity columns. The rule for each column in the table that a
-production statement can write is one of: `recomputed` (the column's
-value is derived from others and should be recomputed on merge, such as
-a gap between commits), `filled` (a set-once field that may be filled
-from the other store when NULL), `skipped` (a field written only by one
-store and never merged), or `unchanged` (a field that must be equal in
-both rows, or one is a conflict).
+identity columns. The rule for each column a production statement changes
+after the insert is one of two: `set-once` (a field that may be filled from
+the other store when NULL), or `recomputed` (part of the field is derived,
+so two stores' values are compared without that part, such as a gap
+between commits or the form of a stored log path). A column no statement
+changes has no rule.
 
 **Every writer of a merged table must be checked.** `merge-rules.sweep.test.ts`
-reads every `UPDATE <table> SET <column>` in every module under `src/`
-(not tests or `store/`) whose column is not in the table's rule, and
+reads every `UPDATE <table> SET <column>` in every production module under
+`src/` and under `packages/rafa/src/`, store modules included (only `*.test.ts`
+files are skipped), whose column is not in the table's rule, and
 fails, so a new edit of an existing table's column needs its rule
 added or updated in the same commit. The test applies each entry in
 `SQLITE_MIGRATIONS` to `:memory:` and checks that every table and column
@@ -54,6 +54,12 @@ rewrites that gap, with no git call, for each commit the union inserted
 and the commit right after it in time, ordered by `Date.parse` of the
 stored timestamp and by sha within an instant. At most two rows are
 written per commit brought in.
+
+**`sessions.row_json` is compared as recomputed too.** No statement rewrites
+it, but its `filePath` is stored as `<folder>/<file>` by a fresh collect and
+as an absolute path by a row from before that form (#1489). Two rows of one
+session that differ only in that form, with `filePath` taken through
+`storedLogPathOf` (`session-log-path.ts`), are the same row.
 
 **`origins.ts` stamps every production insert with the origin pair.**
 `STAMPED_COLUMNS` and `stampedValues` spell both, for every writer, in

@@ -309,6 +309,86 @@ describe('a recomputed field: one commit collected by two devices', () => {
   });
 });
 
+describe('a recomputed field: one session held with its log path in two forms', () => {
+  /** The stored form of the session's log path, `<folder>/<file>`. */
+  const RELATIVE_PATH = '-home-u-repo/session-1.jsonl';
+
+  /** A session's `row_json` holding `filePath` and `model`, as `JSON.stringify` of a `SessionStats` spells it. */
+  function sessionJson(filePath: string, model = 'claude-opus'): string {
+    return JSON.stringify({
+      sessionId: 'session-1', filePath, model, startedAt: '2026-09-29T10:00:00.000Z',
+      endedAt: '2026-09-29T10:30:00.000Z', inputTokens: 10, outputTokens: 20,
+    });
+  }
+
+  /** Plants the session `session-1` into `db` under `origin` with `rowJson`. */
+  function plantSession(db: Database, origin: string, rowJson: string): void {
+    db.query<unknown, [string, string]>(
+      'INSERT INTO sessions (seq, origin_store, origin_seq, session_id, row_json) VALUES (1, ?, 1, \'session-1\', ?)',
+    ).run(origin, rowJson);
+  }
+
+  /** The `row_json` of every session in `db`, in `seq` order. */
+  function sessionJsonOf(db: Database): string[] {
+    return db
+      .query<{ row_json: string }, []>('SELECT row_json FROM sessions ORDER BY seq')
+      .all()
+      .map(({ row_json: json }) => json);
+  }
+
+  it('skips a pair that differs only in the form of filePath, keeping the row here', () => {
+    const local = memoryStore();
+    const other = memoryStore();
+    plantSession(local, 'store-a', sessionJson(`/home/u/.claude/projects/${RELATIVE_PATH}`));
+    plantSession(other, 'store-b', sessionJson(RELATIVE_PATH));
+
+    const result = merge(local, other);
+
+    expect(entryFor(result, 'sessions')).toEqual({ table: 'sessions', skipped: [1], filled: [], conflicts: [] });
+    expect(sessionJsonOf(local)).toEqual([sessionJson(`/home/u/.claude/projects/${RELATIVE_PATH}`)]);
+    expect(conflictsOf(local)).toEqual([]);
+  });
+
+  it('skips a pair whose two absolute paths name two homes, a Linux and a macOS one', () => {
+    const local = memoryStore();
+    const other = memoryStore();
+    plantSession(local, 'store-a', sessionJson(RELATIVE_PATH));
+    plantSession(other, 'store-b', sessionJson(`/Users/u/.claude/projects/${RELATIVE_PATH}`));
+
+    const result = merge(local, other);
+
+    expect(entryFor(result, 'sessions')).toEqual({ table: 'sessions', skipped: [1], filled: [], conflicts: [] });
+    expect(sessionJsonOf(local)).toEqual([sessionJson(RELATIVE_PATH)]);
+    expect(conflictsOf(local)).toEqual([]);
+  });
+
+  it('records a pair that differs in another row_json key, field NULL, both rows kept (control)', () => {
+    const local = memoryStore();
+    const other = memoryStore();
+    plantSession(local, 'store-a', sessionJson(`/home/u/.claude/projects/${RELATIVE_PATH}`));
+    plantSession(other, 'store-b', sessionJson(RELATIVE_PATH, 'claude-sonnet'));
+
+    const result = merge(local, other);
+
+    expect(entryFor(result, 'sessions').conflicts).toEqual([{ localSeq: 1, incomingSeq: 1, field: null }]);
+    expect(sessionJsonOf(local)).toEqual([sessionJson(`/home/u/.claude/projects/${RELATIVE_PATH}`)]);
+    expect(conflictsOf(local).map(({ table_name: table, field, incoming }) => [table, field, incoming.row_json]))
+      .toEqual([['sessions', null, sessionJson(RELATIVE_PATH, 'claude-sonnet')]]);
+  });
+
+  it('records a pair whose two paths name two different logs, field NULL (control)', () => {
+    const local = memoryStore();
+    const other = memoryStore();
+    plantSession(local, 'store-a', sessionJson(`/home/u/.claude/projects/${RELATIVE_PATH}`));
+    plantSession(other, 'store-b', sessionJson('-home-u-other/session-1.jsonl'));
+
+    const result = merge(local, other);
+
+    expect(entryFor(result, 'sessions').conflicts).toEqual([{ localSeq: 1, incomingSeq: 1, field: null }]);
+    expect(sessionJsonOf(local)).toEqual([sessionJson(`/home/u/.claude/projects/${RELATIVE_PATH}`)]);
+  });
+});
+
 describe('what the settling refuses', () => {
   it('rolls back every fill and conflict when a matched row is missing from the other store', () => {
     const local = memoryStore();
@@ -345,7 +425,7 @@ describe('what the settling refuses', () => {
         .map(([field]) => `${table}.${field}`)
       : []);
 
-    expect(recomputed).toEqual(['commits.row_json']);
+    expect(recomputed).toEqual(['sessions.row_json', 'commits.row_json']);
     expect(Object.keys(RECOMPUTED_COMPARISONS).sort()).toEqual(recomputed.sort());
   });
 });

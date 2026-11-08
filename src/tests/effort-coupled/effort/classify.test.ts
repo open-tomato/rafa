@@ -27,7 +27,13 @@
  * Leg counts are deliberately not recorded — they drift with every
  * case added here, where the legs themselves do not.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,6 +43,7 @@ import {
   classifyPromptContent,
   classifySessionLines,
   classifySessionLog,
+  classifyStoredSessionLog,
   ENQUEUE_SCAN_WINDOW,
   findFirstEnqueue,
   matchesShape,
@@ -436,5 +443,52 @@ describe('classifySessionLog', () => {
 
     expect(await classifySessionLog(path))
       .toEqual(await classifySessionLines(fromLines(lines)));
+  });
+});
+
+describe('classifyStoredSessionLog', () => {
+  /** A fixture HOME holding one log under its projects root. */
+  const home = join(tempRoot, 'home');
+  const folder = '-home-u-repo';
+  const fileName = 'stored.jsonl';
+  const absolute = join(home, '.claude', 'projects', folder, fileName);
+  mkdirSync(join(home, '.claude', 'projects', folder), { recursive: true });
+  writeFileSync(absolute, [enqueue(TASK_PROMPT)].join('\n'), 'utf8');
+
+  it('throws on an absent file through classifySessionLog, the control', async () => {
+    const missing = join(home, '.claude', 'projects', '-absent', 'x.jsonl');
+
+    await expect(classifySessionLog(missing)).rejects.toThrow();
+  });
+
+  it('answers not on this machine for a folder absent under HOME', async () => {
+    const result = await classifyStoredSessionLog('-absent/x.jsonl', home);
+
+    expect(result).toEqual({
+      onMachine: false,
+      path: join(home, '.claude', 'projects', '-absent', 'x.jsonl'),
+    });
+  });
+
+  it('classifies a relative path present under HOME', async () => {
+    const result = await classifyStoredSessionLog(`${folder}/${fileName}`, home);
+
+    expect(result.onMachine).toBe(true);
+    expect(result.path).toBe(absolute);
+    expect(result.onMachine && result.classification)
+      .toEqual(await classifySessionLog(absolute));
+    expect(result.onMachine && result.classification.kind).toBe('task');
+  });
+
+  it('answers not on this machine for an old absolute row from another home', async () => {
+    const foreign = `/Users/other/.claude/projects/${folder}/${fileName}`;
+    const result = await classifyStoredSessionLog(foreign, home);
+
+    expect(result).toEqual({ onMachine: false, path: foreign });
+  });
+
+  it('answers a refused stored value with no path', async () => {
+    expect(await classifyStoredSessionLog('../escape.jsonl', home))
+      .toEqual({ onMachine: false, path: null });
   });
 });
