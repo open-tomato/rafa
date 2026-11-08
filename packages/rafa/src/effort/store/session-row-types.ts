@@ -43,7 +43,12 @@ export interface SessionUsageTotals {
 export interface SessionStats {
   /** Log basename without its extension, which is the session uuid. */
   sessionId: string;
-  /** The path the row was accumulated from. */
+  /**
+   * The stored form of the log's path (#1489): `<folder>/<file>`, with no
+   * leading `/`, for a log under `<home>/.claude/projects/`, joined back
+   * under the reading machine's home by `resolveSessionLogPath`; the
+   * absolute path for a log anywhere else, such as a `logDir` override's.
+   */
   filePath: string;
   /** Non-empty lines read. */
   lineCount: number;
