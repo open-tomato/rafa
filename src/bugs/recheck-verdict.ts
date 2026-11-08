@@ -41,11 +41,30 @@
  * {@link RecheckVerdict} also holds `manual` (a reference recheck refuses
  * to run) and `skipped` (an untrusted author), which the command decides
  * before any run; the report reads the whole type from here.
+ *
+ * ## A removed trigger
+ *
+ * {@link triggerRemovedOf} reads whether a `gone` bug's body says its
+ * trigger was removed (#1521): a `## Trigger removed` or `###` heading of
+ * that name on a line of its own, anywhere in the body, so a section
+ * `rafa issue edit --append-file` adds below the record counts. A heading
+ * inside a fence is text and does not. The mark is a field of the row,
+ * never a verdict of its own: the type below stays as it is, and a bug
+ * with any other verdict is never marked.
  */
 import type { RunnableReference } from './test-reference.js';
 import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 
 import { posix } from 'node:path';
+
+/** The heading of the bug-record section that says a bug's trigger was removed. */
+export const TRIGGER_REMOVED_HEADING = 'Trigger removed';
+
+/** A `##` or `###` heading line naming {@link TRIGGER_REMOVED_HEADING}. */
+const TRIGGER_REMOVED_LINE = new RegExp(`^ {0,3}#{2,3}[ \\t]+${TRIGGER_REMOVED_HEADING}[ \\t]*#*[ \\t]*$`, 'i');
+
+/** A fence line: up to three spaces, then three or more backticks or tildes. */
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
 
 /** What one run of a reference showed; see the module note. */
 export type RunOutcome = 'failed' | 'passed' | 'stale';
@@ -97,4 +116,27 @@ export function verdictOf(outcomes: readonly RunOutcome[]): SequenceVerdict {
   return failedRuns === 0
     ? { verdict: 'gone' }
     : { verdict: 'flaky', failedRuns };
+}
+
+/** True when `body` holds a `Trigger removed` heading outside any fence; see the module note. */
+export function hasTriggerRemoved(body: string): boolean {
+  let fence: string | null = null;
+  for (const line of body.split(/\r?\n/)) {
+    const mark = FENCE_LINE.exec(line)?.[1];
+    if (fence !== null) {
+      if (mark !== undefined && mark[0] === fence[0] && mark.length >= fence.length && line.trim() === mark) fence = null;
+      continue;
+    }
+    if (mark !== undefined) {
+      fence = mark;
+      continue;
+    }
+    if (TRIGGER_REMOVED_LINE.test(line)) return true;
+  }
+  return false;
+}
+
+/** True when a bug of `verdict` whose body is `body` is marked trigger removed: `gone` with the section only. */
+export function triggerRemovedOf(verdict: RecheckVerdict, body: string): boolean {
+  return verdict === 'gone' && hasTriggerRemoved(body);
 }
