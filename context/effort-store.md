@@ -877,8 +877,8 @@ commit:**
   through every migration and fails on a table with no entry, an entry
   with no table, a merged table without both origin columns and that
   index, and an `UPDATE <table> SET <column>` in a production module
-  under `src/` whose column has no rule; a new edit of an existing
-  table's column needs its rule the same way;
+  under `src/` or `packages/rafa/src/` whose column has no rule; a new
+  edit of an existing table's column needs its rule the same way;
 - for a merged table, **one fixture row in each builder that plants
   every merged table**: `FIXTURES` in `merge-union.test.ts` and in
   `fixture-extract.test.ts`, and `taskRows` in
