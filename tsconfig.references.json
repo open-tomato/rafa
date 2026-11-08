@@ -17,6 +17,7 @@
     { "path": "./addons/atlas/transport" },
     { "path": "./addons/atlas/ui" },
     { "path": "./addons/atlas/rafa-atlas" },
-    { "path": "./addons/atlas/demo" }
+    { "path": "./addons/atlas/demo" },
+    { "path": "./addons/rafa-d2c" }
   ]
 }

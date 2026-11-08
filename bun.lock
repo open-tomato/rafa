@@ -129,6 +129,18 @@
         "react-dom": "^19.0.0",
       },
     },
+    "addons/rafa-d2c": {
+      "name": "@open-tomato/rafa-d2c",
+      "version": "0.0.0",
+      "dependencies": {
+        "@open-tomato/rafa-core": "workspace:*",
+      },
+      "devDependencies": {
+        "@open-tomato/eslint-config": "^0.1.0",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/rafa": {
       "name": "@open-tomato/rafa-core",
       "version": "0.45.0",
@@ -417,6 +429,8 @@
     "@open-tomato/rafa-board": ["@open-tomato/rafa-board@workspace:packages/rafa-board"],
 
     "@open-tomato/rafa-core": ["@open-tomato/rafa-core@workspace:packages/rafa"],
+
+    "@open-tomato/rafa-d2c": ["@open-tomato/rafa-d2c@workspace:addons/rafa-d2c"],
 
     "@open-tomato/rafa-effort": ["@open-tomato/rafa-effort@workspace:packages/rafa-effort"],
 

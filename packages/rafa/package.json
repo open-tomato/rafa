@@ -17,6 +17,7 @@
     "./core/config": "./src/core/config/index.ts",
     "./core/config/load": "./src/core/config/load.ts",
     "./core/config/sections": "./src/core/config/sections.ts",
+    "./project/scope": "./src/project/scope.ts",
     "./core/git": "./src/core/git/index.ts",
     "./core/loop": "./src/core/loop/index.ts",
     "./core/loop/hops": "./src/core/loop/hops.ts",
