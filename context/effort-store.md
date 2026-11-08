@@ -78,7 +78,12 @@ is copied there as well.
 filled through the kind's `fieldColumns` in `KIND_TABLES`
 (`store/sqlite.ts`).** `row_json` still holds the field and `read`
 answers from it, so both backends' rows stay byte-identical; the column
-only repeats it. `sessions.worktree`, added by migration
+only repeats it. What `read` answers passes through `answeredRows`
+(`store/answered-rows.ts`), one function both backends call: an old
+session row's absolute `filePath` under a `/.claude/projects/` root is
+answered as `<folder>/<file>` (#1489), while `row_json`, the NDJSON
+bytes, `keys` and the NDJSON `readRows` a move copies keep what was
+written. `sessions.worktree`, added by migration
 `session-worktree`, is the one such column today: the row's `worktree`
 field, NULL for a session of the main checkout, for a row collected
 before the field and for a row an older runtime inserts. Such a column

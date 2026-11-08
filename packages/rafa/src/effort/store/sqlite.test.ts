@@ -419,6 +419,66 @@ describe('keys and read', () => {
   });
 });
 
+/** Session rows as a store written before the stored form holds them. */
+const LINUX_ROW = {
+  sessionId: 'linux-0001',
+  filePath: '/home/alice/.claude/projects/-home-alice-repo/linux-0001.jsonl',
+} as unknown as SessionEffortRow;
+const MAC_ROW = {
+  sessionId: 'mac-0002',
+  filePath: '/Users/bob/.claude/projects/-Users-bob-repo/mac-0002.jsonl',
+} as unknown as SessionEffortRow;
+const OVERRIDE_ROW = {
+  sessionId: 'override-0003',
+  filePath: '/var/log/rafa/override-0003.jsonl',
+} as unknown as SessionEffortRow;
+const TEMPLATE_ROW = { sessionId: 'template-session' } as SessionEffortRow;
+
+describe('read answers an old absolute filePath in its stored form', () => {
+  const OLD_ROWS = [LINUX_ROW, MAC_ROW, OVERRIDE_ROW, TEMPLATE_ROW];
+
+  it('answers Linux-home and macOS-home rows relative, others unchanged', () => {
+    const root = freshRoot('old-file-paths');
+    const store = openSqliteStore(root);
+    store.append('sessions', OLD_ROWS);
+    const rows = store.read('sessions');
+
+    expect(rows.map((row): string | undefined => row.filePath)).toEqual([
+      '-home-alice-repo/linux-0001.jsonl',
+      '-Users-bob-repo/mac-0002.jsonl',
+      '/var/log/rafa/override-0003.jsonl',
+      undefined,
+    ]);
+    expect('filePath' in (rows[3] ?? {})).toBe(false);
+  });
+
+  it('leaves row_json and the keys untouched', () => {
+    const root = freshRoot('old-file-paths-raw');
+    const store = openSqliteStore(root);
+    store.append('sessions', OLD_ROWS);
+    store.read('sessions');
+    const sql = 'SELECT row_json AS body FROM sessions WHERE session_id = ?';
+    const stored = (id: string): unknown => rawQuery<{ body: string }>(root, sql, id)
+      .map(({ body }) => JSON.parse(body) as unknown);
+
+    expect(stored('linux-0001')).toEqual([LINUX_ROW]);
+    expect(stored('mac-0002')).toEqual([MAC_ROW]);
+    expect(bodiesOf(root, 'sessions'))
+      .toEqual(OLD_ROWS.map((row) => JSON.stringify(row)));
+    expect([...store.keys('sessions')])
+      .toEqual(['linux-0001', 'mac-0002', 'override-0003', 'template-session']);
+  });
+
+  it('answers what the NDJSON backend answers for the same rows', () => {
+    const store = openSqliteStore(freshRoot('old-file-paths-parity-sqlite'));
+    const ndjson = openNdjsonStore(freshRoot('old-file-paths-parity-ndjson'));
+    store.append('sessions', OLD_ROWS);
+    ndjson.append('sessions', OLD_ROWS);
+
+    expect(store.read('sessions')).toEqual(ndjson.read('sessions'));
+  });
+});
+
 describe('append', () => {
   it('adds nothing and changes no byte on a second identical append', () => {
     const root = freshRoot('rerun');

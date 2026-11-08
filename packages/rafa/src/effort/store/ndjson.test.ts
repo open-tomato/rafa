@@ -261,6 +261,52 @@ describe('keys and read', () => {
   });
 });
 
+/** Session rows as a store written before the stored form holds them. */
+const LINUX_ROW = {
+  sessionId: 'linux-0001',
+  filePath: '/home/alice/.claude/projects/-home-alice-repo/linux-0001.jsonl',
+} as unknown as SessionEffortRow;
+const MAC_ROW = {
+  sessionId: 'mac-0002',
+  filePath: '/Users/bob/.claude/projects/-Users-bob-repo/mac-0002.jsonl',
+} as unknown as SessionEffortRow;
+const OVERRIDE_ROW = {
+  sessionId: 'override-0003',
+  filePath: '/var/log/rafa/override-0003.jsonl',
+} as unknown as SessionEffortRow;
+const TEMPLATE_ROW = { sessionId: 'template-session' } as SessionEffortRow;
+
+describe('read answers an old absolute filePath in its stored form', () => {
+  const OLD_ROWS = [LINUX_ROW, MAC_ROW, OVERRIDE_ROW, TEMPLATE_ROW];
+
+  it('answers Linux-home and macOS-home rows relative, others unchanged', () => {
+    const root = freshRoot('old-file-paths');
+    plant(root, 'sessions', linesOf(...OLD_ROWS));
+    const rows = openNdjsonStore(root).read('sessions');
+
+    expect(rows.map((row): string | undefined => row.filePath)).toEqual([
+      '-home-alice-repo/linux-0001.jsonl',
+      '-Users-bob-repo/mac-0002.jsonl',
+      '/var/log/rafa/override-0003.jsonl',
+      undefined,
+    ]);
+    expect('filePath' in (rows[3] ?? {})).toBe(false);
+  });
+
+  it('leaves the stored bytes, the raw reading and the keys untouched', () => {
+    const root = freshRoot('old-file-paths-raw');
+    const text = linesOf(...OLD_ROWS);
+    plant(root, 'sessions', text);
+    const store = openNdjsonStore(root);
+    store.read('sessions');
+
+    expect(readRaw(root, 'sessions')).toBe(text);
+    expect(store.readRows('sessions').rows).toEqual(OLD_ROWS);
+    expect([...store.keys('sessions')])
+      .toEqual(['linux-0001', 'mac-0002', 'override-0003', 'template-session']);
+  });
+});
+
 describe('append', () => {
   it('adds nothing and writes nothing on a second identical append', () => {
     const root = freshRoot('rerun');
