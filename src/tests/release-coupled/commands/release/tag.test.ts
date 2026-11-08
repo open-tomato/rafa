@@ -697,6 +697,22 @@ describe('the dispatched action', () => {
     expect(seams.calls.filter((call) => call.startsWith('tag v'))).toEqual([]);
   });
 
+  it('names the unset pr.base and the checkout holding the branch on a detached HEAD', async () => {
+    const porcelain = 'worktree /main-checkout\nHEAD abc\nbranch refs/heads/main\n\nworktree /side\nHEAD abc\ndetached\n';
+    const seams = recorded({
+      ...gitTable('HEAD'),
+      'worktree list --porcelain': said(porcelain),
+    });
+
+    const run = await ran(seams.seams, releaseProject());
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('detached HEAD, and a release is tagged on main\nNext:\n  set pr.base in ');
+    expect(run.stderr).toContain('  cd /main-checkout && rafa release tag — main is checked out there\n'
+      + `Usage: ${RELEASE_TAG_USAGE}`);
+    expect(seams.calls.filter((call) => call.startsWith('tag v'))).toEqual([]);
+  });
+
   it('refuses when the tag already exists, and sends no git tag', async () => {
     const seams = recorded(gitTable(DEFAULT_RELEASE_BRANCH, `v0.4.0\n${TAG}\n`));
 
@@ -1005,7 +1021,8 @@ describe('a run over a workspace', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain(`❌ ${TAG} already names ${VERSION}, so there is nothing to tag\n`
-      + `❌ ${pluginTag} already names ${PLUGIN_VERSION}, so there is nothing to tag\nUsage: ${RELEASE_TAG_USAGE}`);
+      + `❌ ${pluginTag} already names ${PLUGIN_VERSION}, so there is nothing to tag\nNext:\n  rafa release status`);
+    expect(run.stderr).toContain(`\nUsage: ${RELEASE_TAG_USAGE}`);
     expect(writes(seams.calls)).toEqual([]);
   });
 

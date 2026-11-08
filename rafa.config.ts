@@ -18,6 +18,15 @@
  * YAML, because the key decides what this repository's release commit
  * holds: the 0.50.0 settle ran from a checkout with it unset and left the
  * lock at 0.49.0. A checkout's YAML can still turn it off.
+ *
+ * `pr.base`, `release.settle`, `release.enabled`, `board.project.number`
+ * and `roadmap.issue` sit here for the same reason. This file makes
+ * every worktree a project root of its own, so the project walk stops in
+ * the worktree and never reads the main checkout's gitignored YAML. With
+ * the keys only in that YAML, `rafa release tag` in a worktree read the
+ * release branch as `main` and refused (measured on 2026-11-08 at
+ * 0.52.0), and `rafa release settle` there would have read
+ * `release.settle: push` against `main`.
  */
 
 import type { Config } from './src/config/index.js';
@@ -35,6 +44,9 @@ export default [
       publish: ['full'],
     },
     loop: { worktreeSetup: 'bun install --frozen-lockfile' },
-    release: { moveLock: true },
+    release: { moveLock: true, enabled: true, settle: 'pr' },
+    pr: { base: 'integration' },
+    board: { project: { number: 7 } },
+    roadmap: { issue: 31 },
   },
 ] satisfies Config as Config;
