@@ -12,7 +12,7 @@
     "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
   },
   "include": ["index.ts", "src"],
-  "exclude": ["**/*.test.ts", "src/testdata"],
+  "exclude": ["**/*.test.ts", "src/testdata", "src/testing.ts"],
   "references": [
     { "path": "../../packages/rafa" }
   ]
