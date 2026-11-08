@@ -439,6 +439,31 @@ describe('the config files', () => {
     expect([absent.config.statusNotice, absent.sources.statusNotice]).toEqual([true, 'default']);
   });
 
+  it('carries the hints section after features, the skill line off by default, which resolves from the file once uncommented', () => {
+    const hints = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# hints:'),
+      CONFIG_SETTINGS_LINES.indexOf('# allowList: []'),
+    );
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...hints].join('\n')), 'c.yaml') });
+
+    expect(CONFIG_SETTINGS_LINES.indexOf('# hints:')).toBeGreaterThan(CONFIG_SETTINGS_LINES.indexOf('# features:'));
+    expect(hints.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# hints:',
+      '#   skills: false',
+    ]);
+    expect([resolved.config.hintsSkills, resolved.sources.hintsSkills]).toEqual([false, 'file']);
+  });
+
+  it('turns the skill line on once its line is uncommented with true, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.map((line) => line.replace(/^(# {3}skills:) false/, '$1 true'));
+    const dropped = CONFIG_SETTINGS_LINES.filter((line) => !line.startsWith('#   skills: false'));
+    const flipped = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+    const absent = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...dropped].join('\n')), 'c.yaml') });
+
+    expect([flipped.config.hintsSkills, flipped.sources.hintsSkills]).toEqual([true, 'file']);
+    expect([absent.config.hintsSkills, absent.sources.hintsSkills]).toEqual([false, 'default']);
+  });
+
   it('carries the tiers section at its defaults, which resolve from the file once uncommented', () => {
     const tiers = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# tiers:'),

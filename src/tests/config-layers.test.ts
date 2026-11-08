@@ -317,6 +317,8 @@ const PROJECT_TEXT = [
   '  pr: false',
   '  run: false',
   '  release: false',
+  'hints:',
+  '  skills: true',
   '',
 ].join('\n');
 
@@ -452,6 +454,7 @@ const PROJECT_VALUES: RafaConfig = {
   featuresPr: false,
   featuresRun: false,
   featuresRelease: false,
+  hintsSkills: true,
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -618,6 +621,8 @@ const USER_TEXT = [
   '  pr: true',
   '  run: true',
   '  release: true',
+  'hints:',
+  '  skills: false',
   '',
 ].join('\n');
 
@@ -739,6 +744,7 @@ const USER_VALUES: RafaConfig = {
   featuresPr: true,
   featuresRun: true,
   featuresRelease: true,
+  hintsSkills: false,
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -1387,6 +1393,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'features.release', 'features:\n  release: 1',
     'features.release is 1, expected true or false',
     'features:\n  release: false', 'featuresRelease', false,
+  ],
+  [
+    'hints.skills', 'hints:\n  skills: yes',
+    'hints.skills is "yes", expected true or false',
+    'hints:\n  skills: true', 'hintsSkills', true,
   ],
 ];
 

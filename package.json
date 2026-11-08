@@ -86,6 +86,9 @@
     "./config-schema-features": {
       "types": "./dist/config-schema-features.d.ts"
     },
+    "./config-schema-hints": {
+      "types": "./dist/config-schema-hints.d.ts"
+    },
     "./config-schema-logger": {
       "types": "./dist/config-schema-logger.d.ts"
     },

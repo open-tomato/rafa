@@ -31,6 +31,7 @@ config-schema-bugs.d.ts
 config-schema-checks.d.ts
 config-schema-errors.d.ts
 config-schema-features.d.ts
+config-schema-hints.d.ts
 config-schema-hub.d.ts
 config-schema-issues.d.ts
 config-schema-logger.d.ts

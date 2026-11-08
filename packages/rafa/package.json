@@ -41,6 +41,7 @@
     "./config-schema-bugs": "./src/config-schema-bugs.ts",
     "./config-schema-errors": "./src/config-schema-errors.ts",
     "./config-schema-features": "./src/config-schema-features.ts",
+    "./config-schema-hints": "./src/config-schema-hints.ts",
     "./config-schema-logger": "./src/config-schema-logger.ts",
     "./config-schema-board-project": "./src/config-schema-board-project.ts",
     "./config-schema-checks": "./src/config-schema-checks.ts",

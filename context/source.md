@@ -406,16 +406,16 @@ coupling is gone, or into the module it really tests.
 **The config sections are handed in, never imported.** Core declares the
 section contract in `packages/rafa/src/core/config/section.ts`: a
 `ConfigSection` carries its `package` name, its `settings`, its `defaults` and
-its cross-key `checks`. Core names no section. The fifteen are listed in
+its cross-key `checks`. Core names no section. The sixteen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and fourteen `config-schema-*.ts` files, all under
+own (`core-section.ts`) and fifteen `config-schema-*.ts` files, all under
 `packages/rafa/src/` since rafa-1325 moved the ten feature sections in from
-`src/`: four for `bugs`, `errors`, `features` and `logger`, and ten for the
-registered feature sections. That module registers nothing as it is imported:
-its `registerCoreConfigSections()` registers the fifteen with core and sets
-core's load hook, and `src/rafa.ts`, `src/index.ts` and `src/tests/preload.ts`
-call it ahead of `registerCoreAdapters()`, before anything loads a config. A
-second call registers nothing. A file outside `packages/rafa/src/core/` takes
+`src/`: four for `bugs`, `errors`, `features` and `logger`, ten for the
+registered feature sections, and `hints`, written there. That module registers
+nothing as it is imported: its `registerCoreConfigSections()` registers the
+sixteen with core and sets core's load hook, and `src/rafa.ts`, `src/index.ts`
+and `src/tests/preload.ts` call it ahead of `registerCoreAdapters()`, before
+anything loads a config. A second call registers nothing. A file outside `packages/rafa/src/core/` takes
 the merged `SETTINGS`, `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`,
 `SECTIONS` and `knownKeysAbove` from the registry, never from the core barrel,
 which exports none of them; core reads the same through the `active*`
@@ -1298,12 +1298,13 @@ names come from, and the facade entry is no node.
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps twenty-three `types`-only entries for
+  them. The root `exports` also keeps twenty-four `types`-only entries for
   core's files (`./core/config`, `./core/config/config-schema`,
   `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
   `./ports/log-level`, `./report/parse`, `./store/check-rows`, and, since pass
   1 and the third decouple item (rafa-1325) moved the section files in,
-  `./bugs/record` and the fourteen `./config-schema-*` files), which #808
+  `./bugs/record` and the fourteen `./config-schema-*` files, and the
+  `hints` section's `./config-schema-hints` since), which #808
   retires. The first pass's `include` names each moved file the root's config
   files import.
 - **A content schema is imported through its owner's `schemas` export.** A
