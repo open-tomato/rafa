@@ -66,6 +66,21 @@ describe('promoteVisual', () => {
     expect(gitOut(project.storeDir, 'status', '--porcelain')).toBe('');
   });
 
+  it('refuses a store folder inside another repository and commits nothing there', async () => {
+    const project = await makeTestProject(temp);
+    initGitStore(project.storeDir);
+    const nested = join(project.storeDir, 'nested');
+    const { visual } = project.loaded.config;
+    const loaded = { ...project.loaded, config: { visual: { ...visual, store: { kind: 'side-repo' as const, dir: nested, set: 'packages-ui' } } } };
+    const inner = { ...project, storeDir: nested, loaded };
+    await writeIndex(inner, [['Atoms/A', 'One', 'a']]);
+    await seedAndPlace(inner, join(project.packageDir, 'visual', '__image_snapshots__'), { 'a--light.png': 'new' }, 10);
+
+    await expect(promoteVisual(loaded, { runnerKey: KEY }, { run: spawnProcess, now: NOW })).rejects.toThrow('is not the top of its own git repository');
+    expect(await Bun.file(join(setPaths(nested, 'packages-ui', '1.61.1', KEY).snapshotsDir, 'a--light.png')).exists()).toBe(false);
+    expect(Bun.spawnSync(['git', 'rev-parse', 'HEAD'], { cwd: project.storeDir }).exitCode).not.toBe(0);
+  });
+
   it('refuses a run with nothing staged', async () => {
     const { project, snapshots } = await gitProject({ 'a--light.png': '1' });
     await seedAndPlace(project, snapshots, { 'a--light.png': '1' }, 10);

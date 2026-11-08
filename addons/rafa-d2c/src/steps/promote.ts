@@ -14,7 +14,7 @@ import type { PlacedRecord } from './place.js';
 
 import { join } from 'node:path';
 
-import { copyNamed, pngNames } from '../store/files.js';
+import { copyNamed, isRepositoryTop, notOwnRepository, pngNames } from '../store/files.js';
 import { hashFolder } from '../store/hash.js';
 import { RECORD_FILE, setPaths, SNAPSHOTS_FOLDER, STAGING_FOLDER } from '../store/key.js';
 import { readSetRecord, writeSetRecord } from '../store/set-record.js';
@@ -79,6 +79,7 @@ async function git(run: ProcessRunner, dir: string, args: readonly string[]): Pr
 export async function promoteVisual(loaded: LoadedConfig, options: PromoteOptions, seams: PromoteSeams): Promise<PromoteResult> {
   const { store } = loaded.config.visual;
   if (store.kind === 'same-repo') throw new Error('promote needs a store folder; same-repo arrives in a later cut');
+  if (store.kind === 'side-repo' && !(await isRepositoryTop(store.dir))) throw new Error(notOwnRepository(store.dir));
   const runDir = await pickRun(store.dir, store.set, options.runnerKey, options.runId, PLACED_FILE, PROMOTED_FILE, 'promote');
   const seed = await readSeedRecord(runDir);
   const placed = (await Bun.file(join(runDir, PLACED_FILE)).json()) as PlacedRecord;

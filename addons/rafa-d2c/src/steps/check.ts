@@ -16,6 +16,7 @@ import type { SetRecord } from '../store/set-record.js';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { isRepositoryTop, notOwnRepository } from '../store/files.js';
 import { hashFolder } from '../store/hash.js';
 import { existingKeys, hostRunnerKey, readPlaywrightVersion, setPaths } from '../store/key.js';
 import { readSetRecord } from '../store/set-record.js';
@@ -90,6 +91,10 @@ async function checkGitStore(dir: string, run: ProcessRunner, found: Findings): 
   const repo = await run(['git', '-C', dir, 'rev-parse', '--is-inside-work-tree'], { cwd: dir });
   if (repo.exitCode !== 0) {
     found.gaps.push(`the store folder ${dir} is not a git repository; run git init there, then git lfs install --local and git lfs track "*.png"`);
+    return;
+  }
+  if (!(await isRepositoryTop(dir))) {
+    found.gaps.push(notOwnRepository(dir));
     return;
   }
   const lfs = await run(['git', 'lfs', 'version'], { cwd: dir });

@@ -18,6 +18,16 @@ export async function moveFolder(from: string, to: string): Promise<void> {
   }
 }
 
+/** The words a side-repo store answers when git would run in a repository above it. */
+export function notOwnRepository(dir: string): string {
+  return `the store folder ${dir} is not the top of its own git repository, so git would commit into the one above it; run git init there`;
+}
+
+/** True when `dir` is the top of a git working tree: it holds `.git`, a folder in a checkout and a file in a linked worktree. */
+export async function isRepositoryTop(dir: string): Promise<boolean> {
+  return exists(join(dir, '.git'));
+}
+
 /** Copies the named files from one folder to another, making the target. Answers how many were copied. */
 export async function copyNamed(from: string, to: string, names: Iterable<string>): Promise<number> {
   await mkdir(to, { recursive: true });
