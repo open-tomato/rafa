@@ -8,7 +8,7 @@
  * | --- | --- | --- |
  * | `index_fts` | FTS5 | one row per indexed store row: `row_table`, `origin_store`, `origin_seq`, unindexed, and its `body`, indexed |
  * | `index_vectors` | `vec0` | one row per embedded store row: its `embedding` and the same three key columns, auxiliary |
- * | `index_meta` | table | one row: the `project`, the embedder's `dimension` and the build `stamp` |
+ * | `index_meta` | table | one row: the `project`, the embedder's `dimension` (null with no embedder) and the build `stamp` |
  *
  * ## The key
  *
@@ -25,6 +25,13 @@
  * embedders are compared by. Its dimension is the embedder's, a whole
  * number from 1 to {@link MAX_DIMENSION}, the cap `sqlite-vec` 0.1.9
  * refuses past (`Dimension on vector column too large`).
+ *
+ * ## No embedder
+ *
+ * An index built with no embedder has no dimension: the metadata row
+ * records `null`, and the schema refuses `null` only when it is to make
+ * the vector table, which cannot be made without one. A dimension that
+ * is given is held to the same range whether or not the table is made.
  */
 import type { VectorAnswer } from './loader.js';
 import type { Database } from 'bun:sqlite';
@@ -45,8 +52,8 @@ export const MAX_DIMENSION = 8192;
 export interface IndexMeta {
   /** The project whose rows the index holds. */
   readonly project: string;
-  /** The embedder's dimension, the length of every vector it answers. */
-  readonly dimension: number;
+  /** The embedder's dimension, the length of every vector it answers; `null` when no embedder was given. */
+  readonly dimension: number | null;
   /** The build stamp, written by the build that made the file. */
   readonly stamp: string;
 }
@@ -54,7 +61,7 @@ export interface IndexMeta {
 /** A metadata row as SQLite answers it. */
 interface MetaRow {
   readonly project: string;
-  readonly dimension: number;
+  readonly dimension: number | null;
   readonly stamp: string;
 }
 
@@ -70,7 +77,7 @@ const CREATE_FTS = `CREATE VIRTUAL TABLE ${FTS_TABLE} USING fts5(
 const CREATE_META = `CREATE TABLE ${META_TABLE} (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   project TEXT NOT NULL,
-  dimension INTEGER NOT NULL,
+  dimension INTEGER,
   stamp TEXT NOT NULL
 )`;
 
@@ -84,13 +91,22 @@ function createVectorSql(dimension: number): string {
 )`;
 }
 
-/** Refuse metadata the table cannot hold, the dimension before it reaches SQL text. */
-function checkMeta(meta: IndexMeta): void {
+/**
+ * Refuse metadata the tables cannot hold, the dimension before it reaches
+ * SQL text: a `null` dimension only when no vector table is to be made.
+ */
+function checkMeta(meta: IndexMeta, answer: VectorAnswer): void {
   if (meta.project.trim() === '') {
     throw new Error('index schema: project must be a non-empty string');
   }
   if (meta.stamp.trim() === '') {
     throw new Error('index schema: stamp must be a non-empty string');
+  }
+  if (meta.dimension === null) {
+    if (answer.vector) {
+      throw new Error('index schema: the vector table needs a dimension, got null');
+    }
+    return;
   }
   if (!Number.isInteger(meta.dimension) || meta.dimension < 1 || meta.dimension > MAX_DIMENSION) {
     throw new Error(`index schema: dimension must be a whole number from 1 to ${MAX_DIMENSION}, got ${String(meta.dimension)}`);
@@ -112,15 +128,15 @@ export function indexTables(answer: VectorAnswer): readonly string[] {
  * Create the index tables on a fresh database and write its metadata
  * row, in one transaction, answering the tables created. The vector
  * table is created only when `answer.vector` is `true`, which the loader
- * answered for this database. Throws on metadata the table cannot hold
- * and on a database that already holds any of the tables.
+ * answered for this database. Throws on metadata the table cannot hold,
+ * a `null` dimension with `answer.vector` `true` among it, and on a database that already holds any of the tables.
  */
 export function createIndexSchema(database: Database, meta: IndexMeta, answer: VectorAnswer): readonly string[] {
-  checkMeta(meta);
+  checkMeta(meta, answer);
   const tables = indexTables(answer);
   database.transaction(() => {
     database.run(CREATE_FTS);
-    if (answer.vector) {
+    if (answer.vector && meta.dimension !== null) {
       database.run(createVectorSql(meta.dimension));
     }
     database.run(CREATE_META);

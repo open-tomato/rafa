@@ -31,7 +31,6 @@ import {
   NO_EMBEDDER,
   parallelIndexPath,
   rebuildIndex,
-  UNEMBEDDED_DIMENSION,
 } from './rebuild.js';
 import { FTS_TABLE, META_TABLE, readIndexMeta, VECTOR_TABLE } from './schema.js';
 
@@ -256,7 +255,7 @@ describe('rebuildIndex, swapped in', () => {
     expect(sha256(storePath)).toBe(store);
     expect(readdirSync(directory).sort()).toEqual(beside);
     expect(metaOf(indexPath)).toEqual({
-      dimension: UNEMBEDDED_DIMENSION,
+      dimension: null,
       project: 'fixture-project',
       stamp: 'next',
     });

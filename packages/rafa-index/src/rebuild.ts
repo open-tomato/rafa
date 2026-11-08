@@ -47,9 +47,8 @@
  * Vector search is on when the loader answered `vector: true` and an
  * {@link IndexEmbedder} was given. Without an embedder no vector table
  * is made, the answer's why is `no embedder configured`, and the
- * metadata row records {@link UNEMBEDDED_DIMENSION}, as the schema takes
- * no dimension below 1: a reader reads the dimension only when the
- * vector table is there. Bodies are embedded {@link EMBED_BATCH} at a
+ * metadata row records a `null` dimension, as there is no embedder to
+ * have one. Bodies are embedded {@link EMBED_BATCH} at a
  * time, and an embedder that answers another count of vectors, or a
  * vector of another length than its dimension, fails the rebuild.
  *
@@ -135,9 +134,6 @@ export interface RebuildIndexResult {
   /** Why it does not, `null` when it does. */
   readonly why: string | null;
 }
-
-/** The dimension recorded when no embedder is given: the smallest the schema takes. */
-export const UNEMBEDDED_DIMENSION = 1;
 
 /** How many bodies one call of the embedder is handed. */
 export const EMBED_BATCH = 64;
@@ -338,7 +334,7 @@ async function build(options: RebuildIndexOptions, parallelPath: string, stamp: 
   const { database } = opened;
   try {
     const answer = rebuildAnswer(opened, embedder);
-    const dimension = embedder?.dimension ?? UNEMBEDDED_DIMENSION;
+    const dimension = embedder?.dimension ?? null;
     createIndexSchema(database, { dimension, project, stamp }, answer);
     const rows = readStore(storePath, tables, loader.state);
     writeFullText(database, rows);

@@ -53,6 +53,13 @@ describe('createIndexSchema, refused', () => {
     }
   });
 
+  it('refuses a null dimension when the vector table is to be made, creating nothing', () => {
+    const { answer, database } = vectorDatabase();
+    expect(answer.vector).toBe(true);
+    expect(() => createIndexSchema(database, { ...META, dimension: null }, answer)).toThrow('the vector table needs a dimension, got null');
+    expect(tableNames(database)).toEqual([]);
+  });
+
   it('refuses an empty project or stamp', () => {
     const database = new Database(':memory:');
     expect(() => createIndexSchema(database, { ...META, project: ' ' }, VECTOR_OFF)).toThrow('project must be a non-empty string');
@@ -145,6 +152,13 @@ describe('createIndexSchema under vector: true', () => {
 describe('readIndexMeta', () => {
   it('answers null for a database with no metadata table', () => {
     expect(readIndexMeta(new Database(':memory:'))).toBeNull();
+  });
+
+  it('records a null dimension for an index made with no vector table', () => {
+    const database = new Database(':memory:');
+    const meta: IndexMeta = { ...META, dimension: null };
+    expect(createIndexSchema(database, meta, VECTOR_OFF)).toEqual([FTS_TABLE, META_TABLE]);
+    expect(readIndexMeta(database)).toEqual(meta);
   });
 
   it('answers the project, the dimension and the build stamp written', () => {
