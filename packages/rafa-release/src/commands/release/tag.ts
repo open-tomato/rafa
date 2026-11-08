@@ -24,7 +24,7 @@
  * read, and every unit is decided before the first tag is written, so a
  * refused run leaves the repository exactly as it found it.
  *
- * ## Units, and the one skip
+ * ## Units, and the two skips
  *
  * The root is read off `release.versionFile` and `release.changelog`;
  * a package off `<dir>/package.json` and `<dir>/CHANGELOG.md`
@@ -33,10 +33,12 @@
  * over its own readings, in unit order: the root first, then the
  * packages by manifest path. A unit whose version a tag already names is
  * `skipped`, not refused, so a run after a hand-tagged root still tags
- * the package; the run refuses `tagged` only when every unit is
- * skipped, which is the one refusal a one-package project had before.
- * Any other refusal of any unit stops the run with exit 1 before the
- * first write, one line per refused unit.
+ * the package. A unit never released — at `0.0.0`, with no changelog
+ * file and no tag of its own (#1515) — is `skipped` too, rather than
+ * refused for the changelog it has not got yet. The run refuses
+ * `tagged` only when every unit is skipped, which is the one refusal a
+ * one-package project had before. Any other refusal of any unit stops
+ * the run with exit 1 before the first write, one line per refused unit.
  *
  * ## The three refusals, and the two readings that must not pass
  *
@@ -570,9 +572,9 @@ function decideUnits(projectRoot: string, git: GitRunner, root: TagInputs): read
   const members = packages.packages.map((member): DecidedUnit => {
     const readings: UnitReadings = readUnitInputs(projectRoot, git, member);
     const inputs: TagInputs = { ...run, ...readings };
-    return { package: member.name, dir: member.dir, inputs, decision: unitDecisionOf(decideTag(inputs)) };
+    return { package: member.name, dir: member.dir, inputs, decision: unitDecisionOf(decideTag(inputs), inputs) };
   });
-  return [{ package: null, dir: null, inputs: root, decision: unitDecisionOf(decideTag(root)) }, ...members];
+  return [{ package: null, dir: null, inputs: root, decision: unitDecisionOf(decideTag(root), root) }, ...members];
 }
 
 /**

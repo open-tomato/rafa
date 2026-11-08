@@ -1,8 +1,9 @@
 /**
  * Tests for `tag-units.ts`: the version and changelog readers
  * `rafa release tag` decides every unit from, the publishable packages
- * it reads as units, a package's readings from its own folder, and the
- * skip a `tagged` refusal becomes.
+ * it reads as units, a package's readings from its own folder, the
+ * skip a `tagged` refusal becomes, and the skip of a unit never
+ * released (#1515).
  *
  * Controls carried by the cases:
  *
@@ -16,10 +17,19 @@
  *     package's commit, so a walk over the wrong file names the wrong
  *     commit;
  *   - the private member sits beside a public one that IS read, so an
- *     empty list cannot pass for a filter that works.
+ *     empty list cannot pass for a filter that works;
+ *   - the never-released skip is read negative first: a `0.0.0` package
+ *     WITH a changelog, a `0.0.0` package with a tag of its own, and a
+ *     `1.2.0` package with no changelog all still refuse `changelog`,
+ *     so a skip that took every missing changelog would redden; the
+ *     planted run then tags the root beside the two it passes over, so
+ *     a skip that stopped the run, or took the root too, would show.
  */
+import type { UnitReadings } from './tag-units.js';
 import type { TagDecision, TagRefused } from './tag.js';
 import type { WorkspacePackage } from '../../release/workspace-packages.js';
+import type { RafaContext } from '@open-tomato/rafa/core/command';
+import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -31,6 +41,7 @@ import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readNewestRelease, readTagPackages, readUnitInputs, readVersion, unitDecisionOf } from './tag-units.js';
+import { decideTag, renderTagged, runTag } from './tag.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-tag-units-')));
@@ -160,13 +171,25 @@ describe('the changelog reading', () => {
     expect(readNewestRelease(root, 'CHANGELOG.md')).toMatchObject({ version: null, problem: null });
   });
 
-  it('says where it looked for a changelog that is not there', () => {
+  it('says where it looked for a changelog that is not there, and that none is there', () => {
     const root = scratch();
 
     const reading = readNewestRelease(root, 'CHANGELOG.md');
 
     expect(reading.version).toBeNull();
     expect(reading.problem).toContain(join(root, 'CHANGELOG.md'));
+    expect(reading.absent).toBe(true);
+  });
+
+  it('does not call a changelog absent when something is there that cannot be read as a file', () => {
+    const root = scratch();
+    mkdirSync(join(root, 'CHANGELOG.md'));
+
+    const reading = readNewestRelease(root, 'CHANGELOG.md');
+
+    // The control: the read failed as for a missing file, so only the absence tells the two apart.
+    expect(reading.problem).toContain(join(root, 'CHANGELOG.md'));
+    expect(reading.absent).toBeUndefined();
   });
 });
 
@@ -302,6 +325,16 @@ describe('a package\'s readings', () => {
   });
 });
 
+/** Released readings of the plugin, for a mapping case whose readings do not matter. */
+const READINGS: UnitReadings = Object.freeze({
+  package: PLUGIN,
+  version: { path: 'packages/plugin/package.json', text: null, version: PLUGIN_VERSION, problem: null },
+  changelog: { path: 'packages/plugin/CHANGELOG.md', version: PLUGIN_VERSION, problem: null },
+  tags: { tags: [], latest: null, problem: null },
+  release: null,
+  receipt: null,
+});
+
 describe('one unit\'s decision', () => {
   /** A refusal of `reason`, for a mapping case. */
   function refusal(reason: TagRefused['reason']): TagRefused {
@@ -309,15 +342,101 @@ describe('one unit\'s decision', () => {
   }
 
   it('skips a unit whose version a tag already names, keeping the sentence', () => {
-    expect(unitDecisionOf(refusal('tagged'))).toEqual({ kind: 'skipped', message: 'tagged refused' });
+    expect(unitDecisionOf(refusal('tagged'), READINGS)).toEqual({ kind: 'skipped', message: 'tagged refused' });
   });
 
   it('keeps every other refusal a refusal, and a ready unit ready', () => {
     const ready: TagDecision = { kind: 'ready', version: VERSION, tag: `v${VERSION}`, commit: 'abc', ahead: 0 };
 
-    expect(unitDecisionOf(ready)).toBe(ready);
+    expect(unitDecisionOf(ready, READINGS)).toBe(ready);
     for (const reason of ['branch', 'version', 'changelog', 'git', 'receipt'] as const) {
-      expect(unitDecisionOf(refusal(reason))).toEqual(refusal(reason));
+      expect(unitDecisionOf(refusal(reason), READINGS)).toEqual(refusal(reason));
     }
+  });
+});
+
+describe('a unit never released', () => {
+  /** A git runner whose tag list is `tags` and whose every other command answers nothing. */
+  function tagsOnly(tags: string): GitRunner {
+    return (args) => ({ ok: true, stdout: args.join(' ') === 'tag --list'
+      ? tags
+      : '', stderr: '' });
+  }
+
+  /** The decision of the plugin planted at `version`, with `changelogText` beside it when given, over `tags`. */
+  function decidedPlugin(version: string, changelogText: string | null, tags = ''): ReturnType<typeof unitDecisionOf> {
+    const root = scratch();
+    plant(root, 'packages/plugin/package.json', manifest(PLUGIN, version));
+    if (changelogText !== null) plant(root, 'packages/plugin/CHANGELOG.md', changelogText);
+    const readings = readUnitInputs(root, tagsOnly(tags), MEMBER);
+    const inputs = { releaseBranch: 'main', branch: { branch: 'main', problem: null }, ...readings };
+    return unitDecisionOf(decideTag(inputs), readings);
+  }
+
+  it('refuses a 0.0.0 package that has a changelog, which says something was released', () => {
+    expect(decidedPlugin('0.0.0', changelog('0.1.0'))).toMatchObject({ kind: 'refused', reason: 'changelog' });
+  });
+
+  it('refuses a 1.2.0 package with no changelog, a release whose changelog went missing', () => {
+    expect(decidedPlugin('1.2.0', null)).toMatchObject({ kind: 'refused', reason: 'changelog' });
+  });
+
+  it('refuses a 0.0.0 package with no changelog that holds a tag of its own', () => {
+    expect(decidedPlugin('0.0.0', null, `${PLUGIN}@0.1.0\n`)).toMatchObject({ kind: 'refused', reason: 'changelog' });
+  });
+
+  it('passes over a 0.0.0 package with no changelog and no tag, naming the package', () => {
+    // The control: another package's tag and the root's do not count as this package's.
+    const decision = decidedPlugin('0.0.0', null, `v${VERSION}\n@scope/other@0.1.0\n`);
+
+    expect(decision.kind).toBe('skipped');
+    const message = decision.kind === 'skipped'
+      ? decision.message
+      : '';
+    expect(message).toContain(`${PLUGIN} has never been released`);
+    expect(message).toContain('packages/plugin/CHANGELOG.md');
+  });
+
+  /** Runs git in `repo`, with an identity and a config of this case's own. */
+  function gitIn(repo: string, args: readonly string[]): string {
+    return execFileSync('git', [...args], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: repo,
+        GIT_CONFIG_GLOBAL: join(repo, '.gitconfig'),
+        GIT_CONFIG_NOSYSTEM: '1',
+        ...gitIdentityEnv(),
+      },
+    });
+  }
+
+  it('tags a released root over a planted workspace and names the two never-released packages as passed over', async () => {
+    const repo = scratch();
+    const home = scratch();
+    gitIn(repo, ['init', '-q', '-b', 'main']);
+    plant(repo, 'package.json', ROOT_MANIFEST);
+    plant(repo, 'CHANGELOG.md', changelog(VERSION));
+    plant(repo, 'packages/charts/package.json', manifest('@scope/charts', '0.0.0'));
+    plant(repo, 'packages/ui/package.json', manifest('@scope/ui', '0.0.0'));
+    gitIn(repo, ['add', '-A']);
+    gitIn(repo, ['commit', '-q', '-m', 'chore: release 0.5.0']);
+    const context = {
+      args: [],
+      flags: {},
+      project: { root: repo, home },
+      output: { warn: () => {} },
+    } as unknown as RafaContext;
+
+    const result = await runTag(context);
+
+    expect(result.written?.tag).toBe(`v${VERSION}`);
+    const tags = gitIn(repo, ['tag', '--list']).split('\n');
+    expect(tags.filter((line) => line !== '')).toEqual([`v${VERSION}`]);
+    const skipped = renderTagged(result.units, 'main').filter((line) => line.startsWith('Skipped: '));
+    expect(skipped).toHaveLength(2);
+    expect(skipped[0]).toContain('@scope/charts has never been released');
+    expect(skipped[1]).toContain('@scope/ui has never been released');
   });
 });
