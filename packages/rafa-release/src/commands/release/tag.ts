@@ -24,6 +24,9 @@
  * read, and every unit is decided before the first tag is written, so a
  * refused run leaves the repository exactly as it found it.
  *
+ * What text mode prints, and the exit a refusal throws with its `Next:`
+ * block, are `./tag-output.ts`'s; this module decides what they say.
+ *
  * ## Units, and the two skips
  *
  * The root is read off `release.versionFile` and `release.changelog`;
@@ -244,6 +247,7 @@ import { DEFAULT_RELEASE_SEAMS } from './status.js';
 import { commitsOf, readBehind } from './tag-behind.js';
 import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
 import { nextStepsOf, readBranchHolder } from './tag-next-steps.js';
+import { pastReleaseWarning, RELEASE_TAG_USAGE, refusal, renderTagged } from './tag-output.js';
 import {
   readNewestRelease,
   readTagPackages,
@@ -252,17 +256,11 @@ import {
   unitDecisionOf,
 } from './tag-units.js';
 
-/** The usage line this action's refusals name. */
-export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';
+/** The rendering, moved to `./tag-output.ts`, re-exported so callers keep importing it from here. */
+export { pastReleaseWarning, RELEASE_TAG_USAGE, renderTagged } from './tag-output.js';
 
 /** The branch a release is tagged on when `pr.base` names none. */
 export const DEFAULT_RELEASE_BRANCH = 'main';
-
-/** What every line under a heading is indented by, as `pr merge` indents its follow-ups. */
-const INDENT = '  ';
-
-/** How many characters of a commit hash a line names it by. */
-const SHORT_COMMIT = 7;
 
 /** What branch the repository has checked out, or why it has none. */
 export interface BranchReading {
@@ -562,19 +560,6 @@ function isReady(unit: DecidedUnit): unit is ReadyUnit {
 }
 
 /**
- * The exit a run refused with: one `❌` line per sentence, then a `Next:`
- * heading over the steps that clear them (`./tag-next-steps.ts`), each
- * without repeats, then the usage.
- */
-function refusal(messages: readonly string[], steps: readonly string[] = []): CommandExit {
-  const lines = [...new Set(messages)].map((message) => `❌ ${message}`);
-  const next = steps.length === 0
-    ? []
-    : ['Next:', ...[...new Set(steps)].map((step) => `${INDENT}${step}`)];
-  return new CommandExit(1, [...lines, ...next, `Usage: ${RELEASE_TAG_USAGE}`].join('\n'));
-}
-
-/**
  * Every unit, read and decided: the root from `root`'s decision, then
  * each publishable package over the run's branch reading. Called only
  * once the branch check passed; see the module note.
@@ -698,59 +683,6 @@ function unitResult(
   return push === undefined
     ? { ...base, followUps, ...ci }
     : { ...base, followUps, pushed: push, ...ci };
-}
-
-/** The `Next:` lines of one unit: its follow-ups, then the CI publish sentence when it has one. */
-function nextLines(unit: ReleaseTagUnit): readonly string[] {
-  const lines = unit.followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`);
-  if (unit.publish !== 'ci' || unit.decision.kind !== 'ready') return lines;
-  const { tag, version } = unit.decision;
-  const sentence = ciPublishSentence(tag, version, readPublishTarget(unit.inputs.version.text));
-  return sentence === null
-    ? lines
-    : [...lines, `${INDENT}${sentence}`];
-}
-
-/** The warning a run prints when HEAD is past the tagged commit, or null when HEAD is the tagged commit. */
-export function pastReleaseWarning(written: TagReady, branch: string): string | null {
-  if (written.ahead === 0) return null;
-  const commits = written.ahead === 1
-    ? '1 commit'
-    : `${String(written.ahead)} commits`;
-  return `HEAD of ${branch} is ${commits} past ${written.commit.slice(0, SHORT_COMMIT)}, where ${written.version}`
-    + ` was set; they are not in ${written.tag}.`;
-}
-
-/** The lines of one unit: its `Tagged` and `Pushed` lines, or its `Skipped` line. */
-function unitLines(unit: ReleaseTagUnit, branch: string): readonly string[] {
-  const decision = unit.decision;
-  if (decision.kind === 'skipped') return [`Skipped: ${decision.message}.`];
-  if (decision.kind === 'refused') return [];
-  const where = decision.ahead === 0
-    ? `the HEAD of ${branch}`
-    : `${decision.commit.slice(0, SHORT_COMMIT)}, the commit of ${branch} that set ${decision.version}`;
-  return [
-    `✅ Tagged ${decision.tag} at ${where}.`,
-    ...(unit.pushed === undefined
-      ? []
-      : [`✅ Pushed ${unit.pushed.tag} to ${unit.pushed.remote}.`]),
-  ];
-}
-
-/**
- * The lines text mode writes for a run that tagged on `branch`: one
- * `Tagged` line per tag in unit order, each with its `Pushed` line when
- * the tag was pushed, a `Skipped` line per skipped unit, and the
- * `Next:` heading only over follow-ups there are, every unit's in unit
- * order, a unit under `release.publish: ci` giving its CI publish
- * sentence where its publish line would stand.
- */
-export function renderTagged(units: readonly ReleaseTagUnit[], branch: string): readonly string[] {
-  const lines = units.flatMap(nextLines);
-  const next = lines.length === 0
-    ? []
-    : ['Next:', ...lines];
-  return [...units.flatMap((unit) => unitLines(unit, branch)), ...next];
 }
 
 /**
