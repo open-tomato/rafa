@@ -32,6 +32,27 @@ passed to `collectEffort` replaces the whole set with that one folder.
 `loop.worktreeDir` from the config, or `.rafa/worktrees` when it reads
 none (a store and `plansDir` both passed).
 
+**A session row stores its log's path as `<folder>/<file>`, not as an
+absolute path.** A fresh collect cuts a log under `<home>/.claude/projects/`
+to the part after that root (`storedLogPath`, `session-log-path.ts`), so
+`filePath` holds `<folder>/<file>.jsonl` with no leading `/` and carries no
+home directory across sync. A log outside that root, a `logDir` override's
+among them, stays absolute as written. A row written before this form
+(#1489) keeps its absolute path in the store's bytes, and `read` rewrites it
+on the way out (`storedLogPathOf`, through `answeredRows`): an absolute value
+holding `/.claude/projects/` is cut after that marker whatever home precedes
+it, so a macOS and a Linux row read alike. No migration carries the rewrite,
+because both backends never rewrite a stored row's bytes, and `row_json`,
+`keys` and the NDJSON files a move copies keep what was written. The old
+absolute values therefore stay in store files and in any export a hub takes
+from cursor zero. `resolveSessionLogPath` joins a stored relative value under
+the reading machine's home, and `classifyStoredSessionLog` (`rafa-effort`,
+`classify.ts`) reads a log absent there as `onMachine: false`, a reading and
+not a fault, since a row synced from another machine names a log only that
+machine holds. `sessions.row_json` compares with `filePath` taken in stored
+form, so two rows that differ only in that form are one row to the merge
+(`RECOMPUTED`, `store/merge-rules.ts`).
+
 ### Where it lives
 
 **Both backends write under `.rafa/effort/` in the project root, unless

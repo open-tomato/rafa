@@ -55,6 +55,12 @@ and the commit right after it in time, ordered by `Date.parse` of the
 stored timestamp and by sha within an instant. At most two rows are
 written per commit brought in.
 
+**`sessions.row_json` is compared as recomputed too.** No statement rewrites
+it, but its `filePath` is stored as `<folder>/<file>` by a fresh collect and
+as an absolute path by a row from before that form (#1489). Two rows of one
+session that differ only in that form, with `filePath` taken through
+`storedLogPathOf` (`session-log-path.ts`), are the same row.
+
 **`origins.ts` stamps every production insert with the origin pair.**
 `STAMPED_COLUMNS` and `stampedValues` spell both, for every writer, in
 the insert's column list with no trigger and no `UPDATE`. A store with
