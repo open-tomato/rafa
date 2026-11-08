@@ -48,7 +48,7 @@
  * | 6 | `pr-red` | `triage` | that pull request is red, or conflicts |
  * | 7 | `pr-no-checks` | `merge-unchecked` | that pull request reports no check at all and merges |
  * | 8 | `pr-green` | `merge` | that pull request is green and merges |
- * | 9 | `plan-unstarted` | `start` | the branch is the base and a plan has no run, and no branch or one holding claim commits alone |
+ * | 9 | `plan-unstarted` | `start` | the branch is the base and a plan has no run, no branch or one holding claim commits alone, and no merged pull request from its branch |
  * | 10 | `issue-ready` | `plan` | the branch is the base and the roadmap's next line is ready |
  * | 11 | `issue-blocked` | `unblock` | that line waits on issues that have not closed, in `labels` mode |
  * | 12 | `issue-not-ready` | `ready` | that line carries no `spec:ready` label |
@@ -107,6 +107,24 @@
  * conflicts, since a conflict is what triage repairs and a pull request
  * that conflicts is often one GitHub never scheduled a check for.
  *
+ * ## Row 9: a plan whose branch merged is done
+ *
+ * A plan finished from another clone has no run record here, and its
+ * branch is often deleted on merge, so both local readings say
+ * unstarted (#1506). Row 9 therefore answers the first plan with no run
+ * and no started branch that is also not done, done meaning a merged
+ * pull request's `headRefName` is the plan's branch under `naming.branch`
+ * ({@link NextWorld.unmergedPlan}). A plan read as done is passed over
+ * for the next unstarted one, and with every such plan done the row does
+ * not match. The provider's `listMerged()` is asked once, only when a
+ * candidate exists, so a base with no unstarted plan asks it nothing,
+ * and it reaches only the provider's recent merges.
+ *
+ * The row is no provider row: no pre-condition is read ahead of it. A
+ * `listMerged` that throws leaves the answer the local readings give,
+ * the first unstarted plan, with one problem naming what the provider
+ * said, since the row has an answer to give without it.
+ *
  * ## In `native` mode
  *
  * Row 11 proposes `unblock`: re-read the blockers and take
@@ -157,7 +175,8 @@
  * each is made at most once per answer and only when it is asked for,
  * so the working tree is read once, ahead of row 2 and on whichever side
  * of row 1 the live runs put it, the provider is reached from row 5 on
- * and the board from row 10 on. A
+ * (its merged pull requests at row 9, and only for a candidate) and the
+ * board from row 10 on. A
  * reading that failed is carried out as {@link NextState.problems}
  * rather than thrown, and the caller prints those beside the answer.
  */
@@ -442,11 +461,15 @@ async function readPrGreen(world: NextWorld): Promise<RowAnswer | null> {
   };
 }
 
-/** Row 9: on the base branch, and a plan has no run and no branch past its claim commits (`./readings.ts`). */
-function readPlanUnstarted(world: NextWorld): RowAnswer | null {
+/**
+ * Row 9: on the base branch, and a plan has no run, no branch past its
+ * claim commits and no merged pull request from its branch
+ * (`./readings.ts`); see the module note.
+ */
+async function readPlanUnstarted(world: NextWorld): Promise<RowAnswer | null> {
   if (!onBase(world)) return null;
 
-  const plan = world.unstartedPlan();
+  const plan = await world.unmergedPlan();
   if (plan === null) return null;
 
   return {

@@ -333,7 +333,11 @@ The base rows are:
 7. `pr-no-checks` (`merge-unchecked`): that pull request reports no check
    and merges
 8. `pr-green` (`merge`): that pull request is green and merges
-9. `plan-unstarted` (`start`): the branch is the base and a plan has no run
+9. `plan-unstarted` (`start`): the branch is the base and a plan has no run,
+   no started branch and no merged pull request from its branch; the
+   provider's `listMerged()` is asked once, only when a plan is a candidate,
+   and a `listMerged` that throws keeps the first such plan with one problem
+   naming the failure
 10. `issue-ready` (`plan`): the branch is the base and the roadmap's next
     line is ready
 11. `issue-blocked` (`unblock`): that line waits on issues that have not
@@ -600,10 +604,14 @@ New; it replaces no earlier text. What a row or an action added to
   so it is not the loop's reason for ending without a pull request, which
   `readLoopEnding` (`stretch/item-merge.ts`) reads from the events file.
 - **`loop start --create-branch` creates the feature branch when on `main`,
-  `master` or a detached HEAD** (`start/run-setup.ts`): when the working
-  directory is checked out on `main` or `master`, or on no branch at all, the
-  flag creates `feat/<stub>` from the latest `origin/<base>`, where `<base>` is
-  `pr.base` when set, else `origin/HEAD`. The branch's name is the
+  `master`, the run's base or a detached HEAD** (`start/run-setup.ts`): when
+  the working directory is checked out on `main`, `master` or the run's base
+  (`pr.base` when set, else `origin/HEAD`, so `integration` where that is the
+  base), or on no branch at all, the flag creates `feat/<stub>` from the latest
+  `origin/<base>`, where `<base>` is the branch checked out, or with no branch
+  that run's base. A `--create-branch` run the branch step leaves on its base,
+  with `--any-branch` beside it or a plan file naming no stub, is refused with
+  exit 1, naming the plan's stub and the base. The branch's name is the
   `naming.branch` template, `feat/{stub}` by default, with the plan's stub for
   `{stub}`; it names the worktree's branch under `--as-worktree` too
   (`packages/rafa/src/start/branch-decision.ts`), and the claim and status

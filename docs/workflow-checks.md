@@ -55,7 +55,7 @@ What is coupled here, in one sentence each:
 flowchart TD
     A["flags: --detached refused until phase 6 · --runtime hands the run away"] --> B[config read and refused early]
     B --> C[plan resolved: --plan, else PLAN.md]
-    C --> D{"on main or master?"}
+    C --> D{"on main, master or the run's base?"}
     D -- "--any-branch ⚠️" --> H
     D -- "no stub / no terminal and no --create-branch" --> G
     D -- yes --> E["❓ Create feat/stub and take it?"]

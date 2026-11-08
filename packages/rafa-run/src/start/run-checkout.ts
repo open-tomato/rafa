@@ -7,9 +7,9 @@
  *
  *  - Without `--as-worktree` the checkout is the working tree the run
  *    was started in ({@link resolveRunDirs}), and the branch is the one
- *    it stands on, or the plan's own once the offer made on `main` or
- *    `master`, or with no branch checked out, has been taken
- *    ({@link resolveRunBranch}). It is null for a run started on no
+ *    it stands on, or the plan's own once the offer made on `main`,
+ *    `master` or the run's base, or with no branch checked out, has been
+ *    taken ({@link resolveRunBranch}). It is null for a run started on no
  *    branch that took no offer, which the guard refuses next.
  *  - Under `--as-worktree` the plan's `feat/<stub>` is added as a linked
  *    worktree at `loop.worktreeDir/<stub>` ({@link addRunWorktree}), or
@@ -48,7 +48,8 @@
  * the default base. It is the reading the wrap-up makes for the pull
  * request (`./wrap-up-run.ts`), so the branch is cut from the base it
  * is later merged into. The reading is the `base` seam, and a run
- * started on a detached HEAD without the flag makes the same one.
+ * without the flag makes the same one, on a branch and on a detached
+ * HEAD alike.
  *
  * The branch checked out where the run was started is NOT the base. It
  * was once: a run started on a branch `origin` had not got then fetched
@@ -68,11 +69,15 @@
  * (`./worktree.ts`).
  *
  * Without the flag the run's branch is that same `readCheckedOutBranch`
- * reading in the started checkout, and on a branch it is all that is
- * read: the branch is the one the offer is made on, and no base is
- * looked up. On a detached HEAD it answers null, never the word `HEAD`,
- * and no branch is treated like the default branch: the offer is handed
- * the run's base, read as above, and the `no-branch` standing, so
+ * reading in the started checkout, and the run's base is read beside it,
+ * as above, and handed to the offer as `runBase`. On a branch, the
+ * branch is the one the offer is made on, and the offer is made when it
+ * is `main`, `master` or that base: a project whose base is
+ * `integration` is offered `feat/<stub>` there as one on `main` is
+ * (#1506), where the offer once stood aside for any base but those two.
+ * On a detached HEAD it answers null, never the word `HEAD`, and no
+ * branch is treated like the default branch: the offer is handed the
+ * run's base as its `base` and the `no-branch` standing, so
  * `feat/<stub>` is cut from the latest `origin/<base>` when the offer is
  * taken (`./branch.ts`). When it is not, the run is still on no branch
  * and the settled branch is null.
@@ -110,8 +115,8 @@ export interface RunCheckoutRequest {
    */
   readonly worktreeSetup: string | null;
   /**
-   * `pr.base` as the config holds it, null when unset, read under
-   * `--as-worktree` and for a run started on a detached HEAD.
+   * `pr.base` as the config holds it, null when unset: the run's base
+   * when set, on every route.
    */
   readonly prBase: string | null;
   /** The plan's stub, or null when the plan path gave none. */
@@ -146,9 +151,10 @@ export interface RunCheckoutSeams {
    */
   readonly checkedOutBranch?: (dir: string) => string | null;
   /**
-   * The run's base, from the project root and `pr.base`, read under
-   * `--as-worktree` and on a detached HEAD without it.
-   * `resolveBaseBranch` over git in that root when absent.
+   * The run's base, from the project root and `pr.base`, read once on
+   * every route: under `--as-worktree` for the worktree's branch, and
+   * without it for the offer. `resolveBaseBranch` over git in that root
+   * when absent.
    */
   readonly base?: (projectRoot: string, prBase: string | null) => string;
   /**
@@ -207,8 +213,9 @@ export async function settleRunCheckout(
   const runBase = (): string => (seams.base ?? readBase)(projectRoot, request.prBase);
 
   if (!args.includes(AS_WORKTREE_FLAG)) {
+    const base = runBase();
     const stands: Pick<RunBranchRequest, 'base' | 'standing'> = startedOn === null
-      ? { base: runBase(), standing: 'no-branch' }
+      ? { base, standing: 'no-branch' }
       : { base: startedOn };
     const branch = await (seams.offer ?? resolveRunBranch)({
       checkout: started.checkout,
@@ -216,6 +223,7 @@ export async function settleRunCheckout(
       ...stands,
       args,
       branchTemplate: request.branchTemplate,
+      runBase: base,
     });
     return Object.freeze({ projectRoot, checkout: started.checkout, branch });
   }
