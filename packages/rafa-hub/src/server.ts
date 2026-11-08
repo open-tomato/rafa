@@ -11,15 +11,22 @@
  *     not. The one route that never asks the identity port, so a
  *     container's `HEALTHCHECK` needs no token.
  *   - `GET /v1/status` (`status.read`): the hub's version, the migration
- *     ids its store holds, its rows per table and each device's last push.
- *   - `POST /v1/effort/push?device=<origin>` (`effort.push`): the body is
- *     a wire payload as core's `encodeWirePayload` writes it, checked by
- *     core's `decodeWirePayload`; answers what the push received and added.
- *   - `GET /v1/effort/pull?device=<origin>&since=<cursor>` (`effort.pull`):
- *     the rows other origins created past `since`, a wire cursor as JSON
- *     text and read from the start when left out, as a wire payload.
+ *     ids its store holds, its rows per table and each device's last push,
+ *     with the store's wire contract beside them: `contractVersion`,
+ *     `migrations` (the same ids) and `capabilities`.
+ *   - `POST /v1/effort/push?device=<origin>&contractVersion=<n>`
+ *     (`effort.push`): the body is a wire payload as core's
+ *     `encodeWirePayload` writes it, checked by core's
+ *     `decodeWirePayload`; answers what the push received and added.
+ *   - `GET /v1/effort/pull?device=<origin>&since=<cursor>&contractVersion=<n>`
+ *     (`effort.pull`): the rows other origins created past `since`, a
+ *     wire cursor as JSON text and read from the start when left out, as
+ *     a wire payload.
  *
- * `device` is the calling store's origin, its rows' `origin_store`. A
+ * `device` is the calling store's origin, its rows' `origin_store`.
+ * `contractVersion` is the wire contract version the caller speaks, a
+ * whole number above zero written in digits, `1` when left out; the
+ * hub speaks core's `WIRE_CONTRACT_VERSION` and serves no other. A
  * route takes no query parameter it does not name, so a misspelt one
  * (`cursor=` for `since=`) is refused rather than read as absent. `GET
  * /v1/settings/locked` is the second plan's, and answers `404` here.
@@ -38,7 +45,12 @@
  *     actions leave out the route's;
  *   - `503` while the store has not opened;
  *   - `400` for a query or body the route cannot read, a
+ *     `contractVersion` that is not a whole number above zero and a
  *     `WireFormatError` from the store included;
+ *   - `409` with `"code": "contract-unsupported"` for a push or a pull
+ *     naming a contract version the hub does not speak, its error naming
+ *     both versions; refused once the query is read, before the body is
+ *     decoded or the store is called;
  *   - `409` for a push the store refuses with `HubUpgradeRequired`: its
  *     message names the migrations the hub lacks and the upgrade to run;
  *   - `500` for anything else, which is logged and never described to
@@ -68,7 +80,7 @@ import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusa
 import type { HubStore } from './store/port.js';
 import type { WireCursor } from '@open-tomato/rafa/store';
 
-import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
+import { decodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
 
 import { HubUpgradeRequired } from './store/sqlite.js';
 
@@ -96,6 +108,12 @@ export const STORE_UNAVAILABLE = 'The hub\'s store did not open; the hub\'s log 
 
 /** The error a `500` answers; the log holds the cause. */
 export const INTERNAL_ERROR = 'The hub failed to serve this request; the hub\'s log says why.';
+
+/** The `code` a `409` carries for a contract version the hub does not speak. */
+export const CONTRACT_UNSUPPORTED = 'contract-unsupported';
+
+/** A `contractVersion` as the query spells it: a whole number above zero, in digits with no leading zero. */
+const CONTRACT_VERSION = /^[1-9][0-9]*$/;
 
 /** A device, as `device` names it: 1 to 200 printable ASCII characters, as a store's origin is. */
 const DEVICE = /^[!-~]{1,200}$/;
@@ -174,6 +192,15 @@ class RequestRefused extends Error {
   }
 }
 
+/** A push or a pull naming a contract version the hub does not speak: `409`, with {@link CONTRACT_UNSUPPORTED}. */
+class ContractUnsupported extends Error {
+  override readonly name = 'ContractUnsupported';
+
+  constructor(asked: number) {
+    super(`The request speaks wire contract version ${String(asked)}; this hub speaks version ${String(WIRE_CONTRACT_VERSION)}.`);
+  }
+}
+
 /** A request's answer, with what its log line adds. */
 interface Served {
   readonly response: Response;
@@ -229,6 +256,11 @@ function failure(status: number, error: string, headers: Readonly<Record<string,
   return answer(status, { success: false, error }, headers);
 }
 
+/** A `409` refusing a contract version, with its `code`. */
+function contractRefusal(error: ContractUnsupported): Response {
+  return answer(409, { success: false, error: error.message, code: CONTRACT_UNSUPPORTED });
+}
+
 /** The answer to an identity refusal. */
 function refusalResponse(refusal: IdentityRefusal): Response {
   const status = REFUSAL_STATUS[refusal.reason];
@@ -260,6 +292,22 @@ function readDevice(url: URL): string {
   return device;
 }
 
+/**
+ * Refuses the contract version the query names unless it is the hub's,
+ * `1` when left out: `400` for a value that is not a whole number above
+ * zero, {@link ContractUnsupported} for another version.
+ */
+function checkContractVersion(url: URL): void {
+  const spelt = url.searchParams.get('contractVersion');
+  if (spelt === null) return;
+
+  const asked = Number(spelt);
+  if (!CONTRACT_VERSION.test(spelt) || !Number.isSafeInteger(asked)) {
+    throw new RequestRefused(400, `contractVersion is ${JSON.stringify(spelt)}; expected a whole number above zero, such as ${String(WIRE_CONTRACT_VERSION)}.`);
+  }
+  if (asked !== WIRE_CONTRACT_VERSION) throw new ContractUnsupported(asked);
+}
+
 /** The cursor `since` spells, `{}` when left out, checked by core's wire codec. */
 function readCursor(url: URL): WireCursor {
   const since = url.searchParams.get('since');
@@ -286,13 +334,14 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
     method: 'GET',
     action: 'status.read',
     query: [],
-    handle: async ({ store, version }) => ({ response: success({ version, ...await store.status() }) }),
+    handle: async ({ store, version }) => ({ response: success({ version, ...await store.status(), ...store.contract() }) }),
   },
   [HUB_ROUTES.push]: {
     method: 'POST',
     action: 'effort.push',
-    query: ['device'],
+    query: ['device', 'contractVersion'],
     handle: async ({ url, request, store }) => {
+      checkContractVersion(url);
       const device = readDevice(url);
       const payload = decodeWirePayload(await request.text());
       const pushed = await store.push({ device, payload });
@@ -302,8 +351,9 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
   [HUB_ROUTES.pull]: {
     method: 'GET',
     action: 'effort.pull',
-    query: ['device', 'since'],
+    query: ['device', 'since', 'contractVersion'],
     handle: async ({ url, store }) => {
+      checkContractVersion(url);
       const device = readDevice(url);
       const since = readCursor(url);
       const pulled = await store.pull({ device, since });
@@ -315,6 +365,7 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
 /** The answer to a request a route refused, or undefined for an error no route expects. */
 function refusedOf(error: unknown): Response | undefined {
   if (error instanceof RequestRefused) return failure(error.status, error.message);
+  if (error instanceof ContractUnsupported) return contractRefusal(error);
   if (error instanceof WireFormatError) return failure(400, error.message);
   if (error instanceof HubUpgradeRequired) return failure(409, error.message);
   return undefined;
