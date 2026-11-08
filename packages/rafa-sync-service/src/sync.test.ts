@@ -17,12 +17,12 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { openSqliteStore, WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
+import { openSqliteStore, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { SYNC_STATE_FILE_NAME } from './state.js';
-import create, { createServiceSync, MOVE_TO_SQLITE, RafaUpdateRequired, SELF_UPDATE, ServiceSyncRefusal } from './sync.js';
+import create, { createServiceSync, HubContractMismatch, MOVE_TO_SQLITE, RafaUpdateRequired, SELF_UPDATE, ServiceSyncRefusal } from './sync.js';
 import { startStandInHub } from './testdata/stand-in-hub.js';
 
 const TOKEN = 'ghp_service_sync_test_token';
@@ -497,5 +497,119 @@ describe('when the hub cannot be reached or refuses', () => {
     expect(refused.name).toBe('HubTokenError');
     expect(refused.message).toContain(`no hub token is stored under service "rafa", name "${TOKEN_SECRET}"`);
     expect(over.requests).toEqual([]);
+  });
+});
+
+/** What a fetch stand-in saw: the path of each call, in order. */
+interface ContractFetch {
+  readonly fetch: typeof fetch;
+  readonly paths: () => readonly string[];
+}
+
+/** The address the fetch stand-in is reached under; nothing listens there. */
+const STAND_IN_URL = 'http://hub.invalid';
+
+/**
+ * A fetch stand-in for a hub speaking contract `contractVersion`: it
+ * answers `/v1/status` naming that version, a push as taken, and a pull
+ * with no row, recording every path it was called for.
+ */
+function contractFetch(contractVersion: number): ContractFetch {
+  const paths: string[] = [];
+  const answer = (pathname: string): unknown => {
+    if (pathname === '/v1/status') {
+      return { version: '0.0.0-stand-in', migrations: [], rows: {}, devices: [], contractVersion, capabilities: {} };
+    }
+    if (pathname === '/v1/effort/push') return { received: 0, added: 0, at: '2026-10-01T09:00:00.000Z' };
+    return { format: WIRE_FORMAT, version: WIRE_VERSION, migrations: [], tables: {}, cursor: {} };
+  };
+  const stand = async (input: string | URL | Request): Promise<Response> => {
+    const { pathname } = new URL(input instanceof Request
+      ? input.url
+      : input);
+    paths.push(pathname);
+    return Response.json({ success: true, data: answer(pathname) });
+  };
+  return { fetch: stand as typeof fetch, paths: () => [...paths] };
+}
+
+/** The `service` strategy over `at`'s store, reaching the hub through `over`. */
+function serviceThrough(at: Device, over: ContractFetch): ReturnType<typeof createServiceSync> {
+  return createServiceSync({
+    repoRoot: at.root,
+    backend: 'sqlite',
+    hub: { url: STAND_IN_URL, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS },
+    readSecret: async () => TOKEN,
+    fetch: over.fetch,
+  });
+}
+
+/** Writes a BLOB into one of `at`'s commit rows, which `exportWirePayload` refuses to read. */
+function plantBlob(at: Device): void {
+  const db = new Database(at.path);
+  try {
+    db.run('UPDATE commits SET row_json = X\'00\'');
+  } finally {
+    db.close();
+  }
+}
+
+describe('a hub speaking another contract version', () => {
+  it.each([
+    [2, SELF_UPDATE],
+    [0, `upgrade the hub at ${STAND_IN_URL} to a rafa-hub that speaks this rafa's contract`],
+  ])('refuses a hub at contract %p with HubContractMismatch naming %p, calling neither the push nor the pull route', async (version, step) => {
+    const over = contractFetch(version);
+    const a = device(1);
+    const service = serviceThrough(a, over);
+    const pushing = await rejectionOf(service.push({ to: null }));
+    const pulling = await rejectionOf(service.pull({ from: null, dryRun: false }));
+    for (const refused of [pushing, pulling]) {
+      expect(refused).toBeInstanceOf(HubContractMismatch);
+      expect(refused).toMatchObject({ name: 'HubContractMismatch', hubVersion: version, rafaVersion: WIRE_CONTRACT_VERSION, nextStep: step });
+      expect(refused.message).toBe(
+        `effort sync: the hub speaks contract ${String(version)}, this rafa contract ${String(WIRE_CONTRACT_VERSION)}; nothing was sent. Next step: ${step}`,
+      );
+    }
+    expect(over.paths()).toEqual(['/v1/status']);
+    expect(existsSync(statePathOf(a))).toBe(false);
+  });
+
+  it('pushes and pulls through the same stand-in when it speaks this rafa\'s contract', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION);
+    const a = device(1);
+    const service = serviceThrough(a, over);
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(await service.pull({ from: null, dryRun: false })).toEqual({ status: 'nothing-to-sync' });
+    expect(over.paths()).toEqual(['/v1/status', '/v1/effort/push', '/v1/effort/pull']);
+  });
+
+  it('refuses before the export runs, where the same store under a matching hub reaches the export\'s refusal', async () => {
+    const a = device(1);
+    plantBlob(a);
+    const ahead = contractFetch(WIRE_CONTRACT_VERSION + 1);
+    const refused = await rejectionOf(serviceThrough(a, ahead).push({ to: null }));
+    expect(refused.name).toBe('HubContractMismatch');
+    expect(ahead.paths()).toEqual(['/v1/status']);
+
+    const agreed = contractFetch(WIRE_CONTRACT_VERSION);
+    const exported = await rejectionOf(serviceThrough(a, agreed).push({ to: null }));
+    expect(exported.name).toBe('WireExportRefusal');
+    expect(agreed.paths()).toEqual(['/v1/status']);
+  });
+
+  it('answers nothing-to-sync with no contact, the status read included, when the store is not there yet', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION + 1);
+    const root = freshRoot();
+    const service = createServiceSync({
+      repoRoot: root,
+      backend: 'sqlite',
+      hub: { url: STAND_IN_URL, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS },
+      readSecret: async () => TOKEN,
+      fetch: over.fetch,
+    });
+    expect(await service.push({ to: null })).toEqual({ status: 'nothing-to-sync' });
+    expect(await service.pull({ from: null, dryRun: false })).toEqual({ status: 'nothing-to-sync' });
+    expect(over.paths()).toEqual([]);
   });
 });
