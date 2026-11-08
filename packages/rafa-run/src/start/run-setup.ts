@@ -17,13 +17,24 @@
  * `start/run-config.ts` and `start/runtime.ts`, and not here.
  *
  * {@link resolveRunBranch} and {@link guardRunBranch} are the branch
- * step: on `main` or `master`, or with no branch checked out, the run is
- * offered the plan's own branch (`start/branch.ts`), and whichever
- * branch that answers is the one the guard reads and the session record
- * names. Once the plan file is known to exist, `start()` reaches the
- * first through `start/run-checkout.ts`, which makes no offer under
- * `--as-worktree`, and calls the second right after on whichever branch
- * that answered.
+ * step: on `main` or `master`, on the run's base
+ * ({@link RunBranchRequest.runBase}, `pr.base` or `origin/HEAD`, so
+ * `integration` where that is the base), or with no branch checked out,
+ * the run is offered the plan's own branch (`start/branch.ts`), and
+ * whichever branch that answers is the one the guard reads and the
+ * session record names. Once the plan file is known to exist, `start()`
+ * reaches the first through `start/run-checkout.ts`, which makes no
+ * offer under `--as-worktree`, and calls the second right after on
+ * whichever branch that answered.
+ *
+ * `--create-branch` is a promise to leave the base. Where the branch
+ * step leaves a run started on its base still on it — the offer stood
+ * aside for `--any-branch` beside the flag, or for a plan file naming no
+ * stub — {@link resolveRunBranch} refuses with exit code 1, naming the
+ * plan's stub and the base, before the guard is reached; it once let
+ * such a run go on there with a warning about the branch's missing
+ * `<type>/` prefix (#1506). A run the flag left on no branch is the
+ * guard's to refuse, as below.
  *
  * No branch is treated like the default branch. A run started on a
  * detached HEAD is offered the plan's branch as a run on `main` is, cut from
@@ -184,6 +195,13 @@ export interface RunBranchRequest {
    * `feat/{stub}` when left out.
    */
   readonly branchTemplate?: string;
+  /**
+   * The run's base, `pr.base` or the branch `origin/HEAD` names, as
+   * `start/run-checkout.ts` reads it: a run started on it is offered the
+   * plan's branch as one on `main` or `master` is. Left out, only those
+   * two are.
+   */
+  readonly runBase?: string;
 }
 
 /**
@@ -192,21 +210,24 @@ export interface RunBranchRequest {
  * made and taken, or null when it was started on no branch and is still
  * on none.
  *
- * The offer is made on a branch {@link DEFAULT_BRANCHES} names and with
- * no branch checked out (`standing: 'no-branch'`), which is exactly what
- * {@link guardRunBranch} refuses. Everywhere else the run is already on
- * a branch of its own and there is nothing to offer, so no git runs and
- * no question is asked — a run on `feat/<stub>` costs this function one
- * array lookup.
+ * The offer is made on a branch {@link DEFAULT_BRANCHES} names, on the
+ * run's base ({@link RunBranchRequest.runBase}) and with no branch
+ * checked out (`standing: 'no-branch'`). Everywhere else the run is
+ * already on a branch of its own and there is nothing to offer, so no
+ * git runs and no question is asked — a run on `feat/<stub>` costs this
+ * function two comparisons.
  *
  * Where it is made, `start/branch.ts` has the whole of it: which
  * question is asked, what `--create-branch` stands in for, which steps a
  * yes runs on either standing, and which refusal a modified tracked
  * file, a failed fetch or a diverged base throws. Only a `moved` outcome
  * answers a new branch. `stood-aside` and `declined` both answer where
- * the run was left: the base, which the guard then refuses or lets
- * through under `--any-branch`, or null for no branch, which it refuses
- * under every line. A base that is the word `HEAD` is a name like any
+ * the run was left: the base, which the guard then refuses on `main` or
+ * `master` or lets through under `--any-branch`, or null for no branch,
+ * which it refuses under every line. Under `--create-branch` a run left
+ * on its base is refused here instead ({@link refuseStillOnBase}): the
+ * flag answers the question yes, so only a stand-aside leaves it there.
+ * A base that is the word `HEAD` is a name like any
  * other here; a detached HEAD is the standing, read by the caller
  * (`start/run-checkout.ts`), and never that word.
  *
@@ -220,22 +241,48 @@ export async function resolveRunBranch(
 ): Promise<string | null> {
   const { args, base, standing } = request;
   const noBranch = standing === 'no-branch';
-  if (!noBranch && !DEFAULT_BRANCHES.includes(base)) return base;
+  const onBase = DEFAULT_BRANCHES.includes(base) || base === request.runBase;
+  if (!noBranch && !onBase) return base;
 
+  const createBranch = args.includes(CREATE_BRANCH_FLAG);
   const outcome = await offerRunBranch({
     repoRoot: request.checkout,
     planStub: request.planStub,
     base,
     standing,
     anyBranch: args.includes(ANY_BRANCH_FLAG),
-    createBranch: args.includes(CREATE_BRANCH_FLAG),
+    createBranch,
     branchTemplate: request.branchTemplate,
   }, seams);
 
   if (outcome.kind === 'moved') return outcome.branch;
-  return noBranch
-    ? null
-    : base;
+  if (noBranch) return null;
+  if (createBranch) refuseStillOnBase(request.planStub, base, request.branchTemplate);
+  return base;
+}
+
+/**
+ * The refusal of a `--create-branch` run the branch step left on its
+ * base, `base` (#1506): the flag promises the plan's own branch, so the
+ * plan's tasks never run on the base instead. Answering yes before the
+ * question, the flag leaves the offer two ways to stand aside, and the
+ * refusal says which: `--any-branch` beside it, for a plan whose stub it
+ * names with the branch that was not made, and a plan file that names
+ * no stub, which is handed the `git` line {@link branchOffer} prints.
+ */
+function refuseStillOnBase(planStub: string | null, base: string, branchTemplate: string | undefined): never {
+  const way = planStub === null || planStub.trim() === ''
+    ? [
+      `\n❌ Refusing ${CREATE_BRANCH_FLAG}: this plan's file names no stub, so no branch was made`,
+      `   and the run is still on \`${base}\`, the base.`,
+      ...branchOffer(null, base, branchTemplate),
+    ]
+    : [
+      `\n❌ Refusing ${CREATE_BRANCH_FLAG} for \`${planStub}\`: the run is still on \`${base}\`, the base.`,
+      `   ${ANY_BRANCH_FLAG} stood the offer aside, so ${branchNameFor(planStub, branchTemplate)} was not made.`,
+      `   Drop ${ANY_BRANCH_FLAG} to make it and run there, or ${CREATE_BRANCH_FLAG} to run on \`${base}\`.`,
+    ];
+  throw new CommandExit(1, [...way, NOTHING_DISPATCHED].join('\n'));
 }
 
 /**

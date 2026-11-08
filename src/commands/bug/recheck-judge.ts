@@ -30,6 +30,11 @@
  * passed a deadline gets a warning through `warn` saying how many timed
  * out.
  *
+ * A `gone` row of a bug whose body holds a `## Trigger removed` section
+ * anywhere, one appended below the record included, carries
+ * `triggerRemoved: true` (`triggerRemovedOf`, `../../bugs/recheck-verdict.ts`);
+ * no other row does.
+ *
  * ## The environment and the JUnit files
  *
  * The child's environment is `suiteEnv(env)` with every variable the
@@ -56,6 +61,7 @@ import { parseBugRecord } from '@open-tomato/rafa/bugs/record';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { suiteEnv } from '@open-tomato/rafa/suite/run';
 
+import { triggerRemovedOf } from '../../bugs/recheck-verdict.js';
 import { readTestReference, resolveTestReference } from '../../bugs/test-reference.js';
 
 import { referenceText } from './recheck-report.js';
@@ -201,6 +207,9 @@ async function checkBug(bug: ReadBug, context: BugContext): Promise<RecheckRow> 
   }
   return rowOf(bug, {
     verdict: run.verdict,
+    ...(triggerRemovedOf(run.verdict, bug.body)
+      ? { triggerRemoved: true }
+      : {}),
     reference,
     runs: run.runs,
     failedRuns: run.failedRuns,

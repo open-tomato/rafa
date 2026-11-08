@@ -138,8 +138,12 @@ their own, the tracker's `filedIssues('bug', since)`
 (`packages/rafa/src/ports/index.ts`), in any state: a bug filed and closed
 between two items is listed, while the open-bug count still reads
 `openIssues('bug')` alone. Each bug's filed time is the `createdAt` that listing
-carries, so no `gh issue view` runs per bug. GitHub answers it from `gh issue
-list --state all --search created:>=<since>`
+carries, so no `gh issue view` runs per bug. Below the line the bugs print
+in two groups, each a count line then its bugs (#1522): `Filed by this item's
+loop (<stub>): <n>.` first, the bugs whose body's `## Plan` fenced value,
+trimmed, is the item's stub, then `Filed by other sessions: <n>.`, the bugs
+naming another plan or none. The rechecks judge both. GitHub answers it from
+`gh issue list --state all --search created:>=<since>`
 (`packages/rafa-board/src/adapters/tracker/github-filed-issues.ts`), whose search index can lag a
 filing by seconds, so a bug filed in the moments before the reading may be
 missing from the line; the local tracker answers the record's `capturedAt`, the

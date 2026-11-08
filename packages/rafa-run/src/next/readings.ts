@@ -79,6 +79,29 @@
  * does one whose commits could not be read: a remote-only branch this
  * clone has not fetched is noted and never fetched here.
  *
+ * ## A plan whose branch merged is done, wherever it ran
+ *
+ * Both readings above are local to the clone, so a plan finished from
+ * another clone, its branch deleted on merge, reads unstarted all the
+ * same (#1506). {@link NextWorld.unmergedPlan} is the reading row 9
+ * answers from: it walks the plans {@link NextWorld.unstartedPlan}
+ * chooses among, in the same order, and passes over each one whose
+ * branch under {@link NextSources.branchTemplate} (`branchNameFor`) is
+ * the `headRefName` of a merged pull request, which the provider still
+ * answers after the branch is gone. The provider is asked, one
+ * `listMerged()` per answer ({@link readMergedHeads}), only once a
+ * candidate has been found: a clone with no unstarted plan asks it
+ * nothing. `listMerged` answers the most recent merges alone, a limit
+ * the provider names, so a branch absent from it reads "not among the
+ * recent merges" and its plan is offered as before, never "never
+ * merged".
+ *
+ * A `listMerged` that throws stops nothing: the local answer stands,
+ * {@link NextWorld.unstartedPlan} as it was, with one problem noted
+ * naming what the provider said. It is the one provider throw that is
+ * carried rather than left to the caller (see below), because row 9
+ * answers without it and only answers better with it.
+ *
  * ## A failed reading is carried, not thrown
  *
  * Every read that fails for an ordinary reason — no network, no remote,
@@ -88,12 +111,13 @@
  * failed remote read out as `BranchScan.problems` rather than stopping
  * the walk on it. The caller prints them beside the answer.
  *
- * The one thing NOT carried is a provider that could not be ASKED. The
- * port answers null for a pull request that is not there and THROWS when
- * it could not look (`packages/rafa/src/pr/types.ts`), so a throw out of `findOpen`,
- * `get` or `checks` means the provider is unusable rather than that the
+ * The one thing NOT carried is a provider that could not be ASKED about
+ * the branch's open pull request. The port answers null for a pull
+ * request that is not there and THROWS when it could not look
+ * (`packages/rafa/src/pr/types.ts`), so a throw out of `findOpen`, `get`
+ * or `checks` means the provider is unusable rather than that the
  * repository has no pull request, and it is left to the caller
- * unchanged.
+ * unchanged. A throw out of `listMerged` is carried, as said above.
  *
  * The seven interfaces the board reads with ({@link NextBoard} and its
  * neighbours) live in board's `packages/rafa-board/src/next/relation-readings.ts` since pass 4c,
@@ -119,7 +143,7 @@ import { branchFromTemplate, DEFAULT_BRANCH_TEMPLATE, messageOf } from '@open-to
 import { parseWorkingTree } from '@open-tomato/rafa/core/git';
 import { isLive } from '@open-tomato/rafa/core/loop/readings';
 import { planFileName } from '@open-tomato/rafa/core/plan';
-import { parseBaseStanding, REMOTE, trackedChanges } from '@open-tomato/rafa/start/branch-decision';
+import { branchNameFor, parseBaseStanding, REMOTE, trackedChanges } from '@open-tomato/rafa/start/branch-decision';
 import { scanClaimBranches } from '@open-tomato/rafa-board';
 import { gitSaid } from '@open-tomato/rafa-pr';
 
@@ -231,6 +255,13 @@ export interface NextWorld {
    * its fork from the base is no work: see {@link hasStartedBranch}.
    */
   readonly unstartedPlan: () => PlanListing | null;
+  /**
+   * The first of the plans {@link NextWorld.unstartedPlan} chooses among
+   * whose branch no merged pull request names, or null when there is
+   * none: the provider asked once, and only when a candidate exists;
+   * see the module note.
+   */
+  readonly unmergedPlan: () => Promise<PlanListing | null>;
   /** The open pull request of the branch, or null when it has none. */
   readonly openPull: () => Promise<OpenPull | null>;
   /** The roadmap walked once. */
@@ -523,6 +554,46 @@ export function hasStartedBranch(sources: NextSources, remote: string, refs: rea
   });
 }
 
+/**
+ * The heads of the pull requests the provider answers as merged, one
+ * `listMerged()`, or none with a problem noted when it threw; see the
+ * module note.
+ */
+export async function readMergedHeads(sources: NextSources, note: Note): Promise<ReadonlySet<string>> {
+  try {
+    const merged = await sources.pulls.listMerged();
+    return new Set(merged.map((pull) => pull.headRefName));
+  } catch (error) {
+    const said = messageOf(error)
+      .replace(/\s+/g, ' ')
+      .trim();
+    note(`the merged pull requests could not be read from the provider, so a plan whose branch merged from another clone may be offered again: ${said}`);
+    return new Set();
+  }
+}
+
+/**
+ * The first plan from `first` on, in plan order, whose branch is no
+ * merged head and that `unstarted` holds unstarted. `first` is the
+ * plan {@link NextWorld.unstartedPlan} answered, so the plans ahead of
+ * it are started and are not read again; a merged plan is passed over
+ * before its branch is read, so it costs no git.
+ */
+export function firstUnmerged(
+  sources: NextSources,
+  plans: readonly PlanListing[],
+  first: PlanListing,
+  merged: ReadonlySet<string>,
+  unstarted: (plan: PlanListing) => boolean,
+): PlanListing | null {
+  const isMerged = (plan: PlanListing): boolean => merged.has(branchNameFor(plan.stub, sources.branchTemplate));
+  if (!isMerged(first)) return first;
+
+  return plans
+    .slice(plans.indexOf(first) + 1)
+    .find((plan) => !isMerged(plan) && unstarted(plan)) ?? null;
+}
+
 /** The readings of one answer, each made at most once and only when a row asks. */
 export function openWorld(sources: NextSources): NextWorld {
   let problems: readonly string[] = [];
@@ -541,6 +612,10 @@ export function openWorld(sources: NextSources): NextWorld {
     return reading;
   });
   const checkout = once(() => readCheckout(sources, note));
+  const unstarted = (plan: PlanListing): boolean => !hasRun(runs(), plan.stub)
+    && !hasStartedBranch(sources, remote, refs(), plan.stub, note);
+  const unstartedPlan = once(() => plans().find(unstarted) ?? null);
+  const mergedHeads = once(() => readMergedHeads(sources, note));
 
   return {
     sources,
@@ -552,8 +627,13 @@ export function openWorld(sources: NextSources): NextWorld {
     tracked: once(() => readTracked(sources, note)),
     checkout,
     branchPlan: once(() => readBranchPlan(branch(), plans(), sources.branchTemplate)),
-    unstartedPlan: once(() => plans()
-      .find((plan) => !hasRun(runs(), plan.stub) && !hasStartedBranch(sources, remote, refs(), plan.stub, note)) ?? null),
+    unstartedPlan,
+    unmergedPlan: once(async (): Promise<PlanListing | null> => {
+      const first = unstartedPlan();
+      if (first === null) return null;
+
+      return firstUnmerged(sources, plans(), first, await mergedHeads(), unstarted);
+    }),
     openPull: once(() => readOpenPull(sources, branch(), note)),
     roadmap,
     picked: once(async (): Promise<PickedLine | null> => {

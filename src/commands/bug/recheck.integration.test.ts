@@ -287,6 +287,33 @@ describe('rafa bug recheck, over a real checkout and real bun test runs', () => 
     expect(run.stdout).toContain(`#1 gone ${PASSING_FILE} -t "passes" (3 runs passed)`);
   }, CASE_TIMEOUT_MS);
 
+  it('leaves a passing reference gone unmarked when the body holds no Trigger removed section, the control for the case after', async () => {
+    const planted = plantCase({ bugs: { 8: bug('plain', `bun test ${PASSING_FILE}`) } });
+
+    const json = rowsOf(await planted.run(['8', '--output=json']));
+    const text = await planted.run(['8']);
+
+    expect(json[0]).toMatchObject({ issue: 8, verdict: 'gone' });
+    expect('triggerRemoved' in (json[0] ?? {})).toBe(false);
+    expect(text.stdout).toContain(`#8 gone ${PASSING_FILE} (3 runs passed)`);
+    expect(text.stdout).not.toContain('trigger removed?');
+  }, CASE_TIMEOUT_MS);
+
+  it('prints gone (trigger removed?) and carries triggerRemoved: true for a passing rerun on a bug with the section', async () => {
+    const body = `${bugBody(`bun test ${PASSING_FILE}`)}## Trigger removed\n\nthe sideEffects field, removed by sweep 33\n`;
+    const planted = plantCase({ bugs: { 9: { title: 'removed', body, author: 'alice' } } });
+
+    const json = rowsOf(await planted.run(['9', '--output=json']));
+    const text = await planted.run(['9']);
+
+    expect(json).toEqual([{
+      issue: 9, title: 'removed', verdict: 'gone', reference: { file: PASSING_FILE, pattern: null },
+      runs: 1 + FURTHER_RUNS, failedRuns: null, reason: null, reproduce: null, commented: false, triggerRemoved: true,
+    }]);
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toContain('#9 gone (trigger removed?)');
+  }, CASE_TIMEOUT_MS);
+
   it('judges a reference failing on alternate runs flaky, with the count of failed runs', async () => {
     const planted = plantCase({ bugs: { 2: bug('alternates', `bun test ${ALTERNATING_FILE}`) } });
 

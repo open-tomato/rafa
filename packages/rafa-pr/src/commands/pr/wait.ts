@@ -26,13 +26,13 @@
  *
  * GitHub registers a push's runs some seconds after the push, so a wait
  * typed in that gap polls a pull request with zero checks whose checks
- * are about to appear. This command is the one caller that hands
- * `waitForChecks` the head's committed time
- * (`PullRequestDetail.headCommittedAt`, read through `get` ahead of the
- * first poll): zero checks on a head younger than
- * `FIRST_CHECK_GRACE_MS` is polled again, at the same interval, until a
- * check registers, the grace has passed or the deadline has. The loop's
- * gate and `pr triage --resolve` hand over no time and are as they were.
+ * are about to appear. This command hands `waitForChecks` the head's
+ * committed time (`PullRequestDetail.headCommittedAt`, read through
+ * `get` ahead of the first poll), as the loop's gate and
+ * `pr triage --resolve`'s wait after each attempt do: zero checks on a
+ * head younger than `FIRST_CHECK_GRACE_MS` is polled again, at the same
+ * interval, until a check registers, the grace has passed or the
+ * deadline has.
  *
  * The time is the commit's own date, not the push's, so a commit made
  * an hour ago and pushed just now gets no grace; and a provider that
