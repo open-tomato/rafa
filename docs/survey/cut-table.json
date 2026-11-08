@@ -5903,10 +5903,11 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 609,
+        "test": 610,
         "testSupport": 22
       },
       "files": [
+        "packages/rafa-index/src/loader.test.ts",
         "src/adapter-registry.test.ts",
         "src/adapter-registry.ts",
         "src/adapters/output/json.test.ts",
