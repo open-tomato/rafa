@@ -9,8 +9,9 @@ import { checkCommand } from './check.js';
 import { orphansCommand } from './orphans.js';
 import { placeCommand } from './place.js';
 import { promoteCommand } from './promote.js';
+import { runCommand } from './run.js';
 import { seedCommand } from './seed.js';
 
-const commands: RafaCommand[] = [checkCommand, seedCommand, placeCommand, promoteCommand, orphansCommand];
+const commands: RafaCommand[] = [runCommand, checkCommand, seedCommand, placeCommand, promoteCommand, orphansCommand];
 
 export default commands;

@@ -19,6 +19,8 @@ export interface ProcessOptions {
   readonly cwd: string;
   /** Kill the process after this many milliseconds; no limit when absent. */
   readonly timeoutMs?: number;
+  /** Pass stdout and stderr through to this process's own; the answer then holds no output. */
+  readonly inherit?: boolean;
   /** The environment; the current one when absent. */
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
@@ -34,9 +36,12 @@ export const NOT_FOUND_EXIT = 127;
 
 /** {@link ProcessRunner} over `Bun.spawn`, capturing stdout and stderr. */
 export const spawnProcess: ProcessRunner = async (argv, options) => {
-  let child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>;
+  const stdio = options.inherit === true
+    ? 'inherit'
+    : 'pipe';
+  let child: Bun.Subprocess<'ignore', 'pipe' | 'inherit', 'pipe' | 'inherit'>;
   try {
-    child = Bun.spawn([...argv], { cwd: options.cwd, env: options.env ?? process.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+    child = Bun.spawn([...argv], { cwd: options.cwd, env: options.env ?? process.env, stdin: 'ignore', stdout: stdio, stderr: stdio });
   } catch (error) {
     return { exitCode: NOT_FOUND_EXIT, stdout: '', stderr: error instanceof Error
       ? error.message
@@ -50,8 +55,12 @@ export const spawnProcess: ProcessRunner = async (argv, options) => {
       child.kill();
     }, options.timeoutMs);
   const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
+    child.stdout instanceof ReadableStream
+      ? new Response(child.stdout).text()
+      : '',
+    child.stderr instanceof ReadableStream
+      ? new Response(child.stderr).text()
+      : '',
     child.exited,
   ]);
   if (timer !== undefined) clearTimeout(timer);
