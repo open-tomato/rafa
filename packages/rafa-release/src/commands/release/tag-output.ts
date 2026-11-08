@@ -11,11 +11,18 @@
  * when `--push` pushed it, a `Skipped` line per skipped unit, and a
  * `Next:` heading over every unit's follow-ups
  * (`./tag-follow-ups.ts`), each written `<command> — <why>`.
+ *
+ * Every step is rendered by `./step-cases.ts`, already placed by
+ * `./tag.ts` where it must run. A refusal's steps carry the refusal's
+ * case, so under `hints.skills: true` each is followed by its skill
+ * line; a follow-up of a run that tagged has no case and never is.
  */
+import type { ReleaseStep } from './step-cases.js';
 import type { ReleaseTagUnit, TagReady } from './tag.js';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 
+import { renderNextSteps, renderStep } from './step-cases.js';
 import { ciPublishSentence, readPublishTarget } from './tag-follow-ups.js';
 
 /** The usage line this action's refusals name. */
@@ -27,22 +34,32 @@ const INDENT = '  ';
 /** How many characters of a commit hash a line names it by. */
 const SHORT_COMMIT = 7;
 
+/** `steps` with each repeat after its first dropped, as two refused units of one reason give the same step. */
+function distinctSteps(steps: readonly ReleaseStep[]): readonly ReleaseStep[] {
+  const keyOf = (step: ReleaseStep): string => `${step.command} — ${step.why} — ${step.case ?? ''}`;
+  return [...new Map(steps.map((step) => [keyOf(step), step] as const)).values()];
+}
+
 /**
  * The exit a run refused with: one `❌` line per sentence, then a `Next:`
  * heading over the steps that clear them (`./tag-next-steps.ts`), each
- * without repeats, then the usage.
+ * without repeats and, under `skills`, the `hints.skills` switch,
+ * followed by its skill line, then the usage.
  */
-export function refusal(messages: readonly string[], steps: readonly string[] = []): CommandExit {
+export function refusal(
+  messages: readonly string[],
+  steps: readonly ReleaseStep[] = [],
+  skills = false,
+): CommandExit {
   const lines = [...new Set(messages)].map((message) => `❌ ${message}`);
-  const next = steps.length === 0
-    ? []
-    : ['Next:', ...[...new Set(steps)].map((step) => `${INDENT}${step}`)];
+  const next = renderNextSteps(distinctSteps(steps), skills);
   return new CommandExit(1, [...lines, ...next, `Usage: ${RELEASE_TAG_USAGE}`].join('\n'));
 }
 
 /** The `Next:` lines of one unit: its follow-ups, then the CI publish sentence when it has one. */
 function nextLines(unit: ReleaseTagUnit): readonly string[] {
-  const lines = unit.followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`);
+  // A follow-up has no case, so the hints.skills switch changes nothing here.
+  const lines = unit.followUps.flatMap((followUp) => renderStep({ ...followUp, case: null }, false));
   if (unit.publish !== 'ci' || unit.decision.kind !== 'ready') return lines;
   const { tag, version } = unit.decision;
   const sentence = ciPublishSentence(tag, version, readPublishTarget(unit.inputs.version.text));

@@ -106,8 +106,14 @@ export function stepEntry(step: ReleaseStep, skills: boolean): ReleaseStepEntry 
   return { command: step.command, why: step.why, case: step.case, skill: skillOf(step, skills) };
 }
 
-/** The lines of one step: its `<command> — <why>` line, then its skill line when it has one. */
-function stepLines(step: ReleaseStep, skills: boolean): readonly string[] {
+/**
+ * The lines of one step under a `Next:` heading, `skills` the
+ * `hints.skills` switch: its `<command> — <why>` line, then its skill
+ * line when it has one. {@link renderNextSteps} gives the heading over
+ * them; a caller that writes lines of its own between the steps, as a
+ * run that tagged writes its CI publish sentence, renders each step here.
+ */
+export function renderStep(step: ReleaseStep, skills: boolean): readonly string[] {
   const line = `${STEP_INDENT}${step.command} — ${step.why}`;
   const skill = skillOf(step, skills);
   return skill === null
@@ -123,5 +129,5 @@ function stepLines(step: ReleaseStep, skills: boolean): readonly string[] {
  */
 export function renderNextSteps(steps: readonly ReleaseStep[], skills: boolean): readonly string[] {
   if (steps.length === 0) return [];
-  return ['Next:', ...steps.flatMap((step) => stepLines(step, skills))];
+  return ['Next:', ...steps.flatMap((step) => renderStep(step, skills))];
 }

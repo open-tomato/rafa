@@ -1,10 +1,10 @@
-import type { BranchPlace } from './tag-next-steps.js';
+import type { BranchPlace, StepPlacing } from './tag-next-steps.js';
 import type { TagInputs, TagRefusalReason, TagRefused } from './tag.js';
 import type { GitResult } from '@open-tomato/rafa/core/git';
 
 import { describe, expect, it } from 'bun:test';
 
-import { nextStepsOf, readBranchHolder } from './tag-next-steps.js';
+import { nextStepsOf, placedAtRoot, readBranchHolder } from './tag-next-steps.js';
 
 /** A git that answered `stdout`. */
 function said(stdout: string): GitResult {
@@ -29,6 +29,19 @@ function inputs(over: Partial<TagInputs> = {}): TagInputs {
 /** A refusal for `reason`. */
 function refused(reason: TagRefusalReason): TagRefused {
   return { kind: 'refused', reason, message: 'refused' };
+}
+
+/**
+ * Steps placed as from `topLevel`, the project root at `/side`, with
+ * every path in `present` there on disk and every other missing.
+ */
+function placing(topLevel: string | null = '/side', present: readonly string[] = ['/repo', '/side']): StepPlacing {
+  return { root: '/side', seams: { readTopLevel: () => topLevel, pathExists: (path) => present.includes(path) } };
+}
+
+/** The `<command> — <why>` lines of `steps`, as the `Next:` block prints them. */
+function lines(steps: readonly { readonly command: string; readonly why: string }[]): readonly string[] {
+  return steps.map((step) => `${step.command} — ${step.why}`);
 }
 
 /** Two worktrees, the main one on `integration`, as `git worktree list --porcelain` prints them. */
@@ -65,38 +78,84 @@ describe('the next steps of a branch refusal', () => {
   const held: BranchPlace = { holder: '/repo', defaulted: false, configFile: '/repo/rafa.config.ts' };
 
   it('names git switch when no checkout holds the branch, or none was read', () => {
-    expect(nextStepsOf(refused('branch'), inputs(), null))
+    expect(lines(nextStepsOf(refused('branch'), inputs(), null, placing())))
       .toEqual(['git switch integration, then rafa release tag — a release is tagged from integration']);
-    expect(nextStepsOf(refused('branch'), inputs(), { ...held, holder: null })[0]).toStartWith('git switch integration');
+    expect(lines(nextStepsOf(refused('branch'), inputs(), { ...held, holder: null }, placing()))[0])
+      .toStartWith('git switch integration');
   });
 
   it('names the checkout to cd into when another worktree holds the branch', () => {
-    expect(nextStepsOf(refused('branch'), inputs(), held))
+    expect(lines(nextStepsOf(refused('branch'), inputs(), held, placing())))
       .toEqual(['cd /repo && rafa release tag — integration is checked out there']);
   });
 
+  it('prints no cd when the run stands in the checkout holding the branch', () => {
+    expect(lines(nextStepsOf(refused('branch'), inputs(), held, placing('/repo'))))
+      .toEqual(['rafa release tag — integration is checked out there']);
+  });
+
+  it('keeps the cd when git did not answer the top-level read', () => {
+    expect(nextStepsOf(refused('branch'), inputs(), held, placing(null))[0]?.command)
+      .toBe('cd /repo && rafa release tag');
+  });
+
+  it('falls back to git switch when the holder git lists is not there on disk', () => {
+    expect(lines(nextStepsOf(refused('branch'), inputs(), held, placing('/side', ['/side']))))
+      .toEqual(['git switch integration, then rafa release tag — a release is tagged from integration']);
+  });
+
+  it('places the git switch step at the project root when the run stands elsewhere', () => {
+    expect(nextStepsOf(refused('branch'), inputs(), null, placing('/elsewhere'))[0]?.command)
+      .toBe('cd /side && git switch integration, then rafa release tag');
+  });
+
   it('names pr.base and the config file read first when the branch is the default', () => {
-    const steps = nextStepsOf(refused('branch'), inputs({ releaseBranch: 'main' }), {
+    const steps = lines(nextStepsOf(refused('branch'), inputs({ releaseBranch: 'main' }), {
       holder: null,
       defaulted: true,
       configFile: '/side/rafa.config.ts',
-    });
+    }, placing()));
 
     expect(steps).toHaveLength(2);
     expect(steps[0]).toStartWith('set pr.base in /side/rafa.config.ts — it is unset there, so main is the default');
     expect(steps[1]).toStartWith('git switch main');
   });
+
+  it('gives every step of the refusal its case', () => {
+    const steps = nextStepsOf(refused('branch'), inputs(), { ...held, defaulted: true }, placing());
+
+    expect(steps.map((step) => step.case)).toEqual(['tag-branch', 'tag-branch']);
+  });
 });
 
 describe('the next steps of the other refusals', () => {
   it('gives behind no step, since its sentence names the merge to run', () => {
-    expect(nextStepsOf(refused('behind'), inputs(), null)).toEqual([]);
+    expect(nextStepsOf(refused('behind'), inputs(), null, placing())).toEqual([]);
   });
 
   it('gives every other reason exactly one step', () => {
     const reasons: readonly TagRefusalReason[] = ['version', 'tagged', 'changelog', 'git', 'receipt'];
 
-    for (const reason of reasons) expect(nextStepsOf(refused(reason), inputs(), null)).toHaveLength(1);
+    for (const reason of reasons) expect(nextStepsOf(refused(reason), inputs(), null, placing())).toHaveLength(1);
+  });
+
+  it('carries the case of its reason on each step', () => {
+    const reasons: readonly TagRefusalReason[] = ['version', 'tagged', 'changelog', 'git', 'receipt'];
+
+    for (const reason of reasons) {
+      expect(nextStepsOf(refused(reason), inputs(), null, placing())[0]?.case).toBe(`tag-${reason}`);
+    }
+  });
+
+  it('places a command step at the project root only when the run stands in another checkout', () => {
+    expect(nextStepsOf(refused('tagged'), inputs(), null, placing())[0]?.command).toBe('rafa release status');
+    expect(nextStepsOf(refused('tagged'), inputs(), null, placing('/repo'))[0]?.command)
+      .toBe('cd /side && rafa release status');
+    expect(nextStepsOf(refused('git'), inputs(), null, placing(null))[0]?.command).toBe('cd /side && git status');
+  });
+
+  it('prints an instruction that is no command without a cd', () => {
+    expect(nextStepsOf(refused('version'), inputs(), null, placing('/repo'))[0]?.command).toBe('check package.json');
   });
 
   it('names settle and the never-released rule for a package with no changelog', () => {
@@ -104,25 +163,36 @@ describe('the next steps of the other refusals', () => {
       package: '@scope/plugin',
       version: { path: 'plugins/x/package.json', text: null, version: '0.1.0', problem: null },
       changelog: { path: 'plugins/x/CHANGELOG.md', version: null, problem: 'could not be read', absent: true },
-    }), null);
+    }), null, placing());
 
-    expect(steps[0]).toStartWith('rafa release settle — writes plugins/x/CHANGELOG.md when @scope/plugin is released');
-    expect(steps[0]).toContain('stays at 0.0.0 in plugins/x/package.json');
+    expect(lines(steps)[0]).toStartWith('rafa release settle — writes plugins/x/CHANGELOG.md when @scope/plugin is released');
+    expect(lines(steps)[0]).toContain('stays at 0.0.0 in plugins/x/package.json');
   });
 
   it('names a readability check for a changelog that is there and could not be read', () => {
     const steps = nextStepsOf(refused('changelog'), inputs({
       changelog: { path: 'CHANGELOG.md', version: null, problem: 'could not be read' },
-    }), null);
+    }), null, placing());
 
-    expect(steps).toEqual(['check that CHANGELOG.md is readable — it is there and could not be read']);
+    expect(lines(steps)).toEqual(['check that CHANGELOG.md is readable — it is there and could not be read']);
   });
 
   it('names release status for a changelog that disagrees with the version', () => {
     const steps = nextStepsOf(refused('changelog'), inputs({
       changelog: { path: 'CHANGELOG.md', version: '1.1.0', problem: null },
-    }), null);
+    }), null, placing());
 
-    expect(steps[0]).toStartWith('rafa release status');
+    expect(lines(steps)[0]).toStartWith('rafa release status');
+  });
+});
+
+describe('placedAtRoot', () => {
+  it('leaves the command bare in the project root and prefixes it elsewhere', () => {
+    expect(placedAtRoot('git push origin v1.2.0', placing())).toBe('git push origin v1.2.0');
+    expect(placedAtRoot('git push origin v1.2.0', placing('/repo'))).toBe('cd /side && git push origin v1.2.0');
+  });
+
+  it('leaves the command bare rather than drop it when the root is not there', () => {
+    expect(placedAtRoot('npm publish', placing('/repo', []))).toBe('npm publish');
   });
 });

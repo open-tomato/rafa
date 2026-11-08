@@ -407,10 +407,14 @@ A refusal prints a `Next:` heading between its `❌` lines and the usage, one
 (`packages/rafa-release/src/commands/release/tag-next-steps.ts`). The branch
 refusal reads `git worktree list --porcelain` and names the checkout holding the
 release branch as `cd <path> && rafa release tag`, or `git switch <branch>` when
-none holds it; with `pr.base` unset it first names the config file read and
-says the branch is the default. `behind` adds no step, since its sentence names
-the merge. The others point at `rafa release status`, `rafa release settle`, the
-version file or `git status`.
+none holds it or the path it lists is gone; with `pr.base` unset it first names
+the config file read and says the branch is the default. `behind` adds no step,
+since its sentence names the merge. The others point at `rafa release status`,
+`rafa release settle`, the version file or `git status`. Each command step, and
+each follow-up of a run that tagged, json mode's included, is placed by core's
+`placeLine`: the `cd` stays off when the run stands in the git top level the
+step needs. Under `hints.skills: true` a refusal's step is followed by its
+`skill: rafa-release › <case>` line.
 
 `pr.base` and the `release.*` keys a release depends on belong in a tracked
 `rafa.config.ts`. That file makes each worktree a project root, so the walk

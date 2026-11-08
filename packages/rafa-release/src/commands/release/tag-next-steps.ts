@@ -27,10 +27,27 @@
  *
  * `behind` gives no step of its own: its sentence already names the
  * `git merge --ff-only` to run.
+ *
+ * ## Every step carries its place and its case
+ *
+ * A step is a {@link ReleaseStep}: its command, its why, and the case of
+ * the refusal that gave it (`./step-cases.ts`), which `hints.skills`
+ * turns into a skill line. Each command is placed by core's `placeLine`
+ * where it must run, through a {@link StepPlacing}: the branch step at
+ * the checkout holding the release branch, every other at the project
+ * root, since that is where the run read what it refused. A holder whose
+ * path is gone, as `git worktree list` keeps a pruned worktree's record,
+ * gives the `git switch` step a run with no holder gives. A step that is
+ * an instruction rather than a command (`set pr.base in …`, `check …`)
+ * is printed as it is: a `cd` in front of prose runs nothing.
  */
+import type { ReleaseStep } from './step-cases.js';
 import type { TagInputs, TagRefused } from './tag.js';
-import type { GitRunner } from '@open-tomato/rafa/core/git';
+import type { GitRunner, PlaceSeams } from '@open-tomato/rafa/core/git';
 
+import { placeLine } from '@open-tomato/rafa/core/git';
+
+import { caseOf } from './step-cases.js';
 import { UNRELEASED_VERSION } from './tag-units.js';
 
 /** Where the release branch stands, read only once the branch check refused. */
@@ -43,11 +60,28 @@ export interface BranchPlace {
   readonly configFile: string;
 }
 
+/** Where a run's steps are placed; see the module note. */
+export interface StepPlacing {
+  /** The project root, which every step but the branch step runs in. */
+  readonly root: string;
+  /** The top-level read and the path check `placeLine` reads. */
+  readonly seams: PlaceSeams;
+}
+
+/** A step without its case: what each reason below spells. */
+type StepText = Omit<ReleaseStep, 'case'>;
+
 /** The line `git worktree list --porcelain` opens each worktree's block with. */
 const WORKTREE_PREFIX = 'worktree ';
 
-/** The step every reading that is hard to judge by eye ends at. */
-const STATUS_STEP = 'rafa release status — shows the version file, the changelog and the tags side by side';
+/** The command every reading that is hard to judge by eye ends at. */
+const STATUS_COMMAND = 'rafa release status';
+
+/** Why {@link STATUS_COMMAND} applies, before the clause each reason adds. */
+const STATUS_WHY = 'shows the version file, the changelog and the tags side by side';
+
+/** The command the branch step runs once it stands on the release branch. */
+const TAG_COMMAND = 'rafa release tag';
 
 /**
  * The worktree that has `branch` checked out, read off `git worktree
@@ -66,49 +100,105 @@ export function readBranchHolder(git: GitRunner, branch: string): string | null 
     : path.slice(WORKTREE_PREFIX.length);
 }
 
+/**
+ * `command` placed at the project root. A root that is not there, which
+ * a run that read it cannot meet, leaves the command bare rather than
+ * dropping the step.
+ */
+export function placedAtRoot(command: string, placing: StepPlacing): string {
+  const answer = placeLine(command, placing.root, placing.seams);
+  return answer.kind === 'placed'
+    ? answer.line
+    : command;
+}
+
+/** The step that moves onto the release branch: a `cd` into its holder, or a `git switch` when there is none. */
+function moveStep(releaseBranch: string, holder: string | null, placing: StepPlacing): StepText {
+  const placed = holder === null
+    ? null
+    : placeLine(TAG_COMMAND, holder, placing.seams);
+  if (placed?.kind === 'placed') return { command: placed.line, why: `${releaseBranch} is checked out there` };
+  return {
+    command: placedAtRoot(`git switch ${releaseBranch}, then ${TAG_COMMAND}`, placing),
+    why: `a release is tagged from ${releaseBranch}`,
+  };
+}
+
 /** The steps of a branch refusal; see the module note. */
-function branchSteps(releaseBranch: string, place: BranchPlace | null): readonly string[] {
-  const move = place?.holder == null
-    ? `git switch ${releaseBranch}, then rafa release tag — a release is tagged from ${releaseBranch}`
-    : `cd ${place.holder} && rafa release tag — ${releaseBranch} is checked out there`;
+function branchSteps(releaseBranch: string, place: BranchPlace | null, placing: StepPlacing): readonly StepText[] {
+  const move = moveStep(releaseBranch, place?.holder ?? null, placing);
   if (place?.defaulted !== true) return [move];
   return [
-    `set pr.base in ${place.configFile} — it is unset there, so ${releaseBranch} is the default release branch;`
-    + ' a tracked rafa.config.ts reaches every worktree, a gitignored .rafa/config.yaml only its own checkout',
+    {
+      command: `set pr.base in ${place.configFile}`,
+      why: `it is unset there, so ${releaseBranch} is the default release branch;`
+        + ' a tracked rafa.config.ts reaches every worktree, a gitignored .rafa/config.yaml only its own checkout',
+    },
     move,
   ];
 }
 
+/** The {@link STATUS_COMMAND} step, placed at the root, its why ending in `clause`. */
+function statusStep(clause: string, placing: StepPlacing): StepText {
+  return { command: placedAtRoot(STATUS_COMMAND, placing), why: `${STATUS_WHY}; ${clause}` };
+}
+
 /** The step of a changelog refusal, which depends on whether the file is there. */
-function changelogStep(inputs: TagInputs): string {
+function changelogStep(inputs: TagInputs, placing: StepPlacing): StepText {
   const { path, problem, absent } = inputs.changelog;
-  if (problem !== null && absent !== true) return `check that ${path} is readable — it is there and could not be read`;
-  if (problem !== null && inputs.package !== null) {
-    return `rafa release settle — writes ${path} when ${inputs.package} is released; a package never released`
-      + ` stays at ${UNRELEASED_VERSION} in ${inputs.version.path} with no changelog and no tag, and is passed over`;
+  if (problem !== null && absent !== true) {
+    return { command: `check that ${path} is readable`, why: 'it is there and could not be read' };
   }
-  return `${STATUS_STEP}; rafa release settle writes the version and its changelog section in one commit`;
+  if (problem !== null && inputs.package !== null) {
+    return {
+      command: placedAtRoot('rafa release settle', placing),
+      why: `writes ${path} when ${inputs.package} is released; a package never released`
+        + ` stays at ${UNRELEASED_VERSION} in ${inputs.version.path} with no changelog and no tag, and is passed over`,
+    };
+  }
+  return statusStep('rafa release settle writes the version and its changelog section in one commit', placing);
+}
+
+/** The steps of `refused` without their case; see {@link nextStepsOf}. */
+function stepsOf(
+  refused: TagRefused,
+  inputs: TagInputs,
+  place: BranchPlace | null,
+  placing: StepPlacing,
+): readonly StepText[] {
+  switch (refused.reason) {
+    case 'branch':
+      return branchSteps(inputs.releaseBranch, place, placing);
+    case 'behind':
+      return [];
+    case 'version':
+      return [{ command: `check ${inputs.version.path}`, why: 'it has to declare the version under "version"' }];
+    case 'tagged':
+      return [statusStep('fragments waiting there go into the next version through rafa release settle', placing)];
+    case 'changelog':
+      return [changelogStep(inputs, placing)];
+    case 'git':
+      return [{
+        command: placedAtRoot('git status', placing),
+        why: 'shows whether git answers in this checkout; then rafa release tag again',
+      }];
+    case 'receipt':
+      return [statusStep('a section above the adoption boundary is one rafa release settle wrote', placing)];
+  }
 }
 
 /**
  * The `Next:` steps of one refusal, `inputs` the readings it was decided
- * from and `place` the branch's, read only for a branch refusal.
+ * from, `place` the branch's, read only for a branch refusal, and
+ * `placing` where each command is placed. Every step carries the
+ * refusal's case.
  */
-export function nextStepsOf(refused: TagRefused, inputs: TagInputs, place: BranchPlace | null): readonly string[] {
-  switch (refused.reason) {
-    case 'branch':
-      return branchSteps(inputs.releaseBranch, place);
-    case 'behind':
-      return [];
-    case 'version':
-      return [`check ${inputs.version.path} — it has to declare the version under "version"`];
-    case 'tagged':
-      return [`${STATUS_STEP}; fragments waiting there go into the next version through rafa release settle`];
-    case 'changelog':
-      return [changelogStep(inputs)];
-    case 'git':
-      return ['git status — shows whether git answers in this checkout; then rafa release tag again'];
-    case 'receipt':
-      return [`${STATUS_STEP}; a section above the adoption boundary is one rafa release settle wrote`];
-  }
+export function nextStepsOf(
+  refused: TagRefused,
+  inputs: TagInputs,
+  place: BranchPlace | null,
+  placing: StepPlacing,
+): readonly ReleaseStep[] {
+  const stepCase = caseOf(refused.reason);
+  return stepsOf(refused, inputs, place, placing).map((step) => ({ ...step, case: stepCase }));
 }

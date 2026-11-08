@@ -26,6 +26,14 @@
  *
  * What text mode prints, and the exit a refusal throws with its `Next:`
  * block, are `./tag-output.ts`'s; this module decides what they say.
+ * Every step, a refusal's and a follow-up's, is placed where it must run
+ * (`./tag-next-steps.ts`, over core's `placeLine`): the run reads the git
+ * top level once, through the project's runner, whose root the scope
+ * walk found without climbing past the top level of the directory the
+ * command ran in, so the two top levels are one. Follow-ups are placed
+ * at the project root, and json mode carries them placed too. A
+ * refusal's steps are followed by their skill line under
+ * `hints.skills: true`, read with the rest of the config.
  *
  * ## Units, and the two skips
  *
@@ -218,9 +226,10 @@
  */
 import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams } from './status.js';
+import type { ReleaseStep } from './step-cases.js';
 import type { BehindReading } from './tag-behind.js';
 import type { ReleaseFollowUp } from './tag-follow-ups.js';
-import type { BranchPlace } from './tag-next-steps.js';
+import type { BranchPlace, StepPlacing } from './tag-next-steps.js';
 import type { ChangelogReading, UnitDecision, UnitReadings, VersionReading } from './tag-units.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
 import type { TagReading } from '../../release/status-readings.js';
@@ -230,11 +239,13 @@ import type { ReleasePublishMode } from '@open-tomato/rafa/core/config/sections'
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
+import { existsSync } from 'node:fs';
+
 import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
-import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
+import { createGitRunner, gitSaid, readTopLevel } from '@open-tomato/rafa/core/git';
 
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { readTags } from '../../release/status-readings.js';
@@ -246,7 +257,7 @@ import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
 import { commitsOf, readBehind } from './tag-behind.js';
 import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
-import { nextStepsOf, readBranchHolder } from './tag-next-steps.js';
+import { nextStepsOf, placedAtRoot, readBranchHolder } from './tag-next-steps.js';
 import { pastReleaseWarning, RELEASE_TAG_USAGE, refusal, renderTagged } from './tag-output.js';
 import {
   readNewestRelease,
@@ -496,11 +507,18 @@ export interface TagSettings {
   readonly releaseBranchDefaulted?: boolean;
 }
 
-/** The five settings this action reads, refusing a config `loadConfig` refuses. */
-async function tagConfig(project: ProjectFound, warn: (message: string) => void): Promise<TagSettings> {
+/** The settings a run reads: the five its readings take, and `hints.skills`, which its steps are rendered by. */
+interface TagRunSettings extends TagSettings {
+  /** `hints.skills`: a refusal's steps are followed by their skill line. */
+  readonly hintsSkills: boolean;
+}
+
+/** The settings this action reads, refusing a config `loadConfig` refuses. */
+async function tagConfig(project: ProjectFound, warn: (message: string) => void): Promise<TagRunSettings> {
   try {
     const { config } = await loadConfig({ root: project.root, home: project.home }, {}, warn);
     return {
+      hintsSkills: config.hintsSkills,
       versionFile: config.releaseVersionFile,
       changelog: config.releaseChangelog,
       releaseBranch: config.prBase ?? DEFAULT_RELEASE_BRANCH,
@@ -567,7 +585,8 @@ function isReady(unit: DecidedUnit): unit is ReadyUnit {
 function decideUnits(projectRoot: string, git: GitRunner, root: TagInputs): readonly DecidedUnit[] {
   const packages = readTagPackages(projectRoot);
   if (!packages.ok) {
-    throw refusal([packages.problem], ['check the workspaces field of package.json — the packages are read from it']);
+    const step = { command: 'check the workspaces field of package.json', why: 'the packages are read from it' };
+    throw refusal([packages.problem], [{ ...step, case: null }]);
   }
   const run = { releaseBranch: root.releaseBranch, branch: root.branch };
   const members = packages.packages.map((member): DecidedUnit => {
@@ -580,27 +599,37 @@ function decideUnits(projectRoot: string, git: GitRunner, root: TagInputs): read
 
 /**
  * The units to write, once every unit is decided: any refusal stops the
- * run, and a run whose every unit is skipped refuses `tagged`.
+ * run, and a run whose every unit is skipped refuses `tagged`. The steps
+ * are placed by `placing` and rendered under `skills`, `hints.skills`.
  */
-function readyUnits(units: readonly DecidedUnit[]): readonly ReadyUnit[] {
+function readyUnits(units: readonly DecidedUnit[], placing: StepPlacing, skills: boolean): readonly ReadyUnit[] {
   const refused = messagesOf(units, 'refused');
-  if (refused.length > 0) throw refusal(refused, unitSteps(units));
+  if (refused.length > 0) throw refusal(refused, unitSteps(units, placing), skills);
   const ready = units.filter(isReady);
   if (ready.length === 0) {
     const root = units[0];
     const tagged = root === undefined
       ? []
-      : nextStepsOf({ kind: 'refused', reason: 'tagged', message: '' }, root.inputs, null);
-    throw refusal(messagesOf(units, 'skipped'), tagged);
+      : nextStepsOf({ kind: 'refused', reason: 'tagged', message: '' }, root.inputs, null, placing);
+    throw refusal(messagesOf(units, 'skipped'), tagged, skills);
   }
   return ready;
 }
 
 /** The `Next:` steps of every refused unit, in unit order. */
-function unitSteps(units: readonly DecidedUnit[]): readonly string[] {
+function unitSteps(units: readonly DecidedUnit[], placing: StepPlacing): readonly ReleaseStep[] {
   return units.flatMap(({ decision, inputs }) => decision.kind === 'refused'
-    ? nextStepsOf(decision, inputs, null)
+    ? nextStepsOf(decision, inputs, null, placing)
     : []);
+}
+
+/**
+ * Where the run's steps are placed: at `root`, the top level read once
+ * through `git`, the project's runner, and every path checked on disk.
+ */
+function placingOf(root: string, git: GitRunner): StepPlacing {
+  const topLevel = readTopLevel(git);
+  return { root, seams: { readTopLevel: () => topLevel, pathExists: existsSync } };
 }
 
 /** Where the release branch stands, for the steps of a branch refusal. */
@@ -662,12 +691,13 @@ function pushTags(git: GitRunner, ready: readonly ReadyUnit[], branch: string): 
   return pushed;
 }
 
-/** `unit` as the result carries it, with its follow-ups and the push it got. */
+/** `unit` as the result carries it, with its follow-ups, placed by `placing`, and the push it got. */
 function unitResult(
   unit: DecidedUnit,
   config: TagSettings,
   pushed: ReadonlyMap<string, TagPushed> | null,
   pushTo: string | null,
+  placing: StepPlacing,
 ): ReleaseTagUnit {
   const base = { package: unit.package, dir: unit.dir, inputs: unit.inputs, decision: unit.decision };
   if (unit.decision.kind !== 'ready') return { ...base, followUps: [] };
@@ -675,7 +705,8 @@ function unitResult(
   const target = readPublishTarget(unit.inputs.version.text);
   const place = { ahead, branch: config.releaseBranch, dir: unit.dir };
   const mode = config.publishMode;
-  const followUps = followUpsFor(tag, version, target, config.publishCommand, place, pushTo, mode);
+  const followUps = followUpsFor(tag, version, target, config.publishCommand, place, pushTo, mode)
+    .map((followUp) => ({ ...followUp, command: placedAtRoot(followUp.command, placing) }));
   const ci = mode === 'ci' && ciPublishSentence(tag, version, target) !== null
     ? { publish: 'ci' as const }
     : {};
@@ -697,6 +728,7 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
     context.output.warn(message);
   });
   const git = (seams.git ?? createGitRunner)(project.root);
+  const placing = placingOf(project.root, git);
 
   const inputs = readTagInputs(project.root, git, config);
   const onBranch = branchRefusal(inputs);
@@ -704,10 +736,10 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
     const place = onBranch.reason === 'branch'
       ? branchPlaceOf(git, config, project.project.configFile)
       : null;
-    throw refusal([onBranch.message], nextStepsOf(onBranch, inputs, place));
+    throw refusal([onBranch.message], nextStepsOf(onBranch, inputs, place, placing), config.hintsSkills);
   }
   const decided = decideUnits(project.root, git, inputs);
-  const ready = readyUnits(decided);
+  const ready = readyUnits(decided, placing, config.hintsSkills);
 
   writeTags(git, ready);
   const pushed = push
@@ -716,7 +748,7 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
   const pushTo = pushed === null
     ? trackedRemote(git, config.releaseBranch)
     : null;
-  const units = decided.map((unit) => unitResult(unit, config, pushed, pushTo));
+  const units = decided.map((unit) => unitResult(unit, config, pushed, pushTo, placing));
   const root = units[0];
   const written = root?.decision.kind === 'ready'
     ? root.decision
