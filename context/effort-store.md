@@ -367,7 +367,11 @@ exits with the status it would have had, and an unreachable push skips its
 pull so a command waits out one timeout. The name `HubUnreachable` is
 matched on the error's `name` property rather than its class, so a module
 can throw a plain `Error({ name: 'HubUnreachable' })` and import no value
-from core. Any other rejection is written as `effort sync: <push|pull> over
+from core. A rejection named `HubContractMismatch` (the hub speaks another
+wire contract version) is written as its message stands, one line per
+contact, `effort sync: the hub speaks contract <v>, this rafa contract <w>;
+nothing was sent. Next step: <step>`, and a mismatched push skips its pull.
+Any other rejection is written as `effort sync: <push|pull> over
 service failed: <message>`, and a refused push still attempts its pull.
 `pullBeforeRead` reads the config without writing its warnings and contacts
 nothing when the config is refused, leaving the refusal to the command.
@@ -398,6 +402,62 @@ registry holds what is installed. The check is done by `rafa doctor`,
 the loop's preflight, and every command that runs a sync. A module loaded
 but not allowed by `allowList:` is equally refused, since it is not
 trustworthy.
+
+### Wire contract
+
+**Two numbers travel with every sync request, and neither stands for the
+other.** `WIRE_CONTRACT_VERSION` (`packages/rafa/src/effort/store/wire.ts`,
+exported from the `./store` subpath) is a whole number, `1` here, that names
+the grammar and the semantics: the payload shape (`WIRE_FORMAT`,
+`WIRE_VERSION`), the cursor rules, the request fields, the capability names,
+the refusal codes and the skew rules. Inside one contract version evolution is
+additive only. The schema is not part of it: a payload names the ordered
+migration ids it carries, pinned by `migrations.lock.json` and
+`row-fields.lock.json`, and that list may grow under the same contract version.
+
+**`wire-contract.lock.json` cuts a contract version.**
+`packages/rafa/src/effort/store/wire-contract.lock.json` holds one entry per
+contract version, keyed by the version: its `wireVersion`, the migration ids it
+names in order, and its tables, each with the sha256 of that table's sorted row
+fields. A shipped entry is never edited. `wire.test.ts` pins each entry's
+sha256 in `SHIPPED_CONTRACT_ENTRIES`, so a new version adds its entry and its
+pin in one commit. The test then holds the lock to the build: each entry's
+migration ids are a prefix of `SQLITE_MIGRATIONS`, each table is one of
+`row-fields.lock.json`, the highest version is `WIRE_CONTRACT_VERSION` and its
+`wireVersion` is `WIRE_VERSION`. Raising the constant without a lock entry for
+the new number fails that test, and so does a pin with no entry or an entry
+with no pin.
+
+**A strategy reads the hub's status once.** `GET /v1/status` answers the hub's
+`contractVersion` and `capabilities`. `agreedClient` in `createServiceSync`
+(`packages/rafa-sync-service/src/sync.ts`) reads it before a strategy's first
+push or pull, and the hub client keeps the answer
+(`packages/rafa-sync-service/src/client.ts`), so the pull that follows a push
+reuses it. A read that fails is not kept, so the next call reads again.
+
+**A request that names no version is version `1`.** The hub reads a
+`contractVersion` query parameter that is left out as `1`
+(`checkContractVersion`, `packages/rafa-hub/src/server.ts`). A status answer
+that names no version reads the same way on the client, and push and pull then
+send no `contractVersion` field, since a hub one release behind refuses a query
+name it does not read.
+
+**The hub refuses a version it does not speak with `409`.** A push or a pull
+naming a `contractVersion` other than `WIRE_CONTRACT_VERSION` gets `409` with
+`"code": "contract-unsupported"` (`CONTRACT_UNSUPPORTED`, the same server), its
+error naming both versions. The refusal comes before the body is decoded or the
+store is called. A value that is not a whole number above zero is a `400`. The
+client sends the version it speaks and does not judge the match itself.
+
+**A device that reads another version writes one line, under the offline
+rule.** `agreedClient` raises `HubContractMismatch` (`sync.ts`) when the status
+names another version, before anything is exported or sent. `contact.ts` writes
+its message as its one line, `effort sync: the hub speaks contract <v>, this
+rafa contract <w>; nothing was sent. Next step: <step>`, skips the pull, and
+leaves the exit code as the command set it. The offline rule above gives the
+line's place in a contact. A device that has read the status refuses first, so
+the `409` above only answers a request that names a version the hub does not
+speak.
 
 ### Row origins
 

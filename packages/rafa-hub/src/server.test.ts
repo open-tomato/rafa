@@ -14,12 +14,12 @@ import type { HubLogEntry, HubServer, HubServerOptions } from './server.js';
 import type { HubStore } from './store/port.js';
 import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 
-import { encodeWirePayload, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { encodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { HUB_ACTIONS } from './identity/port.js';
 import { openMemoryIdentity } from './identity/testdata/memory-identity.js';
-import { AUTH_CHALLENGE, HUB_ROUTES, INTERNAL_ERROR, jsonLineLog, startHubServer, STORE_UNAVAILABLE } from './server.js';
+import { AUTH_CHALLENGE, CONTRACT_UNSUPPORTED, HUB_ROUTES, INTERNAL_ERROR, jsonLineLog, startHubServer, STORE_UNAVAILABLE } from './server.js';
 import { HUB_UPGRADE, HubUpgradeRequired } from './store/sqlite.js';
 import { openMemoryHubStore } from './store/testdata/memory-store.js';
 
@@ -56,6 +56,7 @@ interface Calls {
   pull: number;
   status: number;
   close: number;
+  contract: number;
 }
 
 /** `store` with each call counted into `calls`. */
@@ -76,6 +77,10 @@ function counted(store: HubStore, calls: Calls): HubStore {
     close: () => {
       calls.close += 1;
       return store.close();
+    },
+    contract: () => {
+      calls.contract += 1;
+      return store.contract();
     },
   };
 }
@@ -112,7 +117,7 @@ interface Started {
 /** Starts a hub over stand-ins, `overrides` replacing any option. */
 function start(overrides: Partial<HubServerOptions> = {}): Started {
   const lines: string[] = [];
-  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0 };
+  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0, contract: 0 };
   const server = startHubServer({
     port: 0,
     hostname: '127.0.0.1',
@@ -141,6 +146,7 @@ interface Envelope {
   readonly success: boolean;
   readonly data?: Record<string, unknown>;
   readonly error?: string;
+  readonly code?: string;
 }
 
 async function envelope(response: Response): Promise<Envelope> {
@@ -370,7 +376,9 @@ describe('GET /v1/status', () => {
       success: true,
       data: {
         version: VERSION,
+        contractVersion: WIRE_CONTRACT_VERSION,
         migrations: ['0001-base'],
+        capabilities: { fts: false, vector: false, graph: false, projection: false },
         rows: { commits: 3 },
         devices: [{ device: A, lastPushAt: T0 }, { device: B, lastPushAt: T0 }],
       },
@@ -435,7 +443,7 @@ describe('POST /v1/effort/push', () => {
     ['an empty device', `${HUB_ROUTES.push}?device=`, encodeWirePayload(payload([commit(A, 1)])), 'device is not a store origin'],
     ['a device holding a space', `${HUB_ROUTES.push}?device=a%20b`, encodeWirePayload(payload([commit(A, 1)])), 'device is not a store origin'],
     ['a device given twice', `${HUB_ROUTES.push}?device=${A}&device=${B}`, encodeWirePayload(payload([commit(A, 1)])), 'names device more than once'],
-    ['a parameter the route does not read', `${HUB_ROUTES.push}?device=${A}&since={}`, encodeWirePayload(payload([commit(A, 1)])), 'The query names "since"; expected device.'],
+    ['a parameter the route does not read', `${HUB_ROUTES.push}?device=${A}&since={}`, encodeWirePayload(payload([commit(A, 1)])), 'The query names "since"; expected device, contractVersion.'],
     ['no body', `${HUB_ROUTES.push}?device=${A}`, undefined, 'wire: the payload is not JSON'],
     ['a body that is not JSON', `${HUB_ROUTES.push}?device=${A}`, 'rows please', 'wire: the payload is not JSON'],
     ['a payload of another format', `${HUB_ROUTES.push}?device=${A}`, JSON.stringify({ ...payload([]), format: 'csv' }), 'wire: format is "csv"'],
@@ -493,7 +501,7 @@ describe('GET /v1/effort/pull', () => {
     ['a negative cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":-1}')}`, 'wire: cursor for commits is -1'],
     ['a fractional cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":1.5}')}`, 'wire: cursor for commits is 1.5'],
     ['a cursor naming a table that is not merged', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"merges":1}')}`, 'which is no merged table'],
-    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, since.'],
+    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, since, contractVersion.'],
   ];
   for (const [what, path, says] of refusals) {
     it(`answers 400 for ${what}, reaching no store`, async () => {
@@ -606,4 +614,99 @@ describe('refusal statuses', () => {
       expect((await envelope(response)).error).toBe(`refused: ${reason}`);
     });
   }
+});
+
+describe('contractVersion on push and pull', () => {
+  /** A push and a pull of `query` appended to the device, each with its route's call count. */
+  const routes: readonly (readonly [string, (server: HubServer, query: string) => Promise<Response>, (calls: Calls) => number])[] = [
+    [
+      'a push',
+      (server, query) => send(server, 'POST', `${HUB_ROUTES.push}?device=${A}${query}`, WRITER, encodeWirePayload(payload([commit(A, 1)]))),
+      (calls) => calls.push,
+    ],
+    [
+      'a pull',
+      (server, query) => send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}${query}`, WRITER),
+      (calls) => calls.pull,
+    ],
+  ];
+
+  for (const [what, call, reached] of routes) {
+    it(`serves ${what} naming no version as version 1`, async () => {
+      const { server, calls } = start();
+
+      const response = await call(server, '');
+
+      expect(WIRE_CONTRACT_VERSION).toBe(1);
+      expect(response.status).toBe(200);
+      expect((await envelope(response)).success).toBe(true);
+      expect(reached(calls)).toBe(1);
+    });
+
+    it(`serves ${what} naming version 1`, async () => {
+      const { server, calls } = start();
+
+      const response = await call(server, '&contractVersion=1');
+
+      expect(response.status).toBe(200);
+      expect(reached(calls)).toBe(1);
+    });
+
+    it(`answers 409 with ${CONTRACT_UNSUPPORTED} for ${what} naming version 2, reaching no store`, async () => {
+      const { server, calls, lines } = start();
+
+      const response = await call(server, '&contractVersion=2');
+
+      expect(response.status).toBe(409);
+      expect(await envelope(response)).toEqual({
+        success: false,
+        error: 'The request speaks wire contract version 2; this hub speaks version 1.',
+        code: CONTRACT_UNSUPPORTED,
+      });
+      expect(reached(calls) + calls.contract).toBe(0);
+      expect(requestLines(lines)[0]).toMatchObject({ level: 'warn', status: 409 });
+    });
+
+    const malformed: readonly (readonly [string, string])[] = [
+      ['0', '"0"'],
+      ['1.5', '"1.5"'],
+      ['abc', '"abc"'],
+      ['', '""'],
+      ['01', '"01"'],
+    ];
+    for (const [value, quoted] of malformed) {
+      it(`answers 400 for ${what} naming version ${quoted}, reaching no store`, async () => {
+        const { server, calls } = start();
+
+        const response = await call(server, `&contractVersion=${value}`);
+
+        expect(response.status).toBe(400);
+        expect(await envelope(response)).toEqual({
+          success: false,
+          error: `contractVersion is ${quoted}; expected a whole number above zero, such as 1.`,
+        });
+        expect(reached(calls)).toBe(0);
+      });
+    }
+
+    it(`answers 400 for ${what} naming the version twice`, async () => {
+      const { server, calls } = start();
+
+      const response = await call(server, '&contractVersion=1&contractVersion=1');
+
+      expect(response.status).toBe(400);
+      expect((await envelope(response)).error).toBe('The query names contractVersion more than once.');
+      expect(reached(calls)).toBe(0);
+    });
+  }
+
+  it('refuses another version before the body is decoded', async () => {
+    const { server, calls } = start();
+
+    const response = await send(server, 'POST', `${HUB_ROUTES.push}?device=${A}&contractVersion=2`, WRITER, 'rows please');
+
+    expect(response.status).toBe(409);
+    expect((await envelope(response)).code).toBe(CONTRACT_UNSUPPORTED);
+    expect(calls.push).toBe(0);
+  });
 });

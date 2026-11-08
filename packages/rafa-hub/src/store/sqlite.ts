@@ -67,6 +67,14 @@
  * is the store's own, so it is the hub `seq` the port names, and its
  * cursor, one snapshot of the store, moves past the rows left out too.
  *
+ * ## Contract
+ *
+ * `contract()` answers `WIRE_CONTRACT_VERSION`, the contract version
+ * this build's rafa speaks, with the migration ids the store file holds,
+ * read from the file as `status()` reads them so the two never disagree,
+ * and every capability `false`: the adapter answers push, pull and
+ * status and nothing beyond them.
+ *
  * ## What a development build refuses
  *
  * `mergeStore` refuses a development build (`bun` from a rafa checkout,
@@ -75,6 +83,8 @@
  * The adapter passes that refusal on rather than overriding it.
  */
 import type {
+  HubCapabilities,
+  HubContract,
   HubDevice,
   HubPullRequest,
   HubPushRequest,
@@ -93,6 +103,7 @@ import {
   exportWirePayload,
   materialiseWirePayload,
   mergeStore,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
 } from '@open-tomato/rafa/store';
@@ -134,6 +145,9 @@ interface Catalogue {
 
 /** The merge's project reader: the hub's store names no project. */
 const NO_PROJECT: NonNullable<MergeOptions['readProject']> = () => ({ rootCommit: null, remote: null });
+
+/** What the adapter can answer beyond push, pull and status: nothing. */
+const CAPABILITIES: HubCapabilities = Object.freeze({ fts: false, vector: false, graph: false, projection: false });
 
 const DEVICES_SCHEMA = 'CREATE TABLE IF NOT EXISTS devices (device TEXT PRIMARY KEY NOT NULL, last_push_at TEXT NOT NULL) STRICT';
 
@@ -263,8 +277,10 @@ export function openSqliteHubStore(context: HubStoreContext, options: SqliteHubS
     return Object.freeze({ ...exported, tables: Object.freeze(tables) });
   };
 
+  const heldMigrations = (): readonly string[] => exportWirePayload({ path, cursor: pastEverything }).migrations;
+
   const status = (): HubStoreStatus => ({
-    migrations: exportWirePayload({ path, cursor: pastEverything }).migrations,
+    migrations: heldMigrations(),
     rows: countRows(path, catalogue.tables),
     devices: devices
       .query<HubDevice, []>(READ_DEVICES)
@@ -276,6 +292,11 @@ export function openSqliteHubStore(context: HubStoreContext, options: SqliteHubS
     push: (request) => settle(() => push(request)),
     pull: (request) => settle(() => pull(request)),
     status: () => settle(status),
+    contract: (): HubContract => Object.freeze({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      migrations: heldMigrations(),
+      capabilities: CAPABILITIES,
+    }),
     close: () => settle(() => {
       devices.close();
     }),

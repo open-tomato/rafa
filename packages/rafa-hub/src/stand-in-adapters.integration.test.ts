@@ -11,6 +11,7 @@
  */
 import type { HubAction, HubIdentity, IdentityAnswer } from './identity/port.js';
 import type {
+  HubContract,
   HubPullRequest,
   HubPushRequest,
   HubPushResult,
@@ -20,7 +21,7 @@ import type {
 } from './store/port.js';
 import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 
-import { WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 
 import { identityContract } from './identity/contract.js';
 import { HUB_ACTIONS } from './identity/port.js';
@@ -125,7 +126,13 @@ function openMapStore(context: HubStoreContext): HubStore {
       .sort((left, right) => left.device.localeCompare(right.device)),
   });
 
-  return { push, pull, status, close: () => Promise.resolve() };
+  const contract = (): HubContract => ({
+    contractVersion: WIRE_CONTRACT_VERSION,
+    migrations,
+    capabilities: { fts: false, vector: false, graph: false, projection: false },
+  });
+
+  return { push, pull, status, contract, close: () => Promise.resolve() };
 }
 
 hubStoreContract('map stand-in written in the test', (context) => openMapStore(context));

@@ -134,6 +134,7 @@ export {
   encodeWirePayload,
   exportWirePayload,
   materialiseWirePayload,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
   WireExportRefusal,

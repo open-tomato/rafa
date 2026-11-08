@@ -375,6 +375,7 @@ export {
   openSqliteStore,
   selectEffortStore,
   TRUSTED_PERMISSIONS,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
   WireExportRefusal,
