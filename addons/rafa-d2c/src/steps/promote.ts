@@ -75,6 +75,14 @@ async function git(run: ProcessRunner, dir: string, args: readonly string[]): Pr
   return result.stdout.trim();
 }
 
+/** Commits the set and the staging ignore line in the store; answers the commit's short hash. */
+async function commitSet(run: ProcessRunner, dir: string, set: string, message: string): Promise<string> {
+  await ignoreStaging(dir);
+  await git(run, dir, ['add', '--', set, '.gitignore']);
+  await git(run, dir, ['commit', '-q', '-m', message]);
+  return git(run, dir, ['rev-parse', '--short', 'HEAD']);
+}
+
 /** Promotes one placed run into the set. */
 export async function promoteVisual(loaded: LoadedConfig, options: PromoteOptions, seams: PromoteSeams): Promise<PromoteResult> {
   const { store } = loaded.config.visual;
@@ -94,13 +102,10 @@ export async function promoteVisual(loaded: LoadedConfig, options: PromoteOption
   const staged = await readSetRecord(join(runDir, RECORD_FILE));
   if (staged === null) throw new Error(`run ${seed.runId} has no staged ${RECORD_FILE}; place it again`);
   await writeSetRecord(paths.recordFile, { ...staged, promotedAt: seams.now().toISOString(), files: (await pngNames(paths.snapshotsDir)).length });
+  const commit = store.kind === 'side-repo'
+    ? await commitSet(seams.run, store.dir, store.set, `baselines(${store.set}): ${seed.runnerKey} from ${seed.projectCommit ?? 'no recorded commit'}`)
+    : null;
+  // Marked only once the commit exists, so a failed commit leaves the run waiting for the next promote.
   await Bun.write(join(runDir, PROMOTED_FILE), `${JSON.stringify({ promotedAt: seams.now().toISOString(), promoted, overlap }, null, 2)}\n`);
-  if (store.kind !== 'side-repo') return { runId: seed.runId, promoted, commit: null, overlap };
-
-  await ignoreStaging(store.dir);
-  const from = seed.projectCommit ?? 'no recorded commit';
-  await git(seams.run, store.dir, ['add', '--', store.set, '.gitignore']);
-  await git(seams.run, store.dir, ['commit', '-q', '-m', `baselines(${store.set}): ${seed.runnerKey} from ${from}`]);
-  const commit = await git(seams.run, store.dir, ['rev-parse', '--short', 'HEAD']);
   return { runId: seed.runId, promoted, commit, overlap };
 }

@@ -81,6 +81,19 @@ describe('promoteVisual', () => {
     expect(Bun.spawnSync(['git', 'rev-parse', 'HEAD'], { cwd: project.storeDir }).exitCode).not.toBe(0);
   });
 
+  it('a failed commit leaves the run waiting, so promote can run again', async () => {
+    const { project, snapshots } = await gitProject({ 'a--light.png': '1' });
+    const seed = await seedAndPlace(project, snapshots, { 'a--light.png': 'new' }, 10);
+    const failingCommit: ProcessRunner = (argv, options) => argv[3] === 'commit'
+      ? Promise.resolve({ exitCode: 1, stdout: '', stderr: 'Author identity unknown' })
+      : spawnProcess(argv, options);
+
+    await expect(promoteVisual(project.loaded, { runnerKey: KEY }, { run: failingCommit, now: NOW })).rejects.toThrow('Author identity unknown');
+    const again = await promoteVisual(project.loaded, { runnerKey: KEY }, { run: spawnProcess, now: NOW });
+    expect(again.runId).toBe(seed.runId);
+    expect(again.commit).toBe(gitOut(project.storeDir, 'rev-parse', '--short', 'HEAD'));
+  });
+
   it('refuses a run with nothing staged', async () => {
     const { project, snapshots } = await gitProject({ 'a--light.png': '1' });
     await seedAndPlace(project, snapshots, { 'a--light.png': '1' }, 10);
