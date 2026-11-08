@@ -4,9 +4,10 @@
  *
  * Each run gets its own folder under the store's `.staging/`, named by a
  * run id. What the package's snapshot folder held is moved there, into
- * `previous/`, never deleted; then the set's PNGs are copied in, and
- * `seeded.json` remembers what was seeded and each file's hash, which is
- * what `place` and `promote` compare against.
+ * `previous/`, never deleted, and so is an earlier run's report, so
+ * `place` reads only the report this run's suite writes. Then the set's
+ * PNGs are copied in, and `seeded.json` remembers what was seeded and
+ * each file's hash, which is what `place` and `promote` compare against.
  */
 import type { LoadedConfig } from '../config/load.js';
 import type { ProcessRunner } from '../process.js';
@@ -55,6 +56,9 @@ export const SEED_FILE = 'seeded.json';
 /** The folder in a run folder that holds what the snapshot folder held before the seed. */
 export const PREVIOUS_FOLDER = 'previous';
 
+/** The file in a run folder that holds the report an earlier run left in the package. */
+export const PREVIOUS_REPORT_FILE = 'previous-report.json';
+
 /** The project's short commit and whether its tree is dirty, or null and false outside git. */
 export async function projectState(root: string, run: ProcessRunner): Promise<{ commit: string | null; dirty: boolean }> {
   const head = await run(['git', 'rev-parse', '--short', 'HEAD'], { cwd: root });
@@ -93,6 +97,9 @@ export async function seedVisual(loaded: LoadedConfig, report: CheckReport, seam
     ? (await pngNames(snapshots)).length
     : 0;
   if (await exists(snapshots)) await moveFolder(snapshots, previous);
+  const { suite } = loaded.config.visual;
+  const oldReport = join(loaded.workRoot, suite.package, suite.report);
+  if (await exists(oldReport)) await moveFolder(oldReport, join(runDir, PREVIOUS_REPORT_FILE));
 
   const paths = setPaths(store.dir, store.set, playwrightVersion, runnerKey);
   const seeded = await copyNamed(paths.snapshotsDir, snapshots, await pngNames(paths.snapshotsDir));

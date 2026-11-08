@@ -71,6 +71,16 @@ describe('runVisual', () => {
     expect(result.placeError).toContain(join(project.packageDir, 'visual-report.json'));
   });
 
+  it('a report left by an earlier run is not read when the suite writes none', async () => {
+    const project = await fakeSuiteProject({ shots: { 'a--light.png': '1' }, writeReport: false, exitCode: 127 });
+    await Bun.write(join(project.packageDir, 'visual-report.json'), JSON.stringify({ snapshot: { matched: 0, added: 1, updated: 0, unmatched: 0, total: 1 }, testResults: [] }));
+    const result = await runVisual(project.loaded, [], SEAMS);
+
+    expect(result.suiteExit).toBe(127);
+    expect(result.place).toBeNull();
+    expect(result.placeError).toContain(join(project.packageDir, 'visual-report.json'));
+  });
+
   it('a gap stops the run before seed', async () => {
     const project = await fakeSuiteProject({}, { kind: 'container' });
     await writeShots(join(project.packageDir, 'visual', '__image_snapshots__'), { 'mine--light.png': 'x' });

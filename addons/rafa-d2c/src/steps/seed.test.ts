@@ -49,6 +49,15 @@ describe('seedVisual', () => {
     expect((await readdir(join(result.runDir, 'previous'))).sort()).toEqual(['a--light.png', 'old--light.png']);
   });
 
+  it('moves an earlier run\'s report into the run folder, so place reads only this run\'s', async () => {
+    const { project, report } = await seeded({ 'a--light.png': '1' });
+    await Bun.write(join(project.packageDir, 'visual-report.json'), '{"old":true}');
+    const result = await seedVisual(project.loaded, report, { run: GIT, now: NOW, random: () => 0.5 });
+
+    expect(await Bun.file(join(project.packageDir, 'visual-report.json')).exists()).toBe(false);
+    expect(await Bun.file(join(result.runDir, 'previous-report.json')).text()).toBe('{"old":true}');
+  });
+
   it('works in the checkout the command runs in, not the one the config lives in', async () => {
     const { project, snapshots, report } = await seeded({ 'a--light.png': '1' }, { 'main--light.png': 'main' });
     const work = await temp.make('d2c-worktree-');
