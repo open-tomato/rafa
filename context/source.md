@@ -37,7 +37,10 @@ spells out, and the shapes the lint config forces.
   `../core/` and `../utils/` lines after, while
   `packages/rafa-board/src/board/project/rules.ts` puts `./options.js` last,
   after its `../` lines. Both pass eslint. Take the order from `bunx eslint
-  --fix-dry-run --format json <file>`, not from this page. Value imports differ:
+  --fix-dry-run --format json <file>` or from the lint message itself
+  (`` `./check-rows.js` type import should occur before type import of
+  `./plan-ci.js` ``), not from this page; adding a second sibling type import
+  beside an existing one is where it bites. Value imports differ:
   the `parent` group (`../`) comes before the `sibling` group (`./`), a blank
   line between them.
 - **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
