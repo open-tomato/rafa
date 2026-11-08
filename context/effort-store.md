@@ -367,7 +367,11 @@ exits with the status it would have had, and an unreachable push skips its
 pull so a command waits out one timeout. The name `HubUnreachable` is
 matched on the error's `name` property rather than its class, so a module
 can throw a plain `Error({ name: 'HubUnreachable' })` and import no value
-from core. Any other rejection is written as `effort sync: <push|pull> over
+from core. A rejection named `HubContractMismatch` (the hub speaks another
+wire contract version) is written as its message stands, one line per
+contact, `effort sync: the hub speaks contract <v>, this rafa contract <w>;
+nothing was sent. Next step: <step>`, and a mismatched push skips its pull.
+Any other rejection is written as `effort sync: <push|pull> over
 service failed: <message>`, and a refused push still attempts its pull.
 `pullBeforeRead` reads the config without writing its warnings and contacts
 nothing when the config is refused, leaving the refusal to the command.
