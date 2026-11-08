@@ -15,7 +15,7 @@ import { orphanFiles, readStoryIndex } from '../suite/storybook-jest.js';
 export async function listOrphans(loaded: LoadedConfig, key: SetKey): Promise<{ orphans: readonly string[]; total: number }> {
   const { store, suite } = loaded.config.visual;
   if (store.kind === 'same-repo') throw new Error('orphans needs a store folder; same-repo arrives in a later cut');
-  const indexFile = join(loaded.root, suite.package, suite.index);
+  const indexFile = join(loaded.workRoot, suite.package, suite.index);
   let index;
   try {
     index = await readStoryIndex(indexFile);

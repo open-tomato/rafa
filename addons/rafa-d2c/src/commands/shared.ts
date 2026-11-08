@@ -18,7 +18,7 @@ import { loadD2cConfig } from '../config/load.js';
 import { D2cConfigError } from '../config/read.js';
 import { readHostFacts } from '../host.js';
 import { spawnProcess } from '../process.js';
-import { projectRootOf } from '../project.js';
+import { projectRootOf, workRootOf } from '../project.js';
 import { hostRunnerKey } from '../store/key.js';
 
 /** What a command works with. */
@@ -65,7 +65,7 @@ export async function refusing<T>(context: RafaContext, body: () => Promise<T>):
 /** Finds the project, loads its config and reads the host. */
 export async function prepare(context: RafaContext): Promise<CommandEnv> {
   const root = projectRootOf(context);
-  const loaded = await loadD2cConfig(root, spawnProcess);
+  const loaded = await loadD2cConfig(root, spawnProcess, await workRootOf(root, process.cwd(), spawnProcess));
   return { loaded, run: spawnProcess, host: await readHostFacts(spawnProcess) };
 }
 

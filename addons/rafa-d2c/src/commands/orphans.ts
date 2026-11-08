@@ -22,7 +22,7 @@ export const orphansCommand: RafaCommand = {
   run: (context) => refusing(context, async () => {
     const env = await prepare(context);
     const { suite } = env.loaded.config.visual;
-    const playwrightVersion = readPlaywrightVersion(join(env.loaded.root, suite.package));
+    const playwrightVersion = readPlaywrightVersion(join(env.loaded.workRoot, suite.package));
     const { orphans, total } = await listOrphans(env.loaded, { playwrightVersion, runnerKey: runnerKeyOf(env) });
     context.output.info(`${orphans.length} of ${total} files belong to no story in ${join(suite.package, suite.index)}`);
     for (const file of orphans) context.output.info(file);

@@ -49,6 +49,18 @@ describe('seedVisual', () => {
     expect((await readdir(join(result.runDir, 'previous'))).sort()).toEqual(['a--light.png', 'old--light.png']);
   });
 
+  it('works in the checkout the command runs in, not the one the config lives in', async () => {
+    const { project, snapshots, report } = await seeded({ 'a--light.png': '1' }, { 'main--light.png': 'main' });
+    const work = await temp.make('d2c-worktree-');
+    const workSnapshots = join(work, 'packages', 'ui', 'visual', '__image_snapshots__');
+    await writeShots(workSnapshots, { 'branch--light.png': 'branch' });
+    const result = await seedVisual({ ...project.loaded, workRoot: work }, report, { run: GIT, now: NOW, random: () => 0.5 });
+
+    expect(await readdir(join(result.runDir, 'previous'))).toEqual(['branch--light.png']);
+    expect((await readdir(workSnapshots)).sort()).toEqual(['a--light.png']);
+    expect(await readdir(snapshots)).toEqual(['main--light.png']);
+  });
+
   it('with no set leaves an empty snapshot folder and records seededFrom null', async () => {
     const { project, snapshots, report } = await seeded({});
     const result = await seedVisual(project.loaded, report, { run: GIT, now: NOW, random: () => 0.5 });

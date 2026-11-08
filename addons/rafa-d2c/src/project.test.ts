@@ -6,7 +6,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { projectRootOf } from './project.js';
+import { spawnProcess } from './process.js';
+import { projectRootOf, workRootOf } from './project.js';
 
 const made: string[] = [];
 
@@ -46,8 +47,18 @@ describe('projectRootOf', () => {
     git(main, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'add', '.gitignore');
     git(main, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'init');
     git(main, 'worktree', 'add', '-q', join(base, 'linked'));
+    await mkdir(join(base, 'linked', 'packages'));
 
     expect(projectRootOf(contextAt(home), join(base, 'linked'))).toBe(main);
+    expect(await workRootOf(main, join(base, 'linked', 'packages'), spawnProcess)).toBe(join(base, 'linked'));
+    expect(await workRootOf(main, main, spawnProcess)).toBe(main);
+  });
+
+  it('the work root outside any repository is the project root', async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), 'd2c-scope-')));
+    made.push(base);
+
+    expect(await workRootOf(base, base, spawnProcess)).toBe(base);
   });
 
   it('refuses outside any project with the init hint', async () => {

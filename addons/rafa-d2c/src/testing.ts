@@ -92,7 +92,7 @@ export async function makeTestProject(
       store,
     },
   };
-  return { root, packageDir, storeDir, loaded: { config, file: join(root, '.rafa', 'd2c.yaml'), root, warnings: [] } };
+  return { root, packageDir, storeDir, loaded: { config, file: join(root, '.rafa', 'd2c.yaml'), root, workRoot: root, warnings: [] } };
 }
 
 /** Writes PNG-named files holding the given text into `dir`. */

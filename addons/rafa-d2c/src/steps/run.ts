@@ -59,7 +59,7 @@ export async function runVisual(loaded: LoadedConfig, passArgs: readonly string[
   if (check.gaps.length > 0 || check.runnerKey === null) return stopped;
 
   const seed = await seedVisual(loaded, check, seams);
-  const suiteResult = await seams.run(suiteArgv(suite.command, passArgs), { cwd: join(loaded.root, suite.package), inherit: seams.quiet !== true });
+  const suiteResult = await seams.run(suiteArgv(suite.command, passArgs), { cwd: join(loaded.workRoot, suite.package), inherit: seams.quiet !== true });
   try {
     const place = await placeVisual(loaded, { runnerKey: check.runnerKey, runId: seed.runId }, { now: seams.now, host: seams.host });
     return { check, seed, suiteExit: suiteResult.exitCode, place, placeError: null };

@@ -109,7 +109,7 @@ async function checkGitStore(dir: string, run: ProcessRunner, found: Findings): 
 /** The installed playwright-core version, noting a gap when none resolves. */
 function playwrightOf(loaded: LoadedConfig, found: Findings): string | null {
   try {
-    return readPlaywrightVersion(join(loaded.root, loaded.config.visual.suite.package));
+    return readPlaywrightVersion(join(loaded.workRoot, loaded.config.visual.suite.package));
   } catch (error) {
     found.gaps.push(error instanceof Error
       ? error.message

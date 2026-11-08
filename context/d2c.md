@@ -31,7 +31,10 @@ code and whether `place` ran clean, and either failing exits 1.
 no project, so `src/project.ts` calls core's `resolveScope` from the
 working folder (exported as `@open-tomato/rafa-core/project/scope`). A
 linked worktree resolves to its main checkout, where `.rafa/d2c.yaml`
-and the store live.
+lives. The suite's paths resolve against the work root instead
+(`workRootOf`, `LoadedConfig.workRoot`): the linked worktree the
+command runs from, so each branch tests its own code and two worktrees
+never seed one folder. Every other start answers the project root.
 
 **Served in this version:** the `storybook-jest` suite kind, the `host`
 runner, and the `local-dir` and `side-repo` stores. `container`,

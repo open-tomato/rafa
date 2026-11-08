@@ -23,6 +23,11 @@ export interface LoadedConfig {
   readonly file: string;
   /** The project root the file was found under. */
   readonly root: string;
+  /**
+   * The checkout the suite runs in: the root itself, or the linked
+   * worktree the command runs from when the root is its main checkout.
+   */
+  readonly workRoot: string;
   readonly warnings: readonly string[];
 }
 
@@ -34,8 +39,9 @@ function namesLocalSetup(config: D2cConfig): boolean {
 /**
  * Reads the config under `root`. Throws naming the file when it is
  * missing or does not parse, and a `D2cConfigError` when it reads wrong.
+ * `workRoot` is where the suite's paths resolve, the root when left out.
  */
-export async function loadD2cConfig(root: string, run: ProcessRunner): Promise<LoadedConfig> {
+export async function loadD2cConfig(root: string, run: ProcessRunner, workRoot: string = root): Promise<LoadedConfig> {
   const file = join(root, D2C_CONFIG_FILE);
   const source = Bun.file(file);
   if (!(await source.exists())) throw new Error(`no d2c config at ${file}; write one as the rafa-d2c README shows`);
@@ -52,5 +58,5 @@ export async function loadD2cConfig(root: string, run: ProcessRunner): Promise<L
   const warnings = tracked.exitCode === 0 && namesLocalSetup(config)
     ? [`${D2C_CONFIG_FILE} is tracked by git and names a local folder or host; see ${DISCLAIMER_SECTION}`]
     : [];
-  return Object.freeze({ config, file, root, warnings: Object.freeze(warnings) });
+  return Object.freeze({ config, file, root, workRoot, warnings: Object.freeze(warnings) });
 }

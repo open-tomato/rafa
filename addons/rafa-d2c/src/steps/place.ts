@@ -99,7 +99,7 @@ export function platformOfKey(runnerKey: string): string {
 /** The files the run compared, from the index when it reads, else from the counts with a warning. */
 async function comparedCount(loaded: LoadedConfig, reading: Awaited<ReturnType<typeof readJestReport>>, warnings: string[]): Promise<number> {
   const { suite } = loaded.config.visual;
-  const indexFile = join(loaded.root, suite.package, suite.index);
+  const indexFile = join(loaded.workRoot, suite.package, suite.index);
   try {
     return comparedFiles(reading, await readStoryIndex(indexFile)).compared.length;
   } catch (error) {
@@ -130,7 +130,7 @@ export async function placeVisual(loaded: LoadedConfig, options: PlaceOptions, s
   if (store.kind === 'same-repo') throw new Error('place needs a store folder; same-repo arrives in a later cut');
   const runDir = await pickRun(store.dir, store.set, options.runnerKey, options.runId, SEED_FILE, PLACED_FILE, 'place');
   const seed = await readSeedRecord(runDir);
-  const reading = await readJestReport(join(loaded.root, suite.package, suite.report));
+  const reading = await readJestReport(join(loaded.workRoot, suite.package, suite.report));
   const warnings: string[] = [];
   const seededNames = Object.keys(seed.hashes);
   const kind = runKindOf(reading.counts, seededNames.length);

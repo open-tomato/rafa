@@ -73,7 +73,7 @@ export async function readSeedRecord(runDir: string): Promise<SeedRecord> {
 /** The package's snapshot folder. */
 export function snapshotsOf(loaded: LoadedConfig): string {
   const { suite } = loaded.config.visual;
-  return join(loaded.root, suite.package, suite.snapshots);
+  return join(loaded.workRoot, suite.package, suite.snapshots);
 }
 
 /** Seeds the package's snapshot folder from the set at the report's key. Throws when the report names no key. */
@@ -96,7 +96,7 @@ export async function seedVisual(loaded: LoadedConfig, report: CheckReport, seam
 
   const paths = setPaths(store.dir, store.set, playwrightVersion, runnerKey);
   const seeded = await copyNamed(paths.snapshotsDir, snapshots, await pngNames(paths.snapshotsDir));
-  const state = await projectState(loaded.root, seams.run);
+  const state = await projectState(loaded.workRoot, seams.run);
   const record: SeedRecord = {
     runId,
     set: store.set,
