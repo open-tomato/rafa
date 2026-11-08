@@ -1,28 +1,33 @@
 /**
  * The graph half of the index: {@link links} walks the store's
- * `ref_links` table from one row, a store table and an origin pair, and
- * answers the rows it reaches as row references, never a row's body.
+ * `ref_links` table from one reference, a kind and an id, and answers
+ * the references it reaches, never a row's body.
  *
  * ## The link table
  *
- * `ref_links` is the store's, not the index's, and no store migration
- * creates it yet (the backfill spec's `ref-links` migration will), so
- * the walk reads the six columns {@link REF_LINK_COLUMNS} names: a
- * link runs from the row `(from_table, from_origin_store,
- * from_origin_seq)` to the row `(to_table, to_origin_store,
- * to_origin_seq)`. A store holding no `ref_links` table answers
- * `graph: false` with no links; one whose table lacks a column is
- * refused, naming the columns it lacks.
+ * `ref_links` is the store's, not the index's, and is the backfill
+ * spec's `ref-links` migration (#1436): a link runs from a record,
+ * `(from_kind, from_id)`, such as `commit` and its sha, to a reference
+ * it names, `(ref_kind, ref_text)`, such as `issue` and `#1436`. The
+ * walk reads the four columns {@link REF_LINK_COLUMNS} names and no
+ * other, so the migration's `role`, extractor, provenance and origin
+ * columns may sit beside them. A store holding no `ref_links` table
+ * answers `graph: false` with no links; one whose table lacks a column
+ * is refused, naming the columns it lacks.
  *
  * ## The walk
  *
- * One recursive CTE follows links from their `from` row to their `to`
- * row, one hop per step, up to the request's depth, a whole number from
- * 1 to {@link MAX_DEPTH}, {@link DEFAULT_DEPTH} when left out. The CTE's
- * `UNION` keeps each (row, depth) once, so a cycle is walked at most
- * once per depth and the depth bound ends it. The answer names each row
- * reached once, at the fewest hops it took, never the start row, nearest
- * first with the key (table, origin pair) breaking ties.
+ * A reference is one node, its kind and its id: a link's `ref_kind` and
+ * `ref_text` name the node a further link leaves from as its
+ * `from_kind` and `from_id`. One recursive CTE follows links from their
+ * `from` end to their `ref` end, one hop per step, up to the request's
+ * depth, a whole number from 1 to {@link MAX_DEPTH},
+ * {@link DEFAULT_DEPTH} when left out. Two links joining the same ends
+ * under two roles are one hop. The CTE's `UNION` keeps each
+ * (node, depth) once, so a cycle is walked at most once per depth and
+ * the depth bound ends it. The answer names each node reached once, at
+ * the fewest hops it took, never the start node, nearest first with the
+ * key (kind, id) breaking ties.
  *
  * ## Where the store is
  *
@@ -30,20 +35,17 @@
  * when left out: the connector holds one connection on the store file
  * with the index attached, so the store is its `main`.
  */
-import type { OriginPair } from './search.js';
 import type { Database } from 'bun:sqlite';
 
 /** The store table the walk reads. */
 export const REF_LINKS_TABLE = 'ref_links';
 
-/** The columns the walk reads from {@link REF_LINKS_TABLE}: the two ends of a link. */
+/** The columns the walk reads from {@link REF_LINKS_TABLE}: the two ends of a link, as #1436's `ref-links` names them. */
 export const REF_LINK_COLUMNS: readonly string[] = Object.freeze([
-  'from_table',
-  'from_origin_store',
-  'from_origin_seq',
-  'to_table',
-  'to_origin_store',
-  'to_origin_seq',
+  'from_kind',
+  'from_id',
+  'ref_kind',
+  'ref_text',
 ]);
 
 /** The most hops one walk takes. */
@@ -56,29 +58,29 @@ export const DEFAULT_DEPTH = 1;
 const SCHEMA_PATTERN = /^[A-Za-z_]\w*$/;
 
 /** The key columns, in the order every query names them. */
-const KEY = 'row_table, origin_store, origin_seq';
+const KEY = 'node_kind, node_id';
 
 /** What one walk asks. */
 export interface IndexLinksRequest {
-  /** The store table the start row lives in. */
-  readonly table: string;
-  /** The start row's origin pair. */
-  readonly origin: OriginPair;
+  /** The start node's kind: a link's `from_kind` or `ref_kind`, such as `commit` or `issue`. */
+  readonly kind: string;
+  /** The start node's id: a link's `from_id` or `ref_text`, such as a sha or `#1436`. */
+  readonly id: string;
   /** The most hops taken, a whole number from 1 to {@link MAX_DEPTH}; {@link DEFAULT_DEPTH} when left out. */
   readonly depth?: number;
 }
 
-/** One row a walk reached: its table and origin pair, and the fewest hops to it. Never a body. */
+/** One node a walk reached: its kind and id, and the fewest hops to it. Never a body. */
 export interface IndexLink {
-  /** The store table the row lives in. */
-  readonly table: string;
-  /** The row's origin pair. */
-  readonly origin: OriginPair;
-  /** The fewest hops from the start row, from 1 to the request's depth. */
+  /** The node's kind. */
+  readonly kind: string;
+  /** The node's id. */
+  readonly id: string;
+  /** The fewest hops from the start node, from 1 to the request's depth. */
   readonly depth: number;
 }
 
-/** What one walk answers: whether the store holds a link table, and the rows reached, nearest first. */
+/** What one walk answers: whether the store holds a link table, and the nodes reached, nearest first. */
 export interface IndexLinksResult {
   /** Whether the store holds a `ref_links` table; `false` answers no links. */
   readonly graph: boolean;
@@ -101,19 +103,17 @@ export class IndexLinksRefusal extends Error {
   }
 }
 
-/** A reached row, as the walk query answers it. */
+/** A reached node, as the walk query answers it. */
 interface LinkRow {
-  readonly row_table: string;
-  readonly origin_store: string;
-  readonly origin_seq: number;
+  readonly node_kind: string;
+  readonly node_id: string;
   readonly depth: number;
 }
 
 /** What a request holds once checked. */
 interface CheckedRequest {
-  readonly table: string;
-  readonly originStore: string;
-  readonly originSeq: number;
+  readonly kind: string;
+  readonly id: string;
   readonly depth: number;
 }
 
@@ -127,20 +127,17 @@ function quoted(name: string): string {
 
 /** Refuse a request the walk cannot run, answering it with its depth filled in. */
 function checkRequest(request: IndexLinksRequest): CheckedRequest {
-  const { depth = DEFAULT_DEPTH, origin, table } = request;
-  if (typeof table !== 'string' || table === '') {
-    throw new IndexLinksRefusal(`table must be a table name, got ${JSON.stringify(table)}`);
+  const { depth = DEFAULT_DEPTH, id, kind } = request;
+  if (typeof kind !== 'string' || kind === '') {
+    throw new IndexLinksRefusal(`kind must be a reference kind, got ${JSON.stringify(kind)}`);
   }
-  if (typeof origin?.originStore !== 'string' || origin.originStore === '') {
-    throw new IndexLinksRefusal(`origin store must be a store id, got ${JSON.stringify(origin?.originStore)}`);
-  }
-  if (!Number.isInteger(origin.originSeq)) {
-    throw new IndexLinksRefusal(`origin seq must be a whole number, got ${String(origin.originSeq)}`);
+  if (typeof id !== 'string' || id === '') {
+    throw new IndexLinksRefusal(`id must be a reference id, got ${JSON.stringify(id)}`);
   }
   if (!Number.isInteger(depth) || depth < 1 || depth > MAX_DEPTH) {
     throw new IndexLinksRefusal(`depth must be a whole number from 1 to ${MAX_DEPTH}, got ${String(depth)}`);
   }
-  return { depth, originSeq: origin.originSeq, originStore: origin.originStore, table };
+  return { depth, id, kind };
 }
 
 /** The target's schema, quoted, refusing a name that is no identifier or no attached database. */
@@ -184,28 +181,27 @@ function checkColumns(database: Database, schema: string): void {
 }
 
 /**
- * The recursive walk: every (row, depth) reached from the start row
- * within the depth bound, the start row at depth 0. Its placeholders are
- * `?1` to `?3` the start row's key and `?4` the depth.
+ * The recursive walk: every (node, depth) reached from the start node
+ * within the depth bound, the start node at depth 0. Its placeholders
+ * are `?1` and `?2` the start node's kind and id and `?3` the depth.
  */
 export function walkSql(schema: string): string {
   return `WITH RECURSIVE walk(${KEY}, depth) AS (
-  SELECT ?1, ?2, ?3, 0
+  SELECT ?1, ?2, 0
   UNION
-  SELECT link.to_table, link.to_origin_store, link.to_origin_seq, walk.depth + 1
+  SELECT link.ref_kind, link.ref_text, walk.depth + 1
   FROM walk JOIN ${schema}.${REF_LINKS_TABLE} AS link
-    ON link.from_table = walk.row_table
-    AND link.from_origin_store = walk.origin_store
-    AND link.from_origin_seq = walk.origin_seq
-  WHERE walk.depth < ?4
+    ON link.from_kind = walk.node_kind
+    AND link.from_id = walk.node_id
+  WHERE walk.depth < ?3
 )`;
 }
 
-/** The answer query: each row reached once, at its fewest hops, never the start row. */
+/** The answer query: each node reached once, at its fewest hops, never the start node. */
 function reachedSql(schema: string): string {
   return `${walkSql(schema)}
 SELECT ${KEY}, MIN(depth) AS depth FROM walk
-WHERE NOT (row_table = ?1 AND origin_store = ?2 AND origin_seq = ?3)
+WHERE NOT (node_kind = ?1 AND node_id = ?2)
 GROUP BY ${KEY}
 ORDER BY depth, ${KEY}`;
 }
@@ -214,29 +210,29 @@ ORDER BY depth, ${KEY}`;
 function toLink(row: LinkRow): IndexLink {
   return Object.freeze({
     depth: Number(row.depth),
-    origin: Object.freeze({ originSeq: Number(row.origin_seq), originStore: String(row.origin_store) }),
-    table: String(row.row_table),
+    id: String(row.node_id),
+    kind: String(row.node_kind),
   });
 }
 
 /**
- * Walk the store's `ref_links` from the request's row up to its depth,
- * answering each row reached once with the fewest hops to it, nearest
+ * Walk the store's `ref_links` from the request's node up to its depth,
+ * answering each node reached once with the fewest hops to it, nearest
  * first, and `graph: false` with no links for a store holding no
  * `ref_links` table. Rejects with an {@link IndexLinksRefusal} for a
- * start row that is no table and origin pair, a depth that is not a
+ * start node with an empty kind or id, a depth that is not a
  * whole number from 1 to {@link MAX_DEPTH}, a schema that is no attached
  * database, and a link table lacking a column the walk reads.
  */
 export async function links(target: LinksTarget, request: IndexLinksRequest): Promise<IndexLinksResult> {
-  const { depth, originSeq, originStore, table } = checkRequest(request);
+  const { depth, id, kind } = checkRequest(request);
   if (!holdsRefLinks(target)) {
     return NO_GRAPH;
   }
   const schema = schemaOf(target);
   checkColumns(target.database, schema);
   const rows = target.database
-    .query<LinkRow, [string, string, number, number]>(reachedSql(schema))
-    .all(table, originStore, originSeq, depth);
+    .query<LinkRow, [string, string, number]>(reachedSql(schema))
+    .all(kind, id, depth);
   return Object.freeze({ graph: true, links: Object.freeze(rows.map(toLink)) });
 }
