@@ -6,6 +6,20 @@
  * file; a Postgres or Dolt adapter implements this same port and runs
  * the same cases, {@link HubStore}'s contract suite in `contract.ts`.
  *
+ * ## Two interfaces, never one
+ *
+ * The port is two interfaces, each with a contract suite of its own.
+ * {@link HubStore} keeps the rows: push, pull and status, every case of
+ * `contract.ts`. {@link HubIndex} is the projection over those rows:
+ * full-text and vector search, and the walks over `ref_links`, run by
+ * `index-contract.ts`. A {@link HubConnector} opens both over one
+ * context. The index takes and answers plain readonly records of
+ * strings, numbers and nulls, the value set the wire allows, so nothing
+ * engine-shaped crosses it; `search` answers row references, a table
+ * and an origin pair with a score, never a row body, which a reader
+ * fetches through the store. What an index can do is answered by
+ * {@link HubIndex.capabilities}, measured when the connector opened.
+ *
  * ## Devices and origins
  *
  * A device is named by its store's origin, the `origin_store` its own
@@ -101,16 +115,40 @@ export interface HubStoreStatus {
  * capability name. Every name is a boolean, `false` for a store that
  * cannot: the names are the contract version's, so a new one comes with
  * a new {@link HubContract.contractVersion}, and a store only says
- * whether it has each.
+ * whether it has each. A connector answers them from what it measured
+ * when it opened, never from what its engine is assumed to hold.
  */
 export type HubCapabilities = Readonly<{
-  /** Full-text search over the rows it holds. */
+  /**
+   * Full-text search over the rows it holds. `true` promises that
+   * {@link HubIndex.search} answers `mode: 'fts'`; a connector answers
+   * `false` when its engine has no full-text index, and a store with
+   * no index behind it answers `false`.
+   */
   fts: boolean;
-  /** Vector search over the rows it holds. */
+  /**
+   * Vector search over the rows it holds. `true` promises that
+   * {@link HubIndex.search} answers `mode: 'vector'` and `'hybrid'`;
+   * a connector answers `false` when its vector extension did not load
+   * at open (macOS without a vanilla `libsqlite3`, or an engine with no
+   * extension loading at all) or when it was given no embedder, and
+   * then a vector search is refused with a message naming `fts`.
+   */
   vector: boolean;
-  /** Graph queries over the rows it holds. */
+  /**
+   * Graph queries over the rows it holds. `true` promises that
+   * {@link HubIndex.links} walks the store's `ref_links` table,
+   * recursively; a connector answers `false` when the store holds no
+   * `ref_links` table or its engine cannot recurse.
+   */
   graph: boolean;
-  /** Projected rows answered to a device whose schema is behind the hub's. */
+  /**
+   * Projected rows answered to a device whose schema is behind the
+   * hub's. `true` promises that a pull from such a device answers its
+   * rows projected to the device's schema rather than refusing it; a
+   * connector answers `false` until it can project, and then that
+   * device is refused.
+   */
   projection: boolean;
 }>;
 
@@ -147,6 +185,122 @@ export interface HubStore {
   readonly close: () => Promise<void>;
 }
 
+/** A row's origin: the store it originated in and its sequence number there. */
+export interface IndexOriginPair {
+  /** The row's `origin_store`. */
+  readonly originStore: string;
+  /** The row's `origin_seq`. */
+  readonly originSeq: number;
+}
+
+/** What one rebuild of the index asks. */
+export interface IndexRebuildRequest {
+  /** The project whose rows the index holds, recorded in its metadata. */
+  readonly project: string;
+  /** Which half is rebuilt; both when left out. */
+  readonly scope?: 'fts' | 'vector' | 'all';
+}
+
+/** An index table with the rows a rebuild counted in it. */
+export interface IndexTableRows {
+  /** The index table's name. */
+  readonly table: string;
+  /** The rows it holds. */
+  readonly rows: number;
+}
+
+/** What one rebuild that swapped its new index in answers. */
+export interface IndexRebuildResult {
+  /** The project recorded in the index's metadata. */
+  readonly project: string;
+  /** The build stamp recorded in the index's metadata. */
+  readonly stamp: string;
+  /** The rows read from the store, one full-text row each. */
+  readonly rows: number;
+  /** The rows embedded, one vector row each: `rows` with vector search on, 0 with it off. */
+  readonly vectors: number;
+  /** Each index table with the rows the rebuild's check counted in it. */
+  readonly tables: readonly IndexTableRows[];
+  /** Whether the index holds the vector half. */
+  readonly vector: boolean;
+  /** Why it does not, `null` when it does. */
+  readonly why: string | null;
+}
+
+/** What one search of the index asks. */
+export interface IndexSearchRequest {
+  /**
+   * How the hits are found: `fts` by full text, `vector` by embedding,
+   * `hybrid` both fused by rank. `vector` and `hybrid` are refused when
+   * {@link HubCapabilities.vector} is `false`.
+   */
+  readonly mode: 'fts' | 'vector' | 'hybrid';
+  /** The words searched for, plain text. */
+  readonly query: string;
+  /** The most hits answered, a whole number above zero; the connector's default when left out. */
+  readonly limit?: number;
+}
+
+/** One hit: the row's table and origin pair, and its score. Never a row body. */
+export interface IndexSearchHit {
+  /** The store table the row lives in. */
+  readonly table: string;
+  /** The row's origin pair, its identity on every device and on the hub. */
+  readonly origin: IndexOriginPair;
+  /** The hit's score in its mode, higher is better. */
+  readonly score: number;
+}
+
+/** What one search answers: row references, best first, which a reader fetches through {@link HubStore}. */
+export interface IndexSearchResult {
+  /** The hits, best first. */
+  readonly hits: readonly IndexSearchHit[];
+}
+
+/** What one walk over `ref_links` asks. */
+export interface IndexLinksRequest {
+  /** The start node's kind, such as `commit` or `issue`. */
+  readonly kind: string;
+  /** The start node's id, such as a sha or `#1436`. */
+  readonly id: string;
+  /** The most hops taken, a whole number above zero; one when left out. */
+  readonly depth?: number;
+}
+
+/** One node a walk reached: its kind and id, and the fewest hops to it. Never a row body. */
+export interface IndexLink {
+  /** The node's kind. */
+  readonly kind: string;
+  /** The node's id. */
+  readonly id: string;
+  /** The fewest hops from the start node, from 1 to the request's depth. */
+  readonly depth: number;
+}
+
+/** What one walk answers: whether the store holds `ref_links`, and the nodes reached, nearest first. */
+export interface IndexLinksResult {
+  /** Whether the store holds a `ref_links` table; `false` answers no links. */
+  readonly graph: boolean;
+  /** The nodes reached, nearest first. */
+  readonly links: readonly IndexLink[];
+}
+
+/**
+ * The hub's index: the projection over the rows its {@link HubStore}
+ * holds, rebuilt from them and never migrated. Every answer is a frozen
+ * plain record; see the module note on what crosses it.
+ */
+export interface HubIndex {
+  /** Rebuilds the index from the store's rows beside the live one and swaps it in; the store is left untouched. */
+  readonly rebuild: (request: IndexRebuildRequest) => Promise<IndexRebuildResult>;
+  /** The rows matching a query, as references; refused for a mode its capabilities do not hold. */
+  readonly search: (request: IndexSearchRequest) => Promise<IndexSearchResult>;
+  /** The nodes reached from one node over `ref_links`, recursively. */
+  readonly links: (request: IndexLinksRequest) => Promise<IndexLinksResult>;
+  /** What the index can answer, computed once when the connector opened. */
+  readonly capabilities: () => HubCapabilities;
+}
+
 /** What an adapter factory is handed, by the hub or by the contract suite. */
 export interface HubStoreContext {
   /** A directory the adapter may keep files in, empty the first time. */
@@ -157,3 +311,10 @@ export interface HubStoreContext {
 
 /** Makes one adapter's store over a context. */
 export type HubStoreFactory = (context: HubStoreContext) => HubStore | Promise<HubStore>;
+
+/**
+ * Opens one connector's store and its index over a context, the pair a
+ * hub serves and both contract suites run over: {@link HubStore}'s
+ * `contract.ts` and {@link HubIndex}'s `index-contract.ts`.
+ */
+export type HubConnector = (context: HubStoreContext) => Promise<{ readonly store: HubStore; readonly index: HubIndex }>;

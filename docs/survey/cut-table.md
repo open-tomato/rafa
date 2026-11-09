@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2197 files, 2169 of them in 12 packages (764 left to place) and 28 in 3 unassigned folders. Of the 4868 edges between two files neither of which is a test, value and type alike, 51 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2198 files, 2170 of them in 12 packages (764 left to place) and 28 in 3 unassigned folders. The package rows below sum to 2188 files, 18 more than that reading, because rows were added by hand after the graph was read. Of the 4868 edges between two files neither of which is a test, value and type alike, 51 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -19,7 +19,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 7 | `rafa-run` | 232 | 107 | 125 | 0 | 22 | 0 | 22 |
 | 8 | `rafa-release` | 106 | 56 | 50 | 0 | 1 | 0 | 1 |
 | 9 | `rafa-effort` | 51 | 32 | 19 | 0 | 0 | 0 | 0 |
-| 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
+| 10 | `rafa-hub` | 45 | 10 | 27 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
 | 12 | `@open-tomato/rafa` | 809 | 178 | 609 | 22 | 0 | 0 | 0 |
 
@@ -38,7 +38,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | `rafa-run` | `packages/rafa-run/` (165), `src/start/` (29), `src/commands/claim/` (2), `src/suite/` (2) | `packages/rafa-run/src/cleanup/index.ts`, `packages/rafa-run/src/cleanup/remote-only.ts`, `packages/rafa-run/src/cleanup/runs.ts`, `packages/rafa-run/src/cleanup/steps.ts`, `packages/rafa-run/src/commands/switch.ts`, `packages/rafa-run/src/loop/events-file.ts`, `packages/rafa-run/src/next/actions.ts`, `packages/rafa-run/src/next/ending.ts`, `packages/rafa-run/src/next/hint.ts`, `packages/rafa-run/src/next/hop-action.ts`, `packages/rafa-run/src/next/hop-rows.ts`, `packages/rafa-run/src/next/owner-gate.ts`, `packages/rafa-run/src/next/preconditions.ts`, `packages/rafa-run/src/next/readings.ts`, `packages/rafa-run/src/next/relations-mode.ts`, `packages/rafa-run/src/next/settle-step.ts`, `packages/rafa-run/src/next/sources.ts`, `packages/rafa-run/src/next/state.ts`, `packages/rafa-run/src/plan/list.ts`, `packages/rafa-run/src/plan/store-rules.ts`, `packages/rafa-run/src/runtime/install.ts` |
 | `rafa-release` | `packages/rafa-release/` (92), `src/commands/release/` (3), `src/release/` (1) | `packages/rafa-release/src/cleanup/past-head.ts`, `packages/rafa-release/src/commands/doctor-ladder.ts`, `packages/rafa-release/src/docs/open-lines.ts`, `packages/rafa-release/src/docs/release-issue.ts`, `packages/rafa-release/src/next/epic-end.ts`, `packages/rafa-release/src/project/lock.ts` |
 | `rafa-effort` | `packages/rafa-effort/` (51) | - |
-| `rafa-hub` | `packages/rafa-hub/` (31) | - |
+| `rafa-hub` | `packages/rafa-hub/` (36), `packages/rafa-index/` (9) | - |
 | `rafa-sync-service` | `packages/rafa-sync-service/` (10) | - |
 | `@open-tomato/rafa` | `src/cli/` (30) | `src/commands/index.ts`, `src/effort/store/index.ts`, `src/inventory/browse.ts`, `src/plan/index.ts`, `src/rafa.ts`, `src/schema/agent.ts` |
 

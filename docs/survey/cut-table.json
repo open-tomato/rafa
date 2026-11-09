@@ -5817,8 +5817,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 9,
-        "test": 14,
+        "source": 10,
+        "test": 27,
         "testSupport": 8
       },
       "files": [
@@ -5826,7 +5826,9 @@
         "packages/rafa-hub/src/bin.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
+        "packages/rafa-hub/src/contract-skew.integration.test.ts",
         "packages/rafa-hub/src/core-subpaths.test.ts",
+        "packages/rafa-hub/src/hub-index.integration.test.ts",
         "packages/rafa-hub/src/hub-unreachable.integration.test.ts",
         "packages/rafa-hub/src/hub.integration.test.ts",
         "packages/rafa-hub/src/identity/contract.test.ts",
@@ -5840,9 +5842,12 @@
         "packages/rafa-hub/src/server.test.ts",
         "packages/rafa-hub/src/server.ts",
         "packages/rafa-hub/src/stand-in-adapters.integration.test.ts",
+        "packages/rafa-hub/src/store/connectors.test.ts",
+        "packages/rafa-hub/src/store/connectors.ts",
         "packages/rafa-hub/src/store/contract.test.ts",
         "packages/rafa-hub/src/store/contract.ts",
         "packages/rafa-hub/src/store/port.ts",
+        "packages/rafa-hub/src/store/sqlite-index.test.ts",
         "packages/rafa-hub/src/store/sqlite.test.ts",
         "packages/rafa-hub/src/store/sqlite.ts",
         "packages/rafa-hub/src/store/testdata/broken-store.fixture.ts",
@@ -5852,13 +5857,24 @@
         "packages/rafa-hub/src/testdata/scratch-home-env.ts",
         "packages/rafa-hub/src/testdata/test-secrets.test.ts",
         "packages/rafa-hub/src/testdata/test-secrets.ts",
-        "packages/rafa-hub/src/two-devices.integration.test.ts"
+        "packages/rafa-hub/src/two-devices.integration.test.ts",
+        "packages/rafa-index/src/fusion.test.ts",
+        "packages/rafa-index/src/imports.test.ts",
+        "packages/rafa-index/src/index.integration.test.ts",
+        "packages/rafa-index/src/links.test.ts",
+        "packages/rafa-index/src/loader.test.ts",
+        "packages/rafa-index/src/notice.test.ts",
+        "packages/rafa-index/src/rebuild.test.ts",
+        "packages/rafa-index/src/schema.test.ts",
+        "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 31
+        "packages/rafa-hub/": 36,
+        "packages/rafa-index/": 9
       },
       "folders": [
-        "packages/rafa-hub/"
+        "packages/rafa-hub/",
+        "packages/rafa-index/"
       ],
       "name": "rafa-hub",
       "named": [],
@@ -6739,7 +6755,7 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2197,
+    "files": 2198,
     "leftToPlace": 764,
     "nonTestEdges": 4868,
     "unassignedFiles": 28,

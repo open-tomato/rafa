@@ -82,7 +82,7 @@ const COMMITS = 'commits';
 const SESSIONS = 'sessions';
 
 /** What every payload is built from: a real export's migrations and row columns. */
-interface WireTemplate {
+export interface WireTemplate {
   readonly migrations: readonly string[];
   readonly commit: WireRow;
   readonly session: WireRow;
@@ -109,7 +109,7 @@ function only(rows: readonly WireRow[] | undefined, index = 0): WireRow {
  * template. The store keys a row by its key and keeps the rest as
  * written, so each planted row holds its key and nothing a case reads.
  */
-function readTemplate(): WireTemplate {
+export function readTemplate(): WireTemplate {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hub-contract-template-')));
   try {
     const store = openSqliteStore(root);
@@ -168,8 +168,11 @@ function withoutSeq(rows: readonly WireRow[]): Readonly<Record<string, unknown>>
         : value])));
 }
 
-/** Builds rows and payloads from the template. */
-function builders(template: () => WireTemplate): {
+/**
+ * Builds rows and payloads from the template. `index-contract.ts` builds
+ * its pushes with it too, so both suites push what a device would send.
+ */
+export function builders(template: () => WireTemplate): {
   commit: (origin: string, originSeq: number, seq?: number) => WireRow;
   session: (origin: string, originSeq: number, seq?: number) => WireRow;
   payload: (tables: Readonly<Record<string, readonly WireRow[]>>) => WirePayload;
