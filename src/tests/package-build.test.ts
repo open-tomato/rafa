@@ -600,7 +600,9 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * `core/command/global-flags.d.ts` since the root help's global flags
  * moved out of `src/cli/help.ts` into core, for board's reference check,
  * and `config-schema-collaborate.d.ts` since the `collaborate` section
- * joined the config schema.
+ * joined the config schema. It has `effort/store/repository-facts.d.ts`
+ * since `merge-store.ts` came to write the supersedes of the readings a
+ * merge brings in.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1327,7 +1329,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(168);
+    expect(before).toHaveLength(169);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });

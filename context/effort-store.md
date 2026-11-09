@@ -806,8 +806,8 @@ busy timeout.
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`, `report_absences`,
 `task_reports`, `preflight`, `dispatches`, `skill_invocations`, `plan_ci`,
-`stale_docs`, `bug_routes`, `store_meta`, `merges`, `merge_conflicts` and
-`store_replaced` are SQLite-only and stay out of the port's row map. Migration
+`stale_docs`, `bug_routes`, `reading_supersedes`, `store_meta`, `merges`,
+`merge_conflicts` and `store_replaced` are SQLite-only and stay out of the port's row map. Migration
 `store-replaced` creates the last one, `store_replaced` (`store_id` as its
 primary key, `replaced_at`): one row per id this store carried before its
 present one, `local` in `MERGE_RULES`, never left the machine. `settleUnderLock`
@@ -868,7 +868,7 @@ hash and a store travels. The path is the real path, so a symlinked spelling
 does not mint; the device and inode are bigints. A `.bak` renamed over the store
 has a new inode and mints, but one restored with `cp` over the existing file
 keeps the old inode and does not (measured on tmpfs); the merge's collision
-check is what catches it. Every production insert into the fourteen tables a
+check is what catches it. Every production insert into the fifteen tables a
 merge unions stamps `origin_store` from that row and `origin_seq` as the row's
 own `seq`, which the insert names itself as `COALESCE(MAX(seq), 0) + 1` so the
 two cannot differ: `STAMPED_COLUMNS` and `stampedValues` (`store/origins.ts`)
@@ -969,6 +969,73 @@ two version-7 filters of `changes.test.ts`, the two version-10 filters of
 open through the module creates, and each filter over a store planted
 by raw SQL takes it out as well, since no open has made it there yet.
 
+### Repository facts
+
+`REPOSITORY_FACTS` (`store/repository-facts.ts`) lists the tables whose rows
+are readings of a shared source, beside `MERGE_RULES` (`store/merge-rules.ts`).
+Each entry declares only its fact columns and its reading-time column. Its
+identity is the table's `MERGE_RULES` identity, never spelled twice. It holds
+one entry today: `plan_ci`, with facts `pr`, `head_sha`, `verdict` and
+`failing`, and time `read_at`.
+
+**Rule `same-fact@1`** (`SAME_FACT_RULE`). Two readings of one table are one
+fact when their fact columns are equal, two NULLs counting as equal. The
+canonical reading is the earliest by reading time; two at one time are ordered
+by key, so every store picks the same one. For `plan_ci` the time is part of
+the identity, so two readings with one `pr`, `head_sha` and `read_at` are one
+row already. There is no origin-pair step.
+
+**The supersede row and its key.** A supersede is a row of
+`reading_supersedes`, never a flag on the reading. A key names a reading by its
+table's identity: `readingKey` answers the JSON array of those values in
+`MERGE_RULES` order, for `plan_ci` `[pr,"head_sha","read_at"]`. It is not the
+origin pair, since 27 of the 189 `plan_ci` rows hold none. The table is unique
+over `table_name`, `canonical_key` and `superseded_key`, so a port and the hub
+that write one supersede write one row, and `settleMatches` settles nothing for
+it. A `reading_supersedes` row carries no scope of its own yet: it travels as
+every merged row does until a `ROW_SCOPE` entry gives it the scope of the
+reading it supersedes.
+
+**When supersedes are written.** `writeSupersedes` runs only for the facts a
+write touched, never as a rescan at read:
+
+- `writePlanCi` (`store/plan-ci.ts`) runs it for the new reading's fact, inside
+  the insert's transaction;
+- `mergeStore` (`store/merge-store.ts`) runs it as the merge's last step, inside
+  the union's transaction, for the facts of the readings the union added.
+
+For each fact it reads every reading of it, takes the earliest as canonical, and
+gives every other reading not yet superseded under the rule one row naming the
+canonical. A late reading older than the canonical one adds a row superseding
+the old canonical, and the reader follows the chain to the earliest.
+
+**The reader's answer.** `readRepositoryFacts` answers one `RepositoryFact` per
+fact: the canonical reading, `sightings` (how many readings it supersedes, so
+two readings of one fact answer one sighting), the origins that read it, and
+`lastSighting`, the latest reading time over all its readings, the canonical
+one included. `readPlanCiFacts` (`store/plan-ci.ts`) is its `plan_ci` form.
+
+**The red-wins pick.** A reader that wants a head's current state picks by
+`lastSighting`, never by the canonical reading's time. `currentReading`
+(`packages/rafa-effort/src/effort/report-skills.ts`) takes the latest
+`lastSighting`; on a tie a red fact beats a non-red one, and otherwise the last
+listed wins. Two facts of one head with an equal last sighting need two pull
+requests, since `(pr, head_sha, read_at)` is one row whatever its verdict.
+
+**The sweep.** The test
+`src/tests/core-coupled/effort/store/repository-facts.sweep.test.ts` reads the
+schema every migration builds and fails on a merged table holding
+`read_at` with no entry, an entry naming a table the store lacks, and an entry
+naming a fact or time column its table lacks. It also reads the production
+sources: a module that names `plan_ci` in a `SELECT` or imports `readPlanCi`
+fails unless it is `plan-ci.ts` or `repository-facts.ts`.
+
+**Doubled facts not yet folded.** At the base the store held 12 facts read more
+than once, all from one store. Nothing folds them yet: a fact folds only when a
+reading of it is written or a merge adds one. A backfill is a command, since
+migrations hold DDL only, and none exists, so those 12 stay as they are until
+one lands.
+
 ### The fact rows
 
 **`readSkillFacts` (`packages/rafa-effort/src/effort/skill-facts.ts`) answers
@@ -980,8 +1047,9 @@ expectations do not move. Each `SkillFact` holds what `task_reports` says
 its resolver and offers, what `skill_invocations` shows it invoked (or
 `'unknown'` when its log could not be read), its `findings`, `blockers`
 and `out_of_scope_bugs` rows in `ACROSS_STORES_ORDER`, the facts of one
-plan in that order over `task_reports`, and every `plan_ci` reading
-of its plan (empty for no plan or a plan with no reading). Names are
+plan in that order over `task_reports`, and every `plan_ci` fact of its
+plan as `readPlanCiFacts` answers it, two readings of one fact once
+(empty for no plan or a plan with no reading). Names are
 mapped through `bareSkillName`, so a served skill reads as its bare name
 and a plugin's `plugin:name` is kept. A session with no report (a
 `report_absences` row) has no fact row.
@@ -996,7 +1064,7 @@ strings come from its `failure_strings:` in the frontmatter, a lesson's from its
 or each later task's findings, blockers or out-of-scope bugs (searched
 fields: `trigger`, `what`, `cause`, `artifact` for findings; `what`,
 `artifact` for entries), or in the plan's failing check names (the union
-over every reading). The task is the fact at `fromIndex`; "later task" is
+over every fact's canonical reading). The task is the fact at `fromIndex`; "later task" is
 a row after it in the same plan. A task under no plan has no later task.
 NULL fields and empty strings are never searched. Each match names the
 string, the source (finding, blocker, bug or plan-ci), the session and
@@ -1043,7 +1111,7 @@ under, in order first seen. A plan run under one resolver has one arm.
 | `plans` | array of `SkillsReportPlan` | one per plan, or empty |
 | `plans[].planStub` | string or null | null for no plan |
 | `plans[].sessions` | number | count of fact rows of this plan |
-| `plans[].planCi` | `PlanCiRow` or null | latest CI reading by time |
+| `plans[].planCi` | `PlanCiRow` or null | canonical reading of the fact last sighted, red winning a tie |
 | `plans[].resolvers` | array of `SkillsReportArm` | one per resolver |
 | `plans[].resolvers[].resolver` | string or null | `planner`, `tag`, `none`, or null |
 | `plans[].resolvers[].sessions` | number | fact rows of this arm |
@@ -1195,7 +1263,9 @@ the plan stub the head branch resolves to, the verdict (`green`, `red` or
 `none`), and the failing checks' names as a JSON array. Both commands call
 `recordPlanCi` (`store/plan-ci.ts`), handing it the pull request, the
 `CheckRow`s and `plan.dir`; it never throws. A `pending` reading stores
-no row. `readPlanCi` reads every row, or one plan's, in append order.
+no row. `readPlanCi` reads every row, or one plan's, in append order;
+`readPlanCiFacts` reads each fact once, through `readRepositoryFacts`: the
+canonical row, `sightings`, `origins` and `lastSighting`, or one plan's.
 **Verdict, PR, head commit.** A `pending` verdict (a check still running)
 stores no row, and the table's CHECK admits only `green`, `red` and `none`.
 `verdictOf` (`store/check-rows.ts`, with `CheckRow` and `failingRows`, all
@@ -1285,6 +1355,39 @@ in `effort.sqlite` whichever backend `store` selects.
 `bug-routes-migration.test.ts` holds the entry to a store an older runtime left,
 the table to each CHECK and index, and both backends; `bug-routes.test.ts` holds
 the writer and the reader.
+
+**`reading_supersedes` holds one row per reading of a shared source that another
+reading of the same fact supersedes.** Migration `reading-supersedes` creates
+it: `seq`, `table_name` (the reading's table), `canonical_key` and
+`superseded_key`, `rule` (the rule that matched the two readings as one fact),
+and the origin pair with `reading_supersedes_by_origin`, which the table holds
+from its first row. A key names a reading by its table's identity in
+`MERGE_RULES`, as the JSON array of those values in that order, never by its
+origin pair, which a reading an older runtime wrote does not hold. The table has
+no time column, so a port and the hub that write one supersede write the same
+row. Every text column is non-blank by CHECK, `origin_store` when filled, and no
+CHECK admits a closed set, so no column is in `KEPT_COLUMNS`.
+`reading_supersedes_by_fact` is unique over `table_name`, `canonical_key` and
+`superseded_key`, the table's identity: the table is `merged`, append-only by
+those three, and one of the `ORIGIN_TABLES`. `store/repository-facts.ts`
+holds `REPOSITORY_FACTS`, the tables whose rows are readings of a shared source
+with each one's fact columns and reading time (`plan_ci`: `pr`, `head_sha`,
+`verdict`, `failing`; `read_at`), the rule `same-fact@1`, the key encoder
+`readingKey`, the writer and the reader. `writeSupersedes` is handed the keys of
+the readings a write touched and, for each fact they reach, gives every reading
+of it that is not the earliest and not yet superseded under the rule one stamped
+row naming the earliest, absorbed on the table's identity; it opens no
+transaction of its own, so it runs inside its caller's. `readRepositoryFacts`
+follows the rows to answer per fact the canonical reading, `sightings` (the
+readings it supersedes), the origins that read it and `lastSighting`, the latest
+reading time of them all. `writePlanCi` (`store/plan-ci.ts`) runs the writer
+for the new reading's fact in the transaction of its insert, its `appended`
+still the count of `plan_ci` rows; `mergeStore` runs it as the merge's last step
+before the `merges` row, for the facts of the readings the union added, and
+counts the rows it writes as rows added to `reading_supersedes`.
+`reading-supersedes-migration.test.ts` holds the entry to a store an older
+runtime left and the table to each CHECK and index; `repository-facts.test.ts`
+holds the writer and the reader.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so

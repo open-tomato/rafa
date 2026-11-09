@@ -60,10 +60,15 @@
  * `planner`, half `tag` would otherwise leave a `planner` task's
  * recurrence in a later `tag` task unsearched.
  *
- * `planCi` is the plan's latest CI reading by `readAt`, labelled plan CI
- * by the formatter and never counted per task or per arm; the last
- * written wins a tie. Recurrences search the failing names of every
- * reading, as `findRecurrences` does.
+ * `planCi` is the canonical reading of the plan's current CI fact,
+ * labelled plan CI by the formatter and never counted per task or per
+ * arm. The current fact is the one with the latest `lastSighting`, never
+ * the latest canonical `readAt`: a head read red, then green, then red
+ * again on a rerun is red, though the red fact's canonical reading is
+ * the oldest. On a tie in `lastSighting` a red fact wins over one of
+ * another verdict, and between two of one kind the fact `readSkillFacts`
+ * lists last wins. Recurrences search the failing names of every fact's
+ * canonical reading, as `findRecurrences` does.
  *
  * ## M1 and M2
  *
@@ -88,7 +93,7 @@ import type { SkillFact } from './skill-facts.js';
 import type { LessonSignalRow, RecurrenceMatcher, SkillSignalRow, SkillTally } from './skill-signals.js';
 import type { SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 import type { TierSeams } from '@open-tomato/rafa/schema/tiers';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact, PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 import type { Resolution } from '@open-tomato/rafa-inventory';
 
 import { readFileSync } from 'node:fs';
@@ -138,7 +143,7 @@ export interface SkillsReportPlan {
   readonly planStub: string | null;
   /** Its task sessions: fact rows. */
   readonly sessions: number;
-  /** Its latest CI reading, plan CI, never a task's; null when none was read. */
+  /** Its current CI fact's canonical reading, plan CI, never a task's; null when none was read. */
   readonly planCi: PlanCiRow | null;
   /** One arm per resolver, in the order first seen; one for a plan run under one. */
   readonly resolvers: readonly SkillsReportArm[];
@@ -317,11 +322,22 @@ function armOf(
   };
 }
 
-/** The latest of `readings` by `readAt`, the last written winning a tie; null for none. */
-function latestReading(readings: readonly PlanCiRow[]): PlanCiRow | null {
-  return readings.reduce<PlanCiRow | null>((latest, reading) => (latest === null || reading.readAt >= latest.readAt
-    ? reading
-    : latest), null);
+/** Whether `fact` is current over `current`: a later last sighting, or a tie `current` does not win by being red alone. */
+function isCurrentOver(fact: PlanCiFact, current: PlanCiFact): boolean {
+  if (fact.lastSighting !== current.lastSighting) return fact.lastSighting > current.lastSighting;
+  return fact.row.verdict === 'red' || current.row.verdict !== 'red';
+}
+
+/**
+ * The canonical reading of the current fact of `facts`: the latest
+ * `lastSighting`, a red fact winning a tie, then the last listed; null
+ * for none. See the module note.
+ */
+function currentReading(facts: readonly PlanCiFact[]): PlanCiRow | null {
+  const current = facts.reduce<PlanCiFact | null>((picked, fact) => (picked === null || isCurrentOver(fact, picked)
+    ? fact
+    : picked), null);
+  return current?.row ?? null;
 }
 
 /**
@@ -341,7 +357,7 @@ export function skillsReportOf(
     return {
       planStub,
       sessions: planFacts.length,
-      planCi: latestReading(planFacts[0]?.planCi ?? []),
+      planCi: currentReading(planFacts[0]?.planCi ?? []),
       resolvers: arms.map(([resolver, armFacts]) => armOf(resolver, armFacts, match, failureStrings, artifacts)),
     };
   });

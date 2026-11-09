@@ -27,6 +27,7 @@ import {
   planCiReading,
   planStubOfBranch,
   readPlanCi,
+  readPlanCiFacts,
   recordPlanCi,
   writePlanCi,
 } from './plan-ci.js';
@@ -65,6 +66,7 @@ const TABLES = [
   'out_of_scope_bugs',
   'plan_ci',
   'preflight',
+  'reading_supersedes',
   'report_absences',
   'schema_migrations',
   'sessions',
@@ -190,7 +192,7 @@ describe('the plan_ci table', () => {
     // The control: the first twelve entries make every earlier table and
     // no plan_ci table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
 
     writePlanCi(root, RED);
 
@@ -235,6 +237,79 @@ describe('the plan_ci table', () => {
       db.close();
     }
     expect(rowsOf(root)).toHaveLength(2);
+  });
+});
+
+/** A supersede row as the table holds it, without its seq and origin pair. */
+interface StoredSupersede {
+  table_name: string;
+  canonical_key: string;
+  superseded_key: string;
+  rule: string;
+}
+
+/** Every supersede row under `root`, in append order. */
+function supersedesOf(root: string): StoredSupersede[] {
+  return rawQuery<StoredSupersede>(root, 'SELECT table_name, canonical_key, superseded_key, rule FROM reading_supersedes ORDER BY seq');
+}
+
+/** A green reading of the head {@link RED} read, an hour later. */
+const GREEN_LATER: PlanCiRow = { ...RED, verdict: 'green', failing: [], readAt: '2026-09-27T13:00:00.000Z' };
+
+describe('writePlanCi supersedes', () => {
+  it('writes none for the same reading written twice', () => {
+    const root = freshRoot('twice');
+
+    expect(writePlanCi(root, RED).appended).toBe(1);
+    expect(writePlanCi(root, RED).appended).toBe(0);
+
+    expect(rowsOf(root)).toHaveLength(1);
+    expect(supersedesOf(root)).toEqual([]);
+  });
+
+  it('writes none for a reading of a different verdict on the same head', () => {
+    const root = freshRoot('verdict');
+    const none: PlanCiRow = { ...GREEN_LATER, verdict: 'none', readAt: '2026-09-27T14:00:00.000Z' };
+
+    // Green and none, both with failing [], so the verdict alone tells the facts apart.
+    expect(writePlanCi(root, GREEN_LATER).appended).toBe(1);
+    expect(writePlanCi(root, none).appended).toBe(1);
+
+    expect(rowsOf(root)).toHaveLength(2);
+    expect(supersedesOf(root)).toEqual([]);
+  });
+
+  it('supersedes a second reading of one fact by the first, counting only the plan_ci row', () => {
+    const root = freshRoot('second');
+    const again: PlanCiRow = { ...GREEN_LATER, readAt: '2026-09-27T14:00:00.000Z' };
+
+    expect(writePlanCi(root, GREEN_LATER).appended).toBe(1);
+    // The control: the first reading of a fact has nothing to supersede.
+    expect(supersedesOf(root)).toEqual([]);
+    expect(writePlanCi(root, again).appended).toBe(1);
+
+    expect(rowsOf(root)).toHaveLength(2);
+    expect(supersedesOf(root)).toEqual([{
+      table_name: 'plan_ci',
+      canonical_key: '[42,"a1b2c3d","2026-09-27T13:00:00.000Z"]',
+      superseded_key: '[42,"a1b2c3d","2026-09-27T14:00:00.000Z"]',
+      rule: 'same-fact@1',
+    }]);
+    // Written again, the second reading adds no row and no supersede.
+    expect(writePlanCi(root, again).appended).toBe(0);
+    expect(supersedesOf(root)).toHaveLength(1);
+  });
+
+  it('supersedes the old canonical reading when an older reading of the fact lands late', () => {
+    const root = freshRoot('late');
+    const earlier: PlanCiRow = { ...GREEN_LATER, readAt: '2026-09-27T12:30:00.000Z' };
+
+    writePlanCi(root, GREEN_LATER);
+    expect(writePlanCi(root, earlier).appended).toBe(1);
+
+    expect(supersedesOf(root).map(({ canonical_key, superseded_key }) => [canonical_key, superseded_key])).toEqual([
+      ['[42,"a1b2c3d","2026-09-27T12:30:00.000Z"]', '[42,"a1b2c3d","2026-09-27T13:00:00.000Z"]'],
+    ]);
   });
 });
 
@@ -348,10 +423,82 @@ describe('readPlanCi', () => {
   it('brings a version-12 store forward and answers none, the table just made', () => {
     const root = freshRoot('read-from-v12');
     plantAtVersion(root, 12);
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
 
     expect(readPlanCi(root)).toEqual([]);
     expect(tablesOf(root)).toEqual(TABLES);
+  });
+});
+
+describe('readPlanCiFacts', () => {
+  it('reads none, and creates nothing, under a root with no store', () => {
+    const root = freshRoot('facts-absent');
+
+    expect(readPlanCiFacts(root)).toEqual([]);
+    expect(existsSync(root)).toBe(false);
+  });
+
+  it('answers a fact read once with no sighting, its own time as the last one', () => {
+    const root = freshRoot('facts-once');
+    writePlanCi(root, RED);
+
+    expect(readPlanCiFacts(root)).toEqual([{ row: RED, sightings: 0, origins: [], lastSighting: READ_AT }]);
+  });
+
+  it('answers two readings of one fact as one fact with one sighting, the earliest canonical', () => {
+    const root = freshRoot('facts-two');
+    const again: PlanCiRow = { ...GREEN_LATER, readAt: '2026-09-27T14:00:00.000Z' };
+    writePlanCi(root, again);
+    writePlanCi(root, GREEN_LATER);
+
+    // The control: readPlanCi still holds both readings the facts count once.
+    expect(readPlanCi(root)).toHaveLength(2);
+    expect(readPlanCiFacts(root)).toEqual([{
+      row: GREEN_LATER,
+      sightings: 1,
+      origins: [],
+      lastSighting: '2026-09-27T14:00:00.000Z',
+    }]);
+  });
+
+  it('answers a reading of another verdict on the same head as a fact of its own', () => {
+    const root = freshRoot('facts-verdicts');
+    writePlanCi(root, RED);
+    writePlanCi(root, GREEN_LATER);
+
+    expect(readPlanCiFacts(root).map(({ row, sightings }) => [row, sightings])).toEqual([[RED, 0], [GREEN_LATER, 0]]);
+  });
+
+  it('answers the distinct origins of a fact\'s readings, sorted', () => {
+    const root = freshRoot('facts-origins');
+    const again: PlanCiRow = { ...RED, readAt: '2026-09-27T12:30:00.000Z' };
+    const third: PlanCiRow = { ...RED, readAt: '2026-09-27T13:00:00.000Z' };
+    writePlanCi(root, RED);
+    writePlanCi(root, again);
+    writePlanCi(root, third);
+    // A fixture: the store under tmpdir() mints no origin, so two are planted, the third reading left with none.
+    const db = new Database(sqliteStorePath(root), { readwrite: true });
+    db.run('UPDATE plan_ci SET origin_store = ?, origin_seq = seq WHERE read_at = ?', ['store-b', again.readAt]);
+    db.run('UPDATE plan_ci SET origin_store = ?, origin_seq = seq WHERE read_at = ?', ['store-a', READ_AT]);
+    db.close();
+
+    expect(readPlanCiFacts(root)).toEqual([{
+      row: RED,
+      sightings: 2,
+      origins: ['store-a', 'store-b'],
+      lastSighting: third.readAt,
+    }]);
+  });
+
+  it('answers one plan\'s facts when a plan is named', () => {
+    const root = freshRoot('facts-plan');
+    const other: PlanCiRow = { ...RED, planStub: 'rafa-23-other', pr: 41, readAt: '2026-09-27T11:00:00.000Z' };
+    writePlanCi(root, RED);
+    writePlanCi(root, other);
+
+    expect(readPlanCiFacts(root).map(({ row }) => row)).toEqual([other, RED]);
+    expect(readPlanCiFacts(root, 'rafa-23-other').map(({ row }) => row)).toEqual([other]);
+    expect(readPlanCiFacts(root, 'rafa-99-absent')).toEqual([]);
   });
 });
 

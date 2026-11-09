@@ -148,6 +148,10 @@ const FIXTURES: Readonly<Record<OriginTable, (key: string) => FixtureRow>> = {
     entry_index: 0, what: `SRC routed bug ${key}`, said: 'own-gap', kind: 'bug', route: 'follow-up',
     collected_at: timeOf(key),
   }),
+  reading_supersedes: (key) => ({
+    table_name: 'plan_ci', canonical_key: `[9,"SRC-head-${key}","${timeOf(key)}"]`,
+    superseded_key: `[9,"SRC-head-${key}","${timeOf(key).replace('T10:', 'T11:')}"]`, rule: 'same-fact@1',
+  }),
 };
 
 let base = '';

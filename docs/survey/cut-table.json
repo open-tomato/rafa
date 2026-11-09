@@ -2214,6 +2214,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/repository-facts.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/core-coupled/effort/store/search-row.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3884,8 +3889,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 209,
-        "test": 152,
+        "source": 210,
+        "test": 154,
         "testSupport": 9
       },
       "files": [
@@ -4122,6 +4127,9 @@
         "packages/rafa/src/effort/store/refusal.test.ts",
         "packages/rafa/src/effort/store/reports.test.ts",
         "packages/rafa/src/effort/store/reports.ts",
+        "packages/rafa/src/effort/store/repository-facts-merge.test.ts",
+        "packages/rafa/src/effort/store/repository-facts.test.ts",
+        "packages/rafa/src/effort/store/repository-facts.ts",
         "packages/rafa/src/effort/store/row-fields.test.ts",
         "packages/rafa/src/effort/store/schema-plan.test.ts",
         "packages/rafa/src/effort/store/schema-plan.ts",
@@ -4261,7 +4269,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 370
+        "packages/rafa/": 373
       },
       "folders": [
         "packages/rafa/"
@@ -5928,7 +5936,7 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 609,
+        "test": 610,
         "testSupport": 22
       },
       "files": [
@@ -6419,6 +6427,7 @@
         "src/tests/core-coupled/effort/store/move.test.ts",
         "src/tests/core-coupled/effort/store/origins.test.ts",
         "src/tests/core-coupled/effort/store/preflight.test.ts",
+        "src/tests/core-coupled/effort/store/repository-facts.sweep.test.ts",
         "src/tests/core-coupled/effort/store/search-row.test.ts",
         "src/tests/core-coupled/effort/store/settings.test.ts",
         "src/tests/core-coupled/effort/store/stale-docs.test.ts",

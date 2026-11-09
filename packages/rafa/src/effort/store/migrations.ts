@@ -667,6 +667,41 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
     WHERE origin_store IS NOT NULL;
   `,
   },
+  // One row per reading of a shared source that a later or earlier
+  // reading of the same fact supersedes: `table_name` is the reading's
+  // table, `canonical_key` and `superseded_key` name the two readings by
+  // that table's identity in `MERGE_RULES`, as the JSON array of its
+  // identity values in that order, never by their origin pair, which a
+  // reading an older runtime wrote does not hold. `rule` names the rule
+  // that matched the two as one fact. A supersede is a row of its own and
+  // never a flag on the reading, and the table holds no time of its own,
+  // so a port and the hub that write one supersede write the same row.
+  // `reading_supersedes_by_fact` is that row's identity, so a second
+  // write of it is absorbed; the origin pair is held from the first row,
+  // since the table is created after `row-origins`. Every text column is
+  // non-blank, the origin store too when it is filled.
+  {
+    id: 'reading-supersedes',
+    breaks: [],
+    sql: `
+  CREATE TABLE reading_supersedes (
+    seq            INTEGER PRIMARY KEY,
+    table_name     TEXT NOT NULL CHECK (table_name <> ''),
+    canonical_key  TEXT NOT NULL CHECK (canonical_key <> ''),
+    superseded_key TEXT NOT NULL CHECK (superseded_key <> ''),
+    rule           TEXT NOT NULL CHECK (rule <> ''),
+    origin_store   TEXT CHECK (origin_store <> ''),
+    origin_seq     INTEGER
+  );
+
+  CREATE UNIQUE INDEX reading_supersedes_by_fact
+    ON reading_supersedes (table_name, canonical_key, superseded_key);
+
+  CREATE UNIQUE INDEX reading_supersedes_by_origin
+    ON reading_supersedes (origin_store, origin_seq)
+    WHERE origin_store IS NOT NULL;
+  `,
+  },
 ];
 
 /**
