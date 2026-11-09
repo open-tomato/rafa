@@ -28,10 +28,11 @@
  * `effort.sync: service`), `hub.tokenSecret` (the secret store name of
  * the token, never the token) and `hub.timeout` (default `3s`, from `1s`
  * to `30s`, `0` and negative values refused). The server's keys,
- * `hub.repository`, `hub.port`, `hub.storePath` and `hub.auth.cacheFor`,
- * are read by `packages/rafa-hub/` from its own file and are not keys
- * here: in a project's file they are unknown keys, warned about and
- * acted on by nothing. Five readings the spec leaves to this module:
+ * `hub.repository`, `hub.port`, `hub.storePath`, `hub.auth.cacheFor`,
+ * `hub.store.sqliteLibrary` and `hub.index.rebuildAfterPush`, are read by
+ * `packages/rafa-hub/` from its own file and are not keys here: in a
+ * project's file they are unknown keys, warned about and acted on by
+ * nothing. Five readings the spec leaves to this module:
  *
  *   - `hub.url` and `hub.tokenSecret` default to NULL, meaning "nobody
  *     has said", as `pr.base` does: no default address or secret name

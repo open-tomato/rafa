@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2198 files, 2170 of them in 12 packages (764 left to place) and 28 in 3 unassigned folders. Of the 4868 edges between two files neither of which is a test, value and type alike, 51 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2198 files, 2170 of them in 12 packages (764 left to place) and 28 in 3 unassigned folders. The package rows below sum to 2188 files, 18 more than that reading, because rows were added by hand after the graph was read. Of the 4868 edges between two files neither of which is a test, value and type alike, 51 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 
@@ -21,7 +21,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 9 | `rafa-effort` | 51 | 32 | 19 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 45 | 10 | 27 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
-| 12 | `@open-tomato/rafa` | 806 | 178 | 606 | 22 | 0 | 0 | 0 |
+| 12 | `@open-tomato/rafa` | 809 | 178 | 609 | 22 | 0 | 0 | 0 |
 
 ## What each package holds by rule
 
