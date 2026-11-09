@@ -21,10 +21,10 @@
  *
  * This module declares core's own top-level keys, the keys of
  * `packages/rafa/src/core/config/core-section.ts`, and composes {@link ConfigShape}
- * from them and the interface each of the fifteen section files
- * (`packages/rafa/src/config-schema-*.ts`) exports for the keys it writes: `HubShape`
- * for `hub`, `ReleaseShape` for `pr` and `release`, and so on, each
- * extended by {@link ConfigShape}. A namespace two packages share is a
+ * from them and the interface each of the sixteen section files
+ * (`packages/rafa/src/config-schema-*.ts`) exports for the keys it
+ * writes: `HubShape` for `hub`, `ReleaseShape` for `pr` and `release`,
+ * and so on, each extended by {@link ConfigShape}. A namespace two packages share is a
  * named interface here holding core's keys and extending the part each
  * section exports as an interface of its own: {@link LoopShape} extends
  * `LoopRetriesShape`, `LoopContinueShape` and `WrapUpShape`,
@@ -51,6 +51,7 @@ import type { ChecksShape } from '@open-tomato/rafa/config-schema-checks';
 import type { CollaborateShape } from '@open-tomato/rafa/config-schema-collaborate';
 import type { ErrorsShape } from '@open-tomato/rafa/config-schema-errors';
 import type { FeaturesShape } from '@open-tomato/rafa/config-schema-features';
+import type { HintsShape } from '@open-tomato/rafa/config-schema-hints';
 import type { HubShape } from '@open-tomato/rafa/config-schema-hub';
 import type { IssuesShape } from '@open-tomato/rafa/config-schema-issues';
 import type { LoggerShape } from '@open-tomato/rafa/config-schema-logger';
@@ -161,6 +162,7 @@ export interface ConfigShape extends
   CollaborateShape,
   ErrorsShape,
   FeaturesShape,
+  HintsShape,
   HubShape,
   IssuesShape,
   LoggerShape,

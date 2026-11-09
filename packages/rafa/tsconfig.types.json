@@ -25,6 +25,7 @@
     "src/config-schema-bugs.ts",
     "src/config-schema-errors.ts",
     "src/config-schema-features.ts",
+    "src/config-schema-hints.ts",
     "src/config-schema-logger.ts",
     "src/config-schema-board-project.ts",
     "src/config-schema-checks.ts",

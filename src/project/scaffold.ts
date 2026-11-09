@@ -152,6 +152,8 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   release: ${String(CONFIG_DEFAULTS.featuresRelease)}               # false drops the release feature's commands`,
   '# collaborate:',
   '#   rafa:                        # owner/name of the rafa board --upstream=rafa reports on, of this board\'s owner',
+  '# hints:',
+  `#   skills: ${String(CONFIG_DEFAULTS.hintsSkills)}               # true follows a release step with the rafa-release skill case that explains it`,
   '# allowList: []',
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,

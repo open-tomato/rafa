@@ -118,7 +118,7 @@ const USER_MODULE_PATH = '/home/someone/.rafa/rafa.config.ts';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate)';
+  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate, hints)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -235,6 +235,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'featuresRun',
   'featuresRelease',
   'collaborateRafa',
+  'hintsSkills',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -358,6 +359,7 @@ const DEFAULTS: RafaConfig = {
   featuresRun: true,
   featuresRelease: true,
   collaborateRafa: null,
+  hintsSkills: false,
 };
 
 /**
@@ -535,6 +537,8 @@ const FULL = [
   '  release: false',
   'collaborate:',
   '  rafa: open-tomato/rafa',
+  'hints:',
+  '  skills: true',
   '',
 ].join('\n');
 
@@ -670,6 +674,7 @@ const FULL_VALUES: RafaConfig = {
   featuresRun: false,
   featuresRelease: false,
   collaborateRafa: 'open-tomato/rafa',
+  hintsSkills: true,
 };
 
 /**
@@ -1467,6 +1472,11 @@ describe('parseConfigText', () => {
         'collaborate.rafa', 'collaborate:\n  rafa: rafa',
         'collaborate.rafa is "rafa", expected a repository as owner/name, such as open-tomato/rafa',
         'collaborate:\n  rafa: open-tomato/rafa', 'collaborateRafa', 'open-tomato/rafa',
+      ],
+      [
+        'hints.skills', 'hints:\n  skills: "true"',
+        'hints.skills is "true", expected true or false',
+        'hints:\n  skills: true', 'hintsSkills', true,
       ],
     ];
 

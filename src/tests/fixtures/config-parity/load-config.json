@@ -140,6 +140,10 @@
       "value": true,
       "source": "default"
     },
+    "hintsSkills": {
+      "value": false,
+      "source": "default"
+    },
     "hubTimeout": {
       "value": "3s",
       "source": "default"
@@ -465,7 +469,7 @@
   "userPath": null,
   "userLocalPath": "<home>/.rafa/config.yaml",
   "warnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate, hints)"
   ],
   "extras": [],
   "localExtras": [
@@ -477,6 +481,6 @@
   "userExtras": [],
   "userLocalExtras": [],
   "printedWarnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate, hints)"
   ]
 }

@@ -37,12 +37,16 @@ spells out, and the shapes the lint config forces.
   `../core/` and `../utils/` lines after, while
   `packages/rafa-board/src/board/project/rules.ts` puts `./options.js` last,
   after its `../` lines. Both pass eslint. Take the order from `bunx eslint
-  --fix-dry-run --format json <file>` or from the lint message itself
-  (`` `./check-rows.js` type import should occur before type import of
-  `./plan-ci.js` ``), not from this page; adding a second sibling type import
-  beside an existing one is where it bites. Value imports differ:
-  the `parent` group (`../`) comes before the `sibling` group (`./`), a blank
-  line between them.
+  --fix-dry-run --format json <file>`, not from this page. This holds in tests
+  too: a colocated test's `import type` of its sibling under test, or a second
+  sibling type import, lands where the lint message says (`./release.js` type
+  import should occur before type import of `../../adapters/tracker/github.js`).
+  Value imports differ: the `parent` group (`../`) comes before the `sibling`
+  group (`./`), a blank line between them. A new test that imports
+  `@open-tomato/rafa-effort` beside `bun:test` and `@open-tomato/rafa/*` gets
+  "There should be at least one empty line between import groups"; run `bunx
+  eslint --fix` on that new test file rather than placing the blank lines by
+  hand.
 - **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
@@ -147,8 +151,10 @@ subject folders. `config/` holds the value readers, core's keys of the schema,
 the section contract, core's own section and the loader; `command/` the command
 contract (`RafaCommand`, `RafaContext`, `CommandExit`), the version and the
 confirm prompt; `output/` the active output; `adapters/` the adapter registry;
-`git/` the git runner and the commit helpers; `plan/` the block reader, the plan
-parser and the plan-file readers; `loop/` the loop's session helpers, its
+`git/` the git runner, the commit helpers and the placed-line helper
+(`placed-line.ts`, a printed step with `cd <checkout> &&` in front only when it
+runs elsewhere); `plan/` the block reader, the plan parser and the plan-file
+readers; `loop/` the loop's session helpers, its
 session readings and the Claude spawner; `runtime/` the reading of which build
 is running. The ninth, `services/`, moved nothing in: it was written there
 (#1336) and holds the service registry, the functions of run, pr and release
@@ -411,17 +417,17 @@ coupling is gone, or into the module it really tests.
 **The config sections are handed in, never imported.** Core declares the
 section contract in `packages/rafa/src/core/config/section.ts`: a
 `ConfigSection` carries its `package` name, its `settings`, its `defaults` and
-its cross-key `checks`. Core names no section. The sixteen are listed in
+its cross-key `checks`. Core names no section. The seventeen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and fifteen `config-schema-*.ts` files, all under
+own (`core-section.ts`) and sixteen `config-schema-*.ts` files, all under
 `packages/rafa/src/` since rafa-1325 moved the ten feature sections in from
 `src/`: four for `bugs`, `errors`, `features` and `logger`, ten for the
-registered feature sections, and `collaborate`'s. That module registers
-nothing as it is imported: its `registerCoreConfigSections()` registers the
-sixteen with core and sets core's load hook, and `src/rafa.ts`,
-`src/index.ts` and `src/tests/preload.ts` call it ahead of
-`registerCoreAdapters()`, before anything loads a config. A second call
-registers nothing. A file outside `packages/rafa/src/core/` takes
+registered feature sections, `collaborate`'s and `hints`, written there.
+That module registers nothing as it is imported: its
+`registerCoreConfigSections()` registers the seventeen with core and sets
+core's load hook, and `src/rafa.ts`, `src/index.ts` and
+`src/tests/preload.ts` call it ahead of `registerCoreAdapters()`, before
+anything loads a config. A second call registers nothing. A file outside `packages/rafa/src/core/` takes
 the merged `SETTINGS`, `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`,
 `SECTIONS` and `knownKeysAbove` from the registry, never from the core barrel,
 which exports none of them; core reads the same through the `active*`
@@ -1309,13 +1315,14 @@ names come from, and the facade entry is no node.
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps twenty-three `types`-only entries for
+  them. The root `exports` also keeps twenty-four `types`-only entries for
   core's files (`./core/config`, `./core/config/config-schema`,
   `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
   `./ports/log-level`, `./report/parse`, `./store/check-rows`, and, since pass
   1 and the third decouple item (rafa-1325) moved the section files in,
   `./bugs/record` and the fourteen `./config-schema-*` files, and since
-  rafa-751 a fifteenth, `./config-schema-collaborate`), which #808
+  rafa-751 a fifteenth, `./config-schema-collaborate`, and the `hints`
+  section's `./config-schema-hints`), which #808
   retires. The first pass's `include` names each moved file the root's config
   files import.
 - **A content schema is imported through its owner's `schemas` export.** A
@@ -1401,6 +1408,19 @@ suites also check that every setting appears exactly once:
 test` shows what is missing. A section appended after the last one in the
 scaffold has to bound any scaffold case that slices from an earlier header to
 the end of the template. This section replaces nothing.
+
+**A new top-level section reaches the config-parity fixtures, and a new
+`config-schema-*.ts` file reaches the manifests.** A section added under a new
+name, such as `hints`, moves `src/tests/fixtures/config-parity/load-config.json`
+(one entry per setting, with its default and its source) and the known-keys
+list the unknown-key warning prints in `doctor.txt` and `module-list.txt`;
+`src/tests/config-parity.test.ts` pins those three fixtures. A new
+`packages/rafa/src/config-schema-<section>.ts` file also goes in the
+`./config-schema-<section>` `exports` of `packages/rafa/package.json`, in the
+`include` of `packages/rafa/tsconfig.types.json`, in a `types`-only `exports`
+entry of the root `package.json` naming `dist/config-schema-<section>.d.ts`,
+and in `src/tests/fixtures/dist-files-c920603.txt`. `check-types` reads none
+of them, so `bun run test` is what shows one that is missing.
 
 ### Shapes the lint config forces
 

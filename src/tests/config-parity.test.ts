@@ -28,7 +28,10 @@
  * default from source `default`, and moved nothing else; the
  * `collaborate` section's `collaborate.rafa` added one `load-config.json`
  * entry, its null default from source `default`, and `collaborate` to the
- * end of the known keys the unknown-key warning lists, in all three.
+ * end of the known keys the unknown-key warning lists, in all three; the
+ * `hints` section added one entry, `hintsSkills` at its `false` default
+ * from source `default`, and `hints` after `collaborate` at the end of
+ * the known keys in all three fixtures, and moved nothing else.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

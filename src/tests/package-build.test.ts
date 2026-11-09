@@ -554,6 +554,7 @@ const EXPORTS = {
   './config-schema-bugs': { types: './dist/config-schema-bugs.d.ts' },
   './config-schema-errors': { types: './dist/config-schema-errors.d.ts' },
   './config-schema-features': { types: './dist/config-schema-features.d.ts' },
+  './config-schema-hints': { types: './dist/config-schema-hints.d.ts' },
   './config-schema-logger': { types: './dist/config-schema-logger.d.ts' },
   './config-schema-board-project': { types: './dist/config-schema-board-project.d.ts' },
   './config-schema-checks': { types: './dist/config-schema-checks.d.ts' },
@@ -602,7 +603,9 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * and `config-schema-collaborate.d.ts` since the `collaborate` section
  * joined the config schema. It has `effort/store/repository-facts.d.ts`
  * since `merge-store.ts` came to write the supersedes of the readings a
- * merge brings in.
+ * merge brings in. It has `core/git/placed-line.d.ts`, the placed-line
+ * helper the git barrel exports, and `utils/shell.d.ts`, the `shellQuote`
+ * it imports. It has `config-schema-hints.d.ts` from the `hints` section.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -1211,7 +1214,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name, the fifteen config sections among them, to their types, and nothing else', () => {
+  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name, the sixteen config sections among them, to their types, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -1314,7 +1317,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(32);
+    expect(targets).toHaveLength(33);
     expect(missing).toEqual([]);
   });
 
@@ -1329,7 +1332,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(169);
+    expect(before).toHaveLength(172);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
@@ -1589,14 +1592,14 @@ describe('the config subpath in the build', () => {
     expect(reach.outside).toEqual([]);
   });
 
-  it('reaches the fifteen section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
+  it('reaches the sixteen section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
     const reach = declarationReach(DIST, CONFIG_TYPES);
     const sections = [
-      'board-project', 'bugs', 'checks', 'collaborate', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
-      'loop-retries', 'release', 'tests', 'triage', 'wrap-up',
+      'board-project', 'bugs', 'checks', 'collaborate', 'errors', 'features', 'hints', 'hub', 'issues', 'logger',
+      'loop-continue', 'loop-retries', 'release', 'tests', 'triage', 'wrap-up',
     ].map((name) => `config-schema-${name}.d.ts`);
 
-    expect(sections).toHaveLength(15);
+    expect(sections).toHaveLength(16);
     expect(reach.reached).toEqual(expect.arrayContaining([...sections, 'ports/log-level.d.ts']));
     expect(reach.reached).not.toContain('ports/index.d.ts');
     expect(reach.outside).toEqual([]);

@@ -18,6 +18,11 @@
  * other than the one its tag names. With no release tag on HEAD the run
  * refuses with exit 1 too: a publish workflow started on such a commit
  * has nothing to publish, and saying so is louder than a green no-op.
+ * That refusal ends with a `Next:` step, `rafa release tag`, placed by
+ * core's `placeLine` at the project root as `./tag-next-steps.ts` places
+ * the tag's own steps, so it carries `cd <root> &&` only when the run
+ * stood outside that top level. It is rendered by `./step-cases.ts`
+ * with no case, so `hints.skills` adds no skill line to it.
  *
  * Each unit is read with the readers `rafa release tag` decides from
  * (`./tag-units.ts`): the root off `release.versionFile`, published from
@@ -73,6 +78,7 @@
  * with the dispatcher's `command_exit` error, whose message names what
  * was published before the failure.
  */
+import type { ReleaseStep } from './step-cases.js';
 import type { PublishTarget } from './tag-follow-ups.js';
 import type { VersionReading } from './tag-units.js';
 import type { TaggedRelease } from '../../release/version-tag.js';
@@ -93,7 +99,9 @@ import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { parseReleaseTag } from '../../release/version-tag.js';
 
 import { RELEASE_PUBLISH_DECLARATION, RELEASE_PUBLISH_DRY_RUN_FLAG, RELEASE_PUBLISH_TAG_FLAG } from './declarations.js';
+import { renderNextSteps } from './step-cases.js';
 import { readPublishTarget } from './tag-follow-ups.js';
+import { placedAtRoot, stepPlacingOf } from './tag-next-steps.js';
 import { readTagPackages, readVersion } from './tag-units.js';
 
 /** The usage line this action's refusals name. */
@@ -193,12 +201,20 @@ export interface ReleasePublishResult {
   readonly exit: number;
 }
 
-/** The two settings one run reads out of the config. */
+/** The command that writes the release tag a publish reads off HEAD. */
+const TAG_COMMAND = 'rafa release tag';
+
+/** Why {@link TAG_COMMAND} clears the refusal of a HEAD with no release tag. */
+const TAG_WHY = 'writes the release tag on HEAD that a publish reads; run it on the release branch';
+
+/** The settings one run reads out of the config. */
 interface PublishSettings {
   /** `release.versionFile`, the root unit's manifest. */
   readonly versionFile: string;
   /** `release.publishCommand`, run in each unit's directory. */
   readonly publishCommand: string;
+  /** `hints.skills`, the switch the step renderer reads. */
+  readonly hintsSkills: boolean;
 }
 
 /** A spawn's output stream as text, null read as empty. */
@@ -240,17 +256,31 @@ function projectOf(context: RafaContext): ProjectFound {
   return context.project;
 }
 
-/** The exit a run refused with: one `❌` line per sentence, then the usage. */
-function refusal(messages: readonly string[]): CommandExit {
+/** The exit a run refused with: one `❌` line per sentence, then the `Next:` lines `next` gives, then the usage. */
+function refusal(messages: readonly string[], next: readonly string[] = []): CommandExit {
   const lines = messages.map((message) => `❌ ${message}`);
-  return new CommandExit(1, `${lines.join('\n')}\nUsage: ${RELEASE_PUBLISH_USAGE}`);
+  return new CommandExit(1, [...lines, ...next, `Usage: ${RELEASE_PUBLISH_USAGE}`].join('\n'));
+}
+
+/**
+ * The `Next:` lines of the refusal of a HEAD with no release tag: the
+ * `rafa release tag` step, placed at `root` through `git`, rendered
+ * under `skills`, the `hints.skills` switch; see the module note.
+ */
+export function untaggedNext(root: string, git: GitRunner, skills: boolean): readonly string[] {
+  const step: ReleaseStep = { command: placedAtRoot(TAG_COMMAND, stepPlacingOf(root, git)), why: TAG_WHY, case: null };
+  return renderNextSteps([step], skills);
 }
 
 /** The two settings this action reads, refusing a config `loadConfig` refuses. */
 async function publishConfig(project: ProjectFound, warn: (message: string) => void): Promise<PublishSettings> {
   try {
     const { config } = await loadConfig({ root: project.root, home: project.home }, {}, warn);
-    return { versionFile: config.releaseVersionFile, publishCommand: config.releasePublishCommand };
+    return {
+      versionFile: config.releaseVersionFile,
+      publishCommand: config.releasePublishCommand,
+      hintsSkills: config.hintsSkills,
+    };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw new CommandExit(
@@ -288,9 +318,14 @@ interface HeadRelease {
 /**
  * The release tags a run publishes: the one `wanted` names, refused when
  * it is no release tag or not on HEAD, or every release tag on HEAD, the
- * root's first, refused when there is none.
+ * root's first, refused when there is none with the `Next:` lines
+ * `untagged` gives.
  */
-export function selectReleases(headTags: readonly string[], wanted: string | null): readonly HeadRelease[] {
+export function selectReleases(
+  headTags: readonly string[],
+  wanted: string | null,
+  untagged: () => readonly string[] = () => [],
+): readonly HeadRelease[] {
   if (wanted !== null) {
     const release = parseReleaseTag(wanted);
     if (release === null) {
@@ -305,7 +340,7 @@ export function selectReleases(headTags: readonly string[], wanted: string | nul
       ? []
       : [{ tag, release }];
   });
-  if (releases.length === 0) throw refusal(['no release tag points at HEAD, so there is nothing to publish']);
+  if (releases.length === 0) throw refusal(['no release tag points at HEAD, so there is nothing to publish'], untagged());
   return [
     ...releases.filter((each) => each.release.package === null),
     ...releases.filter((each) => each.release.package !== null),
@@ -503,7 +538,7 @@ export async function runPublish(context: RafaContext, seams: PublishSeams = {})
     context.output.warn(message);
   });
   const git = (seams.git ?? createGitRunner)(project.root);
-  const heads = selectReleases(readHeadTags(git), wanted);
+  const heads = selectReleases(readHeadTags(git), wanted, () => untaggedNext(project.root, git, settings.hintsSkills));
   const units = readUnits(project.root, settings, heads);
   const command = settings.publishCommand;
   if (dryRun) {

@@ -1,14 +1,14 @@
 /**
- * The registry: the sixteen sections of the config schema, handed to
+ * The registry: the seventeen sections of the config schema, handed to
  * core when {@link registerCoreConfigSections} is called, and the merged schema read off
  * them, {@link SETTINGS}, {@link CONFIG_DEFAULTS}, {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and {@link knownKeysAbove}.
  *
  * Core declares the section contract (`packages/rafa/src/core/config/section.ts`) and
  * names no section. This module, outside `packages/rafa/src/core/`, is the one place
- * the sixteen are listed, {@link CONFIG_SECTIONS}: core's own
- * (`CORE_SECTION`) and the fifteen files `config-schema-*.ts` that
- * each export one, all under `packages/rafa/src/`.
+ * the seventeen are listed, {@link CONFIG_SECTIONS}: core's own
+ * (`CORE_SECTION`) and the sixteen files `config-schema-*.ts` under
+ * `packages/rafa/src/` that each export one.
  *
  * Importing it registers nothing. {@link registerCoreConfigSections}
  * calls `registerConfigSections` once, with that list cut into the runs
@@ -109,6 +109,7 @@ import {
 } from '@open-tomato/rafa/config-schema-collaborate';
 import { ERRORS_DEFAULTS, ERRORS_SECTION, ERRORS_SETTINGS } from '@open-tomato/rafa/config-schema-errors';
 import { FEATURES_DEFAULTS, FEATURES_SECTION, FEATURES_SETTINGS } from '@open-tomato/rafa/config-schema-features';
+import { HINTS_DEFAULTS, HINTS_SECTION, HINTS_SETTINGS } from '@open-tomato/rafa/config-schema-hints';
 import { HUB_DEFAULTS, HUB_SECTION, HUB_SETTINGS } from '@open-tomato/rafa/config-schema-hub';
 import { ISSUES_DEFAULTS, ISSUES_SECTION, ISSUES_SETTINGS } from '@open-tomato/rafa/config-schema-issues';
 import {
@@ -149,7 +150,7 @@ import {
 
 import { templateEntry } from './config/templates.js';
 
-/** The sixteen sections, core's first, in the order they are registered. */
+/** The seventeen sections, core's first, in the order they are registered. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   CORE_SECTION,
   HUB_SECTION,
@@ -167,6 +168,7 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = Object.freeze([
   CHECKS_SECTION,
   FEATURES_SECTION,
   COLLABORATE_SECTION,
+  HINTS_SECTION,
 ]);
 
 /**
@@ -282,6 +284,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...CHECKS_DEFAULTS,
   ...FEATURES_DEFAULTS,
   ...COLLABORATE_DEFAULTS,
+  ...HINTS_DEFAULTS,
 });
 
 /**
@@ -314,6 +317,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = Objec
   ...CHECKS_SETTINGS,
   ...FEATURES_SETTINGS,
   ...COLLABORATE_SETTINGS,
+  ...HINTS_SETTINGS,
 });
 
 /** Every setting name, read off the closed record above. */

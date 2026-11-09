@@ -62,6 +62,9 @@ const PLUGIN_DIR = 'packages/plugin';
 const PLUGIN_VERSION = '0.2.0';
 const PLUGIN_TAG = `${PLUGIN}@${PLUGIN_VERSION}`;
 
+/** The step the refusal of a HEAD with no release tag names, before any place. */
+const TAG_STEP = 'rafa release tag — writes the release tag on HEAD that a publish reads; run it on the release branch';
+
 /** The registry the plugin's `publishConfig` names. */
 const PLUGIN_REGISTRY = 'https://npm.example.test';
 
@@ -110,10 +113,17 @@ function fakeRunner(views: Readonly<Record<string, ProcessResult>> = {}, codes: 
   return { runner, calls };
 }
 
-/** A fake git that answers `tags` for `git tag --points-at HEAD`, or `listing` when given. */
-function fakeGit(tags: readonly string[], listing?: GitResult): (root: string) => GitRunner {
+/**
+ * A fake git that answers `tags` for `git tag --points-at HEAD`, or
+ * `listing` when given, and `topLevel` for `git rev-parse
+ * --show-toplevel` when given; any other line it refuses.
+ */
+function fakeGit(tags: readonly string[], listing?: GitResult, topLevel?: string): (root: string) => GitRunner {
   return () => (args) => {
     if (args.join(' ') === 'tag --points-at HEAD') return listing ?? { ok: true, stdout: `${tags.join('\n')}\n`, stderr: '' };
+    if (args.join(' ') === 'rev-parse --show-toplevel' && topLevel !== undefined) {
+      return { ok: true, stdout: `${topLevel}\n`, stderr: '' };
+    }
     return { ok: false, stdout: '', stderr: `fatal: the fake answers no ${args.join(' ')}` };
   };
 }
@@ -159,8 +169,9 @@ async function publish(
   fake: FakeRunner,
   words: readonly string[] = [],
   listing?: GitResult,
+  topLevel?: string,
 ): Promise<Run> {
-  const command = createReleasePublishCommand({ git: fakeGit(tags, listing), runner: fake.runner });
+  const command = createReleasePublishCommand({ git: fakeGit(tags, listing, topLevel), runner: fake.runner });
   const run = await dispatchInProject(['release', 'publish', ...words], SUBJECTS, [command], project);
   return {
     ...run,
@@ -352,10 +363,38 @@ describe('rafa release publish', () => {
       expect(fake.calls).toEqual([]);
     });
 
-    it('when --tag points elsewhere', async () => {
+    it('when no release tag points at HEAD, naming a rafa release tag step with no cd from the top level', async () => {
+      const project = workspaceProject();
+
+      const run = await publish(project, ['deploy-7'], fakeRunner(), [], undefined, project.root);
+
+      expect(run.stderr).toContain(`Next:\n  ${TAG_STEP}\nUsage: ${RELEASE_PUBLISH_USAGE}`);
+      expect(run.stderr).not.toContain('cd ');
+    });
+
+    it('when no release tag points at HEAD and git reads no top level, placing the step with cd at the root', async () => {
+      const project = workspaceProject();
+
+      const run = await publish(project, ['deploy-7'], fakeRunner());
+
+      expect(run.stderr).toContain(`Next:\n  cd ${project.root} && ${TAG_STEP}\n`);
+    });
+
+    it('when no release tag points at HEAD under hints.skills: true, printing no skill line for the caseless step', async () => {
+      const project = workspaceProject({ config: 'hints:\n  skills: true\n' });
+
+      const run = await publish(project, ['deploy-7'], fakeRunner(), [], undefined, project.root);
+
+      expect(run.stderr).toContain(`Next:\n  ${TAG_STEP}\nUsage: ${RELEASE_PUBLISH_USAGE}`);
+      expect(run.stderr).not.toContain('skill:');
+    });
+
+    it('when --tag points elsewhere, naming no Next step', async () => {
       const fake = fakeRunner();
 
       const run = await publish(workspaceProject(), [ROOT_TAG], fake, [`--tag=${PLUGIN_TAG}`]);
+
+      expect(run.stderr).not.toContain('Next:');
 
       expect(run.exitCode).toBe(1);
       expect(run.stderr).toContain(`${PLUGIN_TAG} does not point at HEAD`);
