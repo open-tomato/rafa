@@ -720,8 +720,8 @@ busy timeout.
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`, `report_absences`,
 `task_reports`, `preflight`, `dispatches`, `skill_invocations`, `plan_ci`,
-`stale_docs`, `bug_routes`, `store_meta`, `merges`, `merge_conflicts` and
-`store_replaced` are SQLite-only and stay out of the port's row map. Migration
+`stale_docs`, `bug_routes`, `reading_supersedes`, `store_meta`, `merges`,
+`merge_conflicts` and `store_replaced` are SQLite-only and stay out of the port's row map. Migration
 `store-replaced` creates the last one, `store_replaced` (`store_id` as its
 primary key, `replaced_at`): one row per id this store carried before its
 present one, `local` in `MERGE_RULES`, never left the machine. `settleUnderLock`
@@ -782,7 +782,7 @@ hash and a store travels. The path is the real path, so a symlinked spelling
 does not mint; the device and inode are bigints. A `.bak` renamed over the store
 has a new inode and mints, but one restored with `cp` over the existing file
 keeps the old inode and does not (measured on tmpfs); the merge's collision
-check is what catches it. Every production insert into the fourteen tables a
+check is what catches it. Every production insert into the fifteen tables a
 merge unions stamps `origin_store` from that row and `origin_seq` as the row's
 own `seq`, which the insert names itself as `COALESCE(MAX(seq), 0) + 1` so the
 two cannot differ: `STAMPED_COLUMNS` and `stampedValues` (`store/origins.ts`)
@@ -1199,6 +1199,24 @@ in `effort.sqlite` whichever backend `store` selects.
 `bug-routes-migration.test.ts` holds the entry to a store an older runtime left,
 the table to each CHECK and index, and both backends; `bug-routes.test.ts` holds
 the writer and the reader.
+
+**`reading_supersedes` holds one row per reading of a shared source that another
+reading of the same fact supersedes.** Migration `reading-supersedes` creates
+it: `seq`, `table_name` (the reading's table), `canonical_key` and
+`superseded_key`, `rule` (the rule that matched the two readings as one fact),
+and the origin pair with `reading_supersedes_by_origin`, which the table holds
+from its first row. A key names a reading by its table's identity in
+`MERGE_RULES`, as the JSON array of those values in that order, never by its
+origin pair, which a reading an older runtime wrote does not hold. The table has
+no time column, so a port and the hub that write one supersede write the same
+row. Every text column is non-blank by CHECK, `origin_store` when filled, and no
+CHECK admits a closed set, so no column is in `KEPT_COLUMNS`.
+`reading_supersedes_by_fact` is unique over `table_name`, `canonical_key` and
+`superseded_key`, the table's identity: the table is `merged`, append-only by
+those three, and one of the `ORIGIN_TABLES`. No module writes it yet, so
+`origins.test.ts` lists it in `UNWRITTEN_TABLES`.
+`reading-supersedes-migration.test.ts` holds the entry to a store an older
+runtime left and the table to each CHECK and index.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so

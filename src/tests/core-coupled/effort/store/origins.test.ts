@@ -166,13 +166,13 @@ function appendSession(root: string, session: string): void {
 
 /**
  * The merged tables no module under `packages/rafa/src/effort/store/` inserts into:
- * none today. A table whose migration lands ahead of its writer is
- * listed here. The last group below reads the modules' source and fails
+ * `reading_supersedes`, whose migration lands ahead of its writer. A
+ * table whose migration lands ahead of its writer is listed here. The last group below reads the modules' source and fails
  * once one of them inserts into a table listed here, so a table leaves
  * this list for {@link WRITERS} and {@link PLANTED} in the commit that
  * adds its writer, as `stale_docs` and `bug_routes` did.
  */
-const UNWRITTEN_TABLES: readonly OriginTable[] = [];
+const UNWRITTEN_TABLES: readonly OriginTable[] = ['reading_supersedes'];
 
 /** The merged tables a production writer inserts into: every one but the {@link UNWRITTEN_TABLES}. */
 const WRITTEN_TABLES: readonly OriginTable[] = ORIGIN_TABLES.filter((table) => !UNWRITTEN_TABLES.includes(table));
@@ -334,12 +334,12 @@ const WRITERS: readonly WriterCase[] = [
 ];
 
 describe('every production insert stamps the store\'s origin', () => {
-  it('covers each of the fourteen merged tables, a writer filling every one', () => {
+  it('covers each of the fourteen written merged tables, a writer filling every one', () => {
     const covered = new Set(WRITERS.flatMap(({ tables }) => tables));
 
     expect([...covered].sort()).toEqual([...WRITTEN_TABLES].sort());
     expect(WRITTEN_TABLES).toHaveLength(14);
-    expect(UNWRITTEN_TABLES).toEqual([]);
+    expect(UNWRITTEN_TABLES).toEqual(['reading_supersedes']);
     expect([...WRITTEN_TABLES, ...UNWRITTEN_TABLES].sort()).toEqual([...ORIGIN_TABLES].sort());
   });
 

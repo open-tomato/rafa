@@ -39,8 +39,8 @@
  * name; a commit is one `commits` row whose `minutesSincePrevious` is
  * measured against the commit before it in time in that store, as a
  * collection measures it. A store left at the legacy history holds no
- * `stale_docs` or `bug_routes` table, so a task written there has no
- * row in either: {@link PAST_LEGACY_TABLES}. So every merged table is exercised, and
+ * `stale_docs`, `bug_routes` or `reading_supersedes` table, so a task
+ * written there has no row in any: {@link PAST_LEGACY_TABLES}. So every merged table is exercised, and
  * each builder knows the rows the union of its devices holds from the
  * names it wrote: {@link Scenario.union}.
  *
@@ -159,7 +159,7 @@ const TASK_TABLES = ORIGIN_TABLES.filter((table) => table !== 'commits');
  * left at `plan-ci` holds none of them, so a task written there has no
  * row in any.
  */
-const PAST_LEGACY_TABLES: ReadonlySet<OriginTable> = new Set<OriginTable>(['stale_docs', 'bug_routes']);
+const PAST_LEGACY_TABLES: ReadonlySet<OriginTable> = new Set<OriginTable>(['stale_docs', 'bug_routes', 'reading_supersedes']);
 
 /** A task or commit a device writes: its name, and when, in minutes past {@link EPOCH_MS}. */
 interface Written {
@@ -213,6 +213,10 @@ function taskRows({ key, minute }: Written): readonly PlantedRow[] {
     bug_routes: {
       ...report, id: `route-${key}`, entry_index: 0, what: `bug ${key}`, said: 'bug', kind: 'bug', route: 'filed',
       collected_at: time,
+    },
+    reading_supersedes: {
+      table_name: 'plan_ci', canonical_key: JSON.stringify([PLAN_PR, `head-${key}`, time]),
+      superseded_key: JSON.stringify([PLAN_PR, `head-${key}`, at(minute + 1)]), rule: 'same-fact@1',
     },
   };
   return TASK_TABLES.map((table) => ({ table, values: rows[table] }));
@@ -472,8 +476,8 @@ export function buildRestoredBak(scope: string): Scenario {
  * second device; the first brought through `row-origins` and
  * `store-meta` and minted, the second left at `plan-ci`, both written.
  * The shared rows carry no origin on either side, and only the task the
- * first device wrote after it was brought forward has a `stale_docs` row
- * and a `bug_routes` row.
+ * first device wrote after it was brought forward has a `stale_docs` row,
+ * a `bug_routes` row and a `reading_supersedes` row.
  */
 export function buildPlanCiSide(scope: string): Scenario {
   const dir = scenarioDir(scope, 'plan-ci-side');

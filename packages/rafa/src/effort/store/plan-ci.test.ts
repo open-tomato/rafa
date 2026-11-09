@@ -65,6 +65,7 @@ const TABLES = [
   'out_of_scope_bugs',
   'plan_ci',
   'preflight',
+  'reading_supersedes',
   'report_absences',
   'schema_migrations',
   'sessions',
@@ -190,7 +191,7 @@ describe('the plan_ci table', () => {
     // The control: the first twelve entries make every earlier table and
     // no plan_ci table, so the table this write fills came from a later
     // entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
 
     writePlanCi(root, RED);
 
@@ -348,7 +349,7 @@ describe('readPlanCi', () => {
   it('brings a version-12 store forward and answers none, the table just made', () => {
     const root = freshRoot('read-from-v12');
     plantAtVersion(root, 12);
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
 
     expect(readPlanCi(root)).toEqual([]);
     expect(tablesOf(root)).toEqual(TABLES);

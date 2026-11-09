@@ -122,6 +122,7 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   plan_ci: appendOnly('pr', 'head_sha', 'read_at'),
   stale_docs: appendOnly('id'),
   bug_routes: appendOnly('id'),
+  reading_supersedes: appendOnly('table_name', 'canonical_key', 'superseded_key'),
   schema_migrations: { scope: 'local' },
   store_meta: { scope: 'local' },
   store_replaced: { scope: 'local' },

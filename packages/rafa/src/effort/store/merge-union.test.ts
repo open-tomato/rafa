@@ -60,6 +60,10 @@ const FIXTURES: Readonly<Record<OriginTable, (key: string) => FixtureRow>> = {
     id: `id-${key}`, session_id: `session-${key}`, task_line: `task ${key}`, entry_index: 0, what: `bug ${key}`,
     said: null, kind: 'bug', route: 'filed', collected_at: COLLECTED_AT,
   }),
+  reading_supersedes: (key) => ({
+    table_name: 'plan_ci', canonical_key: `[9,"sha-${key}","${COLLECTED_AT}"]`,
+    superseded_key: `[9,"sha-${key}","2026-09-29T11:00:00.000Z"]`, rule: 'same-fact@1',
+  }),
 };
 
 const opened: Database[] = [];

@@ -49,7 +49,7 @@
  * implicit one. That is a declaration, not a repair: measured on SQLite
  * 3.51.0, a `VACUUM` left implicit rowids where they were as well.
  *
- * The file holds seventeen tables that are not kinds. Six are filled from
+ * The file holds eighteen tables that are not kinds. Six are filled from
  * task reports: `findings`, `blockers`, `out_of_scope_bugs` and
  * `changes`, one per list a report carries, `report_absences`, one row
  * per task session whose output held no report to read, and
@@ -62,10 +62,12 @@
  * six are, one row per documentation line a report named as stale;
  * `stale-docs.ts` writes it and holds its row type. A twelfth,
  * `bug_routes`, holds one row per `out_of_scope_bugs` entry the triage
- * step routed; `bug-routes.ts` writes it and holds its row type. The
- * thirteenth is `schema_migrations`, the migration log, which only
- * `bring-forward.ts` writes; the section on bringing a store forward
- * says what it holds. The last four are the store's own identity and
+ * step routed; `bug-routes.ts` writes it and holds its row type. A
+ * thirteenth, `reading_supersedes`, holds one row per reading of a
+ * shared source that another reading of the same fact supersedes; no
+ * module writes it yet. The fourteenth is `schema_migrations`, the
+ * migration log, which only `bring-forward.ts` writes; the section on
+ * bringing a store forward says what it holds. The last four are the store's own identity and
  * merge trail: `store_meta`, `store_replaced`, `merges` and
  * `merge_conflicts`. The port's row map names none of them, and
  * nothing in this module reads or writes them. `findings.ts` writes the
