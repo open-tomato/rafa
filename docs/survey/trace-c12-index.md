@@ -12,7 +12,7 @@ The contract the exports are read against is `run(ctx, options)` from #119 (step
 
 | Folder | Files | Holds |
 | --- | --- | --- |
-| `packages/rafa-hub/src` | 3 | `bin.ts` (80 lines, the `rafa-hub` command: `runHub`, `HUB_VERSION`), `config.ts` (319, the server's config reader), `server.ts` (529, `startHubServer` over `Bun.serve`) |
+| `packages/rafa-hub/src` | 3 | `bin.ts` (80 lines, the `rafa-hub` command: `runHub`, `HUB_VERSION`), `config.ts` (319, the server's config reader), `server.ts` (672, `startHubServer` over `Bun.serve`) |
 | `packages/rafa-hub/src/identity` | 3 | `port.ts` (89, `HubIdentity`, `HUB_ACTIONS`), `github.ts` (305, `openGitHubIdentity`), `contract.ts` (225, the identity port's contract suite as one function; it imports `bun:test` and is graphed as source) |
 | `packages/rafa-hub/src/store` | 3 | `port.ts` (159, `HubStore`), `sqlite.ts` (304, `openSqliteHubStore`, `HubUpgradeRequired`), `contract.ts` (483, the store port's contract suite, graphed as source) |
 | `packages/rafa-sync-service/src` | 4 | `sync.ts` (403, `createServiceSync` and the default `create`, and `HubContractMismatch`), `client.ts` (382, `createHubClient`, `HubUnreachable`, `HubRefused`), `state.ts` (184, the cursor file), `token.ts` (120, `readHubToken`, `defaultSecretReader`) |

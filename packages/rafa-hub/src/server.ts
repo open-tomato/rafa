@@ -65,6 +65,30 @@
  * so a volume mounted late is picked up without a restart. `stop` closes
  * the store once the server has stopped.
  *
+ * The store is opened by `openConnected` when it is given, a connector
+ * opening the store and its index (`store/port.ts`, `HubConnector`)
+ * together, and by `openStore` otherwise, which opens a store with no
+ * index behind it. One of the two must be given.
+ *
+ * ## The index
+ *
+ * With `rebuildAfterPush` set, a push whose answer has `added` above
+ * zero starts one `index.rebuild({ project })` over the index
+ * `openConnected` opened, `project` being the hub's repository. The
+ * push is answered without awaiting it, and its status and body are the
+ * same whatever the rebuild does. At most one rebuild runs at a time: a
+ * push adding rows while one runs queues one more, which starts once it
+ * ends, and further pushes during it queue nothing beyond that one, since
+ * one rebuild reads every row the store holds when it starts. A push
+ * adding nothing starts none. Each rebuild logs one `index.rebuilt` line
+ * with its counts or one `index.rebuild-failed` line with its error; a
+ * failed rebuild leaves the live index as it was and the next push adding
+ * rows starts another. `stop` awaits a running rebuild before closing the
+ * store, and drops a queued one, which the next start's first push adding
+ * rows or `rafa-hub index rebuild` makes up. `rebuildAfterPush` without
+ * `openConnected` or `project` is refused when the server starts, since
+ * there is no index to rebuild or no project to name.
+ *
  * ## Logs
  *
  * One JSON object per line on standard output, never a file, through
@@ -75,9 +99,13 @@
  * for a push or a pull, and the error a `4xx` from the route answered.
  * A line never holds a request's headers or its query, so no token
  * reaches the log; of a body it holds only what a wire refusal quotes.
+ * An index rebuild logs `index.rebuilt` at `info`, holding its project,
+ * `rows`, `vectors`, `vector`, its `tables` with their rows and its
+ * milliseconds, or `index.rebuild-failed` at `error`, holding its project,
+ * the error's message and its milliseconds.
  */
 import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusalReason } from './identity/port.js';
-import type { HubStore } from './store/port.js';
+import type { HubIndex, HubStore } from './store/port.js';
 import type { WireCursor } from '@open-tomato/rafa/store';
 
 import { decodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
@@ -165,10 +193,22 @@ export interface HubServerOptions {
   readonly version: string;
   /** Who is calling each route but `/health`. */
   readonly identity: HubIdentity;
-  /** Opens the store; may throw, or reject, when it cannot. */
-  readonly openStore: () => HubStore | Promise<HubStore>;
+  /** Opens a store with no index behind it; may throw, or reject, when it cannot. Unused when `openConnected` is given. */
+  readonly openStore?: () => HubStore | Promise<HubStore>;
+  /** Opens the store and its index together, as a connector does; used instead of `openStore` when given. */
+  readonly openConnected?: () => Promise<HubConnected>;
+  /** Whether a push that added rows starts an index rebuild; see the module note. `false` when left out. */
+  readonly rebuildAfterPush?: boolean;
+  /** The project a rebuild records, the hub's repository; required with `rebuildAfterPush`. */
+  readonly project?: string;
   /** Where log lines go; {@link jsonLineLog} to standard output when left out. */
   readonly log?: HubLog;
+}
+
+/** What `openConnected` opens: the store and the index over its rows. */
+export interface HubConnected {
+  readonly store: HubStore;
+  readonly index: HubIndex;
 }
 
 /** A running hub. */
@@ -177,7 +217,7 @@ export interface HubServer {
   readonly url: string;
   /** The port it listens on. */
   readonly port: number;
-  /** Stops answering, closing open connections, then closes the store. */
+  /** Stops answering, closing open connections, then awaits a running index rebuild and closes the store. */
   readonly stop: () => Promise<void>;
 }
 
@@ -215,6 +255,8 @@ interface RouteContext {
   readonly request: Request;
   readonly store: HubStore;
   readonly version: string;
+  /** Starts an index rebuild, or queues one; a no-op when the hub rebuilds nothing after a push. Never throws. */
+  readonly rebuild: () => void;
 }
 
 /** A route behind the identity port. */
@@ -226,13 +268,33 @@ interface Route {
   readonly handle: (context: RouteContext) => Promise<Omit<Served, 'caller'>>;
 }
 
+/** The open store, with the rebuild a push adding rows starts. */
+interface Held {
+  readonly store: HubStore;
+  readonly rebuild: () => void;
+}
+
 /** The store, opened once and opened again after a failed attempt. */
 interface StoreHolder {
   /** The open store, or null when this attempt to open it failed. */
-  readonly acquire: () => Promise<HubStore | null>;
-  /** Closes the store if it opened. */
+  readonly acquire: () => Promise<Held | null>;
+  /** Awaits a running rebuild, then closes the store if it opened. */
   readonly close: () => Promise<void>;
 }
+
+/** Index rebuilds, one at a time with one queued. */
+interface Rebuilds {
+  /** Starts a rebuild, or queues one while one runs. */
+  readonly request: () => void;
+  /** Drops a queued rebuild and awaits the running one. */
+  readonly settle: () => Promise<void>;
+}
+
+/** What a hub that rebuilds nothing after a push holds. */
+const NO_REBUILDS: Rebuilds = Object.freeze({
+  request: () => undefined,
+  settle: () => Promise.resolve(),
+});
 
 /** `error`'s message, whatever was thrown. */
 function messageOf(error: unknown): string {
@@ -340,11 +402,12 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
     method: 'POST',
     action: 'effort.push',
     query: ['device', 'contractVersion'],
-    handle: async ({ url, request, store }) => {
+    handle: async ({ url, request, store, rebuild }) => {
       checkContractVersion(url);
       const device = readDevice(url);
       const payload = decodeWirePayload(await request.text());
       const pushed = await store.push({ device, payload });
+      if (pushed.added > 0) rebuild();
       return { response: success(pushed), fields: { device, received: pushed.received, added: pushed.added } };
     },
   },
@@ -371,38 +434,117 @@ function refusedOf(error: unknown): Response | undefined {
   return undefined;
 }
 
-/** Holds the store `open` opens, logging each attempt's outcome. */
-function holdStore(open: HubServerOptions['openStore'], log: HubLog): StoreHolder {
-  let store: HubStore | null = null;
-  let opening: Promise<HubStore | null> | null = null;
+/**
+ * Rebuilds of `index` recording `project`, each logged; see the module
+ * note. A rebuild that throws, synchronously or not, is logged and never
+ * reaches the caller of `request`.
+ */
+function rebuildsOf(index: HubIndex, project: string, log: HubLog): Rebuilds {
+  let running: Promise<void> | null = null;
+  let queued = false;
 
-  const attempt = async (): Promise<HubStore | null> => {
+  const run = async (): Promise<void> => {
+    const started = performance.now();
     try {
-      store = await open();
+      const built = await index.rebuild({ project });
+      const tables = built.tables.map(({ table, rows }) => ({ table, rows }));
+      log({ level: 'info', event: 'index.rebuilt', project, rows: built.rows, vectors: built.vectors, vector: built.vector, tables, ms: Math.round(performance.now() - started) });
+    } catch (error) {
+      log({ level: 'error', event: 'index.rebuild-failed', project, error: messageOf(error), ms: Math.round(performance.now() - started) });
+    }
+  };
+
+  const begin = (): void => {
+    running = run().then(() => {
+      running = null;
+      if (!queued) return;
+
+      queued = false;
+      begin();
+    });
+  };
+
+  const request = (): void => {
+    if (running === null) {
+      begin();
+      return;
+    }
+    queued = true;
+  };
+
+  const settle = async (): Promise<void> => {
+    queued = false;
+    if (running !== null) await running;
+  };
+
+  return { request, settle };
+}
+
+/** What {@link holdStore} opens with. */
+interface Opening {
+  /** Opens the store, with its index when the hub was given a connector. */
+  readonly open: () => Promise<{ readonly store: HubStore; readonly index: HubIndex | null }>;
+  /** The project rebuilds record, or null when a push starts none. */
+  readonly rebuildFor: string | null;
+}
+
+/** Holds the store `opening` opens, logging each attempt's outcome. */
+function holdStore(opening: Opening, log: HubLog): StoreHolder {
+  let held: Held | null = null;
+  let rebuilds: Rebuilds = NO_REBUILDS;
+  let attempting: Promise<Held | null> | null = null;
+
+  const attempt = async (): Promise<Held | null> => {
+    try {
+      const { store, index } = await opening.open();
+      if (index !== null && opening.rebuildFor !== null) rebuilds = rebuildsOf(index, opening.rebuildFor, log);
+      held = { store, rebuild: rebuilds.request };
       log({ level: 'info', event: 'store.opened' });
-      return store;
+      return held;
     } catch (error) {
       log({ level: 'error', event: 'store.unavailable', error: messageOf(error) });
       return null;
     }
   };
 
-  const acquire = (): Promise<HubStore | null> => {
-    if (store !== null) return Promise.resolve(store);
+  const acquire = (): Promise<Held | null> => {
+    if (held !== null) return Promise.resolve(held);
 
-    opening ??= attempt().then((opened) => {
-      opening = null;
+    attempting ??= attempt().then((opened) => {
+      attempting = null;
       return opened;
     });
-    return opening;
+    return attempting;
   };
 
   const close = async (): Promise<void> => {
-    if (opening !== null) await opening;
-    if (store !== null) await store.close();
+    if (attempting !== null) await attempting;
+    await rebuilds.settle();
+    if (held !== null) await held.store.close();
   };
 
   return { acquire, close };
+}
+
+/**
+ * How `options` opens the store, refusing options that open none, or
+ * that rebuild after a push with no index or no project to name.
+ */
+function openingOf(options: HubServerOptions): Opening {
+  const { openStore, openConnected, rebuildAfterPush = false, project } = options;
+  if (rebuildAfterPush && openConnected === undefined) {
+    throw new TypeError('rebuildAfterPush needs openConnected: a store opened by openStore has no index to rebuild.');
+  }
+  if (rebuildAfterPush && (project === undefined || project === '')) {
+    throw new TypeError('rebuildAfterPush needs project, the repository a rebuild records.');
+  }
+  const rebuildFor = rebuildAfterPush
+    ? project ?? null
+    : null;
+  if (openConnected !== undefined) return { open: openConnected, rebuildFor };
+  if (openStore === undefined) throw new TypeError('startHubServer needs openStore or openConnected to open its store.');
+
+  return { open: async () => ({ store: await openStore(), index: null }), rebuildFor };
 }
 
 /** Everything a request is served with. */
@@ -414,8 +556,8 @@ interface Deps {
 
 /** `GET /health`: whether the store is open, asking no identity. */
 async function health(holder: StoreHolder, version: string): Promise<Served> {
-  const store = await holder.acquire();
-  return store === null
+  const held = await holder.acquire();
+  return held === null
     ? { response: failure(503, STORE_UNAVAILABLE) }
     : { response: success({ status: 'ok', version }) };
 }
@@ -429,12 +571,12 @@ async function serveRoute(request: Request, url: URL, route: Route, deps: Deps):
   if (!identified.may.includes(route.action)) {
     return { response: failure(403, `${caller.id} may not take ${route.action} on this hub.`), caller, refusal: 'forbidden' };
   }
-  const store = await deps.holder.acquire();
-  if (store === null) return { response: failure(503, STORE_UNAVAILABLE), caller };
+  const held = await deps.holder.acquire();
+  if (held === null) return { response: failure(503, STORE_UNAVAILABLE), caller };
 
   try {
     checkQuery(url, route.query);
-    return { ...await route.handle({ url, request, store, version: deps.version }), caller };
+    return { ...await route.handle({ url, request, store: held.store, rebuild: held.rebuild, version: deps.version }), caller };
   } catch (error) {
     const refused = refusedOf(error);
     if (refused === undefined) throw error;
@@ -492,11 +634,12 @@ function requestLine(request: Request, served: Served, started: number): HubLogE
 /**
  * Starts the hub on `options.port` and starts opening the store; see
  * the module note. Returns once the server listens, whether or not the
- * store opens.
+ * store opens. Throws a `TypeError`, before listening, for options
+ * opening no store or rebuilding after a push with no index or project.
  */
 export function startHubServer(options: HubServerOptions): HubServer {
   const log = options.log ?? jsonLineLog();
-  const holder = holdStore(options.openStore, log);
+  const holder = holdStore(openingOf(options), log);
   const deps: Deps = { identity: options.identity, holder, version: options.version };
 
   const fetch = async (request: Request): Promise<Response> => {
