@@ -70,7 +70,7 @@ back into every turn and the split would save nothing.
   are shown, how they are dismissed, and what a test's HOME must hold.
 - `context/operators.md` — the alpha operators under `bundled/operators/`:
   why no loop sees them, the stretch folder, and the events output.
-- `context/atlas.md` — Atlas add-ons: layers, packages, replica, commands.
+- `context/atlas.md` — Atlas add-ons; `context/d2c.md` — rafa-d2c baselines.
 
 ## This file is capped
 

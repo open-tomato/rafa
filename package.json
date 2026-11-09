@@ -33,7 +33,8 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "addons/atlas/*"
+    "addons/atlas/*",
+    "addons/rafa-d2c"
   ],
   "module": "./dist/index.js",
   "bin": {
