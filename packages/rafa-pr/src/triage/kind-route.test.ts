@@ -142,7 +142,7 @@ function kindsOf(runner: Runner, overrides: Partial<KindRouteOptions> = {}): Kin
   return {
     planBase: { ok: true, base: 'main', sha: BASE },
     head: HEAD,
-    planFiles: { ok: true, files: PLAN_FILES },
+    planFiles: { ok: true, files: PLAN_FILES, added: [], addedProblem: null, commits: [], commitsProblem: null },
     runTest: runner.runTest,
     retries: 2,
     ...overrides,

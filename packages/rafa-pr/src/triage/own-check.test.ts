@@ -26,8 +26,11 @@ const GREEN: BaseRunAnswer = { answer: 'green' };
 const RED: BaseRunAnswer = { answer: 'red' };
 const UNRUNNABLE: BaseRunAnswer = { answer: 'unrunnable', problem: 'src/a.test.ts does not exist at 0123456789ab.' };
 
+/** The added lines and commits of a plan files reading, empty: no file row reads them. */
+const NO_ADDED = { added: [], addedProblem: null, commits: [], commitsProblem: null } as const;
+
 /** The plan's files every file row reads, unless it names others. */
-const PLAN_FILES: PlanFilesReading = { ok: true, files: ['src/edited.ts', 'src/a.test.ts', 'docs/guide.md'] };
+const PLAN_FILES: PlanFilesReading = { ok: true, files: ['src/edited.ts', 'src/a.test.ts', 'docs/guide.md'], ...NO_ADDED };
 
 /** An entry said to be `kind`, with `what` and `artifact`. */
 function entry(kind: BugKind, what: string, artifact: string | null = null): KindCheckEntry {
@@ -99,6 +102,7 @@ describe('checkKind: a path outside the plan\'s commits', () => {
 const SHAPE_FILES: PlanFilesReading = {
   ok: true,
   files: ['packages/rafa-pr/src/triage/base-run.ts', 'src/view/panel.tsx', 'src/build/emit.mts'],
+  ...NO_ADDED,
 };
 
 describe('checkKind: path shapes that name no plan file', () => {
@@ -132,7 +136,7 @@ describe('checkKind: path shapes that name no plan file', () => {
   });
 
   it('does not read a .ts specifier as a .js file of the plan', () => {
-    const plan: PlanFilesReading = { ok: true, files: ['src/emitted.js'] };
+    const plan: PlanFilesReading = { ok: true, files: ['src/emitted.js'], ...NO_ADDED };
 
     expect(checkKind(input(entry('own-gap', 'imports ./emitted.ts'), null, plan)).kind).toBe('bug');
   });
@@ -162,7 +166,7 @@ describe('checkKind: path shapes that name a plan file', () => {
   });
 
   it('still reads a .js file of the plan as written', () => {
-    const plan: PlanFilesReading = { ok: true, files: ['scripts/build.js'] };
+    const plan: PlanFilesReading = { ok: true, files: ['scripts/build.js'], ...NO_ADDED };
 
     expect(checkKind(input(entry('bug', 'imports ../build.js'), null, plan)).kind).toBe('own-gap');
   });
