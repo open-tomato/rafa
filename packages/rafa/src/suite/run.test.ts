@@ -43,11 +43,13 @@
  */
 import type { SuiteSpawner, SuiteSpawnOptions } from './run.js';
 
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {
   CLAUDE_CODE_ENV,
@@ -58,7 +60,9 @@ import {
   parseJunitFiles,
   readNoTestFiles,
   readOutputTail,
+  readSuiteHead,
   readSummary,
+  redOutputFileFor,
   runSuite,
   suiteCommand,
   SUITE_ENV_REMOVED,
@@ -675,5 +679,71 @@ describe('runSuite', () => {
     const seen: SeenSpawn[] = [];
     await runSuite({ cwd: dir, junitFile: join(dir, 'j.xml'), env: { PATH: '/bin', [FORCE_COLOR_ENV]: '1', TERM: 'xterm' }, spawn: recordedSpawner('clean', 0, seen) });
     expect(seen[0]?.options.env).toEqual({ PATH: '/bin', TERM: 'xterm' });
+  });
+});
+
+describe('runSuite, the red output kept under its head', () => {
+  const SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+
+  it('keeps a red run\'s text as <name>.<sha>.red.output.txt, and a later green run leaves it', async () => {
+    const junitFile = join(dir, 'suite', 'task.junit.xml');
+    const heads: string[] = [];
+    const readHead = (cwd: string): string => {
+      heads.push(cwd);
+      return SHA;
+    };
+    await runSuite({ cwd: dir, junitFile, readHead, spawn: recordedSpawner('failed-cases', 1, []) });
+    const kept = join(dir, 'suite', `task.${SHA}.red.output.txt`);
+    expect(redOutputFileFor(junitFile, SHA)).toBe(kept);
+    expect(heads).toEqual([dir]);
+    const red = readFileSync(join(dir, 'suite', 'task.output.txt'), 'utf8');
+    expect(readFileSync(kept, 'utf8')).toBe(red);
+    expect(red).toContain('(fail) stand-in claude > throws before any expect');
+    await runSuite({ cwd: dir, junitFile, readHead, spawn: recordedSpawner('clean', 0, []) });
+    // Control: the green rerun did replace the plain text, so the kept file outliving it is no stale read.
+    expect(readFileSync(join(dir, 'suite', 'task.output.txt'), 'utf8')).not.toBe(red);
+    expect(readFileSync(kept, 'utf8')).toBe(red);
+  });
+
+  it('keeps nothing for a green run', async () => {
+    const junitFile = join(dir, 'suite', 'task.junit.xml');
+    await runSuite({ cwd: dir, junitFile, readHead: () => SHA, spawn: recordedSpawner('clean', 0, []) });
+    expect(readdirSync(join(dir, 'suite')).sort()).toEqual(['task.junit.xml', 'task.output.txt']);
+  });
+
+  it('keeps nothing for a red run whose cwd answers no head', async () => {
+    const junitFile = join(dir, 'suite', 'task.junit.xml');
+    await runSuite({ cwd: dir, junitFile, readHead: () => null, spawn: recordedSpawner('failed-cases', 1, []) });
+    expect(readdirSync(join(dir, 'suite')).sort()).toEqual(['task.junit.xml', 'task.output.txt']);
+    // Control: the same run with a head does keep a file, so the absence above is the missing head.
+    await runSuite({ cwd: dir, junitFile, readHead: () => SHA, spawn: recordedSpawner('failed-cases', 1, []) });
+    expect(existsSync(redOutputFileFor(junitFile, SHA))).toBe(true);
+  });
+
+  it('keeps nothing for a project holding no test file, which reads green', async () => {
+    const junitFile = join(dir, 'suite', 'task.junit.xml');
+    const spawn: SuiteSpawner = async () => ({ exitCode: 1, stderr: 'No tests found!\n' });
+    const result = await runSuite({ cwd: dir, junitFile, readHead: () => SHA, spawn });
+    expect(result.noTestFiles).toBe(true);
+    expect(existsSync(redOutputFileFor(junitFile, SHA))).toBe(false);
+  });
+});
+
+describe('readSuiteHead', () => {
+  it('answers null in a directory that is no repository, and in one holding no commit', () => {
+    expect(readSuiteHead(dir)).toBeNull();
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: dir });
+    expect(existsSync(join(dir, '.git'))).toBe(true);
+    expect(readSuiteHead(dir)).toBeNull();
+  });
+
+  it('answers the commit a repository has checked out', () => {
+    const env = { ...process.env, ...gitIdentityEnv() };
+    const git = (...args: string[]) => Bun.spawnSync(['git', '-c', 'commit.gpgsign=false', ...args], { cwd: dir, env });
+    git('init', '-q');
+    git('commit', '-q', '--allow-empty', '-m', 'one');
+    const head = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], { cwd: dir }).stdout.toString().trim();
+    expect(head).toMatch(/^[0-9a-f]{40}$/);
+    expect(readSuiteHead(dir)).toBe(head);
   });
 });
