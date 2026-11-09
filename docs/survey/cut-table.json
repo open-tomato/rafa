@@ -5817,8 +5817,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 9,
-        "test": 15,
+        "source": 10,
+        "test": 27,
         "testSupport": 8
       },
       "files": [
@@ -5826,6 +5826,7 @@
         "packages/rafa-hub/src/bin.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
+        "packages/rafa-hub/src/contract-skew.integration.test.ts",
         "packages/rafa-hub/src/core-subpaths.test.ts",
         "packages/rafa-hub/src/hub-index.integration.test.ts",
         "packages/rafa-hub/src/hub-unreachable.integration.test.ts",
@@ -5856,13 +5857,24 @@
         "packages/rafa-hub/src/testdata/scratch-home-env.ts",
         "packages/rafa-hub/src/testdata/test-secrets.test.ts",
         "packages/rafa-hub/src/testdata/test-secrets.ts",
-        "packages/rafa-hub/src/two-devices.integration.test.ts"
+        "packages/rafa-hub/src/two-devices.integration.test.ts",
+        "packages/rafa-index/src/fusion.test.ts",
+        "packages/rafa-index/src/imports.test.ts",
+        "packages/rafa-index/src/index.integration.test.ts",
+        "packages/rafa-index/src/links.test.ts",
+        "packages/rafa-index/src/loader.test.ts",
+        "packages/rafa-index/src/notice.test.ts",
+        "packages/rafa-index/src/rebuild.test.ts",
+        "packages/rafa-index/src/schema.test.ts",
+        "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 32
+        "packages/rafa-hub/": 36,
+        "packages/rafa-index/": 9
       },
       "folders": [
-        "packages/rafa-hub/"
+        "packages/rafa-hub/",
+        "packages/rafa-index/"
       ],
       "name": "rafa-hub",
       "named": [],
@@ -5907,19 +5919,10 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 618,
+        "test": 609,
         "testSupport": 22
       },
       "files": [
-        "packages/rafa-index/src/fusion.test.ts",
-        "packages/rafa-index/src/imports.test.ts",
-        "packages/rafa-index/src/index.integration.test.ts",
-        "packages/rafa-index/src/links.test.ts",
-        "packages/rafa-index/src/loader.test.ts",
-        "packages/rafa-index/src/notice.test.ts",
-        "packages/rafa-index/src/rebuild.test.ts",
-        "packages/rafa-index/src/schema.test.ts",
-        "packages/rafa-index/src/search.test.ts",
         "src/adapter-registry.test.ts",
         "src/adapter-registry.ts",
         "src/adapters/output/json.test.ts",
@@ -6752,7 +6755,7 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2197,
+    "files": 2198,
     "leftToPlace": 764,
     "nonTestEdges": 4868,
     "unassignedFiles": 28,
