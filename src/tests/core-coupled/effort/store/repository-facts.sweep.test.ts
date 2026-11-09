@@ -11,13 +11,19 @@
  * Three faults are read: a merged table holding a `read_at` column with
  * no entry, an entry naming a table the store lacks, and an entry naming
  * a fact or time column its table lacks.
+ *
+ * A fourth, the reader case, reads the production sources: a module that
+ * names `plan_ci` in a `SELECT` or imports `readPlanCi` reads CI readings
+ * one row each, past the facts, and fails unless it is `plan-ci.ts` or
+ * `repository-facts.ts`. There is no exemption beyond those two.
  */
 import type { MergeRule } from '@open-tomato/rafa/store/merge-rules';
 import type { RepositoryFactColumns } from '@open-tomato/rafa/store/repository-facts';
 
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test';
@@ -148,5 +154,86 @@ describe('REPOSITORY_FACTS against the schema every migration builds', () => {
 
     expect(columns).toHaveProperty('plan_ci');
     expect(registryFaults(columns, REPOSITORY_FACTS, MERGE_RULES)).toEqual([]);
+  });
+});
+
+/** The checkout root. */
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
+
+/** The only production modules that may read `plan_ci` rows or import `readPlanCi`. */
+const PLAN_CI_READERS: ReadonlySet<string> = new Set([
+  'packages/rafa/src/effort/store/plan-ci.ts',
+  'packages/rafa/src/effort/store/repository-facts.ts',
+]);
+
+/** A `SELECT` naming `plan_ci` before the statement or string ends. */
+const SELECT_PLAN_CI = /\bSELECT\b[^;'"`]*\bplan_ci\b/i;
+
+/** A `readPlanCi` name (not `readPlanCiFacts`) in an import clause. */
+const IMPORT_READ_PLAN_CI = /\bimport\b[^;]*?\breadPlanCi\b[^;]*?\bfrom\b/s;
+
+/** Whether `text` reads `plan_ci` rows or imports `readPlanCi`. */
+function readsPlanCi(text: string): boolean {
+  return SELECT_PLAN_CI.test(text) || IMPORT_READ_PLAN_CI.test(text);
+}
+
+/** Every production `.ts` file under `src/` and `packages/<name>/src/`, repo-relative with its text. */
+function productionSources(): { path: string; text: string }[] {
+  const roots = [
+    join(REPO_ROOT, 'src'),
+    ...readdirSync(join(REPO_ROOT, 'packages'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(REPO_ROOT, 'packages', entry.name, 'src')),
+  ];
+  return roots.flatMap((root) => {
+    let entries: string[];
+    try {
+      entries = readdirSync(root, { recursive: true, encoding: 'utf8' });
+    } catch {
+      return [];
+    }
+    return entries
+      .filter((entry) => entry.endsWith('.ts') && !entry.endsWith('.test.ts'))
+      .map((entry) => ({ path: relative(REPO_ROOT, join(root, entry)), text: readFileSync(join(root, entry), 'utf8') }));
+  });
+}
+
+/** The paths among `files` that read `plan_ci` and are not an allowed reader, sorted. */
+function strayReaders(files: readonly { path: string; text: string }[]): string[] {
+  return files
+    .filter((file) => !PLAN_CI_READERS.has(file.path) && readsPlanCi(file.text))
+    .map((file) => file.path)
+    .sort();
+}
+
+describe('readers of plan_ci rows', () => {
+  it('fails a module selecting from plan_ci outside the two readers (planted)', () => {
+    const files = [{ path: 'packages/x/src/stray.ts', text: 'db.query(`SELECT pr, verdict\n FROM plan_ci WHERE pr = 1`);' }];
+
+    expect(strayReaders(files)).toEqual(['packages/x/src/stray.ts']);
+  });
+
+  it('fails a module importing readPlanCi outside the two readers (planted)', () => {
+    const files = [{ path: 'packages/x/src/stray.ts', text: 'import {\n  readPlanCi,\n} from \'@open-tomato/rafa/store/plan-ci\';' }];
+
+    expect(strayReaders(files)).toEqual(['packages/x/src/stray.ts']);
+  });
+
+  it('passes readPlanCiFacts, a DDL naming plan_ci and the two readers themselves (planted)', () => {
+    const files = [
+      { path: 'packages/x/src/facts.ts', text: 'import { readPlanCiFacts } from \'@open-tomato/rafa/store/plan-ci\';' },
+      { path: 'packages/x/src/ddl.ts', text: 'CREATE TABLE plan_ci (pr INTEGER);\nINSERT INTO plan_ci (pr) VALUES (1);' },
+      { path: 'packages/rafa/src/effort/store/plan-ci.ts', text: 'SELECT pr FROM plan_ci' },
+      { path: 'packages/rafa/src/effort/store/repository-facts.ts', text: 'SELECT pr FROM plan_ci' },
+    ];
+
+    expect(strayReaders(files)).toEqual([]);
+  });
+
+  it('finds no production module outside plan-ci.ts and repository-facts.ts reading plan_ci', () => {
+    const files = productionSources();
+
+    expect(files.some((file) => file.path === 'packages/rafa/src/effort/store/plan-ci.ts')).toBe(true);
+    expect(strayReaders(files)).toEqual([]);
   });
 });
