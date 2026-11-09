@@ -71,6 +71,15 @@
  * its schema is brought forward, or refused, as `sqlite.ts` says a
  * read's is.
  *
+ * {@link readPlanCiFacts} answers each fact once instead, through
+ * `readRepositoryFacts` (`repository-facts.ts`) in the same read: the
+ * canonical reading as a {@link PlanCiRow}, `sightings`, the readings it
+ * supersedes, `origins`, the stores that read it, and `lastSighting`, the
+ * latest reading time of the fact, the canonical one included. Named a
+ * plan, it answers the facts whose canonical reading is that plan's. It
+ * opens and creates nothing when the store file does not exist, as
+ * {@link readPlanCi} does.
+ *
  * ## What is refused, and what is only warned about
  *
  * {@link writePlanCi} is handed values from code, so each refusal below
@@ -93,7 +102,7 @@ import { failingRows, verdictOf } from './check-rows.js';
 import { describeValue, textProblem } from './findings.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { attributeBranch, planStubsFromFileNames, resolvePlanStub } from './plan-stubs.js';
-import { readingKey, writeSupersedes } from './repository-facts.js';
+import { readingKey, readRepositoryFacts, writeSupersedes } from './repository-facts.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** A settled verdict: what the table stores, `pending` left out. */
@@ -136,6 +145,18 @@ export interface PlanCiRow {
 export type PlanCiReading =
   | { readonly row: PlanCiRow; readonly skipped: null }
   | { readonly row: null; readonly skipped: string };
+
+/** One fact of `plan_ci`, every reading of it counted once. */
+export interface PlanCiFact {
+  /** The canonical reading: the earliest reading of the fact. */
+  readonly row: PlanCiRow;
+  /** How many readings the canonical one supersedes; 0 for a fact read once. */
+  readonly sightings: number;
+  /** The distinct origin stores of its readings, sorted; a reading with no origin adds none. */
+  readonly origins: readonly string[];
+  /** The latest reading time over all its readings, the canonical one included. */
+  readonly lastSighting: string;
+}
 
 /** What one write did. */
 export interface PlanCiWriteResult {
@@ -318,6 +339,29 @@ export function readPlanCi(repoRoot: string, planStub?: string): PlanCiRow[] {
     ? db.query<StoredPlanCi, []>(`${SELECT_COLUMNS} ORDER BY seq`).all()
     : db.query<StoredPlanCi, [string]>(`${SELECT_COLUMNS} WHERE plan_stub = ? ORDER BY seq`).all(planStub)));
   return rows.map(rowOf);
+}
+
+/**
+ * Every fact of the stored readings, or only those whose canonical
+ * reading is `planStub`'s when one is named, in the order of their
+ * canonical readings' time. See the module note.
+ *
+ * Answers none, opening and creating nothing, when the store file does
+ * not exist. Throws when it exists and cannot be read.
+ */
+export function readPlanCiFacts(repoRoot: string, planStub?: string): PlanCiFact[] {
+  const path = sqliteStorePath(repoRoot);
+  if (!existsSync(path)) return [];
+
+  return withSqliteStore(path, 'read', false, (db) => {
+    const stored = db.query<StoredPlanCi, []>(SELECT_COLUMNS).all();
+    const byKey = new Map(stored.map((row) => [readingKey('plan_ci', { pr: row.pr, head_sha: row.head_sha, read_at: row.read_at }), row] as const));
+    return readRepositoryFacts(db, 'plan_ci').flatMap((fact) => {
+      const canonical = byKey.get(fact.canonical.key);
+      if (canonical === undefined || (planStub !== undefined && canonical.plan_stub !== planStub)) return [];
+      return [{ row: rowOf(canonical), sightings: fact.sightings, origins: fact.origins, lastSighting: fact.lastSighting }];
+    });
+  });
 }
 
 /** The plan stubs `planDir` holds, none when it is not there. */

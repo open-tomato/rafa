@@ -1109,7 +1109,9 @@ the plan stub the head branch resolves to, the verdict (`green`, `red` or
 `none`), and the failing checks' names as a JSON array. Both commands call
 `recordPlanCi` (`store/plan-ci.ts`), handing it the pull request, the
 `CheckRow`s and `plan.dir`; it never throws. A `pending` reading stores
-no row. `readPlanCi` reads every row, or one plan's, in append order.
+no row. `readPlanCi` reads every row, or one plan's, in append order;
+`readPlanCiFacts` reads each fact once, through `readRepositoryFacts`: the
+canonical row, `sightings`, `origins` and `lastSighting`, or one plan's.
 **Verdict, PR, head commit.** A `pending` verdict (a check still running)
 stores no row, and the table's CHECK admits only `green`, `red` and `none`.
 `verdictOf` (`store/check-rows.ts`, with `CheckRow` and `failingRows`, all

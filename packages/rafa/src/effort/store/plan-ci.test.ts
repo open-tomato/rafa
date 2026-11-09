@@ -27,6 +27,7 @@ import {
   planCiReading,
   planStubOfBranch,
   readPlanCi,
+  readPlanCiFacts,
   recordPlanCi,
   writePlanCi,
 } from './plan-ci.js';
@@ -426,6 +427,78 @@ describe('readPlanCi', () => {
 
     expect(readPlanCi(root)).toEqual([]);
     expect(tablesOf(root)).toEqual(TABLES);
+  });
+});
+
+describe('readPlanCiFacts', () => {
+  it('reads none, and creates nothing, under a root with no store', () => {
+    const root = freshRoot('facts-absent');
+
+    expect(readPlanCiFacts(root)).toEqual([]);
+    expect(existsSync(root)).toBe(false);
+  });
+
+  it('answers a fact read once with no sighting, its own time as the last one', () => {
+    const root = freshRoot('facts-once');
+    writePlanCi(root, RED);
+
+    expect(readPlanCiFacts(root)).toEqual([{ row: RED, sightings: 0, origins: [], lastSighting: READ_AT }]);
+  });
+
+  it('answers two readings of one fact as one fact with one sighting, the earliest canonical', () => {
+    const root = freshRoot('facts-two');
+    const again: PlanCiRow = { ...GREEN_LATER, readAt: '2026-09-27T14:00:00.000Z' };
+    writePlanCi(root, again);
+    writePlanCi(root, GREEN_LATER);
+
+    // The control: readPlanCi still holds both readings the facts count once.
+    expect(readPlanCi(root)).toHaveLength(2);
+    expect(readPlanCiFacts(root)).toEqual([{
+      row: GREEN_LATER,
+      sightings: 1,
+      origins: [],
+      lastSighting: '2026-09-27T14:00:00.000Z',
+    }]);
+  });
+
+  it('answers a reading of another verdict on the same head as a fact of its own', () => {
+    const root = freshRoot('facts-verdicts');
+    writePlanCi(root, RED);
+    writePlanCi(root, GREEN_LATER);
+
+    expect(readPlanCiFacts(root).map(({ row, sightings }) => [row, sightings])).toEqual([[RED, 0], [GREEN_LATER, 0]]);
+  });
+
+  it('answers the distinct origins of a fact\'s readings, sorted', () => {
+    const root = freshRoot('facts-origins');
+    const again: PlanCiRow = { ...RED, readAt: '2026-09-27T12:30:00.000Z' };
+    const third: PlanCiRow = { ...RED, readAt: '2026-09-27T13:00:00.000Z' };
+    writePlanCi(root, RED);
+    writePlanCi(root, again);
+    writePlanCi(root, third);
+    // A fixture: the store under tmpdir() mints no origin, so two are planted, the third reading left with none.
+    const db = new Database(sqliteStorePath(root), { readwrite: true });
+    db.run('UPDATE plan_ci SET origin_store = ?, origin_seq = seq WHERE read_at = ?', ['store-b', again.readAt]);
+    db.run('UPDATE plan_ci SET origin_store = ?, origin_seq = seq WHERE read_at = ?', ['store-a', READ_AT]);
+    db.close();
+
+    expect(readPlanCiFacts(root)).toEqual([{
+      row: RED,
+      sightings: 2,
+      origins: ['store-a', 'store-b'],
+      lastSighting: third.readAt,
+    }]);
+  });
+
+  it('answers one plan\'s facts when a plan is named', () => {
+    const root = freshRoot('facts-plan');
+    const other: PlanCiRow = { ...RED, planStub: 'rafa-23-other', pr: 41, readAt: '2026-09-27T11:00:00.000Z' };
+    writePlanCi(root, RED);
+    writePlanCi(root, other);
+
+    expect(readPlanCiFacts(root).map(({ row }) => row)).toEqual([other, RED]);
+    expect(readPlanCiFacts(root, 'rafa-23-other').map(({ row }) => row)).toEqual([other]);
+    expect(readPlanCiFacts(root, 'rafa-99-absent')).toEqual([]);
   });
 });
 
