@@ -883,6 +883,73 @@ two version-7 filters of `changes.test.ts`, the two version-10 filters of
 open through the module creates, and each filter over a store planted
 by raw SQL takes it out as well, since no open has made it there yet.
 
+### Repository facts
+
+`REPOSITORY_FACTS` (`store/repository-facts.ts`) lists the tables whose rows
+are readings of a shared source, beside `MERGE_RULES` (`store/merge-rules.ts`).
+Each entry declares only its fact columns and its reading-time column. Its
+identity is the table's `MERGE_RULES` identity, never spelled twice. It holds
+one entry today: `plan_ci`, with facts `pr`, `head_sha`, `verdict` and
+`failing`, and time `read_at`.
+
+**Rule `same-fact@1`** (`SAME_FACT_RULE`). Two readings of one table are one
+fact when their fact columns are equal, two NULLs counting as equal. The
+canonical reading is the earliest by reading time; two at one time are ordered
+by key, so every store picks the same one. For `plan_ci` the time is part of
+the identity, so two readings with one `pr`, `head_sha` and `read_at` are one
+row already. There is no origin-pair step.
+
+**The supersede row and its key.** A supersede is a row of
+`reading_supersedes`, never a flag on the reading. A key names a reading by its
+table's identity: `readingKey` answers the JSON array of those values in
+`MERGE_RULES` order, for `plan_ci` `[pr,"head_sha","read_at"]`. It is not the
+origin pair, since 27 of the 189 `plan_ci` rows hold none. The table is unique
+over `table_name`, `canonical_key` and `superseded_key`, so a port and the hub
+that write one supersede write one row, and `settleMatches` settles nothing for
+it. A `reading_supersedes` row carries no scope of its own yet: it travels as
+every merged row does until a `ROW_SCOPE` entry gives it the scope of the
+reading it supersedes.
+
+**When supersedes are written.** `writeSupersedes` runs only for the facts a
+write touched, never as a rescan at read:
+
+- `writePlanCi` (`store/plan-ci.ts`) runs it for the new reading's fact, inside
+  the insert's transaction;
+- `mergeStore` (`store/merge-store.ts`) runs it as the merge's last step, inside
+  the union's transaction, for the facts of the readings the union added.
+
+For each fact it reads every reading of it, takes the earliest as canonical, and
+gives every other reading not yet superseded under the rule one row naming the
+canonical. A late reading older than the canonical one adds a row superseding
+the old canonical, and the reader follows the chain to the earliest.
+
+**The reader's answer.** `readRepositoryFacts` answers one `RepositoryFact` per
+fact: the canonical reading, `sightings` (how many readings it supersedes, so
+two readings of one fact answer one sighting), the origins that read it, and
+`lastSighting`, the latest reading time over all its readings, the canonical
+one included. `readPlanCiFacts` (`store/plan-ci.ts`) is its `plan_ci` form.
+
+**The red-wins pick.** A reader that wants a head's current state picks by
+`lastSighting`, never by the canonical reading's time. `currentReading`
+(`packages/rafa-effort/src/effort/report-skills.ts`) takes the latest
+`lastSighting`; on a tie a red fact beats a non-red one, and otherwise the last
+listed wins. Two facts of one head with an equal last sighting need two pull
+requests, since `(pr, head_sha, read_at)` is one row whatever its verdict.
+
+**The sweep.** The test
+`src/tests/core-coupled/effort/store/repository-facts.sweep.test.ts` reads the
+schema every migration builds and fails on a merged table holding
+`read_at` with no entry, an entry naming a table the store lacks, and an entry
+naming a fact or time column its table lacks. It also reads the production
+sources: a module that names `plan_ci` in a `SELECT` or imports `readPlanCi`
+fails unless it is `plan-ci.ts` or `repository-facts.ts`.
+
+**Doubled facts not yet folded.** At the base the store held 12 facts read more
+than once, all from one store. Nothing folds them yet: a fact folds only when a
+reading of it is written or a merge adds one. A backfill is a command, since
+migrations hold DDL only, and none exists, so those 12 stay as they are until
+one lands.
+
 ### The fact rows
 
 **`readSkillFacts` (`packages/rafa-effort/src/effort/skill-facts.ts`) answers
