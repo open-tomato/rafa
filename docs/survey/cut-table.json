@@ -4427,7 +4427,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 138,
+        "test": 139,
         "testSupport": 8
       },
       "files": [
@@ -4604,6 +4604,7 @@
         "packages/rafa-board/src/board/relations/port.ts",
         "packages/rafa-board/src/board/relations/select.test.ts",
         "packages/rafa-board/src/board/relations/select.ts",
+        "packages/rafa-board/src/board/repository.test.ts",
         "packages/rafa-board/src/board/repository.ts",
         "packages/rafa-board/src/board/review-comment.test.ts",
         "packages/rafa-board/src/board/review-comment.ts",
@@ -4735,7 +4736,7 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 253,
+        "packages/rafa-board/": 254,
         "src/board/": 6,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,
