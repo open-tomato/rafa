@@ -3885,7 +3885,7 @@
       "edges": [],
       "fileCounts": {
         "source": 209,
-        "test": 151,
+        "test": 152,
         "testSupport": 9
       },
       "files": [
@@ -3928,6 +3928,7 @@
         "packages/rafa/src/config-schema-board-project.ts",
         "packages/rafa/src/config-schema-bugs.ts",
         "packages/rafa/src/config-schema-checks.ts",
+        "packages/rafa/src/config-schema-collaborate.test.ts",
         "packages/rafa/src/config-schema-errors.ts",
         "packages/rafa/src/config-schema-features.ts",
         "packages/rafa/src/config-schema-hub.ts",
@@ -4260,7 +4261,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 369
+        "packages/rafa/": 370
       },
       "folders": [
         "packages/rafa/"
