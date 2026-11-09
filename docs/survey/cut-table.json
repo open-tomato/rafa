@@ -2214,6 +2214,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/core-coupled/effort/store/repository-facts.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/core-coupled/effort/store/search-row.test.ts",
       "upwardEdgesIn": 0
     },
@@ -5905,7 +5910,7 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 609,
+        "test": 610,
         "testSupport": 22
       },
       "files": [
@@ -6396,6 +6401,7 @@
         "src/tests/core-coupled/effort/store/move.test.ts",
         "src/tests/core-coupled/effort/store/origins.test.ts",
         "src/tests/core-coupled/effort/store/preflight.test.ts",
+        "src/tests/core-coupled/effort/store/repository-facts.sweep.test.ts",
         "src/tests/core-coupled/effort/store/search-row.test.ts",
         "src/tests/core-coupled/effort/store/settings.test.ts",
         "src/tests/core-coupled/effort/store/stale-docs.test.ts",
