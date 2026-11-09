@@ -31,6 +31,7 @@ config-schema-bugs.d.ts
 config-schema-checks.d.ts
 config-schema-errors.d.ts
 config-schema-features.d.ts
+config-schema-hints.d.ts
 config-schema-hub.d.ts
 config-schema-issues.d.ts
 config-schema-logger.d.ts
@@ -80,6 +81,7 @@ core/git/commit.d.ts
 core/git/gh-runner.d.ts
 core/git/git.d.ts
 core/git/index.d.ts
+core/git/placed-line.d.ts
 core/loop/claude.d.ts
 core/loop/hop-record.d.ts
 core/loop/index.d.ts
@@ -165,3 +167,4 @@ schema/tiers.d.ts
 templates/epic-guard.yml
 templates/epic.md
 templates/spec.md
+utils/shell.d.ts

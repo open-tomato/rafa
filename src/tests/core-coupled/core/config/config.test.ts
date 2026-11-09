@@ -118,7 +118,7 @@ const USER_MODULE_PATH = '/home/someone/.rafa/rafa.config.ts';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)';
+  + 'roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, hints)';
 
 /** Every setting, in the order `CONFIG_DEFAULTS` holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -234,6 +234,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'featuresPr',
   'featuresRun',
   'featuresRelease',
+  'hintsSkills',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -356,6 +357,7 @@ const DEFAULTS: RafaConfig = {
   featuresPr: true,
   featuresRun: true,
   featuresRelease: true,
+  hintsSkills: false,
 };
 
 /**
@@ -531,6 +533,8 @@ const FULL = [
   '  pr: false',
   '  run: false',
   '  release: false',
+  'hints:',
+  '  skills: true',
   '',
 ].join('\n');
 
@@ -665,6 +669,7 @@ const FULL_VALUES: RafaConfig = {
   featuresPr: false,
   featuresRun: false,
   featuresRelease: false,
+  hintsSkills: true,
 };
 
 /**
@@ -1457,6 +1462,11 @@ describe('parseConfigText', () => {
         'features.release', 'features:\n  release: "false"',
         'features.release is "false", expected true or false',
         'features:\n  release: false', 'featuresRelease', false,
+      ],
+      [
+        'hints.skills', 'hints:\n  skills: "true"',
+        'hints.skills is "true", expected true or false',
+        'hints:\n  skills: true', 'hintsSkills', true,
       ],
     ];
 

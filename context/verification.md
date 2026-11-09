@@ -60,6 +60,17 @@ instead of the gate's, and `${PIPESTATUS[0]}` prints empty on zsh. Polls
 waste time when the runner will record the same gate later as a real
 step anyway.
 
+**Each gate gets its own foreground call with a 600 000 ms timeout.**
+Chaining `bun test --changed` and the always-run sweeps into one call at
+the default 120 s limit moves it to the background before it prints a
+summary ("Command did not complete within its 120s timeout"). The same
+applies to a task that changes `package.json` or `bun.lock`, whose
+`--changed` run selects nearly the whole suite. **Pass a changed-file list
+to `bunx eslint` through `xargs`**, never as an unquoted shell variable:
+zsh does not word-split `$FILES`, so eslint gets one path holding newlines
+and answers "No files matching the pattern" or "Please check for typing
+mistakes in the pattern".
+
 The full-suite scripts treat the workspace packages apart only for types:
 `check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
 and the test files, then `bun run --filter './packages/*' check-types`, which
