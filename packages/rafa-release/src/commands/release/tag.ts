@@ -239,13 +239,11 @@ import type { ReleasePublishMode } from '@open-tomato/rafa/core/config/sections'
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 
-import { existsSync } from 'node:fs';
-
 import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { ConfigError } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
-import { createGitRunner, gitSaid, readTopLevel } from '@open-tomato/rafa/core/git';
+import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { readTags } from '../../release/status-readings.js';
@@ -257,7 +255,7 @@ import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
 import { commitsOf, readBehind } from './tag-behind.js';
 import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
-import { nextStepsOf, placedAtRoot, readBranchHolder } from './tag-next-steps.js';
+import { nextStepsOf, placedAtRoot, readBranchHolder, stepPlacingOf } from './tag-next-steps.js';
 import { pastReleaseWarning, RELEASE_TAG_USAGE, refusal, renderTagged } from './tag-output.js';
 import {
   readNewestRelease,
@@ -623,15 +621,6 @@ function unitSteps(units: readonly DecidedUnit[], placing: StepPlacing): readonl
     : []);
 }
 
-/**
- * Where the run's steps are placed: at `root`, the top level read once
- * through `git`, the project's runner, and every path checked on disk.
- */
-function placingOf(root: string, git: GitRunner): StepPlacing {
-  const topLevel = readTopLevel(git);
-  return { root, seams: { readTopLevel: () => topLevel, pathExists: existsSync } };
-}
-
 /** Where the release branch stands, for the steps of a branch refusal. */
 function branchPlaceOf(git: GitRunner, config: TagSettings, configFile: string): BranchPlace {
   return {
@@ -728,7 +717,7 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
     context.output.warn(message);
   });
   const git = (seams.git ?? createGitRunner)(project.root);
-  const placing = placingOf(project.root, git);
+  const placing = stepPlacingOf(project.root, git);
 
   const inputs = readTagInputs(project.root, git, config);
   const onBranch = branchRefusal(inputs);

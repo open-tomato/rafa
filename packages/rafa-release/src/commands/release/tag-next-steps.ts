@@ -45,7 +45,9 @@ import type { ReleaseStep } from './step-cases.js';
 import type { TagInputs, TagRefused } from './tag.js';
 import type { GitRunner, PlaceSeams } from '@open-tomato/rafa/core/git';
 
-import { placeLine } from '@open-tomato/rafa/core/git';
+import { existsSync } from 'node:fs';
+
+import { placeLine, readTopLevel } from '@open-tomato/rafa/core/git';
 
 import { caseOf } from './step-cases.js';
 import { UNRELEASED_VERSION } from './tag-units.js';
@@ -98,6 +100,16 @@ export function readBranchHolder(git: GitRunner, branch: string): string | null 
   return path === undefined
     ? null
     : path.slice(WORKTREE_PREFIX.length);
+}
+
+/**
+ * Where a run's steps are placed: at `root`, the top level read once
+ * through `git`, the project's runner, and every path checked on disk.
+ * `rafa release tag` and `rafa release settle` both place theirs so.
+ */
+export function stepPlacingOf(root: string, git: GitRunner): StepPlacing {
+  const topLevel = readTopLevel(git);
+  return { root, seams: { readTopLevel: () => topLevel, pathExists: existsSync } };
 }
 
 /**

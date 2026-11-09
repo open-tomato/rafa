@@ -30,6 +30,7 @@
  * resolved switch in, so every function is pure.
  */
 import type { TagRefusalReason } from './tag.js';
+import type { HintsSettings } from '@open-tomato/rafa/config-schema-hints';
 
 /** How a `rafa release settle` ended: it pushed, it opened a pull request, or it had nothing to fold. */
 export type SettleOutcome = 'push' | 'pr' | 'nothing';
@@ -49,6 +50,13 @@ export type ReleaseCase =
   | 'settle-push'
   | 'settle-pr'
   | 'settle-nothing';
+
+/**
+ * The `hints.skills` switch, as the resolved config carries it. Naming
+ * the hints section here also brings its `RafaConfig` augmentation into
+ * this package's own build, where `config.hintsSkills` is read.
+ */
+export type SkillsSwitch = HintsSettings['hintsSkills'];
 
 /** The skill every release case file sits in. */
 export const RELEASE_SKILL = 'rafa-release';
@@ -94,15 +102,20 @@ export function caseOf(key: ReleaseCaseKey): ReleaseCase {
   return RELEASE_CASES[key];
 }
 
-/** The skill reference of `step` with `skills` the `hints.skills` switch, or null when it gets none. */
-export function skillOf(step: ReleaseStep, skills: boolean): string | null {
-  return skills && step.case !== null
-    ? `${RELEASE_SKILL} › ${step.case}`
+/** The skill reference of `stepCase` with `skills` the `hints.skills` switch, or null when it gets none. */
+export function caseSkill(stepCase: ReleaseCase | null, skills: SkillsSwitch): string | null {
+  return skills && stepCase !== null
+    ? `${RELEASE_SKILL} › ${stepCase}`
     : null;
 }
 
+/** The skill reference of `step` with `skills` the `hints.skills` switch, or null when it gets none. */
+export function skillOf(step: ReleaseStep, skills: SkillsSwitch): string | null {
+  return caseSkill(step.case, skills);
+}
+
 /** `step` as JSON mode's `next` list carries it, `skills` the `hints.skills` switch. */
-export function stepEntry(step: ReleaseStep, skills: boolean): ReleaseStepEntry {
+export function stepEntry(step: ReleaseStep, skills: SkillsSwitch): ReleaseStepEntry {
   return { command: step.command, why: step.why, case: step.case, skill: skillOf(step, skills) };
 }
 
@@ -113,7 +126,7 @@ export function stepEntry(step: ReleaseStep, skills: boolean): ReleaseStepEntry 
  * them; a caller that writes lines of its own between the steps, as a
  * run that tagged writes its CI publish sentence, renders each step here.
  */
-export function renderStep(step: ReleaseStep, skills: boolean): readonly string[] {
+export function renderStep(step: ReleaseStep, skills: SkillsSwitch): readonly string[] {
   const line = `${STEP_INDENT}${step.command} — ${step.why}`;
   const skill = skillOf(step, skills);
   return skill === null
@@ -127,7 +140,7 @@ export function renderStep(step: ReleaseStep, skills: boolean): readonly string[
  * the switch is on and the step has a case, its skill line. No steps
  * give no lines, the heading included.
  */
-export function renderNextSteps(steps: readonly ReleaseStep[], skills: boolean): readonly string[] {
+export function renderNextSteps(steps: readonly ReleaseStep[], skills: SkillsSwitch): readonly string[] {
   if (steps.length === 0) return [];
   return ['Next:', ...steps.flatMap((step) => renderStep(step, skills))];
 }
