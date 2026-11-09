@@ -4427,7 +4427,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 143,
+        "test": 144,
         "testSupport": 8
       },
       "files": [
@@ -4689,6 +4689,7 @@
         "packages/rafa-board/src/commands/issue/edit-run.ts",
         "packages/rafa-board/src/commands/issue/edit.ts",
         "packages/rafa-board/src/commands/issue/issue-tracker.ts",
+        "packages/rafa-board/src/commands/issue/list-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/list.ts",
         "packages/rafa-board/src/commands/issue/move-project.ts",
         "packages/rafa-board/src/commands/issue/move.ts",
@@ -4740,7 +4741,7 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 258,
+        "packages/rafa-board/": 259,
         "src/board/": 6,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,

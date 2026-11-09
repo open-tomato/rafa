@@ -22,6 +22,22 @@
  * (`adapters/tracker/github.ts`), so `--state` on `github` is refused
  * with the adapter's reason. `local` narrows by it.
  *
+ * ## `--upstream=<tool>`
+ *
+ * Lists the issues on the board of a tool the project consumes, the one
+ * `collaborate.<tool>` names, read by `listUpstreamIssues`
+ * (`./list-upstream.ts`): the gate (`./upstream.ts`) first, each refusal
+ * exit 1 and ending `Nothing was read.` with no `gh issue` or `gh label`
+ * call sent, then one `gh issue list` and a `gh issue view` per issue,
+ * each naming `--repo <upstream>`, on the `github` tracker made over
+ * `upstreamGhRunner`. No chain is resolved and no preflight runs.
+ * `--search`, `--type`, `--module` and `--limit` narrow it as they
+ * narrow a `github` list; a blank `--upstream`, `--roadmap` and `--state`
+ * beside it are refused with the usage before the gate. Text mode heads
+ * the list `Tracker: github on <upstream>`, and json mode's
+ * `UpstreamIssueListResult` carries `upstream`, each issue's ref the
+ * upstream as `repo`.
+ *
  * ## Under --roadmap
  *
  * The rows are the Roadmap issue's lines, read by `readRoadmapRows`
@@ -185,7 +201,8 @@
  * Exit code 1, as `issue-tracker.ts` words them: an argument, a switch
  * typed with a value, a flag value outside its set, a `--limit` that is
  * no positive whole number, `--state` beside `--roadmap`, `--all`,
- * `--full` or `--check` without it, a config refused, a chain landing nowhere, and a `find` or
+ * `--full` or `--check` without it, a blank `--upstream`, `--roadmap` or `--state` beside it,
+ * each refusal of the upstream gate, a config refused, a chain landing nowhere, and a `find` or
  * a `get` that rejects. One `get` rejecting refuses the whole list, so no
  * row is left out unannounced.
  *
@@ -203,6 +220,7 @@ import type { Epics } from '../../board/epics.js';
 import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js';
 import type { EpicHorizonGroup, MemberBlockers } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
+import type { IssuesConfigSettings } from '@open-tomato/rafa/config-schema-issues';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { BoardRelationshipMode } from '@open-tomato/rafa/core/config/sections';
 import type { Issue, IssueQuery, IssueType, TrackerKind } from '@open-tomato/rafa/ports';
@@ -240,9 +258,11 @@ import {
   readTextFlag,
   resolveIssueTracker,
 } from './issue-tracker.js';
+import { listUpstreamIssues } from './list-upstream.js';
 import { EPIC_CHECK_EXIT, epicCheckFailure } from './roadmap-check.js';
 import { renderEpicTable } from './roadmap-epic-table.js';
 import { renderRoadmapTable } from './roadmap-table.js';
+import { UPSTREAM_FLAG } from './upstream.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa issue list [--roadmap [--all] [--full] [--check] [--labels] [--texts] [--refresh]] [--state=<state>]'
@@ -605,16 +625,61 @@ const BUG_TYPE: IssueType = 'bug';
 
 /**
  * The template a bug's title is read back with, `issues.titles.bug`. Its
- * config's warnings are dropped: `resolveIssueTracker` already wrote them
- * for the same config.
+ * config's warnings are dropped: `resolveIssueTracker`, or under
+ * `--upstream` the gate, already wrote them for the same config. Typed
+ * off the `issues` section, so a program holding this module holds the
+ * section's `declare module` adding the key to `RafaConfig`.
  */
-async function bugTemplate(context: RafaContext): Promise<string> {
+async function bugTemplate(context: RafaContext): Promise<IssuesConfigSettings['issuesTitleBug']> {
   return (await issueSubjectConfig(issueProject(context), () => undefined)).issuesTitleBug;
+}
+
+/**
+ * The lines text mode writes for an upstream listing: the list's, its
+ * head naming the upstream, `Tracker: github on <upstream>`.
+ */
+export function renderUpstreamList(lines: readonly string[], upstream: string): string[] {
+  const [head = '', ...rows] = lines;
+  return [`${head} on ${upstream}`, ...rows];
+}
+
+/**
+ * Runs an `issue list --upstream=<tool>` line: `--roadmap` and `--state`
+ * refused, then the listing `listUpstreamIssues` (`./list-upstream.ts`)
+ * reads behind the gate. See the module note.
+ */
+async function runUpstreamList(context: RafaContext, seams: IssueSeams, line: IssueListLine, tool: string): Promise<void> {
+  if (line.roadmap) {
+    throw lineRefusal('--roadmap reads this board\'s Roadmap, so it cannot be typed with --upstream', USAGE);
+  }
+  expectNoArgument(context.args, USAGE);
+  const { state, ...query } = readIssueQuery(context.flags);
+  if (state !== undefined) {
+    throw lineRefusal(
+      '--state cannot narrow --upstream: the upstream board is GitHub\'s, which holds an issue open or closed and so'
+      + ' no state of the tracker',
+      USAGE,
+    );
+  }
+  const listed = await listUpstreamIssues(context, seams, { tool, query });
+  if (context.outputMode === 'json') {
+    context.output.result(listed);
+    return;
+  }
+  const lines = listed.query.type === BUG_TYPE
+    ? renderBugList(listed.tracker.kind, listed.issues, await bugTemplate(context))
+    : renderIssueList(listed.tracker.kind, listed.issues);
+  for (const text of renderUpstreamList(lines, listed.upstream)) context.output.info(text);
 }
 
 /** Runs one `issue list` line with `seams`, either listing, writing it in the line's output mode. */
 export async function runIssueList(context: RafaContext, seams: IssueSeams): Promise<void> {
   const line = readIssueListLine(context.flags);
+  const tool = readNonBlankFlag(context.flags, UPSTREAM_FLAG, USAGE);
+  if (tool !== undefined) {
+    await runUpstreamList(context, seams, line, tool);
+    return;
+  }
   if (!line.roadmap) {
     const listed = await listIssues(context, seams);
     if (context.outputMode === 'json') {
