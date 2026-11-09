@@ -24,7 +24,7 @@
  * | `resolver`, `skillsOffered`, `lessonsOffered` | `dispatches` |
  * | `invoked` | `skill_invocations`, main thread and sidechains summed |
  * | `findings`, `blockers`, `outOfScopeBugs` | the tables of the same names |
- * | `planCi` | `plan_ci`, every reading of the row's plan |
+ * | `planCi` | `plan_ci`, every fact of the row's plan, each read once |
  *
  * ## Names
  *
@@ -71,14 +71,24 @@
  * new local `seq` values after its own, and a merged store has to read
  * one order whichever side ran the merge; one device's rows of one
  * report still keep their append order, which `origin_seq` carries.
- * `skill_invocations` and `plan_ci` hold no `collected_at` and are read
- * in their store's own `seq` order. With no `plans` named, every row is read, the plans in the order of
+ * `skill_invocations` holds no `collected_at` and is read in its store's
+ * own `seq` order. With no `plans` named, every row is read, the plans in the order of
  * their first report, and a report dispatched under no plan reads a null
  * `planStub` in a group of its own, placed the same way. With `plans`
  * named, only reports under those stubs are read, in the order the stubs
  * are named, a stub named twice read once; a report under no plan is then
  * never read. Every row of one plan shares one `planCi` list, the plan's
- * readings in append order, `[]` for a plan with none and for no plan.
+ * facts as `readPlanCiFacts` (`store/plan-ci.ts`) answers them, in the
+ * order of their canonical readings' time, `[]` for a plan with none and
+ * for no plan.
+ *
+ * ## Plan CI facts
+ *
+ * Two readings of one CI fact, the same pull request, head and verdict
+ * with the same failing checks, are one entry of `planCi`, read once
+ * from either store a merge joined: the fact's canonical reading, its
+ * `sightings`, `origins` and `lastSighting`. A fact belongs to the plan
+ * of its canonical reading.
  *
  * ## The store
  *
@@ -90,14 +100,14 @@
  * anything but a list of strings, which no writer stores.
  */
 import type { SkillResolverName } from '@open-tomato/rafa/core/config/sections';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact } from '@open-tomato/rafa/store/plan-ci';
 import type { ReportedSkills } from '@open-tomato/rafa/store/reports';
 import type { SkillInvocation } from '@open-tomato/rafa/store/skill-invocations';
 
 import { existsSync } from 'node:fs';
 
 import { ACROSS_STORES_ORDER } from '@open-tomato/rafa/store/origins';
-import { readPlanCi } from '@open-tomato/rafa/store/plan-ci';
+import { readPlanCiFacts } from '@open-tomato/rafa/store/plan-ci';
 import { readReportedSkills } from '@open-tomato/rafa/store/reports';
 import { readSkillInvocations, UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
 import { sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
@@ -159,8 +169,8 @@ export interface SkillFact {
   readonly blockers: readonly SkillFactEntry[];
   /** Its out-of-scope bugs, in append order. */
   readonly outOfScopeBugs: readonly SkillFactEntry[];
-  /** Every CI reading of its plan, in append order; `[]` for none and for no plan. */
-  readonly planCi: readonly PlanCiRow[];
+  /** Every CI fact of its plan, each once, by canonical reading time; `[]` for none and for no plan. */
+  readonly planCi: readonly PlanCiFact[];
 }
 
 /** A `dispatches` row's offer columns, as the query answers them. */
@@ -325,8 +335,8 @@ export function readSkillFacts(repoRoot: string, plans?: readonly string[]): Ski
 
   const rows = readSessionRows(sqliteStorePath(repoRoot));
   const invoked = invocationsBySession(readSkillInvocations(repoRoot));
-  const planCi = new Map<string, readonly PlanCiRow[]>();
-  for (const row of readPlanCi(repoRoot)) planCi.set(row.planStub, [...planCi.get(row.planStub) ?? [], row]);
+  const planCi = new Map<string, readonly PlanCiFact[]>();
+  for (const fact of readPlanCiFacts(repoRoot)) planCi.set(fact.row.planStub, [...planCi.get(fact.row.planStub) ?? [], fact]);
 
   return reports.map((report) => {
     const offer = rows.offers.get(report.sessionId);

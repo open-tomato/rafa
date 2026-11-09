@@ -31,9 +31,11 @@
  * signal is a closed word. A NULL field, as on a row a filed issue
  * inserted, matches nothing.
  *
- * The plan's failing check names are the union over every reading of the
- * plan in `planCi`, each name once. A reading of another plan is skipped,
- * so a caller may hand every reading the store holds.
+ * The plan's failing check names are the union over the canonical
+ * reading of every fact of the plan in `planCi`, each name once. A fact
+ * read twice is one fact with one failing list, so a merge that joined
+ * two readings of it adds no name. A fact of another plan is skipped,
+ * so a caller may hand every fact the store holds.
  *
  * ## What a match answers
  *
@@ -56,7 +58,7 @@
  * row of `facts` throws a `RangeError`.
  */
 import type { SkillFact, SkillFactEntry, SkillFactFinding } from './skill-facts.js';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact } from '@open-tomato/rafa/store/plan-ci';
 
 /** Where a recurrence was found. */
 export type RecurrenceSource = 'finding' | 'blocker' | 'out-of-scope-bug' | 'plan-ci';
@@ -137,9 +139,9 @@ function tasksFrom(facts: readonly SkillFact[], fromIndex: number): SkillFact[] 
 }
 
 /** The plan's failing check names, each once, in the order first read. */
-function failingNames(planStub: string | null, planCi: readonly PlanCiRow[]): Haystack[] {
+function failingNames(planStub: string | null, planCi: readonly PlanCiFact[]): Haystack[] {
   if (planStub === null) return [];
-  const names = new Set(planCi.filter((row) => row.planStub === planStub).flatMap(({ failing }) => failing));
+  const names = new Set(planCi.filter(({ row }) => row.planStub === planStub).flatMap(({ row }) => row.failing));
   return [...names].map((text) => ({ source: 'plan-ci', sessionId: null, taskLine: null, field: 'failing', text }));
 }
 
@@ -155,7 +157,7 @@ export function findRecurrences(
   strings: readonly string[],
   facts: readonly SkillFact[],
   fromIndex: number,
-  planCi: readonly PlanCiRow[],
+  planCi: readonly PlanCiFact[],
 ): Recurrence[] {
   const tasks = tasksFrom(facts, fromIndex);
   const searched = [...new Set(strings)].filter((string) => string !== '');

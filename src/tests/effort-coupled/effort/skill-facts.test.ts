@@ -24,7 +24,7 @@ import type { Device, MergedBothWays } from '../../merged-stores.js';
 import type { SkillResolverName } from '@open-tomato/rafa/core/config/sections';
 import type { ReportBlocker, ReportBug, ReportFinding } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact, PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -144,6 +144,21 @@ function ci(planStub: string, readAt: string, failing: readonly string[]): PlanC
   };
 }
 
+/** How many `plan_ci` rows the store at `root` holds, module uninvolved. */
+function planCiRows(root: string): number {
+  const db = new Database(sqliteStorePath(root), { readonly: true });
+  try {
+    return db.query<{ n: number }, []>('SELECT COUNT(*) AS n FROM plan_ci').get()?.n ?? 0;
+  } finally {
+    db.close();
+  }
+}
+
+/** The canonical readings of `facts`, in the order they come. */
+function rowsOf(facts: readonly PlanCiFact[] | undefined): PlanCiRow[] | undefined {
+  return facts?.map(({ row }) => row);
+}
+
 /** The session ids the facts read, in order. */
 function sessionsOf(root: string, plans?: readonly string[]): string[] {
   return readSkillFacts(root, plans).map(({ sessionId }) => sessionId);
@@ -209,7 +224,12 @@ describe('readSkillFacts joining one session', () => {
       }],
       blockers: [{ what: 'the hook refused', artifact: 'hook exited 1' }],
       outOfScopeBugs: [{ what: 'doctor misreads HOME', artifact: null }],
-      planCi: [ci(PLAN, '2026-09-27T10:00:00.000Z', ['lint'])],
+      planCi: [{
+        row: ci(PLAN, '2026-09-27T10:00:00.000Z', ['lint']),
+        sightings: 0,
+        origins: expect.any(Array),
+        lastSighting: '2026-09-27T10:00:00.000Z',
+      }],
     }]);
   });
 
@@ -356,18 +376,38 @@ describe('readSkillFacts ordering and plans', () => {
     expect(sessionsOf(root, [])).toEqual([]);
   });
 
-  it('gives each row its own plan\'s CI readings only, and none to no plan', () => {
+  it('gives each row its own plan\'s CI facts only, and none to no plan', () => {
     const root = interleaved();
     writePlanCi(root, ci(PLAN, '2026-09-27T10:00:00.000Z', ['lint']));
-    writePlanCi(root, ci(OTHER_PLAN, '2026-09-27T10:30:00.000Z', []));
+    // Another plan's reading is another pull request's: one pull request
+    // read green on one head is one fact, which belongs to the plan of
+    // its earliest reading.
+    writePlanCi(root, { ...ci(OTHER_PLAN, '2026-09-27T10:30:00.000Z', []), pr: 8 });
     writePlanCi(root, ci(PLAN, '2026-09-27T11:00:00.000Z', []));
 
     const byPlan = new Map(readSkillFacts(root).map((fact) => [fact.sessionId, fact.planCi]));
     const ours = [ci(PLAN, '2026-09-27T10:00:00.000Z', ['lint']), ci(PLAN, '2026-09-27T11:00:00.000Z', [])];
-    expect(byPlan.get('a1')).toEqual(ours);
-    expect(byPlan.get('a2')).toEqual(ours);
-    expect(byPlan.get('b1')).toEqual([ci(OTHER_PLAN, '2026-09-27T10:30:00.000Z', [])]);
+    expect(rowsOf(byPlan.get('a1'))).toEqual(ours);
+    expect(rowsOf(byPlan.get('a2'))).toEqual(ours);
+    expect(rowsOf(byPlan.get('b1'))).toEqual([{ ...ci(OTHER_PLAN, '2026-09-27T10:30:00.000Z', []), pr: 8 }]);
     expect(byPlan.get('n1')).toEqual([]);
+  });
+
+  it('reads two readings of one CI fact as one fact, its canonical reading the earliest', () => {
+    const root = freshRoot();
+    report(root, 's1');
+    writePlanCi(root, ci(PLAN, '2026-09-27T11:00:00.000Z', ['lint']));
+    writePlanCi(root, ci(PLAN, '2026-09-27T10:00:00.000Z', ['lint']));
+
+    // The control: the store holds both readings as rows, so a reader of
+    // every reading would answer two and this case could fail.
+    expect(planCiRows(root)).toBe(2);
+
+    const [fact] = readSkillFacts(root)[0]?.planCi ?? [];
+    expect(readSkillFacts(root)[0]?.planCi).toHaveLength(1);
+    expect(fact?.row).toEqual(ci(PLAN, '2026-09-27T10:00:00.000Z', ['lint']));
+    expect(fact?.sightings).toBe(1);
+    expect(fact?.lastSighting).toBe('2026-09-27T11:00:00.000Z');
   });
 
   it('gives a plan with no CI reading an empty list', () => {
@@ -478,6 +518,35 @@ describe('readSkillFacts over a merged store', () => {
       expect(facts.get('s-2')?.blockers.map(({ what }) => what))
         .toEqual(['blocked on zebra from a', 'blocked on alpha from a', 'blocked on middle from a']);
       expect(facts.get('s-4')?.findings.map(({ what }) => what)).toEqual(['yak from b', 'beta from b']);
+    }
+  });
+});
+
+describe('readSkillFacts over a merged store\'s CI readings', () => {
+  it('reads one CI fact two devices read as one fact on either side, with both origins', () => {
+    const scope = freshRoot();
+    const a = freshDevice(scope, 'store-a');
+    const b = freshDevice(scope, 'store-b');
+    for (const device of [a, b]) report(device.root, `s-${device.origin}`);
+    writePlanCi(a.root, ci(PLAN, '2026-09-29T09:00:00.000Z', ['lint']));
+    writePlanCi(b.root, ci(PLAN, '2026-09-29T10:00:00.000Z', ['lint']));
+    const merged = mergeBothWays(scope, a, b);
+
+    for (const root of [merged.firstRanIt, merged.secondRanIt]) {
+      // The control: the merged store holds both devices' readings as
+      // rows, so a reader of every reading would answer two.
+      expect(planCiRows(root)).toBe(2);
+
+      const facts = readSkillFacts(root);
+      expect(facts).toHaveLength(2);
+      for (const { planCi } of facts) {
+        expect(planCi).toEqual([{
+          row: ci(PLAN, '2026-09-29T09:00:00.000Z', ['lint']),
+          sightings: 1,
+          origins: ['store-a', 'store-b'],
+          lastSighting: '2026-09-29T10:00:00.000Z',
+        }]);
+      }
     }
   });
 });

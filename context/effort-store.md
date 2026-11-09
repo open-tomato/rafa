@@ -894,8 +894,9 @@ expectations do not move. Each `SkillFact` holds what `task_reports` says
 its resolver and offers, what `skill_invocations` shows it invoked (or
 `'unknown'` when its log could not be read), its `findings`, `blockers`
 and `out_of_scope_bugs` rows in `ACROSS_STORES_ORDER`, the facts of one
-plan in that order over `task_reports`, and every `plan_ci` reading
-of its plan (empty for no plan or a plan with no reading). Names are
+plan in that order over `task_reports`, and every `plan_ci` fact of its
+plan as `readPlanCiFacts` answers it, two readings of one fact once
+(empty for no plan or a plan with no reading). Names are
 mapped through `bareSkillName`, so a served skill reads as its bare name
 and a plugin's `plugin:name` is kept. A session with no report (a
 `report_absences` row) has no fact row.
@@ -910,7 +911,7 @@ strings come from its `failure_strings:` in the frontmatter, a lesson's from its
 or each later task's findings, blockers or out-of-scope bugs (searched
 fields: `trigger`, `what`, `cause`, `artifact` for findings; `what`,
 `artifact` for entries), or in the plan's failing check names (the union
-over every reading). The task is the fact at `fromIndex`; "later task" is
+over every fact's canonical reading). The task is the fact at `fromIndex`; "later task" is
 a row after it in the same plan. A task under no plan has no later task.
 NULL fields and empty strings are never searched. Each match names the
 string, the source (finding, blocker, bug or plan-ci), the session and
@@ -957,7 +958,7 @@ under, in order first seen. A plan run under one resolver has one arm.
 | `plans` | array of `SkillsReportPlan` | one per plan, or empty |
 | `plans[].planStub` | string or null | null for no plan |
 | `plans[].sessions` | number | count of fact rows of this plan |
-| `plans[].planCi` | `PlanCiRow` or null | latest CI reading by time |
+| `plans[].planCi` | `PlanCiRow` or null | latest fact's canonical reading by time |
 | `plans[].resolvers` | array of `SkillsReportArm` | one per resolver |
 | `plans[].resolvers[].resolver` | string or null | `planner`, `tag`, `none`, or null |
 | `plans[].resolvers[].sessions` | number | fact rows of this arm |

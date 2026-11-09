@@ -12,7 +12,7 @@
  */
 import type { SkillFact, SkillFactEntry } from './skill-facts.js';
 import type { RecurrenceMatcher } from './skill-signals.js';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact } from '@open-tomato/rafa/store/plan-ci';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -53,16 +53,11 @@ function fact(sessionId: string, rows: Partial<SkillFact> = {}): SkillFact {
   };
 }
 
-/** A red CI reading of `PLAN` failing `names`. */
-function redCi(...names: string[]): PlanCiRow {
-  return {
-    planStub: PLAN,
-    pr: 7,
-    headSha: 'abc123',
-    verdict: 'red',
-    failing: names,
-    readAt: '2026-09-27T10:00:00.000Z',
-  };
+/** A red CI fact of `PLAN` failing `names`, read once. */
+function redCi(...names: string[]): PlanCiFact {
+  const readAt = '2026-09-27T10:00:00.000Z';
+  const row = { planStub: PLAN, pr: 7, headSha: 'abc123', verdict: 'red' as const, failing: names, readAt };
+  return { row, sightings: 0, origins: [], lastSighting: readAt };
 }
 
 /** A row's invocations: each name invoked once. */
@@ -123,7 +118,7 @@ describe('recurring', () => {
   });
 
   it('searches from the invoking task with that task\'s plan CI', () => {
-    const calls: [number, readonly PlanCiRow[]][] = [];
+    const calls: [number, readonly PlanCiFact[]][] = [];
     const spy: RecurrenceMatcher = (strings, rows, fromIndex, planCi) => {
       calls.push([fromIndex, planCi]);
       return findRecurrences(strings, rows, fromIndex, planCi);

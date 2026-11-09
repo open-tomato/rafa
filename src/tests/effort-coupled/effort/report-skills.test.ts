@@ -12,7 +12,7 @@
  * once the difference is put in.
  */
 import type { TierPin } from '@open-tomato/rafa/core/config/sections';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact, PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 import type { SkillFact, SkillFactEntry } from '@open-tomato/rafa-effort/effort/skill-facts';
 import type { InventoryKind, InventorySource } from '@open-tomato/rafa-inventory/inventory/record';
 import type { Resolution, TierRow, TierSettings } from '@open-tomato/rafa-inventory/tiers/resolve';
@@ -115,6 +115,11 @@ function ci(readAt: string, failing: readonly string[], planStub = PLAN): PlanCi
     failing,
     readAt,
   };
+}
+
+/** `row` as the one reading of its fact, or the canonical one of `sightings` more read until `lastSighting`. */
+function ciFact(row: PlanCiRow, sightings = 0, lastSighting = row.readAt): PlanCiFact {
+  return { row, sightings, origins: [], lastSighting };
 }
 
 /** `typescript-patterns` declares `TS_ERROR`; nothing else declares a string. */
@@ -326,19 +331,25 @@ describe('plans and plan CI', () => {
     ]);
   });
 
-  it('takes the latest reading by readAt as the plan CI, the last written winning a tie', () => {
-    const readings = [ci('2026-09-27T12:00:00.000Z', ['lint']), ci('2026-09-27T09:00:00.000Z', [])];
-    const tie = [ci('2026-09-27T12:00:00.000Z', ['lint']), { ...ci('2026-09-27T12:00:00.000Z', []), pr: 8 }];
+  it('takes the latest fact\'s canonical reading by readAt as the plan CI, the last listed winning a tie', () => {
+    const readings = [ci('2026-09-27T12:00:00.000Z', ['lint']), ci('2026-09-27T09:00:00.000Z', [])].map((row) => ciFact(row));
+    const tie = [ci('2026-09-27T12:00:00.000Z', ['lint']), { ...ci('2026-09-27T12:00:00.000Z', []), pr: 8 }].map((row) => ciFact(row));
 
-    expect(onlyPlan([fact('s1', { planCi: readings })]).planCi).toEqual(readings[0] ?? null);
+    expect(onlyPlan([fact('s1', { planCi: readings })]).planCi).toEqual(readings[0]?.row ?? null);
     expect(onlyPlan([fact('s1', { planCi: tie })]).planCi?.pr).toBe(8);
     expect(onlyPlan([fact('s1')]).planCi).toBeNull();
   });
 
+  it('answers a fact read twice by its canonical reading, never a later one', () => {
+    const canonical = ci('2026-09-27T10:00:00.000Z', ['lint']);
+
+    expect(onlyPlan([fact('s1', { planCi: [ciFact(canonical, 1, '2026-09-27T13:00:00.000Z')] })]).planCi).toEqual(canonical);
+  });
+
   it('holds a lesson whose artifact is a failing check name to injected-recurring, and one not failing to injected', () => {
     const artifacts = new Map([['lesson-lint', CHECK_NAME]]);
-    const red = onlyPlan([fact('s1', { lessonsOffered: ['lesson-lint'], planCi: [ci('2026-09-27T12:00:00.000Z', [CHECK_NAME])] })], artifacts);
-    const green = onlyPlan([fact('s1', { lessonsOffered: ['lesson-lint'], planCi: [ci('2026-09-27T12:00:00.000Z', ['test'])] })], artifacts);
+    const red = onlyPlan([fact('s1', { lessonsOffered: ['lesson-lint'], planCi: [ciFact(ci('2026-09-27T12:00:00.000Z', [CHECK_NAME]))] })], artifacts);
+    const green = onlyPlan([fact('s1', { lessonsOffered: ['lesson-lint'], planCi: [ciFact(ci('2026-09-27T12:00:00.000Z', ['test']))] })], artifacts);
 
     expect(red.resolvers[0]?.lessons.map(({ id, signal }) => [id, signal])).toEqual([['lesson-lint', 'injected-recurring']]);
     expect(green.resolvers[0]?.lessons.map(({ id, signal }) => [id, signal])).toEqual([['lesson-lint', 'injected']]);
