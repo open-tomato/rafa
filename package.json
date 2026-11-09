@@ -95,6 +95,9 @@
     "./config-schema-checks": {
       "types": "./dist/config-schema-checks.d.ts"
     },
+    "./config-schema-collaborate": {
+      "types": "./dist/config-schema-collaborate.d.ts"
+    },
     "./config-schema-hub": {
       "types": "./dist/config-schema-hub.d.ts"
     },

@@ -96,6 +96,10 @@
       "value": 7,
       "source": "default"
     },
+    "collaborateRafa": {
+      "value": null,
+      "source": "default"
+    },
     "dangerousAcceptStaleRefs": {
       "value": false,
       "source": "default"
@@ -461,7 +465,7 @@
   "userPath": null,
   "userLocalPath": "<home>/.rafa/config.yaml",
   "warnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate)"
   ],
   "extras": [],
   "localExtras": [
@@ -473,6 +477,6 @@
   "userExtras": [],
   "userLocalExtras": [],
   "printedWarnings": [
-    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features)"
+    "rafa config: unknown key \"unknownParityKey\" in <project>/.rafa/config.yaml has no effect in this version (known keys: version, store, effort, hub, plan, specs, tracker, learning, output, prerequisites, tracking, modules, allowList, loop, pr, board, roadmap, claims, triage, release, errors, bugs, logger, issues, cleanup, dangerous, status, tiers, routing, task, merge, naming, templates, tests, checks, features, collaborate)"
   ]
 }

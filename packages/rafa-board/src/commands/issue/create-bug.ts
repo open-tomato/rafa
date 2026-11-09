@@ -57,12 +57,22 @@
  *
  * The config is read here, before the chain resolves it again. Its
  * warnings are written through `warn`, which the caller silences when
- * the chain will write them for the same config.
+ * the chain, or the `--upstream` gate, will write them for the same
+ * config.
+ *
+ * ## Upstream
+ *
+ * A line under `--upstream=<tool>` is read here as any bug line is.
+ * {@link BugLine.owner} answers the package of step 5 beside the draft,
+ * so `./create.ts` can hand its name to the private-name rule
+ * (`./upstream-text.ts`), which it runs over the title and the body,
+ * the `Versions` section included, once the gate has read this board.
  */
 import type { IssueSeams, LineFlags } from './issue-tracker.js';
 import type { BugRecord } from '@open-tomato/rafa/bugs/record';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { IssueDraft } from '@open-tomato/rafa/ports';
+import type { PackageOwner } from '@open-tomato/rafa/project/package-of';
 
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -101,10 +111,16 @@ const FLAG_FIELDS: readonly (readonly [flag: string, field: keyof BugRecord])[] 
 /** The fields a title is read back into. */
 const TITLE_FIELDS = ['project', 'module', 'action', 'summary'] as const;
 
-/** What a bug line makes: the draft to file, and the record it was rendered from. */
+/** What a bug line makes: the draft to file, the record it was rendered from, and the package it names. */
 export interface BugLine {
   readonly draft: IssueDraft;
   readonly record: BugRecord;
+  /**
+   * The package the `Versions` section names, the one its file belongs
+   * to or the checkout's own, or null for none: what `--upstream` hides
+   * of a private board (see "Upstream" in the module note).
+   */
+  readonly owner: PackageOwner | null;
 }
 
 /** How a bug line is read beside its flags. */
@@ -223,5 +239,5 @@ export async function readBugLine(context: RafaContext, seams: IssueSeams, base:
   if (problems.length > 0) {
     throw lineRefusal(['the bug record is not complete:', ...problems.map((problem) => `  ${problem}`)].join('\n'), usage);
   }
-  return { draft: draftOf(base, record, rules, bodyOf(record, base.body, redact)), record };
+  return { draft: draftOf(base, record, rules, bodyOf(record, base.body, redact)), record, owner };
 }

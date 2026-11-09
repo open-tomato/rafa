@@ -3885,7 +3885,7 @@
       "edges": [],
       "fileCounts": {
         "source": 209,
-        "test": 151,
+        "test": 152,
         "testSupport": 9
       },
       "files": [
@@ -3928,6 +3928,7 @@
         "packages/rafa/src/config-schema-board-project.ts",
         "packages/rafa/src/config-schema-bugs.ts",
         "packages/rafa/src/config-schema-checks.ts",
+        "packages/rafa/src/config-schema-collaborate.test.ts",
         "packages/rafa/src/config-schema-errors.ts",
         "packages/rafa/src/config-schema-features.ts",
         "packages/rafa/src/config-schema-hub.ts",
@@ -4260,7 +4261,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 369
+        "packages/rafa/": 370
       },
       "folders": [
         "packages/rafa/"
@@ -4426,7 +4427,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 137,
+        "test": 145,
         "testSupport": 8
       },
       "files": [
@@ -4603,6 +4604,7 @@
         "packages/rafa-board/src/board/relations/port.ts",
         "packages/rafa-board/src/board/relations/select.test.ts",
         "packages/rafa-board/src/board/relations/select.ts",
+        "packages/rafa-board/src/board/repository.test.ts",
         "packages/rafa-board/src/board/repository.ts",
         "packages/rafa-board/src/board/review-comment.test.ts",
         "packages/rafa-board/src/board/review-comment.ts",
@@ -4672,10 +4674,13 @@
         "packages/rafa-board/src/commands/epic/promote.ts",
         "packages/rafa-board/src/commands/epic/show.ts",
         "packages/rafa-board/src/commands/issue/check.ts",
+        "packages/rafa-board/src/commands/issue/collaborate-load.test.ts",
+        "packages/rafa-board/src/commands/issue/comment-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/comment.ts",
         "packages/rafa-board/src/commands/issue/create-blocked.test.ts",
         "packages/rafa-board/src/commands/issue/create-blocked.ts",
         "packages/rafa-board/src/commands/issue/create-bug.ts",
+        "packages/rafa-board/src/commands/issue/create-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/create.ts",
         "packages/rafa-board/src/commands/issue/declarations.test.ts",
         "packages/rafa-board/src/commands/issue/declarations.ts",
@@ -4684,6 +4689,7 @@
         "packages/rafa-board/src/commands/issue/edit-run.ts",
         "packages/rafa-board/src/commands/issue/edit.ts",
         "packages/rafa-board/src/commands/issue/issue-tracker.ts",
+        "packages/rafa-board/src/commands/issue/list-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/list.ts",
         "packages/rafa-board/src/commands/issue/move-project.ts",
         "packages/rafa-board/src/commands/issue/move.ts",
@@ -4698,6 +4704,9 @@
         "packages/rafa-board/src/commands/issue/show.ts",
         "packages/rafa-board/src/commands/issue/unblock-native.ts",
         "packages/rafa-board/src/commands/issue/unblock.ts",
+        "packages/rafa-board/src/commands/issue/upstream-integration.test.ts",
+        "packages/rafa-board/src/commands/issue/upstream-text.test.ts",
+        "packages/rafa-board/src/commands/issue/upstream.test.ts",
         "packages/rafa-board/src/commands/plan/refs-check.ts",
         "packages/rafa-board/src/epic/verify-plan.test.ts",
         "packages/rafa-board/src/epic/verify-plan.ts",
@@ -4733,7 +4742,7 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 252,
+        "packages/rafa-board/": 260,
         "src/board/": 6,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,

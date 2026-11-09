@@ -29,6 +29,7 @@ config-registry.d.ts
 config-schema-board-project.d.ts
 config-schema-bugs.d.ts
 config-schema-checks.d.ts
+config-schema-collaborate.d.ts
 config-schema-errors.d.ts
 config-schema-features.d.ts
 config-schema-hub.d.ts

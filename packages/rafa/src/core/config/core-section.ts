@@ -12,8 +12,9 @@
  * the two item shapes the `prerequisites` and `modules` lists read.
  * `config-readers.ts` holds `mapOf` and the named readers the settings
  * below are read through: `directory`, `trackerKind`, `tierPins` and
- * `routeTable`. The thirteen section files `src/config-schema-*.ts` hold
- * the other packages' settings; core names none of them here.
+ * `routeTable`. The fifteen section files `config-schema-*.ts`, all under
+ * `packages/rafa/src/`, hold the other packages' settings; core names none
+ * of them here.
  *
  * ## The schema
  *

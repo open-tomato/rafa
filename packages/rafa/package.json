@@ -44,6 +44,7 @@
     "./config-schema-logger": "./src/config-schema-logger.ts",
     "./config-schema-board-project": "./src/config-schema-board-project.ts",
     "./config-schema-checks": "./src/config-schema-checks.ts",
+    "./config-schema-collaborate": "./src/config-schema-collaborate.ts",
     "./config-schema-hub": "./src/config-schema-hub.ts",
     "./config-schema-issues": "./src/config-schema-issues.ts",
     "./config-schema-loop-continue": "./src/config-schema-loop-continue.ts",

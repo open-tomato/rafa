@@ -57,6 +57,22 @@ When one matches, add the stretch's case to it:
 rafa issue comment <n> --body="Seen again in stretch <n>: <the raw line>."
 ```
 
+When the config sets `collaborate.rafa` (a project that reports to rafa's
+own board), the gap is filed on that board, not this one. Search and file
+with `--upstream=rafa`, and comment the same way:
+
+```bash
+rafa issue list --upstream=rafa --module=cli-gap --search="<the step in a few words>"
+rafa issue create --upstream=rafa --type=bug --module=cli-gap --action="<the rafa action that came closest, or unknown>" --summary="<the step rafa cannot do yet>" --cause=cli:new-context --reproduce="<the raw line>" --body="<the rafa line that came closest, what it lacks>"
+rafa issue comment <n> --upstream=rafa --body="Seen again in stretch <n>: <the raw line>."
+```
+
+Only a bug is filed upstream: `--type=bug` is the only type it takes. The
+upstream check refuses a run when the config does not set
+`collaborate.rafa`, or when this board's owner differs from the upstream's,
+and a refused line files nothing. A private sibling is named "a private
+sibling repository" in the title and the body, never by its name.
+
 The board is public: no local path, host name, user name or secret in the
 title or the body.
 
