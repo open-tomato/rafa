@@ -415,9 +415,10 @@ export interface BugTriage {
    */
   readonly repairLine?: number;
   /**
-   * True for a `repair` that joined the step repair line already in the
-   * tracker for its kept capture's commit, inserting none
-   * (`./kind-route.ts`); absent otherwise.
+   * True for a `repair` that joined a line already in the tracker,
+   * inserting none (`./kind-route.ts`): the step repair line for its kept
+   * capture's commit, or the open leftover line holding its recurrence
+   * key or symbol (`./leftover-repair.ts`); absent otherwise.
    */
   readonly joined?: boolean;
 }

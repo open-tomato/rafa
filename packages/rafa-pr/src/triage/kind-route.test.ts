@@ -423,6 +423,58 @@ describe('routeByKind: the repair task and its cap', () => {
   });
 });
 
+describe('routeByKind: the leftover dedupe', () => {
+  it('inserts two repairs for two own-gap entries whose keys and symbols differ: the control', async () => {
+    const bugs = [
+      entry('own-gap', 'src/config.ts reads no default', 'config default unset'),
+      entry('own-gap', 'src/config.ts writes no default', 'config default unwritten'),
+    ];
+
+    const { fixture: at, result } = await triage(bugs, kindsOf(stubRunner({})), strictPair());
+
+    expect(result.bugs.map((row) => [row.action, row.joined ?? false])).toEqual([['repair', false], ['repair', false]]);
+    expect(readFileSync(at.trackerPath, 'utf8').split(LEFTOVER_MARKER)).toHaveLength(3);
+  });
+
+  it('joins the second of two own-fallout entries with one recurrence key onto the first one\'s line', async () => {
+    const runner = stubRunner({ [BASE]: 'green', [HEAD]: 'red' });
+    const bugs = [
+      entry('own-fallout', 'the case went red', TEST_ARTIFACT),
+      entry('own-fallout', 'the config case is red again', TEST_ARTIFACT),
+    ];
+
+    const { fixture: at, result } = await triage(bugs, kindsOf(runner, { retries: 1 }), strictPair());
+
+    expect(result.bugs.map((row) => [row.action, row.repairLine, row.joined ?? false])).toEqual([
+      ['repair', OPEN_LINE, false],
+      ['repair', OPEN_LINE, true],
+    ]);
+    const text = readFileSync(at.trackerPath, 'utf8');
+    expect(text.split(LEFTOVER_MARKER)).toHaveLength(2);
+    expect(text.split('\n')[OPEN_LINE]).toMatch(/ <!-- leftover key=[0-9a-f]{12} --> <!-- leftover --> {2}\{agent=build-error-resolver\}/);
+  });
+
+  it('joins an own-gap entry whose plan-symbol match equals an open line\'s, its key differing', async () => {
+    const kinds = kindsOf(stubRunner({}), {
+      planFiles: { ok: true, files: PLAN_FILES, added: ['export function readDefaultConfig() {}'], addedProblem: null, commits: [], commitsProblem: null },
+    });
+    const bugs = [
+      entry('own-gap', 'src/neighbour.ts never calls readDefaultConfig', 'neighbour reads no default'),
+      entry('bug', 'src/other.ts skips readDefaultConfig', 'other reads no default'),
+    ];
+
+    const { fixture: at, result } = await triage(bugs, kinds, strictPair());
+
+    expect(result.bugs.map((row) => [row.kind, row.action, row.repairLine, row.joined ?? false])).toEqual([
+      ['own-gap', 'repair', OPEN_LINE, false],
+      ['own-gap', 'repair', OPEN_LINE, true],
+    ]);
+    const text = readFileSync(at.trackerPath, 'utf8');
+    expect(text.split(LEFTOVER_MARKER)).toHaveLength(2);
+    expect(text.split('\n')[OPEN_LINE]).toContain(' symbol=readDefaultConfig --> <!-- leftover -->');
+  });
+});
+
 describe('routeByKind: the docs row', () => {
   it('stores a docs entry as a sighting whose where is the first path it names', async () => {
     const bug = entry('docs', 'context/triage.md names three channels, as README.md does');

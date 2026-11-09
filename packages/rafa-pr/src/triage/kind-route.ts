@@ -44,6 +44,7 @@
  * | `docs` | settled, `docs` on the `docs` channel: a `sighting` row of `stale_docs` |
  * | `convention` | settled, `pr-body` |
  * | `own-fallout`, its case in a kept capture whose commit has a step repair line | settled, `repair` naming that line, `joined` |
+ * | `own-fallout`, `own-gap`, its key or symbol on an open leftover line | settled, `repair` naming that line, `joined` |
  * | `own-fallout`, `own-gap` | settled, `repair` while the plan's leftover repairs are below the cap, else `follow-up` |
  *
  * A settled `pr-body`, `follow-up` or `repair` row is on the `public`
@@ -60,6 +61,15 @@
  * under the default every leftover is a `follow-up`. A tracker that
  * cannot be read, or a line it refuses, sends the entry to `follow-up`
  * too, its problem naming the failure, so the entry is never lost.
+ *
+ * **The dedupe.** The repair is handed the entry's recurrence key,
+ * `bugKeyOf` over the redacted artifact and `what` (none with no
+ * artifact), and the symbol the check's `plan-symbol` row matched,
+ * redacted. `insertLeftoverRepair` hashes the key into the line's keyed
+ * marker, and joins instead of inserting when an open leftover line
+ * already holds the key's hash or the symbol: a settled `repair` row
+ * whose `repairLine` is that line and whose `joined` is true, nothing
+ * counted against the cap. So two reports of one cause take one slot.
  *
  * **A join.** An `own-fallout` entry whose case a kept capture holds
  * (`capture` on the check's answer) was red in a suite step of this
@@ -97,6 +107,7 @@
  * leaves the table as it read before the captures.
  */
 import type { BaseRunAnswer, NamedTest } from './base-run.js';
+import type { LeftoverEntry, LeftoverInsert } from './leftover-repair.js';
 import type { KindCheck, NamedTestReadings } from './own-check.js';
 import type { PlanBaseReading, PlanFilesReading } from './plan-commits.js';
 import type { KeptCapture, KeptCaptures, StepRepairLine } from './runner-evidence.js';
@@ -108,7 +119,7 @@ import { readFileSync } from 'node:fs';
 
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
-import { artifactOf } from '@open-tomato/rafa/triage/bug-key';
+import { artifactOf, bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { pathsNamedIn } from '@open-tomato/rafa/triage/doc-only';
 import { testFailureOf } from '@open-tomato/rafa/triage/test-failure';
 
@@ -271,30 +282,53 @@ function stepRepairOf(capture: KeptCapture | null, trackerPath: string): StepRep
  */
 function routeLeftover(
   entry: KindRouteEntry,
-  kind: 'own-fallout' | 'own-gap',
-  capture: KeptCapture | null,
+  check: KindCheck & { readonly kind: 'own-fallout' | 'own-gap' },
   trackerPath: string,
   retries: LoopRetries,
 ): KindRouting {
-  const joined = stepRepairOf(capture, trackerPath);
+  const { kind } = check;
+  const joined = stepRepairOf(check.capture, trackerPath);
   if (joined !== null) return settledRow(entry, 'public', 'repair', kind, { repairLine: joined.line, joined: true });
-  const artifact = artifactOf(entry.bug);
   try {
-    const inserted = insertLeftoverRepair(trackerPath, {
-      kind,
-      what: entry.redact(entry.what),
-      artifact: artifact === null
-        ? null
-        : entry.redact(artifact),
-    }, retries);
-    return inserted.inserted
-      ? settledRow(entry, 'public', 'repair', kind, { repairLine: inserted.line })
-      : settledRow(entry, 'public', 'follow-up', kind);
+    return leftoverRow(entry, kind, insertLeftoverRepair(trackerPath, leftoverEntryOf(entry, check, trackerPath), retries));
   } catch (error) {
     return settledRow(entry, 'public', 'follow-up', kind, {
       problem: entry.redact(`out_of_scope_bugs[${entry.index}]: the repair task was not inserted, so it is a follow-up: ${messageOf(error)}`),
     });
   }
+}
+
+/**
+ * The leftover repair entry of `entry`: its `what` and `artifact`
+ * redacted, its recurrence key, from the redacted artifact and `what`
+ * (`bugKeyOf`), null with no artifact, and the symbol the check matched,
+ * redacted; see the module note's dedupe.
+ */
+function leftoverEntryOf(entry: KindRouteEntry, check: KindCheck & { readonly kind: 'own-fallout' | 'own-gap' }, trackerPath: string): LeftoverEntry {
+  const reported = artifactOf(entry.bug);
+  const artifact = reported === null
+    ? null
+    : entry.redact(reported);
+  const what = entry.redact(entry.what);
+  return {
+    kind: check.kind,
+    what,
+    artifact,
+    key: artifact === null
+      ? null
+      : bugKeyOf(trackerPath, artifact, what),
+    symbol: check.symbol === null
+      ? null
+      : entry.redact(check.symbol),
+  };
+}
+
+/** The row of what `insertLeftoverRepair` did: a repair inserted or joined, or a follow-up past the cap. */
+function leftoverRow(entry: KindRouteEntry, kind: 'own-fallout' | 'own-gap', done: LeftoverInsert): KindRouting {
+  if (done.inserted) return settledRow(entry, 'public', 'repair', kind, { repairLine: done.line });
+  return 'joined' in done
+    ? settledRow(entry, 'public', 'repair', kind, { repairLine: done.line, joined: true })
+    : settledRow(entry, 'public', 'follow-up', kind);
 }
 
 /** The route of the kind the check answered; see the module note's table. */
@@ -312,7 +346,7 @@ function routeChecked(entry: KindRouteEntry, check: KindCheck, context: KindRout
       return settledRow(entry, 'public', 'pr-body', 'convention');
     case 'own-fallout':
     case 'own-gap':
-      return routeLeftover(entry, check.kind, check.capture, context.trackerPath, options.retries);
+      return routeLeftover(entry, { ...check, kind: check.kind }, context.trackerPath, options.retries);
   }
 }
 

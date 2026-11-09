@@ -236,6 +236,17 @@ tracker that cannot be read each become a `follow-up` row, the problem naming
 the failure, so an entry is never lost. Each repair the run adds is one
 `Triage:` line naming its tracker line.
 
+One cause holds one repair. An entry with an artifact hands the repair its
+recurrence key (`bugKeyOf`), and a `plan-symbol` answer its matched symbol;
+the line then carries both in a keyed marker before the bare one,
+`<!-- leftover key=<hash> symbol=<name> --> <!-- leftover -->`, the `<hash>`
+the first 12 hex digits of the key's SHA-256 and the `<name>` percent-encoded.
+Before the cap is read, an entry whose key hash or symbol equals the one an
+open leftover line holds, `[ ]` or `[BLOCKED]`, joins that line: a `repair` row
+naming it, with `joined` set, no line inserted and none counted against the
+cap. A ticked line is never joined, and a line with the bare marker alone,
+written with no key or before keys, is never joined but still counts.
+
 ### The follow-up issue
 
 `packages/rafa-run/src/start/follow-ups.ts` (`fileFollowUps`) writes the plan's
