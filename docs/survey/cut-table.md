@@ -12,7 +12,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `rafa-eslint-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2 | `rafa-typescript-config` | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 3 | `@open-tomato/rafa-core` | 369 | 209 | 151 | 9 | 0 | 0 | 0 |
+| 3 | `@open-tomato/rafa-core` | 371 | 210 | 152 | 9 | 0 | 0 | 0 |
 | 4 | `rafa-inventory` | 105 | 56 | 49 | 0 | 0 | 0 | 0 |
 | 5 | `rafa-board` | 301 | 156 | 137 | 8 | 2 | 0 | 2 |
 | 6 | `rafa-pr` | 160 | 80 | 78 | 2 | 26 | 0 | 26 |
@@ -31,7 +31,7 @@ A folder is followed by the files of the graph it placed. A named file is placed
 | --- | --- | --- |
 | `rafa-eslint-config` | `packages/eslint-config/` (0) | - |
 | `rafa-typescript-config` | `packages/typescript-config/` (0) | - |
-| `@open-tomato/rafa-core` | `packages/rafa/` (369) | - |
+| `@open-tomato/rafa-core` | `packages/rafa/` (371) | - |
 | `rafa-inventory` | `packages/rafa-inventory/` (104), `src/tiers/` (1), `src/bundled/` (0), `src/inventory/` (0), `src/schema/` (0) | - |
 | `rafa-board` | `packages/rafa-board/` (252), `src/board/` (6), `src/commands/board/` (1), `src/commands/epic/` (1), `src/commands/issue/` (1) | `packages/rafa-board/src/board/flags.ts`, `packages/rafa-board/src/board/gate.ts`, `packages/rafa-board/src/board/issue.ts`, `packages/rafa-board/src/board/leak.ts`, `packages/rafa-board/src/board/plan-field.ts`, `packages/rafa-board/src/board/plan-spec.ts`, `packages/rafa-board/src/board/previous-copy.ts`, `packages/rafa-board/src/board/readiness.ts`, `packages/rafa-board/src/board/review-comment.ts`, `packages/rafa-board/src/board/review-stamp.ts`, `packages/rafa-board/src/board/snapshot-settle.ts`, `packages/rafa-board/src/board/spec-review.ts`, `packages/rafa-board/src/board/spec-source.ts`, `packages/rafa-board/src/board/trust.ts`, `packages/rafa-board/src/bugs/cause-rule.ts`, `packages/rafa-board/src/claims/ahead.ts`, `packages/rafa-board/src/commands/doctor-refs.ts`, `packages/rafa-board/src/commands/plan/refs-check.ts`, `packages/rafa-board/src/epic/verify-plan.ts`, `packages/rafa-board/src/epic/verify-run.ts`, `packages/rafa-board/src/next/hop-chain.ts`, `packages/rafa-board/src/next/relation-readings.ts` |
 | `rafa-pr` | `packages/rafa-pr/` (134), `src/commands/pr/` (4), `src/pr/` (2), `src/triage/` (2) | `packages/rafa-pr/src/bugs/filed-values.ts`, `packages/rafa-pr/src/cleanup/branches.ts`, `packages/rafa-pr/src/cleanup/groups.ts`, `packages/rafa-pr/src/cleanup/worktrees.ts`, `packages/rafa-pr/src/docs/task-reading.ts`, `packages/rafa-pr/src/plan/risk.ts`, `packages/rafa-pr/src/plan/risk/accounts.ts`, `packages/rafa-pr/src/start/pr-retarget.ts`, `packages/rafa-pr/src/pr/index.ts` |

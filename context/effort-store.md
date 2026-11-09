@@ -1213,10 +1213,21 @@ row. Every text column is non-blank by CHECK, `origin_store` when filled, and no
 CHECK admits a closed set, so no column is in `KEPT_COLUMNS`.
 `reading_supersedes_by_fact` is unique over `table_name`, `canonical_key` and
 `superseded_key`, the table's identity: the table is `merged`, append-only by
-those three, and one of the `ORIGIN_TABLES`. No module writes it yet, so
-`origins.test.ts` lists it in `UNWRITTEN_TABLES`.
+those three, and one of the `ORIGIN_TABLES`. `store/repository-facts.ts`
+holds `REPOSITORY_FACTS`, the tables whose rows are readings of a shared source
+with each one's fact columns and reading time (`plan_ci`: `pr`, `head_sha`,
+`verdict`, `failing`; `read_at`), the rule `same-fact@1`, the key encoder
+`readingKey`, the writer and the reader. `writeSupersedes` is handed the keys of
+the readings a write touched and, for each fact they reach, gives every reading
+of it that is not the earliest and not yet superseded under the rule one stamped
+row naming the earliest, absorbed on the table's identity; it opens no
+transaction of its own, so it runs inside its caller's. `readRepositoryFacts`
+follows the rows to answer per fact the canonical reading, `sightings` (the
+readings it supersedes), the origins that read it and `lastSighting`, the latest
+reading time of them all. No caller runs the writer yet.
 `reading-supersedes-migration.test.ts` holds the entry to a store an older
-runtime left and the table to each CHECK and index.
+runtime left and the table to each CHECK and index; `repository-facts.test.ts`
+holds the writer and the reader.
 
 **`changes` is the one report table with no `outcome` column.** A
 change note is about the diff, not about how the session ended, so

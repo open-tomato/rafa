@@ -39,6 +39,7 @@ import { ORIGIN_TABLES } from '@open-tomato/rafa/store/origins';
 import { readPlanCi, writePlanCi } from '@open-tomato/rafa/store/plan-ci';
 import { readPreflightHalts, writePreflightChecks } from '@open-tomato/rafa/store/preflight';
 import { readReportedSkills, readTaskReportTallies, writeTaskReport } from '@open-tomato/rafa/store/reports';
+import { readRepositoryFacts, writeSupersedes } from '@open-tomato/rafa/store/repository-facts';
 import { readSkillInvocations, writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
 import { openSqliteStore, sqliteStorePath, withSqliteStore } from '@open-tomato/rafa/store/sqlite';
 import { readStaleDocsForPlan, writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
@@ -63,6 +64,9 @@ const WRITTEN_AT = new Date('2026-09-29T10:00:00.000Z');
 
 /** The earliest time a finish is read from, before every row here. */
 const SINCE = '2026-01-01T00:00:00.000Z';
+
+/** The two later readings of one CI fact the supersede writer's case writes, after {@link WRITTEN_AT}. */
+const SIGHTED_AT = ['2026-09-29T11:00:00.000Z', '2026-09-29T12:00:00.000Z'] as const;
 
 let planted = 0;
 
@@ -166,13 +170,14 @@ function appendSession(root: string, session: string): void {
 
 /**
  * The merged tables no module under `packages/rafa/src/effort/store/` inserts into:
- * `reading_supersedes`, whose migration lands ahead of its writer. A
- * table whose migration lands ahead of its writer is listed here. The last group below reads the modules' source and fails
+ * none today. A table whose migration lands ahead of its writer is
+ * listed here. The last group below reads the modules' source and fails
  * once one of them inserts into a table listed here, so a table leaves
  * this list for {@link WRITERS} and {@link PLANTED} in the commit that
- * adds its writer, as `stale_docs` and `bug_routes` did.
+ * adds its writer, as `stale_docs`, `bug_routes` and
+ * `reading_supersedes` did.
  */
-const UNWRITTEN_TABLES: readonly OriginTable[] = ['reading_supersedes'];
+const UNWRITTEN_TABLES: readonly OriginTable[] = [];
 
 /** The merged tables a production writer inserts into: every one but the {@link UNWRITTEN_TABLES}. */
 const WRITTEN_TABLES: readonly OriginTable[] = ORIGIN_TABLES.filter((table) => !UNWRITTEN_TABLES.includes(table));
@@ -320,6 +325,18 @@ const WRITERS: readonly WriterCase[] = [
     },
   },
   {
+    // Two later readings of the fact `writePlanCi`'s case reads, so the one supersede each write adds names the earlier of them alone, or `writePlanCi`'s reading where the store holds it.
+    name: 'writeSupersedes',
+    tables: ['reading_supersedes'],
+    write: (root, session) => {
+      for (const readAt of SIGHTED_AT) {
+        writePlanCi(root, { planStub: PLAN, pr: 7, headSha: `sha-${session}`, verdict: 'green', failing: [], readAt });
+      }
+      const keys = SIGHTED_AT.map((readAt) => `[7,"sha-${session}","${readAt}"]`);
+      withSqliteStore(sqliteStorePath(root), 'write', false, (db) => writeSupersedes(db, 'plan_ci', keys));
+    },
+  },
+  {
     name: 'writeTrackerRef, inserting the row it sets the reference on',
     tables: ['findings'],
     write: (root, session) => {
@@ -334,12 +351,12 @@ const WRITERS: readonly WriterCase[] = [
 ];
 
 describe('every production insert stamps the store\'s origin', () => {
-  it('covers each of the fourteen written merged tables, a writer filling every one', () => {
+  it('covers each of the fifteen merged tables, a writer filling every one', () => {
     const covered = new Set(WRITERS.flatMap(({ tables }) => tables));
 
     expect([...covered].sort()).toEqual([...WRITTEN_TABLES].sort());
-    expect(WRITTEN_TABLES).toHaveLength(14);
-    expect(UNWRITTEN_TABLES).toEqual(['reading_supersedes']);
+    expect(WRITTEN_TABLES).toHaveLength(15);
+    expect(UNWRITTEN_TABLES).toEqual([]);
     expect([...WRITTEN_TABLES, ...UNWRITTEN_TABLES].sort()).toEqual([...ORIGIN_TABLES].sort());
   });
 
@@ -415,13 +432,17 @@ describe('seq across a new mint', () => {
 });
 
 /**
- * One row for each of the fourteen {@link WRITTEN_TABLES} with the
+ * One row for each of the fifteen {@link WRITTEN_TABLES} with the
  * origin columns left out of its insert: for the twelve tables older
  * than `row-origins`, as a runtime before that migration inserts it,
- * every column it knew named; for `stale_docs` and `bug_routes`, which
- * no such runtime holds, the same shape of insert. All under task session `old` (its absence under
+ * every column it knew named; for `stale_docs`, `bug_routes` and
+ * `reading_supersedes`, which no such runtime holds, the same shape of
+ * insert. All under task session `old` (its absence under
  * `old-absent`) and {@link PLAN}, each shaped for the reader of its
- * table to answer it.
+ * table to answer it. The supersede is the one row of session `new`: it
+ * supersedes the first of the two readings {@link SIGHTED_AT} by the
+ * reading `writePlanCi`'s case writes, which leaves the writer one row of
+ * its own to stamp beside it.
  */
 const PLANTED: readonly (readonly [OriginTable, string])[] = [
   ['sessions', 'INSERT INTO sessions (session_id, row_json) VALUES (\'old\', \'{"sessionId":"old","assistantRecordCount":1}\')'],
@@ -450,6 +471,8 @@ const PLANTED: readonly (readonly [OriginTable, string])[] = [
     + ' VALUES (\'d-old\', \'old\', \'phase-1\', \'Add the module\', \'sighting\', NULL, \'the old line\', \'done\', \'2026-09-28T10:00:00.000Z\')'],
   ['bug_routes', 'INSERT INTO bug_routes (id, session_id, plan_stub, task_line, entry_index, what, said, kind, route, collected_at)'
     + ' VALUES (\'g-old\', \'old\', \'phase-1\', \'Add the module\', 0, \'the old entry\', NULL, \'bug\', \'filed\', \'2026-09-28T10:00:00.000Z\')'],
+  ['reading_supersedes', 'INSERT INTO reading_supersedes (table_name, canonical_key, superseded_key, rule)'
+    + ' VALUES (\'plan_ci\', \'[7,"sha-new","2026-09-29T10:00:00.000Z"]\', \'[7,"sha-new","2026-09-29T11:00:00.000Z"]\', \'same-fact@1\')'],
 ];
 
 describe('a row planted with NULL origins', () => {
@@ -538,7 +561,21 @@ describe('a row planted with NULL origins', () => {
   });
 
   it('is read by readPlanCi', () => {
-    expect(readPlanCi(root).map(({ headSha, verdict }) => [headSha, verdict])).toEqual([['sha-old', 'red'], ['sha-new', 'green']]);
+    expect(readPlanCi(root).map(({ headSha, verdict, readAt }) => [headSha, verdict, readAt])).toEqual([
+      ['sha-old', 'red', '2026-09-28T10:00:00.000Z'],
+      ['sha-new', 'green', WRITTEN_AT.toISOString()],
+      ['sha-new', 'green', SIGHTED_AT[0]],
+      ['sha-new', 'green', SIGHTED_AT[1]],
+    ]);
+  });
+
+  it('is read by readRepositoryFacts, the planted supersede followed as the stamped one', () => {
+    const facts = withSqliteStore(sqliteStorePath(root), 'read', false, (db) => readRepositoryFacts(db, 'plan_ci'));
+
+    expect(facts.map(({ canonical, sightings, origins, lastSighting }) => [canonical.key, sightings, origins, lastSighting])).toEqual([
+      ['[6,"sha-old","2026-09-28T10:00:00.000Z"]', 0, [], '2026-09-28T10:00:00.000Z'],
+      [`[7,"sha-new","${WRITTEN_AT.toISOString()}"]`, 2, ['store-a'], SIGHTED_AT[1]],
+    ]);
   });
 
   it('is read by readSkillFacts, from dispatches, findings, blockers and bugs alike', () => {
@@ -560,7 +597,7 @@ describe('a row planted with NULL origins', () => {
         findings: ['issue-old'],
         blockers: ['an old blocker'],
         outOfScopeBugs: ['an old bug'],
-        planCi: 2,
+        planCi: 4,
       },
       {
         sessionId: 'new',
@@ -569,7 +606,7 @@ describe('a row planted with NULL origins', () => {
         findings: ['finding-new', 'issue-new'],
         blockers: ['the fixture is missing'],
         outOfScopeBugs: ['the helper drops a row'],
-        planCi: 2,
+        planCi: 4,
       },
     ]);
   });
@@ -608,7 +645,7 @@ describe('the production inserts, read from source', () => {
 
     expect([...stamped].sort()).toEqual([
       'absences.ts', 'bug-routes.ts', 'changes.ts', 'dispatches.ts', 'findings.ts', 'plan-ci.ts', 'preflight.ts',
-      'reports.ts', 'skill-invocations.ts', 'sqlite.ts', 'stale-docs.ts', 'tracker-refs.ts', 'triage.ts', 'triage.ts',
+      'reports.ts', 'repository-facts.ts', 'skill-invocations.ts', 'sqlite.ts', 'stale-docs.ts', 'tracker-refs.ts', 'triage.ts', 'triage.ts',
     ]);
     expect(unstamped.sort()).toEqual([
       ['bring-forward.ts: ', '${', 'MIGRATION_LOG_TABLE}'].join(''),

@@ -64,8 +64,8 @@
  * `bug_routes`, holds one row per `out_of_scope_bugs` entry the triage
  * step routed; `bug-routes.ts` writes it and holds its row type. A
  * thirteenth, `reading_supersedes`, holds one row per reading of a
- * shared source that another reading of the same fact supersedes; no
- * module writes it yet. The fourteenth is `schema_migrations`, the
+ * shared source that another reading of the same fact supersedes;
+ * `repository-facts.ts` writes and reads it. The fourteenth is `schema_migrations`, the
  * migration log, which only `bring-forward.ts` writes; the section on
  * bringing a store forward says what it holds. The last four are the store's own identity and
  * merge trail: `store_meta`, `store_replaced`, `merges` and
