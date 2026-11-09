@@ -5903,12 +5903,13 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 617,
+        "test": 618,
         "testSupport": 22
       },
       "files": [
         "packages/rafa-index/src/fusion.test.ts",
         "packages/rafa-index/src/imports.test.ts",
+        "packages/rafa-index/src/index.integration.test.ts",
         "packages/rafa-index/src/links.test.ts",
         "packages/rafa-index/src/loader.test.ts",
         "packages/rafa-index/src/notice.test.ts",
