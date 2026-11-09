@@ -958,7 +958,7 @@ under, in order first seen. A plan run under one resolver has one arm.
 | `plans` | array of `SkillsReportPlan` | one per plan, or empty |
 | `plans[].planStub` | string or null | null for no plan |
 | `plans[].sessions` | number | count of fact rows of this plan |
-| `plans[].planCi` | `PlanCiRow` or null | latest fact's canonical reading by time |
+| `plans[].planCi` | `PlanCiRow` or null | canonical reading of the fact last sighted, red winning a tie |
 | `plans[].resolvers` | array of `SkillsReportArm` | one per resolver |
 | `plans[].resolvers[].resolver` | string or null | `planner`, `tag`, `none`, or null |
 | `plans[].resolvers[].sessions` | number | fact rows of this arm |

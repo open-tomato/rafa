@@ -60,10 +60,14 @@
  * `planner`, half `tag` would otherwise leave a `planner` task's
  * recurrence in a later `tag` task unsearched.
  *
- * `planCi` is the canonical reading of the plan's latest CI fact by the
- * canonical reading's `readAt`, labelled plan CI by the formatter and
- * never counted per task or per arm; the fact `readSkillFacts` lists
- * last wins a tie. Recurrences search the failing names of every fact's
+ * `planCi` is the canonical reading of the plan's current CI fact,
+ * labelled plan CI by the formatter and never counted per task or per
+ * arm. The current fact is the one with the latest `lastSighting`, never
+ * the latest canonical `readAt`: a head read red, then green, then red
+ * again on a rerun is red, though the red fact's canonical reading is
+ * the oldest. On a tie in `lastSighting` a red fact wins over one of
+ * another verdict, and between two of one kind the fact `readSkillFacts`
+ * lists last wins. Recurrences search the failing names of every fact's
  * canonical reading, as `findRecurrences` does.
  *
  * ## M1 and M2
@@ -139,7 +143,7 @@ export interface SkillsReportPlan {
   readonly planStub: string | null;
   /** Its task sessions: fact rows. */
   readonly sessions: number;
-  /** Its latest CI reading, plan CI, never a task's; null when none was read. */
+  /** Its current CI fact's canonical reading, plan CI, never a task's; null when none was read. */
   readonly planCi: PlanCiRow | null;
   /** One arm per resolver, in the order first seen; one for a plan run under one. */
   readonly resolvers: readonly SkillsReportArm[];
@@ -318,11 +322,22 @@ function armOf(
   };
 }
 
-/** The latest canonical reading of `facts` by `readAt`, the last listed winning a tie; null for none. */
-function latestReading(facts: readonly PlanCiFact[]): PlanCiRow | null {
-  return facts.reduce<PlanCiRow | null>((latest, { row }) => (latest === null || row.readAt >= latest.readAt
-    ? row
-    : latest), null);
+/** Whether `fact` is current over `current`: a later last sighting, or a tie `current` does not win by being red alone. */
+function isCurrentOver(fact: PlanCiFact, current: PlanCiFact): boolean {
+  if (fact.lastSighting !== current.lastSighting) return fact.lastSighting > current.lastSighting;
+  return fact.row.verdict === 'red' || current.row.verdict !== 'red';
+}
+
+/**
+ * The canonical reading of the current fact of `facts`: the latest
+ * `lastSighting`, a red fact winning a tie, then the last listed; null
+ * for none. See the module note.
+ */
+function currentReading(facts: readonly PlanCiFact[]): PlanCiRow | null {
+  const current = facts.reduce<PlanCiFact | null>((picked, fact) => (picked === null || isCurrentOver(fact, picked)
+    ? fact
+    : picked), null);
+  return current?.row ?? null;
 }
 
 /**
@@ -342,7 +357,7 @@ export function skillsReportOf(
     return {
       planStub,
       sessions: planFacts.length,
-      planCi: latestReading(planFacts[0]?.planCi ?? []),
+      planCi: currentReading(planFacts[0]?.planCi ?? []),
       resolvers: arms.map(([resolver, armFacts]) => armOf(resolver, armFacts, match, failureStrings, artifacts)),
     };
   });

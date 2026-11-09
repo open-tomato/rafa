@@ -331,13 +331,36 @@ describe('plans and plan CI', () => {
     ]);
   });
 
-  it('takes the latest fact\'s canonical reading by readAt as the plan CI, the last listed winning a tie', () => {
+  it('takes the canonical reading of the fact last sighted as the plan CI, the last listed winning a tie of one verdict', () => {
     const readings = [ci('2026-09-27T12:00:00.000Z', ['lint']), ci('2026-09-27T09:00:00.000Z', [])].map((row) => ciFact(row));
-    const tie = [ci('2026-09-27T12:00:00.000Z', ['lint']), { ...ci('2026-09-27T12:00:00.000Z', []), pr: 8 }].map((row) => ciFact(row));
+    const tie = [ci('2026-09-27T12:00:00.000Z', []), { ...ci('2026-09-27T12:00:00.000Z', []), pr: 8 }].map((row) => ciFact(row));
 
     expect(onlyPlan([fact('s1', { planCi: readings })]).planCi).toEqual(readings[0]?.row ?? null);
     expect(onlyPlan([fact('s1', { planCi: tie })]).planCi?.pr).toBe(8);
+    expect(onlyPlan([fact('s1', { planCi: [...tie].reverse() })]).planCi?.pr).toBe(7);
     expect(onlyPlan([fact('s1')]).planCi).toBeNull();
+  });
+
+  it('shows red for a head read red, then green, then red on a rerun, though the red fact\'s canonical reading is the oldest', () => {
+    const red = { ...ci('2026-09-27T10:00:00.000Z', ['lint']), headSha: 'head-1' };
+    const green = { ...ci('2026-09-27T11:00:00.000Z', []), headSha: 'head-1' };
+    const rerun = [ciFact(red, 1, '2026-09-27T12:00:00.000Z'), ciFact(green)];
+    const noRerun = [ciFact(red), ciFact(green)];
+
+    expect(onlyPlan([fact('s1', { planCi: rerun })]).planCi).toEqual(red);
+    expect(onlyPlan([fact('s1', { planCi: [...rerun].reverse() })]).planCi).toEqual(red);
+    expect(onlyPlan([fact('s1', { planCi: noRerun })]).planCi).toEqual(green);
+  });
+
+  it('shows red for two facts of one head with an equal last sighting, one red and one green, in either order', () => {
+    const red = { ...ci('2026-09-27T10:00:00.000Z', ['lint']), headSha: 'head-1' };
+    const green = { ...ci('2026-09-27T11:00:00.000Z', []), headSha: 'head-1' };
+    const tie = [ciFact(red, 1, '2026-09-27T12:00:00.000Z'), ciFact(green, 1, '2026-09-27T12:00:00.000Z')];
+    const greenLater = [ciFact(red, 1, '2026-09-27T12:00:00.000Z'), ciFact(green, 1, '2026-09-27T12:00:00.001Z')];
+
+    expect(onlyPlan([fact('s1', { planCi: tie })]).planCi).toEqual(red);
+    expect(onlyPlan([fact('s1', { planCi: [...tie].reverse() })]).planCi).toEqual(red);
+    expect(onlyPlan([fact('s1', { planCi: greenLater })]).planCi).toEqual(green);
   });
 
   it('answers a fact read twice by its canonical reading, never a later one', () => {
