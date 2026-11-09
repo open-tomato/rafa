@@ -1,6 +1,14 @@
 /**
- * The hub store contract suite (`contract.ts`) run against the
- * in-memory stand-in (`testdata/memory-store.ts`), then against the
+ * Both contract suites, `contract.ts` for rows and `index-contract.ts`
+ * for the index, run over every entry of {@link HUB_CONNECTORS} by name,
+ * the index suite twice per connector: once as configured and once with
+ * the extension held off, so the vector cases run under both answers.
+ * A connector's setup (the embedder, the extension held off) reaches it
+ * through {@link INDEX_SETUPS}, keyed by the same names; a connector
+ * added without one fails the guard case here.
+ *
+ * The row suite also runs against the in-memory stand-in
+ * (`testdata/memory-store.ts`), which is no connector, then against the
  * stand-in with one rule broken at a time, so a suite whose cases could
  * never fail would fail here instead of passing every adapter.
  *
@@ -14,12 +22,59 @@
  * core's merge recomputes, which the suite exempts, where `edits-rows`
  * adds any other key to `row_json` and is held to fail.
  */
+import type { HubIndexConnector, HubIndexFiles } from './index-contract.js';
+
 import { join } from 'node:path';
 
+import { createLoaderState } from '@open-tomato/rafa-index/loader';
 import { describe, expect, it } from 'bun:test';
 
+import { DEFAULT_STORE_FILE } from '../config.js';
+
+import { HUB_CONNECTORS } from './connectors.js';
 import { hubStoreContract } from './contract.js';
+import { hubIndexContract, INDEX_CONTRACT_EMBEDDER } from './index-contract.js';
+import { connectSqliteHub, indexFileName } from './sqlite.js';
 import { openMemoryHubStore } from './testdata/memory-store.js';
+
+/** How the index suite opens one connector of {@link HUB_CONNECTORS}, and the files it reads. */
+interface IndexSetup {
+  readonly connect: HubIndexConnector;
+  readonly files: HubIndexFiles;
+}
+
+/**
+ * The index suite's setup per connector name. `sqlite` holds the
+ * extension off the way macOS does with no library named, on a loader
+ * state of its own so the process's stays unmarked.
+ */
+const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
+  sqlite: {
+    connect: (context, setup) => connectSqliteHub(context, {
+      embedder: setup.embedder,
+      loader: setup.holdExtensionOff
+        ? { library: null, platform: 'darwin', state: createLoaderState() }
+        : { state: createLoaderState() },
+    }),
+    files: { index: indexFileName(DEFAULT_STORE_FILE), store: DEFAULT_STORE_FILE },
+  },
+});
+
+describe('the connectors both suites run over', () => {
+  it('holds an index setup for every connector by name, and none other', () => {
+    expect(Object.keys(INDEX_SETUPS).sort()).toEqual(Object.keys(HUB_CONNECTORS).sort());
+  });
+});
+
+for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
+  hubStoreContract(name, async (context) => (await connector(context)).store);
+  const setup = INDEX_SETUPS[name];
+  if (setup !== undefined) {
+    const options = { embedder: INDEX_CONTRACT_EMBEDDER, files: setup.files };
+    hubIndexContract(name, setup.connect, options);
+    hubIndexContract(`${name}, extension off`, setup.connect, { ...options, holdExtensionOff: true });
+  }
+}
 
 hubStoreContract('in-memory stand-in', openMemoryHubStore);
 
