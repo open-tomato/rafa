@@ -1391,6 +1391,19 @@ test` shows what is missing. A section appended after the last one in the
 scaffold has to bound any scaffold case that slices from an earlier header to
 the end of the template. This section replaces nothing.
 
+**A new top-level section reaches the config-parity fixtures, and a new
+`config-schema-*.ts` file reaches the manifests.** A section added under a new
+name, such as `hints`, moves `src/tests/fixtures/config-parity/load-config.json`
+(one entry per setting, with its default and its source) and the known-keys
+list the unknown-key warning prints in `doctor.txt` and `module-list.txt`;
+`src/tests/config-parity.test.ts` pins those three fixtures. A new
+`packages/rafa/src/config-schema-<section>.ts` file also goes in the
+`./config-schema-<section>` `exports` of `packages/rafa/package.json`, in the
+`include` of `packages/rafa/tsconfig.types.json`, in a `types`-only `exports`
+entry of the root `package.json` naming `dist/config-schema-<section>.d.ts`,
+and in `src/tests/fixtures/dist-files-c920603.txt`. `check-types` reads none
+of them, so `bun run test` is what shows one that is missing.
+
 ### Shapes the lint config forces
 
 - **`@typescript-eslint/no-unused-vars` has no ignore pattern and no
