@@ -97,6 +97,15 @@ ssh -t <host> "cd <checkout> && rafa release tag"
 remote shell has to find `rafa` on its PATH, and a bare non-login command
 may not.
 
+## The mappings
+
+Each row pairs the hand-run step with the rafa line that replaces it.
+
+| Instead of | Use |
+|---|---|
+| reading the tag, version files and changelog by hand | `rafa release status` |
+| `git tag v…` from the version files | `rafa release tag` |
+
 ## Index of the case files
 
 | File | Key | Printed by | Read it when |
