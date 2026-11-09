@@ -7,10 +7,12 @@
  * session called `bug`.
  *
  * The check is pure: it takes the entry, the base and head readings of
- * the test it names and the plan's files, and runs nothing. The caller
- * reads the test it names with {@link namedTestOf}, runs it on the
- * plan's base and head (`runNamedTestAt`, `./base-run.ts`) and reads the
- * files (`readPlanFiles`, `./plan-commits.ts`).
+ * the test it names, the plan's files and the red step captures the
+ * runner kept, and runs nothing. The caller reads the test it names with
+ * {@link namedTestOf}, runs it on the plan's base and head
+ * (`runNamedTestAt`, `./base-run.ts`), reads the files (`readPlanFiles`,
+ * `./plan-commits.ts`) and reads the captures (`readKeptCaptures`,
+ * `./runner-evidence.ts`).
  *
  * ## The decision table
  *
@@ -21,10 +23,11 @@
  *
  * | The entry | Answer |
  * | --- | --- |
- * | names a test case, its head reading not `red` | `bug` |
- * | names a test case, not run on the base | `bug` |
  * | names a test case, `red` on the base and the head | inherited (`bug`) |
  * | names a test case, `green` on the base, `red` on the head | `own-fallout` |
+ * | names a test case a kept capture holds | `own-fallout` |
+ * | names a test case, its head reading not `red` | `bug` |
+ * | names a test case, not run on the base | `bug` |
  * | names no test case, and the plan's files were not read | `bug` |
  * | names no test case nor a test file, a path outside the plan's files, a symbol the plan added | `own-gap` |
  * | names no test case, a path outside the plan's files | `bug` |
@@ -39,7 +42,25 @@
  * **A test case is named** when `testFailureOf` (`./test-failure.ts`)
  * reads one from the entry. A case it reads with no test file cannot be
  * run on the base, and neither can one the caller gave no readings for:
- * both take the "not run on the base" row.
+ * both take the "not run on the base" row, unless a kept capture holds
+ * the case.
+ *
+ * **The step-capture row** reads the runner's own red step captures
+ * ({@link KindCheckInput.captures}): the output text a red suite step
+ * kept under the commit it ran at, the head or one of the plan's
+ * commits. A case one of them holds (`captureHolding`, its name as
+ * `testFailureOf` reads it) was red in a step of this plan, so it reads
+ * `own-fallout` in place of the "head reading not `red`" and "not run on
+ * the base" rows: the step's repair may have turned it green since, and
+ * a green rerun writes over the step's `<kind>.output.txt`, but not over
+ * the kept capture. It never answers in place of the inherited row: a
+ * step's capture holds every red case of the step, the ones the plan's
+ * base already held among them. The `fallout` row keeps its row and
+ * carries the capture too, and the {@link KindCheck} carries it as
+ * `capture`, so the router can join the step repair line for the
+ * capture's commit. The file rows read an entry naming no case, which no
+ * capture can hold, so the row never reaches them. Captures left out,
+ * or none holding the case, leave the table as it read before the row.
  *
  * **Every path, not any:** an entry is `own-gap` only when every file
  * path it names (`pathsNamedIn`, `./doc-only.ts`, over its `what` and
@@ -77,6 +98,7 @@
  */
 import type { BaseRunAnswer, NamedTest } from './base-run.js';
 import type { PlanFilesRead, PlanFilesReading } from './plan-commits.js';
+import type { KeptCapture } from './runner-evidence.js';
 import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
 import { basename, extname, isAbsolute } from 'node:path';
@@ -84,6 +106,7 @@ import { basename, extname, isAbsolute } from 'node:path';
 import { pathsNamedIn } from '@open-tomato/rafa/triage/doc-only';
 import { testFailureOf, testFilesIn } from '@open-tomato/rafa/triage/test-failure';
 
+import { captureHolding } from './runner-evidence.js';
 import { symbolsOf } from './symbols.js';
 
 /** The kinds the check reads down its table; any other is taken as said. */
@@ -112,6 +135,12 @@ export interface KindCheckInput {
   readonly readings: NamedTestReadings | null;
   /** The plan's files, as `readPlanFiles` read them. */
   readonly planFiles: PlanFilesReading;
+  /**
+   * The red step captures the runner kept at the head or one of the
+   * plan's commits, as `readKeptCaptures` read them; left out, none.
+   * Read only for an entry that names a test case.
+   */
+  readonly captures?: readonly KeptCapture[];
 }
 
 /** The row of the decision table that answered; see the module note. */
@@ -126,6 +155,8 @@ export type KindCheckRow =
   | 'red-on-both'
   /** A test case named, `green` on the base and `red` on the head. */
   | 'fallout'
+  /** A test case named that a kept red step capture holds, not `red` on both. */
+  | 'step-capture'
   /** No test case named, the plan's files not read. */
   | 'files-unread'
   /** No test case nor test file named, a path outside the plan's files, a symbol the plan added. */
@@ -149,11 +180,13 @@ export interface KindCheck {
   readonly reason: string;
   /** The symbol the `plan-symbol` row matched in the plan's added lines; null from any other row. */
   readonly symbol: string | null;
+  /** The kept capture holding the named case, from the `step-capture` and `fallout` rows; else null. */
+  readonly capture: KeptCapture | null;
 }
 
-/** An answer of `kind` from `row`, not inherited, matching no symbol. */
+/** An answer of `kind` from `row`, not inherited, matching no symbol and carrying no capture. */
 function answer(kind: BugKind, row: KindCheckRow, reason: string): KindCheck {
-  return { kind, inherited: false, row, reason, symbol: null };
+  return { kind, inherited: false, row, reason, symbol: null, capture: null };
 }
 
 /**
@@ -193,9 +226,31 @@ function checkTest(name: string, readings: NamedTestReadings | null): KindCheck 
       row: 'red-on-both',
       reason: `The case ${name} is red on the plan's base and its head, so the plan inherited it.`,
       symbol: null,
+      capture: null,
     };
   }
   return answer('own-fallout', 'fallout', `The case ${name} is green on the plan's base and red on its head.`);
+}
+
+/** The characters of a commit a reason shows. */
+const SHOWN_COMMIT = 12;
+
+/**
+ * The step-capture row over the test rows' answer `tested`, for an entry
+ * naming the case `name`: the inherited row stands, a capture holding
+ * the case is carried by the `fallout` row and answers in place of any
+ * other; see the module note.
+ */
+function checkCaptured(tested: KindCheck, name: string, captures: readonly KeptCapture[]): KindCheck {
+  if (tested.row === 'red-on-both') return tested;
+  const capture = captureHolding(captures, name);
+  if (capture === null) return tested;
+  if (tested.row === 'fallout') return { ...tested, capture };
+  const shown = capture.sha.slice(0, SHOWN_COMMIT);
+  return {
+    ...answer('own-fallout', 'step-capture', `The case ${name} is red in the ${capture.step} step's capture kept at commit ${shown}, so it reads as own-fallout.`),
+    capture,
+  };
 }
 
 /** A leading run of `./` and `../`, as a relative import specifier opens. */
@@ -298,8 +353,9 @@ function checkFiles(entry: KindCheckEntry, planFiles: PlanFilesReading): KindChe
 
 /**
  * The kind the entry is routed under, read down the decision table of the
- * module note from the readings of the test it names and the plan's
- * files. Pure: it runs no test and no git.
+ * module note from the readings of the test it names, the plan's files
+ * and the kept captures. Pure: it runs no test and no git, and reads no
+ * file.
  */
 export function checkKind(input: KindCheckInput): KindCheck {
   const { entry } = input;
@@ -308,7 +364,8 @@ export function checkKind(input: KindCheckInput): KindCheck {
   }
   const failure = testFailureOf(entry);
   if (failure === null) return checkFiles(entry, input.planFiles);
-  return checkTest(failure.name, failure.file === null
+  const tested = checkTest(failure.name, failure.file === null
     ? null
     : input.readings);
+  return checkCaptured(tested, failure.name, input.captures ?? []);
 }

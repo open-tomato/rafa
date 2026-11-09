@@ -48,10 +48,11 @@ table, the first row that holds answering. An entry the session said is
 
 | The entry | Answer |
 | --- | --- |
-| names a test case, not red on the head | `bug` |
-| names a test case, not runnable on the plan's base | `bug` |
 | names a test case, red on the base and on the head | inherited: unfiled, as a run-start failure is |
 | names a test case, green on the base, red on the head | `own-fallout` |
+| names a test case a kept red step capture holds | `own-fallout` |
+| names a test case, not red on the head | `bug` |
+| names a test case, not runnable on the plan's base | `bug` |
 | names no test case, the plan's files not read | `bug` |
 | names no test case nor a test file, a path outside the plan's files, a symbol the plan added | `own-gap` |
 | names no test case, a path outside the plan's files | `bug` |
@@ -75,6 +76,20 @@ the plan's commits added holds a symbol it names (`symbolsOf`,
 `packages/rafa-pr/src/triage/symbols.ts`), matched at identifier boundaries.
 The check carries that symbol as `symbol`. An entry naming a test file is left
 to the test rows, and when the added lines were not read the row is skipped.
+
+The step-capture row reads the runner's own evidence. A red suite step keeps
+its output text as `<name>.<sha>.red.output.txt` beside its JUnit file
+(`packages/rafa/src/suite/run.ts`), and a later green rerun writes over
+`<name>.output.txt` but never over the kept capture. The triage reads the
+captures under `.rafa/runs/*/suite/` of its `repoRoot` taken at the head or one
+of the plan's commits (`packages/rafa-pr/src/triage/runner-evidence.ts`), so a
+case one of them holds reads as `own-fallout` where it would read "not red on
+the head" or "not runnable". It never replaces the inherited row, since a
+step's capture holds the base's red cases too. When the tracker holds `Repair
+the red <kind> step at commit <sha>` for the capture's commit, the entry joins
+that line: a `repair` row naming it, with `joined` set, no line inserted and
+none counted against the cap. No capture, or one that cannot be read, leaves
+the table as it read before.
 
 **What it costs.** The head is read first: the named test file runs once at
 `HEAD` of the run checkout, and only when the case is red there does it run once
