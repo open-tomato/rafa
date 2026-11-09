@@ -117,6 +117,7 @@ effort/store/ndjson-files.d.ts
 effort/store/origins.d.ts
 effort/store/plan-stubs.d.ts
 effort/store/rebuild-aside.d.ts
+effort/store/repository-facts.d.ts
 effort/store/schema-plan.d.ts
 effort/store/session-row-types.d.ts
 effort/store/settings.d.ts

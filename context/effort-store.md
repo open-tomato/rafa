@@ -1228,7 +1228,9 @@ follows the rows to answer per fact the canonical reading, `sightings` (the
 readings it supersedes), the origins that read it and `lastSighting`, the latest
 reading time of them all. `writePlanCi` (`store/plan-ci.ts`) runs the writer
 for the new reading's fact in the transaction of its insert, its `appended`
-still the count of `plan_ci` rows; the merge does not run it yet.
+still the count of `plan_ci` rows; `mergeStore` runs it as the merge's last step
+before the `merges` row, for the facts of the readings the union added, and
+counts the rows it writes as rows added to `reading_supersedes`.
 `reading-supersedes-migration.test.ts` holds the entry to a store an older
 runtime left and the table to each CHECK and index; `repository-facts.test.ts`
 holds the writer and the reader.

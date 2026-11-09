@@ -113,6 +113,13 @@ inserted, the commit right after it in time (ordered by `Date.parse` of
 the timestamp, then by sha within an instant), and rewrites the
 `minutesSincePrevious` gap in the second commit's `row_json`.
 
+**Supersedes of the readings brought in.** Last, before the `merges` row,
+`writeSupersedes` (`store/repository-facts.ts`) runs for the facts of the
+rows the union added to each `REPOSITORY_FACTS` table (`plan_ci`), so two
+readings of one fact count once in the merged store. The rows it writes
+count as rows added to `reading_supersedes`, in that table's line and in
+the totals.
+
 **The merge writes the store through `rebuildAside`, behind a backup.**
 It writes to `effort.sqlite.merge-<stamp>`, brings the file forward
 (adopting and applying any migrations the incoming store has and the
