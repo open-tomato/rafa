@@ -11,7 +11,9 @@
  * could hold only because nothing was found, a control beside it turns
  * once the difference is put in.
  */
+import type { Device } from '../../merged-stores.js';
 import type { TierPin } from '@open-tomato/rafa/core/config/sections';
+import type { CheckRow } from '@open-tomato/rafa/store/check-rows';
 import type { PlanCiFact, PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
 import type { SkillFact, SkillFactEntry } from '@open-tomato/rafa-effort/effort/skill-facts';
 import type { InventoryKind, InventorySource } from '@open-tomato/rafa-inventory/inventory/record';
@@ -24,7 +26,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { writeDispatch } from '@open-tomato/rafa/store/dispatches';
-import { writePlanCi } from '@open-tomato/rafa/store/plan-ci';
+import { readPlanCi, recordPlanCi, writePlanCi } from '@open-tomato/rafa/store/plan-ci';
 import { writeTaskReport } from '@open-tomato/rafa/store/reports';
 import { UNKNOWN_SKILL_COUNT, writeSkillInvocations } from '@open-tomato/rafa/store/skill-invocations';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
@@ -40,6 +42,8 @@ import {
 import { skillSignals } from '@open-tomato/rafa-effort/effort/skill-signals';
 import { ACTION_HEADING, CAUSE_HEADING } from '@open-tomato/rafa-inventory/schema/instinct';
 import { resolveTiers } from '@open-tomato/rafa-inventory/tiers/resolve';
+
+import { freshDevice, mergeBothWays } from '../../merged-stores.js';
 
 /** The plan most cases run under. */
 const PLAN = 'rafa-24-know-which-skills-earn';
@@ -624,5 +628,110 @@ describe('buildSkillsReport over a scratch store', () => {
 
     expect(report).toEqual({ plans: [] });
     expect(existsSync(sqliteStorePath(root))).toBe(false);
+  });
+});
+
+describe('buildSkillsReport over a merged store of CI readings written by recordPlanCi', () => {
+  /** The head every reading below is of. */
+  const HEAD = 'head-1';
+
+  /** One failing check, which makes a reading red. */
+  const FAILING: CheckRow[] = [{ name: CHECK_NAME, state: 'FAILURE', link: '', outcome: 'fail' }];
+
+  /** One passing check, which makes a reading green. */
+  const PASSING: CheckRow[] = [{ name: CHECK_NAME, state: 'SUCCESS', link: '', outcome: 'pass' }];
+
+  /** `rows` of pull request `pr` read on `device` at `readAt`, through the helper `pr triage` and `pr merge` call. */
+  function read(device: Device, rows: CheckRow[], readAt: string, pr = 7): void {
+    const warnings: string[] = [];
+    const record = recordPlanCi({
+      repoRoot: device.root,
+      planDir: join('.rafa', 'plans'),
+      pullRequest: { number: pr, headRefName: `feat/${PLAN}`, headRefOid: HEAD },
+      rows,
+      warn: (message) => warnings.push(message),
+      now: () => new Date(readAt),
+    });
+    expect(record.problem).toBeNull();
+    expect(record.appended).toBe(1);
+    expect(warnings).toEqual([]);
+  }
+
+  /** The report of `root`, which holds the one plan's sessions. */
+  function reportOf(root: string) {
+    const resolution = resolveTiers([], SETTINGS, () => null);
+    const [plan, ...rest] = buildSkillsReport({ repoRoot: root, plans: [PLAN], resolution, lessons: [] }).plans;
+    expect(rest).toEqual([]);
+    return plan;
+  }
+
+  /** Two devices, the first holding a session of the plan and the readings `onFirst` writes, the second those `onSecond` writes. */
+  function mergedDevices(onFirst: (device: Device) => void, onSecond: (device: Device) => void) {
+    const scope = freshRoot();
+    const first = freshDevice(scope, 'store-a');
+    const second = freshDevice(scope, 'store-b');
+    storeSession(first.root, 's1');
+    onFirst(first);
+    onSecond(second);
+    return mergeBothWays(scope, first, second);
+  }
+
+  it('answers the red fact, read twice on one device and once on the other, with its canonical reading, though the green fact is read later than the red one first was', () => {
+    const merged = mergedDevices((device) => {
+      read(device, FAILING, '2026-09-29T10:00:00.000Z');
+      read(device, PASSING, '2026-09-29T11:00:00.000Z');
+      read(device, FAILING, '2026-09-29T12:00:00.000Z');
+    }, (device) => {
+      read(device, FAILING, '2026-09-29T12:30:00.000Z');
+    });
+
+    for (const root of [merged.firstRanIt, merged.secondRanIt]) {
+      // The control: the merged store holds four readings as rows, so a
+      // report that answered every reading would not hold to two facts.
+      expect(readPlanCi(root)).toHaveLength(4);
+
+      const plan = reportOf(root);
+
+      expect(plan?.planCi).toEqual({
+        planStub: PLAN,
+        pr: 7,
+        headSha: HEAD,
+        verdict: 'red',
+        failing: [CHECK_NAME],
+        readAt: '2026-09-29T10:00:00.000Z',
+      });
+    }
+  });
+
+  it('answers the green fact once a later green reading on the other device outlasts the red one\'s last sighting', () => {
+    const merged = mergedDevices((device) => {
+      read(device, PASSING, '2026-09-29T09:00:00.000Z');
+      read(device, FAILING, '2026-09-29T10:00:00.000Z');
+    }, (device) => {
+      read(device, PASSING, '2026-09-29T10:00:00.001Z');
+    });
+
+    for (const root of [merged.firstRanIt, merged.secondRanIt]) {
+      expect(readPlanCi(root)).toHaveLength(3);
+
+      expect(reportOf(root)?.planCi).toMatchObject({ verdict: 'green', readAt: '2026-09-29T09:00:00.000Z' });
+    }
+  });
+
+  it('answers the red fact when a green fact of the same head, under another pull request, was last sighted at the very time the red one was', () => {
+    // One pull request and head read at one time is one row whatever its
+    // verdict, so an equal last sighting of two facts takes two pull requests.
+    const merged = mergedDevices((device) => {
+      read(device, PASSING, '2026-09-29T09:00:00.000Z');
+      read(device, FAILING, '2026-09-29T10:00:00.000Z');
+    }, (device) => {
+      read(device, PASSING, '2026-09-29T10:00:00.000Z', 8);
+    });
+
+    for (const root of [merged.firstRanIt, merged.secondRanIt]) {
+      expect(readPlanCi(root)).toHaveLength(3);
+
+      expect(reportOf(root)?.planCi).toMatchObject({ verdict: 'red', readAt: '2026-09-29T10:00:00.000Z' });
+    }
   });
 });
