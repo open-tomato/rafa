@@ -21,6 +21,13 @@
  * `recomputes-gap` is held to pass too: it rewrites only the commit gap
  * core's merge recomputes, which the suite exempts, where `edits-rows`
  * adds any other key to `row_json` and is held to fail.
+ *
+ * The index suite has its controls the same way, over the `sqlite`
+ * connector with one rule broken (`testdata/broken-index.fixture.ts`,
+ * fault named in `RAFA_HUB_INDEX_FAULT`): an index kept inside the store
+ * file, a search answering row bodies, and `vector: true` answered with
+ * no load. Each is held to fail its named case, in the run as configured
+ * or in the run with the extension off, and the `none` run is held to pass.
  */
 import type { HubIndexConnector, HubIndexFiles } from './index-contract.js';
 
@@ -81,24 +88,34 @@ hubStoreContract('in-memory stand-in', openMemoryHubStore);
 /** The package directory, whose `tsconfig.json` maps the core subpaths. */
 const PACKAGE_DIR = join(import.meta.dir, '..', '..');
 
-/** The fixture a broken run spawns `bun test` on. */
+/** The fixture a broken store run spawns `bun test` on. */
 const FIXTURE = join(import.meta.dir, 'testdata', 'broken-store.fixture.ts');
+
+/** The fixture a broken index run spawns `bun test` on. */
+const INDEX_FIXTURE = join(import.meta.dir, 'testdata', 'broken-index.fixture.ts');
 
 /** How a spawned run marks a failed case. */
 const FAIL_MARK = '(fail) ';
 
-/** What one spawned run of the fixture did. */
+/** What one spawned run of a fixture did. */
 interface FixtureRun {
   readonly exitCode: number;
   /** Each failed case's title, less the suite prefix and the timing. */
   readonly failed: readonly string[];
 }
 
-/** Runs the fixture with `fault` planted. */
-async function runFixture(fault: string): Promise<FixtureRun> {
-  const child = Bun.spawn([process.execPath, 'test', FIXTURE], {
+/** The title of one `(fail)` line, less the timing: the line after `prefix`, or `null` for a line that is not one. */
+function titleOf(line: string, prefix: string): string | null {
+  return line.startsWith(prefix)
+    ? line.slice(prefix.length).replace(/ \[[\d.]+m?s\]$/, '')
+    : null;
+}
+
+/** Spawns `bun test` on `fixture` with `env` set, answering the exit code and the lines the child printed. */
+async function spawnFixture(fixture: string, env: Readonly<Record<string, string>>): Promise<{ readonly exitCode: number; readonly lines: readonly string[] }> {
+  const child = Bun.spawn([process.execPath, 'test', fixture], {
     cwd: PACKAGE_DIR,
-    env: { ...process.env, RAFA_HUB_STORE_FAULT: fault },
+    env: { ...process.env, ...env },
     stdout: 'pipe',
     stderr: 'pipe',
   });
@@ -107,11 +124,37 @@ async function runFixture(fault: string): Promise<FixtureRun> {
     new Response(child.stderr).text(),
     child.exited,
   ]);
+  return { exitCode, lines: `${stdout}\n${stderr}`.split('\n') };
+}
+
+/** Runs the store fixture with `fault` planted. */
+async function runFixture(fault: string): Promise<FixtureRun> {
+  const { exitCode, lines } = await spawnFixture(FIXTURE, { RAFA_HUB_STORE_FAULT: fault });
   const prefix = `${FAIL_MARK}the hub store contract: ${fault} > `;
-  const failed = `${stdout}\n${stderr}`
-    .split('\n')
-    .filter((line) => line.startsWith(prefix))
-    .map((line) => line.slice(prefix.length).replace(/ \[[\d.]+m?s\]$/, ''));
+  const failed = lines.flatMap((line) => titleOf(line, prefix) ?? []);
+  return { exitCode, failed };
+}
+
+/** The mark a failed case of the extension-off run carries in {@link runIndexFixture}'s titles. */
+const EXTENSION_OFF_MARK = 'extension off: ';
+
+/**
+ * Runs the index fixture with `fault` planted. A case of the run as
+ * configured is titled by its path; one of the run with the extension
+ * off is titled by its path after {@link EXTENSION_OFF_MARK}.
+ */
+async function runIndexFixture(fault: string): Promise<FixtureRun> {
+  const { exitCode, lines } = await spawnFixture(INDEX_FIXTURE, { RAFA_HUB_INDEX_FAULT: fault });
+  const prefix = `${FAIL_MARK}the hub index contract: ${fault}`;
+  const failed = lines.flatMap((line) => {
+    const title = titleOf(line, prefix);
+    if (title === null) return [];
+    if (title.startsWith(' > ')) return [title.slice(' > '.length)];
+    const off = ', extension off > ';
+    return title.startsWith(off)
+      ? [`${EXTENSION_OFF_MARK}${title.slice(off.length)}`]
+      : [];
+  });
   return { exitCode, failed };
 }
 
@@ -146,6 +189,39 @@ describe('the contract suite against a broken stand-in', () => {
   for (const [fault, cases] of FAULT_CASES) {
     it(`fails the stand-in under ${fault}`, async () => {
       const run = await runFixture(fault);
+
+      expect(run.exitCode).toBe(1);
+      expect(cases.filter((title) => !run.failed.includes(title))).toEqual([]);
+    });
+  }
+});
+
+/** Each index fault, and the cases named for the rule it breaks. */
+const INDEX_FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
+  ['index-in-store', [
+    'a rebuild beside a push > leaves the store file\'s sha256 as the push left it, and swaps a new index file in',
+    'a rebuild beside a push > leaves the store file\'s sha256 unchanged by a rebuild run alone',
+  ]],
+  ['answers-bodies', [
+    'what a search answers > holds only a table, an origin pair and a score per hit, in frozen records, for fts',
+    'what a search answers > holds no row body: no sha, subject or topic text is in the answer',
+  ]],
+  ['vector-without-load', [
+    'vector search on > answers a vector search with every row, nearest first, a score of at most one',
+    `${EXTENSION_OFF_MARK}vector search off > answers vector false though an embedder was given`,
+  ]],
+];
+
+describe('the index contract suite against a broken connector', () => {
+  it('passes the connector with nothing broken, as the control', async () => {
+    const run = await runIndexFixture('none');
+
+    expect(run).toEqual({ exitCode: 0, failed: [] });
+  });
+
+  for (const [fault, cases] of INDEX_FAULT_CASES) {
+    it(`fails the connector under ${fault}`, async () => {
+      const run = await runIndexFixture(fault);
 
       expect(run.exitCode).toBe(1);
       expect(cases.filter((title) => !run.failed.includes(title))).toEqual([]);
