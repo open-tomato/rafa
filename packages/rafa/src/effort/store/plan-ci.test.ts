@@ -239,6 +239,79 @@ describe('the plan_ci table', () => {
   });
 });
 
+/** A supersede row as the table holds it, without its seq and origin pair. */
+interface StoredSupersede {
+  table_name: string;
+  canonical_key: string;
+  superseded_key: string;
+  rule: string;
+}
+
+/** Every supersede row under `root`, in append order. */
+function supersedesOf(root: string): StoredSupersede[] {
+  return rawQuery<StoredSupersede>(root, 'SELECT table_name, canonical_key, superseded_key, rule FROM reading_supersedes ORDER BY seq');
+}
+
+/** A green reading of the head {@link RED} read, an hour later. */
+const GREEN_LATER: PlanCiRow = { ...RED, verdict: 'green', failing: [], readAt: '2026-09-27T13:00:00.000Z' };
+
+describe('writePlanCi supersedes', () => {
+  it('writes none for the same reading written twice', () => {
+    const root = freshRoot('twice');
+
+    expect(writePlanCi(root, RED).appended).toBe(1);
+    expect(writePlanCi(root, RED).appended).toBe(0);
+
+    expect(rowsOf(root)).toHaveLength(1);
+    expect(supersedesOf(root)).toEqual([]);
+  });
+
+  it('writes none for a reading of a different verdict on the same head', () => {
+    const root = freshRoot('verdict');
+    const none: PlanCiRow = { ...GREEN_LATER, verdict: 'none', readAt: '2026-09-27T14:00:00.000Z' };
+
+    // Green and none, both with failing [], so the verdict alone tells the facts apart.
+    expect(writePlanCi(root, GREEN_LATER).appended).toBe(1);
+    expect(writePlanCi(root, none).appended).toBe(1);
+
+    expect(rowsOf(root)).toHaveLength(2);
+    expect(supersedesOf(root)).toEqual([]);
+  });
+
+  it('supersedes a second reading of one fact by the first, counting only the plan_ci row', () => {
+    const root = freshRoot('second');
+    const again: PlanCiRow = { ...GREEN_LATER, readAt: '2026-09-27T14:00:00.000Z' };
+
+    expect(writePlanCi(root, GREEN_LATER).appended).toBe(1);
+    // The control: the first reading of a fact has nothing to supersede.
+    expect(supersedesOf(root)).toEqual([]);
+    expect(writePlanCi(root, again).appended).toBe(1);
+
+    expect(rowsOf(root)).toHaveLength(2);
+    expect(supersedesOf(root)).toEqual([{
+      table_name: 'plan_ci',
+      canonical_key: '[42,"a1b2c3d","2026-09-27T13:00:00.000Z"]',
+      superseded_key: '[42,"a1b2c3d","2026-09-27T14:00:00.000Z"]',
+      rule: 'same-fact@1',
+    }]);
+    // Written again, the second reading adds no row and no supersede.
+    expect(writePlanCi(root, again).appended).toBe(0);
+    expect(supersedesOf(root)).toHaveLength(1);
+  });
+
+  it('supersedes the old canonical reading when an older reading of the fact lands late', () => {
+    const root = freshRoot('late');
+    const earlier: PlanCiRow = { ...GREEN_LATER, readAt: '2026-09-27T12:30:00.000Z' };
+
+    writePlanCi(root, GREEN_LATER);
+    expect(writePlanCi(root, earlier).appended).toBe(1);
+
+    expect(supersedesOf(root).map(({ canonical_key, superseded_key }) => [canonical_key, superseded_key])).toEqual([
+      ['[42,"a1b2c3d","2026-09-27T12:30:00.000Z"]', '[42,"a1b2c3d","2026-09-27T13:00:00.000Z"]'],
+    ]);
+  });
+});
+
 describe('writePlanCi refusals', () => {
   const refusals: readonly (readonly [string, Readonly<Record<string, unknown>>, string])[] = [
     ['a pending verdict', { verdict: 'pending', failing: [] }, 'has verdict "pending", not one of green, red, none'],

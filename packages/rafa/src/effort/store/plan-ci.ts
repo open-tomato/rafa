@@ -54,6 +54,15 @@
  * to green on a rerun, while the same reading written twice is stored
  * once, the second counted as skipped.
  *
+ * Two readings of one fact, the same `pr`, `head_sha`, `verdict` and
+ * `failing` read at two times, are two rows still, and {@link writePlanCi}
+ * calls `writeSupersedes` (`repository-facts.ts`) for the new reading's
+ * fact in the same transaction as its insert, so the later reading is
+ * superseded by the earliest one as the reading lands. `appended` counts
+ * the `plan_ci` row alone, never a `reading_supersedes` row. A reading
+ * of another verdict on the same head is another fact and supersedes
+ * nothing.
+ *
  * ## Reading it back
  *
  * {@link readPlanCi} answers every row, or one plan's, in append order.
@@ -84,6 +93,7 @@ import { failingRows, verdictOf } from './check-rows.js';
 import { describeValue, textProblem } from './findings.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { attributeBranch, planStubsFromFileNames, resolvePlanStub } from './plan-stubs.js';
+import { readingKey, writeSupersedes } from './repository-facts.js';
 import { sqliteStorePath, withSqliteStore, writeSqliteStore } from './sqlite.js';
 
 /** A settled verdict: what the table stores, `pending` left out. */
@@ -259,7 +269,8 @@ export function planCiReading(
 }
 
 /**
- * Records one reading, absorbing the same reading already held.
+ * Records one reading, absorbing the same reading already held, and
+ * writes the supersedes its fact calls for in the same transaction.
  *
  * Throws, having opened nothing, when a value cannot be stored. See the
  * module note for each refusal.
@@ -268,7 +279,12 @@ export function writePlanCi(repoRoot: string, row: PlanCiRow): PlanCiWriteResult
   checkRow(row);
   const path = sqliteStorePath(repoRoot);
   const values = [row.planStub, row.pr, row.headSha, row.verdict, JSON.stringify(row.failing), row.readAt];
-  const appended = writeSqliteStore(path, 1, 0, (db) => db.query<unknown, (string | number)[]>(INSERT_PLAN_CI).run(...values).changes);
+  const key = readingKey('plan_ci', { pr: row.pr, head_sha: row.headSha, read_at: row.readAt });
+  const appended = writeSqliteStore(path, 1, 0, (db) => db.transaction(() => {
+    const added = db.query<unknown, (string | number)[]>(INSERT_PLAN_CI).run(...values).changes;
+    writeSupersedes(db, 'plan_ci', [key]);
+    return added;
+  })());
   return { path, appended };
 }
 
