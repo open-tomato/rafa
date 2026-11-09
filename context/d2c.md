@@ -40,6 +40,11 @@ never seed one folder. Every other start answers the project root.
 runner, and the `local-dir` and `side-repo` stores. `container`,
 `remote` and `same-repo` are read by the config and named by `check`.
 
+**The LFS server is the person's.** A side-repo store with LFS needs a
+server that speaks it; the README recommends a self-hosted Gitea with
+`LFS_ALLOW_PURE_SSH`, from a health read of the git-lfs implementations
+list. The add-on never installs, configures or pushes to one.
+
 **The add-on is private and public at once.** Its package is `private`
 until the review page moves in, and its source is in a public repo, so
 `privacy.sweep.test.ts` sweeps the folder with the shared helper in

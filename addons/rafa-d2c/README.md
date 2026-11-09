@@ -64,6 +64,40 @@ The playwright version pins the browser build, and the runner key
 differently never stand in for each other. `set.json` records the
 project commit, the host's OS and the last run's counts.
 
+## A Git LFS server for a side-repo store
+
+A set is hundreds of PNGs, and every re-record replaces some of them.
+With Git LFS on `*.png`, git keeps small pointers in the history and
+the images on an LFS server, so a fresh clone downloads only the set it
+checks out. The `git-lfs` client installs from your package manager,
+but the remote needs a server that speaks LFS: a plain bare repository
+over ssh has none, and its first push fails with no LFS endpoint.
+
+We recommend [Gitea](https://about.gitea.com), self-hosted, with LFS
+over plain ssh turned on in its `app.ini`:
+
+```ini
+[server]
+LFS_START_SERVER = true
+LFS_ALLOW_PURE_SSH = true
+```
+
+Then, in the store:
+
+```bash
+git lfs install --local
+git lfs track "*.png"
+git remote add origin <your Gitea repository's ssh URL>
+```
+
+The pick came from a health read on 2026-11-08 of every server on the
+[git-lfs implementations list](https://github.com/git-lfs/git-lfs/wiki/Implementations)
+that keeps files on its own disk: Gitea releases often, has many
+contributors, closes issues faster than they open, and serves LFS over
+ssh as well as HTTPS. Several pure-SSH servers on that list had no
+release or commit in over a year. Any working LFS server will do: the
+add-on never talks to it, git does, and `promote` never pushes.
+
 ## The verbs, in run order
 
 Each is `rafa module exec @open-tomato/rafa-d2c <verb>`.
