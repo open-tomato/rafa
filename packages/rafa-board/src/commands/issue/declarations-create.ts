@@ -25,7 +25,7 @@
  */
 import type { CommandDeclaration } from '@open-tomato/rafa/core/command';
 
-import { ISSUE_PRIORITY_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS } from './declarations-shared.js';
+import { ISSUE_PRIORITY_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS, issueUpstreamFlagSpec } from './declarations-shared.js';
 
 /** The module an issue filed with no `--module` belongs to: a copy of `TRIAGE_MODULE`; see the module note. */
 export const ISSUE_TRIAGE_MODULE = 'unassigned';
@@ -138,6 +138,7 @@ export const ISSUE_CREATE_DECLARATION: CommandDeclaration = Object.freeze<Comman
       description: 'Print the title and the body the line would file, resolve no tracker and file nothing.',
       type: 'boolean',
     },
+    issueUpstreamFlagSpec('File the issue, a bug only (--type=bug), its private names hidden,'),
   ],
   examples: [
     {

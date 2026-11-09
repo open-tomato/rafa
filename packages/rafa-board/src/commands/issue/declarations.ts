@@ -58,10 +58,18 @@ import type { CommandDeclaration, RafaFlagSpec } from '@open-tomato/rafa/core/co
 
 import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
-import { ISSUE_PRIORITY_WORDS, ISSUE_STATE_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS } from './declarations-shared.js';
+import { ISSUE_PRIORITY_WORDS, ISSUE_STATE_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS, issueUpstreamFlagSpec } from './declarations-shared.js';
 
 export { DEFAULT_ISSUE_TYPE, ISSUE_CREATE_DECLARATION, ISSUE_TRIAGE_MODULE } from './declarations-create.js';
-export { ISSUE_PRIORITY_WORDS, ISSUE_STATE_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS } from './declarations-shared.js';
+export {
+  ISSUE_PRIORITY_WORDS,
+  ISSUE_STATE_WORDS,
+  ISSUE_SUBJECT,
+  ISSUE_TYPE_WORDS,
+  ISSUE_UPSTREAM_FLAG,
+  ISSUE_UPSTREAM_TOOL_WORDS,
+  issueUpstreamFlagSpec,
+} from './declarations-shared.js';
 
 /** The label `issue ready` adds: a copy of `SPEC_READY_LABEL`; see the module note. */
 export const ISSUE_READY_LABEL = 'spec:ready';
@@ -196,7 +204,7 @@ export const ISSUE_LIST_DECLARATION: CommandDeclaration = Object.freeze<CommandD
     + ' the tracker, the query and every issue, or under `--roadmap` the roadmap, the rows, the epics and the'
     + ' warnings, are the data of the terminal result event.',
   args: [],
-  flags: [...ISSUE_LIST_FLAGS],
+  flags: [...ISSUE_LIST_FLAGS, issueUpstreamFlagSpec('List the issues')],
   examples: [
     {
       cmd: 'rafa issue list',
@@ -290,6 +298,7 @@ export const ISSUE_COMMENT_DECLARATION: CommandDeclaration = Object.freeze<Comma
       type: 'string',
       required: true,
     },
+    issueUpstreamFlagSpec('Post the comment, redacted and its private names hidden,'),
   ],
   examples: [
     {

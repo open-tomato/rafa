@@ -21,6 +21,17 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
+import {
+  ISSUE_COMMENT_DECLARATION,
+  ISSUE_CREATE_DECLARATION,
+  ISSUE_LIST_DECLARATION,
+  ISSUE_LIST_FLAGS,
+  ISSUE_SHOW_DECLARATION,
+  ISSUE_UPSTREAM_FLAG,
+  ISSUE_UPSTREAM_TOOL_WORDS,
+} from './declarations.js';
+import { UPSTREAM_FLAG, UPSTREAM_TOOLS } from './upstream.js';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** The three declaration files, by name in this folder. */
@@ -120,5 +131,57 @@ describe('the import reading', () => {
     ].join('\n');
 
     expect(underSrc(readImports(planted, HERE))).toEqual(['./issue-tracker.js', '../../adapters/tracker/issue-values.js']);
+  });
+});
+
+describe('the flags each upstream command declares', () => {
+  it('declares no --upstream on issue show, the control', () => {
+    expect(ISSUE_SHOW_DECLARATION.flags.map(({ name }) => name)).not.toContain(UPSTREAM_FLAG);
+  });
+
+  it('keeps --upstream off ISSUE_LIST_FLAGS, which roadmap reuses', () => {
+    expect(ISSUE_LIST_FLAGS.map(({ name }) => name)).not.toContain(UPSTREAM_FLAG);
+  });
+
+  it('holds the copied flag name and tool list equal to upstream.ts', () => {
+    expect(ISSUE_UPSTREAM_FLAG).toBe(UPSTREAM_FLAG);
+    expect(ISSUE_UPSTREAM_TOOL_WORDS).toEqual([...UPSTREAM_TOOLS]);
+  });
+
+  it('lists the flags of issue create', () => {
+    expect(ISSUE_CREATE_DECLARATION.flags.map(({ name }) => name)).toEqual([
+      'title', 'body', 'body-file', 'type', 'module', 'priority', 'summary', 'action', 'cause',
+      'proposed', 'reproduce', 'rerun', 'env', 'project', 'path', 'dry-run', 'upstream',
+    ]);
+  });
+
+  it('lists the flags of issue comment', () => {
+    expect(ISSUE_COMMENT_DECLARATION.flags.map(({ name }) => name)).toEqual(['body', 'upstream']);
+  });
+
+  it('lists the flags of issue list', () => {
+    expect(ISSUE_LIST_DECLARATION.flags.map(({ name }) => name)).toEqual([
+      'roadmap', 'all', 'full', 'check', 'labels', 'texts', 'refresh', 'state', 'type', 'module',
+      'search', 'limit', 'upstream',
+    ]);
+  });
+
+  it.each([ISSUE_CREATE_DECLARATION, ISSUE_COMMENT_DECLARATION, ISSUE_LIST_DECLARATION])(
+    'names collaborate.rafa and the same-owner rule in the help of $name',
+    ({ flags }) => {
+      const flag = flags.find(({ name }) => name === UPSTREAM_FLAG);
+
+      expect(flag?.type).toBe('string');
+      expect(flag?.description).toContain('collaborate.rafa');
+      expect(flag?.description).toContain('only between repositories of one owner');
+    },
+  );
+
+  it('names the bug-only rule on issue create alone', () => {
+    const help = (flags: typeof ISSUE_CREATE_DECLARATION.flags): string | undefined => flags
+      .find(({ name }) => name === UPSTREAM_FLAG)?.description;
+
+    expect(help(ISSUE_CREATE_DECLARATION.flags)).toContain('a bug only (--type=bug)');
+    expect(help(ISSUE_COMMENT_DECLARATION.flags)).not.toContain('--type=bug');
   });
 });

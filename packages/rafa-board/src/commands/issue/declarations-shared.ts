@@ -23,8 +23,12 @@
  * `ISSUE_PRIORITIES`
  * (`packages/rafa-board/src/adapters/tracker/issue-values.ts`), which
  * `declarations-integration.test.ts` holds equal to their sources.
+ *
+ * `ISSUE_UPSTREAM_FLAG` and `ISSUE_UPSTREAM_TOOL_WORDS` are copies of
+ * `UPSTREAM_FLAG` and `UPSTREAM_TOOLS` (`upstream.ts`), which
+ * `declarations.test.ts` holds equal to their sources.
  */
-import type { SubjectSpec } from '@open-tomato/rafa/core/command';
+import type { RafaFlagSpec, SubjectSpec } from '@open-tomato/rafa/core/command';
 
 /** The `issue` subject: its routing word and its roster line. */
 export const ISSUE_SUBJECT: SubjectSpec = Object.freeze({
@@ -62,3 +66,28 @@ export const ISSUE_PRIORITY_WORDS: readonly string[] = Object.freeze([
   'medium',
   'low',
 ]);
+
+/** The flag that sends an `issue` command to the board `collaborate.<tool>` names: a copy of `UPSTREAM_FLAG`; see the module note. */
+export const ISSUE_UPSTREAM_FLAG = 'upstream';
+
+/** The tools `--upstream` accepts: a copy of `UPSTREAM_TOOLS`; see the module note. */
+export const ISSUE_UPSTREAM_TOOL_WORDS: readonly string[] = Object.freeze(['rafa']);
+
+/** What every `--upstream` help line says: the key it reads and the same-owner rule. */
+const UPSTREAM_RULE = `one of ${ISSUE_UPSTREAM_TOOL_WORDS.join(', ')}, whose board \`collaborate.<tool>\` names`
+  + ' in `.rafa/config.yaml` (`collaborate.rafa` for rafa). Refused, exit 1, when the key is not set or its owner'
+  + ' differs from this board\'s, ignoring case: reporting upstream is allowed only between repositories of one owner.';
+
+/**
+ * The `--upstream=<tool>` flag one `issue` command declares.
+ *
+ * @param what - What the command does on that board, opening the help line.
+ * @returns The flag spec.
+ */
+export function issueUpstreamFlagSpec(what: string): RafaFlagSpec {
+  return Object.freeze<RafaFlagSpec>({
+    name: ISSUE_UPSTREAM_FLAG,
+    description: `${what} on the upstream board of a tool: ${UPSTREAM_RULE}`,
+    type: 'string',
+  });
+}
