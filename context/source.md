@@ -50,8 +50,12 @@ spells out, and the shapes the lint config forces.
 ### Declarations, feature indexes and the roots
 
 - **A `declarations.ts` imports types and `@open-tomato/rafa/core/*`
-  values alone.** A value import of a module under `src/` loads it with
-  the roster and undoes the laziness the declaration exists for. A
+  values, and no module under `src/`.** The issue feature's
+  `declarations.ts` also imports its two sibling files,
+  `declarations-create.ts` and `declarations-shared.ts`, which import no
+  module under `src/` either. A value import of a module under `src/`
+  loads it with the roster and undoes the laziness the declaration exists
+  for. A
   feature's test reads the file's imports off the source (its
   `declarations.test.ts`, or `index.test.ts` for `board`, which has none)
   and holds that; a constant a declaration and its command both read lives
