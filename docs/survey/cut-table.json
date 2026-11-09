@@ -4427,7 +4427,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 137,
+        "test": 138,
         "testSupport": 8
       },
       "files": [
@@ -4673,6 +4673,7 @@
         "packages/rafa-board/src/commands/epic/promote.ts",
         "packages/rafa-board/src/commands/epic/show.ts",
         "packages/rafa-board/src/commands/issue/check.ts",
+        "packages/rafa-board/src/commands/issue/collaborate-load.test.ts",
         "packages/rafa-board/src/commands/issue/comment.ts",
         "packages/rafa-board/src/commands/issue/create-blocked.test.ts",
         "packages/rafa-board/src/commands/issue/create-blocked.ts",
@@ -4734,7 +4735,7 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 252,
+        "packages/rafa-board/": 253,
         "src/board/": 6,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,
