@@ -2129,7 +2129,11 @@ New; it replaces no earlier text. What a row or an action added to
   reads; the reading is refused naming its fault when it names no issue,
   the issue being filed, or an issue the board's `find` listing lacks,
   each refusal thrown before the chain is resolved or before `create`,
-  respectively; `comment` posts `--body`; and `move`
+  respectively; `comment` posts `--body`, and `comment --upstream=rafa`
+  passes the same gate once the line is read, redacts the body
+  (`upstreamCommentRedactor`), hides a private board's names, and posts
+  it on a ref whose `repo` is the upstream over `upstreamGhRunner`, with
+  no chain resolved; and `move`
   moves an issue to a state, writing a `warning` the tracker answers at
   `warn` and still exiting 0. In json mode the result's `data` holds the
   tracker (its kind, whether the chain degraded, and why) beside the
