@@ -5840,6 +5840,8 @@
         "packages/rafa-hub/src/server.test.ts",
         "packages/rafa-hub/src/server.ts",
         "packages/rafa-hub/src/stand-in-adapters.integration.test.ts",
+        "packages/rafa-hub/src/store/connectors.test.ts",
+        "packages/rafa-hub/src/store/connectors.ts",
         "packages/rafa-hub/src/store/contract.test.ts",
         "packages/rafa-hub/src/store/contract.ts",
         "packages/rafa-hub/src/store/port.ts",
