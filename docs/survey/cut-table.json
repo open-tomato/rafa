@@ -5818,7 +5818,7 @@
       "edges": [],
       "fileCounts": {
         "source": 9,
-        "test": 14,
+        "test": 15,
         "testSupport": 8
       },
       "files": [
@@ -5843,6 +5843,7 @@
         "packages/rafa-hub/src/store/contract.test.ts",
         "packages/rafa-hub/src/store/contract.ts",
         "packages/rafa-hub/src/store/port.ts",
+        "packages/rafa-hub/src/store/sqlite-index.test.ts",
         "packages/rafa-hub/src/store/sqlite.test.ts",
         "packages/rafa-hub/src/store/sqlite.ts",
         "packages/rafa-hub/src/store/testdata/broken-store.fixture.ts",
@@ -5855,7 +5856,7 @@
         "packages/rafa-hub/src/two-devices.integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 31
+        "packages/rafa-hub/": 32
       },
       "folders": [
         "packages/rafa-hub/"

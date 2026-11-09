@@ -19,7 +19,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 7 | `rafa-run` | 232 | 107 | 125 | 0 | 22 | 0 | 22 |
 | 8 | `rafa-release` | 106 | 56 | 50 | 0 | 1 | 0 | 1 |
 | 9 | `rafa-effort` | 51 | 32 | 19 | 0 | 0 | 0 | 0 |
-| 10 | `rafa-hub` | 31 | 9 | 14 | 8 | 0 | 0 | 0 |
+| 10 | `rafa-hub` | 32 | 9 | 15 | 8 | 0 | 0 | 0 |
 | 11 | `rafa-sync-service` | 10 | 4 | 5 | 1 | 0 | 0 | 0 |
 | 12 | `@open-tomato/rafa` | 815 | 178 | 615 | 22 | 0 | 0 | 0 |
 

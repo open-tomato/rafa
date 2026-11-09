@@ -1232,8 +1232,9 @@ names come from, and the facade entry is no node.
   `src/`), `outDir: ".tsbuild"` and
   `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages
   never share one (TS6377). It leaves its test files out, and its `references`
-  name what it imports: core and `packages/rafa-index` none, and every other
-  member `../rafa` and the feature packages it imports. `tsc --build` builds a
+  name what it imports: core and `packages/rafa-index` none, `packages/rafa-hub`
+  `../rafa` and `../rafa-index`, and every other member `../rafa` and the
+  feature packages it imports. `tsc --build` builds a
   reference first, reads core through `paths` from that reference's
   declarations, and is a no-op on a second run. `.tsbuild/` is gitignored at
   every depth. Each of the four code packages' `turbo.json` (core, the hub,
