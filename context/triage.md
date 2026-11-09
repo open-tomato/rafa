@@ -51,7 +51,7 @@ taken as said and nothing is read.
 | The entry | Answer |
 | --- | --- |
 | said `convention`, `docs` or `machine` | the kind as said; nothing read |
-| names no test case, the plan's files not read | `bug` (`files-unread`) |
+| names no test case but a path, the plan's files not read | `bug` (`files-unread`) |
 | names no test case nor a test file, a path outside the plan's files, a symbol the plan added | `own-gap` (`plan-symbol`) |
 | names no test case, a path outside the plan's files | `bug` (`file-outside-plan`) |
 | names no test case, every path one of the plan's files | `own-gap` (`plan-files`) |
@@ -84,7 +84,8 @@ off, a named path is one of the plan's files when it:
 - began with `./` or `../`, as an import specifier does, and the rest is a
   suffix of one cut at a `/` (`../base-run.js` names
   `packages/rafa-pr/src/triage/base-run.ts`);
-- is absolute and ends in `/` and one, as a stack frame names a checkout file;
+- is absolute and ends in `/` and then one of the plan's files, as a stack
+  frame names a checkout file;
 - or holds no `/` and one of the plan's files has that base name.
 
 A path ending `.js`, `.mjs` or `.jsx` is also read as the `.ts`, `.mts` or
