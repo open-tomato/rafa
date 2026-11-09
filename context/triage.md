@@ -58,10 +58,15 @@ table, the first row that holds answering. An entry the session said is
 | names neither a test case nor a path | the kind as said |
 
 An `own-` claim the check does not confirm reads as `bug`. For `own-gap`
-every path the entry names must be one of the plan's files, so one neighbour's
-file makes the entry a `bug`. A named path is a plan file when it equals one,
-with any leading `./` taken off; when it is absolute and ends in one; or when
-it is a bare file name and a plan file has that base name.
+every file path the entry names must be one of the plan's files, so one
+neighbour's file makes the entry a `bug`. A path whose last segment holds no
+extension (`packages/rafa-effort`, `and/or`) names a folder or prose, not a
+file, and is dropped before the file rows. A named path is a plan file when it
+equals one, with any leading `./` and `../` taken off; when it began with `./`
+or `../` and the rest ends one at a `/`; when it is absolute and ends in one;
+or when it is a bare file name and a plan file has that base name. A `.js`,
+`.mjs` or `.jsx` path is also read as the `.ts`, `.mts` or `.tsx` file its
+import specifier resolves to.
 
 **What it costs.** The head is read first: the named test file runs once at
 `HEAD` of the run checkout, and only when the case is red there does it run once

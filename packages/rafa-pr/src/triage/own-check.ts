@@ -40,24 +40,31 @@
  * run on the base, and neither can one the caller gave no readings for:
  * both take the "not run on the base" row.
  *
- * **Every path, not any:** an entry is `own-gap` only when every path it
- * names (`pathsNamedIn`, `./doc-only.ts`, over its `what` and
+ * **Every path, not any:** an entry is `own-gap` only when every file
+ * path it names (`pathsNamedIn`, `./doc-only.ts`, over its `what` and
  * `artifact`) is one of the plan's files, since `own-gap` reaches only
  * files the plan's own commits touched; an entry naming one of them and
- * a neighbour's file is a `bug`. A piece of prose with a `/` in it
- * (`and/or`) is read as a path there too, and makes the entry a `bug`:
- * the cost falls on filing, never on hiding.
+ * a neighbour's file is a `bug`. A piece whose last segment holds no
+ * extension (`packages/rafa-effort`, `context/`, `and/or`, a bare
+ * `README`) names no file and is dropped before the file rows are read:
+ * a folder is neither one of the plan's files nor outside them, so an
+ * entry naming only folders takes the "names neither" row.
  *
- * **A named path is one of the plan's files** when, a leading `./` taken
- * off, it equals one; or it is absolute and ends in `/` and one, as a
- * stack frame names a file of the checkout; or it is a bare file name, no
- * `/` in it, and one of the plan's files has that base name.
+ * **A named path is one of the plan's files** when, any leading `./`
+ * and `../` taken off, it equals one; or it began with `./` or `../`,
+ * as an import specifier does, and the rest is a suffix of one, cut at a
+ * `/` (`../base-run.js` reads `packages/rafa-pr/src/triage/base-run.ts`);
+ * or it is absolute and ends in `/` and one, as a stack frame names a
+ * file of the checkout; or it is a bare file name, no `/` in it, and one
+ * of the plan's files has that base name. A path ending in `.js`, `.mjs`
+ * or `.jsx` is read both as written and as the `.ts`, `.mts` or `.tsx`
+ * file an import specifier with that extension resolves to.
  */
 import type { BaseRunAnswer, NamedTest } from './base-run.js';
 import type { PlanFilesReading } from './plan-commits.js';
 import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
-import { basename, isAbsolute } from 'node:path';
+import { basename, extname, isAbsolute } from 'node:path';
 
 import { pathsNamedIn } from '@open-tomato/rafa/triage/doc-only';
 import { testFailureOf } from '@open-tomato/rafa/triage/test-failure';
@@ -169,22 +176,51 @@ function checkTest(name: string, readings: NamedTestReadings | null): KindCheck 
   return answer('own-fallout', 'fallout', `The case ${name} is green on the plan's base and red on its head.`);
 }
 
-/** `path` with any leading `./` taken off. */
-function withoutDotSlash(path: string): string {
-  return path.replace(/^(?:\.\/)+/, '');
+/** A leading run of `./` and `../`, as a relative import specifier opens. */
+const RELATIVE_PREFIX = /^(?:\.\.?\/)+/;
+
+/** A last segment holding an extension: a `.` with a name after it (`a.ts`, `.gitignore`). */
+const HAS_EXTENSION = /\.[^./]+$/;
+
+/** The source extension each emitted one an import specifier spells resolves to. */
+const SOURCE_EXTENSIONS: ReadonlyMap<string, string> = new Map([
+  ['.js', '.ts'],
+  ['.mjs', '.mts'],
+  ['.jsx', '.tsx'],
+]);
+
+/** Whether `path` names a file: its last segment holds an extension; see the module note. */
+function namesFile(path: string): boolean {
+  return HAS_EXTENSION.test(path.split('/').at(-1) ?? '');
 }
 
-/** Whether the named `path` is one of `files`; see the module note. */
-function isPlanFile(path: string, files: readonly string[]): boolean {
-  const named = withoutDotSlash(path);
+/** `path` as written, and as its source file when it ends in an emitted extension. */
+function spellingsOf(path: string): readonly string[] {
+  const emitted = extname(path);
+  const source = SOURCE_EXTENSIONS.get(emitted);
+  return source === undefined
+    ? [path]
+    : [path, `${path.slice(0, -emitted.length)}${source}`];
+}
+
+/** Whether `named`, one spelling of a named path, is one of `files`; see the module note. */
+function isPlanSpelling(named: string, relative: boolean, files: readonly string[]): boolean {
   if (files.includes(named)) return true;
+  if (relative) return files.some((file) => file.endsWith(`/${named}`));
   if (isAbsolute(named)) return files.some((file) => named.endsWith(`/${file}`));
   return !named.includes('/') && files.some((file) => basename(file) === named);
 }
 
+/** Whether the named `path` is one of `files`; see the module note. */
+function isPlanFile(path: string, files: readonly string[]): boolean {
+  const relative = RELATIVE_PREFIX.test(path);
+  const named = path.replace(RELATIVE_PREFIX, '');
+  return spellingsOf(named).some((spelling) => isPlanSpelling(spelling, relative, files));
+}
+
 /** The table's file rows, for an entry naming no test case; see the module note. */
 function checkFiles(entry: KindCheckEntry, planFiles: PlanFilesReading): KindCheck {
-  const paths = pathsNamedIn(`${entry.what ?? ''}\n${entry.artifact ?? ''}`);
+  const paths = pathsNamedIn(`${entry.what ?? ''}\n${entry.artifact ?? ''}`).filter(namesFile);
   if (paths.length === 0) {
     return answer(entry.kind, 'nothing-named', 'The entry names no test case and no path, so it is taken as said.');
   }

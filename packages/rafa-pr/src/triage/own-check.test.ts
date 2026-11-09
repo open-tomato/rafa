@@ -95,6 +95,79 @@ describe('checkKind: a path outside the plan\'s commits', () => {
   });
 });
 
+/** The plan's files the path-shape cases read: a nested source file, a `.tsx` and a `.mts`. */
+const SHAPE_FILES: PlanFilesReading = {
+  ok: true,
+  files: ['packages/rafa-pr/src/triage/base-run.ts', 'src/view/panel.tsx', 'src/build/emit.mts'],
+};
+
+describe('checkKind: path shapes that name no plan file', () => {
+  it('does not read a neighbour\'s folder as a plan file: a bug claim naming one stays a bug', () => {
+    const checked = checkKind(input(entry('bug', 'packages/rafa-effort drops a row'), null, SHAPE_FILES));
+
+    expect([checked.kind, checked.row]).toEqual(['bug', 'nothing-named']);
+  });
+
+  it('names the neighbour\'s file, not its folder, when both are named', () => {
+    const what = 'packages/rafa-effort breaks packages/rafa-effort/src/store.ts';
+    const checked = checkKind(input(entry('own-gap', what), null, SHAPE_FILES));
+
+    expect(checked.reason).toBe('packages/rafa-effort/src/store.ts is not one of the plan\'s files, so it reads as a bug.');
+  });
+
+  it('reads a .js specifier of a file outside the plan as a bug', () => {
+    for (const what of ['imports ../neighbour.js', 'imports ./triage/neighbour.js', 'imports neighbour.js']) {
+      const checked = checkKind(input(entry('own-gap', what), null, SHAPE_FILES));
+
+      expect([what, checked.kind, checked.row]).toEqual([what, 'bug', 'file-outside-plan']);
+    }
+  });
+
+  it('matches a relative specifier only at a segment boundary', () => {
+    expect(checkKind(input(entry('own-gap', 'imports ./un-base-run.js'), null, SHAPE_FILES)).kind).toBe('bug');
+  });
+
+  it('does not read a plain path as a suffix: only a relative one', () => {
+    expect(checkKind(input(entry('own-gap', 'triage/base-run.ts drops a line'), null, SHAPE_FILES)).kind).toBe('bug');
+  });
+
+  it('does not read a .ts specifier as a .js file of the plan', () => {
+    const plan: PlanFilesReading = { ok: true, files: ['src/emitted.js'] };
+
+    expect(checkKind(input(entry('own-gap', 'imports ./emitted.ts'), null, plan)).kind).toBe('bug');
+  });
+});
+
+describe('checkKind: path shapes that name a plan file', () => {
+  it('takes a folder named beside a plan file out of the file rows: the folder control', () => {
+    const checked = checkKind(input(entry('bug', 'packages/rafa-effort calls ../base-run.js'), null, SHAPE_FILES));
+
+    expect([checked.kind, checked.row]).toEqual(['own-gap', 'plan-files']);
+  });
+
+  it('reads a .js, .jsx or .mjs specifier as the plan\'s .ts, .tsx or .mts file', () => {
+    const texts = [
+      'imports ../base-run.js',
+      'imports ./src/triage/base-run.js',
+      'imports ../../view/panel.jsx',
+      'imports ./emit.mjs',
+      'base-run.js drops a line',
+      'packages/rafa-pr/src/triage/base-run.js drops a line',
+    ];
+    for (const what of texts) {
+      const checked = checkKind(input(entry('bug', what), null, SHAPE_FILES));
+
+      expect([what, checked.kind]).toEqual([what, 'own-gap']);
+    }
+  });
+
+  it('still reads a .js file of the plan as written', () => {
+    const plan: PlanFilesReading = { ok: true, files: ['scripts/build.js'] };
+
+    expect(checkKind(input(entry('bug', 'imports ../build.js'), null, plan)).kind).toBe('own-gap');
+  });
+});
+
 describe('checkKind: a case that cannot be run on the base', () => {
   it('reads a case red on the head and unrunnable on the base as a bug, naming the problem', () => {
     const checked = checkKind(input(testEntry('own-fallout'), { base: UNRUNNABLE, head: RED }));
