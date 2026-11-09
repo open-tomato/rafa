@@ -44,7 +44,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { dispatch } from '../../../../../src/cli/dispatch.js';
 import { renderHelp } from '../../../../../src/cli/help.js';
@@ -54,7 +54,17 @@ import { createIssueCommentCommand } from './comment.js';
 import { createIssueCreateCommand } from './create.js';
 import { ISSUE_SUBJECT } from './declarations.js';
 import { createIssueListCommand } from './list.js';
+import { registerUpstreamTestAdapters } from './upstream-test-adapters.js';
 import { PRIVATE_SIBLING } from './upstream-text.js';
+
+/** The logger and trackers this file reads, registered when the package's own preload ran (#1586). */
+let restoreAdapters: () => void = () => undefined;
+beforeAll(() => {
+  restoreAdapters = registerUpstreamTestAdapters();
+});
+afterAll(() => {
+  restoreAdapters();
+});
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-upstream-integration-')));

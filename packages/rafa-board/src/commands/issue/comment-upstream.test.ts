@@ -37,12 +37,22 @@ import { createCommandRegistry } from '@open-tomato/rafa/cli/registry';
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { scopeAt } from '@open-tomato/rafa/core/config';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 
 import { createIssueCommentCommand, renderCommented } from './comment.js';
+import { registerUpstreamTestAdapters } from './upstream-test-adapters.js';
 import { PRIVATE_SIBLING } from './upstream-text.js';
+
+/** The logger and trackers this file reads, registered when the package's own preload ran (#1586). */
+let restoreAdapters: () => void = () => undefined;
+beforeAll(() => {
+  restoreAdapters = registerUpstreamTestAdapters();
+});
+afterAll(() => {
+  restoreAdapters();
+});
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-comment-upstream-')));
