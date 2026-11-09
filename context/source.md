@@ -37,9 +37,16 @@ spells out, and the shapes the lint config forces.
   `../core/` and `../utils/` lines after, while
   `packages/rafa-board/src/board/project/rules.ts` puts `./options.js` last,
   after its `../` lines. Both pass eslint. Take the order from `bunx eslint
-  --fix-dry-run --format json <file>`, not from this page. Value imports differ:
-  the `parent` group (`../`) comes before the `sibling` group (`./`), a blank
-  line between them.
+  --fix-dry-run --format json <file>`, not from this page. This holds in tests
+  too: a colocated test's `import type` of its sibling under test, or a second
+  sibling type import, lands where the lint message says (`./release.js` type
+  import should occur before type import of `../../adapters/tracker/github.js`).
+  Value imports differ: the `parent` group (`../`) comes before the `sibling`
+  group (`./`), a blank line between them. A new test that imports
+  `@open-tomato/rafa-effort` beside `bun:test` and `@open-tomato/rafa/*` gets
+  "There should be at least one empty line between import groups"; run `bunx
+  eslint --fix` on that new test file rather than placing the blank lines by
+  hand.
 - **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
