@@ -125,7 +125,14 @@ afterAll(() => {
 describe('checkKind over a temporary repository', () => {
   it('reads the repository as two commits, the second touching only src/value.ts', () => {
     expect(baseSha).not.toBe(headSha);
-    expect(planFiles).toEqual({ ok: true, files: ['src/value.ts'] });
+    expect(planFiles).toEqual({
+      ok: true,
+      files: ['src/value.ts'],
+      added: ['export const value = 2;'],
+      addedProblem: null,
+      commits: [headSha],
+      commitsProblem: null,
+    });
   });
 
   it('reads an entry naming the test the second commit turned red as own-fallout', async () => {

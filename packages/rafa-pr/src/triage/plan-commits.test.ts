@@ -1,9 +1,12 @@
 /**
  * Tests for the plan's commits (`plan-commits.ts`), over a temporary git
  * repository of two commits: the first is `origin/main`'s tip, the
- * second, on `HEAD` only, edits one file and adds two. Each refusal case
- * keeps a control: the same reading over the same repository answers a
- * base or a file list when the ref it asks for is there.
+ * second, on `HEAD` only, edits one file and adds two, one of them
+ * holding a line that opens with `++`. Each refusal case keeps a
+ * control: the same reading over the same repository answers a base, a
+ * file list, the added lines or the commits when the ref it asks for is
+ * there. A stub answering by argv fails the added-lines or the commits
+ * call alone, beside the real repository reading both.
  */
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
@@ -34,6 +37,14 @@ function put(dir: string, path: string, text: string): void {
 
 let git: GitRunner;
 let first: string;
+let second: string;
+
+/** A stub answering through `git` but failing, saying `said`, each call whose argv opens with `failing`. */
+function failingOn(failing: readonly string[], said: string): GitRunner {
+  return (args) => failing.every((arg, at) => args[at] === arg)
+    ? { ok: false, stdout: '', stderr: said }
+    : git(args);
+}
 
 beforeAll(() => {
   const dir = join(scope, 'repo');
@@ -50,9 +61,10 @@ beforeAll(() => {
   must(git, ['update-ref', 'refs/remotes/origin/main', first]);
   put(dir, 'src/edited.ts', 'export const edited = 2;\n');
   put(dir, 'src/added file.ts', 'export const added = 1;\n');
-  put(dir, 'docs/ü.md', 'note\n');
+  put(dir, 'docs/ü.md', 'note\n++ not a header\n');
   must(git, ['add', '-A']);
   must(git, ['commit', '--quiet', '-m', 'second']);
+  second = must(git, ['rev-parse', 'HEAD']);
 });
 
 afterAll(() => {
@@ -132,13 +144,73 @@ describe('readPlanFiles', () => {
     expect(readPlanFiles(git, '').ok).toBe(false);
   });
 
-  it('answers the files the second commit touched, as written, and not the file it left alone', () => {
-    const reading = readPlanFiles(git, first);
+  it('runs no added-lines or commits call when the files are not read', () => {
+    const calls: string[] = [];
+    const stub: GitRunner = (args) => {
+      calls.push(args.join(' '));
+      return { ok: false, stdout: '', stderr: 'fatal: bad revision \'abc\'' };
+    };
 
-    expect(reading).toEqual({ ok: true, files: ['docs/ü.md', 'src/added file.ts', 'src/edited.ts'] });
+    expect(readPlanFiles(stub, 'abc').ok).toBe(false);
+    expect(calls).toEqual(['diff --name-only -z abc HEAD --']);
   });
 
-  it('answers no file between HEAD and itself', () => {
-    expect(readPlanFiles(git, 'HEAD')).toEqual({ ok: true, files: [] });
+  it('answers the added lines null with a sentence when their diff fails, the files and commits still read', () => {
+    const reading = readPlanFiles(failingOn(['diff', '-U0'], 'fatal: out of memory'), first);
+
+    expect(reading).toEqual({
+      ok: true,
+      files: ['docs/ü.md', 'src/added file.ts', 'src/edited.ts'],
+      added: null,
+      addedProblem: `Could not read the lines added between ${first} and HEAD: fatal: out of memory`,
+      commits: [second],
+      commitsProblem: null,
+    });
+  });
+
+  it('answers the commits null with a sentence when rev-list fails, the files and added lines still read', () => {
+    const reading = readPlanFiles(failingOn(['rev-list'], ''), first);
+
+    expect(reading.ok).toBe(true);
+    if (!reading.ok) return;
+    expect(reading.files).toEqual(['docs/ü.md', 'src/added file.ts', 'src/edited.ts']);
+    expect(reading.added).not.toBeNull();
+    expect(reading.commits).toBeNull();
+    expect(reading.commitsProblem).toBe(`Could not list the commits between ${first} and HEAD`);
+  });
+
+  it('answers the files the second commit touched, as written, its added lines and its commit', () => {
+    const reading = readPlanFiles(git, first);
+
+    expect(reading).toEqual({
+      ok: true,
+      files: ['docs/ü.md', 'src/added file.ts', 'src/edited.ts'],
+      added: ['note', '++ not a header', 'export const added = 1;', 'export const edited = 2;'],
+      addedProblem: null,
+      commits: [second],
+      commitsProblem: null,
+    });
+  });
+
+  it('reads no header and no line the second commit removed or left alone as added', () => {
+    const reading = readPlanFiles(git, first);
+    const added = reading.ok
+      ? reading.added ?? []
+      : [];
+
+    expect(added.some((line) => line.startsWith('++ b/') || line.startsWith('-- a/'))).toBe(false);
+    expect(added).not.toContain('export const edited = 1;');
+    expect(added).not.toContain('export const kept = 1;');
+  });
+
+  it('answers no file, no added line and no commit between HEAD and itself', () => {
+    expect(readPlanFiles(git, 'HEAD')).toEqual({
+      ok: true,
+      files: [],
+      added: [],
+      addedProblem: null,
+      commits: [],
+      commitsProblem: null,
+    });
   });
 });

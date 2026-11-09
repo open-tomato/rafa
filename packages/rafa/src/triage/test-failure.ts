@@ -49,6 +49,13 @@
  * failure (`expect(received).toBe(expected)`, `boom 42`), which is what
  * `packages/rafa/src/suite/run.ts` records as a run-start failure's
  * message.
+ *
+ * ## Every case a capture holds
+ *
+ * {@link failedCaseNamesIn} reads a whole capture, such as the red run's
+ * output text `packages/rafa/src/suite/run.ts` keeps, and answers the case
+ * name of every `(fail)` line in it, in order and without the trailing
+ * timing; a `file > case` line is not bun's own and is not read there.
  */
 import type { ReportBug } from '../report/parse.js';
 
@@ -182,4 +189,14 @@ export function testFailureOf(bug: Pick<ReportBug, 'what' | 'artifact'>): TestFa
     name: inWhat.name,
     evidence: evidenceOf(null, artifactLines),
   };
+}
+
+/**
+ * The case name of every bun `(fail)` line in `capture`, in order, with
+ * the trailing timing taken off; see the module note.
+ */
+export function failedCaseNamesIn(capture: string): readonly string[] {
+  return linesOf(capture)
+    .map((line) => FAIL_LINE.exec(line)?.[1])
+    .filter((name): name is string => name !== undefined);
 }

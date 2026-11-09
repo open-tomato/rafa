@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { testFailureOf } from './test-failure.js';
+import { failedCaseNamesIn, testFailureOf } from './test-failure.js';
 
 const BUN_CAPTURE = [
   'bun test v1.4.2 (744846f84)',
@@ -115,5 +115,20 @@ describe('testFailureOf', () => {
 
   it('answers null for a bug with no artifact and a what naming no case', () => {
     expect(testFailureOf({ what: 'src/a.test.ts is slow', artifact: null })).toBeNull();
+  });
+});
+
+describe('failedCaseNamesIn', () => {
+  it('answers every (fail) line\'s case name in order, without its timing', () => {
+    expect(failedCaseNamesIn(BUN_CAPTURE)).toEqual(['outer > adds', 'outer > throws']);
+  });
+
+  it('reads a (fail) line with no timing and one timed in seconds', () => {
+    expect(failedCaseNamesIn('(fail) a > b\r\n(fail) c > d [1.50s]')).toEqual(['a > b', 'c > d']);
+  });
+
+  it('answers nothing for a capture with no (fail) line, and skips pass and file > case lines', () => {
+    expect(failedCaseNamesIn('')).toEqual([]);
+    expect(failedCaseNamesIn('(pass) a > b [0.10ms]\nsrc/a.test.ts > c')).toEqual([]);
   });
 });
