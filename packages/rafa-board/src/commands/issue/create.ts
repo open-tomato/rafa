@@ -90,8 +90,8 @@
  *
  * ## The project
  *
- * An issue the `github` tracker filed is added to the repository's
- * project and refreshed there once its own lines are written
+ * An issue the `github` tracker filed on this board, never one filed
+ * `--upstream`, is added to the repository's project and refreshed there once its own lines are written
  * (`addAndRefreshIssue`, `../../board/project/add-issue.ts`), with
  * `board.project.number` set; unset, or on another tracker, no call is
  * sent. Every line the add or the refresh answers is written at `warn`
@@ -101,6 +101,43 @@
  * a call that failed on a network error is sent again, each retry an
  * `info` line, `retrying #725 (1 of 3): operation timed out`, or one
  * `retry` event in json mode.
+ *
+ * ## `--upstream=<tool>`
+ *
+ * Files the issue on the board of a tool the project consumes, the one
+ * `collaborate.<tool>` names (`.rafa/specs/rafa-751-report-rafa-gaps-bugs.md`),
+ * in this order:
+ *
+ *  1. **The line**, read as every line is. A type other than `bug` is
+ *     then refused, `issue create --upstream=rafa: --type=code is not
+ *     filed upstream: only a bug is, --type=bug with its fields. Nothing
+ *     was filed.`, since only rafa's own bug shape is filed there. The
+ *     bug line is read through `readBugLine` (`./create-bug.ts`), so a
+ *     record that is not complete is refused before the gate.
+ *  2. **The gate**, `resolveUpstream` (`./upstream.ts`): the tool, the
+ *     key, this board's owner and visibility, read with one
+ *     `gh repo view`, and the same owner, each refusal exit 1 and ending
+ *     `Nothing was filed.`. It writes the config's warnings, so the bug
+ *     line's read writes none.
+ *  3. **The private-name rule** (`privateNameRule`, `./upstream-text.ts`)
+ *     over the title and the body, the `Versions` section included:
+ *     unless this board was read `PUBLIC`, its `owner/name`, its bare
+ *     name and the filing package's name, and the part after the scope
+ *     of a scoped one, become `a private sibling repository`.
+ *  4. **The filing**, on the `github` tracker made over
+ *     `upstreamGhRunner` (`./upstream.ts`), so every `gh issue` and
+ *     `gh label` call names `--repo <upstream>` and no other call is
+ *     sent. No chain is resolved, no preflight runs, and the issue is
+ *     added to no project, `board.project.number` being this board's.
+ *     A key naming a repository that does not exist fails here, with
+ *     `gh`'s own error.
+ *
+ * Text mode prints `Created github issue <id> on <upstream>.` and the
+ * URL; json mode's {@link IssueCreateResult} carries `upstream`.
+ * `--dry-run` passes steps 1 to 3 and stops before the filing: it sends
+ * the gate's one read and no `gh issue` call, and prints an
+ * `Upstream: <upstream>` line after its first, then the draft as it
+ * would be filed there. Its {@link IssueDryRun} carries `upstream` too.
  *
  * ## Refusals
  *
@@ -115,14 +152,16 @@
  * that rejects is refused as any other tracker call.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
+import type { UpstreamTarget } from './upstream.js';
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
 import type { IssueDraft, IssueRef, IssueType, Tracker } from '@open-tomato/rafa/ports';
+import type { PackageOwner } from '@open-tomato/rafa/project/package-of';
 
 import { expectNoArgument, readSwitch } from '@open-tomato/rafa/commands/plan/plan-files';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { TRIAGE_MODULE } from '@open-tomato/rafa/triage/filed-text';
 
-import { createGhRunner } from '../../adapters/tracker/github.js';
+import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
@@ -144,8 +183,14 @@ import {
   resolveIssueTracker,
   urlLines,
 } from './issue-tracker.js';
+import { privateNameRule } from './upstream-text.js';
+import { resolveUpstream, UPSTREAM_FLAG, upstreamGhRunner, upstreamRefusal } from './upstream.js';
 
-/** The usage line a refusal names. */
+/**
+ * The usage line a refusal names. `--upstream=<tool>` is left out of it:
+ * `--help` lists the flag, and `src/tests/board-coupled/commands/issue/create.test.ts`
+ * holds this line as it is.
+ */
 const USAGE = 'rafa issue create (--title=<text> | --type=bug --summary=<text> --module=<name> --action=<name> --cause=<code>'
   + ' --reproduce=<text>) [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]'
   + ' [--env=<place>] [--proposed=<code>] [--rerun=<command>] [--project=<name>] [--path=<file>] [--dry-run]';
@@ -162,11 +207,16 @@ const NO_PRIORITY = 'needs-triage';
 /** The `--body-file` value that reads standard input. */
 export const STDIN_PATH = '-';
 
+/** The tracker an upstream issue is filed on, as json mode gives it: `github`, no chain resolved. */
+const UPSTREAM_TRACKER: IssueTrackerData = Object.freeze({ kind: 'github', degraded: false, fallbackReason: null });
+
 /** What json mode gives as the terminal result's `data`. */
 export interface IssueCreateResult {
   readonly tracker: IssueTrackerData;
   /** The ref the tracker answered for the issue it filed. */
   readonly ref: IssueRef;
+  /** The upstream repository, `owner/name`, under `--upstream`; left out otherwise. */
+  readonly upstream?: string;
 }
 
 /** What json mode gives as the terminal result's `data` under `--dry-run`: the draft, and nothing filed. */
@@ -174,6 +224,15 @@ export interface IssueDryRun {
   readonly dryRun: true;
   /** The draft the line would file. */
   readonly draft: IssueDraft;
+  /** The upstream repository the draft would be filed on, under `--upstream`; left out otherwise. */
+  readonly upstream?: string;
+}
+
+/** What an `--upstream` line hands the filing: its draft as read, the tool, and whether it is a dry run. */
+interface UpstreamLine {
+  readonly base: IssueDraft;
+  readonly tool: string;
+  readonly dryRun: boolean;
 }
 
 /**
@@ -248,13 +307,16 @@ export async function readIssueLine(flags: LineFlags, seams: Pick<IssueSeams, 's
     : { ...draft, body: await readBodyFile(path, seams) };
 }
 
-/** The lines text mode writes once an issue is filed. */
-export function renderCreated(ref: IssueRef): string[] {
-  return [`Created ${issueName(ref)}.`, ...urlLines(ref)];
+/** The lines text mode writes once an issue is filed, naming `upstream` when it was filed there. */
+export function renderCreated(ref: IssueRef, upstream?: string): string[] {
+  const where = upstream === undefined
+    ? ''
+    : ` on ${upstream}`;
+  return [`Created ${issueName(ref)}${where}.`, ...urlLines(ref)];
 }
 
-/** The lines text mode writes under `--dry-run`; see the module note. */
-export function renderDryRun(draft: IssueDraft): string[] {
+/** The lines text mode writes under `--dry-run`, an `Upstream:` line second under `--upstream`; see the module note. */
+export function renderDryRun(draft: IssueDraft, upstream?: string): string[] {
   const facts = [
     `Type: ${draft.type}`,
     `Module: ${draft.module}`,
@@ -266,6 +328,9 @@ export function renderDryRun(draft: IssueDraft): string[] {
   const body = draft.body.trimEnd();
   return [
     '--dry-run: nothing was filed.',
+    ...upstream === undefined
+      ? []
+      : [`Upstream: ${upstream}`],
     `Title: ${draft.title}`,
     facts,
     ...body === ''
@@ -279,11 +344,55 @@ export function isDryRun(result: IssueCreateResult | IssueDryRun): result is Iss
   return 'dryRun' in result;
 }
 
+/**
+ * The tool `--upstream` names, or undefined when the line leaves it out;
+ * a refusal with exit code 1 for a blank value and for a type other than
+ * `bug`. See "`--upstream=<tool>`" in the module note.
+ */
+export function readUpstreamFlag(flags: LineFlags, type: IssueType): string | undefined {
+  const tool = readNonBlankFlag(flags, UPSTREAM_FLAG, USAGE);
+  if (tool === undefined || type === BUG_TYPE) return tool;
+  throw upstreamRefusal(
+    { action: 'create', tool },
+    `--type=${type} is not filed upstream: only a bug is, --type=${BUG_TYPE} with its fields.`,
+  );
+}
+
+/** The names the private-name rule hides of `owner`: its name, and the part after the scope of a scoped one. */
+export function packageNames(owner: Pick<PackageOwner, 'name'> | null): readonly string[] {
+  if (owner === null) return [];
+  const slash = owner.name.indexOf('/');
+  return owner.name.startsWith('@') && slash > 0
+    ? [owner.name, owner.name.slice(slash + 1)]
+    : [owner.name];
+}
+
+/** `draft` with the private-name rule over its title and body, for the board `target` read. */
+function hiddenDraft(draft: IssueDraft, target: UpstreamTarget, owner: PackageOwner | null): IssueDraft {
+  const hide = privateNameRule({ own: target.own, ownIsPublic: target.ownIsPublic, packages: packageNames(owner) });
+  return { ...draft, title: hide(draft.title), body: hide(draft.body) };
+}
+
+/** Files a bug line under `--upstream`, or under `--dry-run` answers its draft; see the module note. */
+async function createUpstreamIssue(context: RafaContext, seams: IssueSeams, line: UpstreamLine): Promise<IssueCreateResult | IssueDryRun> {
+  // The gate writes the config's warnings, so this read of the same config writes none.
+  const bug = await readBugLine(context, seams, line.base, { usage: USAGE, warn: () => undefined });
+  const target = await resolveUpstream(context, seams, { action: 'create', tool: line.tool });
+  const draft = hiddenDraft(bug.draft, target, bug.owner);
+  if (line.dryRun) return { dryRun: true, draft, upstream: target.upstream };
+  const gh = seams.gh ?? createGhRunner({ cwd: issueProject(context).root });
+  const tracker = createGithubTracker({ gh: upstreamGhRunner(gh, target.upstream) });
+  const ref = await onTracker(tracker, `create the issue on ${target.upstream}`, () => tracker.create(draft));
+  return { tracker: UPSTREAM_TRACKER, ref, upstream: target.upstream };
+}
+
 /** Files the issue a line describes, or under `--dry-run` answers its draft; see the module note. */
 export async function createIssue(context: RafaContext, seams: IssueSeams): Promise<IssueCreateResult | IssueDryRun> {
   expectNoArgument(context.args, USAGE);
   const dryRun = readSwitch('dry-run', context.flags['dry-run'], SWITCH_HINT);
   const base = await readIssueLine(context.flags, seams);
+  const tool = readUpstreamFlag(context.flags, base.type);
+  if (tool !== undefined) return createUpstreamIssue(context, seams, { base, tool, dryRun });
   // Under --dry-run no chain is resolved to write the config's warnings, so they are written here.
   const warn = dryRun
     ? (message: string): void => context.output.warn(message)
@@ -346,13 +455,14 @@ export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS
       const created = await createIssue(context, seams);
       if (isDryRun(created)) {
         if (context.outputMode === 'json') context.output.result(created);
-        else for (const line of renderDryRun(created.draft)) context.output.info(line);
+        else for (const line of renderDryRun(created.draft, created.upstream)) context.output.info(line);
         return;
       }
       if (created.ref.warning !== undefined) context.output.warn(`${issueName(created.ref)}: ${created.ref.warning}`);
       if (context.outputMode === 'json') context.output.result(created);
-      else for (const line of renderCreated(created.ref)) context.output.info(line);
-      await addCreatedToProject(context, seams, created.ref);
+      else for (const line of renderCreated(created.ref, created.upstream)) context.output.info(line);
+      // The project is this board's: an issue filed upstream is added to none.
+      if (created.upstream === undefined) await addCreatedToProject(context, seams, created.ref);
     },
   };
   return Object.freeze(command);

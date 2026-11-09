@@ -291,6 +291,16 @@ neither has an "off" spelling. The reader is
 title, a line with the type, module, priority and cause, then the body,
 and stops: no tracker is resolved and nothing is filed.
 
+With `--upstream=rafa`, a bug only, it also passes the upstream gate
+(`packages/rafa-board/src/commands/issue/upstream.ts`), which reads this
+board's owner and visibility with one `gh repo view` and sends no
+`gh issue` call, prints `Upstream: <owner>/<name>` after its first line,
+and prints the draft as it would be filed there: unless this board is
+`PUBLIC`, its repository name and the filing package's name, in the
+title and the body and its `Versions` section alike, read
+`a private sibling repository`
+(`packages/rafa-board/src/commands/issue/create.ts`).
+
 ### Config
 
 `packages/rafa/src/config-schema-issues.ts` reads five keys:

@@ -2113,7 +2113,12 @@ New; it replaces no earlier text. What a row or an action added to
   body's sections, its title is rendered through `issues.titles.bug`, and
   a record missing a field is refused before the chain is resolved, so
   `--title` is required for every type but `bug`. `--dry-run` prints the
-  draft of any type and resolves no tracker. `list --type=bug` prints
+  draft of any type and resolves no tracker. `create --upstream=rafa`
+  takes a bug alone, passes the gate of `issue/upstream.ts` once the bug
+  line is read, hides a private board's names (`issue/upstream-text.ts`)
+  and files on the `github` tracker made over `upstreamGhRunner`, with
+  no chain resolved and no project placement; under `--dry-run` it prints
+  that body and its `Upstream:` target. `list --type=bug` prints
   the columns id, state, module, action and summary, read back from each
   title. Its body
   is `--body` or the bytes of the file `--body-file` names (standard input

@@ -43,6 +43,10 @@
  *   - `issue create --upstream=rafa: collaborate.rafa names <upstream> (owner <a>), and this board is <own> (owner <b>). Reporting upstream is allowed only between repositories of one owner. Nothing was filed.`
  *   - `issue create --upstream=rafa: could not read this board's owner (<reason>). Nothing was filed.`
  *
+ * {@link upstreamRefusal} makes each, and an action words a refusal of
+ * its own under the flag with it, so every line under `--upstream` reads
+ * alike.
+ *
  * A config `loadConfig` refuses is refused as every `issue` action
  * refuses it. The key's value is checked at load for its `owner/name`
  * shape only: a typo naming a repository that does not exist is not
@@ -126,8 +130,13 @@ export interface UpstreamRequest {
   readonly tool: string;
 }
 
-/** A refusal of the gate with exit code 1: the action and flag, the problem, and what was left undone. */
-function upstreamRefusal(request: UpstreamRequest, problem: string): CommandExit {
+/**
+ * A refusal under `--upstream` with exit code 1: the action and flag,
+ * the problem, and what was left undone. The gate's four are made with
+ * it, and so is an action's own refusal of a line under the flag, such
+ * as `issue create`'s of a type other than `bug` (`./create.ts`).
+ */
+export function upstreamRefusal(request: UpstreamRequest, problem: string): CommandExit {
   const { action, tool } = request;
   return new CommandExit(1, `❌ issue ${action} --${UPSTREAM_FLAG}=${tool}: ${problem} ${NOTHING_DONE[action]}`);
 }

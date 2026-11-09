@@ -4427,7 +4427,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 141,
+        "test": 142,
         "testSupport": 8
       },
       "files": [
@@ -4679,6 +4679,7 @@
         "packages/rafa-board/src/commands/issue/create-blocked.test.ts",
         "packages/rafa-board/src/commands/issue/create-blocked.ts",
         "packages/rafa-board/src/commands/issue/create-bug.ts",
+        "packages/rafa-board/src/commands/issue/create-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/create.ts",
         "packages/rafa-board/src/commands/issue/declarations.test.ts",
         "packages/rafa-board/src/commands/issue/declarations.ts",
@@ -4738,7 +4739,7 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 256,
+        "packages/rafa-board/": 257,
         "src/board/": 6,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,
