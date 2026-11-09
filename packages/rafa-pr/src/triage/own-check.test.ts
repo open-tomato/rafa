@@ -56,6 +56,7 @@ describe('checkKind: an own- claim the head does not confirm', () => {
       inherited: false,
       row: 'head-not-red',
       reason: `The case ${CASE_NAME} is not red on the head, so it reads as a bug. It was green.`,
+      symbol: null,
     });
   });
 
@@ -82,6 +83,7 @@ describe('checkKind: a path outside the plan\'s commits', () => {
       inherited: false,
       row: 'file-outside-plan',
       reason: 'src/neighbour.ts is not one of the plan\'s files, so it reads as a bug.',
+      symbol: null,
     });
   });
 
@@ -172,6 +174,142 @@ describe('checkKind: path shapes that name a plan file', () => {
   });
 });
 
+/** The lines a plan added, as `readPlanFiles` reads them: what the symbol cases look for. */
+const ADDED_LINES: readonly string[] = [
+  'export function readPlanFiles(git: GitRunner, planBase: string): PlanFilesReading {',
+  'const TakenByRow = \'taken\';',
+  'Repair the red step (the kept capture) once.',
+  '  run: true,',
+  'closes #1384 in the board\'s run',
+];
+
+/** The plan's files with {@link ADDED_LINES} as its added lines, `src/neighbour.ts` not among its files. */
+const SYMBOL_FILES: PlanFilesReading = { ...PLAN_FILES, added: ADDED_LINES };
+
+/** The answer of the file row for an entry naming `src/neighbour.ts` and no symbol the plan added. */
+const OUTSIDE = {
+  kind: 'bug',
+  inherited: false,
+  row: 'file-outside-plan',
+  reason: 'src/neighbour.ts is not one of the plan\'s files, so it reads as a bug.',
+  symbol: null,
+} as const;
+
+/** What `checkKind` answers for an own-gap claim of `what` and `artifact` over `planFiles`. */
+function symbolCheck(what: string, artifact: string | null = null, planFiles = SYMBOL_FILES): ReturnType<typeof checkKind> {
+  return checkKind(input(entry('own-gap', what, artifact), null, planFiles));
+}
+
+describe('checkKind: a symbol the plan did not add', () => {
+  it('reads an entry outside the plan whose symbol no added line holds as a bug', () => {
+    expect(symbolCheck('src/neighbour.ts never calls `readBoardRows`')).toEqual(OUTSIDE);
+  });
+
+  it('reads the entry as a bug when the added lines were not read, as before the row', () => {
+    const unread: PlanFilesReading = { ...PLAN_FILES, added: null, addedProblem: 'Could not read the lines added.' };
+
+    expect(symbolCheck('src/neighbour.ts never calls readPlanFiles', null, unread)).toEqual(OUTSIDE);
+  });
+
+  it('skips the row for an entry naming a test file, the plan\'s symbol named', () => {
+    const texts: readonly (readonly [string, string | null])[] = [
+      ['src/neighbour.ts fails at base: readPlanFiles answers no TakenBy', 'src/neighbour.test.ts:12'],
+      ['src/neighbour.test.ts asserts readPlanFiles on src/neighbour.ts', null],
+    ];
+    for (const [what, artifact] of texts) {
+      expect([what, symbolCheck(what, artifact).row]).toEqual([what, 'file-outside-plan']);
+    }
+  });
+
+  it('keeps a generic name shorter than the minimum out: `run` stays a bug', () => {
+    expect(symbolCheck('src/neighbour.ts sets `run` wrong')).toEqual(OUTSIDE);
+  });
+
+  it('reads no possessive as a quote: "run\'s, board\'s" stays a bug', () => {
+    expect(symbolCheck('src/neighbour.ts drops the run\'s, board\'s rows')).toEqual(OUTSIDE);
+  });
+
+  it('reads no #<n> ref as a symbol', () => {
+    expect(symbolCheck('src/neighbour.ts misses `#1384`, see (#1384)')).toEqual(OUTSIDE);
+  });
+
+  it('matches a name only at identifier boundaries: TakenBy is not TakenByRow', () => {
+    expect(symbolCheck('src/neighbour.ts reads TakenBy')).toEqual(OUTSIDE);
+  });
+
+  it('matches a span literally, its dot no wildcard', () => {
+    const plan: PlanFilesReading = { ...PLAN_FILES, added: ['loopXretries: 2'] };
+
+    expect(symbolCheck('src/neighbour.ts reads `loop.retries`', null, plan)).toEqual(OUTSIDE);
+  });
+
+  it('runs only after file-outside-plan: a plan file or no path named keeps its row', () => {
+    expect(checkKind(input(entry('bug', 'src/edited.ts misses readPlanFiles'), null, SYMBOL_FILES))).toEqual({
+      kind: 'own-gap',
+      inherited: false,
+      row: 'plan-files',
+      reason: 'Every path the entry names is one of the plan\'s files.',
+      symbol: null,
+    });
+    expect(symbolCheck('readPlanFiles misses a case').row).toBe('nothing-named');
+  });
+
+  it('never runs on an entry naming a test case', () => {
+    const named = entry('own-gap', 'readPlanFiles in src/neighbour.ts', CASE_LINE);
+
+    expect(checkKind(input(named, { base: RED, head: RED }, SYMBOL_FILES)).row).toBe('red-on-both');
+  });
+});
+
+describe('checkKind: a symbol the plan added, its path outside the plan', () => {
+  it('reads the entry as own-gap, carrying the symbol', () => {
+    expect(symbolCheck('src/neighbour.ts never calls readPlanFiles')).toEqual({
+      kind: 'own-gap',
+      inherited: false,
+      row: 'plan-symbol',
+      reason: 'src/neighbour.ts is not one of the plan\'s files, but the plan\'s commits added readPlanFiles, so it reads as own-gap.',
+      symbol: 'readPlanFiles',
+    });
+  });
+
+  it('reads a bug the session called one as own-gap too', () => {
+    const checked = checkKind(input(entry('bug', 'src/neighbour.ts never calls readPlanFiles'), null, SYMBOL_FILES));
+
+    expect([checked.kind, checked.row]).toEqual(['own-gap', 'plan-symbol']);
+  });
+
+  it('matches a backticked span, a CONST_CASE name, a phrase and a name in the artifact', () => {
+    const plan: PlanFilesReading = { ...PLAN_FILES, added: ['const MIN_SYMBOL_LENGTH = 6;', ...ADDED_LINES] };
+    const cases: readonly (readonly [string, string | null, string])[] = [
+      ['src/neighbour.ts never reads `TakenByRow`', null, 'TakenByRow'],
+      ['src/neighbour.ts keeps its own MIN_SYMBOL_LENGTH', null, 'MIN_SYMBOL_LENGTH'],
+      ['src/neighbour.ts skips (the kept capture)', null, 'the kept capture'],
+      ['src/neighbour.ts drops a line', 'TypeError: readPlanFiles is not a function', 'readPlanFiles'],
+    ];
+    for (const [what, artifact, symbol] of cases) {
+      const checked = symbolCheck(what, artifact, plan);
+
+      expect([what, checked.row, checked.symbol]).toEqual([what, 'plan-symbol', symbol]);
+    }
+  });
+
+  it('carries the first symbol the entry names that the plan added', () => {
+    const checked = symbolCheck('src/neighbour.ts: readBoardRows calls TakenByRow, then readPlanFiles');
+
+    expect(checked.symbol).toBe('TakenByRow');
+  });
+
+  it('matches the name TakenBy once an added line holds it whole: the boundary control', () => {
+    const plan: PlanFilesReading = { ...PLAN_FILES, added: ['type TakenBy = string;'] };
+
+    expect(symbolCheck('src/neighbour.ts reads TakenBy', null, plan).symbol).toBe('TakenBy');
+  });
+
+  it('runs the row once the test file is gone from the entry: the test-file control', () => {
+    expect(symbolCheck('src/neighbour.ts fails at base: readPlanFiles answers no TakenBy').row).toBe('plan-symbol');
+  });
+});
+
 describe('checkKind: a case that cannot be run on the base', () => {
   it('reads a case red on the head and unrunnable on the base as a bug, naming the problem', () => {
     const checked = checkKind(input(testEntry('own-fallout'), { base: UNRUNNABLE, head: RED }));
@@ -181,6 +319,7 @@ describe('checkKind: a case that cannot be run on the base', () => {
       inherited: false,
       row: 'base-unrunnable',
       reason: `The case ${CASE_NAME} could not be run on the plan's base, so it reads as a bug. ${UNRUNNABLE.problem}`,
+      symbol: null,
     });
   });
 
@@ -216,6 +355,7 @@ describe('checkKind: a case red on the base and the head', () => {
         inherited: true,
         row: 'red-on-both',
         reason: `The case ${CASE_NAME} is red on the plan's base and its head, so the plan inherited it.`,
+        symbol: null,
       }]);
     }
   });
@@ -231,6 +371,7 @@ describe('checkKind: a case green on the base and red on the head', () => {
         inherited: false,
         row: 'fallout',
         reason: `The case ${CASE_NAME} is green on the plan's base and red on its head.`,
+        symbol: null,
       }]);
     }
   });
@@ -252,6 +393,7 @@ describe('checkKind: the plan\'s files not read', () => {
       inherited: false,
       row: 'files-unread',
       reason: 'The plan\'s files were not read, so it reads as a bug. Could not list the files changed between abc and HEAD.',
+      symbol: null,
     });
   });
 });
@@ -265,6 +407,7 @@ describe('checkKind: every path named one of the plan\'s files', () => {
       inherited: false,
       row: 'plan-files',
       reason: 'Every path the entry names is one of the plan\'s files.',
+      symbol: null,
     });
   });
 
@@ -310,6 +453,7 @@ describe('checkKind: neither a test case nor a path named', () => {
         inherited: false,
         row: 'nothing-named',
         reason: 'The entry names no test case and no path, so it is taken as said.',
+        symbol: null,
       }]);
     }
   });
@@ -325,6 +469,7 @@ describe('checkKind: a kind the check does not read', () => {
         inherited: false,
         row: 'as-said',
         reason: `The kind ${said} is not checked, so it is taken as said.`,
+        symbol: null,
       }]);
     }
   });

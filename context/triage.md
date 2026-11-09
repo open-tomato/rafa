@@ -53,6 +53,7 @@ table, the first row that holds answering. An entry the session said is
 | names a test case, red on the base and on the head | inherited: unfiled, as a run-start failure is |
 | names a test case, green on the base, red on the head | `own-fallout` |
 | names no test case, the plan's files not read | `bug` |
+| names no test case nor a test file, a path outside the plan's files, a symbol the plan added | `own-gap` |
 | names no test case, a path outside the plan's files | `bug` |
 | names no test case, every path one of the plan's files | `own-gap` |
 | names neither a test case nor a path | the kind as said |
@@ -67,6 +68,13 @@ or `../` and the rest ends one at a `/`; when it is absolute and ends in one;
 or when it is a bare file name and a plan file has that base name. A `.js`,
 `.mjs` or `.jsx` path is also read as the `.ts`, `.mts` or `.tsx` file its
 import specifier resolves to.
+
+The symbol row catches an omission, the file the plan should have touched:
+an entry with a path outside the plan's files reads as `own-gap` when a line
+the plan's commits added holds a symbol it names (`symbolsOf`,
+`packages/rafa-pr/src/triage/symbols.ts`), matched at identifier boundaries.
+The check carries that symbol as `symbol`. An entry naming a test file is left
+to the test rows, and when the added lines were not read the row is skipped.
 
 **What it costs.** The head is read first: the named test file runs once at
 `HEAD` of the run checkout, and only when the case is red there does it run once
