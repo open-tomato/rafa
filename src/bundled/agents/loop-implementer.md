@@ -46,7 +46,13 @@ with no `packages/` directory and no workspace boundaries to navigate.
 - **Reproduce of each out-of-scope entry.** Give `reproduce` as one command
   run from the checkout root whose output or exit code shows the bug, such
   as `bun test src/x.test.ts` or `grep -n pattern src/y.ts`. Prose only when
-  no command can show it, and then it names the condition.
+  no command can show it, and then it names the condition. A failing test's
+  `artifact` quotes bun's `(fail) <describe> > <case>` line as printed, with
+  the test file's header line (`<path>.test.ts:`) above it, and every path in
+  full from the checkout root with its real extension:
+
+      packages/rafa-pr/src/triage/own-check.test.ts:
+      (fail) checkKind > reads a red case as fallout [3.00ms]
 
 ## Verification
 
