@@ -27,6 +27,11 @@
  * release branch as `main` and refused (measured on 2026-11-08 at
  * 0.52.0), and `rafa release settle` there would have read
  * `release.settle: push` against `main`.
+ *
+ * `hints.skills` follows each handed-over step whose case has a file in
+ * `.claude/skills/rafa-release/` with a `skill: rafa-release › <case>`
+ * line (#1565): this repository ships those skills, so the pointer
+ * always lands on a file a session can read.
  */
 
 import type { Config } from './src/config/index.js';
@@ -48,5 +53,6 @@ export default [
     pr: { base: 'integration' },
     board: { project: { number: 7 } },
     roadmap: { issue: 31 },
+    hints: { skills: true },
   },
 ] satisfies Config as Config;
