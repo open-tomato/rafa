@@ -440,7 +440,8 @@ git lists them with the root's first. The root publishes from the project root
 and a package from its own folder, through `release.publishCommand`. `--tag`
 names one of those tags and is refused when HEAD does not carry it, and a HEAD
 with no release tag is refused with exit 1, so a publish never ships a tree its
-tag does not name. Every unit is read before anything runs, and a version other
+tag does not name; that refusal ends with a `Next:` step, `rafa release tag`,
+placed at the project root as the tag's own steps are. Every unit is read before anything runs, and a version other
 than the tag's is refused. The publish workflow calls it, and a person may run
 it by hand.
 
