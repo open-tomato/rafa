@@ -196,6 +196,13 @@ describe('the contract suite against a broken stand-in', () => {
   }
 });
 
+/**
+ * The timeout of one index fixture case. Each case spawns the whole index
+ * suite in a child `bun test`, measured at 3.7 to 3.8 s on a development
+ * machine and past bun's 5 s default on the CI runner (#1581).
+ */
+const INDEX_FIXTURE_CASE_TIMEOUT_MS = 60_000;
+
 /** Each index fault, and the cases named for the rule it breaks. */
 const INDEX_FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
   ['index-in-store', [
@@ -217,7 +224,7 @@ describe('the index contract suite against a broken connector', () => {
     const run = await runIndexFixture('none');
 
     expect(run).toEqual({ exitCode: 0, failed: [] });
-  });
+  }, INDEX_FIXTURE_CASE_TIMEOUT_MS);
 
   for (const [fault, cases] of INDEX_FAULT_CASES) {
     it(`fails the connector under ${fault}`, async () => {
@@ -225,6 +232,6 @@ describe('the index contract suite against a broken connector', () => {
 
       expect(run.exitCode).toBe(1);
       expect(cases.filter((title) => !run.failed.includes(title))).toEqual([]);
-    });
+    }, INDEX_FIXTURE_CASE_TIMEOUT_MS);
   }
 });
