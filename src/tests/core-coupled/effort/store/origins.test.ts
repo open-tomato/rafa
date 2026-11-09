@@ -597,7 +597,7 @@ describe('a row planted with NULL origins', () => {
         findings: ['issue-old'],
         blockers: ['an old blocker'],
         outOfScopeBugs: ['an old bug'],
-        planCi: 4,
+        planCi: 2,
       },
       {
         sessionId: 'new',
@@ -606,7 +606,7 @@ describe('a row planted with NULL origins', () => {
         findings: ['finding-new', 'issue-new'],
         blockers: ['the fixture is missing'],
         outOfScopeBugs: ['the helper drops a row'],
-        planCi: 4,
+        planCi: 2,
       },
     ]);
   });
