@@ -2138,7 +2138,11 @@ New; it replaces no earlier text. What a row or an action added to
   refusals ending `Nothing was read.`, and lists the upstream's issues
   over `upstreamGhRunner` (`issue/list-upstream.ts`), narrowed by
   `--search`, `--type`, `--module` and `--limit`, with `--roadmap` and
-  `--state` refused beside it; and `move`
+  `--state` refused beside it. Each upstream line first passes that gate
+  (`issue/upstream.ts`), which refuses with exit code 1, before any `gh`
+  call, a `collaborate.rafa` left unset, an owner differing from this
+  board's (ignoring case), or this board's owner unread, each refusal
+  ending `Nothing was filed.` (`Nothing was read.` for `list`); and `move`
   moves an issue to a state, writing a `warning` the tracker answers at
   `warn` and still exiting 0. In json mode the result's `data` holds the
   tracker (its kind, whether the chain degraded, and why) beside the
