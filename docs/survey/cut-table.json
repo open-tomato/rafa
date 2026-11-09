@@ -4427,7 +4427,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 140,
+        "test": 141,
         "testSupport": 8
       },
       "files": [
@@ -4701,6 +4701,7 @@
         "packages/rafa-board/src/commands/issue/show.ts",
         "packages/rafa-board/src/commands/issue/unblock-native.ts",
         "packages/rafa-board/src/commands/issue/unblock.ts",
+        "packages/rafa-board/src/commands/issue/upstream-text.test.ts",
         "packages/rafa-board/src/commands/issue/upstream.test.ts",
         "packages/rafa-board/src/commands/plan/refs-check.ts",
         "packages/rafa-board/src/epic/verify-plan.test.ts",
@@ -4737,7 +4738,7 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 255,
+        "packages/rafa-board/": 256,
         "src/board/": 6,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,
