@@ -43,25 +43,96 @@ The session that reports a red test is not the one that turned it red, and it
 cannot see the plan's base, so the loop checks every `own-` claim and every
 `bug` that names a test or a path. `checkKind`
 (`packages/rafa-pr/src/triage/own-check.ts`) reads the entry down a decision
-table, the first row that holds answering. An entry the session said is
-`convention`, `docs` or `machine` is taken as said and nothing is read.
+table, the first row that holds answering. The file rows come first, since
+they read only the plan's own git reads; the test rows run a test file and
+follow. An entry the session said is `convention`, `docs` or `machine` is
+taken as said and nothing is read.
 
 | The entry | Answer |
 | --- | --- |
-| names a test case, not red on the head | `bug` |
-| names a test case, not runnable on the plan's base | `bug` |
-| names a test case, red on the base and on the head | inherited: unfiled, as a run-start failure is |
-| names a test case, green on the base, red on the head | `own-fallout` |
-| names no test case, the plan's files not read | `bug` |
-| names no test case, a path outside the plan's files | `bug` |
-| names no test case, every path one of the plan's files | `own-gap` |
-| names neither a test case nor a path | the kind as said |
+| said `convention`, `docs` or `machine` | the kind as said; nothing read |
+| names no test case but a path, the plan's files not read | `bug` (`files-unread`) |
+| names no test case nor a test file, a path outside the plan's files, a symbol the plan added | `own-gap` (`plan-symbol`) |
+| names no test case, a path outside the plan's files | `bug` (`file-outside-plan`) |
+| names no test case, every path one of the plan's files | `own-gap` (`plan-files`) |
+| names neither a test case nor a path | the kind as said (`nothing-named`) |
+| names a test case, red on the base and on the head | inherited: `bug`, unfiled as a run-start failure is (`red-on-both`) |
+| names a test case, green on the base, red on the head | `own-fallout` (`fallout`) |
+| names a test case a kept red step capture holds, not red on both | `own-fallout` (`step-capture`) |
+| names a test case, not red on the head | `bug` (`head-not-red`) |
+| names a test case with no test file, or not run on the plan's base | `bug` (`base-unrunnable`) |
 
-An `own-` claim the check does not confirm reads as `bug`. For `own-gap`
-every path the entry names must be one of the plan's files, so one neighbour's
-file makes the entry a `bug`. A named path is a plan file when it equals one,
-with any leading `./` taken off; when it is absolute and ends in one; or when
-it is a bare file name and a plan file has that base name.
+The file rows and the test rows never both read one entry: an entry naming a
+test case takes the test rows, so the file rows answer only an entry naming
+none. Within the test rows the step-capture row answers in place of the two
+rows below it. It never answers in place of `red-on-both`, since a step's
+capture holds the base's red cases too. A `fallout` answer carries the capture
+as well, so the router can join the step repair line for that commit.
+
+An `own-` claim the check does not confirm reads as `bug`, and a `bug` the
+check finds the plan's own reads as its `own-` kind.
+
+**Path shapes.** A path counts only when its last segment holds an extension:
+`packages/rafa-effort`, `context/`, `and/or` and a bare `README` name no file
+and are dropped before the file rows. For `own-gap` every path the entry names
+(`pathsNamedIn`, read over `what` and `artifact`) must be one of the plan's
+files, since `own-gap` reaches only files the plan's commits touched; one
+neighbour's file makes the entry a `bug`. With any leading `./` or `../` taken
+off, a named path is one of the plan's files when it:
+
+- equals one;
+- began with `./` or `../`, as an import specifier does, and the rest is a
+  suffix of one cut at a `/` (`../base-run.js` names
+  `packages/rafa-pr/src/triage/base-run.ts`);
+- is absolute and ends in `/` and then one of the plan's files, as a stack
+  frame names a checkout file;
+- or holds no `/` and one of the plan's files has that base name.
+
+A path ending `.js`, `.mjs` or `.jsx` is also read as the `.ts`, `.mts` or
+`.tsx` file its import specifier resolves to.
+
+**The symbol row** catches an omission, a file the plan should have touched and
+did not, which no file row can. It reads only an entry the file rows would
+answer `file-outside-plan` for. The first symbol the entry names (`symbolsOf`,
+`packages/rafa-pr/src/triage/symbols.ts`) that a line the plan's commits added
+holds, matched at identifier boundaries, answers `own-gap`, and the check
+carries it as `symbol`. The row is skipped for an entry naming a test file,
+which stays `file-outside-plan`, and when the added lines were not read.
+
+**The kept captures.** A red suite step keeps its output text as
+`<name>.<sha>.red.output.txt` beside its JUnit file
+(`packages/rafa/src/suite/run.ts`), and a later green rerun writes over
+`<name>.output.txt` but never over the kept capture. The triage reads the
+captures in every `suite/` folder one level under `.rafa/runs/` of its
+`repoRoot` (`packages/rafa-pr/src/triage/runner-evidence.ts`). It keeps only
+those whose `<sha>` is a full lower-case sha, 40 or 64 hex digits, taken at the
+head or one of the plan's commits, so another plan's capture in the same
+checkout is never read as this plan's. No folder, no `suite/` or no capture
+answers no capture; one that cannot be read is skipped with a problem sentence
+and the rest are still read.
+
+**The step-capture row** reads those captures. A case one of them holds was red
+in a step of this plan, and the step's repair may have turned it green since:
+a green rerun writes over the step's `<kind>.output.txt`, not over the capture.
+Captures left out, or none holding the case, leave the table as it read before
+the row.
+
+**The repair dedupe.** A red step inserts a repair line, `Repair the red <kind>
+step at commit <sha>`, `<sha>` the first 12 characters of the step's commit
+(`packages/rafa-run/src/start/suite-blocker.ts`). A capture whose commit that
+line shows, at least 7 hex digits opening the commit, joins the last such line:
+its route is a `repair` row naming the line with `joined` set, and nothing is
+inserted or counted against the cap
+(`packages/rafa-pr/src/triage/kind-route.ts`). A leftover repair (`own-fallout`
+or `own-gap`) writes a keyed marker before its bare one, `<!-- leftover
+key=<hash> symbol=<name> --> <!-- leftover -->`
+(`packages/rafa-pr/src/triage/leftover-repair.ts`). The hash is the first 12 hex
+digits of the entry's recurrence key's SHA-256; the symbol is the one the
+`plan-symbol` row matched, and either part is left out when the entry has none.
+Before the cap is read, an entry whose key or symbol an open leftover line (`[
+]` or `[BLOCKED]`) holds joins the first such line in document order: nothing is
+written. A ticked line is never joined, nor is a line with the bare marker
+alone, so one cause reported twice holds one repair and one slot under the cap.
 
 **What it costs.** The head is read first: the named test file runs once at
 `HEAD` of the run checkout, and only when the case is red there does it run once
@@ -207,6 +278,17 @@ the follow-up issue. A leftover past the cap, a line the tracker refuses and a
 tracker that cannot be read each become a `follow-up` row, the problem naming
 the failure, so an entry is never lost. Each repair the run adds is one
 `Triage:` line naming its tracker line.
+
+One cause holds one repair. An entry with an artifact hands the repair its
+recurrence key (`bugKeyOf`), and a `plan-symbol` answer its matched symbol;
+the line then carries both in a keyed marker before the bare one,
+`<!-- leftover key=<hash> symbol=<name> --> <!-- leftover -->`, the `<hash>`
+the first 12 hex digits of the key's SHA-256 and the `<name>` percent-encoded.
+Before the cap is read, an entry whose key hash or symbol equals the one an
+open leftover line holds, `[ ]` or `[BLOCKED]`, joins that line: a `repair` row
+naming it, with `joined` set, no line inserted and none counted against the
+cap. A ticked line is never joined, and a line with the bare marker alone,
+written with no key or before keys, is never joined but still counts.
 
 ### The follow-up issue
 
@@ -354,7 +436,10 @@ bug naming another. The nearest at or above the threshold is commented on
 naming its score; its reference is stored under the key. Below the threshold,
 the bug is filed, and its body ends with a `Possible duplicates` section
 listing the open bugs ranked for it, up to `triage.similarity.candidates`.
-When the option is left out or its threshold is `false`, step 3 is off.
+When `TriageOptions.similarity` is left out, as in a direct `triageReport`
+call, step 3 is off. The run always passes its config, whose
+`triage.similarity.threshold` defaults to `0.3` (`config-schema-triage.ts`), so
+step 3 runs there unless the threshold is `false`.
 
 The threshold decides alone. `nearestOpenBugs` and its first element stay the
 same-bug decision, on the word score, and no bonus below reaches it: a bonus

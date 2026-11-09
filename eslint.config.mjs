@@ -32,6 +32,11 @@ export default [
   },
   ...baseConfig,
   {
+    // The shared base ignores every `build/` folder, and these two hold
+    // source: the bundle script and the Atlas build module.
+    ignores: ['!scripts/build/**', '!addons/atlas/rafa-atlas/src/build/**'],
+  },
+  {
     // The shared base resolves imports through the tsconfig of each folder
     // under packages/, apps/ and services/; this repository also has the
     // Atlas add-ons under addons/atlas/.
@@ -46,14 +51,13 @@ export default [
     },
   },
   {
-    // The demo reads `@open-tomato/charts` and `@open-tomato/atlas-ui`, and
-    // `ui` reads `charts`, through tsconfig `paths`, which the import
-    // resolver does not follow, and the libraries' exports name a dist/
-    // that CI's lint step never builds. `tsc --build` holds these imports;
-    // the two packages' own leaf configs skip them the same way.
-    files: ['addons/atlas/demo/**', 'addons/atlas/ui/**'],
+    // The demo reads `@open-tomato/atlas-ui` through tsconfig `paths`, which
+    // the import resolver does not follow, and the library's exports name a
+    // dist/ that CI's lint step never builds. `tsc --build` holds these
+    // imports; the demo's own leaf config skips them the same way.
+    files: ['addons/atlas/demo/**'],
     rules: {
-      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/(atlas-ui|charts)(/|$)'] }],
+      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/atlas-ui(/|$)'] }],
     },
   },
   {

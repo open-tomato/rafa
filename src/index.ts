@@ -79,7 +79,7 @@
  * None of `config-registry.ts`, `adapter-registry.ts` and
  * `service-registry.ts` registers anything as it is imported. Once its
  * imports have loaded, the entry calls
- * {@link registerCoreConfigSections}, which hands the fourteen sections
+ * {@link registerCoreConfigSections}, which hands the sixteen sections
  * of the config schema to core, so every setting is registered before a
  * caller of this entry loads or reads a config, then
  * {@link registerCoreAdapters}, which hands core's adapters to the
@@ -375,6 +375,7 @@ export {
   openSqliteStore,
   selectEffortStore,
   TRUSTED_PERMISSIONS,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
   WireExportRefusal,

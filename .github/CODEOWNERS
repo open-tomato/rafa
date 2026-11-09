@@ -5,12 +5,12 @@
 /packages/rafa-board/ @open-tomato/maintainers
 /packages/rafa-effort/ @open-tomato/maintainers
 /packages/rafa-hub/ @open-tomato/maintainers
+/packages/rafa-index/ @open-tomato/maintainers
 /packages/rafa-inventory/ @open-tomato/maintainers
 /packages/rafa-pr/ @open-tomato/maintainers
 /packages/rafa-release/ @open-tomato/maintainers
 /packages/rafa-run/ @open-tomato/maintainers
 /packages/rafa-sync-service/ @open-tomato/maintainers
-/addons/atlas/charts/ @open-tomato/maintainers
 /addons/atlas/data/ @open-tomato/maintainers
 /addons/atlas/demo/ @open-tomato/maintainers
 /addons/atlas/rafa-atlas/ @open-tomato/maintainers

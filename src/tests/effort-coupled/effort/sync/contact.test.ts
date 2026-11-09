@@ -12,7 +12,8 @@
  * Each claim sits beside a control that could have failed it: the one
  * line a contact writes beside a second contact writing its own, the
  * skipped pull beside a refused push that still pulls, and the core
- * strategies writing nothing beside the same config naming `service`.
+ * strategies writing nothing beside the same config naming `service`,
+ * and the mismatched push skipping its pull beside the refused one.
  *
  * Every root is a path under a temporary directory of this file's own
  * that is never made, and the core cases hold it absent after, but for
@@ -38,9 +39,11 @@ import { ConfigError, parseConfigText, resolveConfig } from '@open-tomato/rafa/c
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import {
   createHubContact,
+  HUB_CONTRACT_MISMATCH,
   HUB_UNREACHABLE,
   HubUnreachable,
   hubUnreachableLine,
+  isHubContractMismatch,
   isHubUnreachable,
   pullBeforeRead,
 } from '@open-tomato/rafa-effort/effort/sync/contact';
@@ -75,7 +78,15 @@ function resolving(text: string): ResolvedConfig {
 const SERVICE = `effort:\n  sync: service\nhub:\n  url: ${HUB_URL}\n`;
 
 /** What one direction of the fixture does when called. */
-type Behaviour = 'answer' | 'unreachable' | 'renamed-unreachable' | 'refuse' | 'throw-now' | 'throw-string';
+type Behaviour = 'answer' | 'unreachable' | 'renamed-unreachable' | 'mismatch' | 'refuse' | 'throw-now' | 'throw-string';
+
+/** The line the `service` strategy's `HubContractMismatch` carries for a hub one contract ahead. */
+const MISMATCH_LINE = 'effort sync: the hub speaks contract 2, this rafa contract 1; nothing was sent. Next step: rafa self-update';
+
+/** A contract mismatch as the `service` strategy throws it: an error of that name, its fields beside the line. */
+function mismatch(): Error {
+  return Object.assign(new Error(MISMATCH_LINE), { name: HUB_CONTRACT_MISMATCH, hubVersion: 2, rafaVersion: 1, nextStep: 'rafa self-update' });
+}
 
 /** A fixture `service` strategy and what it was asked. */
 interface Fixture {
@@ -92,6 +103,7 @@ function actOut<Result>(behaviour: Behaviour, direction: string, answer: Result)
     case 'renamed-unreachable': {
       return Promise.reject(Object.assign(new Error(`timed out after 3000 ms on ${direction}\nsecond line`), { name: HUB_UNREACHABLE }));
     }
+    case 'mismatch': return Promise.reject(mismatch());
     case 'refuse': return Promise.reject(new Error(`the hub refused the token on ${direction} (403)`));
     case 'throw-now': throw new Error(`thrown before any promise on ${direction}`);
     case 'throw-string': return Promise.reject(`a bare string on ${direction}`);
@@ -308,6 +320,83 @@ describe('a hub that is unreachable', () => {
   });
 });
 
+describe('a hub speaking another contract', () => {
+  it('writes exactly the one mismatch line and skips the pull after a mismatched push', async () => {
+    const service = fixture('mismatch', 'mismatch');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    expect(await contact.pushThenPull()).toEqual({
+      state: 'contacted',
+      strategy: 'service',
+      push: { outcome: 'mismatch', problem: MISMATCH_LINE },
+      pull: { outcome: 'skipped' },
+    });
+    expect(service.calls).toEqual(['push {"to":null}']);
+    expect(lines).toEqual([MISMATCH_LINE]);
+  });
+
+  it('writes the one line for a pull alone', async () => {
+    const service = fixture('answer', 'mismatch');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    expect(await contact.pull()).toMatchObject({ push: null, pull: { outcome: 'mismatch', problem: MISMATCH_LINE } });
+    expect(lines).toEqual([MISMATCH_LINE]);
+  });
+
+  it('writes no second line on later runs of the same contact, and still tries each', async () => {
+    const service = fixture('mismatch', 'mismatch');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    await contact.pushThenPull();
+    await contact.pushThenPull();
+    await contact.pull();
+
+    expect(lines).toEqual([MISMATCH_LINE]);
+    expect(service.calls).toEqual(['push {"to":null}', 'push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+  });
+
+  it('writes the first line alone of a message holding more', async () => {
+    const refusing = (): Promise<never> => Promise.reject(Object.assign(new Error(`${MISMATCH_LINE}\nsecond line`), { name: HUB_CONTRACT_MISMATCH }));
+    const adapters = CORE_ADAPTER_REGISTRY.register({
+      port: 'sync',
+      kind: 'service',
+      portVersion: PORT_VERSIONS.sync,
+      create: (): Sync => ({ kind: 'service', push: refusing, pull: refusing }),
+    });
+    const { lines, contact } = contacting(resolving(SERVICE), { modules: { adapters } });
+
+    expect(await contact.pull()).toMatchObject({ pull: { outcome: 'mismatch', problem: MISMATCH_LINE } });
+    expect(lines).toEqual([MISMATCH_LINE]);
+  });
+
+  it('leaves process.exitCode at the value it found, zero or not', async () => {
+    // Bun keeps a code once set when `undefined` is assigned, so the case restores the one it found, or 0.
+    const before = process.exitCode ?? 0;
+    try {
+      for (const found of [0, 7]) {
+        process.exitCode = found;
+        const { lines, contact } = contacting(resolving(SERVICE), fixture('mismatch', 'mismatch').seams);
+
+        await contact.pushThenPull();
+        await contact.pull();
+
+        expect(lines).toEqual([MISMATCH_LINE]);
+        expect(process.exitCode).toBe(found);
+      }
+    } finally {
+      process.exitCode = before;
+    }
+  });
+
+  it('while a refused push writes the failure and still pulls, the control', async () => {
+    const service = fixture('refuse', 'mismatch');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    expect(await contact.pushThenPull()).toMatchObject({ push: { outcome: 'failed' }, pull: { outcome: 'mismatch' } });
+    expect(lines).toEqual(['effort sync: push over service failed: the hub refused the token on push (403)', MISMATCH_LINE]);
+  });
+});
+
 describe('a contact never throws', () => {
   it('writes a refused push and still pulls, with no unreachable line', async () => {
     const service = fixture('refuse', 'answer');
@@ -362,13 +451,25 @@ describe('a contact never throws', () => {
       contacting(resolving(SERVICE), fixture('unreachable', 'unreachable').seams).contact.pushThenPull(),
       contacting(resolving(SERVICE), fixture('refuse', 'refuse').seams).contact.pushThenPull(),
       contacting(resolving(SERVICE), fixture('throw-now', 'throw-string').seams).contact.pushThenPull(),
+      contacting(resolving(SERVICE), fixture('mismatch', 'mismatch').seams).contact.pushThenPull(),
       contacting(resolving(SERVICE), { modules: { manifest: MANIFEST_SEAMS } }).contact.pull(),
     ];
 
     const settled = await Promise.allSettled(runs);
 
-    expect(settled.map((outcome) => outcome.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
+    expect(settled.map((outcome) => outcome.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
     expect(process.exitCode).toBe(before);
+  });
+});
+
+describe('isHubContractMismatch', () => {
+  it('knows any error of that name, and nothing else', () => {
+    expect(isHubContractMismatch(mismatch())).toBe(true);
+    expect(isHubContractMismatch(new Error(MISMATCH_LINE))).toBe(false);
+    expect(isHubContractMismatch(new HubUnreachable('down'))).toBe(false);
+    expect(isHubContractMismatch({ name: HUB_CONTRACT_MISMATCH, message: MISMATCH_LINE })).toBe(false);
+    expect(isHubContractMismatch(HUB_CONTRACT_MISMATCH)).toBe(false);
+    expect(isHubUnreachable(mismatch())).toBe(false);
   });
 });
 

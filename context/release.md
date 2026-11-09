@@ -382,8 +382,11 @@ checked once for the run: a release branch behind the ref it tracks refuses
 `behind`, naming the `git merge --ff-only` to run, since settle pushes the
 release commit without touching the checkout (#1516). Every unit is decided
 before the first tag is written: a unit whose version a tag already names is
-skipped, the run refuses `tagged` only when every unit is skipped, and any
-other refusal of any unit exits 1 with nothing written. It prints one
+skipped, and so is a unit never released (version `0.0.0`, no changelog file,
+no tag of its own; #1515), printed as one `Skipped:` line naming the package;
+the run refuses `tagged` only when every unit is skipped, and any other refusal
+of any unit exits 1 with nothing written. A `0.0.0` unit with a changelog or a
+tag still refuses. It prints one
 `✅ Tagged <tag> at …` line per tag in unit order, then what to run next: per
 tag, its push and its publish line, a
 package's as `(cd <dir> && <publishCommand>)`. Under `release.publish: ci` the
@@ -398,6 +401,22 @@ names the switch: with the variable unset the tag still goes out, and the
 publish job it names is skipped, not failed. Without `--push` it reaches no
 network and each push is a line to copy, naming the remote `--push` would reach
 (#857).
+
+A refusal prints a `Next:` heading between its `❌` lines and the usage, one
+`<command> — <why>` step per refusal, without repeats
+(`packages/rafa-release/src/commands/release/tag-next-steps.ts`). The branch
+refusal reads `git worktree list --porcelain` and names the checkout holding the
+release branch as `cd <path> && rafa release tag`, or `git switch <branch>` when
+none holds it; with `pr.base` unset it first names the config file read and
+says the branch is the default. `behind` adds no step, since its sentence names
+the merge. The others point at `rafa release status`, `rafa release settle`, the
+version file or `git status`.
+
+`pr.base` and the `release.*` keys a release depends on belong in a tracked
+`rafa.config.ts`. That file makes each worktree a project root, so the walk
+stops there and never reads the main checkout's gitignored `.rafa/config.yaml`:
+with `pr.base` only in the YAML, a worktree reads `main` as the release branch
+and `release.settle` as `push`.
 
 With `--push` (#736) it pushes each tag itself once every tag is written, in
 unit order (`pushTag`, `packages/rafa-release/src/release/tag-push.ts`), never

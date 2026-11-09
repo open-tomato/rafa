@@ -1,0 +1,186 @@
+{
+  "note": "Replay of the out-of-scope entries behind the evidence-first kind check. Each case's what and artifact are the public text of a bug on the board (gh issue view <n> --json title,body), trimmed to the two fields an entry carries; the plan's files, added lines and kept capture are the evidence the loop would have held, written by hand from the issue's own plan, task and suspected cause. A case marked quotedAs is an artifact the filed text held as the case name alone, here quoted as bun's (fail) line with its file header, the form src/PROMPT.md asks for. Never a store or library file.",
+  "bugCases": [
+    {
+      "name": "#1527: a test file the plan never touched, its case quoted in the plan's own test",
+      "issue": 1527,
+      "said": "own-gap",
+      "what": "bless.test.ts case 'reads a confidence tie in hundredths' uses 0.1 + 0.6, which equals 0.7 as a float, so the case passes even if bless compared raw floats; its comment says otherwise",
+      "artifact": "0.1 + 0.6 is 0.7 in hundredths but not as a float; usage decides.",
+      "planFiles": [
+        "packages/rafa-inventory/src/learning/groups.ts",
+        "packages/rafa-inventory/src/learning/groups.test.ts",
+        "packages/rafa-inventory/src/learning/pool.ts"
+      ],
+      "added": [
+        "export function sameActionGroups(held: readonly HeldRecord[]): readonly SameActionGroup[] {",
+        "  it('reads a confidence tie in hundredths', () => {"
+      ],
+      "expected": { "kind": "bug", "row": "file-outside-plan" }
+    },
+    {
+      "name": "#1554: an entry naming no file, no case and no symbol keeps its word",
+      "issue": 1554,
+      "said": "bug",
+      "what": "an update appended with rafa issue edit below a bug whose last section is Rerun turns its recheck verdict manual",
+      "artifact": "a second line",
+      "planFiles": [
+        "src/bugs/recheck-verdict.ts",
+        "src/commands/bug/recheck-report.ts",
+        "context/bug-record.md"
+      ],
+      "added": [
+        "export function hasTriggerRemoved(body: string): boolean {"
+      ],
+      "expected": { "kind": "bug", "row": "nothing-named" }
+    },
+    {
+      "name": "#1356: fails at base, its symbol in the plan's diff, its test file untouched",
+      "issue": 1356,
+      "said": "own-fallout",
+      "what": "packages/rafa-board/index.test.ts fails at base 9c14af0: the facade exports TakenBy, which no outside file imports any more",
+      "artifact": "\"extra\": [ \"TakenBy\" ]",
+      "planFiles": [
+        "packages/rafa-board/index.ts",
+        "src/next/readings.ts",
+        "src/tests/facade-subpaths.sweep.test.ts"
+      ],
+      "added": [
+        "export type { TakenBy, ReadingsTaken } from '../../src/next/relation-readings.js';"
+      ],
+      "expected": { "kind": "bug", "row": "file-outside-plan" }
+    },
+    {
+      "name": "#1384: possessives and a folder name no file and no symbol",
+      "issue": 1384,
+      "said": "bug",
+      "what": "relations-import-boundary.sweep scans the root's, board's and now run's src/ but not pr's, release's, inventory's or effort's; none imports a tracked name today",
+      "artifact": null,
+      "planFiles": [
+        "packages/rafa-run/package.json",
+        "src/index.test.ts",
+        "src/tests/run-coupled/README.md"
+      ],
+      "added": [
+        "  // the root's, board's and run's folders",
+        "export const RUN_NAMED = ['session.ts'];"
+      ],
+      "expected": { "kind": "bug", "row": "nothing-named" }
+    }
+  ],
+  "controls": {
+    "touchedTestFile": {
+      "name": "control: the #1356 text once the plan touched the test file it names",
+      "base": 1356,
+      "planFilesAdded": ["packages/rafa-board/index.test.ts"],
+      "expected": { "kind": "own-gap", "row": "plan-files" }
+    }
+  },
+  "ownCases": [
+    {
+      "name": "#1528: a case the runner captured red at an earlier commit and a repair turned green",
+      "issue": 1528,
+      "said": "own-fallout",
+      "quotedAs": "(fail) line",
+      "what": "src/index.test.ts's spelled import list for ./commands/instinct/promote.js lacks sameActionGroups, which base commit 630b4dc1 added to promote.ts",
+      "artifact": "src/index.test.ts:\n(fail) what the CLI reaches, through the entry > reads the imports ./commands/instinct/promote.js takes as the ones spelled here [1.84ms]",
+      "planFiles": [
+        "packages/rafa/src/commands/instinct/promote.ts",
+        "packages/rafa/src/core/config/core-section.ts"
+      ],
+      "added": [
+        "import { sameActionGroups } from '@open-tomato/rafa-inventory/learning';"
+      ],
+      "head": "green",
+      "capture": {
+        "step": "task",
+        "at": "earlier",
+        "output": "src/index.test.ts:\n(fail) what the CLI reaches, through the entry > reads the imports ./commands/instinct/promote.js takes as the ones spelled here [1.84ms]\n\n 1 fail\n"
+      },
+      "expected": { "kind": "own-fallout", "row": "step-capture" }
+    },
+    {
+      "name": "#1534: first wording, the entry omits what the plan's commits added",
+      "issue": 1534,
+      "wording": 1,
+      "said": "own-gap",
+      "what": "the pairBugFixes task says its types are exported from the package's entry, but packages/rafa-inventory/index.ts exports neither pairBugFixes nor BugFixRows, PlanStageLink, BugFixPair or UnpairedBug",
+      "artifact": "packages/rafa-inventory/index.ts",
+      "planFiles": [
+        "packages/rafa-inventory/src/learning/bug-fix-pairs.ts",
+        "packages/rafa-inventory/src/learning/plan-stage-links.ts",
+        "packages/rafa-effort/src/effort/bug-fix-rows.ts"
+      ],
+      "added": [
+        "export function pairBugFixes(rows: BugFixRows): readonly BugFixPair[] {",
+        "export interface BugFixRows {"
+      ],
+      "expected": { "kind": "own-gap", "row": "plan-symbol" }
+    },
+    {
+      "name": "#1534: second wording, the same artifact",
+      "issue": 1534,
+      "wording": 2,
+      "said": "own-gap",
+      "what": "pairBugFixes and its types (PlanStageLink, BugFixRows, ...) are not exported from the rafa-inventory package entry, though the task that added them said they would be; callers must import the subpath",
+      "artifact": "packages/rafa-inventory/index.ts",
+      "planFiles": [
+        "packages/rafa-inventory/src/learning/bug-fix-pairs.ts",
+        "packages/rafa-inventory/src/learning/plan-stage-links.ts",
+        "packages/rafa-effort/src/effort/bug-fix-rows.ts"
+      ],
+      "added": [
+        "export function pairBugFixes(rows: BugFixRows): readonly BugFixPair[] {",
+        "export interface PlanStageLink {"
+      ],
+      "expected": { "kind": "own-gap", "row": "plan-symbol" }
+    },
+    {
+      "name": "#1536: first wording, a folder and no file",
+      "issue": 1536,
+      "wording": 1,
+      "said": "own-fallout",
+      "what": "packages/rafa-effort facade test fails: BugFixRowsReading is exported from the entry with 0 type and 0 value importers outside the package",
+      "artifact": "\"extra\": [ \"BugFixRowsReading\" ]",
+      "planFiles": [
+        "packages/rafa-effort/index.ts",
+        "packages/rafa-effort/src/effort/bug-fix-rows.ts"
+      ],
+      "added": [
+        "export type { BugFixRowsReading } from './src/effort/bug-fix-rows.js';"
+      ],
+      "expected": { "kind": "own-fallout", "row": "nothing-named" }
+    },
+    {
+      "name": "#1536: second wording, from the issue's suspected cause and reported module",
+      "issue": 1536,
+      "wording": 2,
+      "said": "bug",
+      "what": "55f683c2 (readBugFixRows task) added export type { BugFixRowsReading } at index.ts:12 and nothing outside imports it",
+      "artifact": "packages/rafa-effort/index.ts",
+      "planFiles": [
+        "packages/rafa-effort/index.ts",
+        "packages/rafa-effort/src/effort/bug-fix-rows.ts"
+      ],
+      "added": [
+        "export type { BugFixRowsReading } from './src/effort/bug-fix-rows.js';"
+      ],
+      "expected": { "kind": "own-gap", "row": "plan-files" }
+    },
+    {
+      "name": "#1555: the plan's own mark, named by a parenthesised phrase and no path",
+      "issue": 1555,
+      "said": "own-gap",
+      "what": "the pit stop's recheck lines print gone for a bug whose trigger was removed, without the (trigger removed?) mark",
+      "artifact": "Recheck #<n>: gone",
+      "planFiles": [
+        "src/bugs/recheck-verdict.ts",
+        "src/commands/bug/recheck-report.ts"
+      ],
+      "added": [
+        "  return row.triggerRemoved === true ? 'gone (trigger removed?)' : 'gone';"
+      ],
+      "expected": { "kind": "own-gap", "row": "nothing-named" }
+    }
+  ]
+}

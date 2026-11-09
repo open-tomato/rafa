@@ -1,7 +1,7 @@
 /**
- * The nine `issue` commands as declarations: each command less its
- * `run`, with the subject they sit under and the constants their help
- * spells.
+ * Eight of the nine `issue` commands as declarations, each command less
+ * its `run`, with the constants their help spells; and, re-exported, the
+ * ninth and what the files beside this one hold.
  *
  * ## Why the declarations sit apart from the commands
  *
@@ -12,30 +12,38 @@
  * fields declared here, and a feature list can name, route and render
  * the nine from this file without loading one of their modules.
  *
+ * ## The files beside this one
+ *
+ * `issue create`'s declaration, `ISSUE_CREATE_DECLARATION`, sits in
+ * `declarations-create.ts` with the two constants only it spells,
+ * `DEFAULT_ISSUE_TYPE` and `ISSUE_TRIAGE_MODULE`. The subject and the
+ * state, type and priority lists, which this file and that one both
+ * spell, sit in `declarations-shared.ts`, so neither imports the other's
+ * values and no cycle closes. This file re-exports the names of both,
+ * so its importers (`create.ts`, `BOARD_FEATURE`, the package's
+ * `index.ts` and the tests at the root) read them from here until each
+ * moves to the file that holds them.
+ *
  * ## What this file imports
  *
  * Types from `@open-tomato/rafa/core/command`, with the one value
- * `HINT_FLAG_SPEC` from the same barrel, and no module under `src/`: a
- * value import of a command's helper would load it with the roster and
- * undo the laziness. `declarations.test.ts` reads this file's imports
- * and holds that.
+ * `HINT_FLAG_SPEC` from the same barrel, and its two siblings, and no
+ * module under `src/`: a value import of a command's helper would load
+ * it with the roster and undo the laziness. `declarations.test.ts` reads
+ * the imports of all three files and holds that.
  *
  * So a constant a declaration spells and a module also reads lives
  * here, and the module imports it from here: `ISSUE_LIST_FLAGS`
  * (`list.ts`, and `src/commands/roadmap.ts`, which declares most of
- * them), `DEFAULT_ISSUE_TYPE` (`create.ts`), `PRIORITY_FLAG`
- * (`edit-priority.ts`), `STAMP_FLAG` (`check.ts`), `READY_YES_FLAG` and
- * `READY_DRY_RUN_FLAG` (`ready.ts`), and `UNBLOCK_ALL_FLAG` and
- * `UNBLOCK_YES_FLAG` (`unblock.ts`).
+ * them), `PRIORITY_FLAG` (`edit-priority.ts`), `STAMP_FLAG`
+ * (`check.ts`), `READY_YES_FLAG` and `READY_DRY_RUN_FLAG` (`ready.ts`),
+ * and `UNBLOCK_ALL_FLAG` and `UNBLOCK_YES_FLAG` (`unblock.ts`).
  *
  * The values a declaration spells from outside `src/commands/`, which
  * no file here may import, are copies, and `declarations-integration.test.ts` holds
- * each equal to its source: `ISSUE_STATE_WORDS`, `ISSUE_TYPE_WORDS` and
- * `ISSUE_PRIORITY_WORDS` are `ISSUE_STATES`, `ISSUE_TYPES` and
- * `ISSUE_PRIORITIES` (`packages/rafa-board/src/adapters/tracker/issue-values.ts`);
- * `ISSUE_TRIAGE_MODULE` is `TRIAGE_MODULE`
- * (`packages/rafa/src/triage/filed-text.ts`);
- * `ISSUE_READY_LABEL`, `ISSUE_NEEDS_WORK_LABEL` and
+ * each equal to its source: the three lists of `declarations-shared.ts`
+ * and `ISSUE_TRIAGE_MODULE` of `declarations-create.ts`, as those files
+ * say; and `ISSUE_READY_LABEL`, `ISSUE_NEEDS_WORK_LABEL` and
  * `ISSUE_BLOCKED_LABEL` are `SPEC_READY_LABEL`
  * (`packages/rafa-board/src/board/readiness.ts`), `SPEC_NEEDS_WORK_LABEL`
  * (`packages/rafa-board/src/board/gate.ts`) and `SPEC_BLOCKED_LABEL`
@@ -46,49 +54,22 @@
  * `HINT_FLAG_SPEC` itself, core's one spelling of it, which the other
  * five commands that end with a hint declare too.
  */
-import type { CommandDeclaration, RafaFlagSpec, SubjectSpec } from '@open-tomato/rafa/core/command';
+import type { CommandDeclaration, RafaFlagSpec } from '@open-tomato/rafa/core/command';
 
 import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
-/** The `issue` subject: its routing word and its roster line. */
-export const ISSUE_SUBJECT: SubjectSpec = Object.freeze({
-  name: 'issue',
-  summary: 'the tracker: list, show, create, edit, comment on and move issues; mark one ready, unblock it and check its references',
-});
+import { ISSUE_PRIORITY_WORDS, ISSUE_STATE_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS, issueUpstreamFlagSpec } from './declarations-shared.js';
 
-/** Every issue state, in lifecycle order: a copy of `ISSUE_STATES`; see the module note. */
-export const ISSUE_STATE_WORDS: readonly string[] = Object.freeze([
-  'backlog',
-  'todo',
-  'in-progress',
-  'in-review',
-  'done',
-  'released',
-  'cancelled',
-]);
-
-/** Every issue type, `epic` and `spec` last: a copy of `ISSUE_TYPES`; see the module note. */
-export const ISSUE_TYPE_WORDS: readonly string[] = Object.freeze([
-  'code',
-  'bug',
-  'spike',
-  'adr',
-  'chore',
-  'package-api',
-  'epic',
-  'spec',
-]);
-
-/** Every priority, most urgent first: a copy of `ISSUE_PRIORITIES`; see the module note. */
-export const ISSUE_PRIORITY_WORDS: readonly string[] = Object.freeze([
-  'urgent',
-  'high',
-  'medium',
-  'low',
-]);
-
-/** The module an issue filed with no `--module` belongs to: a copy of `TRIAGE_MODULE`; see the module note. */
-export const ISSUE_TRIAGE_MODULE = 'unassigned';
+export { DEFAULT_ISSUE_TYPE, ISSUE_CREATE_DECLARATION, ISSUE_TRIAGE_MODULE } from './declarations-create.js';
+export {
+  ISSUE_PRIORITY_WORDS,
+  ISSUE_STATE_WORDS,
+  ISSUE_SUBJECT,
+  ISSUE_TYPE_WORDS,
+  ISSUE_UPSTREAM_FLAG,
+  ISSUE_UPSTREAM_TOOL_WORDS,
+  issueUpstreamFlagSpec,
+} from './declarations-shared.js';
 
 /** The label `issue ready` adds: a copy of `SPEC_READY_LABEL`; see the module note. */
 export const ISSUE_READY_LABEL = 'spec:ready';
@@ -98,9 +79,6 @@ export const ISSUE_NEEDS_WORK_LABEL = 'spec:needs-work';
 
 /** The label `issue unblock` takes off: a copy of `SPEC_BLOCKED_LABEL`; see the module note. */
 export const ISSUE_BLOCKED_LABEL = 'spec:blocked';
-
-/** The type an issue filed with no `--type` is of. */
-export const DEFAULT_ISSUE_TYPE = 'code';
 
 /** The flag `issue edit` sets a priority with. */
 export const PRIORITY_FLAG = 'priority';
@@ -226,7 +204,7 @@ export const ISSUE_LIST_DECLARATION: CommandDeclaration = Object.freeze<CommandD
     + ' the tracker, the query and every issue, or under `--roadmap` the roadmap, the rows, the epics and the'
     + ' warnings, are the data of the terminal result event.',
   args: [],
-  flags: [...ISSUE_LIST_FLAGS],
+  flags: [...ISSUE_LIST_FLAGS, issueUpstreamFlagSpec('List the issues')],
   examples: [
     {
       cmd: 'rafa issue list',
@@ -294,130 +272,6 @@ export const ISSUE_SHOW_DECLARATION: CommandDeclaration = Object.freeze<CommandD
   outputs: ['text', 'json'],
 });
 
-/** `issue create`, less its `run`. */
-export const ISSUE_CREATE_DECLARATION: CommandDeclaration = Object.freeze<CommandDeclaration>({
-  name: 'issue create',
-  subject: ISSUE_SUBJECT.name,
-  action: 'create',
-  summary: 'create an issue on the tracker from a title and a body, a bug from its fields',
-  description: 'Files one issue on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
-    + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
-    + ' `--title` is required for every type but `bug`. The issue is of type `code` and module `unassigned` unless'
-    + ' `--type` and `--module` say otherwise, and with no `--priority` the tracker marks it needs-triage. A'
-    + ' `--type=bug` line is filed from its fields: `--module`, `--action`, `--summary`, `--cause` and'
-    + ' `--reproduce`, each also read from a section of the body, with rafa filling the versions and the place,'
-    + ' rendering the title through `issues.titles.bug` and refusing a record missing a field, naming each. The body is'
-    + ' `--body`, or what the file `--body-file` names holds, standard input for `-`. A spec whose body'
-    + ' carries a `Blocked by: #24` line is filed blocked, and refused when the line names no issue, the'
-    + ' issue itself or an issue the board does not hold. With `board.project.number` set, a GitHub issue is'
-    + ' added to the project and its fields filled, any failure there a warning that keeps the exit code. Prints the'
-    + ' tracker and id of the issue filed, and its URL when there is one. With `--output=json` the tracker'
-    + ' and the ref are the data of the terminal result event. `--dry-run` prints the title and body the line'
-    + ' would file, resolves no tracker and files nothing.',
-  args: [],
-  flags: [
-    {
-      name: 'title',
-      description: 'The title of the issue. Required for every type but bug, whose title is rendered from its fields.',
-      type: 'string',
-    },
-    {
-      name: 'body',
-      description: 'The body of the issue, as markdown. Empty when left out. Not with --body-file.',
-      type: 'string',
-    },
-    {
-      name: 'body-file',
-      description: 'A file holding the body of the issue, read whole; `-` reads standard input. Not with --body.',
-      type: 'string',
-    },
-    {
-      name: 'type',
-      description: `What the issue is for: one of ${ISSUE_TYPE_WORDS.join(', ')}.`,
-      type: 'string',
-      default: DEFAULT_ISSUE_TYPE,
-    },
-    {
-      name: 'module',
-      description: `The module the issue belongs to; ${ISSUE_TRIAGE_MODULE} when left out. A bug names one, or unknown.`,
-      type: 'string',
-    },
-    {
-      name: 'priority',
-      description: `How urgent the issue is: one of ${ISSUE_PRIORITY_WORDS.join(', ')}. Marked needs-triage when left out.`,
-      type: 'string',
-    },
-    {
-      name: 'summary',
-      description: 'A bug: one line saying what is wrong, the last part of its title.',
-      type: 'string',
-    },
-    {
-      name: 'action',
-      description: 'A bug: what was running, a command, a step or a test; or unknown.',
-      type: 'string',
-    },
-    {
-      name: 'cause',
-      description: 'A bug: its cause code from `rafa bug codes`, or <family>:new-context when no leaf fits.',
-      type: 'string',
-    },
-    {
-      name: 'proposed',
-      description: 'A bug: beside a new-context cause, the leaf you would have used, as <family>:<leaf>.',
-      type: 'string',
-    },
-    {
-      name: 'reproduce',
-      description: 'A bug: one command run from the checkout root whose output or exit code shows it; the condition only when no command can. Never unknown.',
-      type: 'string',
-    },
-    {
-      name: 'rerun',
-      description: 'A bug: one command that shows it again.',
-      type: 'string',
-    },
-    {
-      name: 'env',
-      description: 'A bug: the place it was seen, one of local, ci, prod, a place `issues.environments` adds, or'
-        + ' unknown. Left out, ci when the CI variable is set and local otherwise.',
-      type: 'string',
-    },
-    {
-      name: 'project',
-      description: 'A bug: the project, where one tracker holds several.',
-      type: 'string',
-    },
-    {
-      name: 'path',
-      description: 'A bug: the file the error points at, which names the package its Versions section holds. Left'
-        + ' out, the first file of the project the artifact names.',
-      type: 'string',
-    },
-    {
-      name: 'dry-run',
-      description: 'Print the title and the body the line would file, resolve no tracker and file nothing.',
-      type: 'boolean',
-    },
-  ],
-  examples: [
-    {
-      cmd: 'rafa issue create --type=bug --module=loop --action=start --summary="resume does not find the worktree branch"'
-        + ' --reproduce="rafa loop start --continue after a stop" --cause=git:new-context --proposed=git:branch-not-found --dry-run',
-      note: 'Prints the title `loop - start: resume does not find the worktree branch` and the body of the bug, and files nothing.',
-    },
-    {
-      cmd: 'rafa issue create --title="Document issue move" --priority=low --output=json',
-      note: 'Writes a start event, then a result event whose data holds the tracker and the ref of the issue.',
-    },
-    {
-      cmd: 'rafa issue create --title="Faster plan show" --body-file=spec.md',
-      note: 'Files an issue whose body is what spec.md holds; --body-file=- reads it from standard input.',
-    },
-  ],
-  outputs: ['text', 'json'],
-});
-
 /** `issue comment`, less its `run`. */
 export const ISSUE_COMMENT_DECLARATION: CommandDeclaration = Object.freeze<CommandDeclaration>({
   name: 'issue comment',
@@ -444,6 +298,7 @@ export const ISSUE_COMMENT_DECLARATION: CommandDeclaration = Object.freeze<Comma
       type: 'string',
       required: true,
     },
+    issueUpstreamFlagSpec('Post the comment, redacted and its private names hidden,'),
   ],
   examples: [
     {

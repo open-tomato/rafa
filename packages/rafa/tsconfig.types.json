@@ -28,6 +28,7 @@
     "src/config-schema-logger.ts",
     "src/config-schema-board-project.ts",
     "src/config-schema-checks.ts",
+    "src/config-schema-collaborate.ts",
     "src/config-schema-hub.ts",
     "src/config-schema-issues.ts",
     "src/config-schema-loop-continue.ts",

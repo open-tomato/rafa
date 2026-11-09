@@ -43,6 +43,7 @@ const SAMPLES: Readonly<Record<string, unknown>> = {
   'pr.base': 'main',
   'board.project.number': 6,
   'roadmap.issue': 1,
+  'collaborate.rafa': 'open-tomato/rafa',
 };
 
 /** The value at a dotted key of a nested object, or undefined. */

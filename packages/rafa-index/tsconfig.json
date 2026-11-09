@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.packages.json",
+  // Composite, so `tsc --build tsconfig.references.json` builds it with the
+  // other members. It references none: the index imports nothing from core
+  // or the hub, only bun:sqlite, node: builtins, sqlite-vec and its own files.
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": ".tsbuild",
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
+  },
+  "include": ["index.ts", "src"],
+  // *.test.ts stays out of check-types, as at the root, until the test
+  // type-checking work lands (.rafa/specs/test-type-checking.md).
+  "exclude": ["**/*.test.ts"]
+}

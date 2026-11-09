@@ -104,6 +104,11 @@
  * folder whose name extends this one's, and run with no `logDir`, so the
  * folder set is the collector's own derivation. Their control is the
  * same HOME read under a `logDir` override, which takes one folder.
+ *
+ * The stored-path cases read the same planted HOME and pin that each
+ * row's `filePath` is `<folder>/<file>`, relative to the projects root.
+ * Their control is a `logDir` override outside `.claude/projects/`,
+ * whose row keeps its absolute path.
  */
 import type { SessionLogCandidate } from '@open-tomato/rafa/effort/session-log-dirs';
 import type { EffortStore } from '@open-tomato/rafa/store/types';
@@ -1363,6 +1368,73 @@ describe('the worktree folders a run reads', () => {
     expect(formatCollectSummary(result)).toContain('  sessions  3 folders, 2 worktrees, 1 log held twice');
     expect(formatCollectSummary({ ...result, sessions: result.sessions && { ...result.sessions, logDirs: ['/one'], duplicates: 0 } }))
       .toContain('  sessions  1 folder, 0 worktrees, 0 logs held twice');
+  });
+});
+
+describe.each(BACKENDS)('the stored filePath through the %s store', (_name, open) => {
+  it('stores each log under the fixture HOME as its folder and file, no leading slash', async () => {
+    const planted = plantWorktreeHome();
+    const store = open(planted.root);
+
+    await collectEffort({
+      home: planted.home,
+      repoRoot: planted.root,
+      plansDir: planted.plansDir,
+      store,
+      collectCommits: false,
+      skills: null,
+      log: () => undefined,
+    });
+
+    const byId = new Map(store.read('sessions').map((row) => [row.sessionId, row.filePath]));
+    expect(byId.size).toBe(4);
+    expect(byId.get('s-main')).toBe(`${projectLogDirName(planted.root)}/s-main.jsonl`);
+    expect(byId.get('s-a')).toBe(`${projectLogDirName(planted.worktrees.a)}/s-a.jsonl`);
+    expect([...byId.values()].filter((path) => path.startsWith('/'))).toEqual([]);
+  });
+
+  it('keeps the absolute path of a log read under a logDir override outside the projects root', async () => {
+    // The control of the case above: the same HOME, a folder outside it.
+    const planted = plantWorktreeHome();
+    const store = open(planted.root);
+    const outside = makeScratch();
+    const path = taskLog(outside, 's-outside', 'feat/q19-loop-economics');
+
+    await collectEffort({
+      home: planted.home,
+      repoRoot: planted.root,
+      plansDir: planted.plansDir,
+      logDir: outside,
+      store,
+      collectCommits: false,
+      skills: null,
+      log: () => undefined,
+    });
+
+    expect(store.read('sessions').map((row) => row.filePath)).toEqual([path]);
+  });
+});
+
+describe('collectSessionRow and the home', () => {
+  it('stores the relative form under the home it is passed', async () => {
+    const planted = plantWorktreeHome();
+    const entry = listSessionLogs(planted.mainDir).find((found) => found.sessionId === 's-main');
+    if (entry === undefined) throw new Error('no candidate');
+
+    const row = await collectSessionRow(entry, [], planted.home);
+
+    expect(row.filePath).toBe(`${projectLogDirName(planted.root)}/s-main.jsonl`);
+  });
+
+  it('keeps the absolute path under a home the log is not beneath', async () => {
+    // The control of the case above: the same log, another home.
+    const planted = plantWorktreeHome();
+    const entry = listSessionLogs(planted.mainDir).find((found) => found.sessionId === 's-main');
+    if (entry === undefined) throw new Error('no candidate');
+
+    const row = await collectSessionRow(entry, [], makeScratch());
+
+    expect(row.filePath).toBe(entry.path);
   });
 });
 

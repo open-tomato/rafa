@@ -485,10 +485,13 @@ on the plan. The branch checked out where the run was started is never the
 base, and where the person stands when they start the run is no part of it.
 
 **`loop start --create-branch` creates the feature branch automatically**
-when run on `main` or `master`, instead of printing a checkout instruction.
-The branch is created as `naming.branch` names it, `feat/{stub}` by default
-with the plan's stub for `{stub}`, from the latest `origin/<base>`, where
-`<base>` is the branch checked out, `main` or `master`. This feature
+when run on `main`, `master` or the run's base (`pr.base` when set, else
+`origin/HEAD`), instead of printing a checkout instruction. The branch is
+created as `naming.branch` names it, `feat/{stub}` by default with the plan's
+stub for `{stub}`, from the latest `origin/<base>`, where `<base>` is the
+branch checked out. A run the flag cannot move off its base, under
+`--any-branch` or for a plan file naming no stub, is refused, naming the plan
+and the base: the flag never runs a plan's tasks on the base. This feature
 requires `--create-branch` to be explicit, preserving the safety of the
 existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being

@@ -25,9 +25,12 @@
  *   3. **The kind check.** For an entry said `bug`, `own-fallout` or
  *      `own-gap` that names a test case, the case is run on the head,
  *      then, only when it is `red` there, on the plan's base, through
- *      {@link KindRouteOptions.runTest}. The check then reads the entry,
- *      those readings and the plan's files. The other three kinds are
- *      taken as said and run nothing.
+ *      {@link KindRouteOptions.runTest}. For such an entry the red step
+ *      captures the runner kept are read too (`readKeptCaptures`,
+ *      `./runner-evidence.ts`): those under the triage's `repoRoot`
+ *      taken at the head or one of the plan's commits. The check then
+ *      reads the entry, those readings, the plan's files and the
+ *      captures. The other three kinds are taken as said and run nothing.
  *   4. **The route** of the kind the check answered, from the stage
  *      table below.
  *
@@ -40,6 +43,8 @@
  * | `machine` | settled, `skipped` on the `machine` channel |
  * | `docs` | settled, `docs` on the `docs` channel: a `sighting` row of `stale_docs` |
  * | `convention` | settled, `pr-body` |
+ * | `own-fallout`, its case in a kept capture whose commit has a step repair line | settled, `repair` naming that line, `joined` |
+ * | `own-fallout`, `own-gap`, its key or symbol on an open leftover line | settled, `repair` naming that line, `joined` |
  * | `own-fallout`, `own-gap` | settled, `repair` while the plan's leftover repairs are below the cap, else `follow-up` |
  *
  * A settled `pr-body`, `follow-up` or `repair` row is on the `public`
@@ -57,6 +62,26 @@
  * cannot be read, or a line it refuses, sends the entry to `follow-up`
  * too, its problem naming the failure, so the entry is never lost.
  *
+ * **The dedupe.** The repair is handed the entry's recurrence key,
+ * `bugKeyOf` over the redacted artifact and `what` (none with no
+ * artifact), and the symbol the check's `plan-symbol` row matched,
+ * redacted. `insertLeftoverRepair` hashes the key into the line's keyed
+ * marker, and joins instead of inserting when an open leftover line
+ * already holds the key's hash or the symbol: a settled `repair` row
+ * whose `repairLine` is that line and whose `joined` is true, nothing
+ * counted against the cap. So two reports of one cause take one slot.
+ *
+ * **A join.** An `own-fallout` entry whose case a kept capture holds
+ * (`capture` on the check's answer) was red in a suite step of this
+ * plan, and a red step inserts its own repair, `Repair the red <kind>
+ * step at commit <sha>` (`stepRepairFor`, `./runner-evidence.ts`). When
+ * the tracker holds that line for the capture's commit, open, blocked or
+ * ticked, the entry joins it: a settled `repair` row whose `repairLine`
+ * is that line and whose `joined` is true, no line inserted, nothing
+ * filed and nothing counted against the cap. A tracker that holds no
+ * such line, or cannot be read, takes the repair route above, which
+ * names a read failure in its problem.
+ *
  * **A `docs` entry** is stored through `writeStaleDocs` as a `sighting`,
  * its `what` the entry's `what` and its `where` the first path
  * `pathsNamedIn` (`./doc-only.ts`) finds in the `what`, then in the
@@ -73,21 +98,34 @@
  * not read, a head commit that was not read and a runner that throws
  * each read `unrunnable`, and so as `bug`: the cost of a reading the
  * loop could not take falls on filing, never on hiding.
+ *
+ * The kept captures are read only when {@link checkedKindOf} is given
+ * the `repoRoot` they sit under, as {@link routeByKind} gives it; left
+ * out, the check reads none. A head and plan commits that were not read
+ * keep no capture, and a capture or folder that cannot be read is
+ * skipped, its problem sentence added to the check's `reason`: each
+ * leaves the table as it read before the captures.
  */
 import type { BaseRunAnswer, NamedTest } from './base-run.js';
+import type { LeftoverEntry, LeftoverInsert } from './leftover-repair.js';
 import type { KindCheck, NamedTestReadings } from './own-check.js';
 import type { PlanBaseReading, PlanFilesReading } from './plan-commits.js';
+import type { KeptCapture, KeptCaptures, StepRepairLine } from './runner-evidence.js';
 import type { BugTriage, BugTriageAction, TriageOptions } from './triage.js';
 import type { LoopRetries } from '@open-tomato/rafa/config-schema-loop-retries';
 import type { BugKind, ReportBug } from '@open-tomato/rafa/report/parse';
 
+import { readFileSync } from 'node:fs';
+
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { writeStaleDocs } from '@open-tomato/rafa/store/stale-docs';
-import { artifactOf } from '@open-tomato/rafa/triage/bug-key';
+import { artifactOf, bugKeyOf } from '@open-tomato/rafa/triage/bug-key';
 import { pathsNamedIn } from '@open-tomato/rafa/triage/doc-only';
+import { testFailureOf } from '@open-tomato/rafa/triage/test-failure';
 
 import { insertLeftoverRepair } from './leftover-repair.js';
 import { CHECKED_KINDS, checkKind, namedTestOf } from './own-check.js';
+import { readKeptCaptures, stepRepairFor } from './runner-evidence.js';
 
 /** What the kind routing reads beside the entry: the check's inputs and the repair cap. */
 export interface KindRouteOptions {
@@ -220,30 +258,77 @@ function routeDocs(entry: KindRouteEntry, context: KindRouteContext): KindRoutin
   }
 }
 
-/** Inserts the repair of an `own-` leftover, or answers `follow-up` past the cap; see the module note. */
+/**
+ * The step repair line of the tracker at `trackerPath` for the commit of
+ * `capture`, or null when there is no capture, the tracker holds no such
+ * line or cannot be read; see the module note's join.
+ */
+function stepRepairOf(capture: KeptCapture | null, trackerPath: string): StepRepairLine | null {
+  if (capture === null) return null;
+  let content: string;
+  try {
+    content = readFileSync(trackerPath, 'utf8');
+  } catch {
+    // The repair route reads the tracker again and names the failure.
+    return null;
+  }
+  return stepRepairFor(content, capture.sha);
+}
+
+/**
+ * Joins the step repair covering the leftover's capture, or inserts the
+ * repair of an `own-` leftover, or answers `follow-up` past the cap; see
+ * the module note.
+ */
 function routeLeftover(
   entry: KindRouteEntry,
-  kind: 'own-fallout' | 'own-gap',
+  check: KindCheck & { readonly kind: 'own-fallout' | 'own-gap' },
   trackerPath: string,
   retries: LoopRetries,
 ): KindRouting {
-  const artifact = artifactOf(entry.bug);
+  const { kind } = check;
+  const joined = stepRepairOf(check.capture, trackerPath);
+  if (joined !== null) return settledRow(entry, 'public', 'repair', kind, { repairLine: joined.line, joined: true });
   try {
-    const inserted = insertLeftoverRepair(trackerPath, {
-      kind,
-      what: entry.redact(entry.what),
-      artifact: artifact === null
-        ? null
-        : entry.redact(artifact),
-    }, retries);
-    return inserted.inserted
-      ? settledRow(entry, 'public', 'repair', kind, { repairLine: inserted.line })
-      : settledRow(entry, 'public', 'follow-up', kind);
+    return leftoverRow(entry, kind, insertLeftoverRepair(trackerPath, leftoverEntryOf(entry, check, trackerPath), retries));
   } catch (error) {
     return settledRow(entry, 'public', 'follow-up', kind, {
       problem: entry.redact(`out_of_scope_bugs[${entry.index}]: the repair task was not inserted, so it is a follow-up: ${messageOf(error)}`),
     });
   }
+}
+
+/**
+ * The leftover repair entry of `entry`: its `what` and `artifact`
+ * redacted, its recurrence key, from the redacted artifact and `what`
+ * (`bugKeyOf`), null with no artifact, and the symbol the check matched,
+ * redacted; see the module note's dedupe.
+ */
+function leftoverEntryOf(entry: KindRouteEntry, check: KindCheck & { readonly kind: 'own-fallout' | 'own-gap' }, trackerPath: string): LeftoverEntry {
+  const reported = artifactOf(entry.bug);
+  const artifact = reported === null
+    ? null
+    : entry.redact(reported);
+  const what = entry.redact(entry.what);
+  return {
+    kind: check.kind,
+    what,
+    artifact,
+    key: artifact === null
+      ? null
+      : bugKeyOf(trackerPath, artifact, what),
+    symbol: check.symbol === null
+      ? null
+      : entry.redact(check.symbol),
+  };
+}
+
+/** The row of what `insertLeftoverRepair` did: a repair inserted or joined, or a follow-up past the cap. */
+function leftoverRow(entry: KindRouteEntry, kind: 'own-fallout' | 'own-gap', done: LeftoverInsert): KindRouting {
+  if (done.inserted) return settledRow(entry, 'public', 'repair', kind, { repairLine: done.line });
+  return 'joined' in done
+    ? settledRow(entry, 'public', 'repair', kind, { repairLine: done.line, joined: true })
+    : settledRow(entry, 'public', 'follow-up', kind);
 }
 
 /** The route of the kind the check answered; see the module note's table. */
@@ -261,7 +346,7 @@ function routeChecked(entry: KindRouteEntry, check: KindCheck, context: KindRout
       return settledRow(entry, 'public', 'pr-body', 'convention');
     case 'own-fallout':
     case 'own-gap':
-      return routeLeftover(entry, check.kind, context.trackerPath, options.retries);
+      return routeLeftover(entry, { ...check, kind: check.kind }, context.trackerPath, options.retries);
   }
 }
 
@@ -275,17 +360,40 @@ export async function routeByKind(entry: KindRouteEntry, context: KindRouteConte
   const options = context.kinds;
   if (options === undefined) return KINDS_OFF;
   if (entry.bug.security !== false) return { settled: false, kind: entry.bug.kind, inherited: false };
-  return routeChecked(entry, await checkedKindOf(entry.bug, options), context, options);
+  return routeChecked(entry, await checkedKindOf(entry.bug, options, context.repoRoot), context, options);
+}
+
+/** No capture read, and no problem. */
+const NO_CAPTURES: KeptCaptures = Object.freeze({ captures: [], problems: [] });
+
+/**
+ * The kept captures under `repoRoot` at the head or the plan's commits,
+ * for an entry of a checked kind naming a test case; none for any other,
+ * or with `repoRoot` left out. See the module note's readings.
+ */
+function capturesOf(bug: ReportBug, options: KindRouteOptions, repoRoot: string | undefined): KeptCaptures {
+  if (repoRoot === undefined || !CHECKED_KINDS.includes(bug.kind) || testFailureOf(bug) === null) return NO_CAPTURES;
+  return readKeptCaptures(repoRoot, {
+    head: options.head,
+    commits: options.planFiles.ok
+      ? options.planFiles.commits
+      : null,
+  });
 }
 
 /**
  * The kind check's answer for one entry: its named test read on the head
- * and the plan's base as {@link routeByKind} reads it, then `checkKind`.
- * Exported so `start/triage.ts` can tell, before `triageReport`, whether
- * a report routes anything to the public tracker; the security rule is
- * the caller's. Never rejects.
+ * and the plan's base as {@link routeByKind} reads it, the kept captures
+ * under `repoRoot` when it is given, then `checkKind`. Exported so
+ * `start/triage.ts` can tell, before `triageReport`, whether a report
+ * routes anything to the public tracker; the security rule is the
+ * caller's. Never rejects.
  */
-export async function checkedKindOf(bug: ReportBug, options: KindRouteOptions): Promise<KindCheck> {
+export async function checkedKindOf(bug: ReportBug, options: KindRouteOptions, repoRoot?: string): Promise<KindCheck> {
   const readings = await readingsOf(bug, options);
-  return checkKind({ entry: bug, readings, planFiles: options.planFiles });
+  const kept = capturesOf(bug, options, repoRoot);
+  const check = checkKind({ entry: bug, readings, planFiles: options.planFiles, captures: kept.captures });
+  return kept.problems.length === 0
+    ? check
+    : { ...check, reason: `${check.reason} Kept captures skipped: ${kept.problems.join('; ')}.` };
 }

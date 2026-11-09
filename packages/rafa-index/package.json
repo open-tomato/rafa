@@ -1,0 +1,28 @@
+{
+  "name": "@open-tomato/rafa-index",
+  "version": "0.0.0",
+  "description": "The hub's search index: full text and vector search over a store's rows, and the links between them, on bun:sqlite and sqlite-vec.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "bun test",
+    "check-types": "tsc --build"
+  },
+  "dependencies": {
+    "sqlite-vec": "0.1.9"
+  },
+  "devDependencies": {
+    "@open-tomato/eslint-config": "^0.1.0",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  }
+}

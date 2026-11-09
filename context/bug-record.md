@@ -85,6 +85,15 @@ record does not read is kept as written, after the record's own
 sections: that text beside a `What` section, a section that is no field
 (`Expected`, `Refs`), and the second section under one heading.
 
+One section beside the fields is read by `rafa bug recheck` alone:
+
+- **`## Trigger removed`**, optional: one line naming what was removed
+  and the commit or pull request that removed it, for a bug whose test
+  passes because the thing that set it off is gone, not because the bug
+  is fixed. No flag writes it; it is written in the body, or appended
+  with `rafa issue edit <n> --append-file=<file> --reason=<text>`. The
+  record keeps it as a section that is no field. See Recheck below.
+
 A record with a problem is refused before any tracker is resolved, every
 problem on a line of its own, each opening with the field it names
 (`bugProblems`, `packages/rafa/src/bugs/record.ts`).
@@ -235,6 +244,13 @@ no test of the file, or named a case the file does not hold. The six
 verdicts are `reproduces`, `gone`, `flaky`, `stale`, `manual` and
 `skipped`.
 
+A `gone` bug whose body holds a `## Trigger removed` heading, anywhere
+in the body and so below an appended update too, and outside a fence,
+prints `gone (trigger removed?)` (`triggerRemovedOf`,
+`src/bugs/recheck-verdict.ts`). The verdict stays `gone`: the mark is
+the row's `triggerRemoved: true`, which `--output=json` carries, and a
+row of any other verdict is never marked. Such a bug stays open.
+
 Runs go in the directory rafa runs in, so a machine-dependent test can
 read `gone` here and fail elsewhere. The report names where it ran, and
 `--comment` names the rafa version and the short commit, with
@@ -243,7 +259,10 @@ read `gone` here and fail elsewhere. The report names where it ran, and
 `--comment` writes only on `gone` and `flaky`, one line through the
 record's redaction, and never closes a bug. A `gone` comment reads
 "gone at rafa <version>, `<commit>`: `<reference>` passed <n> runs";
-a `flaky` one reads "flaky at rafa ..." with the failed count. A
+a `flaky` one reads "flaky at rafa ..." with the failed count. On a
+`gone (trigger removed?)` row it reads "gone (trigger removed?) at rafa
+<version>, `<commit>`: `<reference>` passed <n> runs because the bug's
+trigger was removed, not because the bug is fixed". A
 degraded issue chain (`resolveIssueTracker`) exits 1 before any issue
 is read.
 
@@ -271,6 +290,74 @@ neither has an "off" spelling. The reader is
 `rafa issue create --dry-run`, for any type, makes the draft, prints its
 title, a line with the type, module, priority and cause, then the body,
 and stops: no tracker is resolved and nothing is filed.
+
+With `--upstream=rafa`, a bug only, it also passes the upstream gate
+(`packages/rafa-board/src/commands/issue/upstream.ts`), which reads this
+board's owner and visibility with one `gh repo view` and sends no
+`gh issue` call, prints `Upstream: <owner>/<name>` after its first line,
+and prints the draft as it would be filed there: unless this board is
+`PUBLIC`, its repository name and the filing package's name, in the
+title and the body and its `Versions` section alike, read
+`a private sibling repository`
+(`packages/rafa-board/src/commands/issue/create.ts`).
+
+### Filing upstream
+
+A project that consumes rafa reports to rafa's board with
+`--upstream=rafa`: `rafa issue create` files a bug there, and `rafa issue
+comment` and `rafa issue list` take the same flag. The flag names a tool,
+never a board: the board is the one the `collaborate.<tool>` key names.
+Only `rafa` is read today, so any other key under `collaborate` is warned
+about as an unknown key:
+
+```yaml
+collaborate:
+  rafa: open-tomato/rafa   # owner/name; absent by default: reporting is off
+```
+
+The key is off unless it is set, and its value is checked at load for
+its shape only: two parts, each with no `/` and no whitespace. A blank
+value, `rafa`, `open-tomato/rafa/x` and `open tomato/rafa` are refused at
+load, naming `collaborate.rafa`. `issues.upstream.rafa` is not the key:
+it would mix how this project's issues look with where it may report.
+`tracker.upstream.rafa` is not the key either: it reads as a fallback
+tracker, which the upstream board is not.
+
+The gate (`packages/rafa-board/src/commands/issue/upstream.ts`) runs
+before any call to the upstream board, and refuses with exit 1 and
+`Nothing was filed.` (`Nothing was read.` for `list`) in three cases:
+
+```text
+issue create --upstream=rafa: collaborate.rafa is not set, so reporting upstream is off. Nothing was filed.
+issue create --upstream=rafa: collaborate.rafa names open-tomato/rafa (owner open-tomato), and this board is acme/app (owner acme). Reporting upstream is allowed only between repositories of one owner. Nothing was filed.
+issue create --upstream=rafa: could not read this board's owner (<reason>). Nothing was filed.
+```
+
+The same-owner check reads this board's `owner/name` with one
+`gh repo view` and compares its owner with the upstream's, ignoring case.
+Two owners that differ are refused, so reports go only between
+repositories of one owner. A board the owner cannot be read for (no
+GitHub remote, a `gh` signed out, a failed read) is refused with the
+third line, and nothing is sent. The key's repository is not checked
+against GitHub here: a name that does not exist fails at the filing
+step, with `gh`'s own error.
+
+Only a bug is filed upstream. `issue create --upstream=rafa` refuses any
+other `--type` (`--type=code is not filed upstream: only a bug is`), and
+reads the bug line as any bug line is read, so an incomplete record is
+refused before the gate. `issue comment` and `issue list` take any issue
+number and are not limited to bugs.
+
+The private-name rule keeps a private board's names out of what goes
+upstream. Unless this board's visibility was read `PUBLIC`, its
+`owner/name`, its bare repository name and the filing package's name are
+each replaced with `a private sibling repository` in the title, the body
+and the `Versions` section of a filed bug, and in a comment's body. A
+comment's text is first redacted of the checkout's paths and of named
+secrets. `--dry-run` shows the draft with the same replacement. The
+replacement is matched whole and ignores case, so a name that is part of
+a longer word stays, and a `PRIVATE`, `INTERNAL` or unread visibility
+keeps the rule.
 
 ### Config
 

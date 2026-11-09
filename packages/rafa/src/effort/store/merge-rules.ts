@@ -28,7 +28,9 @@
  *
  * The store is almost append-only. A column a production statement
  * changes after the insert is an edited field, and the merge has to know
- * which of two stores' values to keep. There are two today.
+ * which of two stores' values to keep, or, for a column no statement
+ * changes, a value two stores may hold in two forms that read alike.
+ * There are three today.
  * `findings.tracker_ref`, written by `writeTrackerRef`
  * (`tracker-refs.ts`) once a bug is filed, is {@link SET_ONCE}: a
  * filled value beats NULL, and two different filled values mean one
@@ -39,6 +41,13 @@
  * is rewritten by the merge itself (`merge-commit-gaps.ts`) for each
  * commit brought in and the commit after it in time, so two rows of one
  * commit that differ only in that key are the same row.
+ * `sessions.row_json` is {@link RECOMPUTED} too, though no statement
+ * rewrites it: its `filePath` is stored as `<folder>/<file>` by a fresh
+ * collect and as an absolute path by a row written before that form
+ * (#1489), and `read` answers both alike (`answered-rows.ts`). So two
+ * rows of one session whose `row_json` differ only in that form, with
+ * `filePath` passed through `storedLogPathOf` (`session-log-path.ts`),
+ * are the same row.
  *
  * ## What holds the registry to the schema
  *
@@ -60,9 +69,11 @@ export type MergeScope = 'merged' | 'local';
 export const SET_ONCE = 'set-once';
 
 /**
- * The merge recomputes the field from the rows it holds, so two stores'
- * values of it are never compared: for `commits.row_json`, its
- * `minutesSincePrevious` key.
+ * Part of the field is the merge's or the reader's to derive, so two
+ * stores' values of it are compared without that part: for
+ * `commits.row_json`, its `minutesSincePrevious` key, which the merge
+ * recomputes; for `sessions.row_json`, the form of its `filePath`, which
+ * `read` answers in the stored form either way.
  */
 export const RECOMPUTED = 'recomputed';
 
@@ -74,7 +85,7 @@ export interface MergedTableRule {
   readonly scope: 'merged';
   /** The columns two rows with a NULL origin are matched by. */
   readonly identity: readonly string[];
-  /** Every column a production statement changes after the insert, with its rule. */
+  /** Every column a production statement changes after the insert, or two stores may hold in two forms, with its rule. */
   readonly edited: Readonly<Record<string, EditRule>>;
 }
 
@@ -96,7 +107,7 @@ function appendOnly(...identity: readonly string[]): MergedTableRule {
 
 /** Every table of the SQLite store, by name, and what a merge does with it. */
 export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
-  sessions: appendOnly('session_id'),
+  sessions: { scope: 'merged', identity: ['session_id'], edited: { row_json: RECOMPUTED } },
   commits: { scope: 'merged', identity: ['sha'], edited: { row_json: RECOMPUTED } },
   /**
    * `tracker_ref` is set once. A superseding reference, filed after the

@@ -84,8 +84,11 @@ import type {
 } from './store/session-row-types.js';
 
 import { createReadStream } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename } from 'node:path';
 import { createInterface } from 'node:readline';
+
+import { storedLogPath } from './session-log-path.js';
 
 export type {
   SessionStats,
@@ -350,10 +353,25 @@ function parseRecord(line: string): JsonObject | null {
   }
 }
 
-/** Accumulates one stats row from a session log on disk. */
-export async function readSessionLog(filePath: string): Promise<SessionStats> {
+/**
+ * Accumulates one stats row from a session log on disk.
+ *
+ * The log is read at `filePath`, the absolute path, and the row stores
+ * the form `storedLogPath` answers for it under `home`: `<folder>/<file>`
+ * for a log under `<home>/.claude/projects/`, and the path unchanged for
+ * any other, a `logDir` override's included (#1489).
+ *
+ * @param filePath - The log's absolute path, the one read.
+ * @param home - The home whose projects root the stored path is cut
+ *   against. Defaults to `homedir()`.
+ * @returns The log's stats row, carrying the stored path.
+ */
+export async function readSessionLog(
+  filePath: string,
+  home: string = homedir(),
+): Promise<SessionStats> {
   return accumulateSessionStats(readLines(filePath), {
     sessionId: sessionIdFromPath(filePath),
-    filePath,
+    filePath: storedLogPath(filePath, home),
   });
 }

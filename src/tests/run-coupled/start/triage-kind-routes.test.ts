@@ -349,6 +349,23 @@ describe('an own-fallout the check confirms', () => {
     expect(routesOf(f)).toEqual(['0 own-fallout own-fallout repair']);
   });
 
+  it('notes a second entry with its key as joining the repair task already in the tracker, never as one added', async () => {
+    const f = fixture();
+    const triage = createStartTriage({ ...f.options, kinds: kindsOf(runner(FALLOUT_RUNS), 2) });
+    await triage(taskInput(f, [testEntry('own-fallout')]));
+    const added = readFileSync(f.trackerPath, 'utf8');
+    f.info.length = 0;
+
+    const result = await triage(taskInput(f, [testEntry('own-fallout')], 'session-2'));
+
+    expect(result?.bugs.map((bug) => [bug.action, bug.joined])).toEqual([['repair', true]]);
+    expect(readFileSync(f.trackerPath, 'utf8')).toBe(added);
+    expect(repairLines(f.info)).toEqual([]);
+    expect(f.info).toContain(
+      `   Triage: out_of_scope_bugs[0]: own-fallout: it joined the repair task at tracker line ${NEXT_LINE + 1}, already in the tracker; nothing was filed.`,
+    );
+  });
+
   it('runs its test once on the head and once on the base, though the chain\'s check and the triage\'s both read it', async () => {
     const f = fixture();
     const run = runner(FALLOUT_RUNS);

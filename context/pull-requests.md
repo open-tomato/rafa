@@ -69,8 +69,8 @@ head is younger than `FIRST_CHECK_GRACE_MS` (120 seconds,
 seconds after the push; past that grace the ending is `none` at once. The age is
 the head commit's committed date (`headCommittedAt` on the pull request's
 detail), not the push time, so an old commit pushed just now gets no grace, and
-a head whose date the provider does not answer gets none either. Only `pr wait`
-passes that date: the loop's CI gate and `pr triage --resolve` poll as they did.
+a head whose date the provider does not answer gets none either. `pr wait`, the
+loop's CI gate and `pr triage --resolve`'s wait after each attempt all pass it.
 A `none` ending says the pull request does not merge cleanly, and that no run is
 scheduled for it, only when one more read of its detail says `conflicting`; any
 other reading gets `rafa pr wait <n>` to ask again and `rafa pr show <n>`, and

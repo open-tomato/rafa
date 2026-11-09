@@ -3890,7 +3890,7 @@
       "edges": [],
       "fileCounts": {
         "source": 210,
-        "test": 153,
+        "test": 154,
         "testSupport": 9
       },
       "files": [
@@ -3933,6 +3933,7 @@
         "packages/rafa/src/config-schema-board-project.ts",
         "packages/rafa/src/config-schema-bugs.ts",
         "packages/rafa/src/config-schema-checks.ts",
+        "packages/rafa/src/config-schema-collaborate.test.ts",
         "packages/rafa/src/config-schema-errors.ts",
         "packages/rafa/src/config-schema-features.ts",
         "packages/rafa/src/config-schema-hub.ts",
@@ -4268,7 +4269,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 372
+        "packages/rafa/": 373
       },
       "folders": [
         "packages/rafa/"
@@ -4434,7 +4435,7 @@
       ],
       "fileCounts": {
         "source": 156,
-        "test": 137,
+        "test": 145,
         "testSupport": 8
       },
       "files": [
@@ -4611,6 +4612,7 @@
         "packages/rafa-board/src/board/relations/port.ts",
         "packages/rafa-board/src/board/relations/select.test.ts",
         "packages/rafa-board/src/board/relations/select.ts",
+        "packages/rafa-board/src/board/repository.test.ts",
         "packages/rafa-board/src/board/repository.ts",
         "packages/rafa-board/src/board/review-comment.test.ts",
         "packages/rafa-board/src/board/review-comment.ts",
@@ -4680,10 +4682,13 @@
         "packages/rafa-board/src/commands/epic/promote.ts",
         "packages/rafa-board/src/commands/epic/show.ts",
         "packages/rafa-board/src/commands/issue/check.ts",
+        "packages/rafa-board/src/commands/issue/collaborate-load.test.ts",
+        "packages/rafa-board/src/commands/issue/comment-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/comment.ts",
         "packages/rafa-board/src/commands/issue/create-blocked.test.ts",
         "packages/rafa-board/src/commands/issue/create-blocked.ts",
         "packages/rafa-board/src/commands/issue/create-bug.ts",
+        "packages/rafa-board/src/commands/issue/create-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/create.ts",
         "packages/rafa-board/src/commands/issue/declarations.test.ts",
         "packages/rafa-board/src/commands/issue/declarations.ts",
@@ -4692,6 +4697,7 @@
         "packages/rafa-board/src/commands/issue/edit-run.ts",
         "packages/rafa-board/src/commands/issue/edit.ts",
         "packages/rafa-board/src/commands/issue/issue-tracker.ts",
+        "packages/rafa-board/src/commands/issue/list-upstream.test.ts",
         "packages/rafa-board/src/commands/issue/list.ts",
         "packages/rafa-board/src/commands/issue/move-project.ts",
         "packages/rafa-board/src/commands/issue/move.ts",
@@ -4706,6 +4712,9 @@
         "packages/rafa-board/src/commands/issue/show.ts",
         "packages/rafa-board/src/commands/issue/unblock-native.ts",
         "packages/rafa-board/src/commands/issue/unblock.ts",
+        "packages/rafa-board/src/commands/issue/upstream-integration.test.ts",
+        "packages/rafa-board/src/commands/issue/upstream-text.test.ts",
+        "packages/rafa-board/src/commands/issue/upstream.test.ts",
         "packages/rafa-board/src/commands/plan/refs-check.ts",
         "packages/rafa-board/src/epic/verify-plan.test.ts",
         "packages/rafa-board/src/epic/verify-plan.ts",
@@ -4741,7 +4750,7 @@
         "src/commands/issue/declarations-integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-board/": 252,
+        "packages/rafa-board/": 260,
         "src/board/": 6,
         "src/commands/board/": 1,
         "src/commands/epic/": 1,
@@ -5825,8 +5834,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 9,
-        "test": 14,
+        "source": 10,
+        "test": 27,
         "testSupport": 8
       },
       "files": [
@@ -5834,7 +5843,9 @@
         "packages/rafa-hub/src/bin.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
+        "packages/rafa-hub/src/contract-skew.integration.test.ts",
         "packages/rafa-hub/src/core-subpaths.test.ts",
+        "packages/rafa-hub/src/hub-index.integration.test.ts",
         "packages/rafa-hub/src/hub-unreachable.integration.test.ts",
         "packages/rafa-hub/src/hub.integration.test.ts",
         "packages/rafa-hub/src/identity/contract.test.ts",
@@ -5848,9 +5859,12 @@
         "packages/rafa-hub/src/server.test.ts",
         "packages/rafa-hub/src/server.ts",
         "packages/rafa-hub/src/stand-in-adapters.integration.test.ts",
+        "packages/rafa-hub/src/store/connectors.test.ts",
+        "packages/rafa-hub/src/store/connectors.ts",
         "packages/rafa-hub/src/store/contract.test.ts",
         "packages/rafa-hub/src/store/contract.ts",
         "packages/rafa-hub/src/store/port.ts",
+        "packages/rafa-hub/src/store/sqlite-index.test.ts",
         "packages/rafa-hub/src/store/sqlite.test.ts",
         "packages/rafa-hub/src/store/sqlite.ts",
         "packages/rafa-hub/src/store/testdata/broken-store.fixture.ts",
@@ -5860,13 +5874,24 @@
         "packages/rafa-hub/src/testdata/scratch-home-env.ts",
         "packages/rafa-hub/src/testdata/test-secrets.test.ts",
         "packages/rafa-hub/src/testdata/test-secrets.ts",
-        "packages/rafa-hub/src/two-devices.integration.test.ts"
+        "packages/rafa-hub/src/two-devices.integration.test.ts",
+        "packages/rafa-index/src/fusion.test.ts",
+        "packages/rafa-index/src/imports.test.ts",
+        "packages/rafa-index/src/index.integration.test.ts",
+        "packages/rafa-index/src/links.test.ts",
+        "packages/rafa-index/src/loader.test.ts",
+        "packages/rafa-index/src/notice.test.ts",
+        "packages/rafa-index/src/rebuild.test.ts",
+        "packages/rafa-index/src/schema.test.ts",
+        "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 31
+        "packages/rafa-hub/": 36,
+        "packages/rafa-index/": 9
       },
       "folders": [
-        "packages/rafa-hub/"
+        "packages/rafa-hub/",
+        "packages/rafa-index/"
       ],
       "name": "rafa-hub",
       "named": [],
@@ -6748,7 +6773,7 @@
   ],
   "totals": {
     "clearedByIssue118": 0,
-    "files": 2197,
+    "files": 2198,
     "leftToPlace": 764,
     "nonTestEdges": 4868,
     "unassignedFiles": 28,

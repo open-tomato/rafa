@@ -231,7 +231,8 @@ describe('a real lockfile conflict the attempt actually fixes', () => {
       pullRequests: () => createGhPullRequests({ gh: fake.run }),
       permissions: () => createGhPermissions({ gh: fake.run }),
       now: () => NOW,
-      clock: () => 0,
+      // Held at NOW, so a head the fake commits at its default date reads older than the grace.
+      clock: () => Date.parse(NOW),
       sleep: async () => undefined,
       runLoop: async (run) => {
         loops.push({ worktree: run.worktree, planPath: run.planPath });
@@ -288,7 +289,8 @@ describe('a real lockfile conflict no attempt fixes', () => {
       pullRequests: () => createGhPullRequests({ gh: fake.run }),
       permissions: () => createGhPermissions({ gh: fake.run }),
       now: () => NOW,
-      clock: () => 0,
+      // Held at NOW, so a head the fake commits at its default date reads older than the grace.
+      clock: () => Date.parse(NOW),
       sleep: async () => undefined,
       runLoop: async (run) => {
         loops.push({ worktree: run.worktree, planPath: run.planPath });

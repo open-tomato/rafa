@@ -60,6 +60,14 @@ instead of the gate's, and `${PIPESTATUS[0]}` prints empty on zsh. Polls
 waste time when the runner will record the same gate later as a real
 step anyway.
 
+Give each gate its own foreground Bash call with `timeout: 600000`. Chained
+in one call under the default 120 s limit, `bun test --changed` and the 30
+`tests.alwaysRun` sweeps outlast it and the call is moved to the background
+(`Command did not complete within its 120s timeout`). A computed file list
+reaches ESLint through `xargs` (`print -l $files | xargs bunx eslint`):
+zsh does not word-split an unquoted `$files`, so `bunx eslint $files` hands
+ESLint one argument and it answers `No files matching the pattern`.
+
 The full-suite scripts treat the workspace packages apart only for types:
 `check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
 and the test files, then `bun run --filter './packages/*' check-types`, which
@@ -273,7 +281,7 @@ on that repair's line and halts.
 with three gates. **Triggers:** pull requests into `main` or `integration`,
 and pushes to `stretch/**`. **Gates** (each step runs unless the job was
 cancelled): ring 0's job `verify` runs `bun test`, `bunx eslint .`, and
-`bun run check-types`, the root config and the nine composite members,
+`bun run check-types`, the root config and the ten composite members,
 which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
 (`turbo run lint check-types test --affected`), `bunx tsc --build
 tsconfig.references.json` and `bun scripts/workspace/graph-check.ts`.

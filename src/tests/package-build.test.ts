@@ -10,7 +10,8 @@
  * itself. Every other case reads a build: the suite copies the package
  * (its manifest and lockfile, its tsconfig files, the README, the bundle
  * script `scripts/build/bundle.ts`, `src/`,
- * and core's workspace package `packages/rafa/`) into a scratch directory,
+ * and core's workspace package `packages/rafa/`, each without its
+ * `node_modules`) into a scratch directory,
  * links the installed packages the declaration step reads, and runs
  * `bun run build` there,
  * the script as the manifest holds it, so nothing is written into the
@@ -490,7 +491,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, relative } from 'node:path';
+import { basename, delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -556,6 +557,7 @@ const EXPORTS = {
   './config-schema-logger': { types: './dist/config-schema-logger.d.ts' },
   './config-schema-board-project': { types: './dist/config-schema-board-project.d.ts' },
   './config-schema-checks': { types: './dist/config-schema-checks.d.ts' },
+  './config-schema-collaborate': { types: './dist/config-schema-collaborate.d.ts' },
   './config-schema-hub': { types: './dist/config-schema-hub.d.ts' },
   './config-schema-issues': { types: './dist/config-schema-issues.d.ts' },
   './config-schema-loop-continue': { types: './dist/config-schema-loop-continue.d.ts' },
@@ -596,9 +598,11 @@ const OWN_SUBPATH = '@open-tomato/rafa/';
  * empty one, now sit in the shared chunk the inventory files are in, and
  * no lazy command module entered a library entry. It has
  * `core/command/global-flags.d.ts` since the root help's global flags
- * moved out of `src/cli/help.ts` into core, for board's reference check.
- * It has `effort/store/repository-facts.d.ts` since `merge-store.ts`
- * came to write the supersedes of the readings a merge brings in.
+ * moved out of `src/cli/help.ts` into core, for board's reference check,
+ * and `config-schema-collaborate.d.ts` since the `collaborate` section
+ * joined the config schema. It has `effort/store/repository-facts.d.ts`
+ * since `merge-store.ts` came to write the supersedes of the readings a
+ * merge brings in.
  */
 const DIST_FILES_BEFORE_MOVE = 'fixtures/dist-files-c920603.txt';
 
@@ -695,6 +699,22 @@ const PACKAGE_FILES = [
   // The `build` script's first segment after `rm -rf dist`: both `bun build` runs and their guard.
   'scripts/build/bundle.ts',
 ];
+
+/**
+ * How a source tree of the checkout is copied into the scratch package:
+ * whole, but without any `node_modules` folder in it. An install puts one
+ * in each workspace package and fills it with links relative to the
+ * checkout (`../../../../node_modules/.bun/...`); `cpSync` copies a link
+ * with its target unchanged, so in the scratch package it names a store
+ * that is not there. The build reads the link and stops on it: bun stops
+ * on a dangling `packages/rafa/node_modules/@open-tomato/define-config`
+ * with `File not found` instead of looking in the scratch root's
+ * `node_modules`, which links what the build needs (see the module note).
+ */
+const COPY_SOURCE_TREE = {
+  recursive: true,
+  filter: (source: string): boolean => basename(source) !== 'node_modules',
+} as const;
 
 /** Core's workspace package, which the build reads core's source and first declarations pass from. */
 const CORE_PACKAGE_DIR = 'packages/rafa';
@@ -858,8 +878,8 @@ let plantedBeforeBuild = false;
 beforeAll(() => {
   mkdirSync(DIST, { recursive: true });
   for (const file of PACKAGE_FILES) cpSync(join(REPO_ROOT, file), join(PACKAGE_DIR, file));
-  cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), { recursive: true });
-  cpSync(join(REPO_ROOT, CORE_PACKAGE_DIR), join(PACKAGE_DIR, CORE_PACKAGE_DIR), { recursive: true });
+  cpSync(join(REPO_ROOT, 'src'), join(PACKAGE_DIR, 'src'), COPY_SOURCE_TREE);
+  cpSync(join(REPO_ROOT, CORE_PACKAGE_DIR), join(PACKAGE_DIR, CORE_PACKAGE_DIR), COPY_SOURCE_TREE);
   linkFacades(PACKAGE_DIR);
   linkDefineConfig(PACKAGE_DIR);
   linkTypeScript(PACKAGE_DIR);
@@ -910,7 +930,7 @@ function linkDefineConfig(dir: string): void {
 function linkFacades(dir: string): void {
   for (const name of FACADE_NAMES) {
     const packageDir = join('packages', `rafa-${name}`);
-    cpSync(join(REPO_ROOT, packageDir), join(dir, packageDir), { recursive: true });
+    cpSync(join(REPO_ROOT, packageDir), join(dir, packageDir), COPY_SOURCE_TREE);
     const link = join(dir, 'node_modules', facadePackageName(name));
     mkdirSync(dirname(link), { recursive: true });
     symlinkSync(relative(dirname(link), join(dir, packageDir)), link, 'dir');
@@ -1191,7 +1211,7 @@ describe('the package manifest', () => {
     expect(readManifest()['bin']).toEqual(BIN);
   });
 
-  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name, the fourteen config sections among them, to their types, and nothing else', () => {
+  it('maps the root and the six subpaths to their builds, the core subpaths the declarations name, the fifteen config sections among them, to their types, and nothing else', () => {
     expect(readManifest()['exports']).toEqual(EXPORTS);
   });
 
@@ -1294,7 +1314,7 @@ describe('the build script, run in a copy of the package', () => {
     const targets = [...new Set(manifestTargets().map((target) => join(PACKAGE_DIR, target)))];
     const missing = targets.filter((target) => !existsSync(target));
 
-    expect(targets).toHaveLength(31);
+    expect(targets).toHaveLength(32);
     expect(missing).toEqual([]);
   });
 
@@ -1309,7 +1329,7 @@ describe('the build script, run in a copy of the package', () => {
       .map((file) => file.replace(HASHED_CHUNK, '$1-<hash>.js'))
       .sort();
 
-    expect(before).toHaveLength(166);
+    expect(before).toHaveLength(169);
     expect(before.filter((file) => file.endsWith('-<hash>.js')).length).toBeGreaterThan(0);
     expect(now).toEqual(before);
   });
@@ -1569,14 +1589,14 @@ describe('the config subpath in the build', () => {
     expect(reach.outside).toEqual([]);
   });
 
-  it('reaches the fourteen section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
+  it('reaches the fifteen section declarations and the LogLevel leaf, and not ports/index.d.ts', () => {
     const reach = declarationReach(DIST, CONFIG_TYPES);
     const sections = [
-      'board-project', 'bugs', 'checks', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
+      'board-project', 'bugs', 'checks', 'collaborate', 'errors', 'features', 'hub', 'issues', 'logger', 'loop-continue',
       'loop-retries', 'release', 'tests', 'triage', 'wrap-up',
     ].map((name) => `config-schema-${name}.d.ts`);
 
-    expect(sections).toHaveLength(14);
+    expect(sections).toHaveLength(15);
     expect(reach.reached).toEqual(expect.arrayContaining([...sections, 'ports/log-level.d.ts']));
     expect(reach.reached).not.toContain('ports/index.d.ts');
     expect(reach.outside).toEqual([]);

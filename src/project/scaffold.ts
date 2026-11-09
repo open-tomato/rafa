@@ -36,14 +36,14 @@
  * parses to {@link CONFIG_DEFAULTS}, which the tests hold, so a setting
  * added to the schema without a line here is caught there.
  *
- * Seven lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
- * `loop.worktreeSetup`, `pr.provider`, `pr.base`, `board.project.number`
- * and `roadmap.issue`, because each resolves to null and null is what a
- * key with no value parses to. Uncommented they are silent, so those
- * seven settings resolve from the defaults layer where every other
- * resolves from the file, and the tests name them. The line is written
- * anyway: it tells an operator the key exists and what it takes, which
- * is the whole point of a template of commented settings.
+ * Eight lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
+ * `loop.worktreeSetup`, `pr.provider`, `pr.base`, `board.project.number`,
+ * `roadmap.issue` and `collaborate.rafa`, because each resolves to null
+ * and null is what a key with no value parses to. Uncommented they are
+ * silent, so those eight settings resolve from the defaults layer where
+ * every other resolves from the file, and the tests name them. The line
+ * is written anyway: it tells an operator the key exists and what it
+ * takes, which is the whole point of a template of commented settings.
  *
  * The `tiers`, `routing`, `task`, `tests` and `checks` sections close
  * the template. `tiers.skills` and `tiers.agents` are written as `{}`, their
@@ -150,6 +150,8 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `#   pr: ${String(CONFIG_DEFAULTS.featuresPr)}                    # false drops the pull-request feature's commands`,
   `#   run: ${String(CONFIG_DEFAULTS.featuresRun)}                   # false drops the run feature's commands`,
   `#   release: ${String(CONFIG_DEFAULTS.featuresRelease)}               # false drops the release feature's commands`,
+  '# collaborate:',
+  '#   rafa:                        # owner/name of the rafa board --upstream=rafa reports on, of this board\'s owner',
   '# allowList: []',
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,

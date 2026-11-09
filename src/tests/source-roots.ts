@@ -10,11 +10,11 @@
  * sweep at once.
  *
  * The list holds the root's `src/`, core's `packages/rafa/src/` and the
- * six feature roots. Four workspace members stay out, each named with
+ * six feature roots. Three workspace members stay out, each named with
  * its reason in {@link MEMBERS_LEFT_OUT}: the hub server is a bin of its
- * own and never in the CLI, the service sync strategy is loaded by the
- * hub's users and not shipped in the CLI, and the two config packages
- * hold no `src/`. The unit tests in `./source-roots.test.ts` sort every
+ * own and never in the CLI, the hub's search index is imported by the hub
+ * alone and not shipped in the CLI, and the service sync strategy is
+ * loaded by the hub's users and not shipped in the CLI. The unit tests in `./source-roots.test.ts` sort every
  * `packages/<name>/` directory into one of the two, so a package added
  * later fails there until it is listed or left out with a reason.
  *
@@ -35,8 +35,9 @@ export const SOURCE_ROOTS: readonly string[] = Object.freeze([
   'packages/rafa-effort/src',
 ]);
 
-/** The two workspace members kept out of {@link SOURCE_ROOTS}, by repo-relative directory, with why. */
+/** The three workspace members kept out of {@link SOURCE_ROOTS}, by repo-relative directory, with why. */
 export const MEMBERS_LEFT_OUT: Readonly<Record<string, string>> = Object.freeze({
   'packages/rafa-hub': 'the hub server, a bin of its own, never in the CLI',
+  'packages/rafa-index': 'the hub\'s search index, imported by the hub alone, not shipped in the CLI',
   'packages/rafa-sync-service': 'the service sync strategy, loaded by the hub\'s users, not shipped in the CLI',
 });

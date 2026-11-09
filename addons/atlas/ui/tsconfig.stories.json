@@ -16,8 +16,5 @@
     "rootDir": "."
   },
   "include": ["src/**/*.stories.tsx", "src/stories", ".storybook", "scripts", "visual", "test"],
-  "exclude": [],
-  // Not inherited through `extends`: `@open-tomato/charts` is read from the
-  // declarations its own build writes, never compiled here.
-  "references": [{ "path": "../charts" }]
+  "exclude": []
 }

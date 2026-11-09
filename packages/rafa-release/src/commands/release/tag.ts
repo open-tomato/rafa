@@ -24,7 +24,7 @@
  * read, and every unit is decided before the first tag is written, so a
  * refused run leaves the repository exactly as it found it.
  *
- * ## Units, and the one skip
+ * ## Units, and the two skips
  *
  * The root is read off `release.versionFile` and `release.changelog`;
  * a package off `<dir>/package.json` and `<dir>/CHANGELOG.md`
@@ -33,10 +33,12 @@
  * over its own readings, in unit order: the root first, then the
  * packages by manifest path. A unit whose version a tag already names is
  * `skipped`, not refused, so a run after a hand-tagged root still tags
- * the package; the run refuses `tagged` only when every unit is
- * skipped, which is the one refusal a one-package project had before.
- * Any other refusal of any unit stops the run with exit 1 before the
- * first write, one line per refused unit.
+ * the package. A unit never released — at `0.0.0`, with no changelog
+ * file and no tag of its own (#1515) — is `skipped` too, rather than
+ * refused for the changelog it has not got yet. The run refuses
+ * `tagged` only when every unit is skipped, which is the one refusal a
+ * one-package project had before. Any other refusal of any unit stops
+ * the run with exit 1 before the first write, one line per refused unit.
  *
  * ## The three refusals, and the two readings that must not pass
  *
@@ -215,6 +217,7 @@ import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams } from './status.js';
 import type { BehindReading } from './tag-behind.js';
 import type { ReleaseFollowUp } from './tag-follow-ups.js';
+import type { BranchPlace } from './tag-next-steps.js';
 import type { ChangelogReading, UnitDecision, UnitReadings, VersionReading } from './tag-units.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
 import type { TagReading } from '../../release/status-readings.js';
@@ -240,6 +243,7 @@ import { readReleaseCommit } from './release-commit.js';
 import { DEFAULT_RELEASE_SEAMS } from './status.js';
 import { commitsOf, readBehind } from './tag-behind.js';
 import { ciPublishSentence, followUpsFor, readPublishTarget } from './tag-follow-ups.js';
+import { nextStepsOf, readBranchHolder } from './tag-next-steps.js';
 import {
   readNewestRelease,
   readTagPackages,
@@ -490,6 +494,8 @@ export interface TagSettings {
   readonly publishCommand: string;
   /** `release.publish`: `ci` replaces the publish line; see the module note. */
   readonly publishMode: ReleasePublishMode;
+  /** True when `pr.base` is unset, so {@link releaseBranch} is the default; left out when it is set. */
+  readonly releaseBranchDefaulted?: boolean;
 }
 
 /** The five settings this action reads, refusing a config `loadConfig` refuses. */
@@ -502,6 +508,9 @@ async function tagConfig(project: ProjectFound, warn: (message: string) => void)
       releaseBranch: config.prBase ?? DEFAULT_RELEASE_BRANCH,
       publishCommand: config.releasePublishCommand,
       publishMode: config.releasePublish,
+      ...(config.prBase === null
+        ? { releaseBranchDefaulted: true }
+        : {}),
     };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
@@ -552,10 +561,17 @@ function isReady(unit: DecidedUnit): unit is ReadyUnit {
   return unit.decision.kind === 'ready';
 }
 
-/** The exit a run refused with: one `❌` line per sentence, without repeats, then the usage. */
-function refusal(messages: readonly string[]): CommandExit {
+/**
+ * The exit a run refused with: one `❌` line per sentence, then a `Next:`
+ * heading over the steps that clear them (`./tag-next-steps.ts`), each
+ * without repeats, then the usage.
+ */
+function refusal(messages: readonly string[], steps: readonly string[] = []): CommandExit {
   const lines = [...new Set(messages)].map((message) => `❌ ${message}`);
-  return new CommandExit(1, `${lines.join('\n')}\nUsage: ${RELEASE_TAG_USAGE}`);
+  const next = steps.length === 0
+    ? []
+    : ['Next:', ...[...new Set(steps)].map((step) => `${INDENT}${step}`)];
+  return new CommandExit(1, [...lines, ...next, `Usage: ${RELEASE_TAG_USAGE}`].join('\n'));
 }
 
 /**
@@ -565,14 +581,16 @@ function refusal(messages: readonly string[]): CommandExit {
  */
 function decideUnits(projectRoot: string, git: GitRunner, root: TagInputs): readonly DecidedUnit[] {
   const packages = readTagPackages(projectRoot);
-  if (!packages.ok) throw refusal([packages.problem]);
+  if (!packages.ok) {
+    throw refusal([packages.problem], ['check the workspaces field of package.json — the packages are read from it']);
+  }
   const run = { releaseBranch: root.releaseBranch, branch: root.branch };
   const members = packages.packages.map((member): DecidedUnit => {
     const readings: UnitReadings = readUnitInputs(projectRoot, git, member);
     const inputs: TagInputs = { ...run, ...readings };
-    return { package: member.name, dir: member.dir, inputs, decision: unitDecisionOf(decideTag(inputs)) };
+    return { package: member.name, dir: member.dir, inputs, decision: unitDecisionOf(decideTag(inputs), inputs) };
   });
-  return [{ package: null, dir: null, inputs: root, decision: unitDecisionOf(decideTag(root)) }, ...members];
+  return [{ package: null, dir: null, inputs: root, decision: unitDecisionOf(decideTag(root), root) }, ...members];
 }
 
 /**
@@ -581,10 +599,32 @@ function decideUnits(projectRoot: string, git: GitRunner, root: TagInputs): read
  */
 function readyUnits(units: readonly DecidedUnit[]): readonly ReadyUnit[] {
   const refused = messagesOf(units, 'refused');
-  if (refused.length > 0) throw refusal(refused);
+  if (refused.length > 0) throw refusal(refused, unitSteps(units));
   const ready = units.filter(isReady);
-  if (ready.length === 0) throw refusal(messagesOf(units, 'skipped'));
+  if (ready.length === 0) {
+    const root = units[0];
+    const tagged = root === undefined
+      ? []
+      : nextStepsOf({ kind: 'refused', reason: 'tagged', message: '' }, root.inputs, null);
+    throw refusal(messagesOf(units, 'skipped'), tagged);
+  }
   return ready;
+}
+
+/** The `Next:` steps of every refused unit, in unit order. */
+function unitSteps(units: readonly DecidedUnit[]): readonly string[] {
+  return units.flatMap(({ decision, inputs }) => decision.kind === 'refused'
+    ? nextStepsOf(decision, inputs, null)
+    : []);
+}
+
+/** Where the release branch stands, for the steps of a branch refusal. */
+function branchPlaceOf(git: GitRunner, config: TagSettings, configFile: string): BranchPlace {
+  return {
+    holder: readBranchHolder(git, config.releaseBranch),
+    defaulted: config.releaseBranchDefaulted === true,
+    configFile,
+  };
 }
 
 /** The sentences of the units decided `kind`, in unit order. */
@@ -728,7 +768,12 @@ export async function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT
 
   const inputs = readTagInputs(project.root, git, config);
   const onBranch = branchRefusal(inputs);
-  if (onBranch !== null) throw refusal([onBranch.message]);
+  if (onBranch !== null) {
+    const place = onBranch.reason === 'branch'
+      ? branchPlaceOf(git, config, project.project.configFile)
+      : null;
+    throw refusal([onBranch.message], nextStepsOf(onBranch, inputs, place));
+  }
   const decided = decideUnits(project.root, git, inputs);
   const ready = readyUnits(decided);
 

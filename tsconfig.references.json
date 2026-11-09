@@ -8,6 +8,7 @@
     { "path": "./packages/rafa-board" },
     { "path": "./packages/rafa-effort" },
     { "path": "./packages/rafa-hub" },
+    { "path": "./packages/rafa-index" },
     { "path": "./packages/rafa-inventory" },
     { "path": "./packages/rafa-pr" },
     { "path": "./packages/rafa-release" },
@@ -15,7 +16,6 @@
     { "path": "./packages/rafa-sync-service" },
     { "path": "./addons/atlas/data" },
     { "path": "./addons/atlas/transport" },
-    { "path": "./addons/atlas/charts" },
     { "path": "./addons/atlas/ui" },
     { "path": "./addons/atlas/rafa-atlas" },
     { "path": "./addons/atlas/demo" }

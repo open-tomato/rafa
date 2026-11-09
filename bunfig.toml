@@ -2,4 +2,4 @@
 preload = ["./src/tests/preload.ts"]
 # The Atlas members with their own bunfig.toml (a DOM preload) run their
 # tests from their own folder, locally and in the `atlas` CI job.
-pathIgnorePatterns = ["addons/atlas/charts/**", "addons/atlas/ui/**", "addons/atlas/demo/**"]
+pathIgnorePatterns = ["addons/atlas/ui/**", "addons/atlas/demo/**"]

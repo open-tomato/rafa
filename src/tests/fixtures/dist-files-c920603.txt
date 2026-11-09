@@ -29,6 +29,7 @@ config-registry.d.ts
 config-schema-board-project.d.ts
 config-schema-bugs.d.ts
 config-schema-checks.d.ts
+config-schema-collaborate.d.ts
 config-schema-errors.d.ts
 config-schema-features.d.ts
 config-schema-hub.d.ts
@@ -96,6 +97,8 @@ core/plan/declaration.d.ts
 core/plan/plan-stamp.d.ts
 core/runtime/identity.d.ts
 core/runtime/index.d.ts
+effort/session-log-path.d.ts
+effort/store/answered-rows.d.ts
 effort/store/bring-forward.d.ts
 effort/store/check-rows.d.ts
 effort/store/commit-stats.d.ts

@@ -13,7 +13,10 @@
  * with `.devices.sqlite` for `.sqlite` ({@link devicesFileName}), and
  * never in the store: `mergeStore` builds every merge in a new file and
  * renames it over the store, and a table it does not know would be one
- * `planSchema` might refuse.
+ * `planSchema` might refuse. For the same reason the index
+ * {@link connectSqliteHub} opens is its own file too, the store's name with
+ * `.index.sqlite` for `.sqlite` ({@link indexFileName}); `sqlite-index.ts`
+ * says how it is attached, rebuilt and attached again.
  *
  * ## Opening
  *
@@ -67,6 +70,27 @@
  * is the store's own, so it is the hub `seq` the port names, and its
  * cursor, one snapshot of the store, moves past the rows left out too.
  *
+ * ## Contract
+ *
+ * `contract()` answers `WIRE_CONTRACT_VERSION`, the contract version
+ * this build's rafa speaks, with the migration ids the store file holds,
+ * read from the file as `status()` reads them so the two never disagree.
+ * The store {@link openSqliteHubStore} opens answers every capability
+ * `false`: it answers push, pull and status and nothing beyond them. The
+ * store {@link connectSqliteHub} opens answers its index's capabilities.
+ *
+ * ## The connector
+ *
+ * {@link connectSqliteHub} is the `sqlite` `HubConnector`: the store
+ * above and its index, `sqlite-index.ts`, over one context. It calls the
+ * loader (`prepareSqlite`) before it opens any database, since on macOS a
+ * SQLite library is named only before the process's first open. Then it
+ * learns the catalogue, opens the store and opens the index, handing it
+ * the loader's answer, the embedder and the catalogue's tables. The
+ * index is opened once the store file exists, and a failed index open
+ * closes the store. Closing the store closes the index's connection too,
+ * since the port's index has no close of its own.
+ *
  * ## What a development build refuses
  *
  * `mergeStore` refuses a development build (`bun` from a rafa checkout,
@@ -75,7 +99,10 @@
  * The adapter passes that refusal on rather than overriding it.
  */
 import type {
+  HubCapabilities,
+  HubContract,
   HubDevice,
+  HubIndex,
   HubPullRequest,
   HubPushRequest,
   HubPushResult,
@@ -83,7 +110,9 @@ import type {
   HubStoreContext,
   HubStoreStatus,
 } from './port.js';
+import type { SqliteHubIndex } from './sqlite-index.js';
 import type { MergeOptions, WireCursor, WirePayload } from '@open-tomato/rafa/store';
+import type { IndexEmbedder, PrepareOptions } from '@open-tomato/rafa-index';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, renameSync, rmSync } from 'node:fs';
@@ -93,12 +122,16 @@ import {
   exportWirePayload,
   materialiseWirePayload,
   mergeStore,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
 } from '@open-tomato/rafa/store';
+import { prepareSqlite } from '@open-tomato/rafa-index';
 import { Database } from 'bun:sqlite';
 
 import { DEFAULT_STORE_FILE } from '../config.js';
+
+import { openSqliteHubIndex } from './sqlite-index.js';
 
 /** The package a hub refused as too old is upgraded to. */
 export const HUB_PACKAGE = '@open-tomato/rafa-hub';
@@ -126,6 +159,25 @@ export interface SqliteHubStoreOptions {
   readonly fileName?: string;
 }
 
+/** What the connector may vary beyond the store's options. */
+export interface SqliteHubConnectorOptions extends SqliteHubStoreOptions {
+  /** The embedder vector search embeds with; without one, `vector` is `false`. */
+  readonly embedder?: IndexEmbedder;
+  /** The loader's inputs (`hub.store.sqliteLibrary` is its `library`), the process's own when left out. */
+  readonly loader?: PrepareOptions;
+  /** The project an index built at open records; {@link DEFAULT_INDEX_PROJECT} when left out. */
+  readonly project?: string;
+}
+
+/** The project an index built at open records when the connector is given none. */
+export const DEFAULT_INDEX_PROJECT = 'rafa-hub';
+
+/** The store and index the `sqlite` connector opens. */
+export interface SqliteHub {
+  readonly store: HubStore;
+  readonly index: HubIndex;
+}
+
 /** This build's migrations and merged tables, as its own export names them. */
 interface Catalogue {
   readonly migrations: readonly string[];
@@ -134,6 +186,9 @@ interface Catalogue {
 
 /** The merge's project reader: the hub's store names no project. */
 const NO_PROJECT: NonNullable<MergeOptions['readProject']> = () => ({ rootCommit: null, remote: null });
+
+/** What the adapter can answer beyond push, pull and status: nothing. */
+const CAPABILITIES: HubCapabilities = Object.freeze({ fts: false, vector: false, graph: false, projection: false });
 
 const DEVICES_SCHEMA = 'CREATE TABLE IF NOT EXISTS devices (device TEXT PRIMARY KEY NOT NULL, last_push_at TEXT NOT NULL) STRICT';
 
@@ -145,6 +200,11 @@ const READ_DEVICES = 'SELECT device, last_push_at AS lastPushAt FROM devices ORD
 /** The file each device's last push is kept in, beside the store `fileName`. */
 export function devicesFileName(fileName: string): string {
   return `${fileName.replace(/\.sqlite$/, '')}.devices.sqlite`;
+}
+
+/** The file the index is kept in, beside the store `fileName`. */
+export function indexFileName(fileName: string): string {
+  return `${fileName.replace(/\.sqlite$/, '')}.index.sqlite`;
 }
 
 /** A payload with no rows naming `migrations`. */
@@ -227,10 +287,13 @@ function settle<T>(work: () => T): Promise<T> {
  * the file cannot be made; see the module note.
  */
 export function openSqliteHubStore(context: HubStoreContext, options: SqliteHubStoreOptions = {}): HubStore {
-  const fileName = options.fileName ?? DEFAULT_STORE_FILE;
+  return openStore(context, options.fileName ?? DEFAULT_STORE_FILE, readCatalogue(context.now));
+}
+
+/** Opens the store file `fileName` in the context's directory under a catalogue already learned. */
+function openStore(context: HubStoreContext, fileName: string, catalogue: Catalogue): HubStore {
   const path = join(context.directory, fileName);
   const { now } = context;
-  const catalogue = readCatalogue(now);
   if (!existsSync(path)) createStore(path, context.directory, catalogue, now);
   const devices = new Database(join(context.directory, devicesFileName(fileName)), { create: true, readwrite: true, strict: true });
   devices.run(DEVICES_SCHEMA);
@@ -263,8 +326,10 @@ export function openSqliteHubStore(context: HubStoreContext, options: SqliteHubS
     return Object.freeze({ ...exported, tables: Object.freeze(tables) });
   };
 
+  const heldMigrations = (): readonly string[] => exportWirePayload({ path, cursor: pastEverything }).migrations;
+
   const status = (): HubStoreStatus => ({
-    migrations: exportWirePayload({ path, cursor: pastEverything }).migrations,
+    migrations: heldMigrations(),
     rows: countRows(path, catalogue.tables),
     devices: devices
       .query<HubDevice, []>(READ_DEVICES)
@@ -276,8 +341,55 @@ export function openSqliteHubStore(context: HubStoreContext, options: SqliteHubS
     push: (request) => settle(() => push(request)),
     pull: (request) => settle(() => pull(request)),
     status: () => settle(status),
+    contract: (): HubContract => Object.freeze({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      migrations: heldMigrations(),
+      capabilities: CAPABILITIES,
+    }),
     close: () => settle(() => {
       devices.close();
+    }),
+  };
+}
+
+/**
+ * The `sqlite` connector, a `HubConnector`: opens the store in
+ * `context.directory` as {@link openSqliteHubStore} does, then its index
+ * beside it, the loader called before either opens a database. Rejects
+ * when the store or the index cannot be opened, with nothing left open;
+ * see the module note.
+ */
+export async function connectSqliteHub(context: HubStoreContext, options: SqliteHubConnectorOptions = {}): Promise<SqliteHub> {
+  const prepared = prepareSqlite(options.loader);
+  const fileName = options.fileName ?? DEFAULT_STORE_FILE;
+  const catalogue = readCatalogue(context.now);
+  const store = openStore(context, fileName, catalogue);
+  let half: SqliteHubIndex;
+  try {
+    half = await openSqliteHubIndex({
+      embedder: options.embedder,
+      indexPath: join(context.directory, indexFileName(fileName)),
+      loaderState: options.loader?.state,
+      now: context.now,
+      prepared,
+      project: options.project ?? DEFAULT_INDEX_PROJECT,
+      storePath: join(context.directory, fileName),
+      tables: catalogue.tables,
+    });
+  } catch (error) {
+    await store.close();
+    throw error;
+  }
+  const { index } = half;
+  return {
+    index,
+    store: Object.freeze({
+      ...store,
+      close: async () => {
+        half.close();
+        await store.close();
+      },
+      contract: (): HubContract => Object.freeze({ ...store.contract(), capabilities: index.capabilities() }),
     }),
   };
 }

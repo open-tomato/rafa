@@ -25,6 +25,12 @@
  * `--any-branch`. Each sits beside the case on a branch it was varied
  * from.
  *
+ * `--create-branch` refuses a run the branch step left on its base:
+ * each refusing case sits after the same line less the flag, which
+ * answers the base, and the cases on a configured base `integration`
+ * hand `runBase` and assert the argv that ran, beside the same run whose
+ * base is `main`, which reads no git and stays on `integration` (#1506).
+ *
  * `refuseWorktreeBesideCreateBranch` reads the words alone, so its
  * cases hand it lines and read what it throws; each refusing case is
  * paired with the same line less one flag, which returns, so the
@@ -614,6 +620,17 @@ describe('resolveRunBranch', () => {
     return resolveRunBranch({ checkout: REPO, planStub, base, standing: 'no-branch', args }, over);
   }
 
+  /** The `CommandExit` a branch step threw, or null when it answered. */
+  async function refusalOfResolve(step: Promise<string | null>): Promise<CommandExit | null> {
+    try {
+      await step;
+      return null;
+    } catch (error) {
+      if (error instanceof CommandExit) return error;
+      throw error;
+    }
+  }
+
   beforeEach(() => {
     setActiveOutput(sinkOutput({}));
   });
@@ -651,12 +668,81 @@ describe('resolveRunBranch', () => {
     expect(refusalOf(STUB, branch, [])?.exitCode).toBe(1);
   });
 
-  it('leaves the run on the base under --any-branch, reading no git', async () => {
-    expect(await resolved(STUB, 'main', ['--any-branch', '--create-branch'], NO_GIT)).toBe('main');
+  it('leaves the run on the base under --any-branch alone, reading no git', async () => {
+    // The control of the refusal below: the same line less `--create-branch`.
+    expect(await resolved(STUB, 'main', ['--any-branch'], NO_GIT)).toBe('main');
   });
 
-  it('leaves the run on the base for a plan whose file names no stub', async () => {
-    expect(await resolved(null, 'main', ['--create-branch'], NO_GIT)).toBe('main');
+  it('refuses --create-branch beside --any-branch on the base, naming the plan and the base, reading no git', async () => {
+    const refusal = await refusalOfResolve(resolved(STUB, 'main', ['--any-branch', '--create-branch'], NO_GIT));
+
+    expect(refusal?.exitCode).toBe(1);
+    expect(refusal?.message).toContain(`❌ Refusing --create-branch for \`${STUB}\`: the run is still on \`main\`, the base.`);
+    expect(refusal?.message).toContain(`so ${BRANCH} was not made`);
+    expect(refusal?.message).toEndWith(NOTHING_DISPATCHED);
+  });
+
+  it('leaves the run on the base for a plan whose file names no stub, with no flag', async () => {
+    expect(await resolved(null, 'main', [], NO_GIT)).toBe('main');
+  });
+
+  it('refuses --create-branch for a plan whose file names no stub, printing the git line', async () => {
+    const refusal = await refusalOfResolve(resolved(null, 'main', ['--create-branch'], NO_GIT));
+
+    expect(refusal?.exitCode).toBe(1);
+    expect(refusal?.message).toContain('names no stub');
+    expect(refusal?.message).toContain('still on `main`, the base');
+    expect(refusal?.message).toContain('git checkout -b feat/this-plan');
+  });
+
+  describe('on a configured base outside main and master (#1506)', () => {
+    /** {@link CLEAN} for a run whose base is `integration`. */
+    const ON_INTEGRATION: Readonly<Record<string, GitResult>> = {
+      'fetch origin integration': ok(),
+      'rev-list --left-right --count integration...origin/integration': ok('0\t0\n'),
+      'merge --ff-only origin/integration': ok('Already up to date.\n'),
+    };
+
+    /** The branch a run started on `base` goes on, the run's base being `runBase`. */
+    function resolvedOnBase(
+      args: readonly string[],
+      over: BranchSeams,
+      runBase: string,
+      base = 'integration',
+    ): Promise<string | null> {
+      return resolveRunBranch({ checkout: REPO, planStub: STUB, base, args, runBase }, over);
+    }
+
+    it('makes no offer on integration when the run\'s base is another branch, reading no git', async () => {
+      // The control, and the reading before the fix for every base:
+      // `integration` is a branch of its own when the base is `main`.
+      expect(await resolvedOnBase(['--create-branch'], NO_GIT, 'main')).toBe('integration');
+    });
+
+    it('takes the offer to feat/<stub> under --create-branch, run on the base integration', async () => {
+      const ran: string[] = [];
+      const args = ['--create-branch'];
+      const branch = await resolvedOnBase(args, seams(ON_INTEGRATION, false, ran), 'integration');
+
+      expect(branch).toBe(BRANCH);
+      expect(ran).toEqual([
+        ...REF_READS,
+        'status --porcelain',
+        'fetch origin integration',
+        'rev-list --left-right --count integration...origin/integration',
+        'merge --ff-only origin/integration',
+        `switch -c ${BRANCH}`,
+      ]);
+      expect(refusalOf(STUB, branch, args)).toBeNull();
+    });
+
+    it('refuses a stood-aside --create-branch run on integration, naming the plan and the base', async () => {
+      const refusal = await refusalOfResolve(resolvedOnBase(['--any-branch', '--create-branch'], NO_GIT, 'integration'));
+
+      expect(refusal?.exitCode).toBe(1);
+      expect(refusal?.message).toContain(`for \`${STUB}\`: the run is still on \`integration\`, the base.`);
+      expect(refusal?.message).toEndWith(NOTHING_DISPATCHED);
+    });
   });
 
   // The two lines that answer the question yes before it is asked.

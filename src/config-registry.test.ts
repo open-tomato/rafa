@@ -1,5 +1,5 @@
 /**
- * Tests for the registry: the fourteen sections it lists, the
+ * Tests for the registry: the sixteen sections it lists, the
  * registration its root, `registerCoreConfigSections`, makes, and the
  * merged schema it exports.
  *
@@ -12,7 +12,7 @@
  * section and every package name is SPELLED here, never read off the
  * module, so a section dropped, renamed or reordered fails rather than
  * agreeing with itself. The list merged into `EMPTY_CONFIG_REGISTRY`
- * is held to meet no refusal, so no two of the fourteen define one file
+ * is held to meet no refusal, so no two of the sixteen define one file
  * key under two setting names; `section.test.ts` holds the refusal that
  * case could meet.
  *
@@ -94,7 +94,7 @@ import {
   SETTINGS,
 } from './config-registry.js';
 
-/** The fourteen packages, in the order the registry lists their sections. */
+/** The sixteen packages, in the order the registry lists their sections. */
 const PACKAGES = [
   'core',
   'hub',
@@ -111,6 +111,7 @@ const PACKAGES = [
   'tests',
   'checks',
   'features',
+  'collaborate',
 ];
 
 /** Every setting and the file key it is spelled with, in schema order. */
@@ -227,6 +228,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['featuresPr', 'features.pr'],
   ['featuresRun', 'features.run'],
   ['featuresRelease', 'features.release'],
+  ['collaborateRafa', 'collaborate.rafa'],
 ];
 
 /** The keys known at the top level, in schema order. */
@@ -267,6 +269,7 @@ const TOP = [
   'tests',
   'checks',
   'features',
+  'collaborate',
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -309,7 +312,7 @@ function probeRegistered(module: string, call = false): { settings: number; defa
 }
 
 describe('CONFIG_SECTIONS', () => {
-  it('lists the fourteen sections, core\'s first', () => {
+  it('lists the sixteen sections, core\'s first', () => {
     expect(CONFIG_SECTIONS.map((section) => section.package)).toEqual(PACKAGES);
   });
 
@@ -376,6 +379,7 @@ describe('the registration the preload made', () => {
         'tests',
         'checks',
         'features',
+        'collaborate',
       ]);
     } finally {
       restoreConfigSections(held);
@@ -595,6 +599,7 @@ describe('SECTIONS', () => {
       'checks',
       'claims',
       'cleanup',
+      'collaborate',
       'dangerous',
       'effort',
       'errors',
