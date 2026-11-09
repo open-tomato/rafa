@@ -343,6 +343,23 @@ a CI job after each merge, a post-merge hook, or `rafa next` (which runs settle
 after its merge step). `rafa pr merge` does not call settle itself; instead, it
 prints the settle command as its last line when fragments wait.
 
+**The ending**: a settle that ran closes its output with the step that comes
+next, so `settle && tag` never tags the version before or nothing (#1533). A
+push delivery, or one another settle beat to the same fragments, ends on
+`git merge --ff-only <remote>/<branch>` and then `rafa release tag --push`;
+under `release.tag: settle` the tag already landed, so only the merge remains.
+A pull request delivery ends on `rafa pr wait <n>`, then the same merge and
+tag, each why opening `once #<n> merges`, since a tag before the merge names a
+commit the base never receives. Nothing to settle ends on the sentence `Nothing
+to tag either: every unit keeps its version.` with no step. A dry run that
+would fold ends on `rafa release settle`, without `--dry-run`. A run that
+refused, by its delivery or its tag, ends on its refusal and gets no ending.
+The merge and the tag run on the release branch, so they are placed at the
+checkout holding it (`readBranchHolder`); with no holder, or a holder whose
+path is gone, they follow a `git switch <branch>` step at the project root.
+`rafa pr wait` and the dry run's settle are placed at the project root. JSON
+mode carries the steps as `next`, and the sentence's `next` is empty.
+
 ### Receipt rule and adoption boundary
 
 The changelog section written by settle carries a comment naming the fragments
@@ -410,11 +427,8 @@ release branch as `cd <path> && rafa release tag`, or `git switch <branch>` when
 none holds it or the path it lists is gone; with `pr.base` unset it first names
 the config file read and says the branch is the default. `behind` adds no step,
 since its sentence names the merge. The others point at `rafa release status`,
-`rafa release settle`, the version file or `git status`. Each command step, and
-each follow-up of a run that tagged, json mode's included, is placed by core's
-`placeLine`: the `cd` stays off when the run stands in the git top level the
-step needs. Under `hints.skills: true` a refusal's step is followed by its
-`skill: rafa-release › <case>` line.
+`rafa release settle`, the version file or `git status`. Each step is placed
+and rendered as "Placed steps and the skill line" below describes.
 
 `pr.base` and the `release.*` keys a release depends on belong in a tracked
 `rafa.config.ts`. That file makes each worktree a project root, so the walk
@@ -458,6 +472,40 @@ that names no package or is `private` is skipped without a query. The first
 publish command that fails stops the run, and the units after it are not tried.
 `--dry-run` prints each unit's command, directory and registry, and runs
 nothing, not even the query.
+
+### Placed steps and the skill line
+
+Every `Next:` step of `rafa release tag`, `rafa release settle` and `rafa
+release publish` keeps the `<command> — <why>` form, and is a line that runs
+where it is clicked. `placeLine` (`packages/rafa/src/core/git/placed-line.ts`)
+places it: the command alone when the checkout it must run in is the git top
+level of the directory the command ran in, and `cd <checkout> && <command>`
+when it is another one. A git that does not answer the top-level read counts as
+another place, so the prefix stays. A checkout path that is not on disk, such
+as a `git worktree list` record whose folder was removed, gets no line at all:
+the caller prints its own fallback, the `git switch <branch>` step. Both paths
+are compared after `path.resolve`, with no symlink followed. A step that is an
+instruction, such as `set pr.base in rafa.config.ts`, is printed as written,
+since a `cd` in front of prose runs nothing. The prefix is not on every step,
+since a pasted line that always carried it would print home paths in the
+output.
+
+`hints.skills` is the one switch of the skill line: a boolean under `hints`,
+default `false`, read with the rest of the config by the three commands. With
+it off a step prints its line alone. With it `true`, a step that has a case is
+followed by one indented line, `skill: rafa-release › <case>`, naming the case
+file in `.claude/skills/rafa-release/`. A case is a tag refusal reason or a
+settle outcome: `tag-branch`, `tag-behind`, `tag-version`, `tag-tagged`,
+`tag-changelog`, `tag-git`, `tag-receipt`, `settle-push`, `settle-pr` and
+`settle-nothing`. The nothing sentence carries `settle-nothing`. A step with no
+case prints no skill line whatever the switch says: the publish refusal for a
+HEAD with no release tag, the follow-ups of a run that tagged, and a settle dry
+run's step, whose outcome is not known yet. JSON mode gives each step a `skill`
+field, null when the switch is off or the step has no case. The switch is off
+by default, since a project without the skill installed would read pointers to
+files it lacks, and one skill per case was rejected: every listed skill costs
+context in every session. The case names are keyed in `RELEASE_CASES`
+(`packages/rafa-release/src/commands/release/step-cases.ts`).
 
 ### Guards: the preflight check
 
@@ -671,6 +719,13 @@ findings: `report` (default, warn and proceed), `ask` (ask the user), `refuse`
 to override a `collision` finding and allow a merge. Use only when you have
 merged a branch already stamped with the same version and need to unblock
 another.
+
+Beside the nine, one key under `hints` sets how the steps print:
+**`hints.skills`** — Boolean (default `false`, read through `flag`). `true`
+adds the skill line to each step that has a case, as "Placed steps and the
+skill line" describes. Read by `rafa release tag`, `rafa release settle` and
+`rafa release publish`, and declared in
+`packages/rafa/src/config-schema-hints.ts`.
 
 All keys are optional. An absent `release.fragments` defaults to `.changes/`, an
 absent `release.strategy` defaults to `semver-by-level`, an absent
