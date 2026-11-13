@@ -146,8 +146,8 @@
   },
   "devDependencies": {
     "@open-tomato/define-config": "0.5.0",
-    "@open-tomato/eslint-config": "^0.1.0",
-    "@open-tomato/eslint-plugin": "^0.1.0",
+    "@open-tomato/eslint-config": "^0.2.0",
+    "@open-tomato/eslint-plugin": "^0.2.0",
     "@open-tomato/rafa-board": "workspace:*",
     "@open-tomato/rafa-core": "workspace:*",
     "@open-tomato/rafa-effort": "workspace:*",
