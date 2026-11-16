@@ -437,7 +437,7 @@ reuses it. A read that fails is not kept, so the next call reads again.
 
 **A request that names no version is version `1`.** The hub reads a
 `contractVersion` query parameter that is left out as `1`
-(`checkContractVersion`, `packages/rafa-hub/src/server.ts`). A status answer
+(`checkContractVersion`, `packages/rafa-hub/src/server-query.ts`). A status answer
 that names no version reads the same way on the client, and push and pull then
 send no `contractVersion` field, since a hub one release behind refuses a query
 name it does not read.

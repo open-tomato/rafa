@@ -108,8 +108,9 @@ import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusa
 import type { HubIndex, HubStore } from './store/port.js';
 import type { WireCursor } from '@open-tomato/rafa/store';
 
-import { decodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
+import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
 
+import { checkContractVersion, checkQuery, ContractUnsupported, readDevice, RequestRefused } from './server-query.js';
 import { HubUpgradeRequired } from './store/sqlite.js';
 
 /** The path each route answers on. */
@@ -139,12 +140,6 @@ export const INTERNAL_ERROR = 'The hub failed to serve this request; the hub\'s 
 
 /** The `code` a `409` carries for a contract version the hub does not speak. */
 export const CONTRACT_UNSUPPORTED = 'contract-unsupported';
-
-/** A `contractVersion` as the query spells it: a whole number above zero, in digits with no leading zero. */
-const CONTRACT_VERSION = /^[1-9][0-9]*$/;
-
-/** A device, as `device` names it: 1 to 200 printable ASCII characters, as a store's origin is. */
-const DEVICE = /^[!-~]{1,200}$/;
 
 /** The status each identity refusal is answered with. */
 const REFUSAL_STATUS: Readonly<Record<IdentityRefusalReason, number>> = Object.freeze({
@@ -219,26 +214,6 @@ export interface HubServer {
   readonly port: number;
   /** Stops answering, closing open connections, then awaits a running index rebuild and closes the store. */
   readonly stop: () => Promise<void>;
-}
-
-/** A request the route cannot read, answered with its status and one line. */
-class RequestRefused extends Error {
-  override readonly name = 'RequestRefused';
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-/** A push or a pull naming a contract version the hub does not speak: `409`, with {@link CONTRACT_UNSUPPORTED}. */
-class ContractUnsupported extends Error {
-  override readonly name = 'ContractUnsupported';
-
-  constructor(asked: number) {
-    super(`The request speaks wire contract version ${String(asked)}; this hub speaks version ${String(WIRE_CONTRACT_VERSION)}.`);
-  }
 }
 
 /** A request's answer, with what its log line adds. */
@@ -330,44 +305,6 @@ function refusalResponse(refusal: IdentityRefusal): Response {
     ? { 'www-authenticate': AUTH_CHALLENGE }
     : {};
   return failure(status, refusal.message, headers);
-}
-
-/** Refuses a query parameter `route` does not read, or one given twice. */
-function checkQuery(url: URL, allowed: readonly string[]): void {
-  const names = [...url.searchParams.keys()];
-  const unknown = names.find((name) => !allowed.includes(name));
-  if (unknown !== undefined) {
-    const expected = allowed.length === 0
-      ? 'this route takes none'
-      : `expected ${allowed.join(', ')}`;
-    throw new RequestRefused(400, `The query names ${JSON.stringify(unknown)}; ${expected}.`);
-  }
-  const twice = names.find((name, index) => names.indexOf(name) !== index);
-  if (twice !== undefined) throw new RequestRefused(400, `The query names ${twice} more than once.`);
-}
-
-/** The `device` the query names, refused when absent or not an origin. */
-function readDevice(url: URL): string {
-  const device = url.searchParams.get('device');
-  if (device === null) throw new RequestRefused(400, 'The query names no device; expected device=<the store\'s origin>.');
-  if (!DEVICE.test(device)) throw new RequestRefused(400, 'device is not a store origin; expected 1 to 200 printable ASCII characters.');
-  return device;
-}
-
-/**
- * Refuses the contract version the query names unless it is the hub's,
- * `1` when left out: `400` for a value that is not a whole number above
- * zero, {@link ContractUnsupported} for another version.
- */
-function checkContractVersion(url: URL): void {
-  const spelt = url.searchParams.get('contractVersion');
-  if (spelt === null) return;
-
-  const asked = Number(spelt);
-  if (!CONTRACT_VERSION.test(spelt) || !Number.isSafeInteger(asked)) {
-    throw new RequestRefused(400, `contractVersion is ${JSON.stringify(spelt)}; expected a whole number above zero, such as ${String(WIRE_CONTRACT_VERSION)}.`);
-  }
-  if (asked !== WIRE_CONTRACT_VERSION) throw new ContractUnsupported(asked);
 }
 
 /** The cursor `since` spells, `{}` when left out, checked by core's wire codec. */
