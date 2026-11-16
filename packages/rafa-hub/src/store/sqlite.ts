@@ -32,9 +32,10 @@
  * directory when the options name none. `mergeStore`'s whole-file swap
  * is then one project's file and never another's. Two projects over one
  * store file are refused at open. A request naming no project is served
- * in the first listed project. A push, pull, status or rebuild naming a
- * project not listed is refused with {@link HubProjectNotServed}, whose
- * line names `hub.projects`, before any file is touched.
+ * in the first listed project. A push, pull, status, rebuild, search or
+ * walk naming a project not listed is refused with
+ * {@link HubProjectNotServed}, whose line names `hub.projects`, before
+ * any file is touched.
  *
  * The first served project's store, and with the connector its index,
  * is opened when the adapter opens. Every other project's is opened on
@@ -120,10 +121,10 @@
  * index open closes the store. Another project's index is opened on its
  * first use; an open that fails there is tried again on the next. An
  * index built at open records {@link SqliteHubConnectorOptions.project}
- * on a single-project hub, and the project's id otherwise. A rebuild
- * runs on the index of the project it names (`routeSqliteHubIndex` in
- * `sqlite-index.ts`), and a search or a walk, which names none, on the
- * first served project's. Closing the store closes every index's
+ * on a single-project hub, and the project's id otherwise. A rebuild,
+ * a search or a walk runs on the index of the project it names
+ * (`routeSqliteHubIndex` in `sqlite-index.ts`), a search or a walk
+ * naming none on the first served project's. Closing the store closes every index's
  * connection too, since the port's index has no close of its own.
  *
  * ## What a development build refuses

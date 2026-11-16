@@ -19,10 +19,11 @@
  * A half is one project's index: its store file and its index file
  * beside it, so a hub serving several projects opens one half each,
  * under each project's `storePath`. {@link routeSqliteHubIndex} is the
- * port's index over them. A rebuild runs on the half of the project its
- * request names, and records that project. A search or a walk names no
- * project, so it runs on the first served project's half. Which half a
- * project is, and when it opens, is `sqlite.ts`'s to say.
+ * port's index over them. A rebuild, a search or a walk runs on the
+ * half of the project its request names, and a rebuild records that
+ * project; a search or a walk naming none runs on the first served
+ * project's half. Which half a project is, and when it opens, is
+ * `sqlite.ts`'s to say.
  *
  * ## One read connection, attached
  *
@@ -388,17 +389,17 @@ export interface SqliteHubIndexRoutes {
 }
 
 /**
- * The port's index over one half per served project: a rebuild runs on
- * the half of the project it names, and a search or a walk, which names
- * no project, on the first served project's. See the module note on
- * projects.
+ * The port's index over one half per served project: a rebuild, a
+ * search or a walk runs on the half of the project it names, the first
+ * served project's when a search or a walk names none. See the module
+ * note on projects.
  */
 export function routeSqliteHubIndex(routes: SqliteHubIndexRoutes): HubIndex {
   const { capabilities, halfOf } = routes;
   return Object.freeze({
     capabilities: () => capabilities,
-    links: async (request: IndexLinksRequest): Promise<IndexLinksResult> => (await halfOf(undefined)).links(request),
+    links: async (request: IndexLinksRequest): Promise<IndexLinksResult> => (await halfOf(request.project)).links(request),
     rebuild: async (request: IndexRebuildRequest): Promise<IndexRebuildResult> => (await halfOf(request.project)).rebuild(request),
-    search: async (request: IndexSearchRequest): Promise<IndexSearchResult> => (await halfOf(undefined)).search(request),
+    search: async (request: IndexSearchRequest): Promise<IndexSearchResult> => (await halfOf(request.project)).search(request),
   });
 }

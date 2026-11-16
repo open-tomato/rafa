@@ -300,6 +300,12 @@ export interface IndexRebuildResult {
 /** What one search of the index asks. */
 export interface IndexSearchRequest {
   /**
+   * The project whose index is searched, its root commit sha; a request
+   * naming no project is the first listed project's, and one naming a
+   * project not listed is refused (see the module note on projects).
+   */
+  readonly project?: string;
+  /**
    * How the hits are found: `fts` by full text, `vector` by embedding,
    * `hybrid` both fused by rank. `vector` and `hybrid` are refused when
    * {@link HubCapabilities.vector} is `false`.
@@ -329,6 +335,13 @@ export interface IndexSearchResult {
 
 /** What one walk over `ref_links` asks. */
 export interface IndexLinksRequest {
+  /**
+   * The project whose `ref_links` are walked, its root commit sha; a
+   * request naming no project is the first listed project's, and one
+   * naming a project not listed is refused (see the module note on
+   * projects).
+   */
+  readonly project?: string;
   /** The start node's kind, such as `commit` or `issue`. */
   readonly kind: string;
   /** The start node's id, such as a sha or `#1436`. */

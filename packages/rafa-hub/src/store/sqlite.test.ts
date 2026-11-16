@@ -297,6 +297,17 @@ describe('the SQLite hub store serving projects', () => {
 
       expect((refused as Error).message).toBe(NOT_SERVED);
     });
+
+    it('is refused on search and on a links walk too, the connector naming the same line', async () => {
+      const { index } = await connect();
+
+      const refused = await Promise.all([
+        refusal(index.search({ mode: 'fts', project: UNLISTED, query: 'x' })),
+        refusal(index.links({ id: '#1', kind: 'issue', project: UNLISTED })),
+      ]);
+
+      expect(refused.map((error) => (error as Error | null)?.message)).toEqual([NOT_SERVED, NOT_SERVED]);
+    });
   });
 
   describe('two listed projects over one store file', () => {
@@ -391,6 +402,27 @@ describe('the SQLite hub store serving projects', () => {
       expect([cache.project, cache.rows]).toEqual([Q, 2]);
       expect([parser.project, parser.rows]).toEqual([P, 1]);
       expect(parserAfter).toBe(parserIndex);
+    });
+
+    it('searches the index of the project a search names, and the first listed project\'s for one naming none', async () => {
+      const { store, index } = await connect();
+      const ours = commit(A, 1);
+      const theirs = commit(B, 1);
+      await store.push({ device: A, project: P, payload: payload([ours]) });
+      await store.push({ device: B, project: Q, payload: payload([theirs]) });
+      await index.rebuild({ project: P });
+      await index.rebuild({ project: Q });
+
+      const originsOf = async (query: string, project?: string): Promise<readonly string[]> => (
+        await index.search({ mode: 'fts', project, query })
+      ).hits.map((hit) => hit.origin.originStore);
+
+      expect(await originsOf(String(theirs['sha']), Q)).toEqual([B]);
+      expect(await originsOf(String(theirs['sha']), P)).toEqual([]);
+      expect(await originsOf(String(ours['sha']), P)).toEqual([A]);
+      expect(await originsOf(String(ours['sha']), Q)).toEqual([]);
+      expect(await originsOf(String(ours['sha']))).toEqual([A]);
+      expect(await originsOf(String(theirs['sha']))).toEqual([]);
     });
   });
 
