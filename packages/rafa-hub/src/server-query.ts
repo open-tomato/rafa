@@ -1,14 +1,20 @@
 /**
  * The query readers of the hub's routes: the refusal of a query parameter
- * a route does not name, the `device` reader and the `contractVersion`
- * check. Each throws {@link RequestRefused} for a query it cannot read,
- * and the contract check throws {@link ContractUnsupported} for a version
- * the hub does not speak; `server.ts` answers both.
+ * a route does not name, the `device` reader, the `project` reader and
+ * the `contractVersion` check. Each throws {@link RequestRefused} for a
+ * query it cannot read, the contract check throws
+ * {@link ContractUnsupported} for a version the hub does not speak, and
+ * the project reader throws the store's `HubProjectNotServed` for a
+ * project the hub does not list; `server.ts` answers all three.
  *
  * @module
  */
+import type { HubServedProject } from './store/port.js';
 
 import { WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
+
+import { ROOT_COMMIT } from './config.js';
+import { HubProjectNotServed } from './store/sqlite.js';
 
 /** A `contractVersion` as the query spells it: a whole number above zero, in digits with no leading zero. */
 const CONTRACT_VERSION = /^[1-9][0-9]*$/;
@@ -56,6 +62,23 @@ export function readDevice(url: URL): string {
   if (device === null) throw new RequestRefused(400, 'The query names no device; expected device=<the store\'s origin>.');
   if (!DEVICE.test(device)) throw new RequestRefused(400, 'device is not a store origin; expected 1 to 200 printable ASCII characters.');
   return device;
+}
+
+/**
+ * The `project` the query names, a root commit sha, or undefined when it
+ * names none: `400` for one that is not 40 lowercase hex characters, and
+ * {@link HubProjectNotServed} for one `listed` leaves out. `listed` is
+ * null on a single-project hub, which serves every project a request
+ * names, so only the spelling is checked there.
+ */
+export function readProject(url: URL, listed: readonly HubServedProject[] | null): string | undefined {
+  const project = url.searchParams.get('project');
+  if (project === null) return undefined;
+  if (!ROOT_COMMIT.test(project)) {
+    throw new RequestRefused(400, 'project is not a root commit sha; expected 40 lowercase hex characters, as git rev-list --max-parents=0 HEAD prints.');
+  }
+  if (listed !== null && !listed.some(({ id }) => id === project)) throw new HubProjectNotServed(project);
+  return project;
 }
 
 /**

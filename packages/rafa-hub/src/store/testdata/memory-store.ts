@@ -30,6 +30,7 @@ import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 import { WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 
 import { DEFAULT_PROJECT_ID } from '../../config.js';
+import { HubProjectNotServed } from '../sqlite.js';
 
 /** Everything the stand-in holds. */
 interface MemoryState {
@@ -47,9 +48,9 @@ const EMPTY: MemoryState = { tables: {}, migrations: [], devices: {} };
 /** The key every request is kept under when the context serves one project of before. */
 const SHARED = '';
 
-/** The refusal for a request naming a project the context does not list. */
+/** The refusal for a request naming a project the context does not list: the SQLite adapter's, so the server answers it as it answers that one. */
 function notServed(project: string): Error {
-  return new Error(`rafa-hub: project ${project} is not served here; add it under hub.projects`);
+  return new HubProjectNotServed(project);
 }
 
 /** Whether `projects` is the single-project hub of before: none listed, or `default` alone. */

@@ -130,8 +130,8 @@ const REPOSITORY = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/
 /** Repository names GitHub never holds. */
 const RESERVED_NAMES: readonly string[] = Object.freeze(['.', '..']);
 
-/** A root commit sha as git prints it: 40 lowercase hex characters. */
-const ROOT_COMMIT = /^[0-9a-f]{40}$/;
+/** A root commit sha as git prints it: 40 lowercase hex characters, a project's id on the wire. */
+export const ROOT_COMMIT: RegExp = /^[0-9a-f]{40}$/;
 
 /** The id of the one project a hub serves when `hub.projects` is left out. */
 export const DEFAULT_PROJECT_ID = 'default';
