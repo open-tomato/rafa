@@ -67,6 +67,18 @@ four keys: `id`, the project's root commit sha as 40 lowercase hex characters;
 `id`, or whose `storePath` names one file, are refused. Left out, the hub serves
 one project, with id `default`, named `hub.repository`, in `hub.storePath`.
 
+### `hub.auth.adapter` and `hub.auth.apiKeys`
+
+`hub.auth.adapter` names how the hub identifies a caller: `github`, the
+default, or `api-key`; any other value is refused. `hub.auth.apiKeys` lists the
+names of environment variables, never the keys themselves, each matching
+`^[A-Z_][A-Z0-9_]*$`, such as `RAFA_HUB_KEY`. It is required and non-empty under
+`api-key`, and refused under `github`. An entry that is no variable name is
+refused by its position, such as `hub.auth.apiKeys[1]`, and the refusal never
+repeats what was written, in case a key was pasted in place of its name. This
+release reads and checks both keys, while the hub still identifies every caller
+through GitHub.
+
 ### `hub.auth.cacheFor`
 
 How long a served token's answer is kept in memory before asking GitHub again.

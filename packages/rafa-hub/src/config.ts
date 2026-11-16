@@ -1,5 +1,5 @@
 /**
- * The hub's config reader: the seven server keys `rafa-hub` reads from
+ * The hub's config reader: the nine server keys `rafa-hub` reads from
  * the YAML file the {@link HUB_CONFIG_ENV} environment variable names,
  * each with its default and its reader, resolved into one frozen
  * {@link HubConfig} or refused with every problem at once as a
@@ -16,7 +16,9 @@
  * vector half on for a macOS hub) and `hub.index.rebuildAfterPush`
  * (default `true`; `false` leaves the index to `rafa-hub index
  * rebuild`). The spec for #1431 adds `hub.projects`, the list of
- * projects the hub serves (see below). The client's keys (`hub.url`, `hub.tokenSecret`,
+ * projects the hub serves, and `hub.auth.adapter` with
+ * `hub.auth.apiKeys`, which choose how a caller is identified (see
+ * below). The client's keys (`hub.url`, `hub.tokenSecret`,
  * `hub.timeout`) are core's, read by `packages/rafa/src/config-schema-hub.ts` from a
  * project's `.rafa/config.yaml`; this file is the server's own and
  * never a project's.
@@ -65,6 +67,18 @@
  *     listed project's. Left out, the hub serves one default project,
  *     {@link DEFAULT_PROJECT_ID}, named `hub.repository`, in
  *     `hub.storePath`: the single-project hub of before #1431.
+ *   - `hub.auth.adapter` is `github` (the default, asking GitHub about
+ *     each token's permission) or `api-key`, and nothing else.
+ *     `hub.auth.apiKeys` is a list of environment variable names, each
+ *     matching `^[A-Z_][A-Z0-9_]*$`, and never the keys themselves: the
+ *     `api-key` adapter reads the named variables at start. It is
+ *     required and non-empty under `api-key`, and refused under
+ *     `github`, where nothing would read it. Since a value written
+ *     there may be a key pasted in place of its name, no refusal under
+ *     `hub.auth.apiKeys` repeats what was written: an entry that is no
+ *     variable name is named by its position (`hub.auth.apiKeys[1]`)
+ *     alone, and a value that is no list by its kind. Left out under
+ *     `github`, it is empty.
  *   - Nothing is coerced: a port written as the string `'7373'` is
  *     refused, as core's readers refuse a string spelled like a number.
  *   - A key under `hub`, `hub.auth`, `hub.store` or `hub.index` that the
@@ -122,6 +136,18 @@ const ROOT_COMMIT = /^[0-9a-f]{40}$/;
 /** The id of the one project a hub serves when `hub.projects` is left out. */
 export const DEFAULT_PROJECT_ID = 'default';
 
+/** The adapters `hub.auth.adapter` takes, in the order a refusal names them. */
+export const HUB_AUTH_ADAPTERS: readonly HubAuthAdapter[] = Object.freeze(['github', 'api-key']);
+
+/** How the hub identifies a caller: `hub.auth.adapter`. */
+export type HubAuthAdapter = 'github' | 'api-key';
+
+/** `hub.auth.adapter` when it is left out. */
+export const DEFAULT_AUTH_ADAPTER: HubAuthAdapter = 'github';
+
+/** An environment variable name, as `hub.auth.apiKeys` takes each entry. */
+const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
+
 /** `hub.index.rebuildAfterPush` when it is left out. */
 export const DEFAULT_REBUILD_AFTER_PUSH = true;
 
@@ -132,7 +158,7 @@ const HUB_KEYS: readonly string[] = Object.freeze(['repository', 'port', 'storeP
 const PROJECT_KEYS: readonly string[] = Object.freeze(['id', 'name', 'repository', 'storePath']);
 
 /** The keys the hub reads under `hub.auth`. */
-const AUTH_KEYS: readonly string[] = Object.freeze(['cacheFor']);
+const AUTH_KEYS: readonly string[] = Object.freeze(['adapter', 'apiKeys', 'cacheFor']);
 
 /** The keys the hub reads under `hub.store`. */
 const STORE_KEYS: readonly string[] = Object.freeze(['sqliteLibrary']);
@@ -160,6 +186,15 @@ const PROJECT_NAME_EXPECTED = 'expected a non-empty name, such as rafa';
 
 /** What `hub.auth.cacheFor` takes, as a refusal says it. */
 const CACHE_FOR_EXPECTED = 'expected a duration of whole s, m or h from 1m to 24h, such as 10m, or false to ask GitHub on every request';
+
+/** What `hub.auth.adapter` takes, as a refusal says it. */
+const ADAPTER_EXPECTED = 'expected github or api-key';
+
+/** What `hub.auth.apiKeys` takes, as a refusal says it. */
+const API_KEYS_EXPECTED = 'expected a non-empty list of environment variable names, such as RAFA_HUB_KEY';
+
+/** What an entry of `hub.auth.apiKeys` takes, as a refusal says it. */
+const API_KEY_NAME_EXPECTED = 'expected an environment variable name of A-Z, 0-9 and _, not opening with a digit, such as RAFA_HUB_KEY; the value written is not repeated';
 
 /** What `hub.store.sqliteLibrary` takes, as a refusal says it. */
 const SQLITE_LIBRARY_EXPECTED = 'expected an absolute path to a vanilla libsqlite3, such as /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib';
@@ -208,6 +243,14 @@ export interface HubConfig {
    * to ask GitHub on every request. `hub.auth.cacheFor`.
    */
   readonly cacheForMs: number | null;
+  /** How the hub identifies a caller. `hub.auth.adapter`. */
+  readonly authAdapter: HubAuthAdapter;
+  /**
+   * The names of the environment variables holding the keys the
+   * `api-key` adapter serves, in the order listed, never their values;
+   * empty under `github`. `hub.auth.apiKeys`.
+   */
+  readonly apiKeys: readonly string[];
   /**
    * The absolute path of the vanilla `libsqlite3` the index loads its
    * vector extension through, or null when none is named.
@@ -436,6 +479,47 @@ function readCacheFor(path: string, raw: unknown): Reading<number | null> {
     : { value: ms, problems: [] };
 }
 
+/** Reads `hub.auth.adapter`, {@link DEFAULT_AUTH_ADAPTER} when left out. */
+function readAuthAdapter(path: string, raw: unknown): Reading<HubAuthAdapter> {
+  if (raw === undefined) return { value: DEFAULT_AUTH_ADAPTER, problems: [] };
+
+  const adapter = HUB_AUTH_ADAPTERS.find((name) => name === raw);
+  return adapter === undefined
+    ? refusal(path, 'hub.auth.adapter', raw, ADAPTER_EXPECTED)
+    : { value: adapter, problems: [] };
+}
+
+/** How a refusal under `hub.auth.apiKeys` names a value that is no list, never repeating it. */
+function kindOf(raw: unknown): string {
+  if (raw === null) return 'null';
+  if (isMapping(raw)) return 'a mapping';
+  return `a ${typeof raw}`;
+}
+
+/**
+ * Reads `hub.auth.apiKeys` under `adapter`: a non-empty list of
+ * environment variable names under `api-key`, left out under `github`.
+ * No problem repeats a value written, since one may be a key itself.
+ */
+function readApiKeys(path: string, adapter: HubAuthAdapter | undefined, raw: unknown): Reading<readonly string[]> {
+  const key = 'hub.auth.apiKeys';
+  if (adapter !== 'api-key') {
+    return raw === undefined || adapter === undefined
+      ? { value: Object.freeze([]), problems: [] }
+      : { problems: [`${path}: ${key} is set while hub.auth.adapter is github; expected hub.auth.adapter: api-key beside it, or no ${key}`] };
+  }
+  if (raw === undefined) return { problems: [`${path}: ${key} is missing, ${API_KEYS_EXPECTED}`] };
+  if (!Array.isArray(raw)) return { problems: [`${path}: ${key} is ${kindOf(raw)}, ${API_KEYS_EXPECTED}`] };
+  if (raw.length === 0) return { problems: [`${path}: ${key} is an empty list, ${API_KEYS_EXPECTED}`] };
+
+  const problems = raw.flatMap((name: unknown, position) => typeof name === 'string' && ENV_NAME.test(name)
+    ? []
+    : [`${path}: ${key}[${String(position)}] is not an environment variable name, ${API_KEY_NAME_EXPECTED}`]);
+  return problems.length > 0
+    ? { problems }
+    : { value: Object.freeze([...raw] as string[]), problems: [] };
+}
+
 /** Reads `hub.store.sqliteLibrary`: an absolute path, null when left out. */
 function readSqliteLibrary(path: string, raw: unknown): Reading<string | null> {
   if (raw === undefined) return { value: null, problems: [] };
@@ -509,6 +593,8 @@ export function parseHubConfig(text: string, path: string): HubConfig {
   const storePath = projects === undefined
     ? readStorePath(path, hub['storePath'])
     : { problems: besideProjects(path, hub, ['storePath']) };
+  const authAdapter = readAuthAdapter(path, auth.value?.['adapter']);
+  const apiKeys = readApiKeys(path, authAdapter.value, auth.value?.['apiKeys']);
   const cacheFor = readCacheFor(path, auth.value?.['cacheFor']);
   const sqliteLibrary = readSqliteLibrary(path, store.value?.['sqliteLibrary']);
   const rebuildAfterPush = readRebuildAfterPush(path, index.value?.['rebuildAfterPush']);
@@ -520,6 +606,8 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     ...storePath.problems,
     ...(projects?.problems ?? []),
     ...auth.problems,
+    ...authAdapter.problems,
+    ...apiKeys.problems,
     ...cacheFor.problems,
     ...store.problems,
     ...sqliteLibrary.problems,
@@ -536,6 +624,8 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     storePath: first.storePath,
     projects: served,
     cacheForMs: cacheFor.value as number | null,
+    authAdapter: authAdapter.value as HubAuthAdapter,
+    apiKeys: apiKeys.value as readonly string[],
     sqliteLibrary: sqliteLibrary.value as string | null,
     rebuildAfterPush: rebuildAfterPush.value as boolean,
   });
