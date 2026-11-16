@@ -66,8 +66,8 @@ const FAULTS: Readonly<Record<string, (store: HubStore) => HubStore>> = {
     ...store,
     pull: async (request) => mapRows(await store.pull(request), (row) => ({ ...row, row_json: withKey(row['row_json'] ?? null, 'minutesSincePrevious', 42) })),
   }),
-  'forgets-last-push': (store) => ({ ...store, status: async () => ({ ...await store.status(), devices: [] }) }),
-  'miscounts': (store) => ({ ...store, status: async () => ({ ...await store.status(), rows: {} }) }),
+  'forgets-last-push': (store) => ({ ...store, status: async (request) => ({ ...await store.status(request), devices: [] }) }),
+  'miscounts': (store) => ({ ...store, status: async (request) => ({ ...await store.status(request), rows: {} }) }),
 };
 
 const fault = process.env[FAULT_ENV] ?? '';

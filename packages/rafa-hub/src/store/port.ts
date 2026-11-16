@@ -73,8 +73,10 @@
  * naming a project not listed is refused with
  * `rafa-hub: project <id> is not served here; add it under hub.projects`.
  * One project's rows, devices and cursor are never another's: a pull
- * answers only the named project's rows, and a push leaves every other
- * project's row counts and devices as they were.
+ * answers only the named project's rows, a push leaves every other
+ * project's row counts and devices as they were, and `status()` answers
+ * the rows, devices and migrations of the project its
+ * {@link HubStatusRequest} names, the first listed when it names none.
  *
  * A context listing no projects, or only the one `default` project a
  * hub with `hub.projects` left out serves, is the single-project hub of
@@ -135,6 +137,16 @@ export interface HubPullRequest {
   readonly since: WireCursor;
 }
 
+/** One status reading: which project's rows, devices and migrations it answers. */
+export interface HubStatusRequest {
+  /**
+   * The project read, its root commit sha; a request naming no project
+   * is the first listed project's, and one naming a project not listed
+   * is refused (see the module note on projects).
+   */
+  readonly project?: string;
+}
+
 /** One device the hub has taken a push from. */
 export interface HubDevice {
   /** The device's store origin. */
@@ -143,13 +155,17 @@ export interface HubDevice {
   readonly lastPushAt: string;
 }
 
-/** What the hub's store holds, for `GET /v1/status`. */
+/**
+ * What the hub's store holds for one project, for `GET /v1/status`:
+ * rows, devices and migrations are the project the
+ * {@link HubStatusRequest} names, and `projects` every one served.
+ */
 export interface HubStoreStatus {
-  /** The migration ids the hub's store holds, in apply order: its schema. */
+  /** The migration ids the project's store holds, in apply order: its schema. */
   readonly migrations: readonly string[];
-  /** The rows held per merged table; a table left out holds none. */
+  /** The project's rows held per merged table; a table left out holds none. */
   readonly rows: Readonly<Record<string, number>>;
-  /** Every device that has pushed, in `device` order. */
+  /** Every device that has pushed to the project, in `device` order. */
   readonly devices: readonly HubDevice[];
   /**
    * Every project the store serves, `id` and `name` in the order
@@ -227,8 +243,12 @@ export interface HubStore {
   readonly push: (request: HubPushRequest) => Promise<HubPushResult>;
   /** The rows other origins created past `since`, with the cursor to pass next. */
   readonly pull: (request: HubPullRequest) => Promise<WirePayload>;
-  /** Row counts, the schema and every device's last push. */
-  readonly status: () => Promise<HubStoreStatus>;
+  /**
+   * One project's row counts, schema and every device's last push, with
+   * every project served; the first listed project's when the request,
+   * or the request's `project`, is left out.
+   */
+  readonly status: (request?: HubStatusRequest) => Promise<HubStoreStatus>;
   /** The wire contract the store speaks; its `migrations` are the ones `status()` answers. */
   readonly contract: () => HubContract;
   /** Releases whatever the adapter holds open; the store is not used after. */

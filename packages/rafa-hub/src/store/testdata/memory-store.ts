@@ -20,6 +20,7 @@ import type {
   HubPushRequest,
   HubPushResult,
   HubServedProject,
+  HubStatusRequest,
   HubStore,
   HubStoreContext,
   HubStoreStatus,
@@ -132,11 +133,17 @@ export function openMemoryHubStore(context: HubStoreContext): HubStore {
   const first = (): MemoryState => states[keyOf(undefined)] ?? EMPTY;
 
   /**
-   * Rows, migrations and devices are the first listed project's; `projects`
-   * names every one the context lists, and is left out when it lists none.
+   * Rows, migrations and devices are the named project's, the first
+   * listed project's when the request names none; `projects` names every
+   * one the context lists, and is left out when it lists none.
    */
-  const status = (): Promise<HubStoreStatus> => {
-    const state = first();
+  const status = (request: HubStatusRequest = {}): Promise<HubStoreStatus> => {
+    let state: MemoryState;
+    try {
+      state = states[keyOf(request.project)] ?? EMPTY;
+    } catch (error) {
+      return Promise.reject(error as Error);
+    }
     const rows = Object.fromEntries(Object.entries(state.tables).map(([table, held]) => [table, held.length]));
     const devices: HubDevice[] = Object.entries(state.devices)
       .map(([device, lastPushAt]) => ({ device, lastPushAt }))
