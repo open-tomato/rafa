@@ -75,9 +75,14 @@ names of environment variables, never the keys themselves, each matching
 `^[A-Z_][A-Z0-9_]*$`, such as `RAFA_HUB_KEY`. It is required and non-empty under
 `api-key`, and refused under `github`. An entry that is no variable name is
 refused by its position, such as `hub.auth.apiKeys[1]`, and the refusal never
-repeats what was written, in case a key was pasted in place of its name. This
-release reads and checks both keys, while the hub still identifies every caller
-through GitHub.
+repeats what was written, in case a key was pasted in place of its name.
+
+Under `api-key`, the hub reads each named variable once, when it starts, and
+serves a request whose `Authorization: Bearer` equals one of their values. If a
+named variable is unset or empty, the hub logs one `config.refused` line naming
+the variable and exits 1. Under `github`, a push or a pull naming a listed
+project is checked against that project's `repository`. Every other request is
+checked against the first listed project's.
 
 ### `hub.auth.cacheFor`
 
@@ -147,13 +152,17 @@ hub's host:
 rafa-hub index rebuild
 ```
 
-It reads the same config as the server, rebuilds the index of `hub.repository`
-and prints one line on standard output, then exits 0. The line names the
-repository, the stamp, the row and vector counts per table, and the vector
-state, which reads `vector off: no embedder configured` in this release.
+It reads the same config as the server and rebuilds the index of every listed
+project in turn. For each one it prints one line on standard output, and exits 0
+once all of them are rebuilt. A line names the project (`hub.repository` with
+`hub.projects` left out, the project's id otherwise), the stamp, the row and
+vector counts per table, and the vector state, which reads `vector off: no
+embedder configured` in this release.
 
-A refused config, a store that does not open or a failed rebuild prints one
-line on standard error and exits 1, leaving the live index as it was. A server
+A failed rebuild prints one line on standard error and leaves that project's
+live index as it was. The other projects are still rebuilt, and the command
+exits 1. A refused config or a store that does not open prints one line on
+standard error and exits 1 without rebuilding anything. A server
 already running over the store picks up the new index file on its next query,
 so it needs no restart. In the Docker container, run it with
 `docker exec <container> bun /app/rafa-hub.js index rebuild`.
