@@ -225,6 +225,11 @@ const FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
   ]],
   ['forgets-last-push', ['last push per device > records each device\'s latest push at the clock\'s time, in device order']],
   ['miscounts', ['push > counts the rows it holds per table']],
+  ['shares-projects', [
+    'projects > refuses a push, a pull and a status naming a project not listed, with the line naming hub.projects, and adds nothing',
+    'projects > answers a pull from one project none of the other project\'s rows',
+    'projects > leaves the other project\'s row counts and devices unchanged by a push to one',
+  ]],
   ['edits-rows', ['pull > carries every column as pushed but the recomputed gap, with seq the hub\'s own in rising order past the cursor']],
 ];
 
