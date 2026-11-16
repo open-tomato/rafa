@@ -23,7 +23,7 @@
     "@open-tomato/rafa-effort": "workspace:*"
   },
   "devDependencies": {
-    "@open-tomato/eslint-config": "^0.1.0",
+    "@open-tomato/eslint-config": "^0.2.0",
     "eslint": "^9.39.4",
     "typescript": "^5.9.3"
   }
