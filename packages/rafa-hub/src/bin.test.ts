@@ -18,13 +18,14 @@
  * from rows rather than from an empty index.
  */
 import type { HubLogEntry, HubServer } from './server.js';
-import type { CommitEffortRow, WireRow } from '@open-tomato/rafa/store';
+import type { CommitEffortRow, WirePayload, WireRow } from '@open-tomato/rafa/store';
 
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { exportWirePayload, openSqliteStore, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { encodeWirePayload, exportWirePayload, openSqliteStore, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { hubCommandOf, HUB_VERSION, runHub, runIndexRebuild } from './bin.js';
@@ -245,6 +246,89 @@ describe('runIndexRebuild', () => {
     expect(code).toBe(1);
     expect(err).toHaveLength(1);
     expect(err[0]).toContain(`the store at ${join(root, 'store', 'rafa-hub.sqlite')} did not open`);
+  });
+});
+
+describe('runHub over two listed projects under hub.auth.adapter api-key', () => {
+  const KEYED = { RAFA_HUB_BIN_KEY: API_KEY };
+
+  /** Starts the hub over the two-project config, answers it. */
+  async function startTwo(): Promise<HubServer> {
+    const config = writeTwoProjectConfig();
+    writeFileSync(config, `${readFileSync(config, 'utf8').replace('port: 7373', `port: ${String(await freePort())}`)}  auth:\n    adapter: api-key\n    apiKeys:\n      - RAFA_HUB_BIN_KEY\n`);
+    const server = await runHub({ [HUB_CONFIG_ENV]: config, ...KEYED }, { log: () => undefined, githubApi: 'http://127.0.0.1:9' });
+    if (server === null) throw new Error('the hub refused its config');
+    running = [...running, server];
+    return server;
+  }
+
+  function pushTo(server: HubServer, query: string, bearer: string): Promise<Response> {
+    const { migrations, commit } = exportedCommit();
+    const payload: WirePayload = { format: WIRE_FORMAT, version: WIRE_VERSION, migrations, tables: { commits: [commit] }, cursor: {} };
+    return fetch(`${server.url}${HUB_ROUTES.push}?device=${DEVICE}${query}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${bearer}` },
+      body: encodeWirePayload(payload),
+    });
+  }
+
+  /** The commit rows in a project's store file; 0 when the file was never made, since the hub opens it on first use. */
+  function commitsIn(storePath: string): number {
+    if (!existsSync(join(root, storePath))) return 0;
+    const db = new Database(join(root, storePath), { readonly: true });
+    try {
+      return (db.query('SELECT COUNT(*) AS n FROM commits').get() as { n: number }).n;
+    } finally {
+      db.close();
+    }
+  }
+
+  it('answers a wrong bearer 401 on a push and on status, writing nothing', async () => {
+    const server = await startTwo();
+
+    const push = await pushTo(server, `&project=${TWO_PROJECTS[0].id}`, `${API_KEY}x`);
+    const status = await fetch(`${server.url}${HUB_ROUTES.status}`, { headers: { authorization: `Bearer ${API_KEY.slice(1)}` } });
+
+    expect(push.status).toBe(401);
+    expect(status.status).toBe(401);
+    expect(commitsIn(TWO_PROJECTS[0].storePath)).toBe(0);
+  });
+
+  it('lands the right bearer\'s push to each project in that project\'s store file alone', async () => {
+    const server = await startTwo();
+
+    const toAlpha = await pushTo(server, `&project=${TWO_PROJECTS[0].id}`, API_KEY);
+    expect(toAlpha.status).toBe(200);
+    expect(commitsIn(TWO_PROJECTS[0].storePath)).toBe(1);
+    expect(commitsIn(TWO_PROJECTS[1].storePath)).toBe(0);
+
+    const toBeta = await pushTo(server, `&project=${TWO_PROJECTS[1].id}`, API_KEY);
+    expect(toBeta.status).toBe(200);
+    expect(commitsIn(TWO_PROJECTS[0].storePath)).toBe(1);
+    expect(commitsIn(TWO_PROJECTS[1].storePath)).toBe(1);
+  });
+
+  it('answers a push naming an unlisted project 404 with the line naming hub.projects', async () => {
+    const server = await startTwo();
+    const unlisted = 'c'.repeat(40);
+
+    const response = await pushTo(server, `&project=${unlisted}`, API_KEY);
+    const body = await response.json() as { readonly error: string };
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe(`rafa-hub: project ${unlisted} is not served here; add it under hub.projects`);
+    expect(commitsIn(TWO_PROJECTS[0].storePath)).toBe(0);
+    expect(commitsIn(TWO_PROJECTS[1].storePath)).toBe(0);
+  });
+
+  it('names both projects on GET /v1/status', async () => {
+    const server = await startTwo();
+
+    const response = await fetch(`${server.url}${HUB_ROUTES.status}`, { headers: { authorization: `Bearer ${API_KEY}` } });
+    const body = await response.json() as { readonly data: { readonly projects: readonly { readonly id: string; readonly name: string }[] } };
+
+    expect(response.status).toBe(200);
+    expect(body.data.projects).toEqual(TWO_PROJECTS.map(({ id, name }) => ({ id, name })));
   });
 });
 
