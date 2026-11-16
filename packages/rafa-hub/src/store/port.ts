@@ -63,13 +63,50 @@
  *
  * What a push naming a migration the hub lacks is refused with is the
  * SQLite adapter's to settle, beside the migrations it holds.
+ *
+ * ## Projects
+ *
+ * A hub serves the projects {@link HubStoreContext.projects} lists, in
+ * that order, and a push or pull names the one it is for by
+ * {@link HubPushRequest.project}, the project's root commit sha. A
+ * request naming no project is the first listed project's. A request
+ * naming a project not listed is refused with
+ * `rafa-hub: project <id> is not served here; add it under hub.projects`.
+ * One project's rows, devices and cursor are never another's: a pull
+ * answers only the named project's rows, and a push leaves every other
+ * project's row counts and devices as they were.
+ *
+ * A context listing no projects, or only the one `default` project a
+ * hub with `hub.projects` left out serves, is the single-project hub of
+ * before: every request is served in that one project, whatever
+ * `project` it names or leaves out.
  */
 import type { WireCursor, WirePayload } from '@open-tomato/rafa/store';
+
+/**
+ * One project a hub serves, as the port and `/v1/status` know it: its
+ * id and name, never where its rows are kept.
+ */
+export interface HubServedProject {
+  /**
+   * The project's root commit sha, as a device names it on the wire, or
+   * `default` for the one project of a hub with `hub.projects` left out.
+   */
+  readonly id: string;
+  /** The project's name, `hub.repository` for the default project. */
+  readonly name: string;
+}
 
 /** One push: a device's rows past its push cursor. */
 export interface HubPushRequest {
   /** The pushing device's store origin, its rows' `origin_store`. */
   readonly device: string;
+  /**
+   * The project the rows are for, its root commit sha; a request naming
+   * no project is the first listed project's, and one naming a project
+   * not listed is refused (see the module note on projects).
+   */
+  readonly project?: string;
   /** The rows, as `exportWirePayload` answers them on the device. */
   readonly payload: WirePayload;
 }
@@ -88,6 +125,12 @@ export interface HubPushResult {
 export interface HubPullRequest {
   /** The pulling device's store origin; rows of this origin are never answered. */
   readonly device: string;
+  /**
+   * The project whose rows are answered, its root commit sha; a request
+   * naming no project is the first listed project's, and one naming a
+   * project not listed is refused (see the module note on projects).
+   */
+  readonly project?: string;
   /** The hub cursor a previous pull answered; a table left out is read from the start. */
   readonly since: WireCursor;
 }
@@ -108,6 +151,13 @@ export interface HubStoreStatus {
   readonly rows: Readonly<Record<string, number>>;
   /** Every device that has pushed, in `device` order. */
   readonly devices: readonly HubDevice[];
+  /**
+   * Every project the store serves, `id` and `name` in the order
+   * {@link HubStoreContext.projects} lists them. Optional for now: an
+   * adapter that predates projects answers none, and a reader reads it
+   * left out as the one project of a single-project hub.
+   */
+  readonly projects?: readonly HubServedProject[];
 }
 
 /**
@@ -307,6 +357,14 @@ export interface HubStoreContext {
   readonly directory: string;
   /** The clock every push is stamped from. */
   readonly now: () => Date;
+  /**
+   * The projects the store serves, in the order `hub.projects` lists
+   * them, `status()` answering them in that order. A request naming no
+   * project is the first listed project's. Left out, empty, or the one
+   * `default` project alone, the store serves every request in one
+   * project, as a hub with `hub.projects` left out does.
+   */
+  readonly projects?: readonly HubServedProject[];
 }
 
 /** Makes one adapter's store over a context. */
