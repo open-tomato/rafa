@@ -42,8 +42,9 @@ environment variable is set to `/data/rafa-hub.yaml`.
 ### `hub.repository`
 
 The GitHub repository whose read permission decides who may sync with the hub,
-as `owner/name`. This key is required; there is no default. It is kept as
-written; GitHub's characters are accepted.
+as `owner/name`. This key is required unless `hub.projects` is set, and refused
+beside it; there is no default. It is kept as written; GitHub's characters are
+accepted.
 
 ### `hub.port`
 
@@ -55,6 +56,16 @@ The port the hub listens on. Must be a whole number from 1 to 65535. Defaults to
 The absolute or relative path of the hub's SQLite store. Relative paths are
 resolved against the config file's directory, so the hub opens the same store
 however it is started. Defaults to `rafa-hub.sqlite` beside the config file.
+Refused beside `hub.projects`, where each project names its own.
+
+### `hub.projects`
+
+The projects the hub serves, as a non-empty list. Each entry holds exactly
+four keys: `id`, the project's root commit sha as 40 lowercase hex characters;
+`name`, any non-empty text; `repository`, read as `hub.repository` is; and
+`storePath`, required and resolved as `hub.storePath` is. Two entries with one
+`id`, or whose `storePath` names one file, are refused. Left out, the hub serves
+one project, with id `default`, named `hub.repository`, in `hub.storePath`.
 
 ### `hub.auth.cacheFor`
 

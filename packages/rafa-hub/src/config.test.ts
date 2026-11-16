@@ -1,5 +1,5 @@
 /**
- * Tests for the hub's config reader (`config.ts`): the six server keys,
+ * Tests for the hub's config reader (`config.ts`): the seven server keys,
  * their defaults, the refusal of `0`, negative and out-of-range values,
  * and the file `RAFA_HUB_CONFIG` names.
  *
@@ -36,6 +36,34 @@ const LIBRARY_EXPECTED = 'expected an absolute path to a vanilla libsqlite3, suc
 /** What `hub.index.rebuildAfterPush` says it expected. */
 const REBUILD_EXPECTED = 'expected true or false';
 
+/** What `hub.projects` says it expected. */
+const PROJECTS_EXPECTED = 'expected a non-empty list of projects, each a mapping holding id, name, repository and storePath';
+
+/** What a project's `id` says it expected. */
+const ID_EXPECTED = 'expected the project\'s root commit sha, 40 lowercase hex characters';
+
+/** What a project's `name` says it expected. */
+const NAME_EXPECTED = 'expected a non-empty name, such as rafa';
+
+/** What a project's `storePath` says it expected. */
+const STORE_PATH_EXPECTED = 'expected a file path, such as /data/rafa-hub.sqlite';
+
+/** A root commit sha, as git prints it. */
+const SHA_A = 'a'.repeat(40);
+
+/** Another root commit sha, as git prints it. */
+const SHA_B = '0123456789abcdef0123456789abcdef01234567';
+
+/** A config file's text: `hub.projects` holding `entries`, each a flow mapping, then `lines` under `hub`. */
+function projectsYaml(entries: readonly string[], ...lines: string[]): string {
+  return ['hub:', '  projects:', ...entries.map((item) => `    - ${item}`), ...lines.map((line) => `  ${line}`)].join('\n');
+}
+
+/** One `hub.projects` entry as a flow mapping. */
+function entry(id: string, storePath: string, name = 'rafa', repository = 'open-tomato/rafa'): string {
+  return `{ id: '${id}', name: '${name}', repository: '${repository}', storePath: '${storePath}' }`;
+}
+
 /** A config file's text: `hub.repository` set, then `lines` under `hub`. */
 function hubYaml(...lines: string[]): string {
   return ['hub:', '  repository: open-tomato/rafa', ...lines.map((line) => `  ${line}`)].join('\n');
@@ -58,6 +86,7 @@ describe('defaults', () => {
       repository: 'open-tomato/rafa',
       port: 7373,
       storePath: '/srv/hub/rafa-hub.sqlite',
+      projects: [{ id: 'default', name: 'open-tomato/rafa', repository: 'open-tomato/rafa', storePath: '/srv/hub/rafa-hub.sqlite' }],
       cacheForMs: 600_000,
       sqliteLibrary: null,
       rebuildAfterPush: true,
@@ -80,6 +109,7 @@ describe('defaults', () => {
       repository: 'open-tomato/rafa',
       port: 8080,
       storePath: '/data/hub.sqlite',
+      projects: [{ id: 'default', name: 'open-tomato/rafa', repository: 'open-tomato/rafa', storePath: '/data/hub.sqlite' }],
       cacheForMs: 3_600_000,
       sqliteLibrary: '/opt/sqlite/libsqlite3.dylib',
       rebuildAfterPush: false,
@@ -152,6 +182,103 @@ describe('hub.storePath', () => {
       [`/srv/hub/hub.yaml: hub.storePath is " /data/x", ${expected}`],
       [`/srv/hub/hub.yaml: hub.storePath is 7, ${expected}`],
     ]);
+  });
+});
+
+describe('hub.projects', () => {
+  it('refuses an empty list, a mapping and a scalar', () => {
+    expect(['[]', '{}', 'rafa'].map((raw) => problemsOf(() => parseHubConfig(`hub:\n  projects: ${raw}`, PATH)))).toEqual([
+      [`/srv/hub/hub.yaml: hub.projects is an empty list, ${PROJECTS_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.projects is a mapping, ${PROJECTS_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.projects is "rafa", ${PROJECTS_EXPECTED}`],
+    ]);
+  });
+
+  it('refuses hub.repository and hub.storePath beside it, beside a control without them', () => {
+    const list = [entry(SHA_A, '/data/a.sqlite')];
+
+    expect(problemsOf(() => parseHubConfig(projectsYaml(list, 'repository: open-tomato/rafa', 'storePath: /data/hub.sqlite'), PATH))).toEqual([
+      '/srv/hub/hub.yaml: hub.repository is set beside hub.projects; expected each project\'s repository under hub.projects instead',
+      '/srv/hub/hub.yaml: hub.storePath is set beside hub.projects; expected each project\'s storePath under hub.projects instead',
+    ]);
+    expect(parseHubConfig(projectsYaml(list), PATH).projects).toHaveLength(1);
+  });
+
+  it('refuses a duplicate id, naming both positions', () => {
+    const list = [entry(SHA_A, '/data/a.sqlite'), entry(SHA_B, '/data/b.sqlite'), entry(SHA_A, '/data/c.sqlite')];
+
+    expect(problemsOf(() => parseHubConfig(projectsYaml(list), PATH))).toEqual([
+      `/srv/hub/hub.yaml: hub.projects[2].id is "${SHA_A}", as hub.projects[0].id is; expected each project listed once`,
+    ]);
+  });
+
+  it('refuses a duplicate storePath once resolved, a relative and an absolute spelling of one file included', () => {
+    const list = [entry(SHA_A, 'data/a.sqlite'), entry(SHA_B, '/srv/hub/data/a.sqlite')];
+
+    expect(problemsOf(() => parseHubConfig(projectsYaml(list), PATH))).toEqual([
+      '/srv/hub/hub.yaml: hub.projects[1].storePath is "/srv/hub/data/a.sqlite", as hub.projects[0].storePath is; expected one store file per project',
+    ]);
+  });
+
+  it('refuses an unknown key in an entry, beside the known keys of the same entry', () => {
+    const extra = `{ id: '${SHA_A}', name: rafa, repository: open-tomato/rafa, storePath: /data/a.sqlite, storepath: /data/b.sqlite }`;
+
+    expect(problemsOf(() => parseHubConfig(projectsYaml([extra]), PATH))).toEqual([
+      '/srv/hub/hub.yaml: hub.projects[0].storepath is not a key the hub reads; expected one of hub.projects[0].id, hub.projects[0].name, hub.projects[0].repository, hub.projects[0].storePath',
+    ]);
+  });
+
+  it('refuses an id that is no 40-hex root commit sha', () => {
+    const ids = ['abc', SHA_A.toUpperCase(), `${SHA_A}0`, 'g'.repeat(40), 'default'];
+
+    expect(ids.map((id) => problemsOf(() => parseHubConfig(projectsYaml([entry(id, '/data/a.sqlite')]), PATH)))).toEqual([
+      [`/srv/hub/hub.yaml: hub.projects[0].id is "abc", ${ID_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.projects[0].id is "${'A'.repeat(40)}", ${ID_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.projects[0].id is "${SHA_A}0", ${ID_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.projects[0].id is "${'g'.repeat(40)}", ${ID_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.projects[0].id is "default", ${ID_EXPECTED}`],
+    ]);
+  });
+
+  it('refuses an empty name, a bad repository and a padded storePath', () => {
+    expect(problemsOf(() => parseHubConfig(projectsYaml([entry(SHA_A, ' /data/a.sqlite', '  ', 'rafa')]), PATH))).toEqual([
+      `/srv/hub/hub.yaml: hub.projects[0].name is "  ", ${NAME_EXPECTED}`,
+      `/srv/hub/hub.yaml: hub.projects[0].repository is "rafa", ${REPOSITORY_EXPECTED}`,
+      `/srv/hub/hub.yaml: hub.projects[0].storePath is " /data/a.sqlite", ${STORE_PATH_EXPECTED}`,
+    ]);
+  });
+
+  it('refuses an entry missing every field, and an entry that is not a mapping', () => {
+    expect(problemsOf(() => parseHubConfig(projectsYaml(['{}', SHA_A]), PATH))).toEqual([
+      `/srv/hub/hub.yaml: hub.projects[0].id is missing, ${ID_EXPECTED}`,
+      `/srv/hub/hub.yaml: hub.projects[0].name is missing, ${NAME_EXPECTED}`,
+      `/srv/hub/hub.yaml: hub.projects[0].repository is missing, ${REPOSITORY_EXPECTED}`,
+      `/srv/hub/hub.yaml: hub.projects[0].storePath is missing, ${STORE_PATH_EXPECTED}`,
+      `/srv/hub/hub.yaml: hub.projects[1] is "${SHA_A}", expected a mapping holding id, name, repository, storePath`,
+    ]);
+  });
+
+  it('reads the listed projects in order, resolving each storePath against the config file directory', () => {
+    const config = parseHubConfig(projectsYaml([
+      entry(SHA_A, 'data/a.sqlite', 'rafa', 'open-tomato/rafa'),
+      entry(SHA_B, '/data/b.sqlite', 'Atlas of things', 'open-tomato/atlas'),
+    ]), PATH);
+
+    expect(config.projects).toEqual([
+      { id: SHA_A, name: 'rafa', repository: 'open-tomato/rafa', storePath: '/srv/hub/data/a.sqlite' },
+      { id: SHA_B, name: 'Atlas of things', repository: 'open-tomato/atlas', storePath: '/data/b.sqlite' },
+    ]);
+    expect(config).toMatchObject({ repository: 'open-tomato/rafa', storePath: '/srv/hub/data/a.sqlite' });
+    expect([Object.isFrozen(config.projects), Object.isFrozen(config.projects[0])]).toEqual([true, true]);
+  });
+
+  it('answers one default project named hub.repository in hub.storePath when left out', () => {
+    const config = parseHubConfig(hubYaml('storePath: data/hub.sqlite'), PATH);
+
+    expect(config.projects).toEqual([
+      { id: 'default', name: 'open-tomato/rafa', repository: 'open-tomato/rafa', storePath: '/srv/hub/data/hub.sqlite' },
+    ]);
+    expect([Object.isFrozen(config.projects), Object.isFrozen(config.projects[0])]).toEqual([true, true]);
   });
 });
 
@@ -281,7 +408,7 @@ describe('the document', () => {
   it('refuses unknown keys under hub and hub.auth, beside a known-key control', () => {
     expect(parseHubConfig(hubYaml('port: 7373', 'auth:', '  cacheFor: 10m'), PATH).port).toBe(7373);
     expect(problemsOf(() => parseHubConfig(hubYaml('prot: 7373', 'auth:', '  cachefor: 10m'), PATH))).toEqual([
-      '/srv/hub/hub.yaml: hub.prot is not a key the hub reads; expected one of hub.repository, hub.port, hub.storePath, hub.auth, hub.store, hub.index',
+      '/srv/hub/hub.yaml: hub.prot is not a key the hub reads; expected one of hub.repository, hub.port, hub.storePath, hub.projects, hub.auth, hub.store, hub.index',
       '/srv/hub/hub.yaml: hub.auth.cachefor is not a key the hub reads; expected one of hub.auth.cacheFor',
     ]);
   });
@@ -336,6 +463,7 @@ describe('readHubConfig', () => {
       repository: 'open-tomato/rafa',
       port: 9000,
       storePath: join(dir, 'rafa-hub.sqlite'),
+      projects: [{ id: 'default', name: 'open-tomato/rafa', repository: 'open-tomato/rafa', storePath: join(dir, 'rafa-hub.sqlite') }],
       cacheForMs: 600_000,
       sqliteLibrary: null,
       rebuildAfterPush: true,
