@@ -2,13 +2,13 @@
  * Tests for `findRecurrences`, the recurrence matcher behind `rafa effort
  * report --skills`.
  *
- * The matcher is pure, so every fact row and CI reading is built here and
+ * The matcher is pure, so every fact row and CI fact is built here and
  * no store is opened. Each refusal is paired with a control that holds the
  * same fixture to a match once the refused difference is taken away, so a
  * case that answers none is known to be able to answer one.
  */
 import type { SkillFact, SkillFactEntry, SkillFactFinding } from './skill-facts.js';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact } from '@open-tomato/rafa/store/plan-ci';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -62,18 +62,19 @@ function fact(sessionId: string, rows: Partial<SkillFact> = {}): SkillFact {
   };
 }
 
-/** One CI reading of `planStub`. */
-function reading(planStub: string, failing: readonly string[], readAt = '2026-09-27T10:00:00.000Z'): PlanCiRow {
-  return {
+/** One CI fact of `planStub`, read once. */
+function reading(planStub: string, failing: readonly string[], readAt = '2026-09-27T10:00:00.000Z'): PlanCiFact {
+  const row = {
     planStub,
     pr: 7,
     headSha: 'abc123',
     verdict: failing.length > 0
-      ? 'red'
-      : 'green',
+      ? 'red' as const
+      : 'green' as const,
     failing,
     readAt,
   };
+  return { row, sightings: 0, origins: [], lastSighting: readAt };
 }
 
 describe('findRecurrences over one task', () => {
@@ -240,7 +241,7 @@ describe('findRecurrences over plan CI', () => {
     }]);
   });
 
-  it('reads the union of every reading\'s failing names, each name once, after the tasks', () => {
+  it('reads the union of every fact\'s failing names, each name once, after the tasks', () => {
     const planCi = [
       reading(PLAN, ['unit tests'], '2026-09-27T10:00:00.000Z'),
       reading(PLAN, [], '2026-09-27T11:00:00.000Z'),
@@ -257,7 +258,7 @@ describe('findRecurrences over plan CI', () => {
     ]);
   });
 
-  it('skips another plan\'s readings and reads none for a task under no plan', () => {
+  it('skips another plan\'s facts and reads none for a task under no plan', () => {
     const planCi = [reading(OTHER_PLAN, [TS_ERROR])];
 
     expect(findRecurrences([TS_ERROR], [fact('s1')], 0, planCi)).toEqual([]);

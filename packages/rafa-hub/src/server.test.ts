@@ -8,18 +8,25 @@
  * A refusal case holds that the store was not reached by counting the
  * store's calls, and each such count has a served case beside it that
  * reads it nonzero, so a count that could never move proves nothing.
+ *
+ * The rebuild cases hand the server a stand-in index whose rebuilds end
+ * when the case says, and count the rebuilds it was asked for; every
+ * case reading that count at zero or one has one beside it reading it
+ * higher. A rebuild that ends at once has ended, its log line written,
+ * before the push that started it is answered, since nothing but
+ * microtasks runs between them.
  */
 import type { HubIdentity, IdentityRefusalReason } from './identity/port.js';
 import type { HubLogEntry, HubServer, HubServerOptions } from './server.js';
-import type { HubStore } from './store/port.js';
+import type { HubIndex, HubStore, IndexRebuildRequest, IndexRebuildResult } from './store/port.js';
 import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 
-import { encodeWirePayload, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { encodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { HUB_ACTIONS } from './identity/port.js';
 import { openMemoryIdentity } from './identity/testdata/memory-identity.js';
-import { AUTH_CHALLENGE, HUB_ROUTES, INTERNAL_ERROR, jsonLineLog, startHubServer, STORE_UNAVAILABLE } from './server.js';
+import { AUTH_CHALLENGE, CONTRACT_UNSUPPORTED, HUB_ROUTES, INTERNAL_ERROR, jsonLineLog, startHubServer, STORE_UNAVAILABLE } from './server.js';
 import { HUB_UPGRADE, HubUpgradeRequired } from './store/sqlite.js';
 import { openMemoryHubStore } from './store/testdata/memory-store.js';
 
@@ -56,6 +63,7 @@ interface Calls {
   pull: number;
   status: number;
   close: number;
+  contract: number;
 }
 
 /** `store` with each call counted into `calls`. */
@@ -76,6 +84,10 @@ function counted(store: HubStore, calls: Calls): HubStore {
     close: () => {
       calls.close += 1;
       return store.close();
+    },
+    contract: () => {
+      calls.contract += 1;
+      return store.contract();
     },
   };
 }
@@ -112,7 +124,7 @@ interface Started {
 /** Starts a hub over stand-ins, `overrides` replacing any option. */
 function start(overrides: Partial<HubServerOptions> = {}): Started {
   const lines: string[] = [];
-  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0 };
+  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0, contract: 0 };
   const server = startHubServer({
     port: 0,
     hostname: '127.0.0.1',
@@ -141,6 +153,7 @@ interface Envelope {
   readonly success: boolean;
   readonly data?: Record<string, unknown>;
   readonly error?: string;
+  readonly code?: string;
 }
 
 async function envelope(response: Response): Promise<Envelope> {
@@ -370,7 +383,9 @@ describe('GET /v1/status', () => {
       success: true,
       data: {
         version: VERSION,
+        contractVersion: WIRE_CONTRACT_VERSION,
         migrations: ['0001-base'],
+        capabilities: { fts: false, vector: false, graph: false, projection: false },
         rows: { commits: 3 },
         devices: [{ device: A, lastPushAt: T0 }, { device: B, lastPushAt: T0 }],
       },
@@ -435,7 +450,7 @@ describe('POST /v1/effort/push', () => {
     ['an empty device', `${HUB_ROUTES.push}?device=`, encodeWirePayload(payload([commit(A, 1)])), 'device is not a store origin'],
     ['a device holding a space', `${HUB_ROUTES.push}?device=a%20b`, encodeWirePayload(payload([commit(A, 1)])), 'device is not a store origin'],
     ['a device given twice', `${HUB_ROUTES.push}?device=${A}&device=${B}`, encodeWirePayload(payload([commit(A, 1)])), 'names device more than once'],
-    ['a parameter the route does not read', `${HUB_ROUTES.push}?device=${A}&since={}`, encodeWirePayload(payload([commit(A, 1)])), 'The query names "since"; expected device.'],
+    ['a parameter the route does not read', `${HUB_ROUTES.push}?device=${A}&since={}`, encodeWirePayload(payload([commit(A, 1)])), 'The query names "since"; expected device, contractVersion.'],
     ['no body', `${HUB_ROUTES.push}?device=${A}`, undefined, 'wire: the payload is not JSON'],
     ['a body that is not JSON', `${HUB_ROUTES.push}?device=${A}`, 'rows please', 'wire: the payload is not JSON'],
     ['a payload of another format', `${HUB_ROUTES.push}?device=${A}`, JSON.stringify({ ...payload([]), format: 'csv' }), 'wire: format is "csv"'],
@@ -493,7 +508,7 @@ describe('GET /v1/effort/pull', () => {
     ['a negative cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":-1}')}`, 'wire: cursor for commits is -1'],
     ['a fractional cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":1.5}')}`, 'wire: cursor for commits is 1.5'],
     ['a cursor naming a table that is not merged', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"merges":1}')}`, 'which is no merged table'],
-    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, since.'],
+    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, since, contractVersion.'],
   ];
   for (const [what, path, says] of refusals) {
     it(`answers 400 for ${what}, reaching no store`, async () => {
@@ -606,4 +621,352 @@ describe('refusal statuses', () => {
       expect((await envelope(response)).error).toBe(`refused: ${reason}`);
     });
   }
+});
+
+describe('contractVersion on push and pull', () => {
+  /** A push and a pull of `query` appended to the device, each with its route's call count. */
+  const routes: readonly (readonly [string, (server: HubServer, query: string) => Promise<Response>, (calls: Calls) => number])[] = [
+    [
+      'a push',
+      (server, query) => send(server, 'POST', `${HUB_ROUTES.push}?device=${A}${query}`, WRITER, encodeWirePayload(payload([commit(A, 1)]))),
+      (calls) => calls.push,
+    ],
+    [
+      'a pull',
+      (server, query) => send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}${query}`, WRITER),
+      (calls) => calls.pull,
+    ],
+  ];
+
+  for (const [what, call, reached] of routes) {
+    it(`serves ${what} naming no version as version 1`, async () => {
+      const { server, calls } = start();
+
+      const response = await call(server, '');
+
+      expect(WIRE_CONTRACT_VERSION).toBe(1);
+      expect(response.status).toBe(200);
+      expect((await envelope(response)).success).toBe(true);
+      expect(reached(calls)).toBe(1);
+    });
+
+    it(`serves ${what} naming version 1`, async () => {
+      const { server, calls } = start();
+
+      const response = await call(server, '&contractVersion=1');
+
+      expect(response.status).toBe(200);
+      expect(reached(calls)).toBe(1);
+    });
+
+    it(`answers 409 with ${CONTRACT_UNSUPPORTED} for ${what} naming version 2, reaching no store`, async () => {
+      const { server, calls, lines } = start();
+
+      const response = await call(server, '&contractVersion=2');
+
+      expect(response.status).toBe(409);
+      expect(await envelope(response)).toEqual({
+        success: false,
+        error: 'The request speaks wire contract version 2; this hub speaks version 1.',
+        code: CONTRACT_UNSUPPORTED,
+      });
+      expect(reached(calls) + calls.contract).toBe(0);
+      expect(requestLines(lines)[0]).toMatchObject({ level: 'warn', status: 409 });
+    });
+
+    const malformed: readonly (readonly [string, string])[] = [
+      ['0', '"0"'],
+      ['1.5', '"1.5"'],
+      ['abc', '"abc"'],
+      ['', '""'],
+      ['01', '"01"'],
+    ];
+    for (const [value, quoted] of malformed) {
+      it(`answers 400 for ${what} naming version ${quoted}, reaching no store`, async () => {
+        const { server, calls } = start();
+
+        const response = await call(server, `&contractVersion=${value}`);
+
+        expect(response.status).toBe(400);
+        expect(await envelope(response)).toEqual({
+          success: false,
+          error: `contractVersion is ${quoted}; expected a whole number above zero, such as 1.`,
+        });
+        expect(reached(calls)).toBe(0);
+      });
+    }
+
+    it(`answers 400 for ${what} naming the version twice`, async () => {
+      const { server, calls } = start();
+
+      const response = await call(server, '&contractVersion=1&contractVersion=1');
+
+      expect(response.status).toBe(400);
+      expect((await envelope(response)).error).toBe('The query names contractVersion more than once.');
+      expect(reached(calls)).toBe(0);
+    });
+  }
+
+  it('refuses another version before the body is decoded', async () => {
+    const { server, calls } = start();
+
+    const response = await send(server, 'POST', `${HUB_ROUTES.push}?device=${A}&contractVersion=2`, WRITER, 'rows please');
+
+    expect(response.status).toBe(409);
+    expect((await envelope(response)).code).toBe(CONTRACT_UNSUPPORTED);
+    expect(calls.push).toBe(0);
+  });
+});
+
+/** The project a rebuild records in these cases. */
+const PROJECT = 'open-tomato/rafa';
+
+/** What a stand-in rebuild answers. */
+const REBUILT: IndexRebuildResult = Object.freeze({
+  project: PROJECT,
+  stamp: T0,
+  rows: 3,
+  vectors: 0,
+  tables: Object.freeze([Object.freeze({ table: 'effort_fts', rows: 3 })]),
+  vector: false,
+  why: 'sqlite-vec did not load',
+});
+
+/** A promise with its resolve and reject held outside it. */
+interface Deferred<T> {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+  readonly reject: (error: Error) => void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (error: Error) => void = () => undefined;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+/** A stand-in index, the rebuilds it was asked for, and a promise per rebuild resolving once it starts. */
+interface StandInIndex {
+  readonly index: HubIndex;
+  readonly asked: IndexRebuildRequest[];
+  readonly started: (call: number) => Promise<void>;
+}
+
+/** A stand-in index whose `call`th rebuild (from 0) answers what `outcome(call)` does. */
+function standInIndex(outcome: (call: number) => Promise<IndexRebuildResult> = () => Promise.resolve(REBUILT)): StandInIndex {
+  const asked: IndexRebuildRequest[] = [];
+  const starts: Deferred<void>[] = [];
+  const startOf = (call: number): Deferred<void> => {
+    starts[call] ??= deferred<void>();
+    return starts[call];
+  };
+  const index: HubIndex = {
+    rebuild: (request) => {
+      const call = asked.length;
+      asked.push(request);
+      startOf(call).resolve();
+      return outcome(call);
+    },
+    search: () => Promise.resolve({ hits: [] }),
+    links: () => Promise.resolve({ graph: false, links: [] }),
+    capabilities: () => ({ fts: true, vector: false, graph: false, projection: false }),
+  };
+  return { index, asked, started: (call) => startOf(call).promise };
+}
+
+/** Starts a hub over `index` through `openConnected`, rebuilding after a push, `overrides` replacing any option. */
+function startConnected(index: HubIndex, overrides: Partial<HubServerOptions> = {}): Started {
+  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0, contract: 0 };
+  const started = start({
+    openStore: () => {
+      throw new Error('openStore is not used beside openConnected');
+    },
+    openConnected: () => Promise.resolve({ store: counted(memoryStore(), calls), index }),
+    rebuildAfterPush: true,
+    project: PROJECT,
+    ...overrides,
+  });
+  return { ...started, calls };
+}
+
+/** Stops `server` and lets the `afterEach` hook skip it. */
+async function stopped(server: HubServer): Promise<void> {
+  await server.stop();
+  running = running.filter((held) => held !== server);
+}
+
+/** The `index.*` lines logged, by event. */
+function indexLines(lines: readonly string[]): HubLogEntry[] {
+  return entries(lines).filter((entry) => entry.event.startsWith('index.'));
+}
+
+describe('index rebuild after a push', () => {
+  it('starts one rebuild naming the project after a push adding rows, answering the push before it ends', async () => {
+    const gate = deferred<IndexRebuildResult>();
+    const { index, asked } = standInIndex(() => gate.promise);
+    const { server, lines, calls } = startConnected(index);
+
+    const response = await push(server, A, [commit(A, 1)]);
+
+    expect(response.status).toBe(200);
+    expect(await envelope(response)).toEqual({ success: true, data: { received: 1, added: 1, at: T0 } });
+    expect(asked).toEqual([{ project: PROJECT }]);
+    expect(indexLines(lines)).toEqual([]);
+
+    gate.resolve(REBUILT);
+    await stopped(server);
+
+    expect(calls.push).toBe(1);
+    expect(indexLines(lines)).toEqual([expect.objectContaining({
+      level: 'info',
+      event: 'index.rebuilt',
+      project: PROJECT,
+      rows: 3,
+      vectors: 0,
+      vector: false,
+      tables: [{ table: 'effort_fts', rows: 3 }],
+    }) as HubLogEntry]);
+  });
+
+  const failures: readonly (readonly [string, () => Promise<IndexRebuildResult>])[] = [
+    ['rejects', () => Promise.reject(new Error('SQLITE_IOERR: disk I/O error'))],
+    ['throws', () => {
+      throw new Error('SQLITE_IOERR: disk I/O error');
+    }],
+  ];
+  for (const [how, fail] of failures) {
+    it(`logs index.rebuild-failed when the rebuild ${how}, answering the push unchanged and rebuilding on the next push`, async () => {
+      const { index, asked } = standInIndex((call) => call === 0
+        ? fail()
+        : Promise.resolve(REBUILT));
+      const { server, lines } = startConnected(index);
+
+      const first = await push(server, A, [commit(A, 1)]);
+      const second = await push(server, A, [commit(A, 2)]);
+
+      expect(first.status).toBe(200);
+      expect(await envelope(first)).toEqual({ success: true, data: { received: 1, added: 1, at: T0 } });
+      expect(second.status).toBe(200);
+      await stopped(server);
+
+      expect(asked).toHaveLength(2);
+      expect(indexLines(lines).map(({ level, event, project, error }) => ({ level, event, project, error }))).toEqual([
+        { level: 'error', event: 'index.rebuild-failed', project: PROJECT, error: 'SQLITE_IOERR: disk I/O error' },
+        { level: 'info', event: 'index.rebuilt', project: PROJECT, error: undefined },
+      ]);
+      expect(requestLines(lines).map(({ level, status }) => ({ level, status }))).toEqual([
+        { level: 'info', status: 200 },
+        { level: 'info', status: 200 },
+      ]);
+      expect(entries(lines).some((entry) => entry.event === 'request.failed')).toBe(false);
+    });
+  }
+
+  const quiet: readonly (readonly [string, Partial<HubServerOptions>])[] = [
+    ['false', { rebuildAfterPush: false }],
+    ['left out', { rebuildAfterPush: undefined, project: undefined }],
+  ];
+  for (const [what, overrides] of quiet) {
+    it(`starts no rebuild with rebuildAfterPush ${what}, serving the store openConnected opened`, async () => {
+      const { index, asked } = standInIndex();
+      const { server, lines, calls } = startConnected(index, overrides);
+
+      const response = await push(server, A, [commit(A, 1), commit(A, 2)]);
+      await stopped(server);
+
+      expect(await envelope(response)).toEqual({ success: true, data: { received: 2, added: 2, at: T0 } });
+      expect(calls.push).toBe(1);
+      expect(calls.close).toBe(1);
+      expect(asked).toEqual([]);
+      expect(indexLines(lines)).toEqual([]);
+    });
+  }
+
+  it('starts no rebuild after a push adding nothing, a repeat or an empty payload', async () => {
+    const { index, asked } = standInIndex();
+    const { server, lines } = startConnected(index);
+
+    await push(server, A, [commit(A, 1), commit(A, 2)]);
+    expect(asked).toHaveLength(1);
+
+    const repeat = await push(server, A, [commit(A, 1), commit(A, 2)]);
+    const empty = await push(server, A, []);
+    await stopped(server);
+
+    expect(await envelope(repeat)).toEqual({ success: true, data: { received: 2, added: 0, at: T0 } });
+    expect(await envelope(empty)).toEqual({ success: true, data: { received: 0, added: 0, at: T0 } });
+    expect(asked).toHaveLength(1);
+    expect(indexLines(lines).map(({ event }) => event)).toEqual(['index.rebuilt']);
+  });
+
+  it('queues one rebuild for two pushes during one, starting it once the running one ends', async () => {
+    const gates = [deferred<IndexRebuildResult>(), deferred<IndexRebuildResult>()];
+    const { index, asked, started } = standInIndex((call) => gates[call]?.promise ?? Promise.reject(new Error(`rebuild ${String(call)} was not expected`)));
+    const { server, lines } = startConnected(index);
+
+    await push(server, A, [commit(A, 1)]);
+    const during = await Promise.all([push(server, A, [commit(A, 2)]), push(server, B, [commit(B, 1)])]);
+
+    expect(during.map((response) => response.status)).toEqual([200, 200]);
+    expect(await Promise.all(during.map(envelope))).toEqual([
+      { success: true, data: { received: 1, added: 1, at: T0 } },
+      { success: true, data: { received: 1, added: 1, at: T0 } },
+    ]);
+    expect(asked).toHaveLength(1);
+
+    gates[0]?.resolve(REBUILT);
+    await started(1);
+    expect(asked).toHaveLength(2);
+
+    gates[1]?.resolve({ ...REBUILT, rows: 4 });
+    await stopped(server);
+
+    expect(asked).toEqual([{ project: PROJECT }, { project: PROJECT }]);
+    expect(indexLines(lines).map(({ event, rows }) => ({ event, rows }))).toEqual([
+      { event: 'index.rebuilt', rows: 3 },
+      { event: 'index.rebuilt', rows: 4 },
+    ]);
+  });
+
+  it('stops by awaiting the running rebuild before closing the store, dropping the queued one', async () => {
+    const order: string[] = [];
+    const gate = deferred<IndexRebuildResult>();
+    const { index, asked } = standInIndex(() => gate.promise.then((built) => {
+      order.push('rebuild ended');
+      return built;
+    }));
+    const { server } = startConnected(index, {
+      openConnected: () => Promise.resolve({
+        store: { ...memoryStore(), close: () => {
+          order.push('store closed');
+          return Promise.resolve();
+        } },
+        index,
+      }),
+    });
+    await push(server, A, [commit(A, 1)]);
+    await push(server, A, [commit(A, 2)]);
+
+    setTimeout(() => {
+      gate.resolve(REBUILT);
+    }, 30);
+    await stopped(server);
+
+    expect(order).toEqual(['rebuild ended', 'store closed']);
+    expect(asked).toHaveLength(1);
+  });
+
+  it('refuses at start rebuildAfterPush with no openConnected or no project, and options opening no store', () => {
+    const base = { port: 0, hostname: '127.0.0.1', version: VERSION, identity: identity(), log: () => undefined };
+
+    expect(() => startHubServer({ ...base, openStore: memoryStore, rebuildAfterPush: true, project: PROJECT }))
+      .toThrow('rebuildAfterPush needs openConnected');
+    expect(() => startHubServer({ ...base, openConnected: () => Promise.resolve({ store: memoryStore(), index: standInIndex().index }), rebuildAfterPush: true }))
+      .toThrow('rebuildAfterPush needs project');
+    expect(() => startHubServer(base)).toThrow('startHubServer needs openStore or openConnected');
+  });
 });

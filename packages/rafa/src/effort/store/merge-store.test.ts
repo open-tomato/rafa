@@ -111,6 +111,30 @@ function plantCommit(db: Database, origin: string, sha: string, timestamp: strin
     .run(seq, origin, seq, sha, JSON.stringify({ sha, timestamp, minutesSincePrevious: gap }));
 }
 
+/** Plants a `plan_ci` reading of pr 7 on `sha-a` at `readAt` under `origin`, red ones failing `lint`. */
+function plantReading(db: Database, origin: string, readAt: string, verdict: 'green' | 'red' = 'red'): void {
+  const seq = nextSeq(db, 'plan_ci');
+  const failing = verdict === 'red'
+    ? '["lint"]'
+    : '[]';
+  db.query('INSERT INTO plan_ci (seq, origin_store, origin_seq, plan_stub, pr, head_sha, verdict, failing, read_at)'
+    + ' VALUES (?, ?, ?, \'phase-1\', 7, \'sha-a\', ?, ?, ?)')
+    .run(seq, origin, seq, verdict, failing, readAt);
+}
+
+/** Plants a supersede of the `plan_ci` reading at `superseded` by the one at `canonical`, under `origin`. */
+function plantSupersede(db: Database, origin: string, canonical: string, superseded: string): void {
+  const seq = nextSeq(db, 'reading_supersedes');
+  db.query('INSERT INTO reading_supersedes (seq, origin_store, origin_seq, table_name, canonical_key, superseded_key, rule)'
+    + ' VALUES (?, ?, ?, \'plan_ci\', ?, ?, \'same-fact@1\')')
+    .run(seq, origin, seq, readingKeyAt(canonical), readingKeyAt(superseded));
+}
+
+/** The key of the `plan_ci` reading of pr 7 on `sha-a` at `readAt`, spelled by hand. */
+function readingKeyAt(readAt: string): string {
+  return `[7,"sha-a","${readAt}"]`;
+}
+
 /** Plants the `store_meta` row naming `storeId` of `project`. */
 function plantMeta(db: Database, path: string, storeId: string, project: string): void {
   db.query(
@@ -349,6 +373,121 @@ describe('mergeStore', () => {
     const [hereAfter, thereAfter] = snapshotBoth(testCase);
     expect(hereBefore !== undefined && hereAfter !== undefined && sameFiles(hereBefore, hereAfter)).toBe(true);
     expect(thereBefore !== undefined && thereAfter !== undefined && sameFiles(thereBefore, thereAfter)).toBe(true);
+  });
+});
+
+describe('mergeStore supersedes', () => {
+  const T1 = '2026-11-08T09:00:00.000Z';
+  const T2 = '2026-11-08T10:00:00.000Z';
+  const T3 = '2026-11-08T11:00:00.000Z';
+
+  /** A pair of stores, each minted, with what `here` and `there` plant. */
+  function readingsCase(here: (db: Database) => void, there: (db: Database) => void): Case {
+    const testCase = freshCase();
+    withStore(testCase.path, (db) => {
+      plantMeta(db, testCase.path, HERE, PROJECT);
+      here(db);
+    });
+    withStore(testCase.otherPath, (db) => {
+      plantMeta(db, testCase.otherPath, THERE, PROJECT);
+      there(db);
+    });
+    return testCase;
+  }
+
+  /** Every supersede row of the store at `path`, in append order. */
+  function supersedesOf(path: string): { canonical_key: string; superseded_key: string; origin_store: string | null }[] {
+    return readRows(path, 'SELECT canonical_key, superseded_key, origin_store FROM reading_supersedes ORDER BY seq');
+  }
+
+  /** The `added` the merge answered for `table`. */
+  function addedTo(result: ReturnType<typeof mergeStore>, table: string): number | undefined {
+    return result.tables.find((entry) => entry.table === table)?.added;
+  }
+
+  it('writes no supersede when both stores hold the one reading, matched on its identity', () => {
+    const testCase = readingsCase((db) => plantReading(db, HERE, T1), (db) => plantReading(db, THERE, T1));
+
+    const result = mergeStore(mergeOptions(testCase));
+
+    expect(result).toMatchObject({ rowsAdded: 0, rowsSkipped: 1, rowsInConflict: 0 });
+    expect(addedTo(result, 'reading_supersedes')).toBe(0);
+    expect(supersedesOf(testCase.path)).toEqual([]);
+  });
+
+  it('writes no supersede for a reading of another verdict on the same head, a fact of its own', () => {
+    const testCase = readingsCase((db) => plantReading(db, HERE, T1), (db) => plantReading(db, THERE, T2, 'green'));
+
+    const result = mergeStore(mergeOptions(testCase));
+
+    expect(result.rowsAdded).toBe(1);
+    expect(addedTo(result, 'plan_ci')).toBe(1);
+    expect(addedTo(result, 'reading_supersedes')).toBe(0);
+    expect(supersedesOf(testCase.path)).toEqual([]);
+  });
+
+  it('supersedes a later reading brought in by the earlier one here, counting the row in added, rowsAdded and merges', () => {
+    const testCase = readingsCase((db) => plantReading(db, HERE, T1), (db) => plantReading(db, THERE, T2));
+
+    const result = mergeStore(mergeOptions(testCase));
+
+    expect(addedTo(result, 'plan_ci')).toBe(1);
+    expect(addedTo(result, 'reading_supersedes')).toBe(1);
+    expect(result).toMatchObject({ rowsAdded: 2, rowsSkipped: 0, rowsInConflict: 0 });
+    expect(supersedesOf(testCase.path)).toEqual([{ canonical_key: readingKeyAt(T1), superseded_key: readingKeyAt(T2), origin_store: HERE }]);
+    expect(readRows(testCase.path, 'SELECT rows_added FROM merges')).toEqual([{ rows_added: 2 }]);
+  });
+
+  it('counts the supersede it would write under dryRun, the count check passing over it', () => {
+    const testCase = readingsCase((db) => plantReading(db, HERE, T1), (db) => plantReading(db, THERE, T2));
+
+    const result = mergeStore(mergeOptions(testCase, { dryRun: true }));
+
+    expect(result).toMatchObject({ status: 'would-merge', rowsAdded: 2 });
+    expect(addedTo(result, 'reading_supersedes')).toBe(1);
+    expect(supersedesOf(testCase.path)).toEqual([]);
+  });
+
+  it('writes nothing twice for a supersede the other store brought with its readings', () => {
+    const testCase = readingsCase(() => undefined, (db) => {
+      plantReading(db, THERE, T1);
+      plantReading(db, THERE, T2);
+      plantSupersede(db, THERE, T1, T2);
+    });
+
+    const result = mergeStore(mergeOptions(testCase));
+
+    expect(addedTo(result, 'plan_ci')).toBe(2);
+    expect(addedTo(result, 'reading_supersedes')).toBe(1);
+    expect(result.rowsAdded).toBe(3);
+    expect(supersedesOf(testCase.path)).toEqual([{ canonical_key: readingKeyAt(T1), superseded_key: readingKeyAt(T2), origin_store: THERE }]);
+  });
+
+  it('supersedes the old canonical reading by a merged one older than it, leaving the reading it superseded to the chain', () => {
+    const testCase = readingsCase((db) => {
+      plantReading(db, HERE, T2);
+      plantReading(db, HERE, T3);
+      plantSupersede(db, HERE, T2, T3);
+    }, (db) => plantReading(db, THERE, T1));
+
+    const result = mergeStore(mergeOptions(testCase));
+
+    expect(addedTo(result, 'reading_supersedes')).toBe(1);
+    expect(result.rowsAdded).toBe(2);
+    expect(supersedesOf(testCase.path)).toEqual([
+      { canonical_key: readingKeyAt(T2), superseded_key: readingKeyAt(T3), origin_store: HERE },
+      { canonical_key: readingKeyAt(T1), superseded_key: readingKeyAt(T2), origin_store: HERE },
+    ]);
+  });
+
+  it('adds no supersede when the same merge runs again', () => {
+    const testCase = readingsCase((db) => plantReading(db, HERE, T1), (db) => plantReading(db, THERE, T2));
+    mergeStore(mergeOptions(testCase));
+
+    const again = mergeStore(mergeOptions(testCase, { stamp: `${STAMP}-2`, newMergeId: () => 'merge-2' }));
+
+    expect(again).toMatchObject({ rowsAdded: 0, rowsSkipped: 1 });
+    expect(supersedesOf(testCase.path)).toHaveLength(1);
   });
 });
 

@@ -5,6 +5,7 @@
 /packages/rafa-board/ @open-tomato/maintainers
 /packages/rafa-effort/ @open-tomato/maintainers
 /packages/rafa-hub/ @open-tomato/maintainers
+/packages/rafa-index/ @open-tomato/maintainers
 /packages/rafa-inventory/ @open-tomato/maintainers
 /packages/rafa-pr/ @open-tomato/maintainers
 /packages/rafa-release/ @open-tomato/maintainers

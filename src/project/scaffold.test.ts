@@ -135,6 +135,7 @@ const VALUELESS: readonly (readonly [string, string])[] = [
   ['prBase', 'default'],
   ['boardProjectNumber', 'default'],
   ['roadmapIssue', 'default'],
+  ['collaborateRafa', 'default'],
 ];
 
 describe('the config files', () => {

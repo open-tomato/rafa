@@ -1,8 +1,8 @@
 /**
  * The hub HTTP client: the three calls the `service` sync strategy makes
- * to `rafa-hub` (`packages/rafa-hub/src/server.ts`), each under one
- * `hub.timeout` abort and each telling an unreachable hub apart from one
- * that answered and refused.
+ * to `rafa-hub` (`packages/rafa-hub/src/server.ts`), each request under
+ * one `hub.timeout` abort and each call telling an unreachable hub apart
+ * from one that answered and refused.
  *
  * ## The calls
  *
@@ -13,7 +13,24 @@
  *     `since=<cursor as JSON>` unless the cursor is empty; answers the
  *     payload, checked whole by core's `decodeWirePayload`.
  *   - {@link HubClient.status}: `GET /v1/status`; answers the hub's
- *     version, migrations, rows per table and each device's last push.
+ *     version, migrations, rows per table and each device's last push,
+ *     with the wire contract it speaks: `contractVersion` and
+ *     `capabilities`.
+ *
+ * ## The contract version
+ *
+ * A client reads `/v1/status` once and keeps the answer: a push or a
+ * pull reads it first unless it is kept, and a later `status()` answers
+ * the kept one. A read that fails is not kept, so the next call reads
+ * again. A hub one release behind answers no `contractVersion` and no
+ * `capabilities`; the answer then reads as version `1` with no
+ * capability and {@link HubStatusAnswer.contractNamed} false, and push
+ * and pull send no `contractVersion` field, since that hub refuses a
+ * query name it does not read. A hub that names a version is sent this
+ * rafa's own, core's `WIRE_CONTRACT_VERSION`, as `contractVersion=<n>`
+ * on push and pull. Whether the two versions match is not this
+ * client's to judge: it sends what it speaks, and the hub refuses
+ * another with a `409`.
  *
  * Every call sends the token as `Authorization: Bearer <token>` and
  * reads the hub's one envelope, `{ "success": true, "data": … }` or
@@ -46,7 +63,7 @@
  */
 import type { WireCursor, WirePayload } from '@open-tomato/rafa/store';
 
-import { decodeWirePayload, encodeWirePayload, WireFormatError } from '@open-tomato/rafa/store';
+import { decodeWirePayload, encodeWirePayload, WIRE_CONTRACT_VERSION, WireFormatError } from '@open-tomato/rafa/store';
 
 /** The `name` core's contact matches an unreachable hub by. */
 export const HUB_UNREACHABLE = 'HubUnreachable';
@@ -61,6 +78,9 @@ export const HUB_CLIENT_ROUTES: Readonly<{
   push: '/v1/effort/push',
   pull: '/v1/effort/pull',
 });
+
+/** The contract version a status answer naming none is read as: the hub predates the field. */
+export const UNNAMED_CONTRACT_VERSION = 1;
 
 /** The lowest status a hub fault answers with. */
 const SERVER_ERROR = 500;
@@ -112,6 +132,12 @@ export interface HubStatusAnswer {
   readonly migrations: readonly string[];
   readonly rows: Readonly<Record<string, number>>;
   readonly devices: readonly HubDeviceAnswer[];
+  /** The wire contract version the hub speaks; {@link UNNAMED_CONTRACT_VERSION} when it names none. */
+  readonly contractVersion: number;
+  /** Which capabilities the hub has, by name; empty when it names none. */
+  readonly capabilities: Readonly<Record<string, boolean>>;
+  /** Whether the hub named `contractVersion`; push and pull send the field only when it did. */
+  readonly contractNamed: boolean;
 }
 
 /** What a client is made with. */
@@ -132,7 +158,7 @@ export interface HubClient {
   readonly push: (device: string, payload: WirePayload) => Promise<HubPushAnswer>;
   /** Pulls the rows other devices created past `since`. */
   readonly pull: (device: string, since: WireCursor) => Promise<WirePayload>;
-  /** Reads the hub's status. */
+  /** The hub's status, read once per client and kept; see the module note. */
   readonly status: () => Promise<HubStatusAnswer>;
 }
 
@@ -209,6 +235,28 @@ function isDevice(value: unknown): value is HubDeviceAnswer {
   return isRecord(value) && typeof value.device === 'string' && typeof value.lastPushAt === 'string';
 }
 
+/** Whether `value` names capabilities: an object of booleans. */
+function isCapabilities(value: unknown): value is Readonly<Record<string, boolean>> {
+  return isRecord(value) && Object.values(value).every((has) => typeof has === 'boolean');
+}
+
+/** The contract fields of a status answer's `data`, absent ones read as a hub one release behind. */
+function readContract(data: Record<string, unknown>): Pick<HubStatusAnswer, 'contractVersion' | 'capabilities' | 'contractNamed'> {
+  const contractNamed = data.contractVersion !== undefined;
+  const valid = (!contractNamed || isCount(data.contractVersion))
+    && (data.capabilities === undefined || isCapabilities(data.capabilities));
+  if (!valid) {
+    throw new HubAnswerMalformed('the hub\'s answer to status holds a contractVersion that is not a whole number or capabilities that are not booleans');
+  }
+  return {
+    contractVersion: contractNamed
+      ? data.contractVersion as number
+      : UNNAMED_CONTRACT_VERSION,
+    capabilities: Object.freeze({ ...data.capabilities as Readonly<Record<string, boolean>> | undefined }),
+    contractNamed,
+  };
+}
+
 /** `data` as a status answer, or a {@link HubAnswerMalformed}. */
 function readStatusAnswer(data: unknown): HubStatusAnswer {
   const valid = isRecord(data)
@@ -220,7 +268,14 @@ function readStatusAnswer(data: unknown): HubStatusAnswer {
     throw new HubAnswerMalformed('the hub\'s answer to status holds no version, migrations, rows and devices');
   }
   const { version, migrations, rows, devices } = data as unknown as HubStatusAnswer;
-  return Object.freeze({ version, migrations, rows, devices });
+  return Object.freeze({ version, migrations, rows, devices, ...readContract(data) });
+}
+
+/** The `contractVersion` query a push or pull sends to the hub `status` answered: none when it named none. */
+function contractQuery(status: HubStatusAnswer): Readonly<Record<string, string>> {
+  return status.contractNamed
+    ? { contractVersion: String(WIRE_CONTRACT_VERSION) }
+    : {};
 }
 
 /** `data` as a wire payload, checked whole by core's codec, or a {@link HubAnswerMalformed}. */
@@ -283,29 +338,45 @@ async function send(options: HubClientOptions, call: Call): Promise<unknown> {
   return envelopeData(text, call.what);
 }
 
+/** The kept status read of a client: read on the first call, read again after one that failed. */
+function keptStatus(options: HubClientOptions): () => Promise<HubStatusAnswer> {
+  let kept: Promise<HubStatusAnswer> | undefined;
+  return () => {
+    kept ??= send(options, { method: 'GET', path: HUB_CLIENT_ROUTES.status, query: {}, what: 'status' })
+      .then(readStatusAnswer)
+      .catch((error: unknown) => {
+        kept = undefined;
+        throw error;
+      });
+    return kept;
+  };
+}
+
 /** A client of the hub `options` names; see the module note. */
 export function createHubClient(options: HubClientOptions): HubClient {
+  const status = keptStatus(options);
   return Object.freeze({
-    push: async (device: string, payload: WirePayload) => readPushAnswer(await send(options, {
-      method: 'POST',
-      path: HUB_CLIENT_ROUTES.push,
-      query: { device },
-      body: encodeWirePayload(payload),
-      what: 'push',
-    })),
-    pull: async (device: string, since: WireCursor) => readPullAnswer(await send(options, {
-      method: 'GET',
-      path: HUB_CLIENT_ROUTES.pull,
-      query: Object.keys(since).length === 0
-        ? { device }
-        : { device, since: JSON.stringify(since) },
-      what: 'pull',
-    })),
-    status: async () => readStatusAnswer(await send(options, {
-      method: 'GET',
-      path: HUB_CLIENT_ROUTES.status,
-      query: {},
-      what: 'status',
-    })),
+    push: async (device: string, payload: WirePayload) => {
+      const contract = contractQuery(await status());
+      return readPushAnswer(await send(options, {
+        method: 'POST',
+        path: HUB_CLIENT_ROUTES.push,
+        query: { device, ...contract },
+        body: encodeWirePayload(payload),
+        what: 'push',
+      }));
+    },
+    pull: async (device: string, since: WireCursor) => {
+      const contract = contractQuery(await status());
+      return readPullAnswer(await send(options, {
+        method: 'GET',
+        path: HUB_CLIENT_ROUTES.pull,
+        query: Object.keys(since).length === 0
+          ? { device, ...contract }
+          : { device, since: JSON.stringify(since), ...contract },
+        what: 'pull',
+      }));
+    },
+    status,
   });
 }

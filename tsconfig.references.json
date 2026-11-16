@@ -8,6 +8,7 @@
     { "path": "./packages/rafa-board" },
     { "path": "./packages/rafa-effort" },
     { "path": "./packages/rafa-hub" },
+    { "path": "./packages/rafa-index" },
     { "path": "./packages/rafa-inventory" },
     { "path": "./packages/rafa-pr" },
     { "path": "./packages/rafa-release" },

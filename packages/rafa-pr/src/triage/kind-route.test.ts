@@ -14,7 +14,10 @@
  * by commit and recording each run. The repo root, the plan's tracker
  * file and the store are made under one temporary directory this file
  * creates and removes; a repair is read back off the tracker file and a
- * `docs` row off the fixture store.
+ * `docs` row off the fixture store. A kept capture is written under the
+ * root's `.rafa/runs/<session>/suite/` in the shape
+ * `packages/rafa/src/suite/run.ts` keeps it, beside the step's
+ * `<kind>.output.txt` a later green rerun wrote over.
  */
 import type { BaseRunAnswer, NamedTest } from './base-run.js';
 import type { KindRouteOptions } from './kind-route.js';
@@ -23,7 +26,7 @@ import type { IssueRef, Tracker, TrackerKind } from '@open-tomato/rafa/ports';
 import type { BugKind, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
 import type { FindingsDispatch } from '@open-tomato/rafa/store/findings';
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -32,7 +35,7 @@ import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { ABSENT } from '@open-tomato/rafa-board/refs/stamp';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { docsWhereOf } from './kind-route.js';
+import { checkedKindOf, docsWhereOf } from './kind-route.js';
 import { LEFTOVER_MARKER } from './leftover-repair.js';
 import { triageReport } from './triage.js';
 
@@ -142,7 +145,7 @@ function kindsOf(runner: Runner, overrides: Partial<KindRouteOptions> = {}): Kin
   return {
     planBase: { ok: true, base: 'main', sha: BASE },
     head: HEAD,
-    planFiles: { ok: true, files: PLAN_FILES },
+    planFiles: { ok: true, files: PLAN_FILES, added: [], addedProblem: null, commits: [], commitsProblem: null },
     runTest: runner.runTest,
     retries: 2,
     ...overrides,
@@ -197,8 +200,8 @@ async function triage(
   kinds: KindRouteOptions | undefined,
   trackers: { readonly public: Fake; readonly private: Fake },
   extra: Partial<TriageOptions> = {},
+  at: Fixture = fixture(),
 ): Promise<Triaged> {
-  const at = fixture();
   const result = await triageReport({
     repoRoot: at.root,
     trackerPath: at.trackerPath,
@@ -420,6 +423,58 @@ describe('routeByKind: the repair task and its cap', () => {
   });
 });
 
+describe('routeByKind: the leftover dedupe', () => {
+  it('inserts two repairs for two own-gap entries whose keys and symbols differ: the control', async () => {
+    const bugs = [
+      entry('own-gap', 'src/config.ts reads no default', 'config default unset'),
+      entry('own-gap', 'src/config.ts writes no default', 'config default unwritten'),
+    ];
+
+    const { fixture: at, result } = await triage(bugs, kindsOf(stubRunner({})), strictPair());
+
+    expect(result.bugs.map((row) => [row.action, row.joined ?? false])).toEqual([['repair', false], ['repair', false]]);
+    expect(readFileSync(at.trackerPath, 'utf8').split(LEFTOVER_MARKER)).toHaveLength(3);
+  });
+
+  it('joins the second of two own-fallout entries with one recurrence key onto the first one\'s line', async () => {
+    const runner = stubRunner({ [BASE]: 'green', [HEAD]: 'red' });
+    const bugs = [
+      entry('own-fallout', 'the case went red', TEST_ARTIFACT),
+      entry('own-fallout', 'the config case is red again', TEST_ARTIFACT),
+    ];
+
+    const { fixture: at, result } = await triage(bugs, kindsOf(runner, { retries: 1 }), strictPair());
+
+    expect(result.bugs.map((row) => [row.action, row.repairLine, row.joined ?? false])).toEqual([
+      ['repair', OPEN_LINE, false],
+      ['repair', OPEN_LINE, true],
+    ]);
+    const text = readFileSync(at.trackerPath, 'utf8');
+    expect(text.split(LEFTOVER_MARKER)).toHaveLength(2);
+    expect(text.split('\n')[OPEN_LINE]).toMatch(/ <!-- leftover key=[0-9a-f]{12} --> <!-- leftover --> {2}\{agent=build-error-resolver\}/);
+  });
+
+  it('joins an own-gap entry whose plan-symbol match equals an open line\'s, its key differing', async () => {
+    const kinds = kindsOf(stubRunner({}), {
+      planFiles: { ok: true, files: PLAN_FILES, added: ['export function readDefaultConfig() {}'], addedProblem: null, commits: [], commitsProblem: null },
+    });
+    const bugs = [
+      entry('own-gap', 'src/neighbour.ts never calls readDefaultConfig', 'neighbour reads no default'),
+      entry('bug', 'src/other.ts skips readDefaultConfig', 'other reads no default'),
+    ];
+
+    const { fixture: at, result } = await triage(bugs, kinds, strictPair());
+
+    expect(result.bugs.map((row) => [row.kind, row.action, row.repairLine, row.joined ?? false])).toEqual([
+      ['own-gap', 'repair', OPEN_LINE, false],
+      ['own-gap', 'repair', OPEN_LINE, true],
+    ]);
+    const text = readFileSync(at.trackerPath, 'utf8');
+    expect(text.split(LEFTOVER_MARKER)).toHaveLength(2);
+    expect(text.split('\n')[OPEN_LINE]).toContain(' symbol=readDefaultConfig --> <!-- leftover -->');
+  });
+});
+
 describe('routeByKind: the docs row', () => {
   it('stores a docs entry as a sighting whose where is the first path it names', async () => {
     const bug = entry('docs', 'context/triage.md names three channels, as README.md does');
@@ -468,5 +523,188 @@ describe('routeByKind: the security rule and kinds left out', () => {
     expect(row).toMatchObject({ channel: 'public', action: 'filed' });
     expect(row.kind).toBeUndefined();
     expect(trackers.public.calls.map(([method]) => method)).toEqual(['create']);
+  });
+});
+
+/** The run checkout's head the capture cases are read at: a full sha, as a kept capture's name holds. */
+const FULL_HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+
+/** An earlier commit of the plan, where a red task step kept its capture. */
+const PLAN_COMMIT = 'b2c3d4e5f60718293a4b5c6d7e8f9012345678a1';
+
+/** A commit neither the head nor the plan's: another plan's run in the same checkout. */
+const OTHER_SHA = 'c3d4e5f60718293a4b5c6d7e8f9012345678a1b2';
+
+/** The text of a red task step's run, its `(fail)` line naming {@link TEST_CASE}. */
+const RED_OUTPUT = [
+  `${TEST_FILE}:`,
+  'error: expect(received).toBe(expected)',
+  `(fail) ${TEST_CASE} [3.00ms]`,
+  ' 1 fail',
+].join('\n');
+
+/** The text of the repair's green rerun, which wrote over the step's `task.output.txt`. */
+const GREEN_OUTPUT = `${TEST_FILE}:\n(pass) ${TEST_CASE} [2.00ms]\n 1 pass\n 0 fail`;
+
+/** The step repair line, as `repairTaskText` writes it, a red task step at {@link PLAN_COMMIT} inserted, since ticked. */
+const STEP_REPAIR_LINE = '- [x] Repair the red task step at commit b2c3d4e5f607  {agent=build-error-resolver}';
+
+/** {@link TRACKER_TEXT} with {@link STEP_REPAIR_LINE} after the task that turned the step red. */
+const REPAIRED_TRACKER = TRACKER_TEXT.replace('- [ ] Write the docs', `${STEP_REPAIR_LINE}\n- [ ] Write the docs`);
+
+/** The line of {@link STEP_REPAIR_LINE} in {@link REPAIRED_TRACKER}, counting from zero. */
+const STEP_REPAIR_AT = 4;
+
+/**
+ * A fresh root whose task step kept a red capture at `sha` and whose
+ * `task.output.txt` a green rerun wrote over, its tracker `tracker`.
+ */
+function capturedFixture(sha: string, tracker: string = TRACKER_TEXT): Fixture {
+  const at = fixture();
+  writeFileSync(at.trackerPath, tracker);
+  const suite = join(at.root, '.rafa', 'runs', 'session-0', 'suite');
+  mkdirSync(suite, { recursive: true });
+  writeFileSync(join(suite, `task.${sha}.red.output.txt`), RED_OUTPUT);
+  writeFileSync(join(suite, 'task.output.txt'), GREEN_OUTPUT);
+  return at;
+}
+
+/** Kind options at {@link FULL_HEAD} whose plan's commits are {@link PLAN_COMMIT}, the case answering `answers`. */
+function capturedKinds(runner: Runner, overrides: Partial<KindRouteOptions> = {}): KindRouteOptions {
+  return kindsOf(runner, {
+    head: FULL_HEAD,
+    planFiles: { ok: true, files: PLAN_FILES, added: [], addedProblem: null, commits: [PLAN_COMMIT], commitsProblem: null },
+    ...overrides,
+  });
+}
+
+/** An own-fallout entry naming {@link TEST_ARTIFACT}. */
+const FALLOUT = entry('own-fallout', 'an earlier task turned the case red', TEST_ARTIFACT);
+
+describe('routeByKind: a kept capture that does not answer', () => {
+  it('files a case green on the head whose capture sits at another plan\'s commit', async () => {
+    const trackers = recordingPair();
+    const at = capturedFixture(OTHER_SHA);
+
+    const { result } = await triage([FALLOUT], capturedKinds(stubRunner({ [FULL_HEAD]: 'green' })), trackers, {}, at);
+
+    expect(onlyRow(result)).toMatchObject({ action: 'filed', kind: 'bug' });
+    expect(readFileSync(at.trackerPath, 'utf8')).toBe(TRACKER_TEXT);
+  });
+
+  it('files the case when the plan\'s commits were not read, the capture at one of them', async () => {
+    const at = capturedFixture(PLAN_COMMIT);
+    const kinds = capturedKinds(stubRunner({ [FULL_HEAD]: 'green' }), {
+      planFiles: { ok: true, files: PLAN_FILES, added: [], addedProblem: null, commits: null, commitsProblem: 'no rev-list' },
+    });
+
+    const { result } = await triage([FALLOUT], kinds, recordingPair(), {}, at);
+
+    expect(onlyRow(result)).toMatchObject({ action: 'filed', kind: 'bug' });
+  });
+
+  it('keeps a case red on the base and the head inherited, its capture kept and its step repaired', async () => {
+    const trackers = recordingPair();
+    const at = capturedFixture(PLAN_COMMIT, REPAIRED_TRACKER);
+    const runner = stubRunner({ [BASE]: 'red', [FULL_HEAD]: 'red' });
+
+    const { result } = await triage([FALLOUT], capturedKinds(runner), trackers, {}, at);
+
+    const row = onlyRow(result);
+    expect(row).toMatchObject({ action: 'inherited', kind: 'bug' });
+    expect(row.repairLine).toBeUndefined();
+    expect(trackers.public.calls.map(([method]) => method)).not.toContain('create');
+    expect(readFileSync(at.trackerPath, 'utf8')).toBe(REPAIRED_TRACKER);
+  });
+
+  it('reads no capture through checkedKindOf with the repo root left out', async () => {
+    const at = capturedFixture(PLAN_COMMIT);
+    const kinds = capturedKinds(stubRunner({ [FULL_HEAD]: 'green' }));
+
+    expect((await checkedKindOf(FALLOUT, kinds)).row).toBe('head-not-red');
+    expect((await checkedKindOf(FALLOUT, kinds, at.root)).row).toBe('step-capture');
+  });
+
+  it('names a suite folder it cannot read in the reason, reading the entry as before', async () => {
+    const at = fixture();
+    const locked = join(at.root, '.rafa', 'runs', 'session-0', 'suite');
+    mkdirSync(locked, { recursive: true });
+    chmodSync(locked, 0o000);
+    try {
+      const check = await checkedKindOf(FALLOUT, capturedKinds(stubRunner({ [FULL_HEAD]: 'green' })), at.root);
+      expect(check.row).toBe('head-not-red');
+      if (process.getuid?.() === 0) return;
+      expect(check.reason).toContain(`Kept captures skipped: the folder ${locked} could not be read: `);
+    } finally {
+      chmodSync(locked, 0o755);
+    }
+  });
+});
+
+describe('routeByKind: a case a kept capture holds', () => {
+  it('repairs a case a green rerun replaced the red task.output.txt of, the strict fakes untouched', async () => {
+    const trackers = strictPair();
+    const at = capturedFixture(PLAN_COMMIT);
+    const runner = stubRunner({ [BASE]: 'green', [FULL_HEAD]: 'green' });
+
+    const { result } = await triage([FALLOUT], capturedKinds(runner), trackers, {}, at);
+
+    expect(readFileSync(join(at.root, '.rafa', 'runs', 'session-0', 'suite', 'task.output.txt'), 'utf8')).toBe(GREEN_OUTPUT);
+    expect(onlyRow(result)).toMatchObject({ channel: 'public', action: 'repair', kind: 'own-fallout', repairLine: OPEN_LINE });
+    expect(onlyRow(result).joined).toBeUndefined();
+    expect(trackers.public.calls).toEqual([]);
+    expect(runner.runs.map(([commit]) => commit)).toEqual([FULL_HEAD]);
+    expect(readFileSync(at.trackerPath, 'utf8').split('\n')[OPEN_LINE]).toContain(LEFTOVER_MARKER);
+  });
+
+  it('routes a bug the session called one own-fallout too', async () => {
+    const at = capturedFixture(PLAN_COMMIT);
+    const bug = entry('bug', 'the case is red', TEST_ARTIFACT);
+
+    const { result } = await triage([bug], capturedKinds(stubRunner({ [FULL_HEAD]: 'green' })), strictPair(), {}, at);
+
+    expect(onlyRow(result)).toMatchObject({ action: 'repair', kind: 'own-fallout' });
+  });
+
+  it('joins the step repair line for the capture\'s commit, inserting nothing', async () => {
+    const trackers = strictPair();
+    const at = capturedFixture(PLAN_COMMIT, REPAIRED_TRACKER);
+
+    const { result } = await triage([FALLOUT], capturedKinds(stubRunner({ [FULL_HEAD]: 'green' })), trackers, {}, at);
+
+    const row = onlyRow(result);
+    expect(row).toMatchObject({ channel: 'public', action: 'repair', kind: 'own-fallout', repairLine: STEP_REPAIR_AT, joined: true });
+    expect(REPAIRED_TRACKER.split('\n')[STEP_REPAIR_AT]).toBe(STEP_REPAIR_LINE);
+    expect(readFileSync(at.trackerPath, 'utf8')).toBe(REPAIRED_TRACKER);
+    expect(trackers.public.calls).toEqual([]);
+  });
+
+  it('joins under a cap of false, since a join counts against no cap', async () => {
+    const at = capturedFixture(PLAN_COMMIT, REPAIRED_TRACKER);
+    const kinds = capturedKinds(stubRunner({ [FULL_HEAD]: 'green' }), { retries: false });
+
+    const { result } = await triage([FALLOUT], kinds, strictPair(), {}, at);
+
+    expect(onlyRow(result)).toMatchObject({ action: 'repair', repairLine: STEP_REPAIR_AT, joined: true });
+  });
+
+  it('joins from the fallout row too, a case green on the base and red on the head', async () => {
+    const at = capturedFixture(FULL_HEAD, REPAIRED_TRACKER.replace('b2c3d4e5f607', 'a1b2c3d4e5f6'));
+    const runner = stubRunner({ [BASE]: 'green', [FULL_HEAD]: 'red' });
+
+    const { result } = await triage([FALLOUT], capturedKinds(runner), strictPair(), {}, at);
+
+    expect(onlyRow(result)).toMatchObject({ action: 'repair', repairLine: STEP_REPAIR_AT, joined: true });
+  });
+
+  it('control: inserts a leftover repair when the step repair line is for another commit', async () => {
+    const at = capturedFixture(PLAN_COMMIT, REPAIRED_TRACKER.replace('b2c3d4e5f607', 'c3d4e5f60718'));
+
+    const { result } = await triage([FALLOUT], capturedKinds(stubRunner({ [FULL_HEAD]: 'green' })), strictPair(), {}, at);
+
+    const row = onlyRow(result);
+    expect(row).toMatchObject({ action: 'repair', repairLine: STEP_REPAIR_AT + 1 });
+    expect(row.joined).toBeUndefined();
+    expect(readFileSync(at.trackerPath, 'utf8').split('\n')[STEP_REPAIR_AT + 1]).toContain(LEFTOVER_MARKER);
   });
 });

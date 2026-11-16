@@ -8,6 +8,8 @@
  * Each push replaces the state with a new one rather than editing it.
  */
 import type {
+  HubCapabilities,
+  HubContract,
   HubDevice,
   HubPullRequest,
   HubPushRequest,
@@ -18,7 +20,7 @@ import type {
 } from '../port.js';
 import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 
-import { WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 
 /** Everything the stand-in holds. */
 interface MemoryState {
@@ -29,6 +31,9 @@ interface MemoryState {
   /** Each device's last push, ISO 8601. */
   readonly devices: Readonly<Record<string, string>>;
 }
+
+/** The stand-in has no capability beyond push, pull and status. */
+const CAPABILITIES: HubCapabilities = { fts: false, vector: false, graph: false, projection: false };
 
 /** How a row is known: its origin pair. */
 function pairOf(row: WireRow): string {
@@ -81,5 +86,7 @@ export function openMemoryHubStore(context: HubStoreContext): HubStore {
     return Promise.resolve({ migrations: state.migrations, rows, devices });
   };
 
-  return { push, pull, status, close: () => Promise.resolve() };
+  const contract = (): HubContract => ({ contractVersion: WIRE_CONTRACT_VERSION, migrations: state.migrations, capabilities: CAPABILITIES });
+
+  return { push, pull, status, contract, close: () => Promise.resolve() };
 }

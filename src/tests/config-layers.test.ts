@@ -317,6 +317,8 @@ const PROJECT_TEXT = [
   '  pr: false',
   '  run: false',
   '  release: false',
+  'collaborate:',
+  '  rafa: open-tomato/rafa',
   'hints:',
   '  skills: true',
   '',
@@ -454,6 +456,7 @@ const PROJECT_VALUES: RafaConfig = {
   featuresPr: false,
   featuresRun: false,
   featuresRelease: false,
+  collaborateRafa: 'open-tomato/rafa',
   hintsSkills: true,
 };
 
@@ -621,6 +624,8 @@ const USER_TEXT = [
   '  pr: true',
   '  run: true',
   '  release: true',
+  'collaborate:',
+  '  rafa: open-tomato/rafa-user',
   'hints:',
   '  skills: false',
   '',
@@ -744,6 +749,7 @@ const USER_VALUES: RafaConfig = {
   featuresPr: true,
   featuresRun: true,
   featuresRelease: true,
+  collaborateRafa: 'open-tomato/rafa-user',
   hintsSkills: false,
 };
 
@@ -1393,6 +1399,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'features.release', 'features:\n  release: 1',
     'features.release is 1, expected true or false',
     'features:\n  release: false', 'featuresRelease', false,
+  ],
+  [
+    'collaborate.rafa', 'collaborate:\n  rafa: open-tomato/rafa/x',
+    'collaborate.rafa is "open-tomato/rafa/x", expected a repository as owner/name, such as open-tomato/rafa',
+    'collaborate:\n  rafa: open-tomato/rafa', 'collaborateRafa', 'open-tomato/rafa',
   ],
   [
     'hints.skills', 'hints:\n  skills: yes',

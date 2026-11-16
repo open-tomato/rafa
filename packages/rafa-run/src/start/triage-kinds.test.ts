@@ -109,7 +109,14 @@ describe('the readings a report is routed by', () => {
 
     expect(options.planBase).toEqual({ ok: true, base: 'integration', sha: BASE });
     expect(options.head).toBe(HEAD);
-    expect(options.planFiles).toEqual({ ok: true, files: ['src/config.ts', 'src/a.test.ts'] });
+    expect(options.planFiles).toEqual({
+      ok: true,
+      files: ['src/config.ts', 'src/a.test.ts'],
+      added: null,
+      addedProblem: `Could not read the lines added between ${BASE} and HEAD: fatal: no answer for diff -U0 --no-color ${BASE} HEAD --`,
+      commits: null,
+      commitsProblem: `Could not list the commits between ${BASE} and HEAD: fatal: no answer for rev-list ${BASE}..HEAD`,
+    });
     expect(options.retries).toBe(2);
   });
 

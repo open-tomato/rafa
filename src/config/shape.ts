@@ -21,7 +21,7 @@
  *
  * This module declares core's own top-level keys, the keys of
  * `packages/rafa/src/core/config/core-section.ts`, and composes {@link ConfigShape}
- * from them and the interface each of the fifteen section files
+ * from them and the interface each of the sixteen section files
  * (`packages/rafa/src/config-schema-*.ts`) exports for the keys it
  * writes: `HubShape` for `hub`, `ReleaseShape` for `pr` and `release`,
  * and so on, each extended by {@link ConfigShape}. A namespace two packages share is a
@@ -48,6 +48,7 @@
 import type { BoardProjectLimitsShape } from '@open-tomato/rafa/config-schema-board-project';
 import type { BugsShape } from '@open-tomato/rafa/config-schema-bugs';
 import type { ChecksShape } from '@open-tomato/rafa/config-schema-checks';
+import type { CollaborateShape } from '@open-tomato/rafa/config-schema-collaborate';
 import type { ErrorsShape } from '@open-tomato/rafa/config-schema-errors';
 import type { FeaturesShape } from '@open-tomato/rafa/config-schema-features';
 import type { HintsShape } from '@open-tomato/rafa/config-schema-hints';
@@ -158,6 +159,7 @@ export interface DangerousShape extends ReleaseDangerousShape {
 export interface ConfigShape extends
   BugsShape,
   ChecksShape,
+  CollaborateShape,
   ErrorsShape,
   FeaturesShape,
   HintsShape,

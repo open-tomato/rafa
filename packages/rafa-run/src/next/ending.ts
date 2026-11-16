@@ -10,8 +10,9 @@
  * through the command barrel), not here: three of the six are declared
  * in a declarations file (`packages/rafa-pr/src/commands/pr/declarations.ts`,
  * `packages/rafa-board/src/commands/issue/declarations.ts`), which imports core's entries
- * alone, so core is the one place all six reach the same value from, and
- * the help of all six reads the same.
+ * and, for issue, its two sibling files, and no module under `src/`, so core
+ * is the one place all six reach the same value from, and the help of all
+ * six reads the same.
  *
  * What lives here rather than in `./hint.ts` and rather than six times
  * over is the QUESTION being put and the action being run, which

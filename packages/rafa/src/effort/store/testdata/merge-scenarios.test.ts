@@ -198,6 +198,8 @@ describe('the scenarios, read back', () => {
     expect([...byIdentity(a, 'stale_docs').keys()]).toEqual(['["stale-a1"]']);
     expect(hasTable(old, 'bug_routes')).toBe(false);
     expect([...byIdentity(a, 'bug_routes').keys()]).toEqual(['["route-a1"]']);
+    expect(hasTable(old, 'reading_supersedes')).toBe(false);
+    expect(read(a, 'SELECT canonical_key FROM reading_supersedes')).toEqual([{ canonical_key: '[322,"head-a1","2026-09-29T08:20:00.000Z"]' }]);
   });
 
   it('7: the two stores name different projects', () => {

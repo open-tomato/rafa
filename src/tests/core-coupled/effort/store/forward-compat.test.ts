@@ -502,6 +502,6 @@ describe('skill facts: readSkillFacts joins every table across the tail', () => 
     });
     expect(fact?.findings).toHaveLength(1);
     expect(fact?.blockers).toEqual([{ what: 'a blocker', artifact: null }]);
-    expect(fact?.planCi).toEqual([planCiRow]);
+    expect(fact?.planCi).toEqual([{ row: planCiRow, sightings: 0, origins: [], lastSighting: planCiRow.readAt }]);
   });
 });

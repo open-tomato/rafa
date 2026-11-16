@@ -1,0 +1,34 @@
+{
+  "1": {
+    "wireVersion": 1,
+    "migrations": [
+      "kind-tables",
+      "findings",
+      "blockers-and-bugs",
+      "report-absences",
+      "task-reports",
+      "preflight",
+      "dispatches",
+      "changes",
+      "out-of-scope-bug-scope",
+      "dispatch-skills",
+      "skill-invocations",
+      "task-report-skills",
+      "plan-ci",
+      "row-origins",
+      "store-meta",
+      "store-meta-generation",
+      "session-worktree",
+      "store-replaced",
+      "stale-docs",
+      "bug-routes"
+    ],
+    "tables": {
+      "sessions": "a4572e17211be30497986837f9378a2de60b153dd271260739d3a270d1ac9ec4",
+      "commits": "37fbb556af6d555fbf582328f82bf5d4a84894de900c1f105c8764290f69dbb6",
+      "keyProjections": "3426ab21c9c65211d804f1853f2a370d928714e6db0ca5aa00f382774a0016b2",
+      "staleDocs": "24109d8281dc990f2eb9b4adb3f024997911e7b05f8a1b1557d61f8f5a2dee98",
+      "bugRoutes": "7b372f65900b762c065347d495314399650d181229f6fae702eafc19ba91b8ff"
+    }
+  }
+}

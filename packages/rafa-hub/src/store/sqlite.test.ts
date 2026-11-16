@@ -1,9 +1,9 @@
 /**
- * The SQLite hub store (`sqlite.ts`): the port's contract suite, then
- * what is the adapter's own. That covers the refusal of a push naming a
- * migration the hub lacks, the files it keeps and the ones it leaves
- * behind, a push holding no row, and a store reopened over its
- * directory.
+ * The SQLite hub store (`sqlite.ts`): what is the adapter's own, the
+ * port's contract suites running over it by name in `contract.test.ts`.
+ * That covers the refusal of a push naming a migration the hub lacks,
+ * the files it keeps and the ones it leaves behind, a push holding no
+ * row, and a store reopened over its directory.
  *
  * Payloads here are built as the contract suite builds them. A real
  * store is opened under the temporary directory and given one commit,
@@ -21,10 +21,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test
 
 import { DEFAULT_STORE_FILE } from '../config.js';
 
-import { hubStoreContract } from './contract.js';
 import { devicesFileName, HUB_PACKAGE, HUB_UPGRADE, HubUpgradeRequired, openSqliteHubStore } from './sqlite.js';
-
-hubStoreContract('sqlite', (context) => openSqliteHubStore(context));
 
 const A = 'aaaaaaaa-0000-4000-8000-00000000000a';
 const B = 'bbbbbbbb-0000-4000-8000-00000000000b';
