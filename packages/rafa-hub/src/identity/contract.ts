@@ -20,11 +20,22 @@
  * provider (GitHub) starts a stand-in for it here and stops it in
  * `close`.
  *
+ * ## A scheme with no forbidden caller
+ *
+ * A scheme that serves every credential it knows, as `api-key` serves
+ * every key `hub.auth.apiKeys` names, has no caller to refuse as
+ * forbidden. It registers with `{ forbids: false }` and its subject
+ * names no `forbidden` headers; the forbidden case is then not
+ * registered, so the run lists it neither passed nor failed, and the
+ * cases mixing callers mix the other two. A subject at odds with its
+ * registration, forbidden headers under `forbids: false` or none
+ * without it, fails each case naming the mismatch.
+ *
  * ## What it covers
  *
  * The rules `port.ts` lists: a request with no credential or an
  * unrecognised one refused as `unauthenticated`, a known one lacking
- * permission as `forbidden`, a served one naming a caller and at least
+ * permission as `forbidden` (under `forbids`), a served one naming a caller and at least
  * one known action, each once. Each request answered from its own
  * credential, whatever was served before and on whichever hub route,
  * its body left unread, and no refusal message repeating the credential.
@@ -49,8 +60,11 @@ export interface IdentityContractSubject {
   readonly identity: HubIdentity;
   /** Headers carrying a credential the adapter serves. */
   readonly served: CredentialHeaders;
-  /** Headers carrying a credential the adapter knows and refuses as forbidden. */
-  readonly forbidden: CredentialHeaders;
+  /**
+   * Headers carrying a credential the adapter knows and refuses as
+   * forbidden; left out by a scheme registered with `forbids: false`.
+   */
+  readonly forbidden?: CredentialHeaders;
   /** Headers carrying a well-formed credential the adapter does not recognise. */
   readonly unrecognised: CredentialHeaders;
   /** Stops whatever the subject started; the subject is not used after. */
@@ -59,6 +73,15 @@ export interface IdentityContractSubject {
 
 /** Makes one fresh subject per case. */
 export type IdentityContractFactory = () => IdentityContractSubject | Promise<IdentityContractSubject>;
+
+/** How one adapter registers with the suite. */
+export interface IdentityContractOptions {
+  /**
+   * Whether the scheme knows a caller it refuses as forbidden, and so
+   * whether its subject names `forbidden` headers; true when left out.
+   */
+  readonly forbids?: boolean;
+}
 
 /** The host every case's requests are sent to; no case opens a connection. */
 const HUB = 'http://hub.test';
@@ -112,18 +135,34 @@ function messageOf(answer: IdentityAnswer): string {
   return answer.refusal.message;
 }
 
+/** Why `subject` is at odds with `forbids`, or null when it is not. */
+function mismatchOf(subject: IdentityContractSubject, forbids: boolean): string | null {
+  if (forbids && subject.forbidden === undefined) {
+    return 'identity contract: the subject names no forbidden headers; register with { forbids: false } or name them';
+  }
+  if (!forbids && subject.forbidden !== undefined) {
+    return 'identity contract: the subject names forbidden headers under { forbids: false }; leave them out or drop the option';
+  }
+  return null;
+}
+
 /**
  * Registers the contract's cases for one adapter, under a `describe`
  * naming it. Call it from a test file, once per adapter.
  */
-export function identityContract(name: string, factory: IdentityContractFactory): void {
+export function identityContract(name: string, factory: IdentityContractFactory, options: IdentityContractOptions = {}): void {
+  const forbids = options.forbids ?? true;
   describe(`the identity contract: ${name}`, () => {
     let subject: IdentityContractSubject | undefined;
     const open = (): IdentityContractSubject => {
       if (subject === undefined) throw new Error('identity contract: no subject is open');
+      const mismatch = mismatchOf(subject, forbids);
+      if (mismatch !== null) throw new Error(mismatch);
       return subject;
     };
     const identify = (request: Request): Promise<IdentityAnswer> => open().identity.identify(request);
+    /** The forbidden headers, under `forbids`, where `open` has held they are named. */
+    const forbiddenOf = (): CredentialHeaders => open().forbidden ?? {};
 
     beforeEach(async () => {
       subject = await factory();
@@ -147,22 +186,21 @@ export function identityContract(name: string, factory: IdentityContractFactory)
         expect(outcomeOf(answer)).toBe('unauthenticated');
       });
 
-      it('refuses a known credential lacking permission as forbidden', async () => {
-        const answer = await identify(get('/v1/status', open().forbidden));
+      if (forbids) {
+        it('refuses a known credential lacking permission as forbidden', async () => {
+          const answer = await identify(get('/v1/status', forbiddenOf()));
 
-        expect(outcomeOf(answer)).toBe('forbidden');
-      });
+          expect(outcomeOf(answer)).toBe('forbidden');
+        });
+      }
 
       it('says why in one line naming no credential the request carried', async () => {
-        const { forbidden, unrecognised } = open();
-        const refused = [
-          [await identify(get('/v1/status')), {}],
-          [await identify(get('/v1/status', unrecognised)), unrecognised],
-          [await identify(get('/v1/status', forbidden)), forbidden],
-        ] as const;
-
-        for (const [answer, headers] of refused) {
-          const message = messageOf(answer);
+        const { unrecognised } = open();
+        const callers: readonly CredentialHeaders[] = forbids
+          ? [{}, unrecognised, forbiddenOf()]
+          : [{}, unrecognised];
+        for (const headers of callers) {
+          const message = messageOf(await identify(get('/v1/status', headers)));
           expect(message.trim()).not.toBe('');
           expect(message).not.toContain('\n');
           expect(secretsIn(headers).filter((secret) => message.includes(secret))).toEqual([]);
@@ -203,18 +241,30 @@ export function identityContract(name: string, factory: IdentityContractFactory)
 
     describe('one request, one answer', () => {
       it('answers each request from its own credential, whatever was served before', async () => {
-        const { served, forbidden, unrecognised } = open();
+        const { served, unrecognised } = open();
+        const callers: readonly (readonly [CredentialHeaders, IdentityRefusalReason | 'served'])[] = [
+          [served, 'served'],
+          [{}, 'unauthenticated'],
+          [served, 'served'],
+          [unrecognised, 'unauthenticated'],
+          [served, 'served'],
+          ...(forbids
+            ? [[forbiddenOf(), 'forbidden'], [served, 'served']] as const
+            : []),
+        ];
         const outcomes: (IdentityRefusalReason | 'served')[] = [];
-        for (const headers of [served, {}, served, unrecognised, served, forbidden, served]) {
+        for (const [headers] of callers) {
           outcomes.push(outcomeOf(await identify(get('/v1/status', headers))));
         }
 
-        expect(outcomes).toEqual(['served', 'unauthenticated', 'served', 'unauthenticated', 'served', 'forbidden', 'served']);
+        expect(outcomes).toEqual(callers.map(([, outcome]) => outcome));
       });
 
       it('leaves the request body unread, served or refused', async () => {
-        const { served, forbidden } = open();
-        const requests = [push(served), push(forbidden), push()];
+        const { served, unrecognised } = open();
+        const requests = forbids
+          ? [push(served), push(forbiddenOf()), push()]
+          : [push(served), push(unrecognised), push()];
         for (const request of requests) await identify(request);
 
         expect(requests.map((request) => request.bodyUsed)).toEqual([false, false, false]);
