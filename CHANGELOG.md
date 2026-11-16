@@ -9,6 +9,32 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.54.0 — 2026-11-16, release tag: next steps on every refusal, and the release keys in every worktree; Release steps carry their place; A contract version both sides of the sync carry; The hub's index port, with FTS5 and sqlite-vec on the sqlite connector; Repository facts: two readings of one CI fact count once; Evidence-first kind check for out-of-scope entries; Report rafa gaps and bugs upstream from a sibling project
+<!-- rafa:fragments rafa-release-tag-guidance package-build-copy-links rafa-1262 rafa-d2c-lfs-server rafa-1565-spec-release-steps-carry dependabot-1512 rafa-1427-spec-contractversion-wire-status rafa-1428-spec-hub-index-port rafa-1490-spec-repository-facts-later rafa-1561-spec-evidence-first-kind rafa-1581 rafa-1586 rafa-751-report-rafa-gaps-bugs -->
+
+- release: every rafa release tag refusal names its next step, and a detached or wrong-branch run names the checkout holding the release branch
+- release: Every `Next:` step of `rafa release tag`, `settle` and `publish` now runs where it is clicked, with `cd <checkout> &&` only when you stand in another checkout; `settle` ends with its next step (merge and `rafa release tag --push`, `rafa pr wait` first after a pull request, or a nothing-to-tag line), also as a `next` list in JSON, and `publish` with no release tag at HEAD names a `rafa release tag` step.
+- config: pr.base and the release keys moved to the tracked rafa.config.ts, so worktrees release from integration
+- config: New `hints.skills` key (default `false`) lets a project opt in to a `skill: rafa-release › <case>` line under each release step that has a case file.
+- config: Added the `collaborate.rafa` key, off by default and written commented out by `rafa init`, naming the rafa board a sibling project may report to.
+- effort store: The store entry now exports `WIRE_CONTRACT_VERSION`, the sync wire contract's version, and a lock freezes each shipped version's wire version, migration ids and row fields.
+- effort store: two readings of one CI fact now count once. Recording a CI reading, or `rafa effort merge` bringing one in, marks every later reading of the same fact superseded by the earliest in a new `reading_supersedes` table, and the store reads each fact once with its sightings, origins and last sighting.
+- rafa-hub: The hub's store port now reports the wire contract it speaks: its contract version, migration ids and capabilities. `GET /v1/status` answers all three, and push and pull refuse a contract version the hub doesn't speak with `409 contract-unsupported`.
+- rafa-hub: Read `hub.store.sqliteLibrary` (an absolute path to a vanilla libsqlite3) and `hub.index.rebuildAfterPush` (default `true`) from the config, rebuild the index in the background after a push that adds rows (one at a time, logging `index.rebuilt` or `index.rebuild-failed`), and add `rafa-hub index rebuild` to rebuild it once and print its counts.
+- sync: The hub sync client reads the hub's status once per run, sends its contract version on push and pull, and still syncs with an older hub that names no version. A hub speaking another version is refused before anything is exported or sent, naming both versions and the next step.
+- effort sync: A hub speaking another contract version now produces one warning line, the pull after it is skipped, and the command's exit code is unchanged.
+- hub: The sqlite connector opens a search index beside its store, `<store>.index.sqlite`, with full-text, vector, hybrid and graph search whose capabilities are answered from what loaded at open.
+- docs: The hub config docs name the two new keys, and the cut table's header and its rafa row match the package rows in its JSON.
+- docs: The triage page's decision table now lists the step-capture and plan-symbol rows with the path, capture and repair-dedupe rules in the check's order, and says a run keeps the similarity step on at the default threshold of 0.3.
+- docs: The issue commands' docs describe filing upstream, its same-owner gate and refusals, the bug-only rule and the private-name rule.
+- effort: `rafa effort report --skills` counts two readings of one CI result once, including readings joined by a merge, and shows a plan's CI by the fact sighted last, with red winning a tie, so a head that turns red again on a rerun shows red.
+- prompt: Out-of-scope entries for a failing test now quote bun's `(fail)` line with the test file's header line above it.
+- triage: The kind check now reads evidence before the session's word: it no longer takes a folder for a file and matches `.js` specifiers and `./` or `../` paths to the plan's own files, reads an entry outside the plan as the plan's own gap when the plan's commits added a symbol it names, routes a case red in a suite step's kept capture as the plan's own fallout joined to that step's repair task, shares one leftover repair task between reports of one cause, and says so in its note when an entry joins an existing repair line.
+- loop: A red suite step now keeps its output as `<kind>.<sha>.red.output.txt` under `.rafa/runs/<session>/suite/`, which a later green rerun no longer removes.
+- board: `issue create`, `issue comment` and `issue list` now declare `--upstream=<tool>`, with help naming `collaborate.rafa` and the same-owner rule.
+- issue: `--upstream=rafa` files a bug (`issue create --type=bug`), posts a redacted comment (`issue comment`) or lists issues (`issue list`, with `--search`, `--type`, `--module` and `--limit`) on the board `collaborate.rafa` names; it is refused before any `gh` call unless the key is set and both boards share an owner, a private sibling is named only as "a private sibling repository", and `--dry-run` prints the upstream body and its target.
+- operators: The gap-log skill searches, files and comments on rafa's board upstream when `collaborate.rafa` is set.
+
 ## 0.53.0 — 2026-11-08, Offer a task's lessons by how strongly they match it; Same-action groups count a lesson's wordings once; A filed bug and the loop that fixed it become one lesson; Session rows store their log path relative to the log root; Bug sweep 48: a merged plan, a release tag, a triage wait, and two pit-stop readings
 <!-- rafa:fragments rafa-1468-spec-offers-match-strength rafa-1469-spec-same-action-groups rafa-1470-spec-bug-finding-fix rafa-1523-bug-sweep rafa-1524-bug-sweep-48 -->
 
