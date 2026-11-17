@@ -425,6 +425,51 @@ On the public channel, a bug is looked up in two steps:
    under the key. A find that fails answers failed, as a stored-reference read
    does. On the private channel, find is the only step.
 
+### A recurrence's comment and its append
+
+A recurrence on the public channel is commented on as the key and the match
+above say. When the session gave its own reproduce text, and the bug's body
+does not hold that text yet, the loop also appends the text below the body as
+one dated `Updated` block, through the write `rafa issue edit --append` runs
+(`runIssueEdit`, unchanged). The append dispatches no task and changes no
+bug's action. The comment is posted whatever the append comes to.
+
+Two situations, in order:
+
+- **A bug filed with the fallback.** Its `Reproduce` reads `seen while running
+  task <line> of plan <stub>`, so it has no command of its own. The first
+  recurrence whose session gives a command has that command appended below the
+  body, under a heading naming the reason, such as
+  `**Updated <date>, reproduce from a recurrence (plan <stub>, task <line>):**`.
+  The line counts from one. With no plan stub the heading names only
+  `task <line>`.
+- **A bug reported by every task of a run.** Each task's recurrence gets its
+  comment. The first whose text the body lacks adds one block; the rest find
+  the text in the body and append nothing. A different text adds a second block.
+
+Never appended:
+
+- the fallback, when the session gave no reproduce text of its own;
+- a text the body already holds, read with CRLF as LF and the text trimmed; the
+  write is not called and the outcome is `held`;
+- a bug on the private channel, which is commented on in its local tracker with
+  no append step;
+- an issue closed as completed, which is not commented on at all: a new issue
+  is filed in its place, and its `Reproduce` section holds the text;
+- anything on a tracker with no `editable` read, and any recurrence whose
+  comment failed.
+
+What a refused or failed append comes to is one of five outcomes. `appended`
+and `held` are the cases above. `stale-copy` means the block was written to a
+planned issue, so the plan's copy of it is stale. `refused` means the write's
+gates turned it down: an untrusted author, a closed or claimed issue, or a
+leak. `failed` means the body read or the write failed. Triage prints a warning
+for every outcome but `appended`, names the problem, and goes on to the next
+bug; the bug's action stays `commented`.
+
+The block is not a record field. `rafa bug recheck` reads the body's `Rerun`
+value and its `Reproduce` section, so it does not rerun an appended command.
+
 ### Similarity and duplicates
 
 When `triage.similarity` configures a threshold and the public tracker has

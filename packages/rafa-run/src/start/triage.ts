@@ -109,6 +109,29 @@
  * with the open bugs of the tracker the chain landed on
  * (`triage/triage.ts`). A recurrence found that way is noted with its score.
  *
+ * ## A recurrence's reproduce, appended
+ *
+ * Every `triageReport` is handed an `appendUpdate` ({@link startAppendUpdate})
+ * bound to the public tracker the report files through, which `triageReport`
+ * calls after a public comment when the session gave a reproduce text the
+ * issue's body does not hold. It runs `runIssueEdit`
+ * (`commands/issue/edit-run.ts` of the board package), unchanged, as
+ * `rafa issue edit --append` runs it: over `requireEditingTracker` of that
+ * tracker, the repo root, `specs.dir`, `naming.branch`, the board trust over
+ * `board.trustedAuthors`, the `gh` editor login and the clock
+ * ({@link StartTriageAppendSeams}), under `whileInDevelopment: false`. Its
+ * four gates all apply; on the `local` tracker the two ownership gates
+ * answer `local` and run no `gh`.
+ *
+ * {@link appendOutcomeOf} reads what the write came to: `appended` and
+ * `stale-copy` as themselves, `already` as `held`, an `EditRefusal` (an
+ * untrusted author, a leak, a closed or claimed issue) as `refused`, and
+ * any other `CommandExit`, a tracker read or write rejected, as `failed`,
+ * as is a `conflict`. Each is printed under the bug's note: `appended` as a
+ * note, and every other outcome as a warning, `stale-copy` too though its
+ * block was written, since the plan's copy of the issue is then stale. None
+ * stops the triage, and the bug's action stays `commented`.
+ *
  * ## Secrets
  *
  * The named secrets are read once, when the triage is made: `namedSecrets`
@@ -143,7 +166,8 @@
  *
  * The loop never dispatches a task for an out-of-scope bug; a plan that
  * wants one fixed declares a task. A bug becomes an issue file or a
- * comment, and a stored reference, unless it is machine-scoped: that one
+ * comment, with the reproduce text appended below a commented issue's
+ * body, and a stored reference, unless it is machine-scoped: that one
  * becomes a warned line here and its stored row alone
  * (`triage/triage.ts`). A `stale_docs` entry becomes a noted line here
  * and its stored row alone.
@@ -164,7 +188,7 @@
  *
  * Every line goes through the active output (`core/output/active.ts`):
  * what was written, filed or commented on through `info`, and everything
- * that was not through `warn`.
+ * that was not through `warn`, as is an append that left a stale copy.
  *
  * ## A filed bug, onto the project
  *
@@ -208,6 +232,7 @@ import type {
   ResolveTrackerOptions,
   TrackerResolution,
 } from '@open-tomato/rafa-board';
+import type { EditReport, EditRunOptions } from '@open-tomato/rafa-board/commands/issue/edit-run';
 import type {
   BugTriage,
   InheritedTriage,
@@ -215,10 +240,13 @@ import type {
   TriageOptions,
   TriageResult,
 } from '@open-tomato/rafa-pr';
+import type { AppendUpdate, RecurrenceAppend } from '@open-tomato/rafa-pr/triage/triage';
 
 import { homedir } from 'node:os';
 
 import { bugRulesOf } from '@open-tomato/rafa/config-schema-issues';
+import { CommandExit } from '@open-tomato/rafa/core/command';
+import { CORE_SECTION } from '@open-tomato/rafa/core/config';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { activeOutput } from '@open-tomato/rafa/core/output';
@@ -230,10 +258,14 @@ import { namedSecrets, redactSecrets } from '@open-tomato/rafa/triage/filed-text
 import { localPathRedactor } from '@open-tomato/rafa/triage/local-paths';
 import {
   addFiledBugs,
+  boardRepoLabel,
   createGhRunner,
+  ghBoardTrust,
   openProjectRunner,
   resolveTracker,
 } from '@open-tomato/rafa-board';
+import { createGhEditorLogin } from '@open-tomato/rafa-board/board/trust';
+import { EditRefusal, requireEditingTracker, runIssueEdit } from '@open-tomato/rafa-board/commands/issue/edit-run';
 import {
   blockerTextOf,
   checkedKindOf,
@@ -289,6 +321,30 @@ export interface StartTriageProjectSeams {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
+/**
+ * How a recurrence's append reaches the issue; see the module note. Each
+ * left out is the system's own, as `rafa issue edit` takes it.
+ */
+export interface StartTriageAppendSeams {
+  /** The write. `runIssueEdit` when left out. */
+  readonly edit?: (options: EditRunOptions) => Promise<EditReport>;
+  /**
+   * Runs the `gh api user` lookup and the trust reads a tracker with
+   * accounts is weighed by; never called on the `local` tracker. A `gh`
+   * runner in the repo root when left out.
+   */
+  readonly gh?: GhRunner;
+  /** The clock the appended block is dated by. `new Date()` when left out. */
+  readonly now?: () => Date;
+}
+
+/**
+ * The keys the append is weighed with, as `rafa issue edit` reads them:
+ * `specs.dir`, `naming.branch` and `board.trustedAuthors`, each its
+ * default when left out.
+ */
+type AppendConfig = Partial<Pick<RafaConfig, 'specsDir' | 'namingBranch' | 'boardTrustedAuthors'>>;
+
 /** What the run's triage is made with. */
 export interface StartTriageOptions {
   /** The repo root: where the store and both issue directories live, and the chain's context. */
@@ -299,9 +355,10 @@ export interface StartTriageOptions {
    * the `triage.similarity` settings, the `issues` keys and
    * `errors.codes` the bug record's rules are read from, and the
    * `board.project` keys and the rest of what the project refresh reads,
-   * for the add of each filed bug.
+   * for the add of each filed bug, and the keys a recurrence's append is
+   * weighed with ({@link AppendConfig}).
    */
-  readonly config: Pick<
+  readonly config: AppendConfig & Pick<
     RafaConfig,
     | 'trackerDefault'
     | 'trackerFallback'
@@ -347,6 +404,8 @@ export interface StartTriageOptions {
   readonly kinds?: StartKindOptions;
   /** How each filed bug's add reaches the project; see the module note. */
   readonly project?: StartTriageProjectSeams;
+  /** How a recurrence's append reaches the issue; see the module note. */
+  readonly append?: StartTriageAppendSeams;
 }
 
 /** One task whose report `start()` has just stored. */
@@ -484,9 +543,36 @@ function settledLines(bug: BugTriage, name: string): StartTriageLines | null {
   };
 }
 
+/** No line at all. */
+const NO_LINES: StartTriageLines = Object.freeze({ notes: [], warnings: [] });
+
+/**
+ * The lines for what the append after a bug's comment came to: a note for
+ * `appended`, and a warning for each other outcome, naming its problem.
+ * None for a bug no append was tried for. See the module note.
+ */
+function appendLines(bug: BugTriage, name: string, issue: string): StartTriageLines {
+  const { append } = bug;
+  if (append === undefined) return NO_LINES;
+  const problem = append.problem ?? append.outcome;
+  switch (append.outcome) {
+    case 'appended':
+      return { notes: [`${name}: its reproduce text was appended below the body of ${issue}.`], warnings: [] };
+    case 'held':
+      return { notes: [], warnings: [`${name}: not appended to ${issue}: its body already holds this reproduce text.`] };
+    case 'stale-copy':
+      return { notes: [], warnings: [`${name}: appended to ${issue}, whose saved copy it makes stale: ${problem}`] };
+    case 'refused':
+      return { notes: [], warnings: [`${name}: not appended to ${issue}, the write refused it: ${problem}`] };
+    case 'failed':
+      return { notes: [], warnings: [`${name}: not appended to ${issue}: ${problem}`] };
+  }
+}
+
 /**
  * The lines for one bug: a note for an issue it reached, a failure it
- * inherited, or a route its kind took, and a warning for everything else.
+ * inherited, a route its kind took, or a reproduce text appended, and a
+ * warning for everything else.
  */
 function bugLines(bug: BugTriage, inherited: SuiteFailure | undefined): StartTriageLines {
   const name = `out_of_scope_bugs[${bug.index}]`;
@@ -519,7 +605,8 @@ function bugLines(bug: BugTriage, inherited: SuiteFailure | undefined): StartTri
   const conflict = bug.stored === 'conflict'
     ? [`${name}: the store keeps another reference for its artifact, in place of ${issue}.`]
     : [];
-  return { notes: [note], warnings: [...problem, ...conflict] };
+  const appended = appendLines(bug, name, issue);
+  return { notes: [note, ...appended.notes], warnings: [...problem, ...appended.warnings, ...conflict] };
 }
 
 /**
@@ -591,6 +678,93 @@ async function resolvePublicTracker(
     activeOutput().warn(`${INDENT}${LINE_PREFIX}no tracker resolved, so no public bug of this run is filed: ${redact(reason)}`);
     return unresolvedTracker(options.config.trackerDefault, reason);
   }
+}
+
+/** An issue number as `rafa issue edit` reads one: a whole number from 1. */
+const ISSUE_NUMBER = /^[1-9]\d*$/u;
+
+/** The mark a command's refusal opens with, which a triage line leaves out. */
+const REFUSAL_MARK = /^❌\s*/u;
+
+/** A command's message as a triage line words a problem: its mark left out. */
+function problemOf(message: string): string {
+  return message.replace(REFUSAL_MARK, '');
+}
+
+/** What `made`, the report of a write that ran, comes to as a recurrence's append. */
+function appendOfReport(made: EditReport): RecurrenceAppend {
+  switch (made.outcome) {
+    case 'appended':
+      return { outcome: 'appended', problem: null };
+    case 'already':
+      return { outcome: 'held', problem: null };
+    case 'stale-copy':
+      return { outcome: 'stale-copy', problem: made.message };
+    case 'conflict':
+    case 'replaced':
+      return { outcome: 'failed', problem: problemOf(made.message) };
+  }
+}
+
+/**
+ * What `write`, one `runIssueEdit` of an append, comes to as a
+ * recurrence's append: its report's `appended`, `stale-copy` and
+ * `already` (as `held`), a `conflict` as `failed`; an {@link EditRefusal}
+ * as `refused`, and any other `CommandExit`, a tracker's read or write
+ * rejected, as `failed`, each with its message as the problem. Anything
+ * else it throws is thrown on, for `triageReport` to answer as `failed`.
+ */
+export async function appendOutcomeOf(write: () => Promise<EditReport>): Promise<RecurrenceAppend> {
+  try {
+    return appendOfReport(await write());
+  } catch (error) {
+    if (error instanceof EditRefusal) return { outcome: 'refused', problem: problemOf(error.message) };
+    if (error instanceof CommandExit) return { outcome: 'failed', problem: problemOf(error.message) };
+    throw error;
+  }
+}
+
+/**
+ * The append a recurrence on `tracker` is written through: `runIssueEdit`
+ * of an append, under `whileInDevelopment: false`, with the project root,
+ * `specs.dir`, `naming.branch`, the board trust, the `gh` editor login and
+ * the clock, as `rafa issue edit` runs one. A reference of another kind,
+ * or one naming no issue number, is answered `failed` with nothing run.
+ * See the module note.
+ */
+export function startAppendUpdate(options: StartTriageOptions, tracker: Tracker, git: GitRunner): AppendUpdate {
+  const seams = options.append ?? {};
+  const edit = seams.edit ?? runIssueEdit;
+  const gh = seams.gh ?? createGhRunner({ cwd: options.repoRoot });
+  const defaults = CORE_SECTION.defaults;
+  return (ref, reason, text) => {
+    if (ref.kind !== tracker.kind || !ISSUE_NUMBER.test(ref.externalId)) {
+      const problem = `${issueName(ref)} names no issue the ${tracker.kind} tracker can append to`;
+      return Promise.resolve({ outcome: 'failed', problem });
+    }
+    return appendOutcomeOf(() => edit({
+      request: {
+        issue: Number(ref.externalId),
+        kind: 'append',
+        text,
+        reason,
+        title: null,
+        whileInDevelopment: false,
+        dryRun: false,
+      },
+      tracker: requireEditingTracker(tracker),
+      root: options.repoRoot,
+      specsDir: options.config.specsDir ?? defaults.specsDir,
+      branchTemplate: options.config.namingBranch ?? defaults.namingBranch,
+      trust: () => ghBoardTrust({
+        gh,
+        trustedAuthors: options.config.boardTrustedAuthors ?? defaults.boardTrustedAuthors,
+        repo: boardRepoLabel(git),
+      }),
+      editor: createGhEditorLogin({ gh }),
+      now: seams.now ?? ((): Date => new Date()),
+    }));
+  };
 }
 
 /** The baseline file beside `trackerPath`, or null for a file name no baseline is named from. */
@@ -715,6 +889,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       ? undefined
       : kindReader();
     const dispatch = dispatchOf(input);
+    const tracker = await trackerFor(report, kinds);
     const result = await triage({
       repoRoot: options.repoRoot,
       trackerPath: input.trackerPath,
@@ -722,7 +897,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       dispatch,
       outcome: input.outcome,
       report,
-      tracker: await trackerFor(report, kinds),
+      tracker,
       privateTracker: options.privateTracker,
       secrets,
       seams: options.seams,
@@ -733,6 +908,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       git,
       env,
       bugRules,
+      appendUpdate: startAppendUpdate(options, tracker, git),
     });
 
     const routes = bugRouteEntriesOf(result, report, saidKindsOf(reading.block.body));
