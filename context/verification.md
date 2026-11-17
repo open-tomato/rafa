@@ -635,12 +635,21 @@ nonzero exit whose stdout is ESLint's JSON report names the files with errors
 and the command to run: `found ESLint errors in the task's diff`. A nonzero
 exit with no report is a step that could not run ESLint, and its blocker
 gives the exit code and the first stderr line under the crash banner, as
-in `could not run ESLint: bunx eslint exited 2 and printed no report:
-ResolveMessage {}`. Exit 2 with no report is a config ESLint could not
+in `could not run ESLint: node_modules/.bin/eslint exited 2 and printed no
+report: Error: boom`. Exit 2 with no report is a config ESLint could not
 load (a config that throws `boom` prints `Error: boom`, measured on
-ESLint 9.39.5) or no ESLint for `bunx` to resolve (`ResolveMessage {}`).
-Neither is a rule the task broke, so read that blocker as a setup
-problem in the checkout, not as lint errors to fix in the diff.
+ESLint 9.39.5). It is not a rule the task broke, so read that blocker as a
+setup problem in the checkout, not as lint errors to fix in the diff.
+
+**The lint step runs the checkout's own ESLint, never `bunx`**: its
+`node_modules/.bin/eslint`, else the `eslint` package's bin that
+`Bun.resolveSync` finds from the checkout. With none, the step prints
+`no ESLint installed in the checkout (...); nothing to lint.` and passes
+the task, as with no `eslint.config` file: `bunx` would have fetched the
+latest ESLint from the registry and run it (#1602). The command the
+blocker hands the session is that local bin, relative to the checkout, as
+in `Run node_modules/.bin/eslint --no-warn-ignored a.json and make them
+pass.`
 
 ### The summary line is what the runner reads
 

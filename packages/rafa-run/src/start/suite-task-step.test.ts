@@ -29,6 +29,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { baselineOf } from '../suite/baseline.js';
 
+import { LOCAL_ESLINT_BIN } from './lint-step.js';
 import { OUTSIDE_CASE_REASON } from './suite-outside-case.js';
 import {
   alwaysRunJunitFileFor,
@@ -44,6 +45,13 @@ import { FOLDED_COMMAND_JOINER } from './task-always-run.js';
 const BASE = 'base0000';
 const HEAD = 'head1111';
 const SESSION = 'session-1';
+
+/** Plants an ESLint config and a stand-in `node_modules/.bin/eslint` in `root`, so the lint step resolves an ESLint and runs its seam. */
+function plantLintable(root: string): void {
+  writeFileSync(join(root, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+  mkdirSync(join(root, 'node_modules', '.bin'), { recursive: true });
+  writeFileSync(join(root, LOCAL_ESLINT_BIN), '#!/bin/sh\nexit 0\n', 'utf8');
+}
 
 /** Two stages: the first finished, the second with its task open. */
 const TRACKER = [
@@ -687,14 +695,14 @@ describe('runTaskStep linting the task\'s diff', () => {
   }
 
   beforeEach(() => {
-    writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+    plantLintable(dir);
   });
 
   it('lints the task\'s diff after a green test run and stays green on a green lint', async () => {
     const argvs: (readonly string[])[] = [];
     const { context } = contextWith([result()], { seams: linting({ exitCode: 0, stdout: '[]', stderr: '' }, argvs) });
     const outcome = await runTaskStep(context, input);
-    expect(argvs).toEqual([['bunx', 'eslint', '--no-warn-ignored', '--format', 'json', 'src/a.ts', 'a.json']]);
+    expect(argvs).toEqual([[join(dir, LOCAL_ESLINT_BIN), '--no-warn-ignored', '--format', 'json', 'src/a.ts', 'a.json']]);
     expect(outcome).toMatchObject({ red: false, blocker: null, blockedLine: null });
     expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
   });
@@ -707,7 +715,7 @@ describe('runTaskStep linting the task\'s diff', () => {
     const next = findNextTask(readFileSync(trackerPath, 'utf8'));
     expect(next?.status).toBe('blocked');
     expect(next?.blocker).toBe(outcome.blocker ?? '');
-    expect(next?.blocker).toBe('The runner\'s lint step after "second task" found ESLint errors in the task\'s diff. Files with errors: a.json (1 error). Run bunx eslint --no-warn-ignored a.json and make them pass.');
+    expect(next?.blocker).toBe('The runner\'s lint step after "second task" found ESLint errors in the task\'s diff. Files with errors: a.json (1 error). Run node_modules/.bin/eslint --no-warn-ignored a.json and make them pass.');
   });
 
   it('writes one blocker holding both texts, the tests\' first, when both are red', async () => {
@@ -718,7 +726,7 @@ describe('runTaskStep linting the task\'s diff', () => {
     expect(next?.blocker).toBe(outcome.blocker ?? '');
     expect(outcome.blocker?.startsWith('The runner\'s task step after "second task" found failures')).toBe(true);
     expect(outcome.blocker).toContain('bun test ./src/new.test.ts');
-    expect(outcome.blocker).toContain('Run bunx eslint --no-warn-ignored a.json');
+    expect(outcome.blocker).toContain('Run node_modules/.bin/eslint --no-warn-ignored a.json');
   });
 
   it('reads a lint ended by SIGINT as a stop, blocking nothing', async () => {
@@ -819,7 +827,7 @@ describe('runTaskStep type-checking the task\'s test files', () => {
   });
 
   it('writes one blocker holding the tests\' text, then the lint\'s, then the type step\'s, when all three are red', async () => {
-    writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+    plantLintable(dir);
     const lintReport = JSON.stringify([{ filePath: join(dir, 'src/a.ts'), messages: [], errorCount: 1 }]);
     const seams: SuiteStepSeams = { ...typing(typeRed), runLint: () => Promise.resolve({ exitCode: 1, stdout: lintReport, stderr: '' }) };
     const { context } = contextWith([red([FRESH])], { seams });
@@ -867,7 +875,7 @@ describe('runTaskStep type-checking the task\'s test files', () => {
   });
 
   it('runs no type step after a lint read as a stop', async () => {
-    writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+    plantLintable(dir);
     const spawns: { cwd: string; argv: readonly string[] }[] = [];
     const seams: SuiteStepSeams = { ...typing(typeRed, spawns), runLint: () => Promise.resolve({ exitCode: SIGINT_EXIT_CODE, stdout: '', stderr: '' }) };
     const { context } = contextWith([result()], { seams });
