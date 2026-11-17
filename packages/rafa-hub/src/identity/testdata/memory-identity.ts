@@ -5,8 +5,14 @@
  * table grants actions is served, one it grants none is forbidden, and
  * anything else, a missing or malformed `Authorization` header
  * included, is unauthenticated. It is the port's rules and no more.
+ *
+ * Its contract subject carries a lifecycle hook over its own table: a
+ * created token is granted every action under its name, a paused one
+ * is granted none and so forbidden, and a deleted one is dropped from
+ * the table, so it is refused as a token never created is. The table is
+ * read afresh on every request and replaced, never changed, by a hook.
  */
-import type { CredentialHeaders, IdentityContractSubject } from '../contract.js';
+import type { CredentialHeaders, IdentityContractSubject, IdentityLifecycle } from '../contract.js';
 import type { HubAction, HubIdentity, IdentityAnswer } from '../port.js';
 
 import { HUB_ACTIONS } from '../port.js';
@@ -61,16 +67,41 @@ function bearer(token: string): CredentialHeaders {
   return { authorization: `Bearer ${token}` };
 }
 
-/** A contract subject over a fresh stand-in knowing one served and one forbidden caller. */
+/** The token the lifecycle hook creates for `name`. */
+function createdToken(name: string): string {
+  return `memory-created-${name}-token`;
+}
+
+/**
+ * A contract subject over a fresh stand-in knowing one served and one
+ * forbidden caller, with a lifecycle hook adding, pausing and dropping
+ * tokens in its table.
+ */
 export function memoryIdentitySubject(): IdentityContractSubject {
-  const identity = openMemoryIdentity({
+  let grants: Readonly<Record<string, MemoryGrant>> = {
     [SERVED_TOKEN]: { id: 'served-caller', may: HUB_ACTIONS },
     [FORBIDDEN_TOKEN]: { id: 'forbidden-caller', may: [] },
-  });
+  };
+  const identity: HubIdentity = { identify: (request) => openMemoryIdentity(grants).identify(request) };
+  const lifecycle: IdentityLifecycle = {
+    create: (name) => {
+      grants = { ...grants, [createdToken(name)]: { id: name, may: HUB_ACTIONS } };
+      return Promise.resolve(bearer(createdToken(name)));
+    },
+    pause: (name) => {
+      grants = { ...grants, [createdToken(name)]: { id: name, may: [] } };
+      return Promise.resolve();
+    },
+    delete: (name) => {
+      grants = Object.fromEntries(Object.entries(grants).filter(([token]) => token !== createdToken(name)));
+      return Promise.resolve();
+    },
+  };
   return {
     identity,
     served: bearer(SERVED_TOKEN),
     forbidden: bearer(FORBIDDEN_TOKEN),
     unrecognised: bearer(UNRECOGNISED_TOKEN),
+    lifecycle,
   };
 }

@@ -13,7 +13,14 @@
  * `{ forbids: false }` and its subject names no forbidden headers, as
  * a scheme with no forbidden caller does; `contract.test.ts` holds that
  * the suite still fails a fault under it.
+ *
+ * The subject carries the stand-in's lifecycle hook and registers with
+ * `{ lifecycle: true }` unless {@link LIFECYCLE_ENV} is `false`, which a
+ * `forbids: false` run sets too, since the suite refuses the pair. A
+ * lifecycle fault changes the subject, its hook and its adapter
+ * together, rather than the adapter alone.
  */
+import type { IdentityContractSubject } from '../contract.js';
 import type { HubIdentity, IdentityAnswer } from '../port.js';
 
 import { identityContract } from '../contract.js';
@@ -25,6 +32,9 @@ export const FAULT_ENV = 'RAFA_HUB_IDENTITY_FAULT';
 
 /** The environment variable that, set to `false`, registers with `{ forbids: false }`. */
 export const FORBIDS_ENV = 'RAFA_HUB_IDENTITY_FORBIDS';
+
+/** The environment variable that, set to `false`, registers without the lifecycle hook. */
+export const LIFECYCLE_ENV = 'RAFA_HUB_IDENTITY_LIFECYCLE';
 
 /** `identity` with every answer passed through `change`. */
 function mapAnswers(identity: HubIdentity, change: (answer: IdentityAnswer, request: Request) => IdentityAnswer): HubIdentity {
@@ -93,16 +103,128 @@ const FAULTS: Readonly<Record<string, (identity: HubIdentity) => HubIdentity>> =
   }),
 };
 
+/** The bearer header `request` carries, or the empty string. */
+function authorizationOf(request: Request): string {
+  return request.headers.get('authorization') ?? '';
+}
+
+/** `subject` with its lifecycle hook, which the stand-in always carries. */
+function hookOf(subject: IdentityContractSubject): NonNullable<IdentityContractSubject['lifecycle']> {
+  if (subject.lifecycle === undefined) throw new Error('broken identity fixture: the stand-in carries no lifecycle hook');
+  return subject.lifecycle;
+}
+
+/** Each lifecycle fault, as a change to the working stand-in's subject. */
+const LIFECYCLE_FAULTS: Readonly<Record<string, (subject: IdentityContractSubject) => IdentityContractSubject>> = {
+  'misses-created': (subject) => {
+    const hook = hookOf(subject);
+    const created = new Set<string>();
+    const unknown = new Request('http://hub.test/v1/status', { headers: subject.unrecognised });
+    return {
+      ...subject,
+      identity: { identify: async (request) => created.has(authorizationOf(request))
+        ? subject.identity.identify(unknown)
+        : subject.identity.identify(request) },
+      lifecycle: {
+        ...hook,
+        create: async (name) => {
+          const headers = await hook.create(name);
+          created.add(headers['authorization'] ?? '');
+          return headers;
+        },
+      },
+    };
+  },
+  'ignores-pause': (subject) => ({ ...subject, lifecycle: { ...hookOf(subject), pause: () => Promise.resolve() } }),
+  'unnamed-pause': (subject) => ({
+    ...subject,
+    identity: mapAnswers(subject.identity, (answer) => !answer.served && answer.refusal.reason === 'forbidden'
+      ? withMessage(answer, 'This credential is paused.')
+      : answer),
+  }),
+  'pauses-every-key': (subject) => {
+    const hook = hookOf(subject);
+    const names: string[] = [];
+    return {
+      ...subject,
+      lifecycle: {
+        ...hook,
+        create: (name) => {
+          names.push(name);
+          return hook.create(name);
+        },
+        pause: async () => {
+          for (const name of names) await hook.pause(name);
+        },
+      },
+    };
+  },
+  'ignores-delete': (subject) => ({ ...subject, lifecycle: { ...hookOf(subject), delete: () => Promise.resolve() } }),
+  'tells-deleted': (subject) => {
+    const hook = hookOf(subject);
+    const byHeader = new Map<string, string>();
+    const deleted = new Set<string>();
+    return {
+      ...subject,
+      identity: mapAnswers(subject.identity, (answer, request) => {
+        const name = byHeader.get(authorizationOf(request));
+        return name !== undefined && deleted.has(name)
+          ? withMessage(answer, `Key ${name} was deleted.`)
+          : answer;
+      }),
+      lifecycle: {
+        ...hook,
+        create: async (name) => {
+          const headers = await hook.create(name);
+          byHeader.set(headers['authorization'] ?? '', name);
+          return headers;
+        },
+        delete: async (name) => {
+          deleted.add(name);
+          await hook.delete(name);
+        },
+      },
+    };
+  },
+  'serves-unknown': (subject) => {
+    const hook = hookOf(subject);
+    let createdAny = false;
+    return {
+      ...subject,
+      identity: mapAnswers(subject.identity, (answer, request) => createdAny && authorizationOf(request) !== '' && !answer.served && answer.refusal.reason === 'unauthenticated'
+        ? { served: true, caller: { id: 'anyone', provider: 'memory' }, may: ['status.read'] }
+        : answer),
+      lifecycle: {
+        ...hook,
+        create: (name) => {
+          createdAny = true;
+          return hook.create(name);
+        },
+      },
+    };
+  },
+  'drops-lifecycle': (subject) => ({ ...subject, lifecycle: undefined }),
+};
+
 const fault = process.env[FAULT_ENV] ?? '';
-const plant = FAULTS[fault];
-if (plant === undefined) throw new Error(`${FAULT_ENV} is ${JSON.stringify(fault)}; expected one of ${Object.keys(FAULTS).join(', ')}`);
+const identityFault = FAULTS[fault];
+const subjectFault = LIFECYCLE_FAULTS[fault];
+const plant = identityFault === undefined
+  ? subjectFault
+  : (subject: IdentityContractSubject): IdentityContractSubject => ({ ...subject, identity: identityFault(subject.identity) });
+if (plant === undefined) {
+  throw new Error(`${FAULT_ENV} is ${JSON.stringify(fault)}; expected one of ${[...Object.keys(FAULTS), ...Object.keys(LIFECYCLE_FAULTS)].join(', ')}`);
+}
 
 const forbids = process.env[FORBIDS_ENV] !== 'false';
+const lifecycle = process.env[LIFECYCLE_ENV] !== 'false';
 
 identityContract(fault, () => {
-  const { forbidden, ...subject } = memoryIdentitySubject();
-  const planted = { ...subject, identity: plant(subject.identity) };
-  return forbids
+  const { forbidden, lifecycle: hook, ...planted } = plant(memoryIdentitySubject());
+  const withForbidden = forbids
     ? { ...planted, forbidden }
     : planted;
-}, { forbids });
+  return lifecycle && hook !== undefined
+    ? { ...withForbidden, lifecycle: hook }
+    : withForbidden;
+}, { forbids, lifecycle });
