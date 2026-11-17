@@ -41,10 +41,11 @@ environment variable is set to `/data/rafa-hub.yaml`.
 
 ### `hub.repository`
 
-The GitHub repository whose read permission decides who may sync with the hub,
-as `owner/name`. This key is required unless `hub.projects` is set, and refused
-beside it; there is no default. It is kept as written; GitHub's characters are
-accepted.
+The GitHub repository whose permission decides who may sync with the hub, as
+`owner/name`. A caller needs `write`, `maintain` or `admin` on it; `read` and
+`triage` are refused. This key is required unless `hub.projects` is set, and
+refused beside it; there is no default. It is kept as written; GitHub's
+characters are accepted.
 
 ### `hub.port`
 
@@ -242,9 +243,10 @@ SQLite loads no extension`.
 
 ## Who may sync
 
-Under `github`, anyone with read access to the repository a project's
-`repository` key names may sync with that project; with `hub.projects` left out,
-that is `hub.repository`. The hub asks GitHub's public API about their
+Under `github`, a caller whose permission on the repository a project's
+`repository` key names is `write`, `maintain` or `admin` may sync with that
+project; `read` and `triage` are refused. With `hub.projects` left out, that is
+`hub.repository`. The hub asks GitHub's public API about the caller's
 permission; no deploy keys or personal access tokens are needed on the hub side.
 The client's token (a GitHub token read with `Bun.secrets`) is sent by each
 device in the `Authorization` header of each request. Under `api-key`, GitHub is

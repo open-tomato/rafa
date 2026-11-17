@@ -444,6 +444,15 @@ that names no version reads the same way on the client, and push and pull then
 send no `contractVersion` field, since a hub one release behind refuses a query
 name it does not read.
 
+**A push or a pull names its project only to a hub that names projects.** The
+store's project is the resolved `hub.project`, or else the root commit sha of
+its repository, and push and pull send it as `project` only when the status
+answer names `projects` (`projectQuery` in
+`packages/rafa-sync-service/src/client.ts`; `resolveProject` in `sync.ts`). A
+hub that names none gets no `project` query. A hub that lists projects answers
+a push or a pull naming one it does not list with `404` and a line that names
+the project and `hub.projects` (`packages/rafa-hub/src/server.ts`).
+
 **The hub refuses a version it does not speak with `409`.** A push or a pull
 naming a `contractVersion` other than `WIRE_CONTRACT_VERSION` gets `409` with
 `"code": "contract-unsupported"` (`CONTRACT_UNSUPPORTED`, the same server), its
