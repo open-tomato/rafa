@@ -87,13 +87,13 @@
  * the block names is {@link recurrenceReason}: `reproduce from a
  * recurrence (plan <stub>, task <line>)`, the line the task's tracker
  * line counting from one, or `reproduce from a recurrence (task <line>)`
- * for a dispatch with no plan stub. The text added is the redacted
- * reproduce inside a fence one backtick longer than any backtick run it
- * holds ({@link recurrenceAddition}, sized by `fenceFor`), so it is shown
+ * for a dispatch with no plan stub. The text added is the redacted reproduce
+ * inside a fence longer than any backtick run it holds, at least three
+ * backticks ({@link recurrenceAddition}, sized by `fenceFor`), so it is shown
  * verbatim. A body already holds the text ({@link bodyHoldsText}) when the
- * text, its surrounding whitespace trimmed, is a substring of the body
- * with CRLF read as LF: that finds it in the filed `Reproduce` section and
- * in every earlier `Updated` block alike, so one text is appended once.
+ * text, its surrounding whitespace trimmed, is a substring of the body with
+ * CRLF read as LF: that finds it in the filed `Reproduce` section and in every
+ * earlier `Updated` block alike, so one text is appended once.
  *
  * Every value goes through the caller's `redact` before it is shown.
  */

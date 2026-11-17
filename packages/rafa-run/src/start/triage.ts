@@ -166,7 +166,7 @@
  *
  * The loop never dispatches a task for an out-of-scope bug; a plan that
  * wants one fixed declares a task. A bug becomes an issue file or a
- * comment, with at most one appended block below a commented issue's
+ * comment, with the reproduce text appended below a commented issue's
  * body, and a stored reference, unless it is machine-scoped: that one
  * becomes a warned line here and its stored row alone
  * (`triage/triage.ts`). A `stale_docs` entry becomes a noted line here
