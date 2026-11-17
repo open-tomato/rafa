@@ -190,8 +190,8 @@ function routeOf(pathname: string, method: string): KeyRoute {
     : { kind: 'pause', name };
 }
 
-/** The origins `extra` names, each read as a URL. */
-function originsOf(extra: readonly string[]): ReadonlySet<string> {
+/** The origins `extra` names, each read as a URL; throws a `TypeError` for one that is not. */
+export function originsOf(extra: readonly string[]): ReadonlySet<string> {
   return new Set(extra.map((written) => {
     if (!URL.canParse(written)) throw new TypeError(`openKeyRoutes: origin ${JSON.stringify(written)} is not a URL.`);
     return new URL(written).origin;
@@ -199,7 +199,7 @@ function originsOf(extra: readonly string[]): ReadonlySet<string> {
 }
 
 /** Whether `request` came from the hub's own page, the CLI or `origins`; see the module note. */
-function sameOrigin(request: Request, origins: ReadonlySet<string>): boolean {
+export function sameOrigin(request: Request, origins: ReadonlySet<string>): boolean {
   const origin = request.headers.get('origin');
   if (origin === null) {
     const site = request.headers.get('sec-fetch-site');
