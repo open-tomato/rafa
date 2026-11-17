@@ -17,6 +17,11 @@
  *     core's `WIRE_CONTRACT_VERSION` names and no capability, so the
  *     hub client sends `contractVersion` on push and pull.
  *
+ *   - {@link StandInHub.setProjects} makes the status answer name
+ *     `projects`, as a hub serving projects does, so the client sends
+ *     `project` on push and pull; each push and pull's `project` query
+ *     is recorded in {@link StandInHub.projectQueries}.
+ *
  * It merges nothing: a row is matched by its origin pair alone. Every
  * push and pull is recorded in {@link StandInHub.requests}, and
  * {@link StandInHub.setFault} answers each with a response of the
@@ -57,6 +62,10 @@ export interface StandInHub {
   readonly setFault: (answer: (() => Response) | null) => void;
   /** Ids a pull names beyond the migrations pushed, as a hub newer than the device's rafa would. */
   readonly setExtraMigrations: (ids: readonly string[]) => void;
+  /** The `project` query parameter of every push and pull seen, in order, null when it was left out. */
+  readonly projectQueries: readonly (string | null)[];
+  /** Names `projects` on the status answer from now on; null names none, as a hub one release behind. */
+  readonly setProjects: (projects: readonly { readonly id: string; readonly name: string }[] | null) => void;
   /** Stops listening, so the next request fails to connect. */
   readonly stop: () => Promise<void>;
 }
@@ -83,6 +92,8 @@ export function startStandInHub(): StandInHub {
   let extra: readonly string[] = [];
   let fault: (() => Response) | null = null;
   let statusReads = 0;
+  const projectQueries: (string | null)[] = [];
+  let projects: readonly { readonly id: string; readonly name: string }[] | null = null;
 
   const status = (): Response => {
     statusReads += 1;
@@ -93,6 +104,9 @@ export function startStandInHub(): StandInHub {
       devices: [],
       contractVersion: WIRE_CONTRACT_VERSION,
       capabilities: { fts: false, vector: false, graph: false, projection: false },
+      ...projects === null
+        ? {}
+        : { projects },
     });
   };
 
@@ -155,6 +169,7 @@ export function startStandInHub(): StandInHub {
           : Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0),
         contractVersion: url.searchParams.get('contractVersion'),
       });
+      projectQueries.push(url.searchParams.get('project'));
       if (fault !== null) return fault();
       if (payload !== null) return push(payload);
       return pull(url.searchParams.get('device') ?? '', sinceText === null
@@ -173,6 +188,10 @@ export function startStandInHub(): StandInHub {
     },
     setExtraMigrations: (ids) => {
       extra = ids;
+    },
+    projectQueries,
+    setProjects: (named) => {
+      projects = named;
     },
     stop: () => server.stop(true),
   };
