@@ -6,6 +6,13 @@
  * (`login/testdata/stand-in-oauth.ts`), the callback's cookie serving
  * the next same-site request to `/login`.
  *
+ * The server cases start `server.ts` on a free loopback port with the
+ * routes handed in through its `login` and `keys` options, beside the
+ * store-backed api-key identity over the same key store: a login's basic
+ * credentials and its session cookie, each served on `/login` and
+ * `/v1/keys`, are refused `unauthenticated` on `POST /v1/effort/push`,
+ * where a store key is served.
+ *
  * Every case opens its own key store and login store in `:memory:`, and
  * the OAuth cases a provider of their own, so no case reads another's
  * keys or session.
@@ -16,15 +23,18 @@ import type { HubLogin } from './login/basic.js';
 import type { OAuthLogin } from './login/oauth.js';
 import type { StandInOAuth } from './login/testdata/stand-in-oauth.js';
 import type { LoginRouteAnswer } from './server-login.js';
-import type { HubLogEntry } from './server.js';
+import type { HubLogEntry, HubServer } from './server.js';
 
+import { encodeWirePayload, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { openApiKeyIdentity } from './identity/api-key.js';
 import { openSqliteKeyStore } from './identity/key-store.js';
 import { openSqliteLoginStore } from './identity/login-store.js';
 import { BASIC_CHALLENGE, openBasicLogin } from './login/basic.js';
 import { OAUTH_SESSION_COOKIE, openOAuthLogin } from './login/oauth.js';
 import { startStandInOAuth } from './login/testdata/stand-in-oauth.js';
+import { KEYS_ROUTE, openKeyRoutes } from './server-keys.js';
 import {
   escapeHtml,
   isLoginPath,
@@ -34,6 +44,8 @@ import {
   OAUTH_START_ROUTE,
   openLoginRoutes,
 } from './server-login.js';
+import { AUTH_CHALLENGE, HUB_ROUTES, INTERNAL_ERROR, startHubServer } from './server.js';
+import { openMemoryHubStore } from './store/testdata/memory-store.js';
 
 const HUB = 'http://127.0.0.1:7171';
 const USER = 'ada';
@@ -331,5 +343,171 @@ describe('the OAuth routes', () => {
     expect(out.response.status).toBe(403);
     expect(out.refusal).toBe('forbidden');
     expect(after.response.status).toBe(200);
+  });
+});
+
+describe('server.ts with the login and key routes', () => {
+  const BOOT_VARIABLE = 'RAFA_HUB_LOGIN_ROUTES_BOOT_KEY';
+  const BOOT_KEY = 'rafa_login-routes-bootstrap-key-0003';
+  const DEVICE = 'aaaaaaaa-0000-4000-8000-00000000000a';
+  const PUSH = `${HUB_ROUTES.push}?device=${DEVICE}`;
+  const BODY = encodeWirePayload({ format: WIRE_FORMAT, version: WIRE_VERSION, migrations: ['0001-base'], tables: {}, cursor: {} });
+
+  let running: HubServer[] = [];
+  let provider: StandInOAuth | undefined;
+
+  afterEach(async () => {
+    await Promise.all(running.map((server) => server.stop()));
+    running = [];
+    await provider?.stop();
+    provider = undefined;
+  });
+
+  /** Starts a hub behind the api-key identity over this case's key store, `login` handed to both route modules unless left out. */
+  function serve(login?: HubLogin, keys: HubKeyStore = store): HubServer {
+    const log = (entry: HubLogEntry): void => {
+      logged.push(entry);
+    };
+    const routed = login === undefined
+      ? {}
+      : { login: openLoginRoutes({ login, store: keys, log }), keys: openKeyRoutes({ login, store: keys, log }) };
+    const server = startHubServer({
+      port: 0,
+      hostname: '127.0.0.1',
+      version: '0.0.0-test',
+      identity: openApiKeyIdentity({ variables: [BOOT_VARIABLE], env: { [BOOT_VARIABLE]: BOOT_KEY }, store: keys }),
+      openStore: () => openMemoryHubStore({ directory: '', now: () => STAMPED }),
+      log,
+      ...routed,
+    });
+    running = [...running, server];
+    return server;
+  }
+
+  /** Sends `method` to `path` on `server` with `headers`, and the wire body on a push. */
+  function send(server: HubServer, method: string, path: string, headers: Record<string, string> = {}): Promise<Response> {
+    const body = method === 'POST' && path.startsWith(HUB_ROUTES.push)
+      ? BODY
+      : undefined;
+    return fetch(`${server.url}${path}`, { method, headers, body, redirect: 'manual' });
+  }
+
+  /** The `request` lines logged for `path`, oldest first. */
+  function requestLines(path: string): HubLogEntry[] {
+    return logged.filter((entry) => entry.event === 'request' && entry.path === path);
+  }
+
+  /** The session cookie an OAuth flow through `server`'s own routes ends with, as a browser sends it back. */
+  async function signedInCookie(server: HubServer, flow: StandInOAuth): Promise<string> {
+    flow.signIn(ALLOWED);
+    const started = await send(server, 'GET', OAUTH_START_ROUTE);
+    const authorized = await fetch(started.headers.get('location') ?? '', { redirect: 'manual' });
+    const back = authorized.headers.get('location');
+    if (back === null) throw new Error('the stand-in sent no redirect');
+    const called = await fetch(back, { redirect: 'manual' });
+    expect(called.status).toBe(200);
+    return (called.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+  }
+
+  it('answers 404 on the login and key paths when neither option is handed in', async () => {
+    const server = serve();
+    for (const [method, path] of [['GET', LOGIN_ROUTE], ['GET', OAUTH_START_ROUTE], ['GET', KEYS_ROUTE], ['POST', KEYS_ROUTE], ['POST', `${KEYS_ROUTE}/ci/pause`], ['DELETE', `${KEYS_ROUTE}/ci`]] as const) {
+      const answered = await send(server, method, path, { authorization: SIGNED_IN, 'content-type': 'application/json' });
+      expect({ path, status: answered.status }).toEqual({ path, status: 404 });
+    }
+  });
+
+  it('serves the page and the key routes to basic credentials, naming the login\'s user in the request line', async () => {
+    const server = serve(await basicLogin());
+    const page = await send(server, 'GET', LOGIN_ROUTE, { authorization: SIGNED_IN });
+    const created = await fetch(`${server.url}${KEYS_ROUTE}`, { method: 'POST', headers: { authorization: SIGNED_IN, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'ci' }) });
+    const listed = await send(server, 'GET', KEYS_ROUTE, { authorization: SIGNED_IN });
+    const listing = await listed.json() as { data: { keys: { name: string; createdBy: string }[] } };
+
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(created.status).toBe(201);
+    expect(listed.status).toBe(200);
+    expect(listing.data.keys.map(({ name, createdBy }) => ({ name, createdBy }))).toEqual([{ name: 'ci', createdBy: USER }]);
+    expect(logged).toContainEqual({ level: 'info', event: 'key.created', name: 'ci', user: USER });
+    expect(requestLines(KEYS_ROUTE).at(-1)).toMatchObject({ method: 'GET', status: 200, user: USER });
+    expect(requestLines(KEYS_ROUTE).at(-1)).not.toHaveProperty('caller');
+  });
+
+  it('refuses basic credentials unauthenticated on POST /v1/effort/push, where a store key is served', async () => {
+    const server = serve(await basicLogin());
+    const minted = await store.create('ci', USER);
+
+    const served = await send(server, 'POST', PUSH, { authorization: `Bearer ${minted.plain}` });
+    const refused = await send(server, 'POST', PUSH, { authorization: SIGNED_IN });
+    const body = await refused.json() as { success: boolean; error: string };
+
+    expect(served.status).toBe(200);
+    expect(refused.status).toBe(401);
+    expect(refused.headers.get('www-authenticate')).toBe(AUTH_CHALLENGE);
+    expect(body.success).toBe(false);
+    expect(body.error).not.toContain(PASSWORD);
+    expect(requestLines(HUB_ROUTES.push).at(-1)).toMatchObject({ status: 401, refusal: 'unauthenticated' });
+    expect(requestLines(HUB_ROUTES.push).at(-1)).not.toHaveProperty('user');
+  });
+
+  it('refuses basic credentials unauthenticated on /v1/status and /v1/effort/pull too', async () => {
+    const server = serve(await basicLogin());
+    const status = await send(server, 'GET', HUB_ROUTES.status, { authorization: SIGNED_IN });
+    const pull = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${DEVICE}`, { authorization: SIGNED_IN });
+
+    expect([status.status, pull.status]).toEqual([401, 401]);
+    expect(requestLines(HUB_ROUTES.status).at(-1)).toMatchObject({ refusal: 'unauthenticated' });
+    expect(requestLines(HUB_ROUTES.pull).at(-1)).toMatchObject({ refusal: 'unauthenticated' });
+  });
+
+  it('refuses a store key on the key routes, so a key never manages keys', async () => {
+    const minted = await store.create('ci', USER);
+    const server = serve(await basicLogin());
+    const listed = await send(server, 'GET', KEYS_ROUTE, { authorization: `Bearer ${minted.plain}` });
+
+    expect(listed.status).toBe(401);
+    expect(listed.headers.get('www-authenticate')).toBe(BASIC_CHALLENGE);
+  });
+
+  it('refuses the login cookie unauthenticated on POST /v1/effort/push, alone and beside basic credentials, the cookie serving /login', async () => {
+    provider = startStandInOAuth({ clientId: CLIENT_ID, clientSecret: CLIENT_SECRET });
+    const login = openOAuthLogin({
+      config: {
+        authorizeUrl: provider.authorizeUrl,
+        tokenUrl: provider.tokenUrl,
+        userUrl: provider.userUrl,
+        clientId: CLIENT_ID,
+        clientSecretVariable: SECRET_VARIABLE,
+        scope: null,
+        allowed: ['583231'],
+        callbackUrl: null,
+      },
+      env: { [SECRET_VARIABLE]: CLIENT_SECRET },
+    });
+    const server = serve(login);
+    const cookie = await signedInCookie(server, provider);
+    expect(cookie.startsWith(`${OAUTH_SESSION_COOKIE}=`)).toBe(true);
+
+    const page = await send(server, 'GET', LOGIN_ROUTE, { cookie });
+    const listed = await send(server, 'GET', KEYS_ROUTE, { cookie });
+    const alone = await send(server, 'POST', PUSH, { cookie });
+    const beside = await send(server, 'POST', PUSH, { cookie, authorization: SIGNED_IN });
+
+    expect(page.status).toBe(200);
+    expect(listed.status).toBe(200);
+    expect([alone.status, beside.status]).toEqual([401, 401]);
+    expect(requestLines(HUB_ROUTES.push).map((line) => line.refusal)).toEqual(['unauthenticated', 'unauthenticated']);
+    expect(JSON.stringify(logged)).not.toContain(cookie.split('=')[1] ?? 'no session');
+  });
+
+  it('answers 500 when the key routes reject on a store error, logging it', async () => {
+    const failing: HubKeyStore = { ...store, list: () => Promise.reject(new Error('SQLITE_BUSY: database is locked')) };
+    const server = serve(await basicLogin(), failing);
+    const listed = await send(server, 'GET', KEYS_ROUTE, { authorization: SIGNED_IN });
+
+    expect(listed.status).toBe(500);
+    expect(await listed.json()).toEqual({ success: false, error: INTERNAL_ERROR });
+    expect(logged).toContainEqual(expect.objectContaining({ event: 'request.failed', path: KEYS_ROUTE, error: 'SQLITE_BUSY: database is locked' }));
   });
 });
