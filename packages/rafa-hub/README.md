@@ -91,9 +91,10 @@ refused by its position, such as `hub.auth.apiKeys[1]`, and the refusal never
 repeats what was written, in case a key was pasted in place of its name.
 
 Under `api-key`, the hub reads each named variable once, when it starts, and
-serves a request whose `Authorization: Bearer` equals one of their values. If a
-named variable is unset or empty, the hub logs one `config.refused` line naming
-the variable and exits 1. Under `github`, a push or a pull naming a listed
+serves a request whose `Authorization: Bearer` equals one of their values, or
+one of the keys created through its key routes, which it keeps hashed in
+`rafa-hub.keys.sqlite` beside `hub.storePath`. If a named variable is unset or
+empty, the hub logs one `config.refused` line naming the variable and exits 1. Under `github`, a push or a pull naming a listed
 project is checked against that project's `repository`. Every other request is
 checked against the first listed project's.
 
@@ -251,7 +252,7 @@ permission; no deploy keys or personal access tokens are needed on the hub side.
 The client's token (a GitHub token read with `Bun.secrets`) is sent by each
 device in the `Authorization` header of each request. Under `api-key`, GitHub is
 not asked: a caller is served by holding one of the keys `hub.auth.apiKeys`
-names.
+names, or a key the hub's key list holds and has neither paused nor deleted.
 
 ## The device's `hub.project`
 
