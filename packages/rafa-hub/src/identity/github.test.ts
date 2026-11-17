@@ -2,7 +2,8 @@
  * The repository-permission identity adapter (`github.ts`): the port's
  * contract suite over a stand-in GitHub, then what is the adapter's
  * own. That covers which roles it trusts, that it asks only about the
- * repository it was opened with, how long a served token is kept, that
+ * repository it was opened with, which listed project's repository a
+ * request is checked against, how long a served token is kept, that
  * no refusal is kept, and what it answers when GitHub does not.
  *
  * Every case serves a stand-in GitHub (`testdata/stand-in-github.ts`)
@@ -18,7 +19,7 @@ import { TRUSTED_PERMISSIONS } from '@open-tomato/rafa/store';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { identityContract } from './contract.js';
-import { GITHUB_PROVIDER, openGitHubIdentity } from './github.js';
+import { GITHUB_PROVIDER, openGitHubIdentity, projectRepositoryResolver } from './github.js';
 import { HUB_ACTIONS } from './port.js';
 import { startStandInGitHub } from './testdata/stand-in-github.js';
 
@@ -35,6 +36,11 @@ const WRITER = 'ghp_writer_token_000000000001';
 const READER = 'ghp_reader_token_000000000002';
 const STRANGER = 'ghp_stranger_token_0000000003';
 const UNKNOWN = 'ghp_unknown_token_00000000004';
+const PROJECT_WRITER = 'ghp_project_writer_00000000005';
+
+/** Two listed projects, kept in two repositories; `PROJECT_WRITER` writes to the first only. */
+const PROJECT_ONE = { id: 'a'.repeat(40), repository: 'open-tomato/one' };
+const PROJECT_TWO = { id: 'b'.repeat(40), repository: 'open-tomato/two' };
 
 identityContract('github', () => {
   const github = startStandInGitHub({
@@ -187,6 +193,97 @@ describe('the repository-permission identity adapter', () => {
       const answer = await identity.identify(hubRequest(STRANGER));
 
       expect(outcomeOf(answer)).toBe('served');
+    });
+  });
+
+  describe('over two listed projects', () => {
+    /** The adapter over the stand-in, resolving each request over `projects`. */
+    const openOver = (projects = [PROJECT_ONE, PROJECT_TWO]) => openGitHubIdentity({
+      repository: projectRepositoryResolver(projects),
+      cacheForMs: TEN_MINUTES,
+      apiBase: github.url,
+      now: () => clock,
+    });
+
+    /** The repositories the stand-in was asked about, in order. */
+    const repositoriesAsked = (): string[] => github.asked()
+      .filter((asked) => asked.path !== '/user')
+      .map((asked) => asked.path);
+
+    beforeEach(() => {
+      github.setAccount(PROJECT_WRITER, { login: 'one-writer', roles: { [PROJECT_ONE.repository]: 'write' } });
+    });
+
+    it('refuses a push naming the project whose repository the token holds no role on', async () => {
+      const answer = await openOver().identify(hubRequest(PROJECT_WRITER, `/v1/effort/push?device=d&project=${PROJECT_TWO.id}`));
+
+      expect(outcomeOf(answer)).toBe('forbidden');
+      expect(messageOf(answer)).toBe(`one-writer cannot see ${PROJECT_TWO.repository} on GitHub; the hub serves admin, maintain, write.`);
+      expect(repositoriesAsked()).toEqual([`/repos/${PROJECT_TWO.repository}`]);
+    });
+
+    it('refuses a pull naming that project too', async () => {
+      const answer = await openOver().identify(hubRequest(PROJECT_WRITER, `/v1/effort/pull?device=d&project=${PROJECT_TWO.id}`));
+
+      expect(outcomeOf(answer)).toBe('forbidden');
+    });
+
+    it('serves a push and a pull naming the project whose repository the token writes to, as the control', async () => {
+      const identity = openOver();
+
+      const answers = await Promise.all([
+        identity.identify(hubRequest(PROJECT_WRITER, `/v1/effort/push?device=d&project=${PROJECT_ONE.id}`)),
+        identity.identify(hubRequest(PROJECT_WRITER, `/v1/effort/pull?device=d&project=${PROJECT_ONE.id}`)),
+      ]);
+
+      expect(answers.map(outcomeOf)).toEqual(['served', 'served']);
+      expect(new Set(repositoriesAsked())).toEqual(new Set([`/repos/${PROJECT_ONE.repository}`]));
+    });
+
+    it('checks a request naming no project against the first listed project\'s repository', async () => {
+      const firstTwo = await openOver([PROJECT_TWO, PROJECT_ONE]).identify(hubRequest(PROJECT_WRITER, '/v1/effort/push?device=d'));
+      const firstOne = await openOver().identify(hubRequest(PROJECT_WRITER, '/v1/effort/push?device=d'));
+
+      expect([firstTwo, firstOne].map(outcomeOf)).toEqual(['forbidden', 'served']);
+      expect(repositoriesAsked()).toEqual([`/repos/${PROJECT_TWO.repository}`, `/repos/${PROJECT_ONE.repository}`]);
+    });
+
+    it('checks GET /v1/status against the first listed project\'s repository, whatever its query names', async () => {
+      const identity = openOver([PROJECT_TWO, PROJECT_ONE]);
+
+      const answer = await identity.identify(hubRequest(PROJECT_WRITER, `/v1/status?project=${PROJECT_ONE.id}`));
+
+      expect(outcomeOf(answer)).toBe('forbidden');
+      expect(repositoriesAsked()).toEqual([`/repos/${PROJECT_TWO.repository}`]);
+    });
+
+    it('checks a push naming an unlisted or malformed project against the first listed project\'s repository', async () => {
+      const identity = openOver([PROJECT_TWO, PROJECT_ONE]);
+
+      const answers = await Promise.all([
+        identity.identify(hubRequest(PROJECT_WRITER, `/v1/effort/push?device=d&project=${'c'.repeat(40)}`)),
+        identity.identify(hubRequest(PROJECT_WRITER, '/v1/effort/push?device=d&project=open-tomato%2Fone')),
+      ]);
+
+      expect(answers.map(outcomeOf)).toEqual(['forbidden', 'forbidden']);
+      expect(new Set(repositoriesAsked())).toEqual(new Set([`/repos/${PROJECT_TWO.repository}`]));
+    });
+
+    it('keeps an answer per token and repository, so one project\'s served token is asked about again on the other\'s', async () => {
+      const identity = openOver();
+      const onOne = await identity.identify(hubRequest(PROJECT_WRITER, `/v1/effort/push?device=d&project=${PROJECT_ONE.id}`));
+      const onTwo = await identity.identify(hubRequest(PROJECT_WRITER, `/v1/effort/push?device=d&project=${PROJECT_TWO.id}`));
+      const askedBefore = askedCount();
+
+      const onOneAgain = await identity.identify(hubRequest(PROJECT_WRITER, `/v1/effort/pull?device=d&project=${PROJECT_ONE.id}`));
+
+      expect([onOne, onTwo, onOneAgain].map(outcomeOf)).toEqual(['served', 'forbidden', 'served']);
+      expect(askedBefore).toBe(4);
+      expect(askedCount()).toBe(askedBefore);
+    });
+
+    it('refuses to build a resolver over no project', () => {
+      expect(() => projectRepositoryResolver([])).toThrow('projectRepositoryResolver needs at least one project.');
     });
   });
 

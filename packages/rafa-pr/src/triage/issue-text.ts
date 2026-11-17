@@ -79,6 +79,22 @@
  * after `Feedback`. A `versions` beside a `record` is not written: the
  * record's own `Versions` section is.
  *
+ * ## A recurrence's append
+ *
+ * A recurrence whose session gave its own reproduce text, one the issue's
+ * body does not hold yet, gains it below the body as one dated `Updated`
+ * block, through the write `rafa issue edit --append` uses. The reason
+ * the block names is {@link recurrenceReason}: `reproduce from a
+ * recurrence (plan <stub>, task <line>)`, the line the task's tracker
+ * line counting from one, or `reproduce from a recurrence (task <line>)`
+ * for a dispatch with no plan stub. The text added is the redacted reproduce
+ * inside a fence longer than any backtick run it holds, at least three
+ * backticks ({@link recurrenceAddition}, sized by `fenceFor`), so it is shown
+ * verbatim. A body already holds the text ({@link bodyHoldsText}) when the
+ * text, its surrounding whitespace trimmed, is a substring of the body with
+ * CRLF read as LF: that finds it in the filed `Reproduce` section and in every
+ * earlier `Updated` block alike, so one text is appended once.
+ *
  * Every value goes through the caller's `redact` before it is shown.
  */
 import type { MatchedSignal, RankedIssue } from './similarity.js';
@@ -87,6 +103,7 @@ import type { IssueRef } from '@open-tomato/rafa/ports';
 
 import { fenced } from '@open-tomato/rafa/bugs/fenced';
 import { BUG_FIELDS } from '@open-tomato/rafa/bugs/record';
+import { fenceFor } from '@open-tomato/rafa-board';
 
 export { fenced };
 
@@ -282,4 +299,33 @@ export function issueText(opening: string, values: BugValues, redact: (text: str
       ? []
       : [possibleDuplicatesSection(values.duplicates, redact)],
   ].join('\n\n') + '\n';
+}
+
+/** What every recurrence's append reason opens with; see the module note. */
+export const RECURRENCE_REASON = 'reproduce from a recurrence';
+
+/**
+ * The reason a recurrence's append names: the plan stub, when the dispatch
+ * resolved one, and the task's tracker line counting from one, from the
+ * dispatch's `lineNum` counting from zero; see the module note.
+ */
+export function recurrenceReason(planStub: string | null, lineNum: number): string {
+  const task = `task ${String(lineNum + 1)}`;
+  const named = planStub === null
+    ? task
+    : `plan ${planStub}, ${task}`;
+  return `${RECURRENCE_REASON} (${named})`;
+}
+
+/** The text a recurrence's append adds: `reproduce`, redacted, in a fence `fenceFor` sizes; see the module note. */
+export function recurrenceAddition(reproduce: string, redact: (text: string) => string): string {
+  const shown = redact(reproduce).trim();
+  const fence = fenceFor(shown);
+  return `${fence}\n${shown}\n${fence}`;
+}
+
+/** Whether `body` already holds `text`, CRLF read as LF and `text` trimmed; see the module note. */
+export function bodyHoldsText(body: string, text: string): boolean {
+  const wanted = text.replaceAll('\r\n', '\n').trim();
+  return body.replaceAll('\r\n', '\n').includes(wanted);
 }

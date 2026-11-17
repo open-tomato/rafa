@@ -36,11 +36,11 @@
  * parses to {@link CONFIG_DEFAULTS}, which the tests hold, so a setting
  * added to the schema without a line here is caught there.
  *
- * Eight lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
- * `loop.worktreeSetup`, `pr.provider`, `pr.base`, `board.project.number`,
+ * Nine lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
+ * `hub.project`, `loop.worktreeSetup`, `pr.provider`, `pr.base`, `board.project.number`,
  * `roadmap.issue` and `collaborate.rafa`, because each resolves to null
  * and null is what a key with no value parses to. Uncommented they are
- * silent, so those eight settings resolve from the defaults layer where
+ * silent, so those nine settings resolve from the defaults layer where
  * every other resolves from the file, and the tests name them. The line
  * is written anyway: it tells an operator the key exists and what it
  * takes, which is the whole point of a template of commented settings.
@@ -120,6 +120,7 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '#   url:                         # the hub effort.sync: service reaches, required with it',
   '#   tokenSecret:                 # the secret store name the hub token is kept under, never the token',
   `#   timeout: ${CONFIG_DEFAULTS.hubTimeout}                  # 1s..30s; how long one request to the hub may take`,
+  '#   project:                     # the project synced on the hub; the repository\'s root commit when unset',
   '# plan:',
   `#   inject: ${CONFIG_DEFAULTS.inject}                # full | stage | task`,
   `#   dir: ${CONFIG_DEFAULTS.planDir}`,

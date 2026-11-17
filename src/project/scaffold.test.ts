@@ -130,6 +130,7 @@ function created(path: string, kind: ScopeWriteKind): ScopeWrite {
 const VALUELESS: readonly (readonly [string, string])[] = [
   ['hubUrl', 'default'],
   ['hubTokenSecret', 'default'],
+  ['hubProject', 'default'],
   ['loopWorktreeSetup', 'default'],
   ['prProvider', 'default'],
   ['prBase', 'default'],

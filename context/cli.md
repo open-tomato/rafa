@@ -1020,8 +1020,9 @@ New; it replaces no earlier text. What a row or an action added to
   span running `src/rafa.ts`, `dist/cli.js` or `bun run rafa` without a
   leading `RAFA_EFFORT_DIR=` (`effort copy` excepted), and a
   `PREREQUISITES-<stub>.md` with no `[auto]` probe of
-  `rafa effort schema --check`. It throws exit code 1 when there is any
-  of the five, with a message counting each. That is the check `loop
+  `rafa effort schema --check`, a ticked one counting too. It throws exit
+  code 1 when there is any of the five, with a message counting each.
+  That is the check `loop
   start`'s preflight halts on, so a plan the loop would refuse is
   refused here too. The store rules are read by
   `src/commands/plan/store-check.ts`, which `plan create` refuses a

@@ -2,8 +2,9 @@
  * Tests for the hub HTTP client (`client.ts`), each against a
  * `Bun.serve` stand-in on a free port rather than the real hub: what
  * each call sends and reads, and which of unreachable, refused and
- * malformed each failure is, and the one status read a client keeps
- * for its push and pull. Every unreachable reading is paired with a
+ * malformed each failure is, the one status read a client keeps for
+ * its push and pull, and the project it sends only to a hub naming
+ * `projects`. Every unreachable reading is paired with a
  * control on the same client that proves the call could have succeeded.
  */
 import type { HubClient, HubClientOptions } from './client.js';
@@ -35,13 +36,28 @@ const STATUS = {
   devices: [{ device: 'dev-a', lastPushAt: '2026-10-01T00:00:00.000Z' }],
 };
 
+/** The project fields a status answer naming no `projects` reads as. */
+const NO_PROJECTS = { projects: [], projectsNamed: false };
+
 /** What {@link STATUS} reads as: version 1, no capability, the version unnamed. */
-const STATUS_READ = { ...STATUS, contractVersion: UNNAMED_CONTRACT_VERSION, capabilities: {}, contractNamed: false };
+const STATUS_READ = { ...STATUS, contractVersion: UNNAMED_CONTRACT_VERSION, capabilities: {}, contractNamed: false, ...NO_PROJECTS };
 
 const CAPABILITIES = { fts: false, vector: false, graph: false, projection: true };
 
 /** A status answer of a hub naming its contract. */
 const CONTRACT_STATUS = { ...STATUS, contractVersion: WIRE_CONTRACT_VERSION, capabilities: CAPABILITIES };
+
+/** What {@link CONTRACT_STATUS} reads as. */
+const CONTRACT_STATUS_READ = { ...CONTRACT_STATUS, contractNamed: true, ...NO_PROJECTS };
+
+/** A project's root commit sha, as a port names it. */
+const PROJECT = 'a'.repeat(40);
+
+/** The projects a hub serving two names on its status. */
+const PROJECTS = [{ id: PROJECT, name: 'octo/one' }, { id: 'b'.repeat(40), name: 'octo/two' }];
+
+/** A status answer of a hub naming its contract and the projects it serves. */
+const PROJECTS_STATUS = { ...CONTRACT_STATUS, projects: PROJECTS };
 
 /** One request a stand-in saw. */
 interface Seen {
@@ -180,7 +196,7 @@ describe('pull', () => {
 describe('status', () => {
   it('gets the status route and answers the hub\'s status', async () => {
     const hub = standIn(() => success(CONTRACT_STATUS));
-    expect(await clientOf(hub.url).status()).toEqual({ ...CONTRACT_STATUS, contractNamed: true });
+    expect(await clientOf(hub.url).status()).toEqual(CONTRACT_STATUS_READ);
     expect(hub.seen.map(({ method, path, query }) => ({ method, path, query })))
       .toEqual([{ method: 'GET', path: '/v1/status', query: {} }]);
   });
@@ -195,7 +211,7 @@ describe('status', () => {
     const naming = standIn(() => success({ ...STATUS, contractVersion: 2, capabilities: CAPABILITIES }));
     expect(await clientOf(behindHub.url).status()).toEqual(STATUS_READ);
     expect(await clientOf(naming.url).status())
-      .toEqual({ ...STATUS, contractVersion: 2, capabilities: CAPABILITIES, contractNamed: true });
+      .toEqual({ ...STATUS, contractVersion: 2, capabilities: CAPABILITIES, contractNamed: true, ...NO_PROJECTS });
   });
 
   it('keeps a version 0 the hub names, for the caller to judge', async () => {
@@ -228,7 +244,7 @@ describe('the contract version', () => {
     const client = clientOf(hub.url);
     await client.push('dev-a', PAYLOAD);
     await client.pull('dev-a', { commits: 1 });
-    expect(await client.status()).toEqual({ ...CONTRACT_STATUS, contractNamed: true });
+    expect(await client.status()).toEqual(CONTRACT_STATUS_READ);
     expect(hub.seen.map(({ path, query }) => ({ path, query }))).toEqual([
       { path: '/v1/status', query: {} },
       { path: '/v1/effort/push', query: { device: 'dev-a', contractVersion: String(WIRE_CONTRACT_VERSION) } },
@@ -269,6 +285,101 @@ describe('the contract version', () => {
     up = true;
     await client.push('dev-a', PAYLOAD);
     expect(hub.seen.map(({ path }) => path)).toEqual(['/v1/status', '/v1/status', '/v1/effort/push']);
+  });
+});
+
+describe('the project', () => {
+  /** A hub answering `status` on the status route and a push or pull answer on the others. */
+  function syncHub(status: unknown): StandIn {
+    return standIn(behind((request) => (request.method === 'POST'
+      ? success({ received: 1, added: 1, at: '2026-10-01T00:00:00.000Z' })
+      : success(PAYLOAD)), status));
+  }
+
+  /** The path and query of each request `hub` saw past its status reads. */
+  function queries(hub: StandIn): { path: string; query: Record<string, string> }[] {
+    return pastStatus(hub).map(({ path, query }) => ({ path, query }));
+  }
+
+  it('reads the projects a status answer names, by id and name in its order', async () => {
+    const hub = standIn(() => success(PROJECTS_STATUS));
+    expect(await clientOf(hub.url).status()).toEqual({ ...CONTRACT_STATUS_READ, projects: PROJECTS, projectsNamed: true });
+  });
+
+  it('reads an empty projects list as named, where an answer naming none reads as unnamed', async () => {
+    const empty = standIn(() => success({ ...CONTRACT_STATUS, projects: [] }));
+    const none = standIn(() => success(CONTRACT_STATUS));
+    expect(await clientOf(empty.url).status()).toMatchObject({ projects: [], projectsNamed: true });
+    expect(await clientOf(none.url).status()).toMatchObject({ projects: [], projectsNamed: false });
+  });
+
+  it('keeps only the id and name of each project', async () => {
+    const hub = standIn(() => success({ ...CONTRACT_STATUS, projects: [{ id: PROJECT, name: 'octo/one', storePath: '/srv/one' }] }));
+    expect((await clientOf(hub.url).status()).projects).toEqual([{ id: PROJECT, name: 'octo/one' }]);
+  });
+
+  it.each([
+    ['an object', { id: PROJECT, name: 'octo/one' }],
+    ['a list of ids', [PROJECT]],
+    ['an entry with no name', [{ id: PROJECT }]],
+    ['an entry whose id is a number', [{ id: 1, name: 'octo/one' }]],
+    ['an entry whose name is null', [{ id: PROJECT, name: null }]],
+    ['null', null],
+  ])('refuses a status answer whose projects is %s as malformed', async (_label: string, projects: unknown) => {
+    const hub = standIn(() => success({ ...CONTRACT_STATUS, projects }));
+    const error = await rejectionOf(clientOf(hub.url).status());
+    expect(error).toBeInstanceOf(HubAnswerMalformed);
+    expect(error.message).toBe('the hub\'s answer to status holds projects that are not a list of id and name strings');
+  });
+
+  it('sends project on push and pull to a hub naming projects, the status read once', async () => {
+    const hub = syncHub(PROJECTS_STATUS);
+    const client = clientOf(hub.url, { project: PROJECT });
+    await client.push('dev-a', PAYLOAD);
+    await client.pull('dev-a', { commits: 1 });
+    const contractVersion = String(WIRE_CONTRACT_VERSION);
+    expect(hub.seen.filter(({ path }) => path === '/v1/status')).toHaveLength(1);
+    expect(queries(hub)).toEqual([
+      { path: '/v1/effort/push', query: { device: 'dev-a', project: PROJECT, contractVersion } },
+      { path: '/v1/effort/pull', query: { device: 'dev-a', since: '{"commits":1}', project: PROJECT, contractVersion } },
+    ]);
+  });
+
+  it('sends project to a hub naming an empty projects list', async () => {
+    const hub = syncHub({ ...CONTRACT_STATUS, projects: [] });
+    await clientOf(hub.url, { project: PROJECT }).pull('dev-a', {});
+    expect(queries(hub)[0]?.query).toMatchObject({ project: PROJECT });
+  });
+
+  it('sends no project on push or pull to a hub naming no projects, where one naming them is sent it', async () => {
+    const hub = syncHub(CONTRACT_STATUS);
+    const client = clientOf(hub.url, { project: PROJECT });
+    await client.push('dev-a', PAYLOAD);
+    await client.pull('dev-a', {});
+    const contractVersion = String(WIRE_CONTRACT_VERSION);
+    expect(queries(hub)).toEqual([
+      { path: '/v1/effort/push', query: { device: 'dev-a', contractVersion } },
+      { path: '/v1/effort/pull', query: { device: 'dev-a', contractVersion } },
+    ]);
+
+    const naming = syncHub(PROJECTS_STATUS);
+    await clientOf(naming.url, { project: PROJECT }).push('dev-a', PAYLOAD);
+    expect(queries(naming)[0]?.query).toMatchObject({ project: PROJECT });
+  });
+
+  it('sends no project from a client made with none, even to a hub naming projects', async () => {
+    const hub = syncHub(PROJECTS_STATUS);
+    const client = clientOf(hub.url);
+    await client.push('dev-a', PAYLOAD);
+    await client.pull('dev-a', {});
+    expect(queries(hub).map(({ query }) => 'project' in query)).toEqual([false, false]);
+  });
+
+  it('sends no push when the status answer\'s projects are malformed', async () => {
+    const hub = syncHub({ ...CONTRACT_STATUS, projects: [PROJECT] });
+    const error = await rejectionOf(clientOf(hub.url, { project: PROJECT }).push('dev-a', PAYLOAD));
+    expect(error).toBeInstanceOf(HubAnswerMalformed);
+    expect(pastStatus(hub)).toEqual([]);
   });
 });
 

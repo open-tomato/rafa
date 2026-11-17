@@ -144,6 +144,10 @@
       "value": false,
       "source": "default"
     },
+    "hubProject": {
+      "value": null,
+      "source": "default"
+    },
     "hubTimeout": {
       "value": "3s",
       "source": "default"

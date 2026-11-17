@@ -62,8 +62,16 @@
  * checkout in two passes reddened both too, and reading `Refs` in the
  * root reddened the checkout's `Refs` case. Each of the three cases runs
  * the same report without `checkout` beside it as its control.
+ *
+ * The cases under `a recurrence's append` were driven on 2026-11-17
+ * against eight mutations, the module restored sha256-identical after
+ * the last: the private route given the seam, the held check dropped,
+ * the fallback taken as the session's text, a rejecting seam rethrown and
+ * the seam's problem unredacted each reddened one case; the line read
+ * from zero reddened three, the append never made six, and the body read
+ * before the seam check the seam-left-out case.
  */
-import type { TriageOptions, TriageResult } from './triage.js';
+import type { AppendUpdate, RecurrenceAppend, TriageOptions, TriageResult } from './triage.js';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
 import type { ReportBlocker, ReportBug, TaskReport } from '@open-tomato/rafa/report/parse';
@@ -153,16 +161,25 @@ interface Spied {
 }
 
 /** The calls a case may replace on the public tracker. */
-type TrackerOverrides = Partial<Pick<Tracker, 'create' | 'find' | 'comment' | 'get'>>;
+type TrackerOverrides = Partial<Pick<Tracker, 'create' | 'find' | 'comment' | 'get' | 'editable'>>;
 
-/** Wraps `inner`, replacing any of `create`, `find`, `comment` and `get` with `overrides`. */
+/** Wraps `inner`, replacing any of `create`, `find`, `comment`, `get` and `editable` with `overrides`. */
 function spy(inner: Tracker, overrides: TrackerOverrides = {}): Spied {
   const calls: TrackerCall[] = [];
   const create = overrides.create ?? inner.create;
   const find = overrides.find ?? inner.find;
   const comment = overrides.comment ?? inner.comment;
   const get = overrides.get ?? inner.get;
+  const editable = overrides.editable ?? inner.editable;
   const tracker: Tracker = {
+    ...editable === undefined
+      ? {}
+      : {
+        editable: (ref: IssueRef) => {
+          calls.push(['editable', ref]);
+          return editable(ref);
+        },
+      },
     kind: inner.kind,
     capabilities: inner.capabilities,
     preflight: inner.preflight,
@@ -1617,5 +1634,270 @@ describe('the bug record of a filed bug', () => {
     expect(draft.cause).toBe(KNOWN_CODE);
     expect(headingsOf(afterFeedback(draft.body))).toEqual(['Reproduce', 'Cause', 'Module', 'Action', 'Environment', 'Versions']);
     expect(draft.body).toContain(`## Versions\n\n${VERSIONS}`);
+  });
+});
+
+describe('a recurrence\'s append', () => {
+  const WHAT = 'Parser drops the last line';
+  const REPRODUCE = 'bun test src/parse/parse.test.ts';
+  const REF: IssueRef = { opt: 0, kind: 'local', externalId: '1', url: null };
+  /** The reason for a task on {@link BLOCKED_LINE} of plan `demo`: its tracker line counting from one. */
+  const REASON = 'reproduce from a recurrence (plan demo, task 4)';
+  const TOKEN = 'ghp_appendT0kenValue';
+  const SECRETS: NamedSecret[] = [{ name: 'GITHUB_TOKEN', value: TOKEN }];
+
+  /** One call the append seam received. */
+  type AppendCall = readonly [ref: IssueRef, reason: string, text: string];
+
+  /** A public bug under {@link ARTIFACT}, its reproduce `reproduce`. */
+  function reproduced(reproduce: string | null, security: boolean | null = false): ReportBug {
+    return { ...bug(WHAT, ARTIFACT, security), reproduce };
+  }
+
+  /**
+   * A seam over `f`'s public issues that records each call, then writes the
+   * text below the body as one block through the `local` tracker's `edit`,
+   * as `rafa issue edit --append` would, answering `appended`.
+   */
+  function appendingSeam(f: Fixture): { readonly seam: AppendUpdate; readonly calls: AppendCall[] } {
+    const calls: AppendCall[] = [];
+    const tracker = createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK });
+    const seam: AppendUpdate = async (ref, reason, text) => {
+      calls.push([ref, reason, text]);
+      const issue = await tracker.editable!(ref);
+      await tracker.edit!(ref, { body: `${issue.body}\n**Updated 2026-09-15, ${reason}**\n\n${text}\n` });
+      return { outcome: 'appended', problem: null };
+    };
+    return { seam, calls };
+  }
+
+  /** A seam that records each call and answers `answer`, writing nothing. */
+  function answeringSeam(answer: () => Promise<RecurrenceAppend>): { readonly seam: AppendUpdate; readonly calls: AppendCall[] } {
+    const calls: AppendCall[] = [];
+    const seam: AppendUpdate = (ref, reason, text) => {
+      calls.push([ref, reason, text]);
+      return answer();
+    };
+    return { seam, calls };
+  }
+
+  /** How many `Updated` blocks `body` holds. */
+  function updatedBlocks(body: string): number {
+    return body.split('**Updated ').length - 1;
+  }
+
+  it('appends a new text, redacted and fenced, below the body after the comment, which keeps its action', async () => {
+    const f = fixture();
+    await triage(f, reportWith({ outOfScopeBugs: [reproduced(null)] }));
+    const before = onlyIssue(f.publicDir).draft.body;
+    const { seam, calls } = appendingSeam(f);
+    const callsBefore = f.publicSpy.calls.length;
+
+    const result = await triage(f, reportWith({ outOfScopeBugs: [reproduced(`GITHUB_TOKEN=${TOKEN} ${REPRODUCE}`)] }), {
+      dispatch: SECOND,
+      appendUpdate: seam,
+      secrets: SECRETS,
+    });
+
+    const added = fence(`GITHUB_TOKEN=[redacted: GITHUB_TOKEN] ${REPRODUCE}`);
+    expect(methodsOf(f.publicSpy).slice(callsBefore)).toEqual(['get', 'comment', 'editable']);
+    expect(calls).toEqual([[REF, REASON, added]]);
+    expect(result.bugs).toEqual([{
+      index: 0,
+      channel: 'public',
+      action: 'commented',
+      ref: REF,
+      foundBy: 'store',
+      stored: null,
+      problem: null,
+      append: { outcome: 'appended', problem: null },
+    }]);
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.draft.body).toBe(`${before}\n**Updated 2026-09-15, ${REASON}**\n\n${added}\n`);
+    expect(issue.contents).not.toContain(TOKEN);
+    expect(issue.comments).toHaveLength(1);
+  });
+
+  it('appends after a comment on an issue find found, and names the task alone for a dispatch with no plan stub', async () => {
+    const f = fixture();
+    await createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK }).create({
+      opt: 0,
+      title: 'Filed from another checkout',
+      body: `## Recurrence key\n\n${fence(KEY)}\n`,
+      type: 'bug',
+      module: 'x',
+      priority: null,
+      project: null,
+      blockedBy: [],
+    });
+    const { seam, calls } = appendingSeam(f);
+
+    const result = await triage(f, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }), {
+      dispatch: { sessionId: 'session-1', planStub: null, taskLine: 'Wire the loop' },
+      appendUpdate: seam,
+    });
+
+    expect(methodsOf(f.publicSpy)).toEqual(['find', 'get', 'comment', 'editable']);
+    expect(calls).toEqual([[REF, 'reproduce from a recurrence (task 4)', fence(REPRODUCE)]]);
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'find', stored: 'inserted', append: { outcome: 'appended', problem: null } });
+  });
+
+  it('skips the same text as held, whether the filed Reproduce section or an earlier Updated block holds it', async () => {
+    const filedWith = fixture();
+    await triage(filedWith, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }));
+    const filedBody = onlyIssue(filedWith.publicDir).draft.body;
+    const filedSeam = appendingSeam(filedWith);
+
+    const held = await triage(filedWith, reportWith({ outOfScopeBugs: [reproduced(`  ${REPRODUCE}\n`)] }), {
+      dispatch: SECOND,
+      appendUpdate: filedSeam.seam,
+    });
+
+    expect(filedBody).toContain(`## Reproduce\n\n${fence(REPRODUCE)}`);
+    expect(held.bugs[0]).toMatchObject({ action: 'commented', append: { outcome: 'held', problem: null } });
+    expect(filedSeam.calls).toEqual([]);
+    expect(onlyIssue(filedWith.publicDir).draft.body).toBe(filedBody);
+
+    // One text a run's every task reports gains one block: the second recurrence finds the first's.
+    const appendedTo = fixture();
+    await triage(appendedTo, reportWith({ outOfScopeBugs: [reproduced(null)] }));
+    const seam = appendingSeam(appendedTo);
+    const first = await triage(appendedTo, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }), { dispatch: SECOND, appendUpdate: seam.seam });
+    const second = await triage(appendedTo, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }), { dispatch: THIRD, appendUpdate: seam.seam });
+
+    expect(first.bugs[0]!.append).toEqual({ outcome: 'appended', problem: null });
+    expect(second.bugs[0]!.append).toEqual({ outcome: 'held', problem: null });
+    expect(seam.calls).toHaveLength(1);
+    const issue = onlyIssue(appendedTo.publicDir);
+    expect(updatedBlocks(issue.draft.body)).toBe(1);
+    expect(issue.comments).toHaveLength(2);
+  });
+
+  it('appends nothing and reads no body for a bug whose reproduce is the fallback only', async () => {
+    const f = fixture();
+    await triage(f, reportWith({ outOfScopeBugs: [reproduced(null)] }));
+    const before = onlyIssue(f.publicDir).draft.body;
+    const { seam, calls } = appendingSeam(f);
+    const callsBefore = f.publicSpy.calls.length;
+
+    // No text, the word unknown, and the fallback sentence itself: none is the session's own.
+    const result = await triage(f, reportWith({
+      outOfScopeBugs: [reproduced(null), reproduced(' unknown '), reproduced('seen while running task Wire the loop of plan demo')],
+    }), { dispatch: SECOND, appendUpdate: seam });
+
+    expect(methodsOf(f.publicSpy).slice(callsBefore)).toEqual(['get', 'comment', 'get', 'comment', 'get', 'comment']);
+    expect(result.bugs.map((row) => row.action)).toEqual(['commented', 'commented', 'commented']);
+    expect(result.bugs.map((row) => 'append' in row)).toEqual([false, false, false]);
+    expect(calls).toEqual([]);
+    expect(onlyIssue(f.publicDir).draft.body).toBe(before);
+
+    // Control: the same issue and seam with a text of its own read the body and append.
+    const own = await triage(f, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }), { dispatch: THIRD, appendUpdate: seam });
+    expect(own.bugs[0]!.append).toEqual({ outcome: 'appended', problem: null });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('leaves a private bug untouched: its issue is commented on, never read for an append, and the seam never called', async () => {
+    const f = fixture();
+    const { seam, calls } = appendingSeam(f);
+    await triage(f, reportWith({ outOfScopeBugs: [reproduced(null, true)] }));
+
+    const again = await triage(f, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE, true)] }), { dispatch: SECOND, appendUpdate: seam });
+
+    expect(again.bugs[0]).toMatchObject({ channel: 'private', action: 'commented' });
+    expect('append' in again.bugs[0]!).toBe(false);
+    // Control: the private tracker answers editable, so the channel alone kept it from being read.
+    expect(f.privateSpy.tracker.editable).toBeDefined();
+    expect(methodsOf(f.privateSpy)).toEqual(['find', 'create', 'find', 'comment']);
+    expect(f.publicSpy.calls).toEqual([]);
+    expect(calls).toEqual([]);
+    expect(updatedBlocks(onlyIssue(f.privateDir).draft.body)).toBe(0);
+  });
+
+  it('keeps the action commented when the seam rejects, refuses or the body read fails, its problem redacted, and triages the next bug', async () => {
+    const f = fixture();
+    await triage(f, reportWith({ outOfScopeBugs: [reproduced(null)] }));
+    const next = bug('Lexer drops the first token', 'TypeError: tokens[0] is undefined', false);
+    const rejecting = answeringSeam(() => Promise.reject(new Error(`gh answered 502 for ${TOKEN}`)));
+
+    const rejected = await triage(f, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE), next] }), {
+      dispatch: SECOND,
+      appendUpdate: rejecting.seam,
+      secrets: SECRETS,
+    });
+
+    expect(rejecting.calls).toHaveLength(1);
+    expect(rejected.bugs[0]).toMatchObject({
+      action: 'commented',
+      ref: REF,
+      problem: null,
+      append: { outcome: 'failed', problem: 'the recurrence append failed: gh answered 502 for [redacted: GITHUB_TOKEN]' },
+    });
+    expect(rejected.bugs[1]).toMatchObject({ action: 'filed', problem: null });
+    expect(issueFiles(f.publicDir).map(({ name }) => name)).toEqual(['1.md', '2.md']);
+
+    const refusing = answeringSeam(() => Promise.resolve({ outcome: 'refused', problem: `the author ${TOKEN} is not trusted` }));
+    const refused = await triage(f, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }), {
+      dispatch: THIRD,
+      appendUpdate: refusing.seam,
+      secrets: SECRETS,
+    });
+    expect(refused.bugs[0]).toMatchObject({
+      action: 'commented',
+      append: { outcome: 'refused', problem: 'the author [redacted: GITHUB_TOKEN] is not trusted' },
+    });
+
+    const unreadable = fixture({ editable: () => Promise.reject(new Error('the issue file is unreadable')) });
+    await triage(unreadable, reportWith({ outOfScopeBugs: [reproduced(null)] }));
+    const unread = answeringSeam(() => Promise.resolve({ outcome: 'appended', problem: null }));
+    const failedRead = await triage(unreadable, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }), {
+      dispatch: SECOND,
+      appendUpdate: unread.seam,
+    });
+    expect(failedRead.bugs[0]).toMatchObject({
+      action: 'commented',
+      append: { outcome: 'failed', problem: 'the public tracker editable failed: the issue file is unreadable' },
+    });
+    expect(unread.calls).toEqual([]);
+  });
+
+  it('appends nothing and reads no body with the seam left out', async () => {
+    const f = fixture();
+    await triage(f, reportWith({ outOfScopeBugs: [reproduced(null)] }));
+    const before = onlyIssue(f.publicDir).contents;
+    const callsBefore = f.publicSpy.calls.length;
+
+    const result = await triage(f, reportWith({ outOfScopeBugs: [reproduced(REPRODUCE)] }), { dispatch: SECOND });
+
+    expect(methodsOf(f.publicSpy).slice(callsBefore)).toEqual(['get', 'comment']);
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', problem: null });
+    expect('append' in result.bugs[0]!).toBe(false);
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.draft.body).toBe(parseLocalIssue(before).draft.body);
+    expect(issue.comments).toHaveLength(1);
+    // Control: the tracker the case reads would have answered a body read.
+    expect(f.publicSpy.tracker.editable).toBeDefined();
+  });
+
+  it('appends after the comment on an open issue an inherited bug finds, as after any recurrence', async () => {
+    const f = fixture();
+    const failing = 'src/parse/parse.test.ts:\nerror: expect(received).toBe(expected) at line 12\n(fail) parse > drops the last line [0.19ms]';
+    const red = (reproduce: string | null): ReportBug => ({ ...bug(WHAT, failing, false), reproduce });
+    await triage(f, reportWith({ outOfScopeBugs: [red(null)] }));
+    const { seam, calls } = appendingSeam(f);
+    const inherited = {
+      failures: [{ file: 'src/parse/parse.test.ts', name: 'parse > drops the last line', message: 'expect(received).toBe(expected)' }],
+      commented: new Set<string>(),
+    };
+
+    // Not REPRODUCE: the filed body's Rerun section already holds that command, so it would be held.
+    const own = 'bun run src/parse/cli.ts two-lines.txt';
+
+    const result = await triage(f, reportWith({ outOfScopeBugs: [red(own)] }), { dispatch: SECOND, appendUpdate: seam, inherited });
+
+    expect(onlyIssue(f.publicDir).draft.body).toContain('## Rerun');
+    expect(result.bugs[0]).toMatchObject({ action: 'inherited', ref: REF, append: { outcome: 'appended', problem: null } });
+    expect(calls).toEqual([[REF, REASON, fence(own)]]);
+    expect(updatedBlocks(onlyIssue(f.publicDir).draft.body)).toBe(1);
   });
 });

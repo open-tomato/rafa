@@ -1,7 +1,8 @@
 /**
  * The lint step run for real, over a file planted under a scratch
  * `packages/<name>/src/`. `lint-step.test.ts` answers its runner with
- * canned reports; this file spawns `bunx eslint` in a scratch repository
+ * canned reports; this file spawns the ESLint the step resolves, the
+ * installed package above the scratch repository, in a scratch repository
  * that holds the root lint config, so it reads what the gate says of
  * package code: red with the rule named for a rule-breaking file, and
  * green, with no `import/no-unresolved`, for a clean file importing

@@ -29,7 +29,7 @@ An entry point is a member imported from outside the cluster, or a command regis
 | Export | Status | Where it is held | What is missing |
 | --- | --- | --- | --- |
 | Commands | **missing** | none | a stand-in for an external tool is not a `RafaCommand` |
-| Steps with guards | **missing** | none | it stands in for the lint step's tool (`src/start/lint-step.ts`, which runs `bunx eslint --no-warn-ignored`), but it is that step's test double, not a step or a guard |
+| Steps with guards | **missing** | none | it stands in for the lint step's tool (`packages/rafa-run/src/start/lint-step.ts`, which runs the checkout's own ESLint, `node_modules/.bin/eslint --no-warn-ignored`), but it is that step's test double, not a step or a guard |
 | Config section | **missing** | none | it reads no config; the one rule it answers is wired in the fixture's own `eslint.config.mjs`, which `task-gate-spawned.test.ts` writes, and which the stand-in does not read |
 | Flows | **missing** | none | nothing multi-step: one pass over `argv` and one report |
 
@@ -39,7 +39,7 @@ None. The cluster owns no `RafaCommand`.
 
 ### Steps with guards
 
-None. The step the stand-in serves is the task gate's lint step; its guards (`src/start/lint-step.ts`, `src/start/task-gate-lines.ts`, in `c02-active`) are not here. The stand-in is what makes that step testable without a real ESLint: `task-gate-spawned.test.ts` plants it, or plants none, to prove a lint step that could not run ESLint ends as such.
+None. The step the stand-in serves is the task gate's lint step; its guards (`packages/rafa-run/src/start/lint-step.ts`, `packages/rafa-run/src/start/task-gate-lines.ts`, in `c02-active`) are not here. The stand-in is what makes that step testable without a real ESLint: `task-gate-spawned.test.ts` plants it, or plants none, to prove a lint step with no ESLint to resolve skips with one line and stays green.
 
 ### Config section
 

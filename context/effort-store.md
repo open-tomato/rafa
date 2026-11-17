@@ -287,8 +287,10 @@ declaration of `effort.sync` takes effect when either is read. A
 deployment of the `service` strategy requires `hub.url` (the hub's
 address), and may name `hub.tokenSecret` (the secret store name where
 the token is held, never the token itself) and `hub.timeout` (how long
-a request may take, `3s` by default, from `1s` to `30s`, as `3s`).
-`selectSync` hands the three to the adapter as `AdapterContext.hub`
+a request may take, `3s` by default, from `1s` to `30s`, as `3s`),
+and `hub.project` (the project synced on the hub, by default the root
+commit of the store's repository, which nobody is expected to set).
+`selectSync` hands the four to the adapter as `AdapterContext.hub`
 (`packages/rafa/src/config-schema-hub.ts`). A module implementing
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
@@ -437,10 +439,19 @@ reuses it. A read that fails is not kept, so the next call reads again.
 
 **A request that names no version is version `1`.** The hub reads a
 `contractVersion` query parameter that is left out as `1`
-(`checkContractVersion`, `packages/rafa-hub/src/server.ts`). A status answer
+(`checkContractVersion`, `packages/rafa-hub/src/server-query.ts`). A status answer
 that names no version reads the same way on the client, and push and pull then
 send no `contractVersion` field, since a hub one release behind refuses a query
 name it does not read.
+
+**A push or a pull names its project only to a hub that names projects.** The
+store's project is the resolved `hub.project`, or else the root commit sha of
+its repository, and push and pull send it as `project` only when the status
+answer names `projects` (`projectQuery` in
+`packages/rafa-sync-service/src/client.ts`; `resolveProject` in `sync.ts`). A
+hub that names none gets no `project` query. A hub that lists projects answers
+a push or a pull naming one it does not list with `404` and a line that names
+the project and `hub.projects` (`packages/rafa-hub/src/server.ts`).
 
 **The hub refuses a version it does not speak with `409`.** A push or a pull
 naming a `contractVersion` other than `WIRE_CONTRACT_VERSION` gets `409` with

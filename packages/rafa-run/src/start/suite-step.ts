@@ -73,8 +73,8 @@
  * after a green run, and settle the step ({@link Settling.recorded}).
  *
  * Unless its test run was a stop, a task step then lints the task's diff
- * (`lint-step.ts`: `bunx eslint --no-warn-ignored`, red on a nonzero
- * exit) and, unless the lint was a stop, type-checks the `*.test.ts`
+ * (`lint-step.ts`: the checkout's own ESLint with `--no-warn-ignored`,
+ * red on a nonzero exit) and, unless the lint was a stop, type-checks the `*.test.ts`
  * files of that diff against the same files at the task's base
  * (`type-step.ts`: red on an error the base did not hold). A red lint or
  * a red type step makes the step red: their texts follow the tests' own

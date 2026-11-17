@@ -82,6 +82,12 @@ import type { GhResult, GhRunner } from '@open-tomato/rafa-board/adapters/tracke
 import type { ResolveTrackerOptions, TrackerAttempt, TrackerResolution } from '@open-tomato/rafa-board/adapters/tracker/resolve';
 import type { RefreshAddedItems } from '@open-tomato/rafa-board/board/project/add-issue';
 import type { ProjectRefresh } from '@open-tomato/rafa-board/board/project/refresh';
+import type {
+  EditingTracker,
+  EditOutcome,
+  EditReport,
+  EditRunOptions,
+} from '@open-tomato/rafa-board/commands/issue/edit-run';
 import type { TriageOptions, TriageResult } from '@open-tomato/rafa-pr/triage/triage';
 import type {
   StartTriage,
@@ -111,7 +117,7 @@ import {
 } from 'bun:test';
 
 import { bugRulesOf, ISSUES_DEFAULTS } from '@open-tomato/rafa/config-schema-issues';
-import { RAFA_VERSION } from '@open-tomato/rafa/core/command';
+import { CommandExit, RAFA_VERSION } from '@open-tomato/rafa/core/command';
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { unresolvedTracker } from '@open-tomato/rafa/ports/unresolved-tracker';
 import { sqliteStorePath } from '@open-tomato/rafa/store/sqlite';
@@ -124,11 +130,14 @@ import { createFakeFactsGh } from '@open-tomato/rafa-board/board/project/facts-f
 import { createGhProjectPort } from '@open-tomato/rafa-board/board/project/gh';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from '@open-tomato/rafa-board/board/project/project-fake';
 import { scopeWarning } from '@open-tomato/rafa-board/board/project/refresh-warnings';
+import { EditRefusal, requireEditingTracker } from '@open-tomato/rafa-board/commands/issue/edit-run';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '@open-tomato/rafa-pr/triage/triage';
 import {
+  appendOutcomeOf,
   createStartTriage,
   describeStartTriage,
   NOT_RESOLVED_REASON,
+  startAppendUpdate,
 } from '@open-tomato/rafa-run/start/triage';
 
 import { createJsonOutput } from '../../../adapters/output/json.js';
@@ -190,7 +199,7 @@ const CONFIG: StartTriageOptions['config'] = {
 };
 
 /** One out-of-scope bug as a report lists it: its what, its artifact and its flag. */
-type BugEntry = readonly [what: string, artifact: string | null, security: boolean | null];
+type BugEntry = readonly [what: string, artifact: string | null, security: boolean | null, reproduce?: string];
 
 /** One `stale_docs` entry as a report lists it: where the stale line is, and what no longer matches. */
 type StaleDocEntry = readonly [where: string | null, what: string];
@@ -232,10 +241,13 @@ function sessionOutput(parts: ReportParts = {}): string {
     ? ['out_of_scope_bugs: []']
     : [
       'out_of_scope_bugs:',
-      ...bugs.flatMap(([what, artifact, security]) => [
+      ...bugs.flatMap(([what, artifact, security, reproduce]) => [
         `  - what: ${scalar(what)}`,
         `    artifact: ${scalar(artifact)}`,
         `    security: ${scalar(security)}`,
+        ...reproduce === undefined
+          ? []
+          : [`    reproduce: ${scalar(reproduce)}`],
       ]),
     ];
   return [
@@ -952,6 +964,283 @@ describe('the lines a triage prints', () => {
       notes: [],
       warnings: [],
     });
+  });
+});
+
+describe('the append after a recurrence', () => {
+  /** The local issue every case appends to. */
+  const LOCAL_REF: IssueRef = { opt: 0, kind: 'local', externalId: '3', url: null };
+
+  const REASON = 'reproduce from a recurrence (plan demo, task 4)';
+
+  const ADDED = '```\nbun test src/parser.test.ts\n```';
+
+  /** The clock every bound append is handed. */
+  const NOW = (): Date => new Date('2026-09-15T09:00:00.000Z');
+
+  /** What one `runIssueEdit` of an append answers, for `outcome` worded as `message`. */
+  function editReport(outcome: EditOutcome, message: string): EditReport {
+    return {
+      issue: 3,
+      outcome,
+      exitCode: outcome === 'conflict'
+        ? 1
+        : 0,
+      dryRun: false,
+      written: outcome !== 'already',
+      added: ADDED,
+      readings: [],
+      refresh: null,
+      branch: null,
+      scratch: null,
+      message,
+    };
+  }
+
+  /** An edit seam that records each run it is handed and answers `made`. */
+  function recordingEdit(made: EditReport): { readonly seen: EditRunOptions[]; readonly edit: (options: EditRunOptions) => Promise<EditReport> } {
+    const seen: EditRunOptions[] = [];
+    return {
+      seen,
+      edit: (options) => {
+        seen.push(options);
+        return Promise.resolve(made);
+      },
+    };
+  }
+
+  /** A git runner answering `origin`'s URL, recording each call. */
+  function remoteGit(): { readonly git: GitRunner; readonly calls: (readonly string[])[] } {
+    const calls: (readonly string[])[] = [];
+    return {
+      calls,
+      git: (args) => {
+        calls.push(args);
+        return { ok: true, stdout: 'https://github.com/open-tomato/rafa.git\n', stderr: '' };
+      },
+    };
+  }
+
+  /** The local tracker of `f`, unspied, so it holds `editable` and `edit`. */
+  function localOf(f: Fixture): EditingTracker {
+    return requireEditingTracker(createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK }));
+  }
+
+  it('reads each report of a write that ran: appended and stale-copy as themselves, already as held, a conflict as failed', async () => {
+    const stale = 'Appended an update to local issue 3. Issue #3 has a saved copy this edit makes stale:'
+      + ' rafa plan create --issue=3 --refresh rebuilds it.';
+    const conflict = '❌ local issue 3 changed while it was edited: see .rafa/scratch/rafa-3-edit-before-x.md';
+
+    expect(await appendOutcomeOf(() => Promise.resolve(editReport('appended', 'Appended an update to local issue 3.'))))
+      .toEqual({ outcome: 'appended', problem: null });
+    expect(await appendOutcomeOf(() => Promise.resolve(editReport('already', 'local issue 3 already ends with this update.'))))
+      .toEqual({ outcome: 'held', problem: null });
+    expect(await appendOutcomeOf(() => Promise.resolve(editReport('stale-copy', stale))))
+      .toEqual({ outcome: 'stale-copy', problem: stale });
+    expect(await appendOutcomeOf(() => Promise.resolve(editReport('conflict', conflict))))
+      .toEqual({ outcome: 'failed', problem: 'local issue 3 changed while it was edited: see .rafa/scratch/rafa-3-edit-before-x.md' });
+  });
+
+  it('reads a gate refusal as refused and a tracker read or write rejected as failed, each without its mark, and throws anything else on', async () => {
+    const refusal = new EditRefusal('closed', 'local issue 3 is closed, so it takes no update.', [], false);
+    const rejected = new CommandExit(1, '❌ Could not read local issue 3 on the local tracker: ENOENT');
+    const other = new Error('the clock is broken');
+
+    expect(await appendOutcomeOf(() => Promise.reject(refusal)))
+      .toEqual({ outcome: 'refused', problem: 'refused closed: local issue 3 is closed, so it takes no update.' });
+    expect(await appendOutcomeOf(() => Promise.reject(rejected)))
+      .toEqual({ outcome: 'failed', problem: 'Could not read local issue 3 on the local tracker: ENOENT' });
+    expect(await appendOutcomeOf(() => {
+      throw refusal;
+    })).toEqual({ outcome: 'refused', problem: 'refused closed: local issue 3 is closed, so it takes no update.' });
+    await expect(appendOutcomeOf(() => Promise.reject(other))).rejects.toBe(other);
+  });
+
+  it('hands runIssueEdit an append of the reason and text, never while in development, over the tracker, the root and the config keys', async () => {
+    const f = fixture();
+    const tracker = localOf(f);
+    const { git, calls } = remoteGit();
+    const { seen, edit } = recordingEdit(editReport('appended', 'Appended an update to local issue 3.'));
+    const config: StartTriageOptions['config'] = {
+      ...CONFIG,
+      specsDir: 'docs/specs',
+      namingBranch: 'work/{stub}',
+      boardTrustedAuthors: ['octo'],
+    };
+    const update = startAppendUpdate({ repoRoot: f.root, config, append: { edit, now: NOW } }, tracker, git);
+
+    expect(await update(LOCAL_REF, REASON, ADDED)).toEqual({ outcome: 'appended', problem: null });
+    expect(seen).toHaveLength(1);
+    const [handed] = seen;
+    expect(handed?.request).toEqual({
+      issue: 3,
+      kind: 'append',
+      text: ADDED,
+      reason: REASON,
+      title: null,
+      whileInDevelopment: false,
+      dryRun: false,
+    });
+    expect(handed?.tracker).toBe(tracker);
+    expect(handed?.root).toBe(f.root);
+    expect(handed?.specsDir).toBe('docs/specs');
+    expect(handed?.branchTemplate).toBe('work/{stub}');
+    expect(handed?.now).toBe(NOW);
+    // The trust is made only when a gate asks for it, reading the repository off the runner handed.
+    expect(calls).toEqual([]);
+    const trust = handed?.trust();
+    expect(trust?.trustedAuthors).toEqual(['octo']);
+    expect(trust?.repo).toBe('github.com/open-tomato/rafa');
+    expect(calls).toEqual([['remote', 'get-url', 'origin']]);
+  });
+
+  it('control: with the three config keys left out, hands their defaults, and reads the editor login through the gh seam', async () => {
+    const f = fixture();
+    const { git } = remoteGit();
+    const { seen, edit } = recordingEdit(editReport('appended', 'Appended an update to local issue 3.'));
+    const ghCalls: (readonly string[])[] = [];
+    const gh: GhRunner = (args) => {
+      ghCalls.push(args);
+      return Promise.resolve(answered({ login: 'octo' }));
+    };
+
+    await startAppendUpdate({ repoRoot: f.root, config: CONFIG, append: { edit, gh } }, localOf(f), git)(LOCAL_REF, REASON, ADDED);
+
+    const [handed] = seen;
+    expect(handed?.specsDir).toBe(join('.rafa', 'specs'));
+    expect(handed?.branchTemplate).toBe('feat/{stub}');
+    expect(handed?.trust().trustedAuthors).toEqual([]);
+    expect(handed?.now().getTime()).toBeGreaterThan(0);
+    expect(ghCalls).toEqual([]);
+    expect(await handed?.editor()).toEqual({ login: 'octo', detail: '' });
+    expect(ghCalls).toEqual([['api', 'user']]);
+  });
+
+  it('answers failed with nothing run for a reference of another kind or naming no issue number, and for a tracker with no edit', async () => {
+    const f = fixture();
+    const { git } = remoteGit();
+    const { seen, edit } = recordingEdit(editReport('appended', 'Appended an update to local issue 3.'));
+    const update = startAppendUpdate({ repoRoot: f.root, config: CONFIG, append: { edit } }, localOf(f), git);
+
+    expect(await update({ ...LOCAL_REF, kind: 'github' }, REASON, ADDED))
+      .toEqual({ outcome: 'failed', problem: 'github issue 3 names no issue the local tracker can append to' });
+    expect(await update({ ...LOCAL_REF, externalId: 'abc' }, REASON, ADDED))
+      .toEqual({ outcome: 'failed', problem: 'local issue abc names no issue the local tracker can append to' });
+    // The spy forwards neither member of the editing pair.
+    expect(await startAppendUpdate({ repoRoot: f.root, config: CONFIG, append: { edit } }, f.publicSpy.tracker, git)(LOCAL_REF, REASON, ADDED))
+      .toEqual({ outcome: 'failed', problem: 'The local tracker cannot edit an issue: it reads and writes no issue body.' });
+    expect(seen).toEqual([]);
+    // Control: the same reference on the editing tracker runs the write.
+    expect(await update(LOCAL_REF, REASON, ADDED)).toEqual({ outcome: 'appended', problem: null });
+    expect(seen).toHaveLength(1);
+  });
+
+  it('is handed to every triageReport, bound to the tracker the report files through', async () => {
+    captureLines();
+    const f = fixture();
+    const tracker = localOf(f);
+    const seenOptions: TriageOptions[] = [];
+    const { seen, edit } = recordingEdit(editReport('appended', 'Appended an update to local issue 3.'));
+    const triage = triageFor(f, chainLanding(tracker), {
+      append: { edit, now: NOW },
+      triageReport: (options) => {
+        seenOptions.push(options);
+        return triageReport(options);
+      },
+    });
+
+    await triage(taskInput(f, sessionOutput({ bugs: [['The parser drops a line', 'ERR_ONE', false]] })));
+
+    const [handed] = seenOptions;
+    expect(typeof handed?.appendUpdate).toBe('function');
+    expect(seen).toEqual([]);
+    expect(await handed?.appendUpdate?.(LOCAL_REF, REASON, ADDED)).toEqual({ outcome: 'appended', problem: null });
+    expect(seen[0]?.tracker).toBe(tracker);
+    expect(seen[0]?.root).toBe(f.root);
+  });
+
+  it('is printed under the bug\'s note: appended as a note, every other outcome as a warning, and nothing for a bug with none', () => {
+    const local = (externalId: string): IssueRef => ({ opt: 0, kind: 'local', externalId, url: null });
+    const commented = { ref: local('3'), foundBy: 'find', stored: 'inserted', problem: null, channel: 'public', action: 'commented' } as const;
+    const result: TriageResult = {
+      blocker: { text: null, written: false, problem: null },
+      bugs: [
+        { ...commented, index: 0, append: { outcome: 'appended', problem: null } },
+        { ...commented, index: 1, append: { outcome: 'held', problem: null } },
+        { ...commented, index: 2, append: { outcome: 'stale-copy', problem: 'Issue #3 has a saved copy this edit makes stale.' } },
+        { ...commented, index: 3, append: { outcome: 'refused', problem: 'refused closed: local issue 3 is closed.' } },
+        { ...commented, index: 4, append: { outcome: 'failed', problem: 'the recurrence append failed: EACCES' } },
+        { ...commented, index: 5 },
+      ],
+      staleDocs: [],
+    };
+    const recurs = (index: number): string => `Triage: out_of_scope_bugs[${String(index)}]: recurs in local issue 3 on the public tracker,`
+      + ' found by a tracker find; commented on it.';
+
+    expect(describeStartTriage(result)).toEqual({
+      notes: [
+        recurs(0),
+        'Triage: out_of_scope_bugs[0]: its reproduce text was appended below the body of local issue 3.',
+        recurs(1),
+        recurs(2),
+        recurs(3),
+        recurs(4),
+        recurs(5),
+      ],
+      warnings: [
+        'Triage: out_of_scope_bugs[1]: not appended to local issue 3: its body already holds this reproduce text.',
+        'Triage: out_of_scope_bugs[2]: appended to local issue 3, whose saved copy it makes stale:'
+          + ' Issue #3 has a saved copy this edit makes stale.',
+        'Triage: out_of_scope_bugs[3]: not appended to local issue 3, the write refused it: refused closed: local issue 3 is closed.',
+        'Triage: out_of_scope_bugs[4]: not appended to local issue 3: the recurrence append failed: EACCES',
+      ],
+    });
+  });
+});
+
+describe('the append over a local tracker issue', () => {
+  const FIRST: BugEntry = ['The parser drops a line', 'ERR_ONE', false];
+  const SECOND: BugEntry = ['The store leaks a handle', 'ERR_TWO', false];
+  const REPRODUCE = 'bun test src/parser.test.ts';
+
+  /** Two issues filed by one report, the first then cancelled. */
+  async function filedTwo(f: Fixture): Promise<StartTriage> {
+    const tracker = requireEditingTracker(createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK }));
+    const triage = triageFor(f, chainLanding(tracker));
+    await triage(taskInput(f, sessionOutput({ bugs: [FIRST, SECOND] })));
+    return triage;
+  }
+
+  it('warns a refused append on a closed issue, triages the next bug, then appends one Updated block below an untouched body, once', async () => {
+    const lines = captureLines();
+    const f = fixture();
+    const triage = await filedTwo(f);
+    const reader = createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK });
+    const bodyOf = async (id: string): Promise<string> => (await reader.get({ opt: 0, kind: 'local', externalId: id, url: null })).body;
+    const original = [await bodyOf('1'), await bodyOf('2')];
+    await reader.transition({ opt: 0, kind: 'local', externalId: '1', url: null }, 'cancelled');
+
+    const report = sessionOutput({ bugs: [[FIRST[0], FIRST[1], FIRST[2], REPRODUCE], [SECOND[0], SECOND[1], SECOND[2], REPRODUCE]] });
+    const again = await triage(taskInput(f, report, 'session-2'));
+
+    expect(again?.bugs.map((bug) => [bug.action, bug.append?.outcome])).toEqual([
+      ['commented', 'refused'],
+      ['commented', 'appended'],
+    ]);
+    expect(lines.warn.filter((line) => line.includes('not appended to local issue 1, the write refused it'))).toHaveLength(1);
+    const closedBody = await bodyOf('1');
+    const openBody = await bodyOf('2');
+    expect(closedBody).toBe(original[0] ?? '');
+    expect(closedBody).not.toContain('Updated');
+    expect(openBody.startsWith(original[1] ?? '')).toBe(true);
+    const added = openBody.slice((original[1] ?? '').length);
+    expect(added.match(/Updated/g)).toHaveLength(1);
+    expect(added).toContain(REPRODUCE);
+
+    // The same text again adds no block and the body stays as it was.
+    const third = await triage(taskInput(f, report, 'session-3'));
+    expect(third?.bugs[1]?.append?.outcome).toBe('held');
+    expect(await bodyOf('2')).toBe(openBody);
   });
 });
 

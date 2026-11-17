@@ -18,7 +18,7 @@
  */
 import type { HubIdentity, IdentityRefusalReason } from './identity/port.js';
 import type { HubLogEntry, HubServer, HubServerOptions } from './server.js';
-import type { HubIndex, HubStore, IndexRebuildRequest, IndexRebuildResult } from './store/port.js';
+import type { HubIndex, HubServedProject, HubStore, IndexRebuildRequest, IndexRebuildResult } from './store/port.js';
 import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 
 import { encodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
@@ -450,7 +450,7 @@ describe('POST /v1/effort/push', () => {
     ['an empty device', `${HUB_ROUTES.push}?device=`, encodeWirePayload(payload([commit(A, 1)])), 'device is not a store origin'],
     ['a device holding a space', `${HUB_ROUTES.push}?device=a%20b`, encodeWirePayload(payload([commit(A, 1)])), 'device is not a store origin'],
     ['a device given twice', `${HUB_ROUTES.push}?device=${A}&device=${B}`, encodeWirePayload(payload([commit(A, 1)])), 'names device more than once'],
-    ['a parameter the route does not read', `${HUB_ROUTES.push}?device=${A}&since={}`, encodeWirePayload(payload([commit(A, 1)])), 'The query names "since"; expected device, contractVersion.'],
+    ['a parameter the route does not read', `${HUB_ROUTES.push}?device=${A}&since={}`, encodeWirePayload(payload([commit(A, 1)])), 'The query names "since"; expected device, project, contractVersion.'],
     ['no body', `${HUB_ROUTES.push}?device=${A}`, undefined, 'wire: the payload is not JSON'],
     ['a body that is not JSON', `${HUB_ROUTES.push}?device=${A}`, 'rows please', 'wire: the payload is not JSON'],
     ['a payload of another format', `${HUB_ROUTES.push}?device=${A}`, JSON.stringify({ ...payload([]), format: 'csv' }), 'wire: format is "csv"'],
@@ -508,7 +508,7 @@ describe('GET /v1/effort/pull', () => {
     ['a negative cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":-1}')}`, 'wire: cursor for commits is -1'],
     ['a fractional cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":1.5}')}`, 'wire: cursor for commits is 1.5'],
     ['a cursor naming a table that is not merged', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"merges":1}')}`, 'which is no merged table'],
-    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, since, contractVersion.'],
+    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, project, since, contractVersion.'],
   ];
   for (const [what, path, says] of refusals) {
     it(`answers 400 for ${what}, reaching no store`, async () => {
@@ -968,5 +968,271 @@ describe('index rebuild after a push', () => {
     expect(() => startHubServer({ ...base, openConnected: () => Promise.resolve({ store: memoryStore(), index: standInIndex().index }), rebuildAfterPush: true }))
       .toThrow('rebuildAfterPush needs project');
     expect(() => startHubServer(base)).toThrow('startHubServer needs openStore or openConnected');
+  });
+});
+
+/** The first of two listed projects, where a request naming none is served. */
+const ONE: HubServedProject = Object.freeze({ id: '1'.repeat(40), name: 'open-tomato/one' });
+
+/** The second of two listed projects. */
+const TWO: HubServedProject = Object.freeze({ id: '2'.repeat(40), name: 'open-tomato/two' });
+
+/** A root commit sha neither listed project has. */
+const UNLISTED = '3'.repeat(40);
+
+/** The two projects the server and its store are handed, in listed order. */
+const LISTED: readonly HubServedProject[] = Object.freeze([ONE, TWO]);
+
+/** The refusal of a request naming {@link UNLISTED}. */
+const NOT_SERVED = `rafa-hub: project ${UNLISTED} is not served here; add it under hub.projects`;
+
+/** A fresh in-memory store serving {@link LISTED}, stamped at {@link T0}. */
+function listedStore(): HubStore {
+  return openMemoryHubStore({ directory: '', now: () => new Date(T0), projects: LISTED });
+}
+
+/** Starts a hub over a store serving {@link LISTED}, handed `projects` (both by default), `overrides` replacing any option. */
+function startListed(overrides: Partial<HubServerOptions> = {}): Started {
+  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0, contract: 0 };
+  const started = start({ openStore: () => counted(listedStore(), calls), projects: LISTED, ...overrides });
+  return { ...started, calls };
+}
+
+/** The query naming `project`, none when it is undefined. */
+function projectQuery(project: string | undefined): string {
+  return project === undefined
+    ? ''
+    : `&project=${project}`;
+}
+
+/** Pushes `rows` as `device` to `project`, naming none when it is undefined. */
+function pushTo(server: HubServer, device: string, project: string | undefined, rows: readonly WireRow[]): Promise<Response> {
+  return send(server, 'POST', `${HUB_ROUTES.push}?device=${device}${projectQuery(project)}`, WRITER, encodeWirePayload(payload(rows)));
+}
+
+/** The origins of the commits `device` pulls from `project`, naming none when it is undefined. */
+async function pulledFrom(server: HubServer, device: string, project: string | undefined): Promise<unknown[]> {
+  const response = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${device}${projectQuery(project)}`, WRITER);
+  expect(response.status).toBe(200);
+  const pulled = (await envelope(response)).data as unknown as WirePayload;
+  return (pulled.tables['commits'] ?? []).map((row) => row['origin_seq']);
+}
+
+describe('project on push and pull', () => {
+  it('answers 404 with the hub.projects line for a push naming an unlisted project, before the body is read', async () => {
+    const { server, calls, lines } = startListed();
+
+    const refused = await send(server, 'POST', `${HUB_ROUTES.push}?device=${A}&project=${UNLISTED}`, WRITER, 'rows please');
+    const read = await send(server, 'POST', `${HUB_ROUTES.push}?device=${A}&project=${TWO.id}`, WRITER, 'rows please');
+
+    expect(refused.status).toBe(404);
+    expect(await envelope(refused)).toEqual({ success: false, error: NOT_SERVED });
+    expect(read.status).toBe(400);
+    expect((await envelope(read)).error).toContain('wire: the payload is not JSON');
+    expect(calls.push).toBe(0);
+    expect(requestLines(lines)[0]).toMatchObject({ level: 'warn', status: 404, error: NOT_SERVED });
+  });
+
+  it('answers 404 with the hub.projects line for a pull naming an unlisted project, reaching no store', async () => {
+    const { server, calls } = startListed();
+
+    const refused = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}&project=${UNLISTED}`, WRITER);
+    const served = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}&project=${TWO.id}`, WRITER);
+
+    expect(refused.status).toBe(404);
+    expect(await envelope(refused)).toEqual({ success: false, error: NOT_SERVED });
+    expect(served.status).toBe(200);
+    expect(calls.pull).toBe(1);
+  });
+
+  it('answers the store\'s own refusal of an unlisted project 404 with its line, on a hub handed no projects', async () => {
+    const { server, calls } = startListed({ projects: undefined });
+
+    const response = await pushTo(server, A, UNLISTED, [commit(A, 1)]);
+
+    expect(response.status).toBe(404);
+    expect(await envelope(response)).toEqual({ success: false, error: NOT_SERVED });
+    expect(calls.push).toBe(1);
+  });
+
+  const malformed: readonly (readonly [string, string])[] = [
+    ['an empty project', ''],
+    ['a project in capitals', 'A'.repeat(40)],
+    ['a project one character short', '1'.repeat(39)],
+    ['a project one character long', '1'.repeat(41)],
+    ['the default project\'s id', 'default'],
+    ['a repository', 'open-tomato%2Fone'],
+  ];
+  for (const [what, spelt] of malformed) {
+    for (const [route, method] of [[HUB_ROUTES.push, 'POST'], [HUB_ROUTES.pull, 'GET']] as const) {
+      it(`answers 400 for ${what} on ${method} ${route}, reaching no store`, async () => {
+        const { server, calls } = startListed();
+
+        const response = await send(server, method, `${route}?device=${A}&project=${spelt}`, WRITER, method === 'POST'
+          ? encodeWirePayload(payload([commit(A, 1)]))
+          : undefined);
+
+        expect(response.status).toBe(400);
+        expect((await envelope(response)).error).toBe('project is not a root commit sha; expected 40 lowercase hex characters, as git rev-list --max-parents=0 HEAD prints.');
+        expect(calls.push + calls.pull).toBe(0);
+      });
+    }
+  }
+
+  it('answers 400 for a project given twice, reaching no store', async () => {
+    const { server, calls } = startListed();
+
+    const response = await send(server, 'POST', `${HUB_ROUTES.push}?device=${A}&project=${ONE.id}&project=${TWO.id}`, WRITER, encodeWirePayload(payload([commit(A, 1)])));
+
+    expect(response.status).toBe(400);
+    expect((await envelope(response)).error).toBe('The query names project more than once.');
+    expect(calls.push).toBe(0);
+  });
+
+  it('answers 400 for a malformed project on a single-project hub too', async () => {
+    const { server, calls } = start();
+
+    const response = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}&project=default`, WRITER);
+
+    expect(response.status).toBe(400);
+    expect(calls.pull).toBe(0);
+  });
+
+  it('lands a push naming none in the first listed project, and a pull naming none reads it', async () => {
+    const { server } = startListed();
+
+    const pushed = await pushTo(server, A, undefined, [commit(A, 1)]);
+    await pushTo(server, A, TWO.id, [commit(A, 2), commit(A, 3)]);
+
+    expect(await envelope(pushed)).toEqual({ success: true, data: { received: 1, added: 1, at: T0 } });
+    expect(await pulledFrom(server, B, undefined)).toEqual([1]);
+    expect(await pulledFrom(server, B, ONE.id)).toEqual([1]);
+    expect(await pulledFrom(server, B, TWO.id)).toEqual([2, 3]);
+  });
+
+  it('serves every project a request names on a single-project hub, in its one project', async () => {
+    const { server } = start();
+
+    const pushed = await pushTo(server, A, ONE.id, [commit(A, 1)]);
+
+    expect(pushed.status).toBe(200);
+    expect(await pulledFrom(server, B, TWO.id)).toEqual([1]);
+    expect(await pulledFrom(server, B, UNLISTED)).toEqual([1]);
+    expect(await pulledFrom(server, B, undefined)).toEqual([1]);
+  });
+
+  it('logs the project a push or a pull named, and none for one naming none', async () => {
+    const { server, lines } = startListed();
+
+    await pushTo(server, A, TWO.id, [commit(A, 1)]);
+    await pulledFrom(server, B, undefined);
+
+    expect(requestLines(lines).map(({ path, project }) => ({ path, project }))).toEqual([
+      { path: HUB_ROUTES.push, project: TWO.id },
+      { path: HUB_ROUTES.pull, project: undefined },
+    ]);
+  });
+});
+
+describe('GET /v1/status over two projects', () => {
+  it('answers each project\'s id and name in listed order, beside the first project\'s rows', async () => {
+    const { server } = startListed();
+    await pushTo(server, A, TWO.id, [commit(A, 1), commit(A, 2)]);
+    await pushTo(server, B, ONE.id, [commit(B, 1)]);
+
+    const response = await send(server, 'GET', HUB_ROUTES.status, WRITER);
+
+    expect(response.status).toBe(200);
+    const { data } = await envelope(response);
+    expect(data?.['projects']).toEqual([{ id: ONE.id, name: ONE.name }, { id: TWO.id, name: TWO.name }]);
+    expect(data?.['rows']).toEqual({ commits: 1 });
+    expect(data?.['devices']).toEqual([{ device: B, lastPushAt: T0 }]);
+  });
+
+  it('names no projects over a store answering none', async () => {
+    const { server } = start();
+
+    const { data } = await envelope(await send(server, 'GET', HUB_ROUTES.status, WRITER));
+
+    expect(data).not.toHaveProperty('projects');
+  });
+});
+
+/** Starts a hub over `index` and a store serving {@link LISTED}, rebuilding after a push, `overrides` replacing any option. */
+function startListedConnected(index: HubIndex, overrides: Partial<HubServerOptions> = {}): Started {
+  const calls: Calls = { push: 0, pull: 0, status: 0, close: 0, contract: 0 };
+  const started = startConnected(index, {
+    openConnected: () => Promise.resolve({ store: counted(listedStore(), calls), index }),
+    projects: LISTED,
+    project: undefined,
+    ...overrides,
+  });
+  return { ...started, calls };
+}
+
+describe('index rebuild after a push, per project', () => {
+  it('starts no rebuild for a push refused as naming an unlisted project', async () => {
+    const { index, asked } = standInIndex();
+    const { server } = startListedConnected(index);
+
+    const refused = await pushTo(server, A, UNLISTED, [commit(A, 1)]);
+    const served = await pushTo(server, A, ONE.id, [commit(A, 1)]);
+    await stopped(server);
+
+    expect(refused.status).toBe(404);
+    expect(served.status).toBe(200);
+    expect(asked).toEqual([{ project: ONE.id }]);
+  });
+
+  it('rebuilds the pushed project\'s index, and the first listed project\'s for a push naming none', async () => {
+    const { index, asked } = standInIndex();
+    const { server, lines } = startListedConnected(index);
+
+    await pushTo(server, A, TWO.id, [commit(A, 1)]);
+    await pushTo(server, A, undefined, [commit(A, 2)]);
+    await stopped(server);
+
+    expect(asked).toEqual([{ project: TWO.id }, { project: ONE.id }]);
+    expect(indexLines(lines).map(({ event, project }) => ({ event, project }))).toEqual([
+      { event: 'index.rebuilt', project: TWO.id },
+      { event: 'index.rebuilt', project: ONE.id },
+    ]);
+  });
+
+  it('rebuilds the hub\'s repository on a single-project hub, whatever project the push names', async () => {
+    const { index, asked } = standInIndex();
+    const { server } = startConnected(index);
+
+    await pushTo(server, A, ONE.id, [commit(A, 1)]);
+    await stopped(server);
+
+    expect(asked).toEqual([{ project: PROJECT }]);
+  });
+
+  it('runs two projects\' rebuilds side by side, and queues one per project', async () => {
+    const gates = [deferred<IndexRebuildResult>(), deferred<IndexRebuildResult>(), deferred<IndexRebuildResult>()];
+    const { index, asked, started } = standInIndex((call) => gates[call]?.promise ?? Promise.reject(new Error(`rebuild ${String(call)} was not expected`)));
+    const { server } = startListedConnected(index);
+
+    await pushTo(server, A, ONE.id, [commit(A, 1)]);
+    await pushTo(server, A, TWO.id, [commit(A, 1)]);
+    await pushTo(server, A, ONE.id, [commit(A, 2)]);
+    await pushTo(server, A, ONE.id, [commit(A, 3)]);
+
+    expect(asked).toEqual([{ project: ONE.id }, { project: TWO.id }]);
+
+    gates[0]?.resolve(REBUILT);
+    await started(2);
+    gates[1]?.resolve(REBUILT);
+    gates[2]?.resolve(REBUILT);
+    await stopped(server);
+
+    expect(asked).toEqual([{ project: ONE.id }, { project: TWO.id }, { project: ONE.id }]);
+  });
+
+  it('starts with rebuildAfterPush and no project when projects are listed', () => {
+    const { index } = standInIndex();
+
+    expect(() => startListedConnected(index)).not.toThrow();
   });
 });
