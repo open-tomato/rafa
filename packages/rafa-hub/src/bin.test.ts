@@ -30,6 +30,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { hubCommandOf, HUB_VERSION, runHub, runIndexRebuild } from './bin.js';
 import { HUB_CONFIG_ENV } from './config.js';
+import { keysFileName } from './identity/key-store.js';
+import { openSqliteLoginStore } from './identity/login-store.js';
 import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { HUB_ROUTES } from './server.js';
 import { connectSqliteHub } from './store/sqlite.js';
@@ -361,6 +363,12 @@ describe('hubCommandOf', () => {
     [['index'], null],
     [['rebuild', 'index'], null],
     [['index', 'rebuild', 'now'], null],
+    [['login'], 'login'],
+    [['login', 'ada'], null],
+    [['keys', 'list'], 'keys'],
+    [['keys', 'create', 'ci', '--hub=https://hub.example.org'], 'keys'],
+    [['keys'], null],
+    [['keys', 'create'], null],
   ] as const)('reads %p as %p', (args, command) => {
     expect(hubCommandOf(args)).toBe(command);
   });
@@ -478,6 +486,36 @@ describe('bin.ts as a process', () => {
     const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
 
     expect(code).toBe(1);
-    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub) or rafa-hub index rebuild\n');
+    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
+  });
+
+  it('runs login over two lines of standard input, setting the login in the keys file beside hub.storePath', async () => {
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373, '  auth:\n    adapter: api-key\n    apiKeys: [RAFA_HUB_BIN_KEY]\n') };
+    const password = 'bin login password 0001';
+
+    const child = Bun.spawn([process.execPath, BIN, 'login'], { env, stdin: new TextEncoder().encode(`ada\n${password}\n`), stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(stderr).toBe('');
+    expect(code).toBe(0);
+    const keys = keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+    expect(stdout).toBe(`rafa-hub login: the login is set for ada, in ${keys}\n`);
+    const store = openSqliteLoginStore({ path: keys });
+    try {
+      expect(await store.verifyLogin('ada', password)).toBe(true);
+    } finally {
+      store.close();
+    }
+  }, READY_WITHIN_MS);
+
+  it('runs keys, exiting 1 with one line when no hub is named', async () => {
+    const env = { ...process.env, RAFA_HUB_URL: '' };
+
+    const child = Bun.spawn([process.execPath, BIN, 'keys', 'list'], { env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stdout).toBe('');
+    expect(stderr).toBe('rafa-hub keys list: no hub to reach; pass --hub=<url> or set RAFA_HUB_URL\n');
   });
 });

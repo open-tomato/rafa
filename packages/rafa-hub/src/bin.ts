@@ -41,14 +41,22 @@
  * next. The command exits 0 when every rebuild swapped its index in and
  * 1 otherwise. A refused config and a connector that does not open each
  * print one line on standard error, and the command exits 1; so do
- * arguments naming neither the server nor this entry. A rebuild swaps a
- * new index file in, and a server already running over the same store
- * picks it up by its inode on its following query, so the two need no
- * signal between them.
+ * arguments naming no command, the line holding {@link HUB_USAGE}. A
+ * rebuild swaps a new index file in, and a server already running over
+ * the same store picks it up by its inode on its following query, so
+ * the two need no signal between them.
  *
- * {@link runHub} and {@link runIndexRebuild} are the whole command but
- * the process's exit, so a test runs them in process; importing this
- * file starts nothing.
+ * ## `rafa-hub login` and `rafa-hub keys`
+ *
+ * `rafa-hub login` sets the hub's login in the keys file beside
+ * `hub.storePath`, and `rafa-hub keys create|list|pause|delete` drives
+ * a hub's key routes at `--hub=<url>` or `RAFA_HUB_URL`; both live in
+ * `cli-keys.ts`, whose module note says what each asks and prints.
+ *
+ * {@link runHub} and {@link runIndexRebuild}, like `cli-keys.ts`'s
+ * `runLogin` and `runKeys`, are the whole command but the process's
+ * exit, so a test runs them in process; importing this file starts
+ * nothing.
  */
 import type { HubConfig } from './config.js';
 import type { HubIdentity } from './identity/port.js';
@@ -59,6 +67,7 @@ import { basename, dirname } from 'node:path';
 
 import packageJson from '../package.json';
 
+import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { HubConfigError, readHubConfig } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
 import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
@@ -75,10 +84,10 @@ const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 export const INDEX_REBUILD_ARGS: readonly string[] = Object.freeze(['index', 'rebuild']);
 
 /** What `rafa-hub` takes, as a refused argument list says it. */
-export const HUB_USAGE = 'usage: rafa-hub (serves the hub) or rafa-hub index rebuild';
+export const HUB_USAGE: string = `usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or ${KEYS_USAGE}`;
 
 /** What one run of `rafa-hub` does, by its arguments. */
-export type HubCommand = 'serve' | 'index-rebuild';
+export type HubCommand = 'serve' | 'index-rebuild' | 'login' | 'keys';
 
 /** What {@link runHub} may vary beyond the environment. */
 export interface RunHubOptions {
@@ -166,6 +175,12 @@ function rebuildProjects(config: HubConfig): readonly string[] {
 /** The command `args` (the process's arguments past the script) name, or null for any other. */
 export function hubCommandOf(args: readonly string[]): HubCommand | null {
   if (args.length === 0) return 'serve';
+  if (isLoginCommand(args)) return 'login';
+  if (args[0] === 'keys') {
+    return keysCommandOf(args.slice(1)) === null
+      ? null
+      : 'keys';
+  }
 
   const isRebuild = args.length === INDEX_REBUILD_ARGS.length
     && args.every((arg, at) => arg === INDEX_REBUILD_ARGS[at]);
@@ -268,6 +283,8 @@ if (import.meta.main) {
     process.exit(1);
   }
   if (command === 'index-rebuild') process.exit(await runIndexRebuild(process.env));
+  if (command === 'login') process.exit(await runLogin(process.env));
+  if (command === 'keys') process.exit(await runKeys(process.argv.slice(3), process.env));
 
   await serve();
 }
