@@ -112,6 +112,14 @@ describe('openSqliteLoginStore', () => {
     await expect(store.setLogin('markos', '')).rejects.toThrow(RangeError);
     expect(await store.verifyLogin('markos', PASSWORD)).toBe(true);
   });
+
+  it('refuses a user name holding a colon, which Authorization: Basic could never carry', async () => {
+    await expect(store.setLogin('mar:kos', PASSWORD)).rejects.toThrow('holds no ":"');
+    await expect(store.setLogin(':', PASSWORD)).rejects.toThrow(RangeError);
+    expect(await store.hasLogin()).toBe(false);
+    await store.setLogin('markos', 'a pass:word');
+    expect(await store.verifyLogin('markos', 'a pass:word')).toBe(true);
+  });
 });
 
 describe('bootstrapLoginFromEnv', () => {
@@ -153,6 +161,12 @@ describe('bootstrapLoginFromEnv', () => {
       .toEqual({ outcome: 'incomplete', missing: LOGIN_PASSWORD_VARIABLE });
     expect(await bootstrapLoginFromEnv(store, { [LOGIN_USER_VARIABLE]: '', [LOGIN_PASSWORD_VARIABLE]: PASSWORD }))
       .toEqual({ outcome: 'incomplete', missing: LOGIN_USER_VARIABLE });
+    expect(await store.hasLogin()).toBe(false);
+  });
+
+  it('refuses a user name holding a colon from the variable, setting nothing', async () => {
+    const env = { [LOGIN_USER_VARIABLE]: 'mar:kos', [LOGIN_PASSWORD_VARIABLE]: PASSWORD };
+    await expect(bootstrapLoginFromEnv(store, env)).rejects.toThrow('holds no ":"');
     expect(await store.hasLogin()).toBe(false);
   });
 

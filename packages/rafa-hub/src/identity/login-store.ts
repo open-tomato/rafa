@@ -34,6 +34,13 @@
  * {@link LOGIN_USER_VARIABLE} and {@link LOGIN_PASSWORD_VARIABLE} when no
  * login is set, and leaves a set one as it is, so a restart with the
  * variables still exported never undoes a change made since.
+ *
+ * ## A user name the basic login can carry
+ *
+ * `Authorization: Basic` splits its pair at the first colon, so a user
+ * name holding one could never be verified. {@link HubLoginStore.setLogin}
+ * refuses it with a `RangeError`, whichever caller hands it in: the
+ * `rafa-hub login` prompt and {@link LOGIN_USER_VARIABLE} alike.
  */
 import { randomBytes } from 'node:crypto';
 
@@ -60,7 +67,9 @@ export interface HubLoginStore {
    * login set before, and answers it.
    *
    * @throws {RangeError} When `user` or `password` is empty, or `user`
-   *   opens or ends with white space.
+   *   opens or ends with white space or holds a `:`, which
+   *   `Authorization: Basic` splits the pair at, so no request could
+   *   carry it.
    */
   readonly setLogin: (user: string, password: string) => Promise<HubLogin>;
   /** Whether a login is set. */
@@ -118,10 +127,11 @@ function decoy(): Promise<string> {
   return decoyHash;
 }
 
-/** Refuses an empty `user` or `password`, or a `user` with white space at either end. */
+/** Refuses an empty `user` or `password`, or a `user` with white space at either end or holding a `:`. */
 function refuseCredentials(user: string, password: string): void {
   if (user.length === 0) throw new RangeError('a login\'s user name is not empty');
   if (user.trim() !== user) throw new RangeError('a login\'s user name neither opens nor ends with white space');
+  if (user.includes(':')) throw new RangeError('a login\'s user name holds no ":", which Authorization: Basic could not carry');
   if (password.length === 0) throw new RangeError('a login\'s password is not empty');
 }
 
@@ -172,7 +182,8 @@ export function openSqliteLoginStore(options: SqliteLoginStoreOptions): HubLogin
  * empty variable counts as unset, and one set without the other sets
  * nothing.
  *
- * @throws {RangeError} When the user name opens or ends with white space.
+ * @throws {RangeError} When the user name opens or ends with white space
+ *   or holds a `:`.
  */
 export async function bootstrapLoginFromEnv(
   store: HubLoginStore,
