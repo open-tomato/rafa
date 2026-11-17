@@ -484,3 +484,61 @@ describe('a route write the store refuses', () => {
     expect(f.info.filter((line) => line.includes('held for the pull request'))).toHaveLength(2);
   });
 });
+
+/** The run checkout's head as a full sha, so a kept capture's name can hold it. */
+const FULL_HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+
+/** A red task step's output, its `(fail)` line naming {@link TEST_CASE}. */
+const RED_OUTPUT = [
+  `${TEST_FILE}:`,
+  'error: expect(received).toBe(expected)',
+  `(fail) ${TEST_CASE} [3.00ms]`,
+  ' 1 fail',
+].join('\n');
+
+/** {@link planGit} with its head answered as {@link FULL_HEAD}. */
+function fullHeadGit(args: readonly string[]): GitResult {
+  const command = args.join(' ');
+  if (command === 'rev-parse HEAD') return { ok: true, stdout: FULL_HEAD, stderr: '' };
+  if (command === 'merge-base HEAD refs/remotes/origin/integration') return { ok: true, stdout: BASE, stderr: '' };
+  return planGit(args);
+}
+
+/** The kinds of a run at {@link FULL_HEAD}, the named case green there and on the base. */
+function greenAtFullHead(): StartKindOptions {
+  return { ...kindsOf(runner({ [BASE]: 'green', [FULL_HEAD]: 'green' })), git: fullHeadGit };
+}
+
+/** Keeps a red task step capture at {@link FULL_HEAD} under the fixture's `repoRoot`. */
+function keepCapture(f: Fixture): void {
+  const suite = join(f.root, '.rafa', 'runs', 'session-0', 'suite');
+  mkdirSync(suite, { recursive: true });
+  writeFileSync(join(suite, `task.${FULL_HEAD}.red.output.txt`), RED_OUTPUT);
+}
+
+describe('an own-fallout only a kept capture under repoRoot decides', () => {
+  it('resolves the chain and is filed with no capture kept, the case green on the head', async () => {
+    const f = fixture();
+
+    const result = await createStartTriage({ ...f.options, kinds: greenAtFullHead() })(taskInput(f, [testEntry('own-fallout')]));
+
+    expect(result?.bugs.map((bug) => bug.action)).toEqual(['filed']);
+    expect(f.resolutions).toHaveLength(1);
+    expect(f.publicCalls).toContain('create');
+    expect(routesOf(f)).toEqual(['0 own-fallout bug filed']);
+  });
+
+  it('is routed by the pre-check as triageReport routes it: a repair task, no chain resolved, no tracker called', async () => {
+    const f = fixture();
+    keepCapture(f);
+
+    const result = await createStartTriage({ ...f.options, kinds: greenAtFullHead() })(taskInput(f, [testEntry('own-fallout')]));
+
+    expect(result?.bugs.map((bug) => bug.action)).toEqual(['repair']);
+    expect(routesOf(f)).toEqual(['0 own-fallout own-fallout repair']);
+    expect(f.resolutions).toHaveLength(0);
+    expect(f.publicCalls).toEqual([]);
+    expect(f.privateCalls).toEqual([]);
+    expect(issueNames(localIssuesDir(f.root))).toHaveLength(0);
+  });
+});

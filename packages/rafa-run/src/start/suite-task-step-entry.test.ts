@@ -26,10 +26,18 @@ import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { findNextTask } from '@open-tomato/rafa/utils/tracker';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { LOCAL_ESLINT_BIN } from './lint-step.js';
 import { runTaskStep } from './suite-step.js';
 
 const BASE = 'base0000';
 const HEAD = 'head1111';
+
+/** Plants an ESLint config and a stand-in `node_modules/.bin/eslint` in `root`, so the lint step resolves an ESLint and runs its seam. */
+function plantLintable(root: string): void {
+  writeFileSync(join(root, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+  mkdirSync(join(root, 'node_modules', '.bin'), { recursive: true });
+  writeFileSync(join(root, LOCAL_ESLINT_BIN), '#!/bin/sh\nexit 0\n', 'utf8');
+}
 
 const TRACKER = '# Plan: fixture\n\n# Stage: One\n\n- [x] first task\n- [ ] second task\n';
 
@@ -138,7 +146,7 @@ function contextWith(setup: Setup): { readonly context: SuiteStepContext; readon
         },
       }),
   };
-  if (lint !== undefined) writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+  if (lint !== undefined) plantLintable(dir);
   const context: SuiteStepContext = {
     repoRoot: dir,
     checkout: dir,
@@ -207,7 +215,7 @@ describe('runTaskStep over an empty checks.task', () => {
     const { context, seen } = contextWith({ entry: [], lint: { exitCode: 0, stdout: '[]', stderr: '' } });
     const outcome = await runTaskStep(context, inputOf());
 
-    expect(seen.lints).toEqual([['bunx', 'eslint', '--no-warn-ignored', '--format', 'json', 'src/b/x.ts']]);
+    expect(seen.lints).toEqual([[join(dir, LOCAL_ESLINT_BIN), '--no-warn-ignored', '--format', 'json', 'src/b/x.ts']]);
     expect(outcome.red).toBe(false);
     // The none step is printed before the lint and type steps run.
     expect(lines.indexOf(NO_CHECK_LINE)).toBe(0);
