@@ -199,7 +199,7 @@ const CONFIG: StartTriageOptions['config'] = {
 };
 
 /** One out-of-scope bug as a report lists it: its what, its artifact and its flag. */
-type BugEntry = readonly [what: string, artifact: string | null, security: boolean | null];
+type BugEntry = readonly [what: string, artifact: string | null, security: boolean | null, reproduce?: string];
 
 /** One `stale_docs` entry as a report lists it: where the stale line is, and what no longer matches. */
 type StaleDocEntry = readonly [where: string | null, what: string];
@@ -241,10 +241,13 @@ function sessionOutput(parts: ReportParts = {}): string {
     ? ['out_of_scope_bugs: []']
     : [
       'out_of_scope_bugs:',
-      ...bugs.flatMap(([what, artifact, security]) => [
+      ...bugs.flatMap(([what, artifact, security, reproduce]) => [
         `  - what: ${scalar(what)}`,
         `    artifact: ${scalar(artifact)}`,
         `    security: ${scalar(security)}`,
+        ...reproduce === undefined
+          ? []
+          : [`    reproduce: ${scalar(reproduce)}`],
       ]),
     ];
   return [
@@ -1192,6 +1195,52 @@ describe('the append after a recurrence', () => {
         'Triage: out_of_scope_bugs[4]: not appended to local issue 3: the recurrence append failed: EACCES',
       ],
     });
+  });
+});
+
+describe('the append over a local tracker issue', () => {
+  const FIRST: BugEntry = ['The parser drops a line', 'ERR_ONE', false];
+  const SECOND: BugEntry = ['The store leaks a handle', 'ERR_TWO', false];
+  const REPRODUCE = 'bun test src/parser.test.ts';
+
+  /** Two issues filed by one report, the first then cancelled. */
+  async function filedTwo(f: Fixture): Promise<StartTriage> {
+    const tracker = requireEditingTracker(createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK }));
+    const triage = triageFor(f, chainLanding(tracker));
+    await triage(taskInput(f, sessionOutput({ bugs: [FIRST, SECOND] })));
+    return triage;
+  }
+
+  it('warns a refused append on a closed issue, triages the next bug, then appends one Updated block below an untouched body, once', async () => {
+    const lines = captureLines();
+    const f = fixture();
+    const triage = await filedTwo(f);
+    const reader = createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK });
+    const bodyOf = async (id: string): Promise<string> => (await reader.get({ opt: 0, kind: 'local', externalId: id, url: null })).body;
+    const original = [await bodyOf('1'), await bodyOf('2')];
+    await reader.transition({ opt: 0, kind: 'local', externalId: '1', url: null }, 'cancelled');
+
+    const report = sessionOutput({ bugs: [[FIRST[0], FIRST[1], FIRST[2], REPRODUCE], [SECOND[0], SECOND[1], SECOND[2], REPRODUCE]] });
+    const again = await triage(taskInput(f, report, 'session-2'));
+
+    expect(again?.bugs.map((bug) => [bug.action, bug.append?.outcome])).toEqual([
+      ['commented', 'refused'],
+      ['commented', 'appended'],
+    ]);
+    expect(lines.warn.filter((line) => line.includes('not appended to local issue 1, the write refused it'))).toHaveLength(1);
+    const closedBody = await bodyOf('1');
+    const openBody = await bodyOf('2');
+    expect(closedBody).toBe(original[0] ?? '');
+    expect(closedBody).not.toContain('Updated');
+    expect(openBody.startsWith(original[1] ?? '')).toBe(true);
+    const added = openBody.slice((original[1] ?? '').length);
+    expect(added.match(/Updated/g)).toHaveLength(1);
+    expect(added).toContain(REPRODUCE);
+
+    // The same text again adds no block and the body stays as it was.
+    const third = await triage(taskInput(f, report, 'session-3'));
+    expect(third?.bugs[1]?.append?.outcome).toBe('held');
+    expect(await bodyOf('2')).toBe(openBody);
   });
 });
 
