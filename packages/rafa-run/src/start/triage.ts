@@ -152,6 +152,9 @@
  * a leftover of the plan's own, `own-fallout` or `own-gap`, inserted by
  * `triage/kind-route.ts` while the plan holds fewer such repairs than
  * the cap, and each is noted here in one line naming its tracker line.
+ * An entry that joined a line already in the tracker, a step repair or
+ * an open leftover line (`joined`), adds none and is noted as joining
+ * that line.
  * An entry past the cap, a `convention` and a `docs` entry are each
  * noted in one line too, as held for the follow-up issue, held for the
  * pull request's body, or stored as a stale-doc sighting.
@@ -429,13 +432,26 @@ function inheritedNote(bug: BugTriage, name: string, where: string, failure: Sui
   return `${name}: inherited: ${test}; nothing was filed${comment}.`;
 }
 
+/**
+ * What a note says of a `repair` entry: the repair task added for it, or,
+ * when it `joined` a line already in the tracker, the repair task it joined.
+ */
+function repairText(bug: BugTriage): string {
+  if (bug.joined === true) {
+    return bug.repairLine === undefined
+      ? 'it joined a repair task already in the tracker'
+      : `it joined the repair task at tracker line ${bug.repairLine + 1}, already in the tracker`;
+  }
+  return bug.repairLine === undefined
+    ? 'a repair task was added above the next plan task'
+    : `a repair task was added at tracker line ${bug.repairLine + 1}, above the next plan task`;
+}
+
 /** What a note says became of an entry its kind routed away from every tracker. */
 function settledText(bug: BugTriage): string | null {
   switch (bug.action) {
     case 'repair':
-      return bug.repairLine === undefined
-        ? 'a repair task was added above the next plan task'
-        : `a repair task was added at tracker line ${bug.repairLine + 1}, above the next plan task`;
+      return repairText(bug);
     case 'follow-up':
       return bug.problem === null
         ? 'held for this plan\'s follow-up issue, past its cap on repair tasks'

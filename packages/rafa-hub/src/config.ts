@@ -1,5 +1,5 @@
 /**
- * The hub's config reader: the four server keys `rafa-hub` reads from
+ * The hub's config reader: the six server keys `rafa-hub` reads from
  * the YAML file the {@link HUB_CONFIG_ENV} environment variable names,
  * each with its default and its reader, resolved into one frozen
  * {@link HubConfig} or refused with every problem at once as a
@@ -11,7 +11,11 @@
  * identity adapter asks GitHub about), `hub.port` (default `7373`),
  * `hub.storePath` and `hub.auth.cacheFor` (default `10m`, from `1m` to
  * `24h`, `false` to ask GitHub on every request), with `0` and negative
- * values refused. The client's keys (`hub.url`, `hub.tokenSecret`,
+ * values refused. The spec for #1428 adds two: `hub.store.sqliteLibrary`
+ * (no default; the path of a vanilla `libsqlite3` that turns the index's
+ * vector half on for a macOS hub) and `hub.index.rebuildAfterPush`
+ * (default `true`; `false` leaves the index to `rafa-hub index
+ * rebuild`). The client's keys (`hub.url`, `hub.tokenSecret`,
  * `hub.timeout`) are core's, read by `packages/rafa/src/config-schema-hub.ts` from a
  * project's `.rafa/config.yaml`; this file is the server's own and
  * never a project's.
@@ -37,9 +41,19 @@
  *     unit: `1.5h`, `10M`, ` 10m` and a bare number are refused, and so
  *     is anything below `1m` or above `24h`. `false` turns the cache
  *     off; `true` names no duration and is refused.
+ *   - `hub.store.sqliteLibrary` must be an absolute path, and a relative
+ *     one is refused rather than resolved: the library is handed to
+ *     `Database.setCustomSQLite`, which the process loads once and
+ *     before any database opens, so a path that names a different file
+ *     from another directory would be a silent wrong load. Left out, it
+ *     is null, and the connector answers `vector: false` where the
+ *     engine needs it.
+ *   - `hub.index.rebuildAfterPush` is `true` or `false` and nothing
+ *     else: `'false'` and `0` are refused, not read as off.
  *   - Nothing is coerced: a port written as the string `'7373'` is
  *     refused, as core's readers refuse a string spelled like a number.
- *   - A key under `hub` or `hub.auth` that the hub does not read is
+ *   - A key under `hub`, `hub.auth`, `hub.store` or `hub.index` that the
+ *     hub does not read is
  *     refused rather than ignored: the file is the hub's alone, so an
  *     unknown key there is a misspelling (`cachefor`) that would
  *     otherwise leave a default in force without a word.
@@ -87,11 +101,20 @@ const REPOSITORY = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/
 /** Repository names GitHub never holds. */
 const RESERVED_NAMES: readonly string[] = Object.freeze(['.', '..']);
 
+/** `hub.index.rebuildAfterPush` when it is left out. */
+export const DEFAULT_REBUILD_AFTER_PUSH = true;
+
 /** The keys the hub reads under `hub`. */
-const HUB_KEYS: readonly string[] = Object.freeze(['repository', 'port', 'storePath', 'auth']);
+const HUB_KEYS: readonly string[] = Object.freeze(['repository', 'port', 'storePath', 'auth', 'store', 'index']);
 
 /** The keys the hub reads under `hub.auth`. */
 const AUTH_KEYS: readonly string[] = Object.freeze(['cacheFor']);
+
+/** The keys the hub reads under `hub.store`. */
+const STORE_KEYS: readonly string[] = Object.freeze(['sqliteLibrary']);
+
+/** The keys the hub reads under `hub.index`. */
+const INDEX_KEYS: readonly string[] = Object.freeze(['rebuildAfterPush']);
 
 /** What `hub.repository` takes, as a refusal says it. */
 const REPOSITORY_EXPECTED = 'expected a GitHub repository as owner/name, such as open-tomato/rafa';
@@ -104,6 +127,12 @@ const STORE_PATH_EXPECTED = 'expected a file path, such as /data/rafa-hub.sqlite
 
 /** What `hub.auth.cacheFor` takes, as a refusal says it. */
 const CACHE_FOR_EXPECTED = 'expected a duration of whole s, m or h from 1m to 24h, such as 10m, or false to ask GitHub on every request';
+
+/** What `hub.store.sqliteLibrary` takes, as a refusal says it. */
+const SQLITE_LIBRARY_EXPECTED = 'expected an absolute path to a vanilla libsqlite3, such as /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib';
+
+/** What `hub.index.rebuildAfterPush` takes, as a refusal says it. */
+const REBUILD_AFTER_PUSH_EXPECTED = 'expected true or false';
 
 /** The hub's settings, resolved. */
 export interface HubConfig {
@@ -118,6 +147,17 @@ export interface HubConfig {
    * to ask GitHub on every request. `hub.auth.cacheFor`.
    */
   readonly cacheForMs: number | null;
+  /**
+   * The absolute path of the vanilla `libsqlite3` the index loads its
+   * vector extension through, or null when none is named.
+   * `hub.store.sqliteLibrary`.
+   */
+  readonly sqliteLibrary: string | null;
+  /**
+   * Whether a push that added rows rebuilds the project's index; `false`
+   * leaves it to `rafa-hub index rebuild`. `hub.index.rebuildAfterPush`.
+   */
+  readonly rebuildAfterPush: boolean;
 }
 
 /** The hub's config refused: every problem found, one sentence each. */
@@ -229,6 +269,25 @@ function readCacheFor(path: string, raw: unknown): Reading<number | null> {
     : { value: ms, problems: [] };
 }
 
+/** Reads `hub.store.sqliteLibrary`: an absolute path, null when left out. */
+function readSqliteLibrary(path: string, raw: unknown): Reading<string | null> {
+  if (raw === undefined) return { value: null, problems: [] };
+
+  const isPath = typeof raw === 'string' && raw.trim() === raw && isAbsolute(raw);
+  return isPath
+    ? { value: raw, problems: [] }
+    : refusal(path, 'hub.store.sqliteLibrary', raw, SQLITE_LIBRARY_EXPECTED);
+}
+
+/** Reads `hub.index.rebuildAfterPush`, {@link DEFAULT_REBUILD_AFTER_PUSH} when left out. */
+function readRebuildAfterPush(path: string, raw: unknown): Reading<boolean> {
+  if (raw === undefined) return { value: DEFAULT_REBUILD_AFTER_PUSH, problems: [] };
+
+  return typeof raw === 'boolean'
+    ? { value: raw, problems: [] }
+    : refusal(path, 'hub.index.rebuildAfterPush', raw, REBUILD_AFTER_PUSH_EXPECTED);
+}
+
 /** One problem per key of `section` outside `known`, named by `prefix`. */
 function unknownKeys(path: string, prefix: string, section: Readonly<Record<string, unknown>>, known: readonly string[]): string[] {
   return Object.keys(section)
@@ -236,12 +295,16 @@ function unknownKeys(path: string, prefix: string, section: Readonly<Record<stri
     .map((key) => `${path}: ${prefix}.${key} is not a key the hub reads; expected one of ${known.map((name) => `${prefix}.${name}`).join(', ')}`);
 }
 
-/** The `hub.auth` section, or the problem that refused it. */
-function authSection(path: string, raw: unknown): Reading<Readonly<Record<string, unknown>>> {
+/**
+ * The section `hub.<name>`, or the problem that refused it: a mapping
+ * holding only `known`, empty when left out.
+ */
+function section(path: string, name: string, raw: unknown, known: readonly string[]): Reading<Readonly<Record<string, unknown>>> {
+  const key = `hub.${name}`;
   if (raw === undefined) return { value: {}, problems: [] };
-  if (!isMapping(raw)) return refusal(path, 'hub.auth', raw, 'expected a mapping holding cacheFor');
+  if (!isMapping(raw)) return refusal(path, key, raw, `expected a mapping holding ${known.join(', ')}`);
 
-  return { value: raw, problems: unknownKeys(path, 'hub.auth', raw, AUTH_KEYS) };
+  return { value: raw, problems: unknownKeys(path, key, raw, known) };
 }
 
 /**
@@ -268,11 +331,15 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     throw new HubConfigError([`${path}: hub is ${describeValue(hub)}, expected a mapping holding hub.repository`]);
   }
 
-  const auth = authSection(path, hub['auth']);
+  const auth = section(path, 'auth', hub['auth'], AUTH_KEYS);
+  const store = section(path, 'store', hub['store'], STORE_KEYS);
+  const index = section(path, 'index', hub['index'], INDEX_KEYS);
   const repository = readRepository(path, hub['repository']);
   const port = readPort(path, hub['port']);
   const storePath = readStorePath(path, hub['storePath']);
   const cacheFor = readCacheFor(path, auth.value?.['cacheFor']);
+  const sqliteLibrary = readSqliteLibrary(path, store.value?.['sqliteLibrary']);
+  const rebuildAfterPush = readRebuildAfterPush(path, index.value?.['rebuildAfterPush']);
 
   const problems = [
     ...unknownKeys(path, 'hub', hub, HUB_KEYS),
@@ -281,6 +348,10 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     ...storePath.problems,
     ...auth.problems,
     ...cacheFor.problems,
+    ...store.problems,
+    ...sqliteLibrary.problems,
+    ...index.problems,
+    ...rebuildAfterPush.problems,
   ];
   if (problems.length > 0) throw new HubConfigError(problems);
 
@@ -289,6 +360,8 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     port: port.value as number,
     storePath: storePath.value as string,
     cacheForMs: cacheFor.value as number | null,
+    sqliteLibrary: sqliteLibrary.value as string | null,
+    rebuildAfterPush: rebuildAfterPush.value as boolean,
   });
 }
 

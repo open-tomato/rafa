@@ -241,7 +241,7 @@ describe('bug-routes over a store an older runtime left', () => {
     expect(before.sessions).toHaveLength(1);
     expect(before.out_of_scope_bugs).toHaveLength(1);
     expect(rowsOf(path, tables)).toEqual(before);
-    expect(tablesOf(path).filter((table) => !tables.includes(table))).toEqual(['bug_routes', 'schema_migrations']);
+    expect(tablesOf(path).filter((table) => !tables.includes(table))).toEqual(['bug_routes', 'reading_supersedes', 'schema_migrations']);
     expect(sessions).toEqual([JSON.parse(OLD_ROW_JSON) as SessionEffortRow]);
   });
 

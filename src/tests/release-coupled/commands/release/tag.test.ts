@@ -206,13 +206,26 @@ interface RecordedSeams {
   readonly calls: string[];
 }
 
-/** Seams over `table`, recording every runner made and every command sent. */
+/** The git command a run reads the top level its steps are placed against with. */
+const TOP_LEVEL_READ = 'rev-parse --show-toplevel';
+
+/**
+ * Seams over `table`, recording every runner made and every command
+ * sent. A table that plants no {@link TOP_LEVEL_READ} answer gets the
+ * root the runner was made for, as git in that root would answer, so
+ * the run's steps read as run from the project root.
+ */
 function recorded(table: GitTable): RecordedSeams {
   const roots: string[] = [];
   const calls: string[] = [];
-  const git: GitRunner = (args) => {
-    calls.push(args.join(' '));
-    return table[args.join(' ')] ?? refused(`the case planted no answer for git ${args.join(' ')}`);
+  const gitIn = (root: string): GitRunner => (args) => {
+    const words = args.join(' ');
+    calls.push(words);
+    const planted = table[words];
+    if (planted !== undefined) return planted;
+    return words === TOP_LEVEL_READ
+      ? said(`${root}\n`)
+      : refused(`the case planted no answer for git ${words}`);
   };
   return {
     roots,
@@ -220,7 +233,7 @@ function recorded(table: GitTable): RecordedSeams {
     seams: {
       git: (root) => {
         roots.push(root);
-        return git;
+        return gitIn(root);
       },
     },
   };
@@ -697,6 +710,23 @@ describe('the dispatched action', () => {
     expect(seams.calls.filter((call) => call.startsWith('tag v'))).toEqual([]);
   });
 
+  it('names the unset pr.base and the checkout holding the branch on a detached HEAD', async () => {
+    const holder = scratch();
+    const porcelain = `worktree ${holder}\nHEAD abc\nbranch refs/heads/main\n\nworktree /side\nHEAD abc\ndetached\n`;
+    const seams = recorded({
+      ...gitTable('HEAD'),
+      'worktree list --porcelain': said(porcelain),
+    });
+
+    const run = await ran(seams.seams, releaseProject());
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('detached HEAD, and a release is tagged on main\nNext:\n  set pr.base in ');
+    expect(run.stderr).toContain(`  cd ${holder} && rafa release tag — main is checked out there\n`
+      + `Usage: ${RELEASE_TAG_USAGE}`);
+    expect(seams.calls.filter((call) => call.startsWith('tag v'))).toEqual([]);
+  });
+
   it('refuses when the tag already exists, and sends no git tag', async () => {
     const seams = recorded(gitTable(DEFAULT_RELEASE_BRANCH, `v0.4.0\n${TAG}\n`));
 
@@ -1005,7 +1035,8 @@ describe('a run over a workspace', () => {
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain(`❌ ${TAG} already names ${VERSION}, so there is nothing to tag\n`
-      + `❌ ${pluginTag} already names ${PLUGIN_VERSION}, so there is nothing to tag\nUsage: ${RELEASE_TAG_USAGE}`);
+      + `❌ ${pluginTag} already names ${PLUGIN_VERSION}, so there is nothing to tag\nNext:\n  rafa release status`);
+    expect(run.stderr).toContain(`\nUsage: ${RELEASE_TAG_USAGE}`);
     expect(writes(seams.calls)).toEqual([]);
   });
 
@@ -1313,5 +1344,35 @@ describe('what the default seams reach', () => {
     expect(tagged.exitCode).toBe(0);
     const listed = gitIn(repo.repo, repo.home, ['tag', '--list']).trim();
     expect(listed.split('\n')).toEqual(['v0.4.0', TAG]);
+  });
+});
+
+describe('a refusal under hints.skills', () => {
+  /** A release project whose `.rafa/config.yaml` holds `text`, every tag already written. */
+  function taggedProject(text: string): PlantedProject {
+    const project = plantProject(scratch(), text);
+    writeFileSync(join(project.root, 'package.json'), MANIFEST, 'utf8');
+    writeFileSync(join(project.root, 'CHANGELOG.md'), CHANGELOG, 'utf8');
+    return project;
+  }
+
+  it('follows the step by its skill line when the project config sets hints.skills: true', async () => {
+    const seams = recorded(gitTable(DEFAULT_RELEASE_BRANCH, `v0.4.0\n${TAG}\n`));
+
+    const run = await ran(seams.seams, taggedProject('hints:\n  skills: true\n'));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('\nNext:\n  rafa release status — ');
+    expect(run.stderr).toContain('\n    skill: rafa-release › tag-tagged\n');
+  });
+
+  it('prints no skill line with the key unset or false', async () => {
+    for (const text of ['', 'hints:\n  skills: false\n']) {
+      const run = await ran(recorded(gitTable(DEFAULT_RELEASE_BRANCH, `v0.4.0\n${TAG}\n`)).seams, taggedProject(text));
+
+      expect(run.exitCode).toBe(1);
+      expect(run.stderr).toContain('\nNext:\n  rafa release status — ');
+      expect(run.stderr).not.toContain('skill:');
+    }
   });
 });

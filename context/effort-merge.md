@@ -17,9 +17,9 @@ between stores and their rows combine; local tables stay on their
 machine and are not combined. The `sessions`, `commits`, `findings`,
 `blockers`, `out_of_scope_bugs`, `changes`, `skill_invocations`,
 `preflight`, `dispatches`, `plan_ci`, `report_absences`, `task_reports`,
-`stale_docs` and `bug_routes` tables are merged. The `schema_migrations`,
-`store_meta`, `store_replaced`, `merges` and `merge_conflicts` tables
-are local.
+`stale_docs`, `bug_routes` and `reading_supersedes` tables are merged.
+The `schema_migrations`, `store_meta`, `store_replaced`, `merges` and
+`merge_conflicts` tables are local.
 
 **A merged table's rule holds:** its identity columns (which match rows
 with NULL origin), the columns that can change after insert (each with
@@ -118,6 +118,13 @@ are recomputed. `recomputeCommitGaps` finds each commit the union
 inserted, the commit right after it in time (ordered by `Date.parse` of
 the timestamp, then by sha within an instant), and rewrites the
 `minutesSincePrevious` gap in the second commit's `row_json`.
+
+**Supersedes of the readings brought in.** Last, before the `merges` row,
+`writeSupersedes` (`store/repository-facts.ts`) runs for the facts of the
+rows the union added to each `REPOSITORY_FACTS` table (`plan_ci`), so two
+readings of one fact count once in the merged store. The rows it writes
+count as rows added to `reading_supersedes`, in that table's line and in
+the totals.
 
 **The merge writes the store through `rebuildAside`, behind a backup.**
 It writes to `effort.sqlite.merge-<stamp>`, brings the file forward

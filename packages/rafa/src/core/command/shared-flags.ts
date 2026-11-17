@@ -7,7 +7,7 @@
  * `loop start`. They belong to four features, and three of them are
  * declared in a declarations file (`packages/rafa-pr/src/commands/pr/declarations.ts`,
  * `packages/rafa-board/src/commands/issue/declarations.ts`), which imports core's entries
- * alone and no module under `src/`. So the flag lives here, where every
+ * and, for issue, its two sibling files, and no module under `src/`. So the flag lives here, where every
  * one of the six can reach it, and each declares this value itself
  * rather than a copy its tests would have to hold equal.
  *

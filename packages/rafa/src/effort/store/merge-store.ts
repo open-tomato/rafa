@@ -66,9 +66,20 @@
  * `merge-conflicts.ts`) settles each matched pair and records in
  * `merge_conflicts` what no rule settles, the commit gaps of each commit
  * brought in and of the commit after it are recomputed
- * (`recomputeCommitGaps`, `merge-commit-gaps.ts`), and one `merges` row
- * records the merge: its id, the other store's id, when, and the rows
- * added, skipped and in conflict over every merged table.
+ * (`recomputeCommitGaps`, `merge-commit-gaps.ts`), the supersedes the
+ * readings brought in call for are written (`writeSupersedes`,
+ * `repository-facts.ts`), and one `merges` row records the merge: its
+ * id, the other store's id, when, and the rows added, skipped and in
+ * conflict over every merged table.
+ *
+ * The supersedes are the last step before that row, for the facts of
+ * the rows the union added to each table of `REPOSITORY_FACTS`, today
+ * `plan_ci`, and never for a fact no added reading reaches. A
+ * supersede the other store brought is one the union added already, so
+ * the writer absorbs it or finds its reading superseded and writes
+ * nothing twice. The rows it writes count as rows added to
+ * `reading_supersedes`, in that table's `added` and in `rowsAdded`, so
+ * the `merges` row and the count check below both hold them.
  *
  * The live store is then attached, and every table both files hold,
  * the log apart, must hold its live row count plus the rows the merge
@@ -113,10 +124,12 @@
  * over both paths, before it reads anything.
  */
 import type { DevelopmentProbe } from './development-build.js';
+import type { TableUnion } from './merge-union.js';
 import type { SqliteMigration } from './migrations.js';
 import type { SchemaUse } from './schema-plan.js';
 import type { ProjectIdentity } from './store-identity.js';
 import type { StoreBackend } from '../../core/config/sections.js';
+import type { SQLQueryBindings } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -134,10 +147,11 @@ import { readOnlySchema, refuseUnusable, tableNames } from './fix-schema.js';
 import { guardTestProcess } from './location.js';
 import { recomputeCommitGaps } from './merge-commit-gaps.js';
 import { settleMatches } from './merge-conflicts.js';
-import { unionStores } from './merge-union.js';
+import { carriedColumns, unionStores } from './merge-union.js';
 import { liveLoop } from './migrate.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
-import { checkedCounts, rebuildAside, RebuildRefusal, refuseCorrupt, refuseInFlight } from './rebuild-aside.js';
+import { checkedCounts, quoted, rebuildAside, RebuildRefusal, refuseCorrupt, refuseInFlight } from './rebuild-aside.js';
+import { readingKey, REPOSITORY_FACTS, writeSupersedes } from './repository-facts.js';
 import { planSchema, sqliteCatalogue } from './schema-plan.js';
 import { readProjectIdentity } from './store-identity.js';
 import { readStoreMeta } from './store-meta.js';
@@ -249,6 +263,9 @@ const LIVE = 'live';
 
 /** The table the merge records itself in, which a development build's refusal names. */
 const MERGES_TABLE = 'merges';
+
+/** The table the supersedes of the readings brought in are written to. */
+const SUPERSEDES_TABLE = 'reading_supersedes';
 
 const INSERT_MERGE = `INSERT INTO merges (id, other_store, merged_at, rows_added, rows_skipped, rows_in_conflict)
   VALUES (?, ?, ?, ?, ?, ?)`;
@@ -394,17 +411,40 @@ function openOther(otherPath: string, plan: SchemaUse, stamp: MergeStamp, tempRo
   }
 }
 
-/** Unions `other` into `db`, settles, recomputes gaps and records the merge, in one transaction. */
+/** The key of each row of `table` the union added, by its local `seq`. */
+function addedKeys(db: Database, { table, added }: TableUnion): string[] {
+  const columns = carriedColumns(db, table).map(quoted)
+    .join(', ');
+  const bySeq = db.query<Readonly<Record<string, SQLQueryBindings>>, [number]>(`SELECT ${columns} FROM ${quoted(table)} WHERE seq = ?`);
+  return added.map((seq) => {
+    const row = bySeq.get(seq);
+    if (row === null) throw new Error(`effort store: the merge added ${table} row ${String(seq)} and cannot read it back`);
+    return readingKey(table, row);
+  });
+}
+
+/** Writes the supersedes the readings the union added call for, answering how many rows it wrote. */
+function writeMergedSupersedes(db: Database, unions: readonly TableUnion[]): number {
+  return unions
+    .filter((union) => Object.hasOwn(REPOSITORY_FACTS, union.table) && union.added.length > 0)
+    .reduce((written, union) => written + writeSupersedes(db, union.table, addedKeys(db, union)), 0);
+}
+
+/** Unions `other` into `db`, settles, recomputes gaps, writes supersedes and records the merge, in one transaction. */
 function mergeInto(db: Database, other: Database, mergeId: string, otherStore: string | null, mergedAt: string): Merged {
   return db.transaction((): Merged => {
     const unions = unionStores(db, other);
     const settlements = settleMatches(db, other, unions, { mergeId, recordedAt: mergedAt });
     const gaps = recomputeCommitGaps(db, unions.find(({ table }) => table === 'commits')?.added ?? []);
+    const supersedes = writeMergedSupersedes(db, unions);
     const tables = unions.map((union, index): TableMerge => {
       const settled = settlements[index];
+      const written = union.table === SUPERSEDES_TABLE
+        ? supersedes
+        : 0;
       return {
         table: union.table,
-        added: union.added.length,
+        added: union.added.length + written,
         skipped: settled?.skipped.length ?? 0,
         inConflict: settled?.conflicts.length ?? 0,
         filled: settled?.filled.length ?? 0,

@@ -317,6 +317,10 @@ const PROJECT_TEXT = [
   '  pr: false',
   '  run: false',
   '  release: false',
+  'collaborate:',
+  '  rafa: open-tomato/rafa',
+  'hints:',
+  '  skills: true',
   '',
 ].join('\n');
 
@@ -452,6 +456,8 @@ const PROJECT_VALUES: RafaConfig = {
   featuresPr: false,
   featuresRun: false,
   featuresRelease: false,
+  collaborateRafa: 'open-tomato/rafa',
+  hintsSkills: true,
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -618,6 +624,10 @@ const USER_TEXT = [
   '  pr: true',
   '  run: true',
   '  release: true',
+  'collaborate:',
+  '  rafa: open-tomato/rafa-user',
+  'hints:',
+  '  skills: false',
   '',
 ].join('\n');
 
@@ -739,6 +749,8 @@ const USER_VALUES: RafaConfig = {
   featuresPr: true,
   featuresRun: true,
   featuresRelease: true,
+  collaborateRafa: 'open-tomato/rafa-user',
+  hintsSkills: false,
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -1387,6 +1399,16 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'features.release', 'features:\n  release: 1',
     'features.release is 1, expected true or false',
     'features:\n  release: false', 'featuresRelease', false,
+  ],
+  [
+    'collaborate.rafa', 'collaborate:\n  rafa: open-tomato/rafa/x',
+    'collaborate.rafa is "open-tomato/rafa/x", expected a repository as owner/name, such as open-tomato/rafa',
+    'collaborate:\n  rafa: open-tomato/rafa', 'collaborateRafa', 'open-tomato/rafa',
+  ],
+  [
+    'hints.skills', 'hints:\n  skills: yes',
+    'hints.skills is "yes", expected true or false',
+    'hints:\n  skills: true', 'hintsSkills', true,
   ],
 ];
 

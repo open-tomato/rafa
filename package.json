@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/rafa",
-  "version": "0.53.0",
+  "version": "0.54.0",
   "description": "Alpha. Runs a plan through the ralph loop: one Claude Code session per task, one commit per task, then a pull request and a CI wait.",
   "private": false,
   "publishConfig": {
@@ -33,7 +33,8 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "addons/atlas/*"
+    "addons/atlas/*",
+    "addons/rafa-d2c"
   ],
   "module": "./dist/index.js",
   "bin": {
@@ -86,6 +87,9 @@
     "./config-schema-features": {
       "types": "./dist/config-schema-features.d.ts"
     },
+    "./config-schema-hints": {
+      "types": "./dist/config-schema-hints.d.ts"
+    },
     "./config-schema-logger": {
       "types": "./dist/config-schema-logger.d.ts"
     },
@@ -94,6 +98,9 @@
     },
     "./config-schema-checks": {
       "types": "./dist/config-schema-checks.d.ts"
+    },
+    "./config-schema-collaborate": {
+      "types": "./dist/config-schema-collaborate.d.ts"
     },
     "./config-schema-hub": {
       "types": "./dist/config-schema-hub.d.ts"
@@ -152,10 +159,10 @@
     "@open-tomato/rafa-release": "workspace:*",
     "@open-tomato/rafa-run": "workspace:*",
     "@open-tomato/typescript-config": "^0.1.0",
-    "@types/bun": "^1.4.0",
-    "@types/node": "^26.4.1",
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.6",
     "eslint": "^9.39.4",
-    "turbo": "^2.11.8",
+    "turbo": "^2.11.10",
     "typescript": "^5.9.3"
   }
 }

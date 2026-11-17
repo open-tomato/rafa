@@ -13,11 +13,22 @@
  * finds the scratch parent empty afterwards, and the success cases find
  * it holding the one directory, so an emptiness check that could not
  * see a directory would fail there.
+ *
+ * The last block holds `wire-contract.lock.json` against this build: each
+ * shipped entry matches its pinned sha256, the highest version is
+ * `WIRE_CONTRACT_VERSION` and its `wireVersion` is `WIRE_VERSION`, and each
+ * entry's migration ids are a prefix of the `SQLITE_MIGRATIONS` ids and its
+ * tables are tables of `row-fields.lock.json`. A table's value is the sha256
+ * of its sorted row fields joined by newlines, as that lock held them when
+ * the entry shipped. Its refusals run over in-memory fixture locks, never an
+ * edited copy of the real one, and each expects its one fault alone, beside
+ * a control fixture that holds.
  */
 import type { MergeOptions } from './merge-store.js';
 import type { MaterialiseOptions, WirePayload, WireRow } from './wire.js';
 import type { RuntimeIdentity } from '../../core/runtime/index.js';
 
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -29,11 +40,14 @@ import { bringForward } from './bring-forward.js';
 import { MERGE_RULES } from './merge-rules.js';
 import { mergeStore } from './merge-store.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
+import ROW_FIELDS_LOCK from './row-fields.lock.json';
+import WIRE_CONTRACT_LOCK from './wire-contract.lock.json';
 import {
   decodeWirePayload,
   encodeWirePayload,
   exportWirePayload,
   materialiseWirePayload,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
   WireExportRefusal,
@@ -433,3 +447,211 @@ describe('materialiseWirePayload', () => {
 function rowsOfSender(table: string): readonly WireRow[] {
   return rowsOf(exportWirePayload({ path: plantStore('sender-rows', plantSender) }), table);
 }
+
+/**
+ * The sha256 of each shipped entry of `wire-contract.lock.json`, by
+ * contract version, over the entry's JSON text as `JSON.stringify` writes
+ * it. A shipped entry is never edited; a new contract version adds its
+ * entry and its line here in one commit.
+ */
+const SHIPPED_CONTRACT_ENTRIES: Readonly<Record<string, string>> = {
+  '1': '18b61381d6b33bc40199461e4d7f6bcb99ab50f6b8cf34b6b4c701625524c1a2',
+};
+
+/** What a lock is checked against: its pins, and the numbers, ids and row-field tables of a build. */
+interface ContractSources {
+  readonly pins: Readonly<Record<string, string>>;
+  readonly contractVersion: number;
+  readonly wireVersion: number;
+  readonly migrationIds: readonly string[];
+  readonly rowFieldTables: readonly string[];
+}
+
+/** One lock entry, its shape checked. */
+interface ContractEntry {
+  readonly wireVersion: number;
+  readonly migrations: readonly string[];
+  readonly tables: Readonly<Record<string, string>>;
+}
+
+/** This build's sources, the real lock's pins among them. */
+const BUILD_SOURCES: ContractSources = {
+  pins: SHIPPED_CONTRACT_ENTRIES,
+  contractVersion: WIRE_CONTRACT_VERSION,
+  wireVersion: WIRE_VERSION,
+  migrationIds: ALL_IDS,
+  rowFieldTables: Object.keys(ROW_FIELDS_LOCK),
+};
+
+/** The sha256 of `value`'s JSON text, as lowercase hex. */
+function sha256OfJson(value: unknown): string {
+  return createHash('sha256')
+    .update(JSON.stringify(value), 'utf8')
+    .digest('hex');
+}
+
+/** Whether `value` is a lowercase sha256 hex digest. */
+function isDigest(value: unknown): boolean {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}
+
+/** Whether `value` is a list of strings. */
+function isStringList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+/** `value` as an entry, or the fault its shape holds. */
+function readEntry(version: string, value: unknown): ContractEntry | string {
+  if (!isPlainObject(value)) return `version ${version}: entry is not an object`;
+  const { wireVersion, migrations, tables } = value;
+  if (typeof wireVersion !== 'number' || !Number.isSafeInteger(wireVersion) || wireVersion < 1) {
+    return `version ${version}: wireVersion is ${JSON.stringify(wireVersion)}, expected a whole number of 1 or more`;
+  }
+  if (!isStringList(migrations)) return `version ${version}: migrations is not a list of ids`;
+  if (!isPlainObject(tables) || !Object.values(tables).every(isDigest)) {
+    return `version ${version}: tables is not a sha256 per table`;
+  }
+  return { wireVersion, migrations, tables: tables as Readonly<Record<string, string>> };
+}
+
+/** Whether `value` is a plain JSON object. */
+function isPlainObject(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Each entry against its pin, and each pin against an entry. */
+function pinFaults(lock: Readonly<Record<string, unknown>>, pins: Readonly<Record<string, string>>): string[] {
+  const entryFaults = Object.entries(lock).flatMap(([version, entry]) => {
+    const pin = pins[version];
+    const computed = sha256OfJson(entry);
+    if (pin === undefined) return [`version ${version}: no pinned sha256, entry hashes to ${computed}`];
+    return pin === computed
+      ? []
+      : [`version ${version}: entry hashes to ${computed}, pinned as ${pin}`];
+  });
+  const orphanFaults = Object.keys(pins)
+    .filter((version) => !(version in lock))
+    .map((version) => `version ${version}: pinned, but not in the lock`);
+  return [...entryFaults, ...orphanFaults];
+}
+
+/** One entry's cut against the build: its migration ids a prefix of the catalogue, its tables row-field tables. */
+function cutFaults(version: string, entry: ContractEntry, sources: ContractSources): string[] {
+  const apart = entry.migrations.findIndex((id, index) => sources.migrationIds[index] !== id);
+  const migrationFaults = apart === -1
+    ? []
+    : [`version ${version}: migrations are no prefix of SQLITE_MIGRATIONS, apart at ${JSON.stringify(entry.migrations[apart])}`];
+  const tableFaults = Object.keys(entry.tables)
+    .filter((table) => !sources.rowFieldTables.includes(table))
+    .map((table) => `version ${version}: table ${JSON.stringify(table)} is not in row-fields.lock.json`);
+  return [...migrationFaults, ...tableFaults];
+}
+
+/** The highest version against the build's contract and payload versions. */
+function highestFaults(versions: readonly string[], entries: ReadonlyMap<string, ContractEntry>, sources: ContractSources): string[] {
+  const highest = Math.max(...versions.map(Number));
+  const entry = entries.get(String(highest));
+  const versionFaults = highest === sources.contractVersion
+    ? []
+    : [`highest version is ${String(highest)}, WIRE_CONTRACT_VERSION is ${String(sources.contractVersion)}`];
+  const wireFaults = entry === undefined || entry.wireVersion === sources.wireVersion
+    ? []
+    : [`version ${String(highest)}: wireVersion is ${String(entry.wireVersion)}, WIRE_VERSION is ${String(sources.wireVersion)}`];
+  return [...versionFaults, ...wireFaults];
+}
+
+/**
+ * Every way `lock` disagrees with `sources`: a version that is no whole
+ * number, an entry of the wrong shape, an entry its pin does not match,
+ * a cut past the build, and a highest version apart from the build's. An
+ * empty answer means the lock holds.
+ */
+function contractLockFaults(lock: unknown, sources: ContractSources): string[] {
+  if (!isPlainObject(lock)) return ['lock: not an object'];
+  const versions = Object.keys(lock);
+  if (versions.length === 0) return ['lock: holds no version'];
+  const badVersions = versions
+    .filter((version) => !/^[1-9][0-9]*$/.test(version))
+    .map((version) => `version ${JSON.stringify(version)} is no whole number of 1 or more`);
+  if (badVersions.length > 0) return badVersions;
+  const read = versions.map((version): [string, ContractEntry | string] => [version, readEntry(version, lock[version])]);
+  const shapeFaults = read.map(([, entry]) => entry).filter((entry) => typeof entry === 'string');
+  const entries = new Map(read.filter((pair): pair is [string, ContractEntry] => typeof pair[1] !== 'string'));
+  const cuts = [...entries].flatMap(([version, entry]) => cutFaults(version, entry, sources));
+  return [...shapeFaults, ...pinFaults(lock, sources.pins), ...cuts, ...highestFaults(versions, entries, sources)];
+}
+
+/** A digest standing for one table's fields in the fixtures. */
+const FIXTURE_DIGEST = 'a'.repeat(64);
+
+/** A fixture build: three migrations and two row-field tables, at contract 2 and payload version 3. */
+const FIXTURE_BUILD = {
+  contractVersion: 2,
+  wireVersion: 3,
+  migrationIds: ['first', 'second', 'third'],
+  rowFieldTables: ['sessions', 'commits'],
+} as const;
+
+/** A lock that holds against {@link FIXTURE_BUILD}: two versions, the older at fewer migrations. */
+const FIXTURE_LOCK: Readonly<Record<string, unknown>> = {
+  '1': { wireVersion: 1, migrations: ['first'], tables: { sessions: FIXTURE_DIGEST } },
+  '2': { wireVersion: 3, migrations: ['first', 'second'], tables: { sessions: FIXTURE_DIGEST, commits: FIXTURE_DIGEST } },
+};
+
+/** The pins of every entry of `lock`, as shipping it would write them. */
+function pinsOf(lock: Readonly<Record<string, unknown>>): Readonly<Record<string, string>> {
+  return Object.fromEntries(Object.entries(lock).map(([version, entry]) => [version, sha256OfJson(entry)]));
+}
+
+/** {@link FIXTURE_LOCK} with version 2's entry laid over by `change`. */
+function fixtureWith(change: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return { ...FIXTURE_LOCK, '2': { ...(FIXTURE_LOCK['2'] as Readonly<Record<string, unknown>>), ...change } };
+}
+
+/** The fixture build's sources over `lock`, its pins those of `lock`, with `change` laid over them. */
+function fixtureSources(lock: Readonly<Record<string, unknown>>, change: Partial<ContractSources> = {}): ContractSources {
+  return { ...FIXTURE_BUILD, pins: pinsOf(lock), ...change };
+}
+
+describe('the wire contract lock', () => {
+  const edited = { ...FIXTURE_LOCK, '1': { wireVersion: 1, migrations: ['first'], tables: { sessions: 'b'.repeat(64) } } };
+
+  it.each<[string, unknown, ContractSources, string]>([
+    ['a lock that is not an object', [], fixtureSources(FIXTURE_LOCK), 'lock: not an object'],
+    ['a lock with no version', {}, fixtureSources({}), 'lock: holds no version'],
+    ['a version that is no whole number', { ...FIXTURE_LOCK, v3: {} }, fixtureSources(FIXTURE_LOCK), 'version "v3" is no whole number of 1 or more'],
+    ['an entry with no wireVersion', fixtureWith({ wireVersion: undefined }), fixtureSources(fixtureWith({ wireVersion: undefined })), 'version 2: wireVersion is undefined, expected a whole number of 1 or more'],
+    ['an entry whose table holds no sha256', fixtureWith({ tables: { sessions: 'abc' } }), fixtureSources(fixtureWith({ tables: { sessions: 'abc' } })), 'version 2: tables is not a sha256 per table'],
+    ['a shipped entry edited', edited, fixtureSources(FIXTURE_LOCK), `version 1: entry hashes to ${sha256OfJson(edited['1'])}, pinned as ${pinsOf(FIXTURE_LOCK)['1'] ?? ''}`],
+    ['an entry with no pin', FIXTURE_LOCK, fixtureSources(FIXTURE_LOCK, { pins: { '1': pinsOf(FIXTURE_LOCK)['1'] ?? '' } }), `version 2: no pinned sha256, entry hashes to ${pinsOf(FIXTURE_LOCK)['2'] ?? ''}`],
+    ['a pin with no entry', FIXTURE_LOCK, fixtureSources(FIXTURE_LOCK, { pins: { ...pinsOf(FIXTURE_LOCK), '3': FIXTURE_DIGEST } }), 'version 3: pinned, but not in the lock'],
+    ['a highest version past WIRE_CONTRACT_VERSION', FIXTURE_LOCK, fixtureSources(FIXTURE_LOCK, { contractVersion: 1 }), 'highest version is 2, WIRE_CONTRACT_VERSION is 1'],
+    ['a highest version short of WIRE_CONTRACT_VERSION', FIXTURE_LOCK, fixtureSources(FIXTURE_LOCK, { contractVersion: 3 }), 'highest version is 2, WIRE_CONTRACT_VERSION is 3'],
+    ['a highest version whose wireVersion is not WIRE_VERSION', FIXTURE_LOCK, fixtureSources(FIXTURE_LOCK, { wireVersion: 4 }), 'version 2: wireVersion is 3, WIRE_VERSION is 4'],
+    ['migration ids out of catalogue order', fixtureWith({ migrations: ['first', 'third'] }), fixtureSources(fixtureWith({ migrations: ['first', 'third'] })), 'version 2: migrations are no prefix of SQLITE_MIGRATIONS, apart at "third"'],
+    ['migration ids past the catalogue', fixtureWith({ migrations: ['first', 'second', 'third', 'fourth'] }), fixtureSources(fixtureWith({ migrations: ['first', 'second', 'third', 'fourth'] })), 'version 2: migrations are no prefix of SQLITE_MIGRATIONS, apart at "fourth"'],
+    ['a cut table not in row-fields.lock.json', fixtureWith({ tables: { sessions: FIXTURE_DIGEST, findings: FIXTURE_DIGEST } }), fixtureSources(fixtureWith({ tables: { sessions: FIXTURE_DIGEST, findings: FIXTURE_DIGEST } })), 'version 2: table "findings" is not in row-fields.lock.json'],
+  ])('refuses %s, naming that one fault', (_label, lock, sources, fault) => {
+    expect(contractLockFaults(lock, sources)).toEqual([fault]);
+  });
+
+  it('holds the fixture lock the refusals start from, the control for them', () => {
+    expect(contractLockFaults(FIXTURE_LOCK, fixtureSources(FIXTURE_LOCK))).toEqual([]);
+  });
+
+  it('takes the highest version by number, 10 over 9', () => {
+    const lock = { '9': FIXTURE_LOCK['1'], '10': FIXTURE_LOCK['2'] };
+
+    expect(contractLockFaults(lock, fixtureSources(lock, { contractVersion: 10 }))).toEqual([]);
+    expect(contractLockFaults(lock, fixtureSources(lock, { contractVersion: 9 }))).toEqual(['highest version is 10, WIRE_CONTRACT_VERSION is 9']);
+  });
+
+  it('holds the shipped lock against this build', () => {
+    expect(contractLockFaults(WIRE_CONTRACT_LOCK, BUILD_SOURCES)).toEqual([]);
+  });
+
+  it('pins every shipped entry, version 1 among them', () => {
+    expect(Object.keys(WIRE_CONTRACT_LOCK)).toEqual(Object.keys(SHIPPED_CONTRACT_ENTRIES));
+    expect(Object.keys(WIRE_CONTRACT_LOCK)).toContain('1');
+  });
+});

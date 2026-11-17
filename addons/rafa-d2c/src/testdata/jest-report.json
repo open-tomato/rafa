@@ -1,0 +1,16 @@
+{
+  "success": false,
+  "snapshot": { "added": 0, "matched": 2, "unmatched": 1, "updated": 0, "total": 3, "filesAdded": 0, "filesUpdated": 0 },
+  "testResults": [
+    {
+      "name": "atoms.test",
+      "status": "failed",
+      "assertionResults": [
+        { "ancestorTitles": ["Atoms/Avatar", "Away"], "title": "smoke-test", "status": "passed" },
+        { "ancestorTitles": ["Atoms/Badge", "Default"], "title": "smoke-test", "status": "failed" },
+        { "ancestorTitles": ["Atoms/Badge", "Draft"], "title": "smoke-test", "status": "pending" },
+        { "ancestorTitles": ["Atoms/Gone", "Default"], "title": "smoke-test", "status": "passed" }
+      ]
+    }
+  ]
+}

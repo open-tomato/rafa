@@ -10,6 +10,7 @@
 import type { BaseRunAnswer } from './base-run.js';
 import type { KindCheckEntry, KindCheckInput, NamedTestReadings } from './own-check.js';
 import type { PlanFilesReading } from './plan-commits.js';
+import type { KeptCapture } from './runner-evidence.js';
 import type { BugKind } from '@open-tomato/rafa/report/parse';
 
 import { describe, expect, it } from 'bun:test';
@@ -26,8 +27,11 @@ const GREEN: BaseRunAnswer = { answer: 'green' };
 const RED: BaseRunAnswer = { answer: 'red' };
 const UNRUNNABLE: BaseRunAnswer = { answer: 'unrunnable', problem: 'src/a.test.ts does not exist at 0123456789ab.' };
 
+/** The added lines and commits of a plan files reading, empty: no file row reads them. */
+const NO_ADDED = { added: [], addedProblem: null, commits: [], commitsProblem: null } as const;
+
 /** The plan's files every file row reads, unless it names others. */
-const PLAN_FILES: PlanFilesReading = { ok: true, files: ['src/edited.ts', 'src/a.test.ts', 'docs/guide.md'] };
+const PLAN_FILES: PlanFilesReading = { ok: true, files: ['src/edited.ts', 'src/a.test.ts', 'docs/guide.md'], ...NO_ADDED };
 
 /** An entry said to be `kind`, with `what` and `artifact`. */
 function entry(kind: BugKind, what: string, artifact: string | null = null): KindCheckEntry {
@@ -53,6 +57,8 @@ describe('checkKind: an own- claim the head does not confirm', () => {
       inherited: false,
       row: 'head-not-red',
       reason: `The case ${CASE_NAME} is not red on the head, so it reads as a bug. It was green.`,
+      symbol: null,
+      capture: null,
     });
   });
 
@@ -79,6 +85,8 @@ describe('checkKind: a path outside the plan\'s commits', () => {
       inherited: false,
       row: 'file-outside-plan',
       reason: 'src/neighbour.ts is not one of the plan\'s files, so it reads as a bug.',
+      symbol: null,
+      capture: null,
     });
   });
 
@@ -95,6 +103,331 @@ describe('checkKind: a path outside the plan\'s commits', () => {
   });
 });
 
+/** The plan's files the path-shape cases read: a nested source file, a `.tsx` and a `.mts`. */
+const SHAPE_FILES: PlanFilesReading = {
+  ok: true,
+  files: ['packages/rafa-pr/src/triage/base-run.ts', 'src/view/panel.tsx', 'src/build/emit.mts'],
+  ...NO_ADDED,
+};
+
+describe('checkKind: path shapes that name no plan file', () => {
+  it('does not read a neighbour\'s folder as a plan file: a bug claim naming one stays a bug', () => {
+    const checked = checkKind(input(entry('bug', 'packages/rafa-effort drops a row'), null, SHAPE_FILES));
+
+    expect([checked.kind, checked.row]).toEqual(['bug', 'nothing-named']);
+  });
+
+  it('names the neighbour\'s file, not its folder, when both are named', () => {
+    const what = 'packages/rafa-effort breaks packages/rafa-effort/src/store.ts';
+    const checked = checkKind(input(entry('own-gap', what), null, SHAPE_FILES));
+
+    expect(checked.reason).toBe('packages/rafa-effort/src/store.ts is not one of the plan\'s files, so it reads as a bug.');
+  });
+
+  it('reads a .js specifier of a file outside the plan as a bug', () => {
+    for (const what of ['imports ../neighbour.js', 'imports ./triage/neighbour.js', 'imports neighbour.js']) {
+      const checked = checkKind(input(entry('own-gap', what), null, SHAPE_FILES));
+
+      expect([what, checked.kind, checked.row]).toEqual([what, 'bug', 'file-outside-plan']);
+    }
+  });
+
+  it('matches a relative specifier only at a segment boundary', () => {
+    expect(checkKind(input(entry('own-gap', 'imports ./un-base-run.js'), null, SHAPE_FILES)).kind).toBe('bug');
+  });
+
+  it('does not read a plain path as a suffix: only a relative one', () => {
+    expect(checkKind(input(entry('own-gap', 'triage/base-run.ts drops a line'), null, SHAPE_FILES)).kind).toBe('bug');
+  });
+
+  it('does not read a .ts specifier as a .js file of the plan', () => {
+    const plan: PlanFilesReading = { ok: true, files: ['src/emitted.js'], ...NO_ADDED };
+
+    expect(checkKind(input(entry('own-gap', 'imports ./emitted.ts'), null, plan)).kind).toBe('bug');
+  });
+});
+
+describe('checkKind: path shapes that name a plan file', () => {
+  it('takes a folder named beside a plan file out of the file rows: the folder control', () => {
+    const checked = checkKind(input(entry('bug', 'packages/rafa-effort calls ../base-run.js'), null, SHAPE_FILES));
+
+    expect([checked.kind, checked.row]).toEqual(['own-gap', 'plan-files']);
+  });
+
+  it('reads a .js, .jsx or .mjs specifier as the plan\'s .ts, .tsx or .mts file', () => {
+    const texts = [
+      'imports ../base-run.js',
+      'imports ./src/triage/base-run.js',
+      'imports ../../view/panel.jsx',
+      'imports ./emit.mjs',
+      'base-run.js drops a line',
+      'packages/rafa-pr/src/triage/base-run.js drops a line',
+    ];
+    for (const what of texts) {
+      const checked = checkKind(input(entry('bug', what), null, SHAPE_FILES));
+
+      expect([what, checked.kind]).toEqual([what, 'own-gap']);
+    }
+  });
+
+  it('still reads a .js file of the plan as written', () => {
+    const plan: PlanFilesReading = { ok: true, files: ['scripts/build.js'], ...NO_ADDED };
+
+    expect(checkKind(input(entry('bug', 'imports ../build.js'), null, plan)).kind).toBe('own-gap');
+  });
+});
+
+/** The lines a plan added, as `readPlanFiles` reads them: what the symbol cases look for. */
+const ADDED_LINES: readonly string[] = [
+  'export function readPlanFiles(git: GitRunner, planBase: string): PlanFilesReading {',
+  'const TakenByRow = \'taken\';',
+  'Repair the red step (the kept capture) once.',
+  '  run: true,',
+  'closes #1384 in the board\'s run',
+];
+
+/** The plan's files with {@link ADDED_LINES} as its added lines, `src/neighbour.ts` not among its files. */
+const SYMBOL_FILES: PlanFilesReading = { ...PLAN_FILES, added: ADDED_LINES };
+
+/** The answer of the file row for an entry naming `src/neighbour.ts` and no symbol the plan added. */
+const OUTSIDE = {
+  kind: 'bug',
+  inherited: false,
+  row: 'file-outside-plan',
+  reason: 'src/neighbour.ts is not one of the plan\'s files, so it reads as a bug.',
+  symbol: null,
+  capture: null,
+} as const;
+
+/** What `checkKind` answers for an own-gap claim of `what` and `artifact` over `planFiles`. */
+function symbolCheck(what: string, artifact: string | null = null, planFiles = SYMBOL_FILES): ReturnType<typeof checkKind> {
+  return checkKind(input(entry('own-gap', what, artifact), null, planFiles));
+}
+
+describe('checkKind: a symbol the plan did not add', () => {
+  it('reads an entry outside the plan whose symbol no added line holds as a bug', () => {
+    expect(symbolCheck('src/neighbour.ts never calls `readBoardRows`')).toEqual(OUTSIDE);
+  });
+
+  it('reads the entry as a bug when the added lines were not read, as before the row', () => {
+    const unread: PlanFilesReading = { ...PLAN_FILES, added: null, addedProblem: 'Could not read the lines added.' };
+
+    expect(symbolCheck('src/neighbour.ts never calls readPlanFiles', null, unread)).toEqual(OUTSIDE);
+  });
+
+  it('skips the row for an entry naming a test file, the plan\'s symbol named', () => {
+    const texts: readonly (readonly [string, string | null])[] = [
+      ['src/neighbour.ts fails at base: readPlanFiles answers no TakenBy', 'src/neighbour.test.ts:12'],
+      ['src/neighbour.test.ts asserts readPlanFiles on src/neighbour.ts', null],
+    ];
+    for (const [what, artifact] of texts) {
+      expect([what, symbolCheck(what, artifact).row]).toEqual([what, 'file-outside-plan']);
+    }
+  });
+
+  it('keeps a generic name shorter than the minimum out: `run` stays a bug', () => {
+    expect(symbolCheck('src/neighbour.ts sets `run` wrong')).toEqual(OUTSIDE);
+  });
+
+  it('reads no possessive as a quote: "run\'s, board\'s" stays a bug', () => {
+    expect(symbolCheck('src/neighbour.ts drops the run\'s, board\'s rows')).toEqual(OUTSIDE);
+  });
+
+  it('reads no #<n> ref as a symbol', () => {
+    expect(symbolCheck('src/neighbour.ts misses `#1384`, see (#1384)')).toEqual(OUTSIDE);
+  });
+
+  it('matches a name only at identifier boundaries: TakenBy is not TakenByRow', () => {
+    expect(symbolCheck('src/neighbour.ts reads TakenBy')).toEqual(OUTSIDE);
+  });
+
+  it('matches a span literally, its dot no wildcard', () => {
+    const plan: PlanFilesReading = { ...PLAN_FILES, added: ['loopXretries: 2'] };
+
+    expect(symbolCheck('src/neighbour.ts reads `loop.retries`', null, plan)).toEqual(OUTSIDE);
+  });
+
+  it('runs only after file-outside-plan: a plan file or no path named keeps its row', () => {
+    expect(checkKind(input(entry('bug', 'src/edited.ts misses readPlanFiles'), null, SYMBOL_FILES))).toEqual({
+      kind: 'own-gap',
+      inherited: false,
+      row: 'plan-files',
+      reason: 'Every path the entry names is one of the plan\'s files.',
+      symbol: null,
+      capture: null,
+    });
+    expect(symbolCheck('readPlanFiles misses a case').row).toBe('nothing-named');
+  });
+
+  it('never runs on an entry naming a test case', () => {
+    const named = entry('own-gap', 'readPlanFiles in src/neighbour.ts', CASE_LINE);
+
+    expect(checkKind(input(named, { base: RED, head: RED }, SYMBOL_FILES)).row).toBe('red-on-both');
+  });
+});
+
+describe('checkKind: a symbol the plan added, its path outside the plan', () => {
+  it('reads the entry as own-gap, carrying the symbol', () => {
+    expect(symbolCheck('src/neighbour.ts never calls readPlanFiles')).toEqual({
+      kind: 'own-gap',
+      inherited: false,
+      row: 'plan-symbol',
+      reason: 'src/neighbour.ts is not one of the plan\'s files, but the plan\'s commits added readPlanFiles, so it reads as own-gap.',
+      symbol: 'readPlanFiles',
+      capture: null,
+    });
+  });
+
+  it('reads a bug the session called one as own-gap too', () => {
+    const checked = checkKind(input(entry('bug', 'src/neighbour.ts never calls readPlanFiles'), null, SYMBOL_FILES));
+
+    expect([checked.kind, checked.row]).toEqual(['own-gap', 'plan-symbol']);
+  });
+
+  it('matches a backticked span, a CONST_CASE name, a phrase and a name in the artifact', () => {
+    const plan: PlanFilesReading = { ...PLAN_FILES, added: ['const MIN_SYMBOL_LENGTH = 6;', ...ADDED_LINES] };
+    const cases: readonly (readonly [string, string | null, string])[] = [
+      ['src/neighbour.ts never reads `TakenByRow`', null, 'TakenByRow'],
+      ['src/neighbour.ts keeps its own MIN_SYMBOL_LENGTH', null, 'MIN_SYMBOL_LENGTH'],
+      ['src/neighbour.ts skips (the kept capture)', null, 'the kept capture'],
+      ['src/neighbour.ts drops a line', 'TypeError: readPlanFiles is not a function', 'readPlanFiles'],
+    ];
+    for (const [what, artifact, symbol] of cases) {
+      const checked = symbolCheck(what, artifact, plan);
+
+      expect([what, checked.row, checked.symbol]).toEqual([what, 'plan-symbol', symbol]);
+    }
+  });
+
+  it('carries the first symbol the entry names that the plan added', () => {
+    const checked = symbolCheck('src/neighbour.ts: readBoardRows calls TakenByRow, then readPlanFiles');
+
+    expect(checked.symbol).toBe('TakenByRow');
+  });
+
+  it('matches the name TakenBy once an added line holds it whole: the boundary control', () => {
+    const plan: PlanFilesReading = { ...PLAN_FILES, added: ['type TakenBy = string;'] };
+
+    expect(symbolCheck('src/neighbour.ts reads TakenBy', null, plan).symbol).toBe('TakenBy');
+  });
+
+  it('runs the row once the test file is gone from the entry: the test-file control', () => {
+    expect(symbolCheck('src/neighbour.ts fails at base: readPlanFiles answers no TakenBy').row).toBe('plan-symbol');
+  });
+});
+
+/** The commit of an earlier task of the plan, where a red step kept its capture. */
+const CAPTURE_SHA = 'b2c3d4e5f60718293a4b5c6d7e8f9012345678a1';
+
+/** A red task step's capture kept at {@link CAPTURE_SHA}, holding `cases`. */
+function captureOf(cases: readonly string[]): KeptCapture {
+  return {
+    file: `/repo/.rafa/runs/session-1/suite/task.${CAPTURE_SHA}.red.output.txt`,
+    step: 'task',
+    sha: CAPTURE_SHA,
+    cases,
+  };
+}
+
+/** A capture holding {@link CASE_NAME} beside another case. */
+const HOLDING = captureOf(['outer > other', CASE_NAME]);
+
+/** What `checkKind` reads with `captures` kept. */
+function captured(checked: KindCheckEntry, readings: NamedTestReadings | null, captures: readonly KeptCapture[]): KindCheckInput {
+  return { ...input(checked, readings), captures };
+}
+
+describe('checkKind: a kept capture that does not answer', () => {
+  it('leaves a case green on the head a bug when no capture holds it', () => {
+    const checked = checkKind(captured(testEntry('own-fallout'), { base: GREEN, head: GREEN }, [captureOf(['outer > other'])]));
+
+    expect([checked.kind, checked.row, checked.capture]).toEqual(['bug', 'head-not-red', null]);
+  });
+
+  it('leaves the table as before with the captures left out or none kept', () => {
+    expect(checkKind(input(testEntry('own-fallout'), { base: GREEN, head: GREEN })).row).toBe('head-not-red');
+    expect(checkKind(captured(testEntry('own-fallout'), null, [])).row).toBe('base-unrunnable');
+  });
+
+  it('never answers in place of red-on-both: a case red on the base stays inherited', () => {
+    const checked = checkKind(captured(testEntry('own-fallout'), { base: RED, head: RED }, [HOLDING]));
+
+    expect(checked).toEqual({
+      kind: 'bug',
+      inherited: true,
+      row: 'red-on-both',
+      reason: `The case ${CASE_NAME} is red on the plan's base and its head, so the plan inherited it.`,
+      symbol: null,
+      capture: null,
+    });
+  });
+
+  it('matches the case name whole: a capture holding a longer name answers nothing', () => {
+    const checked = checkKind(captured(testEntry('own-fallout'), { base: GREEN, head: GREEN }, [captureOf([`${CASE_NAME} twice`])]));
+
+    expect(checked.row).toBe('head-not-red');
+  });
+
+  it('reads no capture for an entry naming no case: the file rows answer', () => {
+    const named = entry('own-gap', 'src/neighbour.ts drops outer > fails');
+
+    expect(checkKind(captured(named, null, [HOLDING])).row).toBe('file-outside-plan');
+  });
+
+  it('takes a docs, convention or machine entry as said, its case in a capture', () => {
+    for (const said of ['docs', 'convention', 'machine'] as const) {
+      const checked = checkKind(captured(testEntry(said), { base: GREEN, head: GREEN }, [HOLDING]));
+
+      expect([said, checked.kind, checked.row]).toEqual([said, said, 'as-said']);
+    }
+  });
+});
+
+describe('checkKind: a case a kept capture holds', () => {
+  it('reads a case a green rerun turned green on the head as own-fallout, carrying the capture', () => {
+    const checked = checkKind(captured(testEntry('own-fallout'), { base: GREEN, head: GREEN }, [HOLDING]));
+
+    expect(checked).toEqual({
+      kind: 'own-fallout',
+      inherited: false,
+      row: 'step-capture',
+      reason: `The case ${CASE_NAME} is red in the task step's capture kept at commit b2c3d4e5f607, so it reads as own-fallout.`,
+      symbol: null,
+      capture: HOLDING,
+    });
+  });
+
+  it('reads a bug the session called one as own-fallout too', () => {
+    const checked = checkKind(captured(testEntry('bug'), { base: GREEN, head: GREEN }, [HOLDING]));
+
+    expect([checked.kind, checked.row]).toEqual(['own-fallout', 'step-capture']);
+  });
+
+  it('answers in place of base-unrunnable: no readings, an unrunnable base, a case with no file', () => {
+    const noFile = entry('own-fallout', 'a test went red', `(fail) ${CASE_NAME} [0.19ms]`);
+    const inputs: readonly KindCheckInput[] = [
+      captured(testEntry('own-fallout'), null, [HOLDING]),
+      captured(testEntry('own-fallout'), { base: UNRUNNABLE, head: RED }, [HOLDING]),
+      captured(noFile, null, [HOLDING]),
+    ];
+    for (const one of inputs) {
+      expect(checkKind(one)).toMatchObject({ kind: 'own-fallout', row: 'step-capture', capture: HOLDING });
+    }
+  });
+
+  it('carries the first capture holding the case', () => {
+    const later = { ...captureOf([CASE_NAME]), step: 'stage' };
+
+    expect(checkKind(captured(testEntry('own-fallout'), null, [captureOf(['outer > other']), later, HOLDING])).capture).toBe(later);
+  });
+
+  it('keeps the fallout row for a case green on the base and red on the head, carrying the capture', () => {
+    const checked = checkKind(captured(testEntry('own-fallout'), { base: GREEN, head: RED }, [HOLDING]));
+
+    expect([checked.kind, checked.row, checked.capture]).toEqual(['own-fallout', 'fallout', HOLDING]);
+  });
+});
+
 describe('checkKind: a case that cannot be run on the base', () => {
   it('reads a case red on the head and unrunnable on the base as a bug, naming the problem', () => {
     const checked = checkKind(input(testEntry('own-fallout'), { base: UNRUNNABLE, head: RED }));
@@ -104,6 +437,8 @@ describe('checkKind: a case that cannot be run on the base', () => {
       inherited: false,
       row: 'base-unrunnable',
       reason: `The case ${CASE_NAME} could not be run on the plan's base, so it reads as a bug. ${UNRUNNABLE.problem}`,
+      symbol: null,
+      capture: null,
     });
   });
 
@@ -139,6 +474,8 @@ describe('checkKind: a case red on the base and the head', () => {
         inherited: true,
         row: 'red-on-both',
         reason: `The case ${CASE_NAME} is red on the plan's base and its head, so the plan inherited it.`,
+        symbol: null,
+        capture: null,
       }]);
     }
   });
@@ -154,6 +491,8 @@ describe('checkKind: a case green on the base and red on the head', () => {
         inherited: false,
         row: 'fallout',
         reason: `The case ${CASE_NAME} is green on the plan's base and red on its head.`,
+        symbol: null,
+        capture: null,
       }]);
     }
   });
@@ -175,6 +514,8 @@ describe('checkKind: the plan\'s files not read', () => {
       inherited: false,
       row: 'files-unread',
       reason: 'The plan\'s files were not read, so it reads as a bug. Could not list the files changed between abc and HEAD.',
+      symbol: null,
+      capture: null,
     });
   });
 });
@@ -188,6 +529,8 @@ describe('checkKind: every path named one of the plan\'s files', () => {
       inherited: false,
       row: 'plan-files',
       reason: 'Every path the entry names is one of the plan\'s files.',
+      symbol: null,
+      capture: null,
     });
   });
 
@@ -233,6 +576,8 @@ describe('checkKind: neither a test case nor a path named', () => {
         inherited: false,
         row: 'nothing-named',
         reason: 'The entry names no test case and no path, so it is taken as said.',
+        symbol: null,
+        capture: null,
       }]);
     }
   });
@@ -248,6 +593,8 @@ describe('checkKind: a kind the check does not read', () => {
         inherited: false,
         row: 'as-said',
         reason: `The kind ${said} is not checked, so it is taken as said.`,
+        symbol: null,
+        capture: null,
       }]);
     }
   });

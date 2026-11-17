@@ -15,6 +15,13 @@ An `out_of_scope_bugs` entry's `kind` is one of six, a different list from a fin
 - `docs` applies when the leftover is a documentation fault larger than one stale line, since a single stale doc line goes into `stale_docs` instead.
 - `machine` applies when the fault lies in this machine or its setup, such as a missing tool or an unreachable service, rather than in the code.
 
+An out-of-scope entry that is a failing test carries its evidence in `artifact`: bun's `(fail) <describe> > <case>` line as printed, with the test file's header line (`<path>.test.ts:`) above it, and every path in full from the checkout root with its real extension. The file never goes inside the `(fail)` line. For example:
+
+```text
+packages/rafa-pr/src/triage/own-check.test.ts:
+(fail) checkKind > reads a red case as fallout [3.00ms]
+```
+
 ```rafa:report
 status: done
 feedback: |

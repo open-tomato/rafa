@@ -2,16 +2,17 @@
  * Tests for the hub HTTP client (`client.ts`), each against a
  * `Bun.serve` stand-in on a free port rather than the real hub: what
  * each call sends and reads, and which of unreachable, refused and
- * malformed each failure is. Every unreachable reading is paired with a
+ * malformed each failure is, and the one status read a client keeps
+ * for its push and pull. Every unreachable reading is paired with a
  * control on the same client that proves the call could have succeeded.
  */
 import type { HubClient, HubClientOptions } from './client.js';
 import type { WirePayload } from '@open-tomato/rafa/store';
 
-import { WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { createHubClient, HUB_UNREACHABLE, HubAnswerMalformed, HubRefused, HubUnreachable } from './client.js';
+import { createHubClient, HUB_UNREACHABLE, HubAnswerMalformed, HubRefused, HubUnreachable, UNNAMED_CONTRACT_VERSION } from './client.js';
 
 const TOKEN = 'ghp_client_test_token';
 
@@ -26,12 +27,21 @@ const PAYLOAD: WirePayload = {
   cursor: { commits: 1 },
 };
 
+/** A status answer of a hub one release behind: no contractVersion, no capabilities. */
 const STATUS = {
   version: '0.0.0',
   migrations: ['0001-init'],
   rows: { commits: 3 },
   devices: [{ device: 'dev-a', lastPushAt: '2026-10-01T00:00:00.000Z' }],
 };
+
+/** What {@link STATUS} reads as: version 1, no capability, the version unnamed. */
+const STATUS_READ = { ...STATUS, contractVersion: UNNAMED_CONTRACT_VERSION, capabilities: {}, contractNamed: false };
+
+const CAPABILITIES = { fts: false, vector: false, graph: false, projection: true };
+
+/** A status answer of a hub naming its contract. */
+const CONTRACT_STATUS = { ...STATUS, contractVersion: WIRE_CONTRACT_VERSION, capabilities: CAPABILITIES };
 
 /** One request a stand-in saw. */
 interface Seen {
@@ -76,6 +86,18 @@ function standIn(answer: (request: Request) => Response | Promise<Response>): St
   return { url: `http://127.0.0.1:${String(server.port)}`, seen };
 }
 
+/** Answers `/v1/status` with `status` and every other route with `answer`. */
+function behind(answer: (request: Request) => Response | Promise<Response>, status: unknown = STATUS) {
+  return (request: Request): Response | Promise<Response> => (new URL(request.url).pathname.endsWith('/v1/status')
+    ? success(status)
+    : answer(request));
+}
+
+/** The requests `hub` saw past its status reads. */
+function pastStatus(hub: StandIn): Seen[] {
+  return hub.seen.filter(({ path }) => !path.endsWith('/v1/status'));
+}
+
 /** A success envelope holding `data`. */
 function success(data: unknown): Response {
   return Response.json({ success: true, data });
@@ -112,10 +134,10 @@ async function closedPort(): Promise<number> {
 
 describe('push', () => {
   it('posts the encoded payload under device with the bearer token, answering the push', async () => {
-    const hub = standIn(() => success({ received: 1, added: 1, at: '2026-10-01T00:00:00.000Z' }));
+    const hub = standIn(behind(() => success({ received: 1, added: 1, at: '2026-10-01T00:00:00.000Z' })));
     const answer = await clientOf(hub.url).push('dev-a', PAYLOAD);
     expect(answer).toEqual({ received: 1, added: 1, at: '2026-10-01T00:00:00.000Z' });
-    expect(hub.seen).toEqual([{
+    expect(pastStatus(hub)).toEqual([{
       method: 'POST',
       path: '/v1/effort/push',
       query: { device: 'dev-a' },
@@ -125,7 +147,7 @@ describe('push', () => {
   });
 
   it('refuses a push answer missing a count as malformed', async () => {
-    const hub = standIn(() => success({ received: 1, at: 'now' }));
+    const hub = standIn(behind(() => success({ received: 1, at: 'now' })));
     const error = await rejectionOf(clientOf(hub.url).push('dev-a', PAYLOAD));
     expect(error).toBeInstanceOf(HubAnswerMalformed);
     expect(error.message).toBe('the hub\'s answer to push holds no received, added and at');
@@ -134,21 +156,21 @@ describe('push', () => {
 
 describe('pull', () => {
   it('leaves since out for an empty cursor and answers the decoded payload', async () => {
-    const hub = standIn(() => success(PAYLOAD));
+    const hub = standIn(behind(() => success(PAYLOAD)));
     const payload = await clientOf(hub.url).pull('dev-a', {});
     expect(payload).toEqual(PAYLOAD);
-    expect(hub.seen.map(({ method, path, query }) => ({ method, path, query })))
+    expect(pastStatus(hub).map(({ method, path, query }) => ({ method, path, query })))
       .toEqual([{ method: 'GET', path: '/v1/effort/pull', query: { device: 'dev-a' } }]);
   });
 
   it('sends a cursor as JSON in since', async () => {
-    const hub = standIn(() => success(PAYLOAD));
+    const hub = standIn(behind(() => success(PAYLOAD)));
     await clientOf(hub.url).pull('dev-a', { commits: 12, sessions: 3 });
-    expect(hub.seen[0]?.query).toEqual({ device: 'dev-a', since: '{"commits":12,"sessions":3}' });
+    expect(pastStatus(hub)[0]?.query).toEqual({ device: 'dev-a', since: '{"commits":12,"sessions":3}' });
   });
 
   it('refuses an answer the wire codec cannot read as malformed, naming the codec\'s fault', async () => {
-    const hub = standIn(() => success({ ...PAYLOAD, version: 99 }));
+    const hub = standIn(behind(() => success({ ...PAYLOAD, version: 99 })));
     const error = await rejectionOf(clientOf(hub.url).pull('dev-a', {}));
     expect(error).toBeInstanceOf(HubAnswerMalformed);
     expect(error.message).toBe('the hub\'s answer to pull is not a wire payload: wire: version is 99; this rafa reads version 1');
@@ -157,8 +179,8 @@ describe('pull', () => {
 
 describe('status', () => {
   it('gets the status route and answers the hub\'s status', async () => {
-    const hub = standIn(() => success(STATUS));
-    expect(await clientOf(hub.url).status()).toEqual(STATUS);
+    const hub = standIn(() => success(CONTRACT_STATUS));
+    expect(await clientOf(hub.url).status()).toEqual({ ...CONTRACT_STATUS, contractNamed: true });
     expect(hub.seen.map(({ method, path, query }) => ({ method, path, query })))
       .toEqual([{ method: 'GET', path: '/v1/status', query: {} }]);
   });
@@ -166,6 +188,87 @@ describe('status', () => {
   it('refuses a status answer whose devices are not devices as malformed', async () => {
     const hub = standIn(() => success({ ...STATUS, devices: ['dev-a'] }));
     await expect(clientOf(hub.url).status()).rejects.toBeInstanceOf(HubAnswerMalformed);
+  });
+
+  it('reads an answer naming no contractVersion or capabilities as version 1 with none, where a named one is kept', async () => {
+    const behindHub = standIn(() => success(STATUS));
+    const naming = standIn(() => success({ ...STATUS, contractVersion: 2, capabilities: CAPABILITIES }));
+    expect(await clientOf(behindHub.url).status()).toEqual(STATUS_READ);
+    expect(await clientOf(naming.url).status())
+      .toEqual({ ...STATUS, contractVersion: 2, capabilities: CAPABILITIES, contractNamed: true });
+  });
+
+  it('keeps a version 0 the hub names, for the caller to judge', async () => {
+    const hub = standIn(() => success({ ...STATUS, contractVersion: 0 }));
+    expect(await clientOf(hub.url).status()).toMatchObject({ contractVersion: 0, contractNamed: true, capabilities: {} });
+  });
+
+  it.each([
+    ['a contractVersion that is not a whole number', { contractVersion: 1.5 }],
+    ['a contractVersion spelt as text', { contractVersion: '1' }],
+    ['capabilities that are not booleans', { contractVersion: 1, capabilities: { fts: 'yes' } }],
+  ])('refuses a status answer with %s as malformed', async (_label: string, fields: Record<string, unknown>) => {
+    const hub = standIn(() => success({ ...STATUS, ...fields }));
+    const error = await rejectionOf(clientOf(hub.url).status());
+    expect(error).toBeInstanceOf(HubAnswerMalformed);
+    expect(error.message).toBe('the hub\'s answer to status holds a contractVersion that is not a whole number or capabilities that are not booleans');
+  });
+});
+
+describe('the contract version', () => {
+  /** A hub answering `status` on the status route and a push or pull answer on the others. */
+  function syncHub(status: unknown): StandIn {
+    return standIn(behind((request) => (request.method === 'POST'
+      ? success({ received: 1, added: 1, at: '2026-10-01T00:00:00.000Z' })
+      : success(PAYLOAD)), status));
+  }
+
+  it('reads the status once over a push then a pull, sending this rafa\'s contractVersion on both', async () => {
+    const hub = syncHub(CONTRACT_STATUS);
+    const client = clientOf(hub.url);
+    await client.push('dev-a', PAYLOAD);
+    await client.pull('dev-a', { commits: 1 });
+    expect(await client.status()).toEqual({ ...CONTRACT_STATUS, contractNamed: true });
+    expect(hub.seen.map(({ path, query }) => ({ path, query }))).toEqual([
+      { path: '/v1/status', query: {} },
+      { path: '/v1/effort/push', query: { device: 'dev-a', contractVersion: String(WIRE_CONTRACT_VERSION) } },
+      { path: '/v1/effort/pull', query: { device: 'dev-a', since: '{"commits":1}', contractVersion: String(WIRE_CONTRACT_VERSION) } },
+    ]);
+  });
+
+  it('reads the status again on a second client, so the answer is kept per client', async () => {
+    const hub = syncHub(CONTRACT_STATUS);
+    await clientOf(hub.url).push('dev-a', PAYLOAD);
+    await clientOf(hub.url).pull('dev-a', {});
+    expect(hub.seen.filter(({ path }) => path === '/v1/status')).toHaveLength(2);
+  });
+
+  it('sends no contractVersion on push or pull to a hub naming none', async () => {
+    const hub = syncHub(STATUS);
+    const client = clientOf(hub.url);
+    await client.push('dev-a', PAYLOAD);
+    await client.pull('dev-a', {});
+    expect(hub.seen.map(({ path, query }) => ({ path, query }))).toEqual([
+      { path: '/v1/status', query: {} },
+      { path: '/v1/effort/push', query: { device: 'dev-a' } },
+      { path: '/v1/effort/pull', query: { device: 'dev-a' } },
+    ]);
+  });
+
+  it('sends no push when the status read fails, and reads the status again on the next call', async () => {
+    let up = false;
+    const hub = standIn((request) => (up || !new URL(request.url).pathname.endsWith('/v1/status')
+      ? behind(() => success({ received: 1, added: 1, at: '2026-10-01T00:00:00.000Z' }), CONTRACT_STATUS)(request)
+      : failure(503, 'down')));
+    const client = clientOf(hub.url);
+    const error = await rejectionOf(client.push('dev-a', PAYLOAD));
+    expect(error).toBeInstanceOf(HubUnreachable);
+    expect(error.message).toBe('the hub answered status with HTTP 503: down');
+    expect(pastStatus(hub)).toEqual([]);
+
+    up = true;
+    await client.push('dev-a', PAYLOAD);
+    expect(hub.seen.map(({ path }) => path)).toEqual(['/v1/status', '/v1/status', '/v1/effort/push']);
   });
 });
 
@@ -186,7 +289,7 @@ describe('unreachable', () => {
     expect(error.message).toStartWith('could not reach the hub for status: ');
 
     const hub = standIn(() => success(STATUS));
-    expect(await clientOf(hub.url).status()).toEqual(STATUS);
+    expect(await clientOf(hub.url).status()).toEqual(STATUS_READ);
   });
 
   it('aborts a hub that never answers once hub.timeout passes', async () => {
@@ -213,11 +316,11 @@ describe('unreachable', () => {
       await Bun.sleep(TIMEOUT_MS / 2);
       return success(STATUS);
     });
-    expect(await clientOf(hub.url).status()).toEqual(STATUS);
+    expect(await clientOf(hub.url).status()).toEqual(STATUS_READ);
   });
 
   it.each([500, 502, 503])('rejects a %i as HubUnreachable, quoting the hub\'s line', async (status: number) => {
-    const hub = standIn(() => failure(status, 'The hub\'s store did not open.'));
+    const hub = standIn(behind(() => failure(status, 'The hub\'s store did not open.')));
     const error = await rejectionOf(clientOf(hub.url).push('dev-a', PAYLOAD));
     expect(error).toBeInstanceOf(HubUnreachable);
     expect(error.message).toBe(`the hub answered push with HTTP ${String(status)}: The hub's store did not open.`);
@@ -237,7 +340,7 @@ describe('refused', () => {
     [409, 'The hub lacks migration 0002-x; upgrade the hub.'],
     [400, 'The query names "cursor"; expected device, since.'],
   ])('rejects a %i as HubRefused, never HubUnreachable, quoting the hub\'s line', async (status: number, said: string) => {
-    const hub = standIn(() => failure(status, said));
+    const hub = standIn(behind(() => failure(status, said)));
     const error = await rejectionOf(clientOf(hub.url).push('dev-a', PAYLOAD));
     expect(error).toBeInstanceOf(HubRefused);
     expect(error.name).not.toBe(HUB_UNREACHABLE);

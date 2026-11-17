@@ -277,12 +277,16 @@ describe('publishableOf and packageNamed', () => {
 /** The folders the root manifest's two `workspaces` globs, `packages/*` and `addons/atlas/*`, name. */
 const MEMBER_DIRS: readonly string[] = ['packages', 'addons/atlas'];
 
+/** The members the root manifest's `workspaces` names by path, not by glob. */
+const NAMED_MEMBERS: readonly string[] = ['addons/rafa-d2c'];
+
 describe('readWorkspacePackages over this repository', () => {
-  it('reads exactly the folders under packages/ and addons/atlas/ that hold a manifest, the members the workspace-graph sweep lists', () => {
+  it('reads exactly the folders under packages/ and addons/atlas/ that hold a manifest, and each member named by path, the members the workspace-graph sweep lists', () => {
     const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
     const folders = MEMBER_DIRS.flatMap((dir) => readdirSync(join(repoRoot, dir), { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && existsSync(join(repoRoot, dir, entry.name, 'package.json')))
       .map((entry) => `${dir}/${entry.name}`))
+      .concat(NAMED_MEMBERS.filter((dir) => existsSync(join(repoRoot, dir, 'package.json'))))
       .sort();
 
     const members = packagesOf(readWorkspacePackages(repoRoot));

@@ -97,6 +97,17 @@
  * when stderr held none of the three, so the file on disk is always this
  * run's.
  *
+ * A red run, one whose exit code is not 0 and that is not
+ * {@link SuiteResult.noTestFiles}, also keeps that text under the head it
+ * was taken at: `<name>.<sha>.red.output.txt` beside it
+ * ({@link redOutputFileFor}), `<sha>` being what `git rev-parse HEAD`
+ * answers in `cwd` ({@link readSuiteHead}, the
+ * {@link SuiteRunOptions.readHead} seam). No run removes a kept file, so
+ * a green rerun that replaces `<name>.output.txt` leaves the red text of
+ * the head before it. A green run keeps nothing, and neither does a run
+ * whose `cwd` answers no head: measured on git 2.53.0, `git rev-parse HEAD`
+ * exited 128 both outside a repository and in one holding no commit.
+ *
  * ## The output tail
  *
  * A result carries {@link SuiteResult.outputTail} too: the last
@@ -318,6 +329,12 @@ export interface SuiteRunOptions {
   readonly env?: Readonly<SpawnEnv>;
   /** {@link spawnSuite} when left out. */
   readonly spawn?: SuiteSpawner;
+  /**
+   * The commit `cwd` has checked out, or null when it answers none; a red
+   * run keeps its text under it (see the module note). {@link readSuiteHead}
+   * when left out.
+   */
+  readonly readHead?: (cwd: string) => string | null;
 }
 
 /** The summary line Bun ends a run with. */
@@ -395,6 +412,40 @@ export function outputFileFor(junitFile: string): string {
     ? name.slice(0, -JUNIT_SUFFIX.length)
     : name.slice(0, name.length - extname(name).length);
   return join(dirname(junitFile), `${stem}${OUTPUT_SUFFIX}`);
+}
+
+/** The suffix of a red run's text kept under its head, after the `.<sha>`. */
+export const RED_OUTPUT_SUFFIX = '.red.output.txt';
+
+/**
+ * Where a red run reporting to `junitFile` at commit `sha` keeps its
+ * text: beside {@link outputFileFor}'s file, `<name>.<sha>.red.output.txt`
+ * for its `<name>.output.txt`.
+ */
+export function redOutputFileFor(junitFile: string, sha: string): string {
+  const outputFile = outputFileFor(junitFile);
+  return `${outputFile.slice(0, -OUTPUT_SUFFIX.length)}.${sha}${RED_OUTPUT_SUFFIX}`;
+}
+
+/**
+ * The commit `cwd` has checked out, as `git rev-parse HEAD` answers it,
+ * or null when git exits nonzero (no repository, or no commit yet) or
+ * answers no line.
+ */
+export function readSuiteHead(cwd: string): string | null {
+  const proc = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' });
+  if (proc.exitCode !== 0) return null;
+  const sha = proc.stdout.toString().trim();
+  return sha === ''
+    ? null
+    : sha;
+}
+
+/** Keeps `text` under the head of `options.cwd`, when it answers one; see the module note. */
+function keepRedOutput(options: SuiteRunOptions, text: string): void {
+  const sha = (options.readHead ?? readSuiteHead)(options.cwd);
+  if (sha === null) return;
+  writeFileSync(redOutputFileFor(options.junitFile, sha), text);
 }
 
 /** `base` without the {@link SUITE_ENV_REMOVED} variables, `CLAUDECODE` and `FORCE_COLOR`, as a new object. */
@@ -660,7 +711,8 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   const { exitCode, stderr, timedOut } = await spawn(command, { cwd: options.cwd, env });
   const { junit, failures: named, files, cases } = readJunit(options.junitFile);
   const failedCases = parseFailedCases(stderr, failingFilesOf(named));
-  writeFileSync(outputFile, suiteOutputText(stderr, failedCases));
+  const outputText = suiteOutputText(stderr, failedCases);
+  writeFileSync(outputFile, outputText);
   const { summary, errors } = readSummary(stderr);
   const failures = withErrorLines(named, failedCases);
   const unhandled = parseUnhandled(stderr);
@@ -669,7 +721,9 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
     ? {}
     : { timedOut };
   const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, outputTail, fileOrder: [files], cases, ...deadline };
-  return readNoTestFiles(stderr)
+  const noTestFiles = readNoTestFiles(stderr);
+  if (exitCode !== 0 && !noTestFiles) keepRedOutput(options, outputText);
+  return noTestFiles
     ? { ...result, noTestFiles: true }
     : result;
 }

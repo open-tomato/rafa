@@ -28,7 +28,8 @@
  *
  * The loop never dispatches a task for a bug. A plan that wants one fixed
  * declares a task for it. A leftover of the plan's own, `own-fallout` or
- * `own-gap`, is no bug: `./kind-route.ts` inserts its repair task.
+ * `own-gap`, is no bug: `./kind-route.ts` inserts its repair task, or
+ * joins the step repair line already covering it.
  *
  * ## The key a bug is looked up by
  *
@@ -358,7 +359,7 @@ export type BugTriageAction =
   | 'skipped'
   /** A step failed before an issue was filed or commented on. */
   | 'failed'
-  /** A plan's own leftover: a repair task was inserted for it (`./kind-route.ts`). */
+  /** A plan's own leftover: a repair task was inserted for it, or it joined one (`./kind-route.ts`). */
   | 'repair'
   /** A plan's own leftover past the repair cap: it goes to the plan's follow-up issue. */
   | 'follow-up'
@@ -408,8 +409,18 @@ export interface BugTriage {
   readonly score?: number;
   /** The kind it was routed under (`./kind-route.ts`); absent with {@link TriageOptions.kinds} left out. */
   readonly kind?: BugKind;
-  /** For a `repair`, the inserted task's line, counting from zero; absent otherwise. */
+  /**
+   * For a `repair`, the inserted task's line, or the step repair line it
+   * joined, counting from zero; absent otherwise.
+   */
   readonly repairLine?: number;
+  /**
+   * True for a `repair` that joined a line already in the tracker,
+   * inserting none (`./kind-route.ts`): the step repair line for its kept
+   * capture's commit, or the open leftover line holding its recurrence
+   * key or symbol (`./leftover-repair.ts`); absent otherwise.
+   */
+  readonly joined?: boolean;
 }
 
 /** What {@link triageReport} did. */

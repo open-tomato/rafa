@@ -30,8 +30,9 @@
  * `session-worktree` is held to a store an older runtime left in
  * `session-worktree.test.ts`, beside the backend that fills its column.
  * `stale-docs` is held to one in `stale-docs-migration.test.ts`, beside
- * the refusals of the table it creates, and `bug-routes` to one in
- * `bug-routes-migration.test.ts` the same way.
+ * the refusals of the table it creates, `bug-routes` to one in
+ * `bug-routes-migration.test.ts` the same way, and `reading-supersedes`
+ * to one in `reading-supersedes-migration.test.ts`.
  */
 import type { CreatedObject, ShapeProblem } from '@open-tomato/rafa/store/migration-shapes';
 import type { MigrationBreak, MigrationLock, MigrationSpec, SqliteMigration } from '@open-tomato/rafa/store/migrations';
@@ -435,6 +436,7 @@ const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
   'store-replaced': ['create-table'],
   'stale-docs': ['create-table', 'create-unique-index-on-new-table', 'create-unique-index-on-new-table'],
   'bug-routes': ['create-table', 'create-unique-index-on-new-table', 'create-unique-index-on-new-table'],
+  'reading-supersedes': ['create-table', 'create-unique-index-on-new-table', 'create-unique-index-on-new-table'],
 };
 
 describe('classifyMigration over the catalogue', () => {

@@ -1,0 +1,35 @@
+{
+  "name": "@open-tomato/rafa-d2c",
+  "version": "0.0.0",
+  "description": "Design-to-code as a rafa module. This first part keeps a project's visual baselines in a store the person configures: it checks readiness, seeds the suite's snapshots, places a run's results in staging, and promotes them on the person's command.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --build",
+    "lint": "eslint .",
+    "test": "bun test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@open-tomato/rafa-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@open-tomato/eslint-config": "^0.1.0",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  },
+  "rafa": {
+    "manifestVersion": 1,
+    "types": ["commands"],
+    "provides": {
+      "commands": { "entry": "./src/commands/index.ts" }
+    },
+    "requires": { "rafa": ">=0.53 <1" }
+  }
+}

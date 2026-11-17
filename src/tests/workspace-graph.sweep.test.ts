@@ -8,8 +8,10 @@
  * The check reads the tree at run time, so the `.sweep.test.ts` suffix is
  * what has `tests.alwaysRun` run it. Each refusal has a planted-tree
  * control in `scripts/workspace/graph-check.test.ts`; here, the members the
- * check read are held to the folders under `packages/` that hold a
- * manifest, so a reading that found no member cannot pass as a clean one.
+ * check read are held to the folders under `packages/` and
+ * `addons/atlas/` that hold a manifest, plus the members the root manifest
+ * names one by one, so a reading that found no member cannot pass as a
+ * clean one.
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,11 +30,15 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /** The folders the root manifest's two `workspaces` globs, `packages/*` and `addons/atlas/*`, name. */
 const MEMBER_DIRS: readonly string[] = ['packages', 'addons/atlas'];
 
+/** The members the root manifest's `workspaces` names by path, not by glob. */
+const NAMED_MEMBERS: readonly string[] = ['addons/rafa-d2c'];
+
 /** The folders under the member dirs that hold a manifest, as the check spells a member. */
 function manifestFolders(): string[] {
   return MEMBER_DIRS.flatMap((dir) => readdirSync(join(REPO_ROOT, dir), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && existsSync(join(REPO_ROOT, dir, entry.name, 'package.json')))
     .map((entry) => `${dir}/${entry.name}`))
+    .concat(NAMED_MEMBERS.filter((dir) => existsSync(join(REPO_ROOT, dir, 'package.json'))))
     .sort();
 }
 
@@ -47,7 +53,7 @@ describe('the workspace graph of the live tree', () => {
     expect(lines).toHaveLength(manifestFolders().length);
   });
 
-  test('control: the check read every folder under packages/ and addons/atlas/ that holds a manifest', () => {
+  test('control: the check read every folder under packages/ and addons/atlas/ that holds a manifest, and each member named by path', () => {
     const report = checkGraph(REPO_ROOT);
 
     expect(report.root).toEqual([]);

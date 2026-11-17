@@ -70,7 +70,7 @@
  */
 import type { Recurrence } from './recurrence.js';
 import type { SkillFact } from './skill-facts.js';
-import type { PlanCiRow } from '@open-tomato/rafa/store/plan-ci';
+import type { PlanCiFact } from '@open-tomato/rafa/store/plan-ci';
 
 import { UNKNOWN_SKILL_COUNT } from '@open-tomato/rafa/store/skill-invocations';
 
@@ -91,7 +91,7 @@ export type RecurrenceMatcher = (
   strings: readonly string[],
   facts: readonly SkillFact[],
   fromIndex: number,
-  planCi: readonly PlanCiRow[],
+  planCi: readonly PlanCiFact[],
 ) => Recurrence[];
 
 /** What the rows hold about one skill. Every count is of rows. */

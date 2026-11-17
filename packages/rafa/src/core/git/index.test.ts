@@ -1,6 +1,6 @@
 /**
  * Tests for the `index.ts` barrel: it exports every name `git.ts`,
- * `commit.ts` and `gh-runner.ts` export, each once, as the same
+ * `commit.ts`, `gh-runner.ts` and `placed-line.ts` export, each once, as the same
  * binding, and no other name, with the one name `git.ts` and
  * `commit.ts` share exported as `git.ts` declares it.
  *
@@ -43,6 +43,7 @@ import ts from 'typescript';
 
 import * as commit from './commit.js';
 import * as git from './git.js';
+import * as placed from './placed-line.js';
 
 import * as barrel from './index.js';
 
@@ -52,12 +53,13 @@ const BARREL = 'packages/rafa/src/core/git/index.ts';
 const GIT = 'packages/rafa/src/core/git/git.ts';
 const COMMIT = 'packages/rafa/src/core/git/commit.ts';
 const GH = 'packages/rafa/src/core/git/gh-runner.ts';
+const PLACED = 'packages/rafa/src/core/git/placed-line.ts';
 
 /** The names both files export. The barrel exports each as `git.ts` declares it. */
 const SHARED = ['GitRunner'];
 
 /** Every path a case reads the exports of, in the order the cases first name them. */
-const EXPORT_PATHS: readonly string[] = [GIT, COMMIT, BARREL, GH];
+const EXPORT_PATHS: readonly string[] = [GIT, COMMIT, BARREL, GH, PLACED];
 
 /**
  * Every export name of each file, types included, with the file that
@@ -134,18 +136,19 @@ function onTwo(lists: readonly (readonly string[])[]): string[] {
 }
 
 /** The runtime bindings of the two files; the second case holds that no runtime name is lost to the spread. */
-const BEHIND: Readonly<Record<string, unknown>> = { ...git, ...commit };
+const BEHIND: Readonly<Record<string, unknown>> = { ...git, ...commit, ...placed };
 
 describe('the git barrel', () => {
   beforeAll(() => {
     storedExports = readExports(EXPORT_PATHS);
   }, 30_000);
 
-  it('exports the runtime names of the two files, each once, and no other', () => {
-    const expected = [...Object.keys(git), ...Object.keys(commit)].sort();
+  it('exports the runtime names of the files behind it, each once, and no other', () => {
+    const expected = [...Object.keys(git), ...Object.keys(commit), ...Object.keys(placed)].sort();
 
     expect(Object.keys(git)).toContain('createGitRunner');
     expect(Object.keys(commit)).toContain('commitTaskWork');
+    expect(Object.keys(placed)).toContain('placeLine');
     expect(Object.keys(barrel).sort()).toEqual(expected);
   });
 
@@ -156,7 +159,8 @@ describe('the git barrel', () => {
     expect(namesOf(exports[COMMIT]).length).toBeGreaterThan(0);
     expect(onTwo([['a', 'b'], ['b', 'c'], ['c']])).toEqual(['b', 'c']);
     expect(onTwo([namesOf(exports[GIT]), namesOf(exports[COMMIT])])).toEqual(SHARED);
-    expect(onTwo([Object.keys(git), Object.keys(commit)])).toEqual([]);
+    expect(onTwo([Object.keys(git), Object.keys(commit), Object.keys(placed)])).toEqual([]);
+    expect(onTwo([namesOf(exports[PLACED]), namesOf(exports[GIT]), namesOf(exports[COMMIT])])).toEqual(SHARED);
   });
 
   it('exports each runtime name as the binding its file declares', () => {
@@ -168,15 +172,21 @@ describe('the git barrel', () => {
     }
   });
 
-  it('exports the type names of the two files with the runtime ones, each once, and no other', () => {
+  it('exports the type names of the files behind it with the runtime ones, each once, and no other', () => {
     const exports = exportsByPath();
     const expected = [
-      ...new Set([...namesOf(exports[GIT]), ...namesOf(exports[COMMIT]), ...namesOf(exports[GH])]),
+      ...new Set([
+        ...namesOf(exports[GIT]),
+        ...namesOf(exports[COMMIT]),
+        ...namesOf(exports[GH]),
+        ...namesOf(exports[PLACED]),
+      ]),
     ].sort();
 
     expect(namesOf(exports[GIT])).toContain('GitResult');
     expect(namesOf(exports[COMMIT])).toContain('CommitAttempt');
     expect(namesOf(exports[GH])).toEqual(['GhResult', 'GhRunner']);
+    expect(namesOf(exports[PLACED])).toContain('PlaceSeams');
     expect(Object.keys(git)).not.toContain('GitResult');
     expect(Object.keys(commit)).not.toContain('CommitAttempt');
     expect(namesOf(exports[BARREL])).toEqual(expected);
@@ -186,6 +196,7 @@ describe('the git barrel', () => {
     const exports = exportsByPath();
     const gitNames = namesOf(exports[GIT]);
     const ghNames = namesOf(exports[GH]);
+    const placedNames = namesOf(exports[PLACED]);
     const expected = Object.fromEntries(
       namesOf(exports[BARREL]).map((name) => [
         name,
@@ -193,12 +204,15 @@ describe('the git barrel', () => {
           ? GIT
           : ghNames.includes(name)
             ? GH
-            : COMMIT,
+            : placedNames.includes(name)
+              ? PLACED
+              : COMMIT,
       ]),
     );
 
     expect(expected['CommitAttempt']).toBe(COMMIT);
     expect(expected['GhRunner']).toBe(GH);
+    expect(expected['placeLine']).toBe(PLACED);
     for (const name of SHARED) {
       expect([name, expected[name]]).toEqual([name, GIT]);
     }

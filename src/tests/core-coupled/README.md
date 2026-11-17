@@ -32,6 +32,7 @@ file: back into the package once its coupling is gone, or into the module it rea
 | `config-schema-checks.test.ts` | `src/config-registry.ts` |
 | `config-schema-errors.test.ts` | `src/config-registry.ts` |
 | `config-schema-features-integration.test.ts` | `src/config-registry.ts` |
+| `config-schema-hints.test.ts` | `src/config-registry.ts` |
 | `config-schema-hub.test.ts` | `src/config-registry.ts` |
 | `config-schema-issues.test.ts` | `src/config-registry.ts`, `src/project/scaffold.ts` |
 | `config-schema-logger.test.ts` | `src/config-registry.ts`, `src/project/scaffold.ts`, `src/tests/cli-capture.ts` |

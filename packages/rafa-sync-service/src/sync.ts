@@ -66,6 +66,21 @@
  * other, which brings it to every migration this build knows, and its
  * export names them. The store subpath exports no catalogue.
  *
+ * ## The contract version
+ *
+ * Each push and pull reads the hub's status before it exports or asks
+ * for anything; the hub client reads it once and keeps it, so a
+ * strategy reads it once. A hub whose `contractVersion` is not this
+ * rafa's, core's `WIRE_CONTRACT_VERSION`, is refused with
+ * {@link HubContractMismatch} before `exportWirePayload` runs and
+ * before any push or pull request: nothing is exported, sent or
+ * merged, and no cursor moves. Its next step is {@link SELF_UPDATE}
+ * when the hub is ahead, and upgrading the hub at `hub.url` when this
+ * rafa is. A hub one release behind names no version and reads as
+ * version `1` (`client.ts`), so it is not refused. A store with no file
+ * yet answers `nothing-to-sync` with no contact, the status read
+ * included.
+ *
  * ## After a merge
  *
  * A merged store keeps its origin: core carries the `store_meta` row
@@ -83,7 +98,9 @@
  * which core's contact matches) for a connect failure, the timeout or a
  * `5xx`, and `HubRefused` for a `4xx` such as a token or migration
  * refusal, which is not unreachable. So does the token reader's
- * `HubTokenError`. The token is read once per strategy, at its first
+ * `HubTokenError`. A status read that fails passes its error through
+ * the same way, so an unreachable hub is unreachable for push and pull
+ * alike. The token is read once per strategy, at its first
  * contact, never when it is made.
  */
 import type { HubClient } from './client.js';
@@ -100,6 +117,7 @@ import {
   mergeStore,
   openSqliteStore,
   STORE_BACKENDS,
+  WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
 } from '@open-tomato/rafa/store';
@@ -149,6 +167,35 @@ export class RafaUpdateRequired extends Error {
         + ` so its rows cannot be merged here. Nothing was merged. Next step: ${SELF_UPDATE}, then sync again.`,
     );
     this.missing = Object.freeze([...missing]);
+  }
+}
+
+/** The next step a contract mismatch names when this rafa is ahead of the hub at `url`. */
+export function upgradeHubStep(url: string): string {
+  return `upgrade the hub at ${url} to a rafa-hub that speaks this rafa's contract`;
+}
+
+/** A hub whose wire contract version is not this rafa's: refused before anything is exported or sent. */
+export class HubContractMismatch extends Error {
+  override readonly name = 'HubContractMismatch';
+  /** The contract version the hub speaks. */
+  readonly hubVersion: number;
+  /** The contract version this rafa speaks: core's `WIRE_CONTRACT_VERSION`. */
+  readonly rafaVersion: number;
+  /** The one thing to do next: {@link SELF_UPDATE} when the hub is ahead, {@link upgradeHubStep} when this rafa is. */
+  readonly nextStep: string;
+
+  constructor(hubVersion: number, rafaVersion: number, hubUrl: string) {
+    const nextStep = hubVersion > rafaVersion
+      ? SELF_UPDATE
+      : upgradeHubStep(hubUrl);
+    super(
+      `effort sync: the hub speaks contract ${String(hubVersion)}, this rafa contract ${String(rafaVersion)};`
+        + ` nothing was sent. Next step: ${nextStep}`,
+    );
+    this.hubVersion = hubVersion;
+    this.rafaVersion = rafaVersion;
+    this.nextStep = nextStep;
   }
 }
 
@@ -286,6 +333,16 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
     return client;
   };
 
+  /** The hub client, once its status names this rafa's contract; see the module note. */
+  const agreedClient = async (): Promise<HubClient> => {
+    const reached = await hubClient();
+    const { contractVersion } = await reached.status();
+    if (contractVersion !== WIRE_CONTRACT_VERSION) {
+      throw new HubContractMismatch(contractVersion, WIRE_CONTRACT_VERSION, hub.url);
+    }
+    return reached;
+  };
+
   /** The store's origin, or undefined when there is no store yet. */
   const originOf = (): string | undefined => {
     refuseNdjson(backend);
@@ -298,8 +355,9 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
     refusePath('to', to);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
+    const reached = await agreedClient();
     const payload = exportWirePayload({ path: storePath, cursor: readSyncCursors(statePath, origin, hub.url).push });
-    await (await hubClient()).push(origin, payload);
+    await reached.push(origin, payload);
     writeSyncCursor(statePath, origin, hub.url, 'push', payload.cursor);
     return PUSHED;
   };
@@ -309,7 +367,7 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
     refusePath('from', from);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
-    const payload = await (await hubClient()).pull(origin, readSyncCursors(statePath, origin, hub.url).pull);
+    const payload = await (await agreedClient()).pull(origin, readSyncCursors(statePath, origin, hub.url).pull);
     known ??= learnMigrations(now);
     refuseUnknownMigrations(payload, known);
     const merge = rowsIn(payload) === 0

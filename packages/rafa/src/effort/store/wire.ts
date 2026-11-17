@@ -78,6 +78,20 @@ import { quoted } from './rebuild-aside.js';
 import { activeStoreSettings } from './settings.js';
 import { SQLITE_STORE_FILE_NAME } from './sqlite.js';
 
+/**
+ * The wire contract's version, a whole number that names its grammar and
+ * semantics: the payload shape ({@link WIRE_FORMAT}, {@link WIRE_VERSION}),
+ * the cursor rules, the request fields, the capability names, the refusal
+ * codes and the skew rules. Inside one contract version evolution is
+ * additive only; a change to any of those raises it.
+ *
+ * It does not cover the schema. The schema a payload carries is the ordered
+ * list of migration ids it names, pinned by `migrations.lock.json` and
+ * `row-fields.lock.json`, and that list may grow under the same contract
+ * version.
+ */
+export const WIRE_CONTRACT_VERSION = 1;
+
 /** What every payload's `format` holds. */
 export const WIRE_FORMAT = 'rafa-effort-wire';
 

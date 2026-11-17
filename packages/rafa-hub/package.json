@@ -17,7 +17,8 @@
     "check-types": "tsc --build"
   },
   "dependencies": {
-    "@open-tomato/rafa-core": "workspace:*"
+    "@open-tomato/rafa-core": "workspace:*",
+    "@open-tomato/rafa-index": "workspace:*"
   },
   "devDependencies": {
     "@open-tomato/eslint-config": "^0.1.0",

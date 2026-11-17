@@ -58,6 +58,17 @@
  * After a push that was retried, the
  * reading printed is the REBUILT one, the batch the base now holds.
  *
+ * A run that did not refuse ends with its next step (`./settle-endings.ts`,
+ * #1533): a push delivery with the `git merge --ff-only` and the
+ * `rafa release tag --push` the caller's branch needs, a pull request
+ * delivery with `rafa pr wait <n>` before them, a dry run that would fold
+ * with `rafa release settle`, and nothing to settle with
+ * `Nothing to tag either: every unit keeps its version.` Each step is
+ * placed at the checkout holding the release branch, read once the
+ * scratch worktree is gone, and under `hints.skills: true`, read with the
+ * rest of the config, followed by its skill line. Json mode carries the
+ * steps as the result's `next` list.
+ *
  * ## Exit codes
  *
  * 0 when the settle is done or there was nothing to do: a dry run that
@@ -90,6 +101,7 @@
  * It starts no Claude session and declares no `spends`.
  */
 import type { SettleProjectRefresh } from './settle-project.js';
+import type { ReleaseStepEntry } from './step-cases.js';
 import type { SettleLockPlan } from '../../release/settle-lock.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
@@ -119,7 +131,9 @@ import { CHANGELOG_TITLE, readSettle, settleMoves } from '../../release/settle.j
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 
 import { RELEASE_SETTLE_DECLARATION, RELEASE_SETTLE_DRY_RUN_FLAG } from './declarations.js';
+import { settleEndedOf, settleEnding, withSettleEnding } from './settle-endings.js';
 import { refreshProjectAfterSettle } from './settle-project.js';
+import { readBranchHolder, stepPlacingOf } from './tag-next-steps.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_SETTLE_USAGE = 'rafa release settle [--dry-run]';
@@ -172,6 +186,8 @@ export interface ReleaseSettleResult {
   readonly lines: readonly string[];
   /** What the project refresh read and warned of, or null where it sent nothing; see the module note. */
   readonly project: SettleProjectRefresh | null;
+  /** The ending's `Next:` steps (`./settle-endings.ts`), `skill` null under `hints.skills: false`; empty for a refusal and for nothing to settle. */
+  readonly next: readonly ReleaseStepEntry[];
 }
 
 /** The project the dispatcher resolved, which it resolves for this action. */
@@ -263,7 +279,7 @@ function resultOf(
   const exitCode = problem === null
     ? 0
     : 1;
-  return { ...base, lines, problem, exitCode, project: null };
+  return { ...base, lines, problem, exitCode, project: null, next: [] };
 }
 
 /** The line naming a changelog the release commit creates rather than inserts into. */
@@ -377,8 +393,9 @@ export async function runSettle(
   const pulls = !dryRun && config.releaseSettle === 'pr'
     ? providerFor(project, config, seams)
     : null;
+  const git = (seams.git ?? createGitRunner)(project.root);
   const options: SettleWorktreeOptions = {
-    git: (seams.git ?? createGitRunner)(project.root),
+    git,
     base: { remote: RELEASE_REMOTE, branch },
     scratchRoot: seams.scratchRoot,
   };
@@ -393,16 +410,23 @@ export async function runSettle(
   });
   if (ran.leftover !== null) context.output.warn(`The settle worktree was not fully removed: ${ran.leftover}`);
   if (!ran.ok) throw new CommandExit(1, `❌ ${ran.problem}`);
-  if (ran.value.delivered === null) return ran.value;
+  const ended = settleEndedOf(ran.value);
+  const place = ended.kind === 'none'
+    ? null
+    : { branch, remote: RELEASE_REMOTE, holder: readBranchHolder(git, branch), placing: stepPlacingOf(project.root, git) };
+  const value = place === null
+    ? ran.value
+    : withSettleEnding(ran.value, settleEnding(ended, place), config.hintsSkills);
+  if (value.delivered === null) return value;
   const refreshed = await refreshProjectAfterSettle({
-    delivered: ran.value.delivered,
+    delivered: value.delivered,
     branch,
     config,
     openGh: () => (seams.gh ?? ((cwd: string) => createGhRunner({ cwd })))(project.root),
     refresh: seams.refresh,
     retry: commandRetrySeams(context.output, context.outputMode),
   });
-  return { ...ran.value, project: refreshed };
+  return { ...value, project: refreshed };
 }
 
 /** The command, reaching git and the provider through `seams`; see the module note. */

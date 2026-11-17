@@ -37,9 +37,16 @@ spells out, and the shapes the lint config forces.
   `../core/` and `../utils/` lines after, while
   `packages/rafa-board/src/board/project/rules.ts` puts `./options.js` last,
   after its `../` lines. Both pass eslint. Take the order from `bunx eslint
-  --fix-dry-run --format json <file>`, not from this page. Value imports differ:
-  the `parent` group (`../`) comes before the `sibling` group (`./`), a blank
-  line between them.
+  --fix-dry-run --format json <file>`, not from this page. This holds in tests
+  too: a colocated test's `import type` of its sibling under test, or a second
+  sibling type import, lands where the lint message says (`./release.js` type
+  import should occur before type import of `../../adapters/tracker/github.js`).
+  Value imports differ: the `parent` group (`../`) comes before the `sibling`
+  group (`./`), a blank line between them. A new test that imports
+  `@open-tomato/rafa-effort` beside `bun:test` and `@open-tomato/rafa/*` gets
+  "There should be at least one empty line between import groups"; run `bunx
+  eslint --fix` on that new test file rather than placing the blank lines by
+  hand.
 - **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
@@ -47,8 +54,12 @@ spells out, and the shapes the lint config forces.
 ### Declarations, feature indexes and the roots
 
 - **A `declarations.ts` imports types and `@open-tomato/rafa/core/*`
-  values alone.** A value import of a module under `src/` loads it with
-  the roster and undoes the laziness the declaration exists for. A
+  values, and no module under `src/`.** The issue feature's
+  `declarations.ts` also imports its two sibling files,
+  `declarations-create.ts` and `declarations-shared.ts`, which import no
+  module under `src/` either. A value import of a module under `src/`
+  loads it with the roster and undoes the laziness the declaration exists
+  for. A
   feature's test reads the file's imports off the source (its
   `declarations.test.ts`, or `index.test.ts` for `board`, which has none)
   and holds that; a constant a declaration and its command both read lives
@@ -82,7 +93,7 @@ and `erasableSyntaxOnly`**. Every tsconfig reaches it by one chain: the
 root `tsconfig.json` and each composite member's `tsconfig.json` extend
 `tsconfig.packages.json`, which extends `@open-tomato/typescript-config/base`,
 the name the root's `^0.1.0` line installs into `node_modules`. So the root
-config and the nine composite members are held to both flags by
+config and the ten composite members are held to both flags by
 `bun run check-types`, with no flag on the command line. The base also sets
 `declaration`, because `tsc` refuses `isolatedDeclarations` without it; under
 the base's `noEmit` it writes no
@@ -90,7 +101,7 @@ file. The root `tsconfig.json` excludes `**/*.test.ts`,
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
 runner's type step does, for the test files a task adds or edits: its scratch
 config extends `tsconfig.json` and takes the flags with it. The
-`tsconfig.json` of each of the nine composite members leaves its test files out
+`tsconfig.json` of each of the ten composite members leaves its test files out
 too, as the root does, so `check-types` holds no test file anywhere: `tsc`
 reports no `isolatedDeclarations` error for a program with any other error,
 and the test files carry hundreds (the spike's probe 8, #804).
@@ -140,8 +151,10 @@ subject folders. `config/` holds the value readers, core's keys of the schema,
 the section contract, core's own section and the loader; `command/` the command
 contract (`RafaCommand`, `RafaContext`, `CommandExit`), the version and the
 confirm prompt; `output/` the active output; `adapters/` the adapter registry;
-`git/` the git runner and the commit helpers; `plan/` the block reader, the plan
-parser and the plan-file readers; `loop/` the loop's session helpers, its
+`git/` the git runner, the commit helpers and the placed-line helper
+(`placed-line.ts`, a printed step with `cd <checkout> &&` in front only when it
+runs elsewhere); `plan/` the block reader, the plan parser and the plan-file
+readers; `loop/` the loop's session helpers, its
 session readings and the Claude spawner; `runtime/` the reading of which build
 is running. The ninth, `services/`, moved nothing in: it was written there
 (#1336) and holds the service registry, the functions of run, pr and release
@@ -404,16 +417,17 @@ coupling is gone, or into the module it really tests.
 **The config sections are handed in, never imported.** Core declares the
 section contract in `packages/rafa/src/core/config/section.ts`: a
 `ConfigSection` carries its `package` name, its `settings`, its `defaults` and
-its cross-key `checks`. Core names no section. The fifteen are listed in
+its cross-key `checks`. Core names no section. The seventeen are listed in
 `src/config-registry.ts`, which sits outside `packages/rafa/src/core/`: core's
-own (`core-section.ts`) and fourteen `config-schema-*.ts` files, all under
+own (`core-section.ts`) and sixteen `config-schema-*.ts` files, all under
 `packages/rafa/src/` since rafa-1325 moved the ten feature sections in from
-`src/`: four for `bugs`, `errors`, `features` and `logger`, and ten for the
-registered feature sections. That module registers nothing as it is imported:
-its `registerCoreConfigSections()` registers the fifteen with core and sets
-core's load hook, and `src/rafa.ts`, `src/index.ts` and `src/tests/preload.ts`
-call it ahead of `registerCoreAdapters()`, before anything loads a config. A
-second call registers nothing. A file outside `packages/rafa/src/core/` takes
+`src/`: four for `bugs`, `errors`, `features` and `logger`, ten for the
+registered feature sections, `collaborate`'s and `hints`, written there.
+That module registers nothing as it is imported: its
+`registerCoreConfigSections()` registers the seventeen with core and sets
+core's load hook, and `src/rafa.ts`, `src/index.ts` and
+`src/tests/preload.ts` call it ahead of `registerCoreAdapters()`, before
+anything loads a config. A second call registers nothing. A file outside `packages/rafa/src/core/` takes
 the merged `SETTINGS`, `CONFIG_DEFAULTS`, `SETTING_NAMES`, `SETTING_BY_KEY`,
 `SECTIONS` and `knownKeysAbove` from the registry, never from the core barrel,
 which exports none of them; core reads the same through the `active*`
@@ -746,11 +760,13 @@ names come from, and the facade entry is no node.
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with nine members, all `private`: the three that
+  `package.json`) with ten members, all `private`: the three that
   predate the facades, `packages/rafa/` (`@open-tomato/rafa-core`, core, the
   name for good), `packages/rafa-hub/` (`@open-tomato/rafa-hub`),
-  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`); and the
-  six feature packages that
+  `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`); the tenth,
+  `packages/rafa-index/` (`@open-tomato/rafa-index`), the hub's search index,
+  which imports only `bun:sqlite`, `node:` builtins, `sqlite-vec` and its own
+  files; and the six feature packages that
   `docs/survey/facade-pile.md` lists as passing, `packages/rafa-effort/`,
   `packages/rafa-inventory/`, `packages/rafa-board/`,
   `packages/rafa-release/`, `packages/rafa-pr/` and `packages/rafa-run/`,
@@ -1192,7 +1208,7 @@ names come from, and the facade entry is no node.
   `bun run check-types` runs `tsc --noEmit` over the root, whose `tsconfig.json`
   leaves out `packages/` and the test files, then `bun run --filter
   './packages/*' check-types`, which runs the `check-types` script of each
-  member that has one: `tsc --build` in the nine composite members. `bun run
+  member that has one: `tsc --build` in the ten composite members. `bun run
   lint` lints package code from the root config like `src/`, its `testdata/`
   folders included, and so does the runner's lint step on a task's diff; the
   root `eslint.config.mjs` ignores `**/.tsbuild/**`, so the root `eslint .`
@@ -1215,33 +1231,36 @@ names come from, and the facade entry is no node.
   references `../rafa`, has a `check-types` script and an entry in the solution
   file, and its `bunfig.toml` preloads `test-preload.ts`, which registers
   core's section alone, so `bun test` run from its folder reads core's settings.
-- **The composite recipe builds the nine composite members' declarations.**
+- **The composite recipe builds the ten composite members' declarations.**
   The `tsconfig.json` of `packages/rafa`, `packages/rafa-board`,
-  `packages/rafa-effort`, `packages/rafa-hub`, `packages/rafa-inventory`,
-  `packages/rafa-pr`, `packages/rafa-release`, `packages/rafa-run` and
-  `packages/rafa-sync-service` keeps the `extends` of `tsconfig.packages.json`
-  and sets `composite: true`, `noEmit: false`, `emitDeclarationOnly: true`,
-  `rootDir` (`"src"` in `packages/rafa`, `packages/rafa-hub` and
-  `packages/rafa-sync-service`, or `"."` in the six feature packages, whose
-  `index.ts` sits beside `src/`), `outDir: ".tsbuild"` and
+  `packages/rafa-effort`, `packages/rafa-hub`, `packages/rafa-index`,
+  `packages/rafa-inventory`, `packages/rafa-pr`, `packages/rafa-release`,
+  `packages/rafa-run` and `packages/rafa-sync-service` keeps the `extends` of
+  `tsconfig.packages.json` and sets `composite: true`, `noEmit: false`,
+  `emitDeclarationOnly: true`, `rootDir` (`"src"` in `packages/rafa`,
+  `packages/rafa-hub` and `packages/rafa-sync-service`, or `"."` in the six
+  feature packages and `packages/rafa-index`, whose `index.ts` sits beside
+  `src/`), `outDir: ".tsbuild"` and
   `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages
   never share one (TS6377). It leaves its test files out, and its `references`
-  name what it imports: core none, and every other member `../rafa` and the
+  name what it imports: core and `packages/rafa-index` none, `packages/rafa-hub`
+  `../rafa` and `../rafa-index`, and every other member `../rafa` and the
   feature packages it imports. `tsc --build` builds a
   reference first, reads core through `paths` from that reference's
   declarations, and is a no-op on a second run. `.tsbuild/` is gitignored at
-  every depth. Each of the three code packages' `turbo.json` extends the root's
-  (`"extends": ["//"]`) and declares `check-types.outputs` as `.tsbuild/**`, so
-  a cache hit restores the declarations a dependent's build reads. The six
-  feature packages have no `turbo.json`, so their `check-types` runs under
-  the root's definition, which declares no outputs. A service with its
-  reference to core dropped fails with `TS6307` and `TS6059` on core's files,
-  and still writes their `.d.ts` files beside core's sources, so a run that
-  fails that way leaves stray files under `packages/rafa/src/` to remove; list
-  them with `git ls-files --others --exclude-standard`.
+  every depth. Each of the four code packages' `turbo.json` (core, the hub,
+  the index and the sync service) extends the root's (`"extends": ["//"]`) and
+  declares `check-types.outputs` as `.tsbuild/**`, so a cache hit restores the
+  declarations a dependent's build reads. The six feature packages have no
+  `turbo.json`, so their `check-types` runs under the root's definition, which
+  declares no outputs. A service with its reference to core dropped fails with
+  `TS6307` and `TS6059` on core's files, and still writes their `.d.ts` files
+  beside core's sources, so a run that fails that way leaves stray files under
+  `packages/rafa/src/` to remove; list them with
+  `git ls-files --others --exclude-standard`.
 - **The solution file builds the members in dependency order.** The root
   `tsconfig.references.json` holds `"files": []` and one reference per
-  composite member, so `tsc --build tsconfig.references.json` builds all nine
+  composite member, so `tsc --build tsconfig.references.json` builds all ten
   and refuses a reference cycle with `TS6202`, exit 4. Ring 1 runs it. The root
   umbrella `tsconfig.json` keeps `tsc --noEmit` and no `references`, so ring 0
   reads core's source through `paths` as before.
@@ -1296,12 +1315,14 @@ names come from, and the facade entry is no node.
   `packages/rafa/tsconfig.types.json` writes core's declarations for the
   root's `./config` subpath into the root `dist/`, and
   `tsconfig.config-types.json` then writes the `./config` declarations after
-  them. The root `exports` also keeps twenty-three `types`-only entries for
+  them. The root `exports` also keeps twenty-four `types`-only entries for
   core's files (`./core/config`, `./core/config/config-schema`,
   `./core/config/sections`, `./errors/codes`, `./errors/rafa-codes`,
   `./ports/log-level`, `./report/parse`, `./store/check-rows`, and, since pass
   1 and the third decouple item (rafa-1325) moved the section files in,
-  `./bugs/record` and the fourteen `./config-schema-*` files), which #808
+  `./bugs/record` and the fourteen `./config-schema-*` files, and since
+  rafa-751 a fifteenth, `./config-schema-collaborate`, and the `hints`
+  section's `./config-schema-hints`), which #808
   retires. The first pass's `include` names each moved file the root's config
   files import.
 - **A content schema is imported through its owner's `schemas` export.** A
@@ -1387,6 +1408,19 @@ suites also check that every setting appears exactly once:
 test` shows what is missing. A section appended after the last one in the
 scaffold has to bound any scaffold case that slices from an earlier header to
 the end of the template. This section replaces nothing.
+
+**A new top-level section reaches the config-parity fixtures, and a new
+`config-schema-*.ts` file reaches the manifests.** A section added under a new
+name, such as `hints`, moves `src/tests/fixtures/config-parity/load-config.json`
+(one entry per setting, with its default and its source) and the known-keys
+list the unknown-key warning prints in `doctor.txt` and `module-list.txt`;
+`src/tests/config-parity.test.ts` pins those three fixtures. A new
+`packages/rafa/src/config-schema-<section>.ts` file also goes in the
+`./config-schema-<section>` `exports` of `packages/rafa/package.json`, in the
+`include` of `packages/rafa/tsconfig.types.json`, in a `types`-only `exports`
+entry of the root `package.json` naming `dist/config-schema-<section>.d.ts`,
+and in `src/tests/fixtures/dist-files-c920603.txt`. `check-types` reads none
+of them, so `bun run test` is what shows one that is missing.
 
 ### Shapes the lint config forces
 

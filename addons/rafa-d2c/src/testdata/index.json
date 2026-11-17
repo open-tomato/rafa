@@ -1,0 +1,10 @@
+{
+  "v": 5,
+  "entries": {
+    "atoms-avatar--away": { "type": "story", "id": "atoms-avatar--away", "title": "Atoms/Avatar", "name": "Away" },
+    "atoms-badge--default": { "type": "story", "id": "atoms-badge--default", "title": "Atoms/Badge", "name": "Default" },
+    "atoms-badge--draft": { "type": "story", "id": "atoms-badge--draft", "title": "Atoms/Badge", "name": "Draft" },
+    "atoms-badge--small-size": { "type": "story", "id": "atoms-badge--small-size", "title": "Atoms/Badge", "name": "Small Size", "exportName": "SmallSize" },
+    "atoms-badge--docs": { "type": "docs", "id": "atoms-badge--docs", "title": "Atoms/Badge", "name": "Docs" }
+  }
+}

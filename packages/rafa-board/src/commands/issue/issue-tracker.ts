@@ -225,7 +225,7 @@ export function readChoiceFlag<T extends string>(
 }
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
-export function issueProject(context: RafaContext): ProjectFound {
+export function issueProject(context: Pick<RafaContext, 'project'>): ProjectFound {
   if (context.project === null) throw new Error('rafa issue runs inside a project, and was handed none');
   return context.project;
 }

@@ -65,9 +65,10 @@ command: follow its reason, and do not retry the step another way. A
 command the hook or the permission prompt stopped did not run, so report
 it as not run, never as done.
 
-A command meant for another machine (a loop host over ssh) goes in a plain
-fenced block with no `bash` tag, under a line naming the machine: the Run
-button on a `bash` block runs it here.
+A command meant for another machine (a loop host over ssh) carries its
+`ssh -t <host>` segment and goes in a `bash` block like any other, under a
+line naming the machine. The Run button runs the `ssh` line here, and the
+segment is what sends the command to the host.
 
 ## Flag syntax
 
@@ -116,6 +117,30 @@ usually the main one. A session worktree often has no `.rafa/`, so a plan
 created there lands in the wrong root; say which directory a handed-over
 command is for. `loop start --create-branch` in a worktree on a detached
 `HEAD` names the branch `HEAD`.
+
+Each line is placed where it runs. It takes a `cd <checkout> &&` prefix only
+when the checkout that must run it is not the git top level of the directory
+the command ran in:
+
+```text
+cd <checkout> && rafa release tag
+```
+
+The checkout is the one `git worktree list` shows holding the branch. A git
+that does not answer the top-level read counts as another place, so the
+prefix stays. When that checkout's path is gone, the line is a
+`git switch <branch>` line, then the command.
+
+A stretch on another device gets the same line with its ssh segment in
+front. Without that segment the line runs on the machine the reader types
+it on, so a remote command is never handed over bare. `<host>` is the
+device's ssh name and `<checkout>` its checkout. `-t` gives the remote
+command a terminal, for a step that asks a question. The remote shell has
+to find `rafa` on its PATH, and a bare non-login command may not:
+
+```bash
+ssh -t <host> "cd <checkout> && rafa release tag"
+```
 
 `loop start` and `self-update` act on the checkout and the global install
 that a running loop may be using, so run `rafa loop list` and
@@ -213,8 +238,6 @@ Each row pairs the verbose command with the rafa line that replaces it.
 | `gh pr checks 41 --watch` | `rafa pr wait 41` |
 | `gh pr merge 41 --squash --delete-branch` + local branch cleanup | `rafa pr merge 41` |
 | `git branch --merged`, `git worktree list` + removals | `rafa cleanup` |
-| reading the tag, version files and changelog by hand | `rafa release status` |
-| `git tag v…` from the version files | `rafa release tag` |
 
 When `rafa issue edit` returns `stale-copy`, the issue is already planned:
 follow up with `rafa plan create --issue=<n> --refresh` to rebuild the copy,

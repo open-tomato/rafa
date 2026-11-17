@@ -223,6 +223,15 @@ describe('two devices converge through a hub the test starts', () => {
       expect(run.output).not.toContain('effort sync:');
     }
 
+    // The status answer names the wire contract beside the version and the rows.
+    const statusResponse = await fetch(`${hub.url}/v1/status`, { headers: { authorization: `Bearer ${WRITER}` } });
+    expect(statusResponse.status).toBe(200);
+    const statusBody = (await statusResponse.json()) as { success: boolean; data: Record<string, unknown> };
+    expect(statusBody.success).toBe(true);
+    expect(statusBody.data.contractVersion).toBe(1);
+    expect(Array.isArray(statusBody.data.migrations)).toBe(true);
+    expect(statusBody.data.capabilities).toBeObject();
+
     const aPath = openSqliteStore(a.root).path('commits');
     const bPath = openSqliteStore(b.root).path('commits');
     const hubPath = join(hubDir, DEFAULT_STORE_FILE);

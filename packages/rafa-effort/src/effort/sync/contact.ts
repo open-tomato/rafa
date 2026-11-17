@@ -36,6 +36,21 @@
  * the pull after it, so a command waits out one timeout and not two.
  * Every later run still pushes and pulls: rows sync on the next contact.
  *
+ * ## Contract mismatch
+ *
+ * A push or pull that rejects with an error named `HubContractMismatch`
+ * ({@link HUB_CONTRACT_MISMATCH}) met a hub speaking another wire
+ * contract version than this rafa's, and the `service` strategy refused
+ * it before anything was exported or sent. It is matched by its `name`
+ * ({@link isHubContractMismatch}), as `HubUnreachable` is, since this
+ * module never imports `packages/rafa-sync-service`. Its message is the
+ * whole line, `effort sync: the hub speaks contract <v>, this rafa
+ * contract <w>; nothing was sent. Next step: <step>`, and is written
+ * through `warn` as it stands, its first line alone, once per contact
+ * however many runs meet it. A mismatched push skips the pull after it,
+ * since the same hub refuses the pull for the same reason; a later run
+ * still tries, and writes nothing more.
+ *
  * ## Never the exit code
  *
  * A contact never throws and never sets `process.exitCode`, so the
@@ -48,7 +63,8 @@
  *     `modules:` and `allowList:` lines that load the module. Any other
  *     selection or loading throw is written the same way. Selection
  *     runs once per contact, so it is written once.
- *   - A push or pull that rejects with anything but `HubUnreachable` —
+ *   - A push or pull that rejects with anything but `HubUnreachable` or
+ *     `HubContractMismatch` —
  *     a refused token, a migration the hub or this rafa lacks, the
  *     merge's own refusal — is written as `effort sync: <direction> over
  *     <kind> failed: <message>`, and a refused push still pulls.
@@ -98,6 +114,9 @@ import { selectSync } from './select.js';
 /** The `name` an error carries when a push or pull found the hub unreachable. */
 export const HUB_UNREACHABLE = 'HubUnreachable';
 
+/** The `name` an error carries when the hub speaks another wire contract version than this rafa. */
+export const HUB_CONTRACT_MISMATCH = 'HubContractMismatch';
+
 /** What every line a contact writes opens with. */
 const OPENING = 'effort sync';
 
@@ -112,6 +131,11 @@ export class HubUnreachable extends Error {
 /** Whether a thrown value says the hub was unreachable; see the module note. */
 export function isHubUnreachable(error: unknown): boolean {
   return error instanceof Error && error.name === HUB_UNREACHABLE;
+}
+
+/** Whether a thrown value says the hub speaks another contract version; see the module note. */
+export function isHubContractMismatch(error: unknown): boolean {
+  return error instanceof Error && error.name === HUB_CONTRACT_MISMATCH;
 }
 
 /** The first line of `text` holding anything, trimmed, or the whole text described when none does. */
@@ -142,9 +166,11 @@ export type HubContactStep<Result> =
   | { readonly outcome: 'done'; readonly result: Result }
   /** The hub was unreachable; `problem` is why, as the error said it. */
   | { readonly outcome: 'unreachable'; readonly problem: string }
+  /** The hub speaks another contract version; `problem` is the line, written through `warn` once per contact. */
+  | { readonly outcome: 'mismatch'; readonly problem: string }
   /** The strategy refused or failed for another reason, written through `warn`. */
   | { readonly outcome: 'failed'; readonly problem: string }
-  /** Not run: the push before it found the hub unreachable. */
+  /** Not run: the push before it found the hub unreachable or speaking another contract. */
   | { readonly outcome: 'skipped' };
 
 /** What one run of a contact did. */
@@ -186,7 +212,7 @@ export interface HubContactSeams {
 
 /** One invocation's contact with the other devices; see the module note. */
 export interface HubContact {
-  /** Pushes this store's rows, then pulls the others' unless the push found the hub unreachable. */
+  /** Pushes this store's rows, then pulls the others' unless the push found the hub unreachable or mismatched. */
   readonly pushThenPull: () => Promise<HubContactReading>;
   /** Pulls the others' rows alone. */
   readonly pull: () => Promise<HubContactReading>;
@@ -234,6 +260,7 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
   const strategy = strategyOf(config.effortSync);
   let selection: Promise<Selection> | null = null;
   let toldUnreachable = false;
+  let toldMismatch = false;
   const pullRequest: SyncPullRequest = Object.freeze({
     from: null,
     dryRun: false,
@@ -251,12 +278,18 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     return selection;
   };
 
-  /** Runs one direction, writing the unreachable line once per contact and any other failure each time. */
+  /** Runs one direction, writing the unreachable and mismatch lines once per contact and any other failure each time. */
   const attempt = async <Result>(direction: 'push' | 'pull', run: () => Promise<Result>): Promise<HubContactStep<Result>> => {
     try {
       return { outcome: 'done', result: await run() };
     } catch (error) {
       const problem = messageOf(error);
+      if (isHubContractMismatch(error)) {
+        const line = firstLine(problem);
+        if (!toldMismatch) input.warn(line);
+        toldMismatch = true;
+        return { outcome: 'mismatch', problem: line };
+      }
       if (!isHubUnreachable(error)) {
         input.warn(`${OPENING}: ${direction} over ${strategy} failed: ${problem}`);
         return { outcome: 'failed', problem };
@@ -276,7 +309,7 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     const push = direction === 'push-then-pull'
       ? await attempt('push', () => sync.push({ to: null }))
       : null;
-    const pull: HubContactStep<SyncPullResult> = push?.outcome === 'unreachable'
+    const pull: HubContactStep<SyncPullResult> = push?.outcome === 'unreachable' || push?.outcome === 'mismatch'
       ? { outcome: 'skipped' }
       : await attempt('pull', () => sync.pull(pullRequest));
     return { state: 'contacted', strategy, push, pull };
