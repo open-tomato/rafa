@@ -156,6 +156,20 @@ describe('the schema probe of a plan that carries a migration', () => {
     expect(problemsIn(CLEAN, PROBE_UNPROBED)).toEqual(['missing-probe 3']);
   });
 
+  it('is refused when a ticked probe line was edited, as an unticked one is', () => {
+    const edited = WITH_PROBE.replace('- [ ]', '- [x]').replace('--check', '--check --quiet');
+    expect(problemsIn(CLEAN, edited)).toEqual(['missing-probe 3']);
+    expect(problemsIn(CLEAN, WITH_PROBE.replace('--check', '--check --quiet'))).toEqual(['missing-probe 3']);
+  });
+
+  it('counts the probe line unticked, ticked, and ticked with a note after the probe', () => {
+    const ticked = WITH_PROBE.replace('- [ ]', '- [x]');
+    expect(problemsIn(CLEAN, WITH_PROBE)).toEqual([]);
+    expect(problemsIn(CLEAN, ticked)).toEqual([]);
+    expect(problemsIn(CLEAN, ticked.replace('--check`', '--check` (ran on 17 Nov, exit 0)'))).toEqual([]);
+    expect(problemsIn(CLEAN, WITH_PROBE.replace('- [ ]', '- [X]'))).toEqual([]);
+  });
+
   it('is not asked of a plan whose migration is named without its id', () => {
     expect(problemsIn(planWith('- [ ] Add a nullable column to dispatches'), null)).toEqual([]);
   });
