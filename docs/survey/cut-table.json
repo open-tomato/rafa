@@ -4979,8 +4979,8 @@
         }
       ],
       "fileCounts": {
-        "source": 80,
-        "test": 78,
+        "source": 81,
+        "test": 79,
         "testSupport": 2
       },
       "files": [
@@ -5122,6 +5122,8 @@
         "packages/rafa-pr/src/triage/own-check.ts",
         "packages/rafa-pr/src/triage/plan-commits.test.ts",
         "packages/rafa-pr/src/triage/plan-commits.ts",
+        "packages/rafa-pr/src/triage/recurrence-append.test.ts",
+        "packages/rafa-pr/src/triage/recurrence-append.ts",
         "packages/rafa-pr/src/triage/refs-section.test.ts",
         "packages/rafa-pr/src/triage/refs-section.ts",
         "packages/rafa-pr/src/triage/scoring-fixture.test.ts",
@@ -5146,7 +5148,7 @@
         "src/triage/own-check.integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-pr/": 134,
+        "packages/rafa-pr/": 136,
         "src/commands/pr/": 4,
         "src/pr/": 2,
         "src/triage/": 2

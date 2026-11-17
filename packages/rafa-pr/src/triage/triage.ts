@@ -157,21 +157,9 @@
  *
  * ## A recurrence's append
  *
- * Given {@link TriageOptions.appendUpdate}, a comment made on the public
- * tracker, by any of the three paths above that comment, is followed by
- * an append when the session gave its own reproduce text: one that is not
- * the `seen while running` fallback `./bug-filing.ts`'s `reproduceOf`
- * answers for none. The tracker's `editable` reads the body once; a body
- * that already holds the redacted text (`bodyHoldsText`,
- * `./issue-text.ts`) is answered `held` and the seam is not called, and
- * any other has the seam called with `recurrenceReason`'s reason and
- * `recurrenceAddition`'s fenced text. The comment's action is kept
- * whatever the append comes to: its outcome, and its problem redacted, go
- * on {@link BugTriage.append}, and a read or a seam that fails answers
- * `failed` there. A comment that fails, a bug with no text of its own, a
- * tracker with no `editable`, a private bug and an issue filed in place
- * of a closed one append nothing and carry no `append` at all, as does
- * every bug with the seam left out.
+ * Given {@link TriageOptions.appendUpdate}, a public comment is followed
+ * by an append of the session's own reproduce text; see
+ * `./recurrence-append.ts`'s module note.
  *
  * ## A security bug
  *
@@ -303,6 +291,7 @@ import type { BugFiling, BugFilingContext } from './bug-filing.js';
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
 import type { KindRouteOptions } from './kind-route.js';
+import type { AppendStep, AppendUpdate, RecurrenceAppend } from './recurrence-append.js';
 import type { ComparedText, ScoredIssue, SimilarityWeights } from './similarity.js';
 import type { BugRecord, BugRules } from '@open-tomato/rafa/bugs/record';
 import type { TriageSettings } from '@open-tomato/rafa/config-schema-triage';
@@ -336,18 +325,19 @@ import { createLocalTracker } from '@open-tomato/rafa-board';
 import { bugFilingOf, DEFAULT_BUG_RULES, reproduceOf } from './bug-filing.js';
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import {
-  bodyHoldsText,
   COMMENT_OPENING,
   ISSUE_OPENING,
   issueText,
-  recurrenceAddition,
   recurrenceReason,
   similarCommentOpening,
 } from './issue-text.js';
 import { routeByKind } from './kind-route.js';
+import { appendAfterComment } from './recurrence-append.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
 import { nearestOpenBugs, rankedCandidates } from './similarity.js';
 import { triageStaleDocs } from './stale-docs.js';
+
+export type { AppendUpdate, RecurrenceAppend, RecurrenceAppendOutcome } from './recurrence-append.js';
 
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR: string = join('.rafa', 'triage', 'private');
@@ -449,32 +439,6 @@ export interface BugTriage {
    */
   readonly append?: RecurrenceAppend;
 }
-
-/** What a recurrence's append came to; see the module note. */
-export type RecurrenceAppendOutcome =
-  /** The text was appended below the body as one dated `Updated` block. */
-  | 'appended'
-  /** The body already held the text, so nothing was written. */
-  | 'held'
-  /** The issue is planned: the text was appended, and the plan's copy of it is stale. */
-  | 'stale-copy'
-  /** The write refused the append, as `rafa issue edit` refuses one. */
-  | 'refused'
-  /** The body read or the write failed. */
-  | 'failed';
-
-/** A recurrence's append outcome, with the problem it names, redacted, or null. */
-export interface RecurrenceAppend {
-  readonly outcome: RecurrenceAppendOutcome;
-  readonly problem: string | null;
-}
-
-/**
- * Appends `text` below the body of the issue `ref` names, under `reason`,
- * through the write `rafa issue edit --append` uses, and answers what the
- * write came to. Rejecting is answered as `failed`.
- */
-export type AppendUpdate = (ref: IssueRef, reason: string, text: string) => Promise<RecurrenceAppend>;
 
 /** What {@link triageReport} did. */
 export interface TriageResult {
@@ -777,12 +741,6 @@ interface Route {
   readonly append: AppendStep | null;
 }
 
-/** The seam a recurrence's text is appended through, and the reason it names. */
-interface AppendStep {
-  readonly update: AppendUpdate;
-  readonly reason: string;
-}
-
 /** The similarity step's settings, its threshold a number. */
 interface SimilarityStep {
   readonly threshold: number;
@@ -899,31 +857,6 @@ async function commentOn(
   return append === null
     ? result
     : { ...result, append };
-}
-
-/**
- * Appends the session's reproduce text below the body of the issue just
- * commented on, unless the body holds it; null when no append is tried.
- * See the module note.
- */
-async function appendAfterComment(run: BugRun, ref: IssueRef): Promise<RecurrenceAppend | null> {
-  const { append, tracker, channel } = run.route;
-  const { reproduce } = run.filing;
-  const { editable } = tracker;
-  if (append === null || reproduce === null || editable === undefined) return null;
-
-  const read = await step(run, `the ${channel} tracker editable`, () => editable.call(tracker, ref));
-  if (!read.ok) return { outcome: 'failed', problem: read.problem };
-  if (bodyHoldsText(read.value.body, run.redact(reproduce))) return { outcome: 'held', problem: null };
-  const written = await step(run, 'the recurrence append', () => append.update(ref, append.reason, recurrenceAddition(reproduce, run.redact)));
-  if (!written.ok) return { outcome: 'failed', problem: written.problem };
-  const { outcome, problem } = written.value;
-  return {
-    outcome,
-    problem: problem === null
-      ? null
-      : run.redact(problem),
-  };
 }
 
 /** The issue a bug's key found, and how. */
