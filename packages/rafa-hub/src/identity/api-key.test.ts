@@ -51,6 +51,38 @@ identityContract('api-key', () => ({
   unrecognised: { authorization: `Bearer ${UNKNOWN_KEY}` },
 }), { forbids: false });
 
+/** Headers carrying `plain` as a bearer. */
+function bearer(plain: string): Readonly<Record<string, string>> {
+  return { authorization: `Bearer ${plain}` };
+}
+
+identityContract('api-key (store)', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'rafa-hub-api-key-contract-'));
+  const store = openSqliteKeyStore({ path: keysFileName(join(directory, 'rafa.sqlite')), reservedNames: [FIRST] });
+  const served = await store.create('contract-served', 'octocat');
+  const forbidden = await store.create('contract-forbidden', 'octocat');
+  await store.pause('contract-forbidden');
+  return {
+    identity: openApiKeyIdentity({ variables: [FIRST], env: ENV, store }),
+    served: bearer(served.plain),
+    forbidden: bearer(forbidden.plain),
+    unrecognised: bearer(UNKNOWN_KEY),
+    lifecycle: {
+      create: async (name) => bearer((await store.create(name, 'octocat')).plain),
+      pause: async (name) => {
+        await store.pause(name);
+      },
+      delete: async (name) => {
+        await store.delete(name);
+      },
+    },
+    close: async () => {
+      store.close();
+      rmSync(directory, { recursive: true, force: true });
+    },
+  };
+}, { forbids: true, lifecycle: true });
+
 /** A hub request carrying `authorization`, or none. */
 function hubRequest(authorization?: string): Request {
   return new Request('http://hub.test/v1/status', {
