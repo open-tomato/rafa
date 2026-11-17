@@ -5834,8 +5834,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 10,
-        "test": 27,
+        "source": 11,
+        "test": 29,
         "testSupport": 8
       },
       "files": [
@@ -5848,6 +5848,7 @@
         "packages/rafa-hub/src/hub-index.integration.test.ts",
         "packages/rafa-hub/src/hub-unreachable.integration.test.ts",
         "packages/rafa-hub/src/hub.integration.test.ts",
+        "packages/rafa-hub/src/identity/api-key.test.ts",
         "packages/rafa-hub/src/identity/contract.test.ts",
         "packages/rafa-hub/src/identity/contract.ts",
         "packages/rafa-hub/src/identity/github.test.ts",
@@ -5888,7 +5889,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 36,
+        "packages/rafa-hub/": 39,
         "packages/rafa-index/": 9
       },
       "folders": [
