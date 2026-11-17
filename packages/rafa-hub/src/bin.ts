@@ -2,32 +2,48 @@
 /**
  * The `rafa-hub` command, the package's `bin`: reads the hub's config
  * from the file `RAFA_HUB_CONFIG` names (`config.ts`), then starts the
- * server (`server.ts`) over the repository-permission identity
- * (`identity/github.ts`, asking GitHub's public API about
- * `hub.repository`) and the `sqlite` connector (`connectSqliteHub` in
- * `store/sqlite.ts`), which opens the store at the file `hub.storePath`
- * names and the index beside it, the loader handed
- * `hub.store.sqliteLibrary`. The server rebuilds the index after a push
- * that added rows unless `hub.index.rebuildAfterPush` is `false`, the
- * project a rebuild records being `hub.repository`. Logs are JSON lines
- * on standard output.
+ * server (`server.ts`) over the identity adapter `hub.auth.adapter`
+ * picks and the `sqlite` connector (`connectSqliteHub` in
+ * `store/sqlite.ts`), handed the listed projects (`hub.projects`, or
+ * the one default project of `hub.repository` in `hub.storePath`), each
+ * project's store at the file its `storePath` names and its index
+ * beside it, the loader handed `hub.store.sqliteLibrary`. The server
+ * rebuilds the pushed project's index after a push that added rows
+ * unless `hub.index.rebuildAfterPush` is `false`. Logs are JSON lines on
+ * standard output.
+ *
+ * ## The identity adapter
+ *
+ * Under `github` (the default) the repository-permission identity
+ * (`identity/github.ts`) asks GitHub's API about each listed project's
+ * repository, a push or a pull naming a project by `project` checked
+ * against that project's and every other request against the first
+ * listed project's (`projectRepositoryResolver`). Under `api-key` the
+ * API-key identity (`identity/api-key.ts`) reads the variables
+ * `hub.auth.apiKeys` names from the command's environment, once, at
+ * start.
  *
  * A config the reader refuses is logged as one `config.refused` line
- * holding every problem, and the command exits 1 without listening. A
- * store that does not open is no reason to exit: the server answers
- * `503` on `/health` until it opens, which is what an operator reads.
- * `SIGINT` and `SIGTERM` stop the server, close the store and exit 0.
+ * holding every problem, and the command exits 1 without listening; so
+ * is an `api-key` hub whose named variable is unset or empty, the line
+ * naming the variable and never a value. A store that does not open is
+ * no reason to exit: the server answers `503` on `/health` until it
+ * opens, which is what an operator reads. `SIGINT` and `SIGTERM` stop
+ * the server, close the store and exit 0.
  *
  * ## `rafa-hub index rebuild`
  *
- * Reads the same config, opens the same connector, runs one
- * `index.rebuild({ project: hub.repository })`, prints one line with
- * its counts on standard output and exits 0. A refused config, a
- * connector that does not open and a rebuild that fails each print one
- * line on standard error, and the command exits 1; so do arguments
- * naming neither the server nor this entry. The rebuild swaps a new
- * index file in, and a server already running over the same store picks
- * it up by its inode on its following query, so the two need no
+ * Reads the same config, opens the same connector and runs one
+ * `index.rebuild` per listed project, in `hub.projects` order: the
+ * default project's records `hub.repository`, a listed project's its
+ * id. Each rebuild prints one line, its counts on standard output or
+ * its failure on standard error, and a failed one does not stop the
+ * next. The command exits 0 when every rebuild swapped its index in and
+ * 1 otherwise. A refused config and a connector that does not open each
+ * print one line on standard error, and the command exits 1; so do
+ * arguments naming neither the server nor this entry. A rebuild swaps a
+ * new index file in, and a server already running over the same store
+ * picks it up by its inode on its following query, so the two need no
  * signal between them.
  *
  * {@link runHub} and {@link runIndexRebuild} are the whole command but
@@ -35,17 +51,19 @@
  * file starts nothing.
  */
 import type { HubConfig } from './config.js';
+import type { HubIdentity } from './identity/port.js';
 import type { HubConnected, HubLog, HubServer } from './server.js';
-import type { IndexRebuildResult } from './store/port.js';
+import type { HubServedProject, IndexRebuildResult } from './store/port.js';
 
 import { basename, dirname } from 'node:path';
 
 import packageJson from '../package.json';
 
 import { HubConfigError, readHubConfig } from './config.js';
-import { GITHUB_API, openGitHubIdentity } from './identity/github.js';
+import { openApiKeyIdentity } from './identity/api-key.js';
+import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
 import { jsonLineLog, startHubServer } from './server.js';
-import { connectSqliteHub } from './store/sqlite.js';
+import { connectSqliteHub, servesOneProject } from './store/sqlite.js';
 
 /** The hub's version, as its `package.json` names it. */
 export const HUB_VERSION: string = packageJson.version;
@@ -78,8 +96,10 @@ export interface RunHubOptions {
 export async function runHub(env: Readonly<Record<string, string | undefined>>, options: RunHubOptions = {}): Promise<HubServer | null> {
   const log = options.log ?? jsonLineLog();
   let config;
+  let identity;
   try {
     config = await readHubConfig(env);
+    identity = openIdentity(config, env, options.githubApi ?? GITHUB_API);
   } catch (error) {
     if (!(error instanceof HubConfigError)) throw error;
 
@@ -87,25 +107,60 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     return null;
   }
 
-  const { repository, port, cacheForMs, rebuildAfterPush } = config;
+  const { repository, port, rebuildAfterPush } = config;
   return startHubServer({
     port,
     version: HUB_VERSION,
-    identity: openGitHubIdentity({ repository, cacheForMs, apiBase: options.githubApi ?? GITHUB_API }),
+    identity,
     openConnected: () => connectHub(config),
     rebuildAfterPush,
     project: repository,
+    projects: servedProjects(config),
     log,
   });
 }
 
-/** Opens the `sqlite` connector over `config`'s store, index and library. */
+/**
+ * The identity adapter `hub.auth.adapter` picks: `api-key` over the
+ * variables `hub.auth.apiKeys` names, read from `env` now, or `github`
+ * asking `apiBase` about each listed project's repository.
+ *
+ * @throws {HubConfigError} Under `api-key`, when a named variable is unset or empty.
+ */
+function openIdentity(config: HubConfig, env: Readonly<Record<string, string | undefined>>, apiBase: string): HubIdentity {
+  if (config.authAdapter === 'api-key') return openApiKeyIdentity({ variables: config.apiKeys, env });
+
+  return openGitHubIdentity({ repository: projectRepositoryResolver(config.projects), cacheForMs: config.cacheForMs, apiBase });
+}
+
+/** The projects `config` lists, by `id` and `name` alone, as the port and `/v1/status` know them. */
+function servedProjects(config: HubConfig): readonly HubServedProject[] {
+  return config.projects.map(({ id, name }) => Object.freeze({ id, name }));
+}
+
+/** Opens the `sqlite` connector over `config`'s projects, their stores and indexes, and its library. */
 function connectHub(config: HubConfig): Promise<HubConnected> {
-  const { storePath, sqliteLibrary, repository } = config;
+  const { storePath, sqliteLibrary, repository, projects } = config;
   return connectSqliteHub(
-    { directory: dirname(storePath), now: () => new Date() },
-    { fileName: basename(storePath), loader: { library: sqliteLibrary }, project: repository },
+    { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config) },
+    {
+      fileName: basename(storePath),
+      storeFiles: projects.map(({ id, storePath: file }) => ({ id, storePath: file })),
+      loader: { library: sqliteLibrary },
+      project: repository,
+    },
   );
+}
+
+/**
+ * The project each listed project's rebuild names: `hub.repository` for
+ * the one default project, which the index records, and each listed
+ * project's id otherwise, which routes the rebuild to its index.
+ */
+function rebuildProjects(config: HubConfig): readonly string[] {
+  return servesOneProject(config.projects)
+    ? [config.repository]
+    : config.projects.map(({ id }) => id);
 }
 
 /** The command `args` (the process's arguments past the script) name, or null for any other. */
@@ -151,10 +206,12 @@ export function rebuiltLine(result: IndexRebuildResult): string {
 
 /**
  * Reads the config `env` names, opens its connector, runs one rebuild
- * of `hub.repository`'s index and closes the store, answering the exit
- * code: 0 with the counts line on `out`, or 1 with one line on `err`
- * for a refused config, a connector that did not open or a rebuild that
- * failed. Never exits the process.
+ * of each listed project's index in turn and closes the store,
+ * answering the exit code: 0 when every rebuild swapped its index in,
+ * each printing its counts line on `out`, or 1 when one failed, its line
+ * on `err`, the others still run. A refused config and a connector that
+ * did not open answer 1 with one line on `err` and run no rebuild.
+ * Never exits the process.
  */
 export async function runIndexRebuild(env: Readonly<Record<string, string | undefined>>, options: RunIndexRebuildOptions = {}): Promise<number> {
   const out = options.out ?? ((line: string) => process.stdout.write(`${line}\n`));
@@ -176,12 +233,17 @@ export async function runIndexRebuild(env: Readonly<Record<string, string | unde
     err(`${REBUILD_PREFIX}: the store at ${config.storePath} did not open: ${oneLine(error)}`);
     return 1;
   }
+  let code = 0;
   try {
-    out(rebuiltLine(await connected.index.rebuild({ project: config.repository })));
-    return 0;
-  } catch (error) {
-    err(`${REBUILD_PREFIX}: the rebuild failed, and the live index is as it was: ${oneLine(error)}`);
-    return 1;
+    for (const project of rebuildProjects(config)) {
+      try {
+        out(rebuiltLine(await connected.index.rebuild({ project })));
+      } catch (error) {
+        err(`${REBUILD_PREFIX}: ${project}'s rebuild failed, and its live index is as it was: ${oneLine(error)}`);
+        code = 1;
+      }
+    }
+    return code;
   } finally {
     await connected.store.close();
   }

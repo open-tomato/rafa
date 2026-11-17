@@ -30,6 +30,7 @@
  * or in the run with the extension off, and the `none` run is held to pass.
  */
 import type { HubIndexConnector, HubIndexFiles } from './index-contract.js';
+import type { HubServedProject, HubStore } from './port.js';
 
 import { join } from 'node:path';
 
@@ -39,7 +40,7 @@ import { describe, expect, it } from 'bun:test';
 import { DEFAULT_STORE_FILE } from '../config.js';
 
 import { HUB_CONNECTORS } from './connectors.js';
-import { hubStoreContract } from './contract.js';
+import { builders, hubStoreContract, readTemplate } from './contract.js';
 import { hubIndexContract, INDEX_CONTRACT_EMBEDDER } from './index-contract.js';
 import { connectSqliteHub, indexFileName } from './sqlite.js';
 import { openMemoryHubStore } from './testdata/memory-store.js';
@@ -84,6 +85,60 @@ for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
 }
 
 hubStoreContract('in-memory stand-in', openMemoryHubStore);
+
+/** Two listed projects, as `hub.projects` would name them. */
+const PROJECT_ONE: HubServedProject = { id: '1'.repeat(40), name: 'open-tomato/one' };
+const PROJECT_TWO: HubServedProject = { id: '2'.repeat(40), name: 'open-tomato/two' };
+
+/** A device's store origin. */
+const DEVICE = 'dddddddd-0000-4000-8000-00000000000d';
+
+/** The clock every push of the stand-in below is stamped at. */
+const PUSHED_AT = '2026-11-16T10:00:00.000Z';
+
+describe('the in-memory stand-in\'s status over two projects', () => {
+  const template = readTemplate();
+  const { commit, payload } = builders(() => template);
+
+  /** The stand-in over both projects, with one row pushed to the second. */
+  const openPushedToTwo = async (): Promise<HubStore> => {
+    const store = openMemoryHubStore({ directory: '', now: () => new Date(PUSHED_AT), projects: [PROJECT_ONE, PROJECT_TWO] });
+    await store.push({ device: DEVICE, project: PROJECT_TWO.id, payload: payload({ commits: [commit(DEVICE, 1)] }) });
+    return store;
+  };
+
+  it('refuses a status naming a project not listed, with the line naming hub.projects', async () => {
+    const store = await openPushedToTwo();
+    const unlisted = '3'.repeat(40);
+
+    await expect(store.status({ project: unlisted })).rejects.toThrow(`rafa-hub: project ${unlisted} is not served here; add it under hub.projects`);
+  });
+
+  it('leaves the other project\'s rows, devices and migrations unchanged by a push to one', async () => {
+    const store = await openPushedToTwo();
+
+    const one = await store.status({ project: PROJECT_ONE.id });
+
+    expect({ rows: one.rows, devices: one.devices, migrations: one.migrations }).toEqual({ rows: {}, devices: [], migrations: [] });
+  });
+
+  it('answers the named project\'s rows, devices and migrations', async () => {
+    const store = await openPushedToTwo();
+
+    const two = await store.status({ project: PROJECT_TWO.id });
+
+    expect({ rows: two.rows, devices: two.devices, migrations: two.migrations })
+      .toEqual({ rows: { commits: 1 }, devices: [{ device: DEVICE, lastPushAt: PUSHED_AT }], migrations: template.migrations });
+  });
+
+  it('reads a status naming no project as the first listed project\'s, naming both projects', async () => {
+    const store = await openPushedToTwo();
+
+    const unnamed = await store.status();
+
+    expect(unnamed).toEqual({ ...await store.status({ project: PROJECT_ONE.id }), projects: [PROJECT_ONE, PROJECT_TWO] });
+  });
+});
 
 /** The package directory, whose `tsconfig.json` maps the core subpaths. */
 const PACKAGE_DIR = join(import.meta.dir, '..', '..');
@@ -170,6 +225,11 @@ const FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
   ]],
   ['forgets-last-push', ['last push per device > records each device\'s latest push at the clock\'s time, in device order']],
   ['miscounts', ['push > counts the rows it holds per table']],
+  ['shares-projects', [
+    'projects > refuses a push, a pull and a status naming a project not listed, with the line naming hub.projects, and adds nothing',
+    'projects > answers a pull from one project none of the other project\'s rows',
+    'projects > leaves the other project\'s row counts and devices unchanged by a push to one',
+  ]],
   ['edits-rows', ['pull > carries every column as pushed but the recomputed gap, with seq the hub\'s own in rising order past the cursor']],
 ];
 

@@ -41,9 +41,11 @@ environment variable is set to `/data/rafa-hub.yaml`.
 
 ### `hub.repository`
 
-The GitHub repository whose read permission decides who may sync with the hub,
-as `owner/name`. This key is required; there is no default. It is kept as
-written; GitHub's characters are accepted.
+The GitHub repository whose permission decides who may sync with the hub, as
+`owner/name`. A caller needs `write`, `maintain` or `admin` on it; `read` and
+`triage` are refused. This key is required unless `hub.projects` is set, and
+refused beside it; there is no default. It is kept as written; GitHub's
+characters are accepted.
 
 ### `hub.port`
 
@@ -55,6 +57,45 @@ The port the hub listens on. Must be a whole number from 1 to 65535. Defaults to
 The absolute or relative path of the hub's SQLite store. Relative paths are
 resolved against the config file's directory, so the hub opens the same store
 however it is started. Defaults to `rafa-hub.sqlite` beside the config file.
+Refused beside `hub.projects`, where each project names its own.
+
+### `hub.projects`
+
+The projects the hub serves, as a non-empty list. Each entry holds exactly
+four keys: `id`, the project's root commit sha as 40 lowercase hex characters;
+`name`, any non-empty text; `repository`, read as `hub.repository` is; and
+`storePath`, required and resolved as `hub.storePath` is. Two entries with one
+`id`, or whose `storePath` names one file, are refused. Set, it replaces
+`hub.repository` and `hub.storePath`, and either key beside it is refused.
+
+A push or a pull names its project by `project`, and one naming none is the
+first listed project's. A push or a pull naming a project that is not listed is
+answered `404` with this line:
+
+```text
+rafa-hub: project <id> is not served here; add it under hub.projects
+```
+
+Left out, the hub serves one project, with id `default`, named `hub.repository`,
+in `hub.storePath`. That one project answers every request in it, whatever
+`project` the request names or leaves out, so the refusal above never comes up.
+
+### `hub.auth.adapter` and `hub.auth.apiKeys`
+
+`hub.auth.adapter` names how the hub identifies a caller: `github`, the
+default, or `api-key`; any other value is refused. `hub.auth.apiKeys` lists the
+names of environment variables, never the keys themselves, each matching
+`^[A-Z_][A-Z0-9_]*$`, such as `RAFA_HUB_KEY`. It is required and non-empty under
+`api-key`, and refused under `github`. An entry that is no variable name is
+refused by its position, such as `hub.auth.apiKeys[1]`, and the refusal never
+repeats what was written, in case a key was pasted in place of its name.
+
+Under `api-key`, the hub reads each named variable once, when it starts, and
+serves a request whose `Authorization: Bearer` equals one of their values. If a
+named variable is unset or empty, the hub logs one `config.refused` line naming
+the variable and exits 1. Under `github`, a push or a pull naming a listed
+project is checked against that project's `repository`. Every other request is
+checked against the first listed project's.
 
 ### `hub.auth.cacheFor`
 
@@ -76,12 +117,26 @@ stays off with this line set, because no embedder ships in this release; see
 
 ### `hub.index.rebuildAfterPush`
 
-Whether the hub rebuilds the index of `hub.repository` after a push that added
+Whether the hub rebuilds the index of the pushed project after a push that added
 rows. `true`, the default, rebuilds it after each such push; `false` leaves
 rebuilds to `rafa-hub index rebuild`, run by the operator. Only the two booleans
 are read: `'false'` and `0` are refused.
 
 ### Example configuration
+
+The lightest configuration names only the repository:
+
+```yaml
+hub:
+  repository: open-tomato/rafa
+```
+
+It serves one project from `rafa-hub.sqlite` beside the config, on port `7373`,
+with a `10m` token cache, the index rebuilt after each push, and GitHub asked
+about each token's permission. The lightest one that runs without GitHub is in
+[Running a local hub](#running-a-local-hub).
+
+A macOS hub that leaves rebuilds to the operator:
 
 ```yaml
 hub:
@@ -99,8 +154,45 @@ hub:
 This example is a macOS hub that leaves rebuilds to the operator. With `port`,
 `auth.cacheFor`, `store.sqliteLibrary` and `index.rebuildAfterPush` left out,
 they take their defaults: `7373`, `10m`, none and `true`. The lightest
-configuration has neither index key: it answers `fts`, and `graph` when the
-store holds `ref_links`, and `vector: false` with the notice below.
+configuration above has neither index key: it answers `fts`, and `graph` when
+the store holds `ref_links`, and `vector: false` with the notice below.
+
+## Running a local hub
+
+A hub on this machine for one device takes one config, one exported key and a
+`hub.url` in the device's config. The config names the `api-key` adapter, so
+the hub asks GitHub about nothing and the key is the only caller it knows:
+
+```yaml
+hub:
+  repository: open-tomato/rafa
+  auth:
+    adapter: api-key
+    apiKeys: [RAFA_HUB_KEY]
+```
+
+Save it as `rafa-hub.yaml`, export the key the config names, and start the hub
+over the config:
+
+```shell
+export RAFA_HUB_KEY=<a long random value>
+RAFA_HUB_CONFIG=./rafa-hub.yaml bun packages/rafa-hub/src/bin.ts
+```
+
+The device's project names the hub and the secret holding the key. The device
+sends its secret as the bearer token, so the secret must hold the same value as
+`RAFA_HUB_KEY`:
+
+```yaml
+effort:
+  sync: service
+hub:
+  url: http://127.0.0.1:<port>
+  tokenSecret: rafa-hub-key
+```
+
+`<port>` is the port the hub config names, `7373` when `hub.port` is left out.
+The secret is read from the system secret store, not from the environment.
 
 ## The index
 
@@ -124,13 +216,17 @@ hub's host:
 rafa-hub index rebuild
 ```
 
-It reads the same config as the server, rebuilds the index of `hub.repository`
-and prints one line on standard output, then exits 0. The line names the
-repository, the stamp, the row and vector counts per table, and the vector
-state, which reads `vector off: no embedder configured` in this release.
+It reads the same config as the server and rebuilds the index of every listed
+project in turn. For each one it prints one line on standard output, and exits 0
+once all of them are rebuilt. A line names the project (`hub.repository` with
+`hub.projects` left out, the project's id otherwise), the stamp, the row and
+vector counts per table, and the vector state, which reads `vector off: no
+embedder configured` in this release.
 
-A refused config, a store that does not open or a failed rebuild prints one
-line on standard error and exits 1, leaving the live index as it was. A server
+A failed rebuild prints one line on standard error and leaves that project's
+live index as it was. The other projects are still rebuilt, and the command
+exits 1. A refused config or a store that does not open prints one line on
+standard error and exits 1 without rebuilding anything. A server
 already running over the store picks up the new index file on its next query,
 so it needs no restart. In the Docker container, run it with
 `docker exec <container> bun /app/rafa-hub.js index rebuild`.
@@ -147,11 +243,22 @@ SQLite loads no extension`.
 
 ## Who may sync
 
-Anyone with read access to the repository the `hub.repository` key names may
-sync with the hub. The hub asks GitHub's public API about their permission; no
-deploy keys or personal access tokens are needed on the hub side. The client's
-token (a GitHub token read with `Bun.secrets`) is sent by each device in the
-`Authorization` header of each request.
+Under `github`, a caller whose permission on the repository a project's
+`repository` key names is `write`, `maintain` or `admin` may sync with that
+project; `read` and `triage` are refused. With `hub.projects` left out, that is
+`hub.repository`. The hub asks GitHub's public API about the caller's
+permission; no deploy keys or personal access tokens are needed on the hub side.
+The client's token (a GitHub token read with `Bun.secrets`) is sent by each
+device in the `Authorization` header of each request. Under `api-key`, GitHub is
+not asked: a caller is served by holding one of the keys `hub.auth.apiKeys`
+names.
+
+## The device's `hub.project`
+
+A device names the project it syncs on the hub with `hub.project` in its
+`.rafa/config.yaml`, sent as `project` on each push and pull. Left out, it is
+the root commit sha of the repository holding the store, the `id` that
+`hub.projects` lists for that project, so nobody is expected to set it.
 
 ## What the ad-hoc recipe lacks
 

@@ -8,6 +8,11 @@
  *
  * Each fault wraps the working stand-in rather than forking it, so the
  * one rule it breaks is the only difference.
+ *
+ * With {@link FORBIDS_ENV} set to `false`, the stand-in registers with
+ * `{ forbids: false }` and its subject names no forbidden headers, as
+ * a scheme with no forbidden caller does; `contract.test.ts` holds that
+ * the suite still fails a fault under it.
  */
 import type { HubIdentity, IdentityAnswer } from '../port.js';
 
@@ -17,6 +22,9 @@ import { memoryIdentitySubject } from './memory-identity.js';
 
 /** The environment variable naming the fault to plant. */
 export const FAULT_ENV = 'RAFA_HUB_IDENTITY_FAULT';
+
+/** The environment variable that, set to `false`, registers with `{ forbids: false }`. */
+export const FORBIDS_ENV = 'RAFA_HUB_IDENTITY_FORBIDS';
 
 /** `identity` with every answer passed through `change`. */
 function mapAnswers(identity: HubIdentity, change: (answer: IdentityAnswer, request: Request) => IdentityAnswer): HubIdentity {
@@ -89,7 +97,12 @@ const fault = process.env[FAULT_ENV] ?? '';
 const plant = FAULTS[fault];
 if (plant === undefined) throw new Error(`${FAULT_ENV} is ${JSON.stringify(fault)}; expected one of ${Object.keys(FAULTS).join(', ')}`);
 
+const forbids = process.env[FORBIDS_ENV] !== 'false';
+
 identityContract(fault, () => {
-  const subject = memoryIdentitySubject();
-  return { ...subject, identity: plant(subject.identity) };
-});
+  const { forbidden, ...subject } = memoryIdentitySubject();
+  const planted = { ...subject, identity: plant(subject.identity) };
+  return forbids
+    ? { ...planted, forbidden }
+    : planted;
+}, { forbids });

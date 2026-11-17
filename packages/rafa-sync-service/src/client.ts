@@ -14,8 +14,8 @@
  *     payload, checked whole by core's `decodeWirePayload`.
  *   - {@link HubClient.status}: `GET /v1/status`; answers the hub's
  *     version, migrations, rows per table and each device's last push,
- *     with the wire contract it speaks: `contractVersion` and
- *     `capabilities`.
+ *     with the wire contract it speaks, `contractVersion` and
+ *     `capabilities`, and the projects it serves, `projects`.
  *
  * ## The contract version
  *
@@ -31,6 +31,17 @@
  * on push and pull. Whether the two versions match is not this
  * client's to judge: it sends what it speaks, and the hub refuses
  * another with a `409`.
+ *
+ * ## The project
+ *
+ * A hub that serves projects names them on `/v1/status` as `projects`,
+ * each by `id` and `name`; a hub one release behind names none, which
+ * reads as an empty list with {@link HubStatusAnswer.projectsNamed}
+ * false, never as a malformed answer. Push and pull send the
+ * {@link HubClientOptions.project} a client is made with as
+ * `project=<id>` only when the kept status answer names `projects`, for
+ * the same reason as `contractVersion`: that older hub refuses a query
+ * name it does not read. A client made with no project sends none.
  *
  * Every call sends the token as `Authorization: Bearer <token>` and
  * reads the hub's one envelope, `{ "success": true, "data": … }` or
@@ -126,6 +137,14 @@ export interface HubDeviceAnswer {
   readonly lastPushAt: string;
 }
 
+/** One project a hub serves, as `/v1/status` names it. */
+export interface HubProjectAnswer {
+  /** The project's id: its root commit sha, or `default` on a single-project hub. */
+  readonly id: string;
+  /** The project's name, as `hub.projects` lists it. */
+  readonly name: string;
+}
+
 /** What a status call answers. */
 export interface HubStatusAnswer {
   readonly version: string;
@@ -138,6 +157,10 @@ export interface HubStatusAnswer {
   readonly capabilities: Readonly<Record<string, boolean>>;
   /** Whether the hub named `contractVersion`; push and pull send the field only when it did. */
   readonly contractNamed: boolean;
+  /** The projects the hub serves, in the order it names them; empty when it names none. */
+  readonly projects: readonly HubProjectAnswer[];
+  /** Whether the hub named `projects`; push and pull send `project` only when it did. */
+  readonly projectsNamed: boolean;
 }
 
 /** What a client is made with. */
@@ -148,6 +171,11 @@ export interface HubClientOptions {
   readonly token: string;
   /** How long one call may take, in milliseconds: the resolved `hub.timeout`. */
   readonly timeoutMs: number;
+  /**
+   * The project push and pull name, sent as `project` only to a hub
+   * whose status names `projects`; none is sent when left out.
+   */
+  readonly project?: string;
   /** The fetch to call; the global `fetch` when left out. */
   readonly fetch?: typeof fetch;
 }
@@ -257,6 +285,22 @@ function readContract(data: Record<string, unknown>): Pick<HubStatusAnswer, 'con
   };
 }
 
+/** Whether `value` is a project entry of a status answer: an id and a name, both text. */
+function isProject(value: unknown): value is HubProjectAnswer {
+  return isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string';
+}
+
+/** The project fields of a status answer's `data`, absent ones read as a hub one release behind. */
+function readProjects(data: Record<string, unknown>): Pick<HubStatusAnswer, 'projects' | 'projectsNamed'> {
+  const projectsNamed = data.projects !== undefined;
+  if (!projectsNamed) return { projects: Object.freeze([]), projectsNamed };
+  if (!Array.isArray(data.projects) || !data.projects.every(isProject)) {
+    throw new HubAnswerMalformed('the hub\'s answer to status holds projects that are not a list of id and name strings');
+  }
+  const projects = data.projects.map(({ id, name }) => Object.freeze({ id, name }));
+  return { projects: Object.freeze(projects), projectsNamed };
+}
+
 /** `data` as a status answer, or a {@link HubAnswerMalformed}. */
 function readStatusAnswer(data: unknown): HubStatusAnswer {
   const valid = isRecord(data)
@@ -268,7 +312,7 @@ function readStatusAnswer(data: unknown): HubStatusAnswer {
     throw new HubAnswerMalformed('the hub\'s answer to status holds no version, migrations, rows and devices');
   }
   const { version, migrations, rows, devices } = data as unknown as HubStatusAnswer;
-  return Object.freeze({ version, migrations, rows, devices, ...readContract(data) });
+  return Object.freeze({ version, migrations, rows, devices, ...readContract(data), ...readProjects(data) });
 }
 
 /** The `contractVersion` query a push or pull sends to the hub `status` answered: none when it named none. */
@@ -276,6 +320,18 @@ function contractQuery(status: HubStatusAnswer): Readonly<Record<string, string>
   return status.contractNamed
     ? { contractVersion: String(WIRE_CONTRACT_VERSION) }
     : {};
+}
+
+/** The `project` query a push or pull sends to the hub `status` answered: none when it named no projects or the client has none. */
+function projectQuery(status: HubStatusAnswer, project: string | undefined): Readonly<Record<string, string>> {
+  return status.projectsNamed && project !== undefined
+    ? { project }
+    : {};
+}
+
+/** The contract and project query a push or pull sends to the hub `status` answered. */
+function syncQuery(status: HubStatusAnswer, options: HubClientOptions): Readonly<Record<string, string>> {
+  return { ...projectQuery(status, options.project), ...contractQuery(status) };
 }
 
 /** `data` as a wire payload, checked whole by core's codec, or a {@link HubAnswerMalformed}. */
@@ -357,7 +413,7 @@ export function createHubClient(options: HubClientOptions): HubClient {
   const status = keptStatus(options);
   return Object.freeze({
     push: async (device: string, payload: WirePayload) => {
-      const contract = contractQuery(await status());
+      const contract = syncQuery(await status(), options);
       return readPushAnswer(await send(options, {
         method: 'POST',
         path: HUB_CLIENT_ROUTES.push,
@@ -367,7 +423,7 @@ export function createHubClient(options: HubClientOptions): HubClient {
       }));
     },
     pull: async (device: string, since: WireCursor) => {
-      const contract = contractQuery(await status());
+      const contract = syncQuery(await status(), options);
       return readPullAnswer(await send(options, {
         method: 'GET',
         path: HUB_CLIENT_ROUTES.pull,

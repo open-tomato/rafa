@@ -204,7 +204,7 @@ describe('a contact that reaches the hub', () => {
     await contact.pushThenPull();
     await contact.pull();
 
-    expect(service.contexts).toEqual([{ repoRoot: ROOT, store: 'sqlite', hub: { url: HUB_URL, tokenSecret: null, timeoutMs: 3000 } }]);
+    expect(service.contexts).toEqual([{ repoRoot: ROOT, store: 'sqlite', hub: { url: HUB_URL, tokenSecret: null, timeoutMs: 3000, project: null } }]);
     expect(service.calls).toHaveLength(3);
   });
 

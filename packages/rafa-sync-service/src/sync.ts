@@ -66,6 +66,19 @@
  * other, which brings it to every migration this build knows, and its
  * export names them. The store subpath exports no catalogue.
  *
+ * ## The project
+ *
+ * Push and pull name the store's project to the hub as `project`: the
+ * resolved `hub.project` when it is set, or else the root commit of the
+ * repository at `repoRoot`, core's `readProjectIdentity(repoRoot)
+ * .rootCommit`, read once per strategy, at its first contact after the
+ * store's origin. Nobody is expected to set `hub.project`. A repository
+ * with no commit has no root commit, so with `hub.project` unset push
+ * and pull are refused with {@link ServiceSyncRefusal} in one line
+ * naming both, before the token or the status is read: nothing is sent
+ * or merged, and no cursor moves. The hub client sends the project only
+ * to a hub whose status names `projects` (`client.ts`).
+ *
  * ## The contract version
  *
  * Each push and pull reads the hub's status before it exports or asks
@@ -121,6 +134,7 @@ import {
   WIRE_FORMAT,
   WIRE_VERSION,
 } from '@open-tomato/rafa/store';
+import { readProjectIdentity } from '@open-tomato/rafa/store/store-identity';
 import { Database } from 'bun:sqlite';
 
 import { createHubClient } from './client.js';
@@ -207,6 +221,8 @@ export interface ServiceHub {
   readonly tokenSecret: string | null;
   /** The resolved `hub.timeout`, in milliseconds. */
   readonly timeoutMs: number;
+  /** The resolved `hub.project`; null or left out reads the repository's root commit. */
+  readonly project?: string | null;
 }
 
 /** The fields of core's `AdapterContext` this strategy reads. */
@@ -289,6 +305,18 @@ function readOrigin(path: string): string {
   );
 }
 
+/** The project push and pull name: `hub.project`, or else `repoRoot`'s root commit; see the module note. */
+function resolveProject(repoRoot: string, configured: string | null | undefined): string {
+  if (configured !== null && configured !== undefined) return configured;
+  const { rootCommit } = readProjectIdentity(repoRoot);
+  if (rootCommit !== null) return rootCommit;
+  throw new ServiceSyncRefusal(
+    `${REFUSAL}: the repository at ${repoRoot} has no root commit and hub.project is not set,`
+      + ' so the hub could not tell which project its rows belong to. Nothing was sent.'
+      + ' Next safe step: commit once in the repository, or set hub.project in .rafa/config.yaml',
+  );
+}
+
 /** The rows `payload` carries, across its tables. */
 function rowsIn(payload: WirePayload): number {
   return Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
@@ -326,10 +354,13 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
   const statePath = syncStatePath(storePath);
   let client: Promise<HubClient> | undefined;
   let known: readonly string[] | undefined;
+  let project: string | undefined;
 
   const hubClient = (): Promise<HubClient> => {
+    project ??= resolveProject(options.repoRoot, hub.project);
+    const named = project;
     client ??= readHubToken(hub.tokenSecret, options.readSecret ?? defaultSecretReader())
-      .then((token) => createHubClient({ url: hub.url, token, timeoutMs: hub.timeoutMs, fetch: options.fetch }));
+      .then((token) => createHubClient({ url: hub.url, token, timeoutMs: hub.timeoutMs, project: named, fetch: options.fetch }));
     return client;
   };
 

@@ -7,7 +7,8 @@
  * The identity stand-in reads a scheme the default adapter does not,
  * a key in `x-hub-key`, so the suite cannot lean on `Authorization`.
  * The store stand-in keeps rows in `Map`s by origin pair, and counts
- * its hub `seq` per table apart from the rows it holds.
+ * its hub `seq` per table apart from the rows it holds. It keeps one such
+ * store per project the context lists, and one for a context listing none.
  */
 import type { HubAction, HubIdentity, IdentityAnswer } from './identity/port.js';
 import type {
@@ -15,6 +16,7 @@ import type {
   HubPullRequest,
   HubPushRequest,
   HubPushResult,
+  HubStatusRequest,
   HubStore,
   HubStoreContext,
   HubStoreStatus,
@@ -76,8 +78,8 @@ function pairKey(row: WireRow): string {
   return JSON.stringify([row['origin_store'], row['origin_seq']]);
 }
 
-/** The stand-in store: `Map`s by origin pair, a `seq` counter per table. */
-function openMapStore(context: HubStoreContext): HubStore {
+/** One project's stand-in store: `Map`s by origin pair, a `seq` counter per table. */
+function openMapProjectStore(context: HubStoreContext): HubStore {
   let tables = new Map<string, MapTable>();
   let migrations: readonly string[] = [];
   let devices = new Map<string, string>();
@@ -133,6 +135,39 @@ function openMapStore(context: HubStoreContext): HubStore {
   });
 
   return { push, pull, status, contract, close: () => Promise.resolve() };
+}
+
+/** The stand-in over every project the context lists: one project store each, routed by the request's `project`. */
+function openMapStore(context: HubStoreContext): HubStore {
+  const listed = context.projects ?? [];
+  if (listed.length === 0) return openMapProjectStore(context);
+  const stores = new Map(listed.map(({ id }) => [id, openMapProjectStore(context)]));
+  const first = stores.get(listed[0]?.id ?? '');
+  const route = (project: string | undefined): HubStore => {
+    const store = project === undefined
+      ? first
+      : stores.get(project);
+    if (store === undefined) throw new Error(`rafa-hub: project ${String(project)} is not served here; add it under hub.projects`);
+    return store;
+  };
+  const refuse = <T>(run: () => Promise<T>): Promise<T> => {
+    try {
+      return run();
+    } catch (error) {
+      return Promise.reject(error as Error);
+    }
+  };
+  const status = (request: HubStatusRequest = {}): Promise<HubStoreStatus> => refuse(async () => ({
+    ...await route(request.project).status(),
+    projects: listed.map(({ id, name }) => ({ id, name })),
+  }));
+  return {
+    push: (request) => refuse(() => route(request.project).push(request)),
+    pull: (request) => refuse(() => route(request.project).pull(request)),
+    status,
+    contract: () => route(undefined).contract(),
+    close: () => Promise.resolve(),
+  };
 }
 
 hubStoreContract('map stand-in written in the test', (context) => openMapStore(context));

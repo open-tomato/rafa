@@ -13,18 +13,27 @@
  *   - `GET /v1/status` (`status.read`): the hub's version, the migration
  *     ids its store holds, its rows per table and each device's last push,
  *     with the store's wire contract beside them: `contractVersion`,
- *     `migrations` (the same ids) and `capabilities`.
- *   - `POST /v1/effort/push?device=<origin>&contractVersion=<n>`
+ *     `migrations` (the same ids) and `capabilities`. The rows, devices
+ *     and migrations are the first served project's, and `projects`
+ *     names every project the store serves, each by `id` and `name` in
+ *     the order listed, as the store's `status()` answers them; a store
+ *     answering none leaves `projects` out.
+ *   - `POST /v1/effort/push?device=<origin>&project=<id>&contractVersion=<n>`
  *     (`effort.push`): the body is a wire payload as core's
  *     `encodeWirePayload` writes it, checked by core's
  *     `decodeWirePayload`; answers what the push received and added.
- *   - `GET /v1/effort/pull?device=<origin>&since=<cursor>&contractVersion=<n>`
+ *   - `GET /v1/effort/pull?device=<origin>&project=<id>&since=<cursor>&contractVersion=<n>`
  *     (`effort.pull`): the rows other origins created past `since`, a
  *     wire cursor as JSON text and read from the start when left out, as
  *     a wire payload.
  *
  * `device` is the calling store's origin, its rows' `origin_store`.
- * `contractVersion` is the wire contract version the caller speaks, a
+ * `project` is the project the rows are for, its root commit sha as 40
+ * lowercase hex characters; a request naming none is the first listed
+ * project's, as the store reads it. On a hub handed no
+ * {@link HubServerOptions.projects}, or the one `default` project alone,
+ * every project a request names is served, in the one project of a
+ * single-project hub. `contractVersion` is the wire contract version the caller speaks, a
  * whole number above zero written in digits, `1` when left out; the
  * hub speaks core's `WIRE_CONTRACT_VERSION` and serves no other. A
  * route takes no query parameter it does not name, so a misspelt one
@@ -45,8 +54,16 @@
  *     actions leave out the route's;
  *   - `503` while the store has not opened;
  *   - `400` for a query or body the route cannot read, a
- *     `contractVersion` that is not a whole number above zero and a
- *     `WireFormatError` from the store included;
+ *     `contractVersion` that is not a whole number above zero, a
+ *     `project` that is not a root commit sha and a `WireFormatError`
+ *     from the store included;
+ *   - `404` for a push or a pull naming a project the hub does not
+ *     serve, its error the store's `HubProjectNotServed` line,
+ *     `rafa-hub: project <id> is not served here; add it under
+ *     hub.projects`: refused once the query is read, before the body is
+ *     read, when the project is not among
+ *     {@link HubServerOptions.projects}, and by the store's own refusal
+ *     otherwise;
  *   - `409` with `"code": "contract-unsupported"` for a push or a pull
  *     naming a contract version the hub does not speak, its error naming
  *     both versions; refused once the query is read, before the body is
@@ -74,20 +91,26 @@
  *
  * With `rebuildAfterPush` set, a push whose answer has `added` above
  * zero starts one `index.rebuild({ project })` over the index
- * `openConnected` opened, `project` being the hub's repository. The
- * push is answered without awaiting it, and its status and body are the
- * same whatever the rebuild does. At most one rebuild runs at a time: a
- * push adding rows while one runs queues one more, which starts once it
- * ends, and further pushes during it queue nothing beyond that one, since
- * one rebuild reads every row the store holds when it starts. A push
- * adding nothing starts none. Each rebuild logs one `index.rebuilt` line
+ * `openConnected` opened, for the pushed project's index: `project` is
+ * the project the push named, or the first listed project's id for a
+ * push naming none, and on a single-project hub always
+ * {@link HubServerOptions.project}, the hub's repository, whatever the
+ * push named. The push is answered without awaiting it, and its status
+ * and body are the same whatever the rebuild does. At most one rebuild
+ * of a project runs at a time: a push to it adding rows while one runs
+ * queues one more, which starts once it ends, and further pushes to it
+ * during it queue nothing beyond that one, since one rebuild reads every
+ * row the project's store holds when it starts. Two projects' rebuilds
+ * run side by side, each over its own index. A push adding nothing
+ * starts none. Each rebuild logs one `index.rebuilt` line
  * with its counts or one `index.rebuild-failed` line with its error; a
  * failed rebuild leaves the live index as it was and the next push adding
- * rows starts another. `stop` awaits a running rebuild before closing the
- * store, and drops a queued one, which the next start's first push adding
- * rows or `rafa-hub index rebuild` makes up. `rebuildAfterPush` without
- * `openConnected` or `project` is refused when the server starts, since
- * there is no index to rebuild or no project to name.
+ * rows starts another. `stop` awaits every running rebuild before closing
+ * the store, and drops every queued one, which the next start's first push
+ * adding rows or `rafa-hub index rebuild` makes up. `rebuildAfterPush`
+ * without `openConnected`, or on a single-project hub without `project`,
+ * is refused when the server starts, since there is no index to rebuild
+ * or no project to name.
  *
  * ## Logs
  *
@@ -96,7 +119,8 @@
  * Every request logs one `request` line holding its method, path,
  * status and milliseconds, the caller when the identity port named one,
  * the refusal reason when it refused, the device with its row counts
- * for a push or a pull, and the error a `4xx` from the route answered.
+ * for a push or a pull, the project when the request named one, and
+ * the error a `4xx` from the route answered.
  * A line never holds a request's headers or its query, so no token
  * reaches the log; of a body it holds only what a wire refusal quotes.
  * An index rebuild logs `index.rebuilt` at `info`, holding its project,
@@ -105,12 +129,13 @@
  * the error's message and its milliseconds.
  */
 import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusalReason } from './identity/port.js';
-import type { HubIndex, HubStore } from './store/port.js';
+import type { HubIndex, HubServedProject, HubStore } from './store/port.js';
 import type { WireCursor } from '@open-tomato/rafa/store';
 
-import { decodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
+import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
 
-import { HubUpgradeRequired } from './store/sqlite.js';
+import { checkContractVersion, checkQuery, ContractUnsupported, readDevice, readProject, RequestRefused } from './server-query.js';
+import { HubProjectNotServed, HubUpgradeRequired, servesOneProject } from './store/sqlite.js';
 
 /** The path each route answers on. */
 export const HUB_ROUTES: Readonly<{
@@ -139,12 +164,6 @@ export const INTERNAL_ERROR = 'The hub failed to serve this request; the hub\'s 
 
 /** The `code` a `409` carries for a contract version the hub does not speak. */
 export const CONTRACT_UNSUPPORTED = 'contract-unsupported';
-
-/** A `contractVersion` as the query spells it: a whole number above zero, in digits with no leading zero. */
-const CONTRACT_VERSION = /^[1-9][0-9]*$/;
-
-/** A device, as `device` names it: 1 to 200 printable ASCII characters, as a store's origin is. */
-const DEVICE = /^[!-~]{1,200}$/;
 
 /** The status each identity refusal is answered with. */
 const REFUSAL_STATUS: Readonly<Record<IdentityRefusalReason, number>> = Object.freeze({
@@ -199,8 +218,16 @@ export interface HubServerOptions {
   readonly openConnected?: () => Promise<HubConnected>;
   /** Whether a push that added rows starts an index rebuild; see the module note. `false` when left out. */
   readonly rebuildAfterPush?: boolean;
-  /** The project a rebuild records, the hub's repository; required with `rebuildAfterPush`. */
+  /** The project a rebuild records on a single-project hub, the hub's repository; required there with `rebuildAfterPush`. */
   readonly project?: string;
+  /**
+   * The projects the store serves, as the connector was handed them, in
+   * `hub.projects` order: a push or a pull naming another is refused
+   * `404` before its body is read, and a rebuild after a push names the
+   * pushed project. Left out, empty, or the one `default` project alone,
+   * the hub is single-project; see the module note.
+   */
+  readonly projects?: readonly HubServedProject[];
   /** Where log lines go; {@link jsonLineLog} to standard output when left out. */
   readonly log?: HubLog;
 }
@@ -221,26 +248,6 @@ export interface HubServer {
   readonly stop: () => Promise<void>;
 }
 
-/** A request the route cannot read, answered with its status and one line. */
-class RequestRefused extends Error {
-  override readonly name = 'RequestRefused';
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-/** A push or a pull naming a contract version the hub does not speak: `409`, with {@link CONTRACT_UNSUPPORTED}. */
-class ContractUnsupported extends Error {
-  override readonly name = 'ContractUnsupported';
-
-  constructor(asked: number) {
-    super(`The request speaks wire contract version ${String(asked)}; this hub speaks version ${String(WIRE_CONTRACT_VERSION)}.`);
-  }
-}
-
 /** A request's answer, with what its log line adds. */
 interface Served {
   readonly response: Response;
@@ -255,8 +262,10 @@ interface RouteContext {
   readonly request: Request;
   readonly store: HubStore;
   readonly version: string;
-  /** Starts an index rebuild, or queues one; a no-op when the hub rebuilds nothing after a push. Never throws. */
-  readonly rebuild: () => void;
+  /** The projects the hub lists, or null on a single-project hub, which serves every project a request names. */
+  readonly listed: readonly HubServedProject[] | null;
+  /** Starts a rebuild of the index of the project a push named, or queues one; a no-op when the hub rebuilds nothing after a push. Never throws. */
+  readonly rebuild: (project: string | undefined) => void;
 }
 
 /** A route behind the identity port. */
@@ -271,7 +280,7 @@ interface Route {
 /** The open store, with the rebuild a push adding rows starts. */
 interface Held {
   readonly store: HubStore;
-  readonly rebuild: () => void;
+  readonly rebuild: (project: string | undefined) => void;
 }
 
 /** The store, opened once and opened again after a failed attempt. */
@@ -282,11 +291,11 @@ interface StoreHolder {
   readonly close: () => Promise<void>;
 }
 
-/** Index rebuilds, one at a time with one queued. */
+/** Index rebuilds, one at a time per project with one queued. */
 interface Rebuilds {
-  /** Starts a rebuild, or queues one while one runs. */
-  readonly request: () => void;
-  /** Drops a queued rebuild and awaits the running one. */
+  /** Starts a rebuild of `project`'s index, or queues one while one of it runs. */
+  readonly request: (project: string) => void;
+  /** Drops every queued rebuild and awaits every running one. */
   readonly settle: () => Promise<void>;
 }
 
@@ -332,44 +341,6 @@ function refusalResponse(refusal: IdentityRefusal): Response {
   return failure(status, refusal.message, headers);
 }
 
-/** Refuses a query parameter `route` does not read, or one given twice. */
-function checkQuery(url: URL, allowed: readonly string[]): void {
-  const names = [...url.searchParams.keys()];
-  const unknown = names.find((name) => !allowed.includes(name));
-  if (unknown !== undefined) {
-    const expected = allowed.length === 0
-      ? 'this route takes none'
-      : `expected ${allowed.join(', ')}`;
-    throw new RequestRefused(400, `The query names ${JSON.stringify(unknown)}; ${expected}.`);
-  }
-  const twice = names.find((name, index) => names.indexOf(name) !== index);
-  if (twice !== undefined) throw new RequestRefused(400, `The query names ${twice} more than once.`);
-}
-
-/** The `device` the query names, refused when absent or not an origin. */
-function readDevice(url: URL): string {
-  const device = url.searchParams.get('device');
-  if (device === null) throw new RequestRefused(400, 'The query names no device; expected device=<the store\'s origin>.');
-  if (!DEVICE.test(device)) throw new RequestRefused(400, 'device is not a store origin; expected 1 to 200 printable ASCII characters.');
-  return device;
-}
-
-/**
- * Refuses the contract version the query names unless it is the hub's,
- * `1` when left out: `400` for a value that is not a whole number above
- * zero, {@link ContractUnsupported} for another version.
- */
-function checkContractVersion(url: URL): void {
-  const spelt = url.searchParams.get('contractVersion');
-  if (spelt === null) return;
-
-  const asked = Number(spelt);
-  if (!CONTRACT_VERSION.test(spelt) || !Number.isSafeInteger(asked)) {
-    throw new RequestRefused(400, `contractVersion is ${JSON.stringify(spelt)}; expected a whole number above zero, such as ${String(WIRE_CONTRACT_VERSION)}.`);
-  }
-  if (asked !== WIRE_CONTRACT_VERSION) throw new ContractUnsupported(asked);
-}
-
 /** The cursor `since` spells, `{}` when left out, checked by core's wire codec. */
 function readCursor(url: URL): WireCursor {
   const since = url.searchParams.get('since');
@@ -383,6 +354,13 @@ function readCursor(url: URL): WireCursor {
   }
   const probe = { format: WIRE_FORMAT, version: WIRE_VERSION, migrations: [], tables: {}, cursor: parsed };
   return decodeWirePayload(JSON.stringify(probe)).cursor;
+}
+
+/** The log field naming `project`, none when the request named none. */
+function projectField(project: string | undefined): Readonly<Record<string, string>> {
+  return project === undefined
+    ? {}
+    : { project };
 }
 
 /** The rows across every table of `tables`. */
@@ -401,26 +379,28 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
   [HUB_ROUTES.push]: {
     method: 'POST',
     action: 'effort.push',
-    query: ['device', 'contractVersion'],
-    handle: async ({ url, request, store, rebuild }) => {
+    query: ['device', 'project', 'contractVersion'],
+    handle: async ({ url, request, store, listed, rebuild }) => {
       checkContractVersion(url);
       const device = readDevice(url);
+      const project = readProject(url, listed);
       const payload = decodeWirePayload(await request.text());
-      const pushed = await store.push({ device, payload });
-      if (pushed.added > 0) rebuild();
-      return { response: success(pushed), fields: { device, received: pushed.received, added: pushed.added } };
+      const pushed = await store.push({ device, project, payload });
+      if (pushed.added > 0) rebuild(project);
+      return { response: success(pushed), fields: { device, ...projectField(project), received: pushed.received, added: pushed.added } };
     },
   },
   [HUB_ROUTES.pull]: {
     method: 'GET',
     action: 'effort.pull',
-    query: ['device', 'since', 'contractVersion'],
-    handle: async ({ url, store }) => {
+    query: ['device', 'project', 'since', 'contractVersion'],
+    handle: async ({ url, store, listed }) => {
       checkContractVersion(url);
       const device = readDevice(url);
+      const project = readProject(url, listed);
       const since = readCursor(url);
-      const pulled = await store.pull({ device, since });
-      return { response: success(pulled), fields: { device, rows: rowCount(pulled.tables) } };
+      const pulled = await store.pull({ device, project, since });
+      return { response: success(pulled), fields: { device, ...projectField(project), rows: rowCount(pulled.tables) } };
     },
   },
 });
@@ -429,21 +409,22 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
 function refusedOf(error: unknown): Response | undefined {
   if (error instanceof RequestRefused) return failure(error.status, error.message);
   if (error instanceof ContractUnsupported) return contractRefusal(error);
+  if (error instanceof HubProjectNotServed) return failure(404, error.message);
   if (error instanceof WireFormatError) return failure(400, error.message);
   if (error instanceof HubUpgradeRequired) return failure(409, error.message);
   return undefined;
 }
 
 /**
- * Rebuilds of `index` recording `project`, each logged; see the module
- * note. A rebuild that throws, synchronously or not, is logged and never
- * reaches the caller of `request`.
+ * Rebuilds of `index`, each logged with the project it records; see the
+ * module note. A rebuild that throws, synchronously or not, is logged
+ * and never reaches the caller of `request`.
  */
-function rebuildsOf(index: HubIndex, project: string, log: HubLog): Rebuilds {
-  let running: Promise<void> | null = null;
-  let queued = false;
+function rebuildsOf(index: HubIndex, log: HubLog): Rebuilds {
+  const running = new Map<string, Promise<void>>();
+  const queued = new Set<string>();
 
-  const run = async (): Promise<void> => {
+  const run = async (project: string): Promise<void> => {
     const started = performance.now();
     try {
       const built = await index.rebuild({ project });
@@ -454,27 +435,24 @@ function rebuildsOf(index: HubIndex, project: string, log: HubLog): Rebuilds {
     }
   };
 
-  const begin = (): void => {
-    running = run().then(() => {
-      running = null;
-      if (!queued) return;
-
-      queued = false;
-      begin();
-    });
+  const begin = (project: string): void => {
+    running.set(project, run(project).then(() => {
+      running.delete(project);
+      if (queued.delete(project)) begin(project);
+    }));
   };
 
-  const request = (): void => {
-    if (running === null) {
-      begin();
+  const request = (project: string): void => {
+    if (running.has(project)) {
+      queued.add(project);
       return;
     }
-    queued = true;
+    begin(project);
   };
 
   const settle = async (): Promise<void> => {
-    queued = false;
-    if (running !== null) await running;
+    queued.clear();
+    await Promise.all(running.values());
   };
 
   return { request, settle };
@@ -484,8 +462,8 @@ function rebuildsOf(index: HubIndex, project: string, log: HubLog): Rebuilds {
 interface Opening {
   /** Opens the store, with its index when the hub was given a connector. */
   readonly open: () => Promise<{ readonly store: HubStore; readonly index: HubIndex | null }>;
-  /** The project rebuilds record, or null when a push starts none. */
-  readonly rebuildFor: string | null;
+  /** The project a rebuild after a push naming `project` records, or null when a push starts none. */
+  readonly rebuildFor: ((project: string | undefined) => string) | null;
 }
 
 /** Holds the store `opening` opens, logging each attempt's outcome. */
@@ -497,8 +475,14 @@ function holdStore(opening: Opening, log: HubLog): StoreHolder {
   const attempt = async (): Promise<Held | null> => {
     try {
       const { store, index } = await opening.open();
-      if (index !== null && opening.rebuildFor !== null) rebuilds = rebuildsOf(index, opening.rebuildFor, log);
-      held = { store, rebuild: rebuilds.request };
+      const { rebuildFor } = opening;
+      if (index !== null && rebuildFor !== null) rebuilds = rebuildsOf(index, log);
+      held = {
+        store,
+        rebuild: (project) => {
+          if (rebuildFor !== null) rebuilds.request(rebuildFor(project));
+        },
+      };
       log({ level: 'info', event: 'store.opened' });
       return held;
     } catch (error) {
@@ -526,6 +510,30 @@ function holdStore(opening: Opening, log: HubLog): StoreHolder {
   return { acquire, close };
 }
 
+/** The projects `options` lists, or null for a single-project hub; see the module note. */
+function listedOf(options: HubServerOptions): readonly HubServedProject[] | null {
+  const listed = options.projects ?? [];
+  return servesOneProject(listed)
+    ? null
+    : listed;
+}
+
+/**
+ * The project a rebuild after a push records: on a single-project hub
+ * `project`, the hub's repository, whatever the push named; otherwise
+ * the pushed project, the first listed one's for a push naming none.
+ * Null when `project` is needed and not given.
+ */
+function rebuildTargetOf(listed: readonly HubServedProject[] | null, project: string | undefined): ((pushed: string | undefined) => string) | null {
+  if (listed === null) {
+    return project === undefined || project === ''
+      ? null
+      : () => project;
+  }
+  const [first] = listed as [HubServedProject, ...HubServedProject[]];
+  return (pushed) => pushed ?? first.id;
+}
+
 /**
  * How `options` opens the store, refusing options that open none, or
  * that rebuild after a push with no index or no project to name.
@@ -535,11 +543,12 @@ function openingOf(options: HubServerOptions): Opening {
   if (rebuildAfterPush && openConnected === undefined) {
     throw new TypeError('rebuildAfterPush needs openConnected: a store opened by openStore has no index to rebuild.');
   }
-  if (rebuildAfterPush && (project === undefined || project === '')) {
-    throw new TypeError('rebuildAfterPush needs project, the repository a rebuild records.');
+  const target = rebuildTargetOf(listedOf(options), project);
+  if (rebuildAfterPush && target === null) {
+    throw new TypeError('rebuildAfterPush needs project on a single-project hub, the repository a rebuild records.');
   }
   const rebuildFor = rebuildAfterPush
-    ? project ?? null
+    ? target
     : null;
   if (openConnected !== undefined) return { open: openConnected, rebuildFor };
   if (openStore === undefined) throw new TypeError('startHubServer needs openStore or openConnected to open its store.');
@@ -552,6 +561,7 @@ interface Deps {
   readonly identity: HubIdentity;
   readonly holder: StoreHolder;
   readonly version: string;
+  readonly listed: readonly HubServedProject[] | null;
 }
 
 /** `GET /health`: whether the store is open, asking no identity. */
@@ -576,7 +586,7 @@ async function serveRoute(request: Request, url: URL, route: Route, deps: Deps):
 
   try {
     checkQuery(url, route.query);
-    return { ...await route.handle({ url, request, store: held.store, rebuild: held.rebuild, version: deps.version }), caller };
+    return { ...await route.handle({ url, request, store: held.store, rebuild: held.rebuild, version: deps.version, listed: deps.listed }), caller };
   } catch (error) {
     const refused = refusedOf(error);
     if (refused === undefined) throw error;
@@ -635,12 +645,13 @@ function requestLine(request: Request, served: Served, started: number): HubLogE
  * Starts the hub on `options.port` and starts opening the store; see
  * the module note. Returns once the server listens, whether or not the
  * store opens. Throws a `TypeError`, before listening, for options
- * opening no store or rebuilding after a push with no index or project.
+ * opening no store, or rebuilding after a push with no index, or on a
+ * single-project hub with no project.
  */
 export function startHubServer(options: HubServerOptions): HubServer {
   const log = options.log ?? jsonLineLog();
   const holder = holdStore(openingOf(options), log);
-  const deps: Deps = { identity: options.identity, holder, version: options.version };
+  const deps: Deps = { identity: options.identity, holder, version: options.version, listed: listedOf(options) };
 
   const fetch = async (request: Request): Promise<Response> => {
     const started = performance.now();
