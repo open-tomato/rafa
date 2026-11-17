@@ -287,8 +287,10 @@ declaration of `effort.sync` takes effect when either is read. A
 deployment of the `service` strategy requires `hub.url` (the hub's
 address), and may name `hub.tokenSecret` (the secret store name where
 the token is held, never the token itself) and `hub.timeout` (how long
-a request may take, `3s` by default, from `1s` to `30s`, as `3s`).
-`selectSync` hands the three to the adapter as `AdapterContext.hub`
+a request may take, `3s` by default, from `1s` to `30s`, as `3s`),
+and `hub.project` (the project synced on the hub, by default the root
+commit of the store's repository, which nobody is expected to set).
+`selectSync` hands the four to the adapter as `AdapterContext.hub`
 (`packages/rafa/src/config-schema-hub.ts`). A module implementing
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 

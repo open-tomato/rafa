@@ -1,5 +1,5 @@
 /**
- * The `hub` section of the config schema: the three keys a device reads
+ * The `hub` section of the config schema: the four keys a device reads
  * to reach a `rafa-hub` under `effort.sync: service`, each with its
  * field, its default, its spec and its reader, the one refusal that
  * reads two settings at once, and the {@link HubContext} an adapter is
@@ -27,12 +27,15 @@
  * `.rafa/specs/rafa-325-rafa-hub.md` names them: `hub.url` (required with
  * `effort.sync: service`), `hub.tokenSecret` (the secret store name of
  * the token, never the token) and `hub.timeout` (default `3s`, from `1s`
- * to `30s`, `0` and negative values refused). The server's keys,
+ * to `30s`, `0` and negative values refused). A fourth, `hub.project`,
+ * names the project the device syncs on the hub; the port's project
+ * otherwise defaults to the root commit sha of the repository holding
+ * the store, and nobody is expected to set it. The server's keys,
  * `hub.repository`, `hub.port`, `hub.storePath`, `hub.auth.cacheFor`,
  * `hub.store.sqliteLibrary` and `hub.index.rebuildAfterPush`, are read by
  * `packages/rafa-hub/` from its own file and are not keys here: in a
  * project's file they are unknown keys, warned about and acted on by
- * nothing. Five readings the spec leaves to this module:
+ * nothing. Six readings the spec leaves to this module:
  *
  *   - `hub.url` and `hub.tokenSecret` default to NULL, meaning "nobody
  *     has said", as `pr.base` does: no default address or secret name
@@ -50,6 +53,8 @@
  *     `0s`, anything below `1s` and anything above `30s`. It is kept as
  *     written, and {@link hubTimeoutMs} answers the milliseconds it
  *     spells.
+ *   - `hub.project` defaults to NULL, meaning "read the root commit",
+ *     and is any text holding a character other than whitespace.
  *   - None is a `CommandLineSetting`, for the reason the `pr` section
  *     gives in `config-schema-release.ts`.
  *
@@ -71,7 +76,8 @@
  *
  * {@link hubContextOf} turns the resolved settings into the
  * {@link HubContext} `selectSync` hands a `sync` adapter as
- * `AdapterContext.hub`, the timeout already in milliseconds. It answers
+ * `AdapterContext.hub`, the timeout already in milliseconds and
+ * `hub.project` carried as `project`, null when unset. It answers
  * undefined with no `hub.url`, since a hub with no address is none an
  * adapter could reach; the refusal above keeps that from happening
  * under `service`.
@@ -96,6 +102,7 @@ export interface HubShape {
     readonly url: string;
     readonly tokenSecret: string;
     readonly timeout: HubTimeout;
+    readonly project: string;
   };
 }
 
@@ -131,6 +138,11 @@ export interface HubSettings {
   hubTokenSecret: string | null;
   /** How long one request to the hub may take. `hub.timeout`. */
   hubTimeout: HubTimeout;
+  /**
+   * The project this device syncs on the hub, or null to read the
+   * root commit of the store's repository. `hub.project`.
+   */
+  hubProject: string | null;
 }
 
 /** The `hub` section's defaults. */
@@ -138,6 +150,7 @@ export const HUB_DEFAULTS: Readonly<HubSettings> = Object.freeze({
   hubUrl: null,
   hubTokenSecret: null,
   hubTimeout: '3s',
+  hubProject: null,
 });
 
 /**
@@ -182,6 +195,7 @@ export const HUB_SETTINGS: { readonly [K in keyof HubSettings]: SettingSpec<K> }
   hubUrl: { key: 'hub.url', read: hubUrl, cli: false },
   hubTokenSecret: { key: 'hub.tokenSecret', read: text('a secret store name'), cli: false },
   hubTimeout: { key: 'hub.timeout', read: hubTimeout, cli: false },
+  hubProject: { key: 'hub.project', read: text('a project id'), cli: false },
 };
 
 /** The strategy that reads the `hub` section. */
@@ -211,7 +225,7 @@ export function hubUrlProblems(input: ConfigCheckInput): readonly string[] {
   ];
 }
 
-/** The `hub` section: its three settings, their defaults, and {@link hubUrlProblems}. */
+/** The `hub` section: its four settings, their defaults, and {@link hubUrlProblems}. */
 export const HUB_SECTION: ConfigSection = Object.freeze({
   package: 'hub',
   settings: Object.freeze(HUB_SETTINGS),
@@ -227,6 +241,8 @@ export interface HubContext {
   readonly tokenSecret: string | null;
   /** How long one request may take, in milliseconds: the resolved `hub.timeout`. */
   readonly timeoutMs: number;
+  /** The project synced on the hub, or null to read the root commit: the resolved `hub.project`. */
+  readonly project: string | null;
 }
 
 /**
@@ -244,5 +260,10 @@ export function hubContextOf(config: Partial<HubSettings>): HubContext | undefin
   if (timeoutMs === null) {
     throw new TypeError(`hub.timeout is ${describeValue(timeout)}, which no config accepts`);
   }
-  return Object.freeze({ url, tokenSecret: config.hubTokenSecret ?? null, timeoutMs });
+  return Object.freeze({
+    url,
+    tokenSecret: config.hubTokenSecret ?? null,
+    timeoutMs,
+    project: config.hubProject ?? null,
+  });
 }
