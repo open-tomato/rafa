@@ -25,6 +25,9 @@ const MODE_EXPECTED = 'expected basic or oauth';
 /** What a provider URL says it expected. */
 const URL_EXPECTED = 'expected an absolute https URL, or http on localhost, 127.0.0.1 or [::1], holding no user name or password';
 
+/** What `callbackUrl` says it expected. */
+const CALLBACK_EXPECTED = 'expected an absolute https URL, or http on localhost, 127.0.0.1 or [::1], holding no user name, password or fragment, such as https://hub.example.org/login/oauth/callback';
+
 /** What `clientId` and `scope` say they expected. */
 const TEXT_EXPECTED = 'expected non-empty text with no white space at either end';
 
@@ -38,7 +41,7 @@ const ALLOWED_EXPECTED = 'expected a non-empty list of the provider\'s user ids,
 const ALLOWED_ID_EXPECTED = 'expected a provider user id, as non-empty text with no white space at either end or a whole number';
 
 /** A provider's settings every case starts from, all accepted. */
-const OAUTH: Omit<HubLoginOAuth, 'scope'> = Object.freeze({
+const OAUTH: Omit<HubLoginOAuth, 'scope' | 'callbackUrl'> = Object.freeze({
   authorizeUrl: 'https://github.com/login/oauth/authorize',
   tokenUrl: 'https://github.com/login/oauth/access_token',
   userUrl: 'https://api.github.com/user',
@@ -114,22 +117,22 @@ describe('hub.auth.login', () => {
 
   it('refuses oauth left out, or no mapping, under mode oauth', () => {
     expect([problems({ mode: 'oauth' }), problems({ mode: 'oauth', oauth: 'github' })]).toEqual([
-      ['/srv/hub/hub.yaml: hub.auth.login.oauth is missing, expected a mapping holding authorizeUrl, tokenUrl, userUrl, clientId, clientSecretVariable, scope, allowed under hub.auth.login.mode: oauth'],
-      ['/srv/hub/hub.yaml: hub.auth.login.oauth is "github", expected a mapping holding authorizeUrl, tokenUrl, userUrl, clientId, clientSecretVariable, scope, allowed'],
+      ['/srv/hub/hub.yaml: hub.auth.login.oauth is missing, expected a mapping holding authorizeUrl, tokenUrl, userUrl, clientId, clientSecretVariable, scope, allowed, callbackUrl under hub.auth.login.mode: oauth'],
+      ['/srv/hub/hub.yaml: hub.auth.login.oauth is "github", expected a mapping holding authorizeUrl, tokenUrl, userUrl, clientId, clientSecretVariable, scope, allowed, callbackUrl'],
     ]);
   });
 });
 
 describe('hub.auth.login.oauth', () => {
-  it('reads every setting written, scope null when left out, frozen', () => {
+  it('reads every setting written, scope and callbackUrl null when left out, frozen', () => {
     const login = read(oauthLogin()) as HubLoginConfig;
 
     expect(login).toEqual({
       mode: 'oauth',
-      oauth: { ...OAUTH, scope: null },
+      oauth: { ...OAUTH, scope: null, callbackUrl: null },
     });
     expect([Object.isFrozen(login), Object.isFrozen(login.oauth)]).toEqual([true, true]);
-    expect(read(oauthLogin({ scope: 'read:user' }))).toEqual({ mode: 'oauth', oauth: { ...OAUTH, scope: 'read:user' } });
+    expect(read(oauthLogin({ scope: 'read:user' }))).toEqual({ mode: 'oauth', oauth: { ...OAUTH, scope: 'read:user', callbackUrl: null } });
   });
 
   it('refuses each required setting left out, in key order', () => {
@@ -145,7 +148,7 @@ describe('hub.auth.login.oauth', () => {
 
   it('refuses a key it does not read', () => {
     expect(problems(oauthLogin({ clientSecret: 'RAFA_HUB_OAUTH_SECRET' }))).toEqual([
-      '/srv/hub/hub.yaml: hub.auth.login.oauth.clientSecret is not a key the hub reads; expected one of hub.auth.login.oauth.authorizeUrl, hub.auth.login.oauth.tokenUrl, hub.auth.login.oauth.userUrl, hub.auth.login.oauth.clientId, hub.auth.login.oauth.clientSecretVariable, hub.auth.login.oauth.scope, hub.auth.login.oauth.allowed',
+      '/srv/hub/hub.yaml: hub.auth.login.oauth.clientSecret is not a key the hub reads; expected one of hub.auth.login.oauth.authorizeUrl, hub.auth.login.oauth.tokenUrl, hub.auth.login.oauth.userUrl, hub.auth.login.oauth.clientId, hub.auth.login.oauth.clientSecretVariable, hub.auth.login.oauth.scope, hub.auth.login.oauth.allowed, hub.auth.login.oauth.callbackUrl',
     ]);
   });
 
@@ -194,6 +197,28 @@ describe('hub.auth.login.oauth', () => {
     ]);
   });
 
+  it('reads the callbackUrl written: the public one behind a proxy, http on loopback, and one under a prefix', () => {
+    const accepted = ['https://hub.example.org/login/oauth/callback', 'http://127.0.0.1:7171/login/oauth/callback', 'https://example.org/rafa/login/oauth/callback'];
+
+    expect(accepted.map((url) => read(oauthLogin({ callbackUrl: url })))).toEqual(accepted.map((url) => ({
+      mode: 'oauth',
+      oauth: { ...OAUTH, scope: null, callbackUrl: url },
+    })));
+  });
+
+  it('refuses a callbackUrl in the clear off loopback, relative, holding credentials or a fragment, or no text', () => {
+    const refused = ['http://hub.internal:7171/login/oauth/callback', '/login/oauth/callback', 'https://ada:pw@hub.example.org/login/oauth/callback', 'https://hub.example.org/login/oauth/callback#top', 'https://hub.example.org/login/oauth/callback#', null];
+
+    expect(refused.map((url) => problems(oauthLogin({ callbackUrl: url })))).toEqual([
+      [`/srv/hub/hub.yaml: hub.auth.login.oauth.callbackUrl is "http://hub.internal:7171/login/oauth/callback", ${CALLBACK_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.auth.login.oauth.callbackUrl is "/login/oauth/callback", ${CALLBACK_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.auth.login.oauth.callbackUrl is "https://ada:pw@hub.example.org/login/oauth/callback", ${CALLBACK_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.auth.login.oauth.callbackUrl is "https://hub.example.org/login/oauth/callback#top", ${CALLBACK_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.auth.login.oauth.callbackUrl is "https://hub.example.org/login/oauth/callback#", ${CALLBACK_EXPECTED}`],
+      [`/srv/hub/hub.yaml: hub.auth.login.oauth.callbackUrl is null, ${CALLBACK_EXPECTED}`],
+    ]);
+  });
+
   it('refuses a clientSecretVariable that is no variable name, never repeating it', () => {
     const planted = 'gho_16C7e42F292c6912E7710c838347Ae178B4a';
     const refused = [planted, 'rafa_hub_secret', '1SECRET', ''];
@@ -214,7 +239,7 @@ describe('hub.auth.login.oauth.allowed', () => {
   it('reads text ids and whole-number ids as their digits, in the order listed', () => {
     expect(read(oauthLogin({ allowed: ['octocat', 583_231, 0] }))).toEqual({
       mode: 'oauth',
-      oauth: { ...OAUTH, scope: null, allowed: ['octocat', '583231', '0'] },
+      oauth: { ...OAUTH, scope: null, callbackUrl: null, allowed: ['octocat', '583231', '0'] },
     });
   });
 
@@ -281,7 +306,7 @@ describe('the hub config', () => {
       '    allowed: [583231]',
     ), PATH);
 
-    expect(config.login).toEqual({ mode: 'oauth', oauth: { ...OAUTH, scope: 'read:user' } });
+    expect(config.login).toEqual({ mode: 'oauth', oauth: { ...OAUTH, scope: 'read:user', callbackUrl: null } });
   });
 
   it('refuses a login under github through parseHubConfig, beside every other problem in key order', () => {

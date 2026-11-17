@@ -63,6 +63,7 @@ function configFor(overrides: Partial<HubLoginOAuth> = {}): HubLoginOAuth {
     clientSecretVariable: SECRET_VARIABLE,
     scope: 'read:user',
     allowed: ['583231', 'grace'],
+    callbackUrl: null,
     ...overrides,
   };
 }
@@ -243,6 +244,18 @@ describe('openOAuthLogin and start', () => {
     expect(location.searchParams.get('redirect_uri')).toBe('https://hub.example.org/login/oauth/callback');
     expect(location.searchParams.has('scope')).toBe(false);
   });
+
+  it('sends the callbackUrl the config writes over the start request\'s origin, and the opener\'s over both', () => {
+    const written = 'https://hub.example.org/login/oauth/callback';
+    const passed = 'https://other.example.org/login/oauth/callback';
+    const redirectOf = (login: OAuthLogin): string | null => new URL(login.start(hubRequest('/login/oauth/start')).location).searchParams.get('redirect_uri');
+
+    expect([
+      redirectOf(openLogin({ config: configFor({ callbackUrl: written }) })),
+      redirectOf(openLogin({ config: configFor({ callbackUrl: written }), callbackUrl: passed })),
+      redirectOf(openLogin()),
+    ]).toEqual([written, passed, `${HUB}${OAUTH_CALLBACK_PATH}`]);
+  });
 });
 
 describe('the callback', () => {
@@ -279,6 +292,17 @@ describe('the callback', () => {
     const state = startFlow(secure);
     const code = provider.grant(ALLOWED, callbackUrl);
     expect(cookieOf(await secure.callback(callbackRequest({ state, code }))).split('; ')).toContain('Secure');
+  });
+
+  it('sets the cookie Secure behind a TLS terminator when the config writes an https callbackUrl, the start arriving over http', async () => {
+    const callbackUrl = 'https://hub.example.org/login/oauth/callback';
+    const proxied = openLogin({ config: configFor({ callbackUrl }) });
+    const state = startFlow(proxied);
+    const code = provider.grant(ALLOWED, callbackUrl);
+    const served = await proxied.callback(callbackRequest({ state, code }));
+
+    expect(cookieOf(served).split('; ')).toContain('Secure');
+    expect(provider.asked().find((asked) => asked.path === '/token')?.params).toMatchObject({ redirect_uri: callbackUrl });
   });
 
   it('reads the user id from sub when the lookup holds no id, and a text id as written', async () => {

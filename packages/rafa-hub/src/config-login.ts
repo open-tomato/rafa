@@ -13,7 +13,7 @@
  *   - `oauth` is required under `mode: oauth` and refused under `basic`,
  *     where nothing would read it. It holds `authorizeUrl`, `tokenUrl`,
  *     `userUrl`, `clientId`, `clientSecretVariable` and `allowed`, all
- *     required, and `scope`, optional.
+ *     required, and `scope` and `callbackUrl`, optional.
  *
  * ## Readings the spec leaves to this module
  *
@@ -27,6 +27,15 @@
  *     provider on the test machine is accepted and a provider reached in
  *     the clear over a network is not. A URL holding a user name or a
  *     password is refused, since its credentials would sit in the file.
+ *   - `callbackUrl` is the hub's own public callback, sent to the
+ *     provider as `redirect_uri`: the one a hub behind a reverse proxy or
+ *     a TLS terminator writes, since the start request then carries the
+ *     proxy's internal origin. It takes the provider URLs' rule and
+ *     refuses a fragment as well, which a `redirect_uri` may not hold.
+ *     Its path is not checked, so a proxy that mounts the hub under a
+ *     prefix may name its own; the proxy forwards it to the hub's
+ *     `/login/oauth/callback`. Left out, it is null, and the login builds
+ *     the callback from each start request's origin.
  *   - `clientSecretVariable` names an environment variable, matching
  *     `^[A-Z_][A-Z0-9_]*$`, and never holds the secret itself: as
  *     `hub.auth.apiKeys` does, its refusal never repeats what was
@@ -72,6 +81,8 @@ export interface HubLoginOAuth {
   readonly scope: string | null;
   /** The provider user ids who may log in, in the order listed, never empty. */
   readonly allowed: readonly string[];
+  /** The hub's public callback URL sent as `redirect_uri`, or null to build it from each start request. */
+  readonly callbackUrl: string | null;
 }
 
 /** The login guarding the key routes, resolved: `hub.auth.login`. */
@@ -92,7 +103,7 @@ export interface LoginReading<T> {
 const LOGIN_KEYS: readonly string[] = Object.freeze(['mode', 'oauth']);
 
 /** The keys the hub reads under `hub.auth.login.oauth`. */
-const OAUTH_KEYS: readonly string[] = Object.freeze(['authorizeUrl', 'tokenUrl', 'userUrl', 'clientId', 'clientSecretVariable', 'scope', 'allowed']);
+const OAUTH_KEYS: readonly string[] = Object.freeze(['authorizeUrl', 'tokenUrl', 'userUrl', 'clientId', 'clientSecretVariable', 'scope', 'allowed', 'callbackUrl']);
 
 /** The hosts an `http:` provider URL may name. */
 const LOOPBACK_HOSTS: readonly string[] = Object.freeze(['localhost', '127.0.0.1', '[::1]']);
@@ -111,6 +122,9 @@ const MODE_EXPECTED = 'expected basic or oauth';
 
 /** What a provider URL takes, as a refusal says it. */
 const URL_EXPECTED = 'expected an absolute https URL, or http on localhost, 127.0.0.1 or [::1], holding no user name or password';
+
+/** What `callbackUrl` takes, as a refusal says it. */
+const CALLBACK_EXPECTED = 'expected an absolute https URL, or http on localhost, 127.0.0.1 or [::1], holding no user name, password or fragment, such as https://hub.example.org/login/oauth/callback';
 
 /** What `clientId` and `scope` take, as a refusal says it. */
 const TEXT_EXPECTED = 'expected non-empty text with no white space at either end';
@@ -161,6 +175,11 @@ function isProviderUrl(raw: unknown): raw is string {
   if (url.username !== '' || url.password !== '') return false;
   return url.protocol === 'https:'
     || (url.protocol === 'http:' && LOOPBACK_HOSTS.includes(url.hostname));
+}
+
+/** Whether `raw` is a callback URL the provider may be sent: a provider URL holding no fragment. */
+function isCallbackUrl(raw: unknown): raw is string {
+  return isProviderUrl(raw) && !raw.includes('#');
 }
 
 /** Reads `hub.auth.login.mode`, {@link DEFAULT_LOGIN_MODE} when left out. */
@@ -244,6 +263,9 @@ function readOAuth(path: string, raw: unknown): LoginReading<HubLoginOAuth> {
     ? { value: null, problems: [] }
     : text(`${OAUTH}.scope`, raw['scope']);
   const allowed = field(path, raw, 'allowed', ALLOWED_EXPECTED, (key, value) => readAllowed(path, key, value));
+  const callbackUrl: LoginReading<string | null> = raw['callbackUrl'] === undefined
+    ? { value: null, problems: [] }
+    : checked(path, isCallbackUrl, CALLBACK_EXPECTED)(`${OAUTH}.callbackUrl`, raw['callbackUrl']);
 
   const problems = [
     ...unknownKeys(path, OAUTH, raw, OAUTH_KEYS),
@@ -254,6 +276,7 @@ function readOAuth(path: string, raw: unknown): LoginReading<HubLoginOAuth> {
     ...clientSecretVariable.problems,
     ...scope.problems,
     ...allowed.problems,
+    ...callbackUrl.problems,
   ];
   if (problems.length > 0) return { problems };
 
@@ -266,6 +289,7 @@ function readOAuth(path: string, raw: unknown): LoginReading<HubLoginOAuth> {
       clientSecretVariable: clientSecretVariable.value as string,
       scope: scope.value as string | null,
       allowed: allowed.value as readonly string[],
+      callbackUrl: callbackUrl.value as string | null,
     }),
     problems: [],
   };

@@ -36,9 +36,12 @@
  *     never a value, when it is unset or empty, so a hub that cannot
  *     finish a login does not start.
  *   - **The callback URL** is `callbackUrl` when the opener passes one,
- *     and otherwise {@link OAUTH_CALLBACK_PATH} on the start request's
- *     origin. The provider checks it against the client's registered
- *     callback, so a hub behind a proxy passes the public one.
+ *     then `hub.auth.login.oauth.callbackUrl` when written, and otherwise
+ *     {@link OAUTH_CALLBACK_PATH} on the start request's origin. The
+ *     provider checks it against the client's registered callback, so a
+ *     hub behind a reverse proxy or a TLS terminator, whose start
+ *     requests carry the proxy's internal origin, writes the public one
+ *     in its config; that is also what makes its cookie `Secure`.
  *   - **Pending states** are held by their SHA-256 digest, at most
  *     {@link MAX_PENDING_OAUTH_STATES} at once: an expired one is dropped
  *     at the next start, and the oldest one when the cap is reached, so
@@ -96,7 +99,7 @@ export const DEFAULT_OAUTH_TIMEOUT_MS: number = 10_000;
 /** The session cookie's name. */
 export const OAUTH_SESSION_COOKIE: string = 'rafa_hub_login';
 
-/** The callback's path, on the start request's origin when no `callbackUrl` is passed. */
+/** The callback's path, on the start request's origin when no `callbackUrl` is passed or written. */
 export const OAUTH_CALLBACK_PATH: string = '/login/oauth/callback';
 
 /** What {@link openOAuthLogin} is opened with. */
@@ -105,7 +108,7 @@ export interface OAuthLoginOptions {
   readonly config: HubLoginOAuth;
   /** Where the client secret's variable is read; `process.env` when left out. */
   readonly env?: Readonly<Record<string, string | undefined>>;
-  /** The callback URL sent as `redirect_uri`; derived from each start request when left out. */
+  /** The callback URL sent as `redirect_uri`, over `config.callbackUrl`; derived from each start request when both are left out. */
   readonly callbackUrl?: string;
   /** The clock, in milliseconds; `Date.now` when left out. */
   readonly now?: () => number;
@@ -334,7 +337,7 @@ export function openOAuthLogin(options: OAuthLoginOptions): OAuthLogin {
     const at = now();
     prunePending(at);
     const state = mintToken();
-    const callbackUrl = options.callbackUrl ?? new URL(OAUTH_CALLBACK_PATH, request.url).href;
+    const callbackUrl = options.callbackUrl ?? config.callbackUrl ?? new URL(OAUTH_CALLBACK_PATH, request.url).href;
     pending.set(digestOf(state), { startedAt: at, callbackUrl });
 
     const location = new URL(config.authorizeUrl);
