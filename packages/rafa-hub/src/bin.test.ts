@@ -10,7 +10,9 @@
  * case reaches api.github.com.
  *
  * Under `hub.auth.adapter: api-key` the keys are variables of the
- * environment the case hands {@link runHub}, never the process's own.
+ * environment the case hands {@link runHub}, never the process's own,
+ * and so are the login's user and password; the keys file and the
+ * login it holds are made under the case's root.
  *
  * `rafa-hub index rebuild` runs over a store the `sqlite` connector made
  * under the case's root, seeded with one commit pushed from a real
@@ -28,8 +30,10 @@ import { encodeWirePayload, exportWirePayload, openSqliteStore, WIRE_FORMAT, WIR
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { hubCommandOf, HUB_VERSION, runHub, runIndexRebuild } from './bin.js';
+import { hubCommandOf, HUB_VERSION, isLoopbackHostname, runHub, runIndexRebuild } from './bin.js';
 import { HUB_CONFIG_ENV } from './config.js';
+import { keysFileName } from './identity/key-store.js';
+import { LOGIN_PASSWORD_VARIABLE, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
 import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { HUB_ROUTES } from './server.js';
 import { connectSqliteHub } from './store/sqlite.js';
@@ -224,6 +228,206 @@ describe('runHub', () => {
   });
 });
 
+/** `hub.auth` under `api-key`, naming `RAFA_HUB_BIN_KEY`, plus `login` lines indented under it. */
+function apiKeyAuth(login = ''): string {
+  return `  auth:\n    adapter: api-key\n    apiKeys:\n      - RAFA_HUB_BIN_KEY\n${login}`;
+}
+
+/** An OAuth login under {@link apiKeyAuth}, its secret in `RAFA_HUB_BIN_OAUTH_SECRET`; no case reaches the provider. */
+const OAUTH_LOGIN = [
+  '    login:',
+  '      mode: oauth',
+  '      oauth:',
+  '        authorizeUrl: https://github.com/login/oauth/authorize',
+  '        tokenUrl: https://github.com/login/oauth/access_token',
+  '        userUrl: https://api.github.com/user',
+  '        clientId: Iv1.8a61f9b3a7aba766',
+  '        clientSecretVariable: RAFA_HUB_BIN_OAUTH_SECRET',
+  '        allowed: [\'583231\']',
+  '',
+].join('\n');
+
+const LOGIN_USER = 'ada';
+const LOGIN_PASSWORD = 'bin start password 0001';
+
+/** `Authorization: Basic` for `user` and `password`. */
+function basic(user: string, password: string): string {
+  return `Basic ${Buffer.from(`${user}:${password}`).toString('base64')}`;
+}
+
+/** The keys file beside the case's `hub.storePath`. */
+function keysFile(): string {
+  return keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+}
+
+describe('runHub under hub.auth.adapter api-key, with the keys file', () => {
+  /** Starts the hub over `extra` config lines and `env`, listening on `hostname`; answers it and its log. */
+  async function startKeyed(
+    env: Readonly<Record<string, string>>,
+    options: { readonly extra?: string; readonly hostname?: string } = {},
+  ): Promise<{ readonly server: HubServer; readonly logged: HubLogEntry[] }> {
+    const { log, logged } = collecting();
+    const config = writeConfig(await freePort(), options.extra ?? apiKeyAuth());
+    const server = await runHub(
+      { [HUB_CONFIG_ENV]: config, RAFA_HUB_BIN_KEY: API_KEY, ...env },
+      { log, githubApi: 'http://127.0.0.1:9', hostname: options.hostname ?? '127.0.0.1' },
+    );
+    if (server === null) throw new Error(`the hub refused its config: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+    return { server, logged };
+  }
+
+  /** Creates the key `name` through the key routes with the login's basic credentials; answers the plain key. */
+  async function createKey(server: HubServer, name: string): Promise<string> {
+    const response = await fetch(`${server.url}/v1/keys`, {
+      method: 'POST',
+      headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD), 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const body = await response.json() as { readonly data: { readonly plain: string } };
+    if (response.status !== 201) throw new Error(`the create answered ${String(response.status)}`);
+    return body.data.plain;
+  }
+
+  it('sets the login from the environment, logging login.set with the user alone, and a key it creates serves a bearer', async () => {
+    mkdirStore();
+    const { server, logged } = await startKeyed({ [LOGIN_USER_VARIABLE]: LOGIN_USER, [LOGIN_PASSWORD_VARIABLE]: LOGIN_PASSWORD });
+
+    const plain = await createKey(server, 'laptop');
+    const status = await fetch(`${server.url}${HUB_ROUTES.status}`, { headers: { authorization: `Bearer ${plain}` } });
+    const listed = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+    const body = await listed.json() as { readonly data: { readonly keys: readonly { readonly name: string; readonly lastUsedAt: string | null }[] } };
+
+    expect(status.status).toBe(200);
+    expect(body.data.keys.map((key) => key.name)).toEqual(['laptop']);
+    expect(body.data.keys[0]?.lastUsedAt).not.toBeNull();
+    expect(logged.filter((entry) => entry.event === 'login.set')).toEqual([{ level: 'info', event: 'login.set', user: LOGIN_USER }]);
+    expect(existsSync(keysFile())).toBe(true);
+    expect(JSON.stringify(logged)).not.toContain(LOGIN_PASSWORD);
+    expect(JSON.stringify(logged)).not.toContain(plain);
+  });
+
+  it('keeps a login already set in the keys file, whatever the environment holds', async () => {
+    mkdirStore();
+    const store = openSqliteLoginStore({ path: keysFile() });
+    try {
+      await store.setLogin(LOGIN_USER, LOGIN_PASSWORD);
+    } finally {
+      store.close();
+    }
+    const { server, logged } = await startKeyed({ [LOGIN_USER_VARIABLE]: 'grace', [LOGIN_PASSWORD_VARIABLE]: 'another password 0002' });
+
+    const kept = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+    const fromEnv = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic('grace', 'another password 0002') } });
+
+    expect(kept.status).toBe(200);
+    expect(fromEnv.status).toBe(401);
+    expect(logged.some((entry) => entry.event === 'login.set')).toBe(false);
+  });
+
+  it('logs login.incomplete naming the empty variable when only the user is set, and sets no login', async () => {
+    mkdirStore();
+    const { server, logged } = await startKeyed({ [LOGIN_USER_VARIABLE]: LOGIN_USER, [LOGIN_PASSWORD_VARIABLE]: '' });
+
+    const listed = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, '') } });
+
+    expect(listed.status).toBe(401);
+    expect(logged.filter((entry) => entry.event.startsWith('login.'))).toEqual([
+      { level: 'warn', event: 'login.incomplete', missing: LOGIN_PASSWORD_VARIABLE },
+    ]);
+  });
+
+  it('answers null with a config.refused line naming the variable when the login user holds a colon', async () => {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const config = writeConfig(await freePort(), apiKeyAuth());
+
+    const server = await runHub(
+      { [HUB_CONFIG_ENV]: config, RAFA_HUB_BIN_KEY: API_KEY, [LOGIN_USER_VARIABLE]: 'ada:lovelace', [LOGIN_PASSWORD_VARIABLE]: LOGIN_PASSWORD },
+      { log, hostname: '127.0.0.1' },
+    );
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain(`${LOGIN_USER_VARIABLE}: `);
+    expect(JSON.stringify(logged)).not.toContain(LOGIN_PASSWORD);
+  });
+
+  it('closes the keys file when the server stops, its write-ahead log gone with the last connection', async () => {
+    mkdirStore();
+    const { server } = await startKeyed({ [LOGIN_USER_VARIABLE]: LOGIN_USER, [LOGIN_PASSWORD_VARIABLE]: LOGIN_PASSWORD });
+    const whileServing = existsSync(`${keysFile()}-wal`);
+
+    await server.stop();
+    running = running.filter((other) => other !== server);
+
+    expect(whileServing).toBe(true);
+    expect(existsSync(`${keysFile()}-wal`)).toBe(false);
+  });
+
+  it('logs one login.insecure warning under basic on every interface, and none on a loopback hostname', async () => {
+    mkdirStore();
+    const open = await startKeyed({}, { hostname: '0.0.0.0' });
+    await open.server.stop();
+    running = running.filter((other) => other !== open.server);
+    const loopback = await startKeyed({}, { hostname: '127.0.0.1' });
+
+    const insecure = open.logged.filter((entry) => entry.event === 'login.insecure');
+    expect(insecure).toHaveLength(1);
+    expect(insecure[0]).toMatchObject({ level: 'warn', hostname: '0.0.0.0' });
+    expect(String(insecure[0]?.['message'])).toContain('TLS');
+    expect(loopback.logged.some((entry) => entry.event === 'login.insecure')).toBe(false);
+  });
+
+  it('logs no login.insecure under oauth on every interface, and refuses the config when the client secret is unset', async () => {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const config = writeConfig(await freePort(), apiKeyAuth(OAUTH_LOGIN));
+
+    const refused = await runHub({ [HUB_CONFIG_ENV]: config, RAFA_HUB_BIN_KEY: API_KEY }, { log, hostname: '0.0.0.0' });
+    const { server, logged: served } = await startKeyed({ RAFA_HUB_BIN_OAUTH_SECRET: 'bin-oauth-secret-0001' }, { extra: apiKeyAuth(OAUTH_LOGIN), hostname: '0.0.0.0' });
+    const page = await fetch(`${server.url}/login`);
+
+    expect(refused).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0]?.['problems'])).toContain('RAFA_HUB_BIN_OAUTH_SECRET');
+    expect(page.status).toBe(401);
+    expect(await page.text()).toContain('/login/oauth/start');
+    expect(served.some((entry) => entry.event === 'login.insecure')).toBe(false);
+  });
+
+  it('answers 404 on the key routes and the page under github, making no keys file', async () => {
+    mkdirStore();
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '0.0.0.0' });
+    if (server === null) throw new Error('the hub refused its config');
+    running = [...running, server];
+    const keys = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+    const page = await fetch(`${server.url}/login`);
+
+    expect(keys.status).toBe(404);
+    expect(page.status).toBe(404);
+    expect(existsSync(keysFile())).toBe(false);
+    expect(logged.some((entry) => entry.event === 'login.insecure')).toBe(false);
+  });
+});
+
+describe('isLoopbackHostname', () => {
+  it('reads localhost, ::1 and every 127.x.x.x address as loopback', () => {
+    for (const hostname of ['localhost', 'LOCALHOST', '::1', '[::1]', '127.0.0.1', '127.1.2.3']) {
+      expect(isLoopbackHostname(hostname)).toBe(true);
+    }
+  });
+
+  it('reads every interface, a LAN address and a name as reached from elsewhere', () => {
+    for (const hostname of ['0.0.0.0', '::', '192.168.1.10', '128.0.0.1', 'hub.example.org', '127.0.0.1.example.org']) {
+      expect(isLoopbackHostname(hostname)).toBe(false);
+    }
+  });
+});
+
 describe('runIndexRebuild', () => {
   it('answers 1 with one line naming every problem when the config is refused, writing nothing to out', async () => {
     const out: string[] = [];
@@ -361,6 +565,12 @@ describe('hubCommandOf', () => {
     [['index'], null],
     [['rebuild', 'index'], null],
     [['index', 'rebuild', 'now'], null],
+    [['login'], 'login'],
+    [['login', 'ada'], null],
+    [['keys', 'list'], 'keys'],
+    [['keys', 'create', 'ci', '--hub=https://hub.example.org'], 'keys'],
+    [['keys'], null],
+    [['keys', 'create'], null],
   ] as const)('reads %p as %p', (args, command) => {
     expect(hubCommandOf(args)).toBe(command);
   });
@@ -478,6 +688,36 @@ describe('bin.ts as a process', () => {
     const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
 
     expect(code).toBe(1);
-    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub) or rafa-hub index rebuild\n');
+    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
+  });
+
+  it('runs login over two lines of standard input, setting the login in the keys file beside hub.storePath', async () => {
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373, '  auth:\n    adapter: api-key\n    apiKeys: [RAFA_HUB_BIN_KEY]\n') };
+    const password = 'bin login password 0001';
+
+    const child = Bun.spawn([process.execPath, BIN, 'login'], { env, stdin: new TextEncoder().encode(`ada\n${password}\n`), stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(stderr).toBe('');
+    expect(code).toBe(0);
+    const keys = keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+    expect(stdout).toBe(`rafa-hub login: the login is set for ada, in ${keys}\n`);
+    const store = openSqliteLoginStore({ path: keys });
+    try {
+      expect(await store.verifyLogin('ada', password)).toBe(true);
+    } finally {
+      store.close();
+    }
+  }, READY_WITHIN_MS);
+
+  it('runs keys, exiting 1 with one line when no hub is named', async () => {
+    const env = { ...process.env, RAFA_HUB_URL: '' };
+
+    const child = Bun.spawn([process.execPath, BIN, 'keys', 'list'], { env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stdout).toBe('');
+    expect(stderr).toBe('rafa-hub keys list: no hub to reach; pass --hub=<url> or set RAFA_HUB_URL\n');
   });
 });

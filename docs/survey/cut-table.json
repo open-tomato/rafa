@@ -5835,17 +5835,21 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 29,
+        "test": 39,
         "testSupport": 8
       },
       "files": [
         "packages/rafa-hub/src/bin.test.ts",
         "packages/rafa-hub/src/bin.ts",
+        "packages/rafa-hub/src/cli-keys.test.ts",
+        "packages/rafa-hub/src/config-login.test.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
         "packages/rafa-hub/src/contract-skew.integration.test.ts",
         "packages/rafa-hub/src/core-subpaths.test.ts",
         "packages/rafa-hub/src/hub-index.integration.test.ts",
+        "packages/rafa-hub/src/hub-keys.integration.test.ts",
+        "packages/rafa-hub/src/hub-oauth.integration.test.ts",
         "packages/rafa-hub/src/hub-unreachable.integration.test.ts",
         "packages/rafa-hub/src/hub.integration.test.ts",
         "packages/rafa-hub/src/identity/api-key.test.ts",
@@ -5853,10 +5857,16 @@
         "packages/rafa-hub/src/identity/contract.ts",
         "packages/rafa-hub/src/identity/github.test.ts",
         "packages/rafa-hub/src/identity/github.ts",
+        "packages/rafa-hub/src/identity/key-store.test.ts",
+        "packages/rafa-hub/src/identity/login-store.test.ts",
         "packages/rafa-hub/src/identity/port.ts",
         "packages/rafa-hub/src/identity/testdata/broken-identity.fixture.ts",
         "packages/rafa-hub/src/identity/testdata/memory-identity.ts",
         "packages/rafa-hub/src/identity/testdata/stand-in-github.ts",
+        "packages/rafa-hub/src/login/basic.test.ts",
+        "packages/rafa-hub/src/login/oauth.test.ts",
+        "packages/rafa-hub/src/server-keys.test.ts",
+        "packages/rafa-hub/src/server-login.test.ts",
         "packages/rafa-hub/src/server-query.ts",
         "packages/rafa-hub/src/server.test.ts",
         "packages/rafa-hub/src/server.ts",
@@ -5889,7 +5899,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 39,
+        "packages/rafa-hub/": 49,
         "packages/rafa-index/": 9
       },
       "folders": [

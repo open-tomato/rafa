@@ -4,8 +4,8 @@
  * it before doing anything, so the routes are written once and an
  * authentication scheme is an adapter. Repository permission is the
  * first the plan for #325 lays down, as `github.ts` beside this file,
- * and an API key read from the hub's environment the second, as
- * `api-key.ts`; hub roles, OAuth or SAML implement this same port and run the same
+ * and an API key, read from the hub's environment or its key store, the
+ * second, as `api-key.ts`; hub roles, OAuth or SAML implement this same port and run the same
  * cases, {@link HubIdentity}'s contract suite in `contract.ts`.
  *
  * ## One request, one answer

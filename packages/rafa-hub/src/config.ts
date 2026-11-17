@@ -1,5 +1,5 @@
 /**
- * The hub's config reader: the nine server keys `rafa-hub` reads from
+ * The hub's config reader: the ten server keys `rafa-hub` reads from
  * the YAML file the {@link HUB_CONFIG_ENV} environment variable names,
  * each with its default and its reader, resolved into one frozen
  * {@link HubConfig} or refused with every problem at once as a
@@ -18,7 +18,9 @@
  * rebuild`). The spec for #1431 adds `hub.projects`, the list of
  * projects the hub serves, and `hub.auth.adapter` with
  * `hub.auth.apiKeys`, which choose how a caller is identified (see
- * below). The client's keys (`hub.url`, `hub.tokenSecret`,
+ * below). The spec for #1433 adds `hub.auth.login`, the login that
+ * guards the key routes under `api-key`, read by `config-login.ts`
+ * (whose TSDoc holds its readings). The client's keys (`hub.url`, `hub.tokenSecret`,
  * `hub.timeout`) are core's, read by `packages/rafa/src/config-schema-hub.ts` from a
  * project's `.rafa/config.yaml`; this file is the server's own and
  * never a project's.
@@ -81,14 +83,21 @@
  *     `github`, it is empty.
  *   - Nothing is coerced: a port written as the string `'7373'` is
  *     refused, as core's readers refuse a string spelled like a number.
+ *   - `hub.auth.login` is read by `config-login.ts`: refused under
+ *     `github`, null there when left out, and `basic` when left out
+ *     under `api-key`.
  *   - A key under `hub`, `hub.auth`, `hub.store` or `hub.index` that the
  *     hub does not read is
  *     refused rather than ignored: the file is the hub's alone, so an
  *     unknown key there is a misspelling (`cachefor`) that would
  *     otherwise leave a default in force without a word.
  */
+import type { HubLoginConfig } from './config-login.js';
+
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
+
+import { readLoginConfig } from './config-login.js';
 
 /** The environment variable naming the hub's config file. */
 export const HUB_CONFIG_ENV = 'RAFA_HUB_CONFIG';
@@ -158,7 +167,7 @@ const HUB_KEYS: readonly string[] = Object.freeze(['repository', 'port', 'storeP
 const PROJECT_KEYS: readonly string[] = Object.freeze(['id', 'name', 'repository', 'storePath']);
 
 /** The keys the hub reads under `hub.auth`. */
-const AUTH_KEYS: readonly string[] = Object.freeze(['adapter', 'apiKeys', 'cacheFor']);
+const AUTH_KEYS: readonly string[] = Object.freeze(['adapter', 'apiKeys', 'cacheFor', 'login']);
 
 /** The keys the hub reads under `hub.store`. */
 const STORE_KEYS: readonly string[] = Object.freeze(['sqliteLibrary']);
@@ -251,6 +260,11 @@ export interface HubConfig {
    * empty under `github`. `hub.auth.apiKeys`.
    */
   readonly apiKeys: readonly string[];
+  /**
+   * The login guarding the key routes, or null under `github`, where
+   * neither exists. `hub.auth.login`, read by `config-login.ts`.
+   */
+  readonly login: HubLoginConfig | null;
   /**
    * The absolute path of the vanilla `libsqlite3` the index loads its
    * vector extension through, or null when none is named.
@@ -595,6 +609,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     : { problems: besideProjects(path, hub, ['storePath']) };
   const authAdapter = readAuthAdapter(path, auth.value?.['adapter']);
   const apiKeys = readApiKeys(path, authAdapter.value, auth.value?.['apiKeys']);
+  const login = readLoginConfig(path, authAdapter.value, auth.value?.['login']);
   const cacheFor = readCacheFor(path, auth.value?.['cacheFor']);
   const sqliteLibrary = readSqliteLibrary(path, store.value?.['sqliteLibrary']);
   const rebuildAfterPush = readRebuildAfterPush(path, index.value?.['rebuildAfterPush']);
@@ -609,6 +624,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     ...authAdapter.problems,
     ...apiKeys.problems,
     ...cacheFor.problems,
+    ...login.problems,
     ...store.problems,
     ...sqliteLibrary.problems,
     ...index.problems,
@@ -626,6 +642,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     cacheForMs: cacheFor.value as number | null,
     authAdapter: authAdapter.value as HubAuthAdapter,
     apiKeys: apiKeys.value as readonly string[],
+    login: login.value as HubLoginConfig | null,
     sqliteLibrary: sqliteLibrary.value as string | null,
     rebuildAfterPush: rebuildAfterPush.value as boolean,
   });

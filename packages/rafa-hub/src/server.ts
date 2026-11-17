@@ -40,6 +40,20 @@
  * (`cursor=` for `since=`) is refused rather than read as absent. `GET
  * /v1/settings/locked` is the second plan's, and answers `404` here.
  *
+ * ## The login and the key routes
+ *
+ * Handed {@link HubServerOptions.keys}, the server answers every path
+ * `isKeyPath` claims (`/v1/keys` and below it, `server-keys.ts`) through
+ * it, and handed {@link HubServerOptions.login} every path `isLoginPath`
+ * claims (`/login` and below it, `server-login.ts`); left out, those
+ * paths answer `404`. Neither asks the identity port nor opens the
+ * project store: each is behind the login it was opened with, which in
+ * turn is asked on no other route, so a login's basic credentials or
+ * cookie sent to `/v1/status`, `/v1/effort/push` or `/v1/effort/pull`
+ * reach the identity port alone, which refuses them `unauthenticated`.
+ * Their answers keep their own envelope and headers; the `request` line
+ * names the login's `user` in place of a caller.
+ *
  * ## Answers
  *
  * Every answer is JSON in one envelope: `{ "success": true, "data": … }`
@@ -129,11 +143,15 @@
  * the error's message and its milliseconds.
  */
 import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusalReason } from './identity/port.js';
+import type { HubKeyRoutes } from './server-keys.js';
+import type { HubLoginRoutes } from './server-login.js';
 import type { HubIndex, HubServedProject, HubStore } from './store/port.js';
 import type { WireCursor } from '@open-tomato/rafa/store';
 
 import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
 
+import { isKeyPath } from './server-keys.js';
+import { isLoginPath } from './server-login.js';
 import { checkContractVersion, checkQuery, ContractUnsupported, readDevice, readProject, RequestRefused } from './server-query.js';
 import { HubProjectNotServed, HubUpgradeRequired, servesOneProject } from './store/sqlite.js';
 
@@ -230,6 +248,10 @@ export interface HubServerOptions {
   readonly projects?: readonly HubServedProject[];
   /** Where log lines go; {@link jsonLineLog} to standard output when left out. */
   readonly log?: HubLog;
+  /** The key page and the OAuth routes, answering `/login` and below it; `404` there when left out. */
+  readonly login?: HubLoginRoutes;
+  /** The key routes, answering `/v1/keys` and below it; `404` there when left out. */
+  readonly keys?: HubKeyRoutes;
 }
 
 /** What `openConnected` opens: the store and the index over its rows. */
@@ -252,6 +274,8 @@ export interface HubServer {
 interface Served {
   readonly response: Response;
   readonly caller?: HubCaller;
+  /** The login's user, on a login or key route the login served. */
+  readonly user?: string;
   readonly refusal?: IdentityRefusalReason;
   readonly fields?: Readonly<Record<string, unknown>>;
 }
@@ -562,6 +586,16 @@ interface Deps {
   readonly holder: StoreHolder;
   readonly version: string;
   readonly listed: readonly HubServedProject[] | null;
+  readonly login: HubLoginRoutes | undefined;
+  readonly keys: HubKeyRoutes | undefined;
+}
+
+/** The login or key routes that serve `pathname`, or undefined when none were handed the server. */
+function loginRoutesOf(pathname: string, deps: Deps): HubLoginRoutes | HubKeyRoutes | undefined {
+  if (isKeyPath(pathname)) return deps.keys;
+  return isLoginPath(pathname)
+    ? deps.login
+    : undefined;
 }
 
 /** `GET /health`: whether the store is open, asking no identity. */
@@ -597,6 +631,8 @@ async function serveRoute(request: Request, url: URL, route: Route, deps: Deps):
 /** Serves `request`: the route its path and method name, or `404` and `405`. */
 function dispatch(request: Request, deps: Deps): Promise<Served> {
   const url = new URL(request.url);
+  const behindLogin = loginRoutesOf(url.pathname, deps);
+  if (behindLogin !== undefined) return behindLogin.serve(request);
   const isHealth = url.pathname === HUB_ROUTES.health;
   const route = isHealth
     ? undefined
@@ -623,7 +659,7 @@ function levelOf(status: number): HubLogLevel {
 
 /** The `request` log line for one served request. */
 function requestLine(request: Request, served: Served, started: number): HubLogEntry {
-  const { response, caller, refusal, fields } = served;
+  const { response, caller, user, refusal, fields } = served;
   return {
     level: levelOf(response.status),
     event: 'request',
@@ -634,6 +670,9 @@ function requestLine(request: Request, served: Served, started: number): HubLogE
     ...caller === undefined
       ? {}
       : { caller: caller.id, provider: caller.provider },
+    ...user === undefined
+      ? {}
+      : { user },
     ...refusal === undefined
       ? {}
       : { refusal },
@@ -651,7 +690,7 @@ function requestLine(request: Request, served: Served, started: number): HubLogE
 export function startHubServer(options: HubServerOptions): HubServer {
   const log = options.log ?? jsonLineLog();
   const holder = holdStore(openingOf(options), log);
-  const deps: Deps = { identity: options.identity, holder, version: options.version, listed: listedOf(options) };
+  const deps: Deps = { identity: options.identity, holder, version: options.version, listed: listedOf(options), login: options.login, keys: options.keys };
 
   const fetch = async (request: Request): Promise<Response> => {
     const started = performance.now();

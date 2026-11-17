@@ -91,11 +91,43 @@ refused by its position, such as `hub.auth.apiKeys[1]`, and the refusal never
 repeats what was written, in case a key was pasted in place of its name.
 
 Under `api-key`, the hub reads each named variable once, when it starts, and
-serves a request whose `Authorization: Bearer` equals one of their values. If a
-named variable is unset or empty, the hub logs one `config.refused` line naming
-the variable and exits 1. Under `github`, a push or a pull naming a listed
+serves a request whose `Authorization: Bearer` equals one of their values, or
+one of the keys created through its key routes, which it keeps hashed in
+`rafa-hub.keys.sqlite` beside `hub.storePath`. If a named variable is unset or
+empty, the hub logs one `config.refused` line naming the variable and exits 1. Under `github`, a push or a pull naming a listed
 project is checked against that project's `repository`. Every other request is
 checked against the first listed project's.
+
+### `hub.auth.login`
+
+Under `api-key`, the hub keeps a login that guards its key routes: the key page
+at `/login` and the routes under `/v1/keys`. `hub.auth.login.mode` picks it.
+`basic`, the default, is one user name and one password, kept as a hash in
+`rafa-hub.keys.sqlite` and set by `rafa-hub login` (see
+[Keys under `api-key`](#keys-under-api-key)). `oauth` hands sign-in to a
+provider instead. Under `oauth`, `hub.auth.login.oauth` is required and holds
+`authorizeUrl`, `tokenUrl`, `userUrl`, `clientId`, `clientSecretVariable` and
+`allowed`, all required, and `scope` and `callbackUrl`, optional. Under `basic`
+it is refused. `clientSecretVariable` names the environment variable that holds
+the client secret, never the secret itself.
+
+When no login is set, the hub reads `RAFA_HUB_LOGIN_USER` and
+`RAFA_HUB_LOGIN_PASSWORD` at start and sets the login from them, logging
+`login.set` with the user name. A login already set is kept, so a restart with
+the variables still exported changes nothing. A variable left empty logs
+`login.incomplete` naming it.
+
+The login grants the key routes alone. `/v1/status`, `/v1/effort/push`,
+`/v1/effort/pull` and `/v1/settings/locked` never accept it, so a login
+cannot sync. Under `github` a written `hub.auth.login` is refused, and the
+login and key routes answer `404`.
+
+The hub serves plain HTTP. Under `basic`, the password crosses the network in
+clear unless TLS fronts the hub or the hub listens on a loopback address
+(`127.x.x.x`, `localhost` or `::1`). The hub listens on every interface and no
+config key narrows that, so under `basic` it logs one `login.insecure` warning
+when it starts listening; `oauth` is not affected by this warning. Put a TLS
+terminator in front of the hub for any use beyond one machine.
 
 ### `hub.auth.cacheFor`
 
@@ -193,6 +225,8 @@ hub:
 
 `<port>` is the port the hub config names, `7373` when `hub.port` is left out.
 The secret is read from the system secret store, not from the environment.
+The hub listens on every interface, so under the default `basic` login it logs
+`login.insecure` at start; see [`hub.auth.login`](#hubauthlogin).
 
 ## The index
 
@@ -251,7 +285,51 @@ permission; no deploy keys or personal access tokens are needed on the hub side.
 The client's token (a GitHub token read with `Bun.secrets`) is sent by each
 device in the `Authorization` header of each request. Under `api-key`, GitHub is
 not asked: a caller is served by holding one of the keys `hub.auth.apiKeys`
-names.
+names, or a key the hub's key list holds and has neither paused nor deleted.
+
+## Keys under `api-key`
+
+A key the hub's key list holds is made by the key routes, and the login signs
+the caller into them. Set the login first, then mint keys:
+
+```shell
+rafa-hub login
+rafa-hub keys create laptop
+```
+
+`rafa-hub login` asks for a user name and a password at a terminal, twice for
+the password, and writes the login into `rafa-hub.keys.sqlite` beside
+`hub.storePath`; a running hub reads it on its next request. `rafa-hub keys`
+reaches the hub at `--hub=<url>` or `RAFA_HUB_URL`, and signs in with
+`RAFA_HUB_LOGIN_USER` and `RAFA_HUB_LOGIN_PASSWORD` when both are set, asking
+for them otherwise. A hub whose login is `oauth` answers with a line pointing to
+`<url>/login`, where a person signs in through the provider.
+
+Each key's life runs through these states:
+
+- **Created.** `rafa-hub keys create <name>` prints the plain key alone on
+  standard output, the one time anyone sees it. The key is `rafa_` followed by
+  32 random bytes in base64url. The hub keeps only its SHA-256 digest and never
+  logs the key.
+- **Active.** The key serves every hub action. Each request it serves stamps
+  its last use, which `rafa-hub keys list` shows.
+- **Paused.** `rafa-hub keys pause <name>` refuses the key as forbidden, with a
+  message naming the key's name. This release has no command that unpauses it.
+- **Deleted.** `rafa-hub keys delete <name>` marks the key deleted and keeps its
+  name and last use. A deleted key is refused as unknown, with a message that
+  names nothing it carried.
+
+A name matches `^[a-z0-9][a-z0-9._-]{0,63}$`. It is unique over every key ever
+created, deleted ones included, so a deleted name is never reused, and it never
+equals a variable `hub.auth.apiKeys` names. `rafa-hub keys list` prints one line
+per key, deleted ones included: its name, its state, who created it and when,
+and its last use, `never` when it has served nothing.
+
+The key routes are `GET` and `POST /v1/keys`, `POST /v1/keys/<name>/pause` and
+`DELETE /v1/keys/<name>`. The mutating ones need a same-origin `Origin` or none,
+which the CLI sends, and a JSON body, so a page on another site cannot drive
+them with the browser's cached basic credentials. Under `github` they answer
+`404`.
 
 ## The device's `hub.project`
 

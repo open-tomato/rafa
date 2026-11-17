@@ -1,5 +1,5 @@
 /**
- * Tests for the hub's config reader (`config.ts`): the nine server keys,
+ * Tests for the hub's config reader (`config.ts`): the ten server keys,
  * their defaults, the refusal of `0`, negative and out-of-range values,
  * and the file `RAFA_HUB_CONFIG` names.
  *
@@ -99,6 +99,7 @@ describe('defaults', () => {
       cacheForMs: 600_000,
       authAdapter: 'github',
       apiKeys: [],
+      login: null,
       sqliteLibrary: null,
       rebuildAfterPush: true,
     });
@@ -124,6 +125,7 @@ describe('defaults', () => {
       cacheForMs: 3_600_000,
       authAdapter: 'github',
       apiKeys: [],
+      login: null,
       sqliteLibrary: '/opt/sqlite/libsqlite3.dylib',
       rebuildAfterPush: false,
     });
@@ -505,13 +507,13 @@ describe('the document', () => {
     expect(parseHubConfig(hubYaml('port: 7373', 'auth:', '  cacheFor: 10m'), PATH).port).toBe(7373);
     expect(problemsOf(() => parseHubConfig(hubYaml('prot: 7373', 'auth:', '  cachefor: 10m'), PATH))).toEqual([
       '/srv/hub/hub.yaml: hub.prot is not a key the hub reads; expected one of hub.repository, hub.port, hub.storePath, hub.projects, hub.auth, hub.store, hub.index',
-      '/srv/hub/hub.yaml: hub.auth.cachefor is not a key the hub reads; expected one of hub.auth.adapter, hub.auth.apiKeys, hub.auth.cacheFor',
+      '/srv/hub/hub.yaml: hub.auth.cachefor is not a key the hub reads; expected one of hub.auth.adapter, hub.auth.apiKeys, hub.auth.cacheFor, hub.auth.login',
     ]);
   });
 
   it('refuses an auth section that is not a mapping', () => {
     expect(problemsOf(() => parseHubConfig(hubYaml('auth: 10m'), PATH))).toEqual([
-      '/srv/hub/hub.yaml: hub.auth is "10m", expected a mapping holding adapter, apiKeys, cacheFor',
+      '/srv/hub/hub.yaml: hub.auth is "10m", expected a mapping holding adapter, apiKeys, cacheFor, login',
     ]);
   });
 
@@ -563,6 +565,7 @@ describe('readHubConfig', () => {
       cacheForMs: 600_000,
       authAdapter: 'github',
       apiKeys: [],
+      login: null,
       sqliteLibrary: null,
       rebuildAfterPush: true,
     });

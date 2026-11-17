@@ -1,22 +1,34 @@
 /**
  * The API-key identity adapter (`api-key.ts`): the port's contract
- * suite, registered with `{ forbids: false }` since every key the
- * adapter knows is served, then what is the adapter's own. That covers
- * a bearer near a key refused (a prefix, a character more), a second
- * listed key served, the variables read once when opened, and an open
- * refused over a variable unset or empty.
+ * suite over the bootstrap keys alone, registered with
+ * `{ forbids: false }` since every key a variable holds is served, then
+ * what is the adapter's own. That covers a bearer near a key refused (a
+ * prefix, a character more), a second listed key served, the variables
+ * read once when opened, an open refused over a variable unset or
+ * empty, and the key store: a live key served under its name and
+ * stamped once per served request, a paused one `forbidden` naming it,
+ * a deleted or unknown one `unauthenticated` naming nothing, each read
+ * on every request, a bootstrap key served before the store is asked,
+ * and a store that rejects answered `unavailable`.
  *
  * Every case hands the adapter an environment of its own, a record
- * rather than `process.env`, so no case sets a variable another reads.
+ * rather than `process.env`, so no case sets a variable another reads,
+ * and a store of its own in a scratch directory under the temp dir.
  */
+import type { HubKey, HubKeyStore } from './key-store.js';
 import type { IdentityAnswer } from './port.js';
 
-import { describe, expect, it } from 'bun:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { HubConfigError } from '../config.js';
 
 import { API_KEY_PROVIDER, openApiKeyIdentity } from './api-key.js';
 import { identityContract } from './contract.js';
+import { keysFileName, openSqliteKeyStore } from './key-store.js';
 import { HUB_ACTIONS } from './port.js';
 
 /** The variables `hub.auth.apiKeys` names in these cases. */
@@ -38,6 +50,38 @@ identityContract('api-key', () => ({
   served: { authorization: `Bearer ${FIRST_KEY}` },
   unrecognised: { authorization: `Bearer ${UNKNOWN_KEY}` },
 }), { forbids: false });
+
+/** Headers carrying `plain` as a bearer. */
+function bearer(plain: string): Readonly<Record<string, string>> {
+  return { authorization: `Bearer ${plain}` };
+}
+
+identityContract('api-key (store)', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'rafa-hub-api-key-contract-'));
+  const store = openSqliteKeyStore({ path: keysFileName(join(directory, 'rafa.sqlite')), reservedNames: [FIRST] });
+  const served = await store.create('contract-served', 'octocat');
+  const forbidden = await store.create('contract-forbidden', 'octocat');
+  await store.pause('contract-forbidden');
+  return {
+    identity: openApiKeyIdentity({ variables: [FIRST], env: ENV, store }),
+    served: bearer(served.plain),
+    forbidden: bearer(forbidden.plain),
+    unrecognised: bearer(UNKNOWN_KEY),
+    lifecycle: {
+      create: async (name) => bearer((await store.create(name, 'octocat')).plain),
+      pause: async (name) => {
+        await store.pause(name);
+      },
+      delete: async (name) => {
+        await store.delete(name);
+      },
+    },
+    close: async () => {
+      store.close();
+      rmSync(directory, { recursive: true, force: true });
+    },
+  };
+}, { forbids: true, lifecycle: true });
 
 /** A hub request carrying `authorization`, or none. */
 function hubRequest(authorization?: string): Request {
@@ -193,6 +237,184 @@ describe('the API-key identity adapter', () => {
       const problems = openProblems([], ENV);
 
       expect(problems).toEqual(['hub.auth.apiKeys: names no variable; expected at least one environment variable name']);
+    });
+  });
+
+  describe('the key store', () => {
+    /** The instant the store's clock answers, fixed, so a stamp reads as it. */
+    const NOW = '2026-11-17T10:00:00.000Z';
+
+    let directory = '';
+    let store: HubKeyStore;
+
+    beforeEach(() => {
+      directory = mkdtempSync(join(tmpdir(), 'rafa-hub-api-key-'));
+      store = openSqliteKeyStore({ path: keysFileName(join(directory, 'rafa.sqlite')), now: () => new Date(NOW), reservedNames: [FIRST] });
+    });
+
+    afterEach(() => {
+      store.close();
+      rmSync(directory, { recursive: true, force: true });
+    });
+
+    /** The adapter over the first variable and the case's store. */
+    const openWithStore = () => openApiKeyIdentity({ variables: [FIRST], env: ENV, store });
+
+    /** The row named `name`, failing the case when the store lists none. */
+    async function rowOf(name: string): Promise<HubKey> {
+      const row = (await store.list()).find((key) => key.name === name);
+      if (row === undefined) throw new Error(`expected a key named ${name} and the store lists none`);
+      return row;
+    }
+
+    it('serves a live store key with every hub action, named by its name', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+
+      const answer = await openWithStore().identify(hubRequest(`Bearer ${plain}`));
+
+      expect(answer).toEqual({ served: true, caller: { id: 'ci-runner', provider: API_KEY_PROVIDER }, may: [...HUB_ACTIONS] });
+    });
+
+    it('serves a key created after the adapter was opened', async () => {
+      const identity = openWithStore();
+      const { plain } = await store.create('late', 'octocat');
+
+      expect(outcomeOf(await identity.identify(hubRequest(`Bearer ${plain}`)))).toBe('served');
+    });
+
+    it('stamps a served key as used, at the store clock', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+      expect((await rowOf('ci-runner')).lastUsedAt).toBeNull();
+
+      await openWithStore().identify(hubRequest(`Bearer ${plain}`));
+
+      expect((await rowOf('ci-runner')).lastUsedAt).toBe(NOW);
+    });
+
+    it('stamps once per served request', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+      const stamped: string[] = [];
+      const counting: HubKeyStore = { ...store, stampUse: async (name) => {
+        stamped.push(name);
+        await store.stampUse(name);
+      } };
+      const identity = openApiKeyIdentity({ variables: [FIRST], env: ENV, store: counting });
+
+      await identity.identify(hubRequest(`Bearer ${plain}`));
+      await identity.identify(hubRequest(`Bearer ${plain}`));
+      await identity.identify(hubRequest(`Bearer ${UNKNOWN_KEY}`));
+
+      expect(stamped).toEqual(['ci-runner', 'ci-runner']);
+    });
+
+    it('refuses a paused key as forbidden, naming the key and not the bearer', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+      const identity = openWithStore();
+      expect(outcomeOf(await identity.identify(hubRequest(`Bearer ${plain}`)))).toBe('served');
+      await store.pause('ci-runner');
+
+      const answer = await identity.identify(hubRequest(`Bearer ${plain}`));
+      if (answer.served) throw new Error('expected a refusal and the request was served');
+
+      expect(answer.refusal.reason).toBe('forbidden');
+      expect(answer.refusal.message).toContain('ci-runner');
+      expect(answer.refusal.message).not.toContain(plain.slice(5, 17));
+    });
+
+    it('stamps no paused key', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+      await store.pause('ci-runner');
+
+      await openWithStore().identify(hubRequest(`Bearer ${plain}`));
+
+      expect((await rowOf('ci-runner')).lastUsedAt).toBeNull();
+    });
+
+    it('refuses a deleted key as unauthenticated, naming neither the key nor the bearer', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+      const identity = openWithStore();
+      expect(outcomeOf(await identity.identify(hubRequest(`Bearer ${plain}`)))).toBe('served');
+      await store.delete('ci-runner');
+
+      const answer = await identity.identify(hubRequest(`Bearer ${plain}`));
+      if (answer.served) throw new Error('expected a refusal and the request was served');
+
+      expect(answer.refusal.reason).toBe('unauthenticated');
+      expect(answer.refusal.message).not.toContain('ci-runner');
+      expect(answer.refusal.message).not.toContain(plain.slice(5, 17));
+    });
+
+    it('refuses a deleted key with the message an unknown one gets', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+      await store.delete('ci-runner');
+      const identity = openWithStore();
+
+      const answers = await Promise.all([plain, UNKNOWN_KEY].map((key) => identity.identify(hubRequest(`Bearer ${key}`))));
+
+      expect(answers.map(outcomeOf)).toEqual(['unauthenticated', 'unauthenticated']);
+      expect(answers[0]).toEqual(answers[1]);
+    });
+
+    it('refuses a prefix of a store key as unauthenticated', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+
+      const answer = await openWithStore().identify(hubRequest(`Bearer ${plain.slice(0, -1)}`));
+
+      expect(outcomeOf(answer)).toBe('unauthenticated');
+    });
+
+    it('names the key list as well as hub.auth.apiKeys in an unauthenticated refusal', async () => {
+      const answer = await openWithStore().identify(hubRequest(`Bearer ${UNKNOWN_KEY}`));
+      if (answer.served) throw new Error('expected a refusal and the request was served');
+
+      expect(answer.refusal.message).toContain('hub.auth.apiKeys');
+      expect(answer.refusal.message).toContain('key list');
+    });
+
+    it('serves a bootstrap key beside the store, under its variable, without asking the store', async () => {
+      let asked = 0;
+      const watched: HubKeyStore = { ...store, findByDigest: async (digest) => {
+        asked += 1;
+        return await store.findByDigest(digest);
+      } };
+      const identity = openApiKeyIdentity({ variables: [FIRST], env: ENV, store: watched });
+
+      const answer = await identity.identify(hubRequest(`Bearer ${FIRST_KEY}`));
+
+      expect(answer.served && answer.caller.id).toBe(FIRST);
+      expect(asked).toBe(0);
+    });
+
+    it('asks the store for a bearer no bootstrap key equals, as a control on the case above', async () => {
+      let asked = 0;
+      const watched: HubKeyStore = { ...store, findByDigest: async (digest) => {
+        asked += 1;
+        return await store.findByDigest(digest);
+      } };
+      const identity = openApiKeyIdentity({ variables: [FIRST], env: ENV, store: watched });
+
+      await identity.identify(hubRequest(`Bearer ${UNKNOWN_KEY}`));
+
+      expect(asked).toBe(1);
+    });
+
+    it('answers unavailable, resolving, when the store rejects', async () => {
+      const broken: HubKeyStore = { ...store, findByDigest: () => Promise.reject(new Error(`disk gone under ${UNKNOWN_KEY}`)) };
+      const identity = openApiKeyIdentity({ variables: [FIRST], env: ENV, store: broken });
+
+      const answer = await identity.identify(hubRequest(`Bearer ${UNKNOWN_KEY}`));
+      if (answer.served) throw new Error('expected a refusal and the request was served');
+
+      expect(answer.refusal.reason).toBe('unavailable');
+      expect(answer.refusal.message).not.toContain(UNKNOWN_KEY);
+    });
+
+    it('answers unavailable when the stamp rejects', async () => {
+      const { plain } = await store.create('ci-runner', 'octocat');
+      const broken: HubKeyStore = { ...store, stampUse: () => Promise.reject(new Error('read-only file')) };
+      const identity = openApiKeyIdentity({ variables: [FIRST], env: ENV, store: broken });
+
+      expect(outcomeOf(await identity.identify(hubRequest(`Bearer ${plain}`)))).toBe('unavailable');
     });
   });
 });
