@@ -38,8 +38,8 @@
  * first lists a bug `triageReport` will take to it, one with a `what`
  * and a `security` flag of `false` that is not machine-scoped and whose
  * kind the check reads as `bug`. That check is taken here before
- * `triageReport` takes it again, and both read one answer per test case
- * (`start/triage-kinds.ts`), so a report whose entries all route to a
+ * `triageReport` takes it again, both reading the kept captures under
+ * the repo root and one answer per test case (`start/triage-kinds.ts`), so a report whose entries all route to a
  * repair task, the follow-up issue, the pull request's body, the store
  * or the machine channel resolves nothing. Every later report of the
  * run files through the tracker that resolution landed on. A chain that
@@ -444,18 +444,19 @@ function filesPublicly(bug: ReportBug): boolean {
 /**
  * True for a bug `triageReport` will take to the public tracker: one
  * that {@link filesPublicly}, is not machine-scoped, and, with `kinds`
- * given, whose kind the check reads as `bug`. See the module note.
+ * given, whose kind the check reads as `bug`, the kept captures under
+ * `repoRoot` read as `triageReport` reads them. See the module note.
  */
-async function routesPublicly(bug: ReportBug, kinds: KindRouteOptions | undefined): Promise<boolean> {
+async function routesPublicly(bug: ReportBug, kinds: KindRouteOptions | undefined, repoRoot: string): Promise<boolean> {
   if (!filesPublicly(bug) || isMachineFault(bug)) return false;
   if (kinds === undefined) return true;
-  return (await checkedKindOf(bug, kinds)).kind === 'bug';
+  return (await checkedKindOf(bug, kinds, repoRoot)).kind === 'bug';
 }
 
 /** True when any of `bugs` {@link routesPublicly}, checking them one at a time. */
-async function anyRoutesPublicly(bugs: readonly ReportBug[], kinds: KindRouteOptions | undefined): Promise<boolean> {
+async function anyRoutesPublicly(bugs: readonly ReportBug[], kinds: KindRouteOptions | undefined, repoRoot: string): Promise<boolean> {
   for (const bug of bugs) {
-    if (await routesPublicly(bug, kinds)) return true;
+    if (await routesPublicly(bug, kinds, repoRoot)) return true;
   }
   return false;
 }
@@ -866,7 +867,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
   };
 
   const trackerFor = async (report: TaskReport, kinds: KindRouteOptions | undefined): Promise<Tracker> => {
-    if (!await anyRoutesPublicly(report.outOfScopeBugs, kinds)) {
+    if (!await anyRoutesPublicly(report.outOfScopeBugs, kinds, options.repoRoot)) {
       return unresolvedTracker(options.config.trackerDefault, NOT_RESOLVED_REASON);
     }
     publicTracker ??= resolvePublicTracker(options, redact);
