@@ -387,6 +387,7 @@ export type {
   TrustReading,
 } from './src/board/trust.js';
 export {
+  createGhEditorLogin,
   createGhPermissions,
   ghBoardTrust,
   readAuthorTrust,
@@ -437,6 +438,16 @@ export {
   ISSUE_LIST_FLAGS,
   ISSUE_SUBJECT,
 } from './src/commands/issue/declarations.js';
+
+export type {
+  EditReport,
+  EditRunOptions,
+} from './src/commands/issue/edit-run.js';
+export {
+  EditRefusal,
+  requireEditingTracker,
+  runIssueEdit,
+} from './src/commands/issue/edit-run.js';
 
 export type {
   IssueSeams,
