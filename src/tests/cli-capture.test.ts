@@ -118,10 +118,13 @@ describe('plantScratchRepo', () => {
 });
 
 describe('runRafa', () => {
-  // Bun's behaviour differs here: 1.4.2 writes an install cache under
-  // $HOME/.bun on a bare spawn; 1.3.14 writes none. Rafa's claim (nothing
-  // under the scratch HOME) holds on every version; only the control's
-  // expectation is version-dependent.
+  // What lands under $HOME/.bun on a bare spawn is Bun's transpiler cache:
+  // Bun caches the transpiled output of any source file over 50 KB under
+  // $HOME/.bun/install/cache/@t@/. 1.4.2 writes it on this spawn; on 1.3.14
+  // the control stays clean only while every source file the CLI loads
+  // stays under 50 KB, so one file growing past it turns this case red.
+  // Rafa's claim (nothing under the scratch HOME) holds on every version;
+  // only the control's expectation is version-dependent.
   const bunWritesInstallCache = Bun.semver.satisfies(Bun.version, '>=1.4.0');
 
   it('leaves no .bun directory under the scratch HOME, where the same spawn under HOME alone leaves one only on Bun versions that write the install cache', () => {
