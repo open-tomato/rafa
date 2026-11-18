@@ -3,8 +3,9 @@
  *
  * The case the module exists for is the repository's own
  * `.github/workflows/verify.yml`, read from disk rather than copied, so
- * the cases follow the file: it runs on `pull_request` into `main` and
- * on `push` to `stretch/**`, so it names `main` and not `stretch/1`.
+ * the cases follow the file: it runs on `pull_request` into `main`,
+ * `integration` and `stretch/**`, and on `push` to `stretch/**`, so it
+ * names `main` and `stretch/1`, and not `release/1`.
  * Each "does not name" answer has a sibling over a near text that does,
  * because a reader answering false for everything would pass every case
  * about `stretch/1`, and one answering true for everything would pass
@@ -30,9 +31,12 @@ function workflowWith(onBlock: string): string {
 }
 
 describe('the repository\'s own verify.yml', () => {
-  test('holds the pull_request into main and integration, and push to stretch/** triggers these cases read', () => {
+  test('holds the pull_request into main, integration and stretch/**, and push to stretch/** triggers these cases read', () => {
     const on = (Bun.YAML.parse(VERIFY_YML) as { on: unknown }).on;
-    expect(on).toEqual({ pull_request: { branches: ['main', 'integration'] }, push: { branches: ['stretch/**'] } });
+    expect(on).toEqual({
+      pull_request: { branches: ['main', 'integration', 'stretch/**'] },
+      push: { branches: ['stretch/**'] },
+    });
   });
 
   test('names integration, the trunk', () => {
@@ -45,15 +49,20 @@ describe('the repository\'s own verify.yml', () => {
     expect(workflowsRunOnPullRequestsInto([VERIFY_YML], 'main')).toBe(true);
   });
 
-  test('does not name stretch/1, whose stretch/** filter sits under push only', () => {
-    expect(workflowNamesBase(VERIFY_YML, 'stretch/1')).toBe(false);
-    expect(workflowsRunOnPullRequestsInto([VERIFY_YML], 'stretch/1')).toBe(false);
+  test('names stretch/1, through the stretch/** filter under pull_request', () => {
+    expect(workflowNamesBase(VERIFY_YML, 'stretch/1')).toBe(true);
+    expect(workflowsRunOnPullRequestsInto([VERIFY_YML], 'stretch/1')).toBe(true);
   });
 
-  test('names stretch/1 once the same text puts stretch/** under pull_request', () => {
-    const control = VERIFY_YML.replace('      - main', '      - main\n      - \'stretch/**\'');
+  test('does not name release/1, which no filter matches', () => {
+    expect(workflowNamesBase(VERIFY_YML, 'release/1')).toBe(false);
+    expect(workflowsRunOnPullRequestsInto([VERIFY_YML], 'release/1')).toBe(false);
+  });
+
+  test('stops naming stretch/1 once the same text drops stretch/** from pull_request', () => {
+    const control = VERIFY_YML.replace('      - integration\n      - \'stretch/**\'', '      - integration');
     expect(control).not.toBe(VERIFY_YML);
-    expect(workflowNamesBase(control, 'stretch/1')).toBe(true);
+    expect(workflowNamesBase(control, 'stretch/1')).toBe(false);
   });
 });
 
@@ -65,11 +74,11 @@ describe('workflowsRunOnPullRequestsInto', () => {
   test('answers true when any one file names the base', () => {
     const pushOnly = workflowWith('on: push');
     expect(workflowsRunOnPullRequestsInto([pushOnly, VERIFY_YML], 'main')).toBe(true);
-    expect(workflowsRunOnPullRequestsInto([pushOnly, VERIFY_YML], 'stretch/1')).toBe(false);
+    expect(workflowsRunOnPullRequestsInto([pushOnly, VERIFY_YML], 'release/1')).toBe(false);
   });
 
   test('answers true when one file does not parse', () => {
-    expect(workflowsRunOnPullRequestsInto([VERIFY_YML, 'on: [pull_request'], 'stretch/1')).toBe(true);
+    expect(workflowsRunOnPullRequestsInto([VERIFY_YML, 'on: [pull_request'], 'release/1')).toBe(true);
   });
 });
 

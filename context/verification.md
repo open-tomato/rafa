@@ -281,9 +281,10 @@ on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs two jobs under two triggers, each
-with three gates. **Triggers:** pull requests into `main` or `integration`,
-and pushes to `stretch/**`. **Gates** (each step runs unless the job was
-cancelled): ring 0's job `verify` runs `bun test`, `bunx eslint .`, and
+with three gates. **Triggers:** pull requests into `main`, `integration`
+or `stretch/**`, and pushes to `stretch/**`. **Gates** (each step runs
+unless the job was cancelled): ring 0's job `verify` runs `bun test`,
+`bunx eslint .`, and
 `bun run check-types`, the root config and the ten composite members,
 which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
 (`turbo run lint check-types test --affected`), `bunx tsc --build
@@ -304,8 +305,11 @@ key. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` and `affected` checks (merge with
 `rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports
-the `fragment` check (merge with `rafa pr merge <n>`; `--skip-checks` is refused
-there). One more gate runs
+the same two and the `fragment` check (merge with `rafa pr merge <n>`, which
+`rafa stretch item --wait` runs once they pass; `--skip-checks` is refused
+there). So an item's red shows on its pull request, before the merge into
+the stretch branch, and each item merge waits for one hosted run. One more
+gate runs
 at `git commit`: `.githooks/pre-commit`
 runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
 refusing a commit whose staged blobs carry a raw control byte or an
