@@ -11,13 +11,10 @@
  * `tests.alwaysRun` glob, `src/**` + `/*.sweep.test.ts`, names the sweep.
  *
  * The fixture's ESLint is a stand-in (`eslint-stand-in.mjs`) copied to its
- * `node_modules/.bin/eslint`, so `bunx eslint` runs a file inside the
- * scratch repository and the cases read nothing outside it: a link to this
- * checkout's `node_modules` made them pass only where that link, or a
- * `node_modules` above the scratch directory, reached a real ESLint, and
- * without both, `bunx` fetched ESLint from the registry. A fixture planted
- * with no ESLint gets an unreachable registry, so its `bunx eslint` has
- * nothing to resolve and fetch.
+ * `node_modules/.bin/eslint`, which the lint step resolves and spawns, so
+ * the cases run a file inside the scratch repository and read nothing
+ * outside it. A fixture planted with no ESLint gets an unreachable
+ * registry as well, so a step that reached for one could fetch nothing.
  *
  * A stand-in `claude` answers the task session: it copies a payload tree
  * into the repository, which the loop then commits, and saves the prompt
@@ -29,8 +26,8 @@
  *   - a JSON file indented by one space is red at the task's step on the
  *     lint, with every test green;
  *   - clean files leave the step green, lint included;
- *   - a fixture with no resolvable ESLint ends at a lint step that could
- *     not run ESLint, which is no ESLint errors in the task's diff;
+ *   - a fixture with no resolvable ESLint skips the lint with one line
+ *     naming the missing ESLint, and the step stays green;
  *   - a test file that throws while it loads is an error outside any
  *     test: Bun's JUnit file holds nothing for it, so the step names the
  *     file and the error's first line from Bun's stderr, and keeps the
@@ -112,7 +109,7 @@ const UNREACHABLE_REGISTRY = { npm_config_registry: 'http://127.0.0.1:1/' };
 /** The files the task session adds, by path, or a function of the planted scratch for files that name a path outside the repository. */
 type Payload = Readonly<Record<string, string>> | ((scratch: Scratch) => Readonly<Record<string, string>>);
 
-/** Whether a planted fixture holds an ESLint `bunx` resolves. */
+/** Whether a planted fixture holds an ESLint the lint step resolves. */
 type EslintPlanting = 'stand-in' | 'none';
 
 /** The report the stand-in ends its task session on. */
@@ -315,7 +312,7 @@ describe('rafa loop start over a one-task fixture plan whose task commits clean 
     }));
 
     expectExit(seen.run, 0, seen.scratch);
-    expect(seen.output).toContain(`🧹 lint step after "${TASK}": bunx eslint --no-warn-ignored over 2 file(s) exited 0; 0 error(s) in 0 file(s).`);
+    expect(seen.output).toContain(`🧹 lint step after "${TASK}": node_modules/.bin/eslint --no-warn-ignored over 2 file(s) exited 0; 0 error(s) in 0 file(s).`);
     expect(seen.output).not.toContain('❌');
     expect(seen.taskStep?.newFailures).toEqual([]);
     expect(seen.prompt).toContain(`Also run \`bun test ./${SWEEP_PATH}\``);
@@ -323,16 +320,18 @@ describe('rafa loop start over a one-task fixture plan whose task commits clean 
 });
 
 describe('rafa loop start over a one-task fixture plan with no ESLint to resolve', () => {
-  it('reports that the lint step could not run ESLint, not that the task\'s diff has errors', () => {
+  it('skips the lint with one line naming the missing ESLint, and the step stays green', () => {
     const seen = runAndObserve(
-      plantFixture({ 'data.json': '{\n  "name": "probe"\n}\n' }, 'none'),
+      plantFixture({ 'data.json': '{\n "name": "probe"\n}\n' }, 'none'),
       UNREACHABLE_REGISTRY,
     );
 
-    expect(seen.output).toContain(`❌ The runner's lint step after "${TASK}" could not run ESLint: bunx eslint exited`);
-    expect(seen.output).toContain('printed no report');
+    expectExit(seen.run, 0, seen.scratch);
+    expect(seen.output).toContain(`🧹 lint step after "${TASK}": no ESLint installed in the checkout (no node_modules/.bin/eslint, no eslint package resolves from it); nothing to lint.`);
+    expect(seen.output).not.toContain('bunx');
+    expect(seen.output).not.toContain('could not run ESLint');
     expect(seen.output).not.toContain('found ESLint errors');
-    expect(seen.output).toContain('Stopping here. Run again to retry the blocked task');
+    expect(seen.output).not.toContain('❌');
   }, RUN_TIMEOUT);
 });
 

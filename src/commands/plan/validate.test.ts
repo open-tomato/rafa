@@ -832,6 +832,23 @@ describe('the effort-store rules rafa plan validate checks', () => {
       + ' live store: `rafa effort schema --check` under an [auto] heading\n');
   });
 
+  it('refuses a migration plan whose ticked probe line was edited, where the unedited ticked line passes (#1591)', async () => {
+    const collect = 'RAFA_EFFORT_DIR=/tmp/copy bun src/rafa.ts effort collect';
+    const ticked = PROBED_PREREQUISITES.replace('- [ ]', '- [x]');
+    const edited = ticked.replace('schema --check', 'schema --check --quick');
+    const editedRoot = plantStorePlan(storePlan(collect), edited);
+    const tickedRoot = plantStorePlan(storePlan(collect), ticked);
+
+    const refused = await validateStorePlan(editedRoot);
+    const passed = await validateStorePlan(tickedRoot, ['--output=json']);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toContain('error: plans/PLAN-demo.md:3: missing-probe:');
+    expect(passed.exitCode).toBe(0);
+    expect(passed.stdout).not.toContain('missing-probe');
+    expect(eventsOf(passed.stdout).at(-1)).toMatchObject({ type: 'result', ok: true, data: { storeProblems: [] } });
+  });
+
   it('refuses a plan pinning a store change by number, where one quoting it in a code span passes', async () => {
     const pinned = plantStorePlan('# Stage: one\n\n- [ ] Ship the column as migration 14\n', null);
     const quoted = plantStorePlan('# Stage: one\n\n- [ ] Refuse a spec saying `migration 14`\n', null);

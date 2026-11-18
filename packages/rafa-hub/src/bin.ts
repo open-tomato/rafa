@@ -2,50 +2,113 @@
 /**
  * The `rafa-hub` command, the package's `bin`: reads the hub's config
  * from the file `RAFA_HUB_CONFIG` names (`config.ts`), then starts the
- * server (`server.ts`) over the repository-permission identity
- * (`identity/github.ts`, asking GitHub's public API about
- * `hub.repository`) and the `sqlite` connector (`connectSqliteHub` in
- * `store/sqlite.ts`), which opens the store at the file `hub.storePath`
- * names and the index beside it, the loader handed
- * `hub.store.sqliteLibrary`. The server rebuilds the index after a push
- * that added rows unless `hub.index.rebuildAfterPush` is `false`, the
- * project a rebuild records being `hub.repository`. Logs are JSON lines
- * on standard output.
+ * server (`server.ts`) over the identity adapter `hub.auth.adapter`
+ * picks and the `sqlite` connector (`connectSqliteHub` in
+ * `store/sqlite.ts`), handed the listed projects (`hub.projects`, or
+ * the one default project of `hub.repository` in `hub.storePath`), each
+ * project's store at the file its `storePath` names and its index
+ * beside it, the loader handed `hub.store.sqliteLibrary`. The server
+ * rebuilds the pushed project's index after a push that added rows
+ * unless `hub.index.rebuildAfterPush` is `false`. Logs are JSON lines on
+ * standard output.
+ *
+ * ## The identity adapter
+ *
+ * Under `github` (the default) the repository-permission identity
+ * (`identity/github.ts`) asks GitHub's API about each listed project's
+ * repository, a push or a pull naming a project by `project` checked
+ * against that project's and every other request against the first
+ * listed project's (`projectRepositoryResolver`). Under `api-key` the
+ * API-key identity (`identity/api-key.ts`) reads the variables
+ * `hub.auth.apiKeys` names from the command's environment, once, at
+ * start, and looks every other bearer up in the key store.
+ *
+ * ## The keys file, the login and its routes, under `api-key`
+ *
+ * At start, under `api-key` alone, `runHub` opens the key store and the
+ * login store in the keys file beside `hub.storePath` (`keysFileName`,
+ * the first listed project's under `hub.projects`), creating its
+ * directory as `rafa-hub login` does, no key taking a name
+ * `hub.auth.apiKeys` holds. It hands the key store to the identity and
+ * opens the login `hub.auth.login.mode` picks: under `basic` the login
+ * store's, first set from `RAFA_HUB_LOGIN_USER` and
+ * `RAFA_HUB_LOGIN_PASSWORD` when no login is set (`bootstrapLoginFromEnv`,
+ * which keeps a set one), logging `login.set` with the user, or
+ * `login.incomplete` naming the variable left empty; under `oauth` the
+ * provider's, its client secret read now. The key routes and the key
+ * page are opened over that login and handed to the server, which
+ * answers them `404` under `github`. Stopping the server closes both
+ * stores.
+ *
+ * The hub serves plain HTTP, so under `basic`, listening on a hostname
+ * that is not loopback (`0.0.0.0` unless {@link RunHubOptions.hostname}
+ * says), it logs one `login.insecure` warning once it listens: the
+ * login's password crosses the network in clear unless TLS fronts it.
  *
  * A config the reader refuses is logged as one `config.refused` line
- * holding every problem, and the command exits 1 without listening. A
- * store that does not open is no reason to exit: the server answers
- * `503` on `/health` until it opens, which is what an operator reads.
- * `SIGINT` and `SIGTERM` stop the server, close the store and exit 0.
+ * holding every problem, and the command exits 1 without listening; so
+ * is an `api-key` hub whose named variable is unset or empty, the line
+ * naming the variable and never a value, a keys file that does not
+ * open, an OAuth client secret's variable left unset, and a
+ * `RAFA_HUB_LOGIN_USER` no basic login can carry. A store that does not open is
+ * no reason to exit: the server answers `503` on `/health` until it
+ * opens, which is what an operator reads. `SIGINT` and `SIGTERM` stop
+ * the server, close the store and exit 0.
  *
  * ## `rafa-hub index rebuild`
  *
- * Reads the same config, opens the same connector, runs one
- * `index.rebuild({ project: hub.repository })`, prints one line with
- * its counts on standard output and exits 0. A refused config, a
- * connector that does not open and a rebuild that fails each print one
- * line on standard error, and the command exits 1; so do arguments
- * naming neither the server nor this entry. The rebuild swaps a new
- * index file in, and a server already running over the same store picks
- * it up by its inode on its following query, so the two need no
- * signal between them.
+ * Reads the same config, opens the same connector and runs one
+ * `index.rebuild` per listed project, in `hub.projects` order: the
+ * default project's records `hub.repository`, a listed project's its
+ * id. Each rebuild prints one line, its counts on standard output or
+ * its failure on standard error, and a failed one does not stop the
+ * next. The command exits 0 when every rebuild swapped its index in and
+ * 1 otherwise. A refused config and a connector that does not open each
+ * print one line on standard error, and the command exits 1; so do
+ * arguments naming no command, the line holding {@link HUB_USAGE}. A
+ * rebuild swaps a new index file in, and a server already running over
+ * the same store picks it up by its inode on its following query, so
+ * the two need no signal between them.
  *
- * {@link runHub} and {@link runIndexRebuild} are the whole command but
- * the process's exit, so a test runs them in process; importing this
- * file starts nothing.
+ * ## `rafa-hub login` and `rafa-hub keys`
+ *
+ * `rafa-hub login` sets the hub's login in the keys file beside
+ * `hub.storePath`, and `rafa-hub keys create|list|pause|delete` drives
+ * a hub's key routes at `--hub=<url>` or `RAFA_HUB_URL`; both live in
+ * `cli-keys.ts`, whose module note says what each asks and prints.
+ *
+ * {@link runHub} and {@link runIndexRebuild}, like `cli-keys.ts`'s
+ * `runLogin` and `runKeys`, are the whole command but the process's
+ * exit, so a test runs them in process; importing this file starts
+ * nothing.
  */
 import type { HubConfig } from './config.js';
+import type { HubKeyStore } from './identity/key-store.js';
+import type { HubLoginStore } from './identity/login-store.js';
+import type { HubIdentity } from './identity/port.js';
+import type { HubLogin } from './login/basic.js';
+import type { HubKeyRoutes } from './server-keys.js';
+import type { HubLoginRoutes } from './server-login.js';
 import type { HubConnected, HubLog, HubServer } from './server.js';
-import type { IndexRebuildResult } from './store/port.js';
+import type { HubServedProject, IndexRebuildResult } from './store/port.js';
 
+import { mkdirSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
 import packageJson from '../package.json';
 
+import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { HubConfigError, readHubConfig } from './config.js';
-import { GITHUB_API, openGitHubIdentity } from './identity/github.js';
-import { jsonLineLog, startHubServer } from './server.js';
-import { connectSqliteHub } from './store/sqlite.js';
+import { openApiKeyIdentity } from './identity/api-key.js';
+import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
+import { keysFileName, openSqliteKeyStore } from './identity/key-store.js';
+import { bootstrapLoginFromEnv, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
+import { openBasicLogin } from './login/basic.js';
+import { openOAuthLogin } from './login/oauth.js';
+import { openKeyRoutes } from './server-keys.js';
+import { openLoginRoutes } from './server-login.js';
+import { DEFAULT_HOSTNAME, jsonLineLog, startHubServer } from './server.js';
+import { connectSqliteHub, servesOneProject } from './store/sqlite.js';
 
 /** The hub's version, as its `package.json` names it. */
 export const HUB_VERSION: string = packageJson.version;
@@ -57,10 +120,10 @@ const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 export const INDEX_REBUILD_ARGS: readonly string[] = Object.freeze(['index', 'rebuild']);
 
 /** What `rafa-hub` takes, as a refused argument list says it. */
-export const HUB_USAGE = 'usage: rafa-hub (serves the hub) or rafa-hub index rebuild';
+export const HUB_USAGE: string = `usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or ${KEYS_USAGE}`;
 
 /** What one run of `rafa-hub` does, by its arguments. */
-export type HubCommand = 'serve' | 'index-rebuild';
+export type HubCommand = 'serve' | 'index-rebuild' | 'login' | 'keys';
 
 /** What {@link runHub} may vary beyond the environment. */
 export interface RunHubOptions {
@@ -68,49 +131,268 @@ export interface RunHubOptions {
   readonly log?: HubLog;
   /** GitHub's API root; {@link GITHUB_API} when left out. */
   readonly githubApi?: string;
+  /** The hostname to listen on; {@link DEFAULT_HOSTNAME}, every interface, when left out. */
+  readonly hostname?: string;
+}
+
+/** The hostnames no other machine reaches the hub at, beside every `127.x.x.x` address. */
+const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set(['localhost', '::1', '[::1]']);
+
+/** An IPv4 address in `127.0.0.0/8`. */
+const LOOPBACK_IPV4 = /^127(?:\.\d{1,3}){3}$/;
+
+/** Whether a hub listening on `hostname` is reached from this machine alone. */
+export function isLoopbackHostname(hostname: string): boolean {
+  return LOOPBACK_HOSTNAMES.has(hostname.toLowerCase()) || LOOPBACK_IPV4.test(hostname);
+}
+
+/** The login and the key and login routes over it, opened at start under `api-key`. */
+interface OpenedLogin {
+  readonly login: HubLogin;
+  readonly routes: { readonly login: HubLoginRoutes; readonly keys: HubKeyRoutes };
+}
+
+/** One thrown value as a {@link HubConfigError}, its message the problem `what` opens. */
+function refusalOf(what: string, error: unknown): HubConfigError {
+  return error instanceof HubConfigError
+    ? error
+    : new HubConfigError([`${what}: ${oneLine(error)}`]);
+}
+
+/**
+ * Opens the key store in the keys file beside `config.storePath`,
+ * creating its directory as `rafa-hub login` does, no key taking a name
+ * `hub.auth.apiKeys` holds.
+ *
+ * @throws {HubConfigError} When the file does not open.
+ */
+function openKeyStore(config: HubConfig): HubKeyStore {
+  const path = keysFileName(config.storePath);
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    return openSqliteKeyStore({ path, reservedNames: config.apiKeys });
+  } catch (error) {
+    throw refusalOf(`the keys file at ${path} did not open`, error);
+  }
+}
+
+/**
+ * The login `hub.auth.login` picks, opened over the keys file: under
+ * `oauth` the provider's, its client secret read from `env` now; under
+ * `basic` the login store's, its login set from `env` when none is set
+ * (`bootstrapLoginFromEnv`), which logs `login.set` naming the user, or
+ * `login.incomplete` naming the variable left empty.
+ *
+ * @throws {HubConfigError} When the client secret's variable is unset,
+ *   or the bootstrap's user name is one no login can carry.
+ */
+async function openLogin(config: HubConfig, env: Readonly<Record<string, string | undefined>>, log: HubLog, onStore: (store: HubLoginStore) => void): Promise<HubLogin> {
+  const oauth = config.login?.oauth ?? null;
+  if (config.login?.mode === 'oauth' && oauth !== null) {
+    try {
+      return openOAuthLogin({ config: oauth, env });
+    } catch (error) {
+      throw refusalOf('hub.auth.login.oauth', error);
+    }
+  }
+
+  const path = keysFileName(config.storePath);
+  let store: HubLoginStore;
+  try {
+    store = openSqliteLoginStore({ path });
+  } catch (error) {
+    throw refusalOf(`the keys file at ${path} did not open`, error);
+  }
+  onStore(store);
+  let bootstrap;
+  try {
+    bootstrap = await bootstrapLoginFromEnv(store, env);
+  } catch (error) {
+    throw refusalOf(LOGIN_USER_VARIABLE, error);
+  }
+  if (bootstrap.outcome === 'set') log({ level: 'info', event: 'login.set', user: bootstrap.login.user });
+  if (bootstrap.outcome === 'incomplete') log({ level: 'warn', event: 'login.incomplete', missing: bootstrap.missing });
+  return openBasicLogin({ store });
+}
+
+/**
+ * Opens the login over the keys file, then the key and login routes
+ * over it and `store`, both answering `hub.auth.login.oauth.callbackUrl`'s
+ * origin beside each request's own. The login store it opens is handed
+ * to `onStore`, for the caller to close.
+ *
+ * @throws {HubConfigError} When the file does not open, or the login refuses.
+ */
+async function openLoginRoutesOver(
+  config: HubConfig,
+  env: Readonly<Record<string, string | undefined>>,
+  log: HubLog,
+  store: HubKeyStore,
+  onStore: (store: HubLoginStore) => void,
+): Promise<OpenedLogin> {
+  const login = await openLogin(config, env, log, onStore);
+  const callbackUrl = config.login?.oauth?.callbackUrl ?? null;
+  const origins = callbackUrl === null
+    ? []
+    : [callbackUrl];
+  return {
+    login,
+    routes: {
+      login: openLoginRoutes({ login, store, log, origins }),
+      keys: openKeyRoutes({ login, store, log, origins }),
+    },
+  };
+}
+
+/**
+ * Logs one `login.insecure` warning when the login is `basic` and the
+ * hub listens on `hostname`, not a loopback one: it serves plain HTTP,
+ * so the login's password crosses the network in clear unless TLS
+ * fronts the hub.
+ */
+function warnInsecureLogin(login: HubLogin | undefined, hostname: string, log: HubLog): void {
+  if (login?.mode !== 'basic' || isLoopbackHostname(hostname)) return;
+
+  log({
+    level: 'warn',
+    event: 'login.insecure',
+    hostname,
+    message: `hub.auth.login.mode is basic and the hub listens on ${hostname} over plain HTTP, so the login's password crosses the network in clear; serve it behind TLS, or listen on a loopback address`,
+  });
 }
 
 /**
  * Reads the config `env` names and starts the hub over it, answering
  * the running server, or null when the config was refused, which is
- * logged. Never exits the process.
+ * logged. Under `api-key` it opens the key and login stores in the keys
+ * file first, bootstraps the login from `env`, and closes both when the
+ * server stops. Never exits the process.
  */
 export async function runHub(env: Readonly<Record<string, string | undefined>>, options: RunHubOptions = {}): Promise<HubServer | null> {
   const log = options.log ?? jsonLineLog();
+  const hostname = options.hostname ?? DEFAULT_HOSTNAME;
+  const opened: { close: () => void }[] = [];
+  const closeOpened = (): void => {
+    for (const file of opened.splice(0).reverse()) file.close();
+  };
   let config;
+  let identity;
+  let keyLogin: OpenedLogin | undefined;
   try {
     config = await readHubConfig(env);
+    const store = config.authAdapter === 'api-key'
+      ? openKeyStore(config)
+      : undefined;
+    if (store !== undefined) opened.push(store);
+    identity = openIdentity(config, env, options.githubApi ?? GITHUB_API, store);
+    if (store !== undefined) {
+      keyLogin = await openLoginRoutesOver(config, env, log, store, (loginStore) => opened.push(loginStore));
+    }
   } catch (error) {
+    closeOpened();
     if (!(error instanceof HubConfigError)) throw error;
 
     log({ level: 'error', event: 'config.refused', problems: error.problems });
     return null;
   }
 
-  const { repository, port, cacheForMs, rebuildAfterPush } = config;
-  return startHubServer({
-    port,
-    version: HUB_VERSION,
-    identity: openGitHubIdentity({ repository, cacheForMs, apiBase: options.githubApi ?? GITHUB_API }),
-    openConnected: () => connectHub(config),
-    rebuildAfterPush,
-    project: repository,
-    log,
-  });
+  const { repository, port, rebuildAfterPush } = config;
+  let server;
+  try {
+    server = startHubServer({
+      port,
+      hostname,
+      version: HUB_VERSION,
+      identity,
+      openConnected: () => connectHub(config),
+      rebuildAfterPush,
+      project: repository,
+      projects: servedProjects(config),
+      log,
+      ...keyLogin?.routes,
+    });
+  } catch (error) {
+    closeOpened();
+    throw error;
+  }
+  warnInsecureLogin(keyLogin?.login, hostname, log);
+  return opened.length === 0
+    ? server
+    : closingOnStop(server, closeOpened);
 }
 
-/** Opens the `sqlite` connector over `config`'s store, index and library. */
+/** `server`, whose stop also runs `close` once the server has stopped. */
+function closingOnStop(server: HubServer, close: () => void): HubServer {
+  return {
+    url: server.url,
+    port: server.port,
+    stop: async () => {
+      try {
+        await server.stop();
+      } finally {
+        close();
+      }
+    },
+  };
+}
+
+/**
+ * The identity adapter `hub.auth.adapter` picks: `api-key` over the
+ * variables `hub.auth.apiKeys` names, read from `env` now, and over
+ * `store`, asked on every request; or `github` asking `apiBase` about
+ * each listed project's repository.
+ *
+ * @throws {HubConfigError} Under `api-key`, when a named variable is unset or empty.
+ */
+function openIdentity(config: HubConfig, env: Readonly<Record<string, string | undefined>>, apiBase: string, store: HubKeyStore | undefined): HubIdentity {
+  if (config.authAdapter === 'api-key') {
+    return openApiKeyIdentity({ variables: config.apiKeys, env, ...store === undefined
+      ? {}
+      : { store } });
+  }
+
+  return openGitHubIdentity({ repository: projectRepositoryResolver(config.projects), cacheForMs: config.cacheForMs, apiBase });
+}
+
+/** The projects `config` lists, by `id` and `name` alone, as the port and `/v1/status` know them. */
+function servedProjects(config: HubConfig): readonly HubServedProject[] {
+  return config.projects.map(({ id, name }) => Object.freeze({ id, name }));
+}
+
+/** Opens the `sqlite` connector over `config`'s projects, their stores and indexes, and its library. */
 function connectHub(config: HubConfig): Promise<HubConnected> {
-  const { storePath, sqliteLibrary, repository } = config;
+  const { storePath, sqliteLibrary, repository, projects } = config;
   return connectSqliteHub(
-    { directory: dirname(storePath), now: () => new Date() },
-    { fileName: basename(storePath), loader: { library: sqliteLibrary }, project: repository },
+    { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config) },
+    {
+      fileName: basename(storePath),
+      storeFiles: projects.map(({ id, storePath: file }) => ({ id, storePath: file })),
+      loader: { library: sqliteLibrary },
+      project: repository,
+    },
   );
+}
+
+/**
+ * The project each listed project's rebuild names: `hub.repository` for
+ * the one default project, which the index records, and each listed
+ * project's id otherwise, which routes the rebuild to its index.
+ */
+function rebuildProjects(config: HubConfig): readonly string[] {
+  return servesOneProject(config.projects)
+    ? [config.repository]
+    : config.projects.map(({ id }) => id);
 }
 
 /** The command `args` (the process's arguments past the script) name, or null for any other. */
 export function hubCommandOf(args: readonly string[]): HubCommand | null {
   if (args.length === 0) return 'serve';
+  if (isLoginCommand(args)) return 'login';
+  if (args[0] === 'keys') {
+    return keysCommandOf(args.slice(1)) === null
+      ? null
+      : 'keys';
+  }
 
   const isRebuild = args.length === INDEX_REBUILD_ARGS.length
     && args.every((arg, at) => arg === INDEX_REBUILD_ARGS[at]);
@@ -151,10 +433,12 @@ export function rebuiltLine(result: IndexRebuildResult): string {
 
 /**
  * Reads the config `env` names, opens its connector, runs one rebuild
- * of `hub.repository`'s index and closes the store, answering the exit
- * code: 0 with the counts line on `out`, or 1 with one line on `err`
- * for a refused config, a connector that did not open or a rebuild that
- * failed. Never exits the process.
+ * of each listed project's index in turn and closes the store,
+ * answering the exit code: 0 when every rebuild swapped its index in,
+ * each printing its counts line on `out`, or 1 when one failed, its line
+ * on `err`, the others still run. A refused config and a connector that
+ * did not open answer 1 with one line on `err` and run no rebuild.
+ * Never exits the process.
  */
 export async function runIndexRebuild(env: Readonly<Record<string, string | undefined>>, options: RunIndexRebuildOptions = {}): Promise<number> {
   const out = options.out ?? ((line: string) => process.stdout.write(`${line}\n`));
@@ -176,12 +460,17 @@ export async function runIndexRebuild(env: Readonly<Record<string, string | unde
     err(`${REBUILD_PREFIX}: the store at ${config.storePath} did not open: ${oneLine(error)}`);
     return 1;
   }
+  let code = 0;
   try {
-    out(rebuiltLine(await connected.index.rebuild({ project: config.repository })));
-    return 0;
-  } catch (error) {
-    err(`${REBUILD_PREFIX}: the rebuild failed, and the live index is as it was: ${oneLine(error)}`);
-    return 1;
+    for (const project of rebuildProjects(config)) {
+      try {
+        out(rebuiltLine(await connected.index.rebuild({ project })));
+      } catch (error) {
+        err(`${REBUILD_PREFIX}: ${project}'s rebuild failed, and its live index is as it was: ${oneLine(error)}`);
+        code = 1;
+      }
+    }
+    return code;
   } finally {
     await connected.store.close();
   }
@@ -206,6 +495,8 @@ if (import.meta.main) {
     process.exit(1);
   }
   if (command === 'index-rebuild') process.exit(await runIndexRebuild(process.env));
+  if (command === 'login') process.exit(await runLogin(process.env));
+  if (command === 'keys') process.exit(await runKeys(process.argv.slice(3), process.env));
 
   await serve();
 }

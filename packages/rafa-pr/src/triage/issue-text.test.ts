@@ -6,6 +6,8 @@
  * `issueTextOf` (`./similarity.ts`) reads a new body as it reads an old one.
  * Then the `Possible duplicates` section's lines over the ranked list: the
  * rank, the bonus signals each names, and the sentence for an empty list.
+ * Last, the helpers of a recurrence's append: its reason, the fenced text
+ * it adds, and the check that a body already holds a text.
  */
 import type { BugValues } from './issue-text.js';
 import type { MatchedSignal, RankedIssue } from './similarity.js';
@@ -16,12 +18,15 @@ import { EMPTY_BUG_RECORD, parseBugRecord } from '@open-tomato/rafa/bugs/record'
 import { describe, expect, it } from 'bun:test';
 
 import {
+  bodyHoldsText,
   COMMENT_OPENING,
   ISSUE_OPENING,
   issueText,
   NO_DUPLICATES,
   possibleDuplicatesSection,
   recordSections,
+  recurrenceAddition,
+  recurrenceReason,
 } from './issue-text.js';
 import { issueTextOf, sectionValueOf } from './similarity.js';
 
@@ -317,5 +322,81 @@ describe('possibleDuplicatesSection', () => {
 
     // Assert
     expect(listLinesOf(section)).toEqual(['- https://example.test/[redacted]/7 (score 0.40; same cause)']);
+  });
+});
+
+describe('recurrenceReason', () => {
+  it('names the plan stub and the task line counting from one', () => {
+    // Act
+    const reason = recurrenceReason('my-plan', 11);
+
+    // Assert
+    expect(reason).toBe('reproduce from a recurrence (plan my-plan, task 12)');
+  });
+
+  it('names the task line alone for a dispatch with no plan stub', () => {
+    // Act
+    const reason = recurrenceReason(null, 0);
+
+    // Assert
+    expect(reason).toBe('reproduce from a recurrence (task 1)');
+  });
+});
+
+describe('recurrenceAddition', () => {
+  it('fences the redacted text, its surrounding whitespace trimmed, in three backticks', () => {
+    // Act
+    const added = recurrenceAddition('  bun test src/SECRET.test.ts\n', noSecret);
+
+    // Assert
+    expect(added).toBe('```\nbun test src/[redacted].test.ts\n```');
+  });
+
+  it('sizes the fence one backtick longer than the longest run the text holds', () => {
+    // Act
+    const added = recurrenceAddition('run ````bun test```` then `ls`', asIs);
+
+    // Assert
+    expect(added).toBe('`````\nrun ````bun test```` then `ls`\n`````');
+  });
+});
+
+describe('bodyHoldsText', () => {
+  /** A filed body whose Reproduce section holds one command, written with CRLF line ends. */
+  const CRLF_BODY = '## Reproduce\r\n\r\n```\r\nbun test src/a.test.ts\r\n-t keeps\r\n```\r\n';
+
+  it('finds a text in a body written with CRLF, the text itself in LF', () => {
+    // Act
+    const held = bodyHoldsText(CRLF_BODY, 'bun test src/a.test.ts\n-t keeps');
+
+    // Assert
+    expect(held).toBe(true);
+  });
+
+  it('finds a text written with CRLF and surrounding whitespace in a body written with LF', () => {
+    // Act
+    const held = bodyHoldsText('## Reproduce\n\nbun test src/a.test.ts\n-t keeps\n', '\r\n  bun test src/a.test.ts\r\n-t keeps \r\n');
+
+    // Assert
+    expect(held).toBe(true);
+  });
+
+  it('finds a text in an earlier Updated block below the body', () => {
+    // Arrange
+    const body = `${CRLF_BODY}\n**Updated 2026-11-17, reproduce from a recurrence (task 3)**\n\n\`\`\`\nbun run repro.ts\n\`\`\`\n`;
+
+    // Act
+    const held = bodyHoldsText(body, 'bun run repro.ts');
+
+    // Assert
+    expect(held).toBe(true);
+  });
+
+  it('does not find a text the body does not hold', () => {
+    // Act
+    const held = bodyHoldsText(CRLF_BODY, 'bun test src/b.test.ts');
+
+    // Assert
+    expect(held).toBe(false);
   });
 });

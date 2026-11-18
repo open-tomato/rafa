@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
  * The ESLint a spawned fixture repository resolves: planted at
- * `node_modules/.bin/eslint` inside the fixture, so `bunx eslint` runs it
- * from the repository itself and nothing outside the repository is read
+ * `node_modules/.bin/eslint` inside the fixture, so the lint step spawns
+ * it from the repository itself and nothing outside the repository is read
  * (`task-gate-spawned.test.ts`). It answers the one rule that suite's
  * fixture configures, `jsonc/indent` at two spaces, in ESLint's own JSON
  * report shape (`filePath`, `messages`, `errorCount`, `warningCount`), and

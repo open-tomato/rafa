@@ -150,7 +150,7 @@ function isModuleStrategy(kind: unknown): kind is SyncStrategy {
  * rest when the caller has it.
  */
 export type SyncSelection = Pick<RafaConfig, 'effortSync'>
-  & Partial<Pick<RafaConfig, 'store' | 'hubUrl' | 'hubTokenSecret' | 'hubTimeout'>>;
+  & Partial<Pick<RafaConfig, 'store' | 'hubUrl' | 'hubTokenSecret' | 'hubTimeout' | 'hubProject'>>;
 
 /**
  * The context a `sync` adapter is made with: `repoRoot`, then `store`
