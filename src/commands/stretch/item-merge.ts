@@ -31,8 +31,8 @@
  *      with exit 1 naming `rafa stretch item <issue> --resume`: the
  *      mergeability, read again while GitHub answers `UNKNOWN` (#1191),
  *      then the pull request's checks, since every pull request reports
- *      the `fragment` check and `pr merge` refuses one whose checks have
- *      not passed (#1255).
+ *      the `fragment` check and `verify`'s jobs, and `pr merge` refuses
+ *      one whose checks have not passed (#1255).
  *   2. `rafa pr merge <pr> --yes` on this terminal: the `pr merge` logic,
  *      which frees the loop worktree holding the head branch and cleans
  *      up after the merge. No `--skip-checks`: `pr merge` refuses it

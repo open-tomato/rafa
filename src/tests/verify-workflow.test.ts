@@ -1,9 +1,10 @@
 /**
  * The `verify` workflow at `.github/workflows/verify.yml`: the gates that
- * run on every pull request into `main` or `integration` and on every
- * push to a `stretch/**` branch. The root eslint config lints no YAML, so this test
- * is the file's only gate. Pull requests into `stretch/**` report no
- * check, which keeps `rafa pr merge <pr> --skip-checks` working there.
+ * run on every pull request into `main`, `integration` or a `stretch/**`
+ * branch, and on every push to a `stretch/**` branch. The root eslint config
+ * lints no YAML, so this test is the file's only gate. A pull request into
+ * `stretch/**` runs them too, so an item's red shows before its merge into
+ * the stretch branch, not after it on the push.
  *
  * The workflow holds three jobs under the same triggers, permissions and
  * timeout: `verify` (ring 0) runs the whole suite, lint and types,
@@ -84,8 +85,8 @@ const AFFECTED_GATES: ReadonlyArray<readonly [string, string]> = [
 
 /**
  * The base `affected` hands `turbo run --affected`: the pull request's
- * base branch on a pull request, and the trunk on the only other
- * trigger, a push to `stretch/**`.
+ * base branch on a pull request (a stretch branch's item included), and
+ * the trunk on the only other trigger, a push to `stretch/**`.
  */
 const SCM_BASE = '${{ github.event_name == \'pull_request\' && format(\'origin/{0}\', github.base_ref) || \'origin/integration\' }}';
 
@@ -111,27 +112,19 @@ const JOBS: ReadonlyArray<readonly [string, ReadonlyArray<readonly [string, stri
 ];
 
 describe('the verify workflow, what it must not trigger on', () => {
-  it('names no stretch/** branch under pull_request', () => {
-    expect(branchesOf(WORKFLOW, 'pull_request')).not.toContain('stretch/**');
-  });
-
   it('names no main branch under push', () => {
     expect(branchesOf(WORKFLOW, 'push')).not.toContain('main');
   });
 
-  it('would see both, the control over a file that swaps the branches', () => {
-    const swapped = parse([
+  it('would see it, the control over a file that pushes to main', () => {
+    const pushesMain = parse([
       'on:',
-      '  pull_request:',
-      '    branches:',
-      '      - \'stretch/**\'',
       '  push:',
       '    branches:',
       '      - main',
     ].join('\n'));
 
-    expect(branchesOf(swapped, 'pull_request')).toContain('stretch/**');
-    expect(branchesOf(swapped, 'push')).toContain('main');
+    expect(branchesOf(pushesMain, 'push')).toContain('main');
   });
 });
 
@@ -141,9 +134,9 @@ describe('the verify workflow', () => {
     expect(Object.keys(WORKFLOW)).not.toContain('true');
   });
 
-  it('runs on pull requests into main and integration, and pushes to stretch/** only', () => {
+  it('runs on pull requests into main, integration and stretch/**, and pushes to stretch/** only', () => {
     expect(Object.keys(WORKFLOW.on).sort()).toEqual(['pull_request', 'push']);
-    expect(branchesOf(WORKFLOW, 'pull_request')).toEqual(['main', 'integration']);
+    expect(branchesOf(WORKFLOW, 'pull_request')).toEqual(['main', 'integration', 'stretch/**']);
     expect(branchesOf(WORKFLOW, 'push')).toEqual(['stretch/**']);
   });
 

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - integration
+      - 'stretch/**'
   push:
     branches:
       - 'stretch/**'
