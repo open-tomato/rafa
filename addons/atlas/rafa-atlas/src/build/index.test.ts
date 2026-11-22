@@ -1,7 +1,7 @@
 /**
  * Tests for `buildAtlas` over the ingest's fixture store: one build writes
- * the replica under the project root with both buckets filled and both
- * sources stamped, and a second build replaces it whole.
+ * the replica under the project root with `task_facts` and `daily_rollup`
+ * filled and every source stamped, and a second build replaces it whole.
  */
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,6 +12,7 @@ import { openSqliteStore } from '@open-tomato/rafa-core/store/sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { TASKS_SOURCE } from '../ingest/effort.js';
+import { BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from '../ingest/facts.js';
 import { sessionRow, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
 
 import { DAILY_SOURCE } from './daily.js';
@@ -25,8 +26,8 @@ afterAll(() => {
 
 const BUILT_AT = new Date('2026-11-05T12:00:00.000Z');
 
-describe('buildAtlas over the two buckets', () => {
-  it('writes the replica under the root with task_facts and daily_rollup filled and both sources stamped', async () => {
+describe('buildAtlas over the buckets built so far', () => {
+  it('writes the replica under the root with task_facts and daily_rollup filled and every source stamped', async () => {
     const root = join(scope, 'one');
     writeFixtureStore(root);
 
@@ -35,14 +36,18 @@ describe('buildAtlas over the two buckets', () => {
     expect(summary.replicaPath).toBe(join(root, '.rafa', 'atlas', 'atlas.sqlite'));
     expect(summary.replicaPath).toBe(replicaPathOf(root));
     expect(summary.tables).toEqual(expect.objectContaining({ task_facts: 4, daily_rollup: 4, plan_facts: 0 }));
-    expect(summary.sources.map((stamp) => stamp.source)).toEqual([TASKS_SOURCE, DAILY_SOURCE]);
-    expect(summary.sources[1]).toEqual(expect.objectContaining({ rows: 4, readAt: BUILT_AT.toISOString() }));
+    expect(summary.sources.map((stamp) => stamp.source)).toEqual([
+      TASKS_SOURCE, FINDINGS_SOURCE, BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, DAILY_SOURCE,
+    ]);
+    expect(summary.sources[5]).toEqual(expect.objectContaining({ rows: 4, readAt: BUILT_AT.toISOString() }));
 
     const reader = openReplica(summary.replicaPath);
     const replica = reader.current();
     reader.close();
     expect(replica.meta.buildId).toBe(summary.buildId);
-    expect([...replica.sources.keys()].sort()).toEqual([DAILY_SOURCE, TASKS_SOURCE]);
+    expect([...replica.sources.keys()].sort()).toEqual([
+      BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, DAILY_SOURCE, FINDINGS_SOURCE, TASKS_SOURCE,
+    ]);
     expect(existsSync(`${summary.replicaPath}.build-${summary.buildId}`)).toBe(false);
   });
 

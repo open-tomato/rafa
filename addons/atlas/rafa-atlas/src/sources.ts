@@ -1,7 +1,8 @@
 /**
- * The table sources the registry serves, one spec per replica bucket
- * built so far: `local.tasks` over `task_facts` and `local.daily` over
- * `daily_rollup`. Each spec is the descriptor without its build stamps,
+ * The table sources the registry serves so far, one spec per replica
+ * bucket: `local.tasks` over `task_facts` and `local.daily` over
+ * `daily_rollup`. The build stamps the finding, bug, change and CI
+ * buckets' sources too, and no spec here defines them yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
  *

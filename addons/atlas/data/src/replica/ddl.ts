@@ -1,7 +1,7 @@
 /**
- * The replica's tables: the six buckets of the PoC (`task_facts`,
- * `plan_facts`, `daily_rollup`, `bug_facts`, `finding_facts`, `ci_facts`)
- * and the two meta tables every replica holds (`atlas_meta`,
+ * The replica's tables: the seven buckets of the PoC (`task_facts`,
+ * `plan_facts`, `daily_rollup`, `bug_facts`, `finding_facts`,
+ * `change_facts`, `ci_facts`) and the two meta tables every replica holds (`atlas_meta`,
  * `atlas_sources`). Dates are ISO-8601 UTC text, and `day` is
  * `YYYY-MM-DD`.
  *
@@ -15,7 +15,7 @@
  */
 
 /** The DDL version stamped as `replica_version`; a reader opens only its own. */
-export const REPLICA_VERSION: string = '1';
+export const REPLICA_VERSION: string = '2';
 
 /** One row per stamp: the keys of `META_KEYS`. */
 const ATLAS_META_DDL = 'CREATE TABLE atlas_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)';
@@ -98,6 +98,11 @@ const FINDING_FACTS_DDL = `CREATE TABLE finding_facts (
   trigger TEXT, what TEXT, artifact TEXT, module TEXT, outcome TEXT, tracker_ref TEXT, day TEXT,
   UNIQUE (origin_store, origin_seq, source))`;
 
+/** One row per changelog entry a task reported. */
+const CHANGE_FACTS_DDL = `CREATE TABLE change_facts (
+  id TEXT PRIMARY KEY, origin_store TEXT, origin_seq INTEGER, session_id TEXT, plan_stub TEXT,
+  level TEXT, area TEXT, module TEXT, summary TEXT, day TEXT, UNIQUE (origin_store, origin_seq))`;
+
 /** One row per CI reading of a plan's head. */
 const CI_FACTS_DDL = `CREATE TABLE ci_facts (
   plan_stub TEXT NOT NULL, pr INTEGER, head_sha TEXT NOT NULL, verdict TEXT NOT NULL,
@@ -113,6 +118,7 @@ export type ReplicaTable =
   | 'daily_rollup'
   | 'bug_facts'
   | 'finding_facts'
+  | 'change_facts'
   | 'ci_facts';
 
 /** The table whitelist: each bucket of the PoC with the statement that creates it. */
@@ -122,6 +128,7 @@ export const REPLICA_TABLES: Readonly<Record<ReplicaTable, string>> = {
   daily_rollup: DAILY_ROLLUP_DDL,
   bug_facts: BUG_FACTS_DDL,
   finding_facts: FINDING_FACTS_DDL,
+  change_facts: CHANGE_FACTS_DDL,
   ci_facts: CI_FACTS_DDL,
 };
 

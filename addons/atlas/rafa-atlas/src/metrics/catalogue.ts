@@ -3,7 +3,7 @@
  * source id, fixed query params and a formula, with how a card draws it.
  * The params carry no window: a caller adds the one its range asks for.
  *
- * Phase 1 holds three, on the two sources built so far:
+ * Phase 1 holds three, on the two sources the registry serves so far:
  * `pm.tokens-per-day` and `arch.tokens-by-model` are measured as named,
  * and `arch.task-minutes-p50-p90` stands in for loop latency, which the
  * store does not record.

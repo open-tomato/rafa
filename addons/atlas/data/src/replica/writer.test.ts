@@ -112,6 +112,7 @@ describe('writeReplica', () => {
       daily_rollup: 0,
       bug_facts: 0,
       finding_facts: 0,
+      change_facts: 0,
       ci_facts: 0,
     });
   });

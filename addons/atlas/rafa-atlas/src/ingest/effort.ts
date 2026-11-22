@@ -1,16 +1,18 @@
 /**
- * The effort ingest, sessions only: `task_facts` from a snapshot of the
- * effort store (`snapshot.ts`), one row per session, stamped in
- * `atlas_sources` as `local.tasks`.
+ * The effort ingest: one snapshot of the effort store (`snapshot.ts`)
+ * read into five buckets of the build, `task_facts` here, one row per
+ * session, and `finding_facts`, `bug_facts`, `change_facts` and
+ * `ci_facts` through `facts.ts`, whose note says what each of those
+ * holds. Each bucket's source is stamped in `atlas_sources`:
+ * `local.tasks`, then `local.findings`, `local.bugs`, `local.changes`
+ * and `local.ci`.
  *
- * 1. **Column check.** `pragma_table_info` lists the columns of
- *    `sessions`, `dispatches`, `task_reports` and `store_meta`, and each
- *    column of {@link READ_COLUMNS} the snapshot lacks is listed in the
- *    stamp's reason, with the source marked `partial`. A missing column
- *    reads NULL; a missing `sessions.seq`, `session_id` or `row_json`
- *    reads no row at all. A session whose `row_json` is not valid JSON is
- *    skipped and counted in the reason too. The snapshot is never
- *    migrated, so a store from an older or newer runtime is read as it is.
+ * 1. **Column check** (`columns.ts`). Each column of `READ_COLUMNS` the
+ *    snapshot lacks is named in the reason of each source read from its
+ *    table, with that source marked `partial`. A missing column reads
+ *    NULL; a missing `sessions.seq`, `session_id` or `row_json` reads no
+ *    session at all. A session whose `row_json` is not valid JSON is
+ *    skipped and counted in the reason too.
  * 2. **Read.** `sessions` (its facts through `json_extract` on
  *    `row_json`) left-joined to `dispatches` and `task_reports` on
  *    `session_id`, in `seq` order.
@@ -20,9 +22,10 @@
  *    are its origin. A plain `UNIQUE` with `INSERT OR IGNORE` would keep
  *    every such row, since SQLite holds NULLs distinct; here the first row
  *    of a key, in `seq` order, is kept and the rest are dropped, before
- *    any insert. The key is what `task_facts` stores as its origin pair.
+ *    any insert. The key is what each bucket stores as its origin pair.
  * 4. **Insert** into the build's `task_facts`, with `attempt` numbered
- *    per plan stub and task line by start time.
+ *    per plan stub and task line by start time, then into the four fact
+ *    buckets, which also fill each session's three counts below.
  *
  * What each column holds:
  *
@@ -38,13 +41,19 @@
  *   are left out.
  * - `status` is the report's status for a task session, `absent` when it
  *   has no report or the report holds none, and null for any other kind.
- * - `skills_used` counts the report's `skills_used` list. `findings`,
- *   `bugs` and `blockers` stay at the DDL's 0 until the finding and bug
- *   ingest fills them.
+ * - `skills_used` counts the report's `skills_used` list.
+ * - `findings` and `blockers` count the session's rows of
+ *   `finding_facts`, a tracker-ref-only findings row in neither; `bugs`
+ *   counts its out-of-scope rows of `bug_facts`.
  *
- * The stamp's `as_of` is the newest of the sessions' `lastTimestamp` and
- * the dispatches' and reports' `collected_at`.
+ * The `local.tasks` stamp's `as_of` is the newest of the sessions'
+ * `lastTimestamp` and the dispatches' and reports' `collected_at`; each
+ * fact source's is the newest `collected_at` of its rows, or `read_at`
+ * for `local.ci`. The `module` column is filled only when the caller
+ * hands the project's modules (`attribute.ts`).
  */
+import type { ColumnCheck, EffortTable } from './columns.js';
+import type { EffortFactsRead, FactSource } from './facts.js';
 import type { EffortSnapshot, EffortSnapshotOptions } from './snapshot.js';
 import type { ReplicaBuild, SourceStamp } from '@open-tomato/atlas-data/replica';
 
@@ -52,32 +61,27 @@ import { minutesBetween } from '@open-tomato/rafa-core/store/commit-stats';
 import { guardTestProcess } from '@open-tomato/rafa-core/store/location';
 import { Database } from 'bun:sqlite';
 
+import { checkEffortColumns, dayOf, missingOf, newest, numberOrNull, textOrNull } from './columns.js';
+import {
+  BUGS_SOURCE,
+  CHANGES_SOURCE,
+  CI_SOURCE,
+  FACT_SOURCE_TABLES,
+  FINDINGS_SOURCE,
+  insertEffortFacts,
+  readable,
+  readEffortFacts,
+} from './facts.js';
 import { takeEffortSnapshot } from './snapshot.js';
 
 /** The `atlas_sources` row the ingest stamps; `local.tasks` reads it. */
 export const TASKS_SOURCE = 'local.tasks';
 
-/** The store tables the ingest reads. */
-export type EffortTable = 'sessions' | 'dispatches' | 'task_reports' | 'store_meta';
-
-/** Every column the ingest reads, by table; a missing one marks the source partial. */
-export const READ_COLUMNS: Readonly<Record<EffortTable, readonly string[]>> = {
-  sessions: ['seq', 'session_id', 'row_json', 'origin_store', 'origin_seq'],
-  dispatches: ['session_id', 'plan_stub', 'task_line', 'agent', 'model', 'effort', 'budget_usd', 'collected_at'],
-  task_reports: ['session_id', 'plan_stub', 'task_line', 'status', 'skills_used', 'collected_at'],
-  store_meta: ['id', 'store_id'],
-};
+/** The tables `local.tasks` is read from; its stamp names their missing columns only. */
+const TASK_TABLES: readonly EffortTable[] = ['sessions', 'dispatches', 'task_reports', 'store_meta'];
 
 /** The `sessions` columns without which no row is read. */
 const SESSION_KEY_COLUMNS: readonly string[] = ['seq', 'session_id', 'row_json'];
-
-/** What the column check found. */
-export interface ColumnCheck {
-  /** The columns each table holds, of those the ingest reads. */
-  readonly present: Readonly<Record<EffortTable, ReadonlySet<string>>>;
-  /** Each column read and not held, as `<table>.<column>`, in {@link READ_COLUMNS} order. */
-  readonly missing: readonly string[];
-}
 
 /** One `task_facts` row, before its attempt is numbered. */
 export interface TaskFact {
@@ -124,8 +128,12 @@ export interface TaskFactsRead {
 export interface EffortIngest {
   readonly snapshot: EffortSnapshot;
   readonly read: TaskFactsRead;
+  /** The four fact buckets, as read. */
+  readonly facts: EffortFactsRead;
   /** The `atlas_sources` row stamped for {@link TASKS_SOURCE}. */
   readonly stamp: SourceStamp;
+  /** Every `atlas_sources` row stamped, `local.tasks` first, then the four fact sources. */
+  readonly stamps: readonly SourceStamp[];
 }
 
 /** One joined row, as the read query answers it. */
@@ -160,38 +168,6 @@ interface JoinedRow {
   readonly skills_used: unknown;
 }
 
-/** Check the snapshot's columns against {@link READ_COLUMNS}. */
-export function checkEffortColumns(snapshot: Database): ColumnCheck {
-  const columnsOf = snapshot.query<{ readonly name: string }, [string]>('SELECT name FROM pragma_table_info(?)');
-  const heldOf = (table: EffortTable): ReadonlySet<string> => {
-    const held = new Set(columnsOf.all(table).map((row) => row.name));
-    return new Set(READ_COLUMNS[table].filter((column) => held.has(column)));
-  };
-  const present: Record<EffortTable, ReadonlySet<string>> = {
-    sessions: heldOf('sessions'),
-    dispatches: heldOf('dispatches'),
-    task_reports: heldOf('task_reports'),
-    store_meta: heldOf('store_meta'),
-  };
-  const tables = Object.keys(READ_COLUMNS) as EffortTable[];
-  const missing = tables.flatMap((table) => READ_COLUMNS[table]
-    .filter((column) => !present[table].has(column))
-    .map((column) => `${table}.${column}`));
-  return { present, missing };
-}
-
-function textOrNull(value: unknown): string | null {
-  return typeof value === 'string' && value !== ''
-    ? value
-    : null;
-}
-
-function numberOrNull(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value
-    : null;
-}
-
 /** The key of a JSON count map with the most records, ties broken on the name; null for none. */
 export function dominantKey(countsJson: unknown): string | null {
   if (typeof countsJson !== 'string') return null;
@@ -208,15 +184,6 @@ export function dominantKey(countsJson: unknown): string | null {
       ? -1
       : 1));
   return entries[0]?.[0] ?? null;
-}
-
-function dayOf(timestamp: string | null): string | null {
-  if (timestamp === null) return null;
-  const ms = Date.parse(timestamp);
-  return Number.isNaN(ms)
-    ? null
-    : new Date(ms).toISOString()
-      .slice(0, 'YYYY-MM-DD'.length);
 }
 
 function sumOrNull(values: readonly (number | null)[]): number | null {
@@ -314,16 +281,6 @@ function keyOf(fact: TaskFact): string {
   return JSON.stringify([fact.originStore, fact.originSeq]);
 }
 
-/** The newest ISO time of `times`, or null; a value that does not parse is skipped. */
-function newest(times: readonly (string | null)[]): string | null {
-  return times.reduce<string | null>((latest, time) => {
-    if (time === null || Number.isNaN(Date.parse(time))) return latest;
-    return latest === null || Date.parse(time) > Date.parse(latest)
-      ? time
-      : latest;
-  }, null);
-}
-
 function collectedAtMax(snapshot: Database, present: ColumnCheck['present'], table: 'dispatches' | 'task_reports'): string | null {
   if (!present[table].has('collected_at')) return null;
   const row = snapshot.query<{ readonly at: unknown }, []>(`SELECT max(collected_at) AS at FROM ${table}`).get();
@@ -417,8 +374,9 @@ export function insertTaskFacts(replica: Database, facts: readonly TaskFact[]): 
 /** The stamp's reason, or null when the read was whole. */
 function partialReason(read: TaskFactsRead): string | null {
   const reasons: string[] = [];
-  if (read.columns.missing.length > 0) {
-    reasons.push(`the effort store has no ${read.columns.missing.join(', ')}; those fields read NULL`);
+  const missing = missingOf(read.columns, TASK_TABLES);
+  if (missing.length > 0) {
+    reasons.push(`the effort store has no ${missing.join(', ')}; those fields read NULL`);
   }
   if (!SESSION_KEY_COLUMNS.every((column) => read.columns.present.sessions.has(column))) {
     reasons.push('no session row was read');
@@ -431,29 +389,59 @@ function partialReason(read: TaskFactsRead): string | null {
     : reasons.join('; ');
 }
 
+/** The reason of a fact source's stamp, or null when it was read whole. */
+function factReason(columns: ColumnCheck, source: FactSource): string | null {
+  const tables = FACT_SOURCE_TABLES[source];
+  const reasons: string[] = [];
+  const missing = missingOf(columns, tables);
+  if (missing.length > 0) reasons.push(`the effort store has no ${missing.join(', ')}; those fields read NULL`);
+  const unread = tables.filter((table) => table !== 'store_meta' && !readable(columns.present, table));
+  if (unread.length > 0) reasons.push(`no row of ${unread.join(', ')} was read`);
+  return reasons.length === 0
+    ? null
+    : reasons.join('; ');
+}
+
+/** What one ingest is handed: the snapshot's options and the modules the `module` column names. */
+export interface EffortIngestOptions extends EffortSnapshotOptions {
+  /** The project's modules, as `discoverModules` answers them; none reads every `module` as NULL. */
+  readonly modules?: readonly string[];
+}
+
 /**
  * Snapshot the store under `options.root`, fill the build's `task_facts`
- * from the copy and stamp {@link TASKS_SOURCE}. The copy is opened
- * read-only and closed before this returns.
+ * and the four fact buckets from the copy, and stamp {@link TASKS_SOURCE}
+ * then each fact bucket's source. The copy is opened read-only and closed
+ * before this returns.
  */
-export function ingestEffort(build: ReplicaBuild, options: EffortSnapshotOptions): EffortIngest {
+export function ingestEffort(build: ReplicaBuild, options: EffortIngestOptions): EffortIngest {
   const snapshot = takeEffortSnapshot(options);
   guardTestProcess(snapshot.snapshotPath);
   const database = new Database(snapshot.snapshotPath, { readonly: true });
   try {
     const read = readTaskFacts(database);
     const rows = insertTaskFacts(build.database, read.facts);
+    const facts = readEffortFacts(database, read.columns, options.modules ?? []);
+    const written = insertEffortFacts(build.database, facts);
     const reason = partialReason(read);
-    const stamp: SourceStamp = {
-      source: TASKS_SOURCE,
-      asOf: read.asOf,
+    const stampOf = (source: string, sourceRows: number, asOf: string | null, why: string | null): SourceStamp => ({
+      source,
+      asOf,
       readAt: snapshot.takenAt,
-      rows,
-      partial: reason !== null,
-      reason,
-    };
-    build.stampSource(stamp);
-    return { snapshot, read, stamp };
+      rows: sourceRows,
+      partial: why !== null,
+      reason: why,
+    });
+    const stamp = stampOf(TASKS_SOURCE, rows, read.asOf, reason);
+    const stamps = [
+      stamp,
+      stampOf(FINDINGS_SOURCE, written.finding_facts, facts.asOf[FINDINGS_SOURCE], factReason(read.columns, FINDINGS_SOURCE)),
+      stampOf(BUGS_SOURCE, written.bug_facts, facts.asOf[BUGS_SOURCE], factReason(read.columns, BUGS_SOURCE)),
+      stampOf(CHANGES_SOURCE, written.change_facts, facts.asOf[CHANGES_SOURCE], factReason(read.columns, CHANGES_SOURCE)),
+      stampOf(CI_SOURCE, written.ci_facts, facts.asOf[CI_SOURCE], factReason(read.columns, CI_SOURCE)),
+    ];
+    stamps.forEach((each) => build.stampSource(each));
+    return { snapshot, read, facts, stamp, stamps };
   } finally {
     database.close();
   }

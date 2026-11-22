@@ -1,17 +1,21 @@
 /**
- * `buildAtlas`: the one-pass replica builder, over the two buckets built
- * so far.
+ * `buildAtlas`: the one-pass replica builder, over the buckets built so
+ * far.
  *
  * 1. `ingestEffort` snapshots the effort store under the project root
- *    with `vacuumInto` and fills `task_facts`, stamping `local.tasks`.
- * 2. `rollupDaily` derives `daily_rollup` from those rows, stamping
+ *    with `vacuumInto` and fills `task_facts`, `finding_facts`,
+ *    `bug_facts`, `change_facts` and `ci_facts`, stamping `local.tasks`,
+ *    `local.findings`, `local.bugs`, `local.changes` and `local.ci`. The
+ *    `module` column names the folders `DEFAULT_MODULE_GLOBS` finds under
+ *    the root (`discoverModules`).
+ * 2. `rollupDaily` derives `daily_rollup` from `task_facts`, stamping
  *    `local.daily`.
  *
  * Both run inside one `writeReplica`, so the replica at
  * `<root>/.rafa/atlas/atlas.sqlite` is replaced whole by one rename, and
- * a failed step leaves the earlier replica as it was. The other four
- * buckets of the PoC are created empty by the DDL and read 0 rows in the
- * summary until their ingest lands.
+ * a failed step leaves the earlier replica as it was. `plan_facts` is
+ * created empty by the DDL and reads 0 rows in the summary until its
+ * ingest lands.
  *
  * The options take the project root itself; the project config
  * (`loadAtlasConfig`) and the `offline` switch join them once a source
@@ -24,6 +28,7 @@ import { basename, join } from 'node:path';
 
 import { writeReplica } from '@open-tomato/atlas-data/replica';
 
+import { DEFAULT_MODULE_GLOBS, discoverModules } from '../ingest/attribute.js';
 import { ingestEffort } from '../ingest/effort.js';
 
 import { rollupDaily } from './daily.js';
@@ -73,6 +78,7 @@ export async function buildAtlas(options: BuildOptions): Promise<BuildSummary> {
   }, (build) => {
     const effort = ingestEffort(build, {
       root: options.projectRoot,
+      modules: discoverModules(options.projectRoot, DEFAULT_MODULE_GLOBS),
       ...(options.env === undefined
         ? {}
         : { env: options.env }),
@@ -81,7 +87,7 @@ export async function buildAtlas(options: BuildOptions): Promise<BuildSummary> {
         : { now: options.now }),
     });
     const daily = rollupDaily(build, effort.stamp);
-    return [effort.stamp, daily];
+    return [...effort.stamps, daily];
   });
   return { replicaPath, buildId: result.buildId, tables: result.tables, sources: result.value };
 }

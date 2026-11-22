@@ -1,7 +1,10 @@
 /**
  * A fixture effort store for the ingest tests, written in a tmpdir with
  * core's store writers: `openSqliteStore(...).append` for sessions,
- * `writeDispatch` and `writeTaskReport` for the joined rows, and
+ * `writeDispatch` and `writeTaskReport` for the joined rows,
+ * `writeFindings`, `writeTriage`, `writeTrackerRef`, `writeBugRoutes`,
+ * `writeChanges` and `writePlanCi` for the fact buckets
+ * (`writeFactsFixture`), and
  * `withSqliteStore` to mint the store's origin with the project injected,
  * so no git runs. Named without `.test` so bun never runs it alone.
  *
@@ -13,16 +16,26 @@
  *
  * No row is copied from a real store: every value is made up here.
  */
+import type { IssueRef } from '@open-tomato/rafa-core/ports';
+import type { ReportBlocker, ReportBug, ReportChange, ReportFinding } from '@open-tomato/rafa-core/report/parse';
+import type { BugRouteEntry } from '@open-tomato/rafa-core/store/bug-routes';
 import type { SessionEffortRow } from '@open-tomato/rafa-core/store/types';
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { writeBugRoutes } from '@open-tomato/rafa-core/store/bug-routes';
+import { writeChanges } from '@open-tomato/rafa-core/store/changes';
 import { writeDispatch } from '@open-tomato/rafa-core/store/dispatches';
+import { writeFindings } from '@open-tomato/rafa-core/store/findings';
 import { guardTestProcess } from '@open-tomato/rafa-core/store/location';
+import { writePlanCi } from '@open-tomato/rafa-core/store/plan-ci';
 import { writeTaskReport } from '@open-tomato/rafa-core/store/reports';
 import { openSqliteStore, sqliteStorePath, withSqliteStore } from '@open-tomato/rafa-core/store/sqlite';
+import { writeTrackerRef } from '@open-tomato/rafa-core/store/tracker-refs';
+import { writeTriage } from '@open-tomato/rafa-core/store/triage';
+import { bugKeyOf } from '@open-tomato/rafa-core/triage/bug-key';
 import { Database } from 'bun:sqlite';
 
 /** The origin the fixture store is minted with. */
@@ -227,4 +240,165 @@ export function storeDigest(root: string): string {
 /** The store directory under `root`, as core resolves it with no override. */
 export function fixtureStoreDir(root: string): string {
   return join(root, '.rafa', 'effort');
+}
+
+/** The tracker file the fixture's bugs were keyed against; a relative path, so no home path is in it. */
+export const FIXTURE_TRACKER = '.rafa/plans/PLAN_TRACKER-atlas-fixture.md';
+
+/** One fixture bug: what the report said, and the GitHub issue its key was filed as. */
+export interface FixtureBug {
+  readonly what: string;
+  readonly artifact: string;
+  readonly issue: number;
+}
+
+/** The first task session's bug, filed from that session: its routed row reads issue 1234. */
+export const FILED_BUG: FixtureBug = {
+  what: 'the stage reader drops a closed epic',
+  artifact: 'packages/rafa-board/src/stage.ts:41 returns null for a closed epic',
+  issue: 1234,
+};
+
+/** The second session's bug naming a test case, which keys on the test with no tracker file. */
+export const TEST_BUG: FixtureBug = {
+  what: 'the triage check reads a red case as fallout',
+  artifact: 'packages/rafa-pr/src/triage/own-check.test.ts:\n(fail) checkKind > reads a red case as fallout [3.00ms]',
+  issue: 4321,
+};
+
+/**
+ * The second session's other bug, whose reference the FIRST session holds
+ * under the bug's key: a recurrence commented on, so its rows read no
+ * issue number.
+ */
+export const RECURRING_BUG: FixtureBug = {
+  what: 'the ci reader skips a draft pull request',
+  artifact: 'packages/rafa-pr/src/ci/read.ts: draft skipped',
+  issue: 5678,
+};
+
+/** The fixture's CI heads: read red then green, green then red, and red only. */
+export const CI_HEADS = { flipped: 'a1a1a1a', greenThenRed: 'b2b2b2b', redOnly: 'c3c3c3c' } as const;
+
+/** A report bug of `bug`, as `parseReport` answers one. */
+function reportBug(bug: FixtureBug): ReportBug {
+  return {
+    what: bug.what,
+    artifact: bug.artifact,
+    security: false,
+    kind: 'bug',
+    module: null,
+    action: null,
+    reproduce: null,
+    cause: null,
+    extras: [],
+  };
+}
+
+/** A report finding, every field not set null. */
+function reportFinding(finding: Partial<ReportFinding> & Pick<ReportFinding, 'kind'>): ReportFinding {
+  return {
+    trigger: 'when the fixture ran',
+    what: null,
+    cause: null,
+    resolution: null,
+    artifact: null,
+    signal: 'loud',
+    domain: null,
+    extras: [],
+    ...finding,
+  };
+}
+
+/** The GitHub reference core's tracker answers for `bug`. */
+function issueRef(bug: FixtureBug): IssueRef {
+  return { opt: bug.issue, kind: 'github', externalId: String(bug.issue), url: `https://github.com/example/fixture/issues/${String(bug.issue)}` };
+}
+
+/** One task session's report rows, through core's writers: findings first, as triage writes them. */
+interface SessionRows {
+  readonly sessionId: string;
+  readonly outcome: 'done' | 'blocked';
+  readonly at: string;
+  readonly findings: readonly ReportFinding[];
+  readonly blockers: readonly ReportBlocker[];
+  readonly bugs: readonly FixtureBug[];
+  /** The bugs whose reference this session stores, under each bug's key. */
+  readonly refs: readonly FixtureBug[];
+  readonly routes: readonly Omit<BugRouteEntry, 'entryIndex'>[];
+  readonly changes: readonly ReportChange[];
+}
+
+function writeSessionRows(root: string, rows: SessionRows): void {
+  const dispatch = { sessionId: rows.sessionId, planStub: FIXTURE_PLAN, taskLine: FIXTURE_TASK_LINE };
+  const seams = { now: () => new Date(rows.at) };
+  writeFindings(root, { dispatch, outcome: rows.outcome, findings: rows.findings }, seams);
+  writeTriage(root, { dispatch, outcome: rows.outcome, blockers: rows.blockers, outOfScopeBugs: rows.bugs.map(reportBug) }, seams);
+  for (const bug of rows.refs) {
+    writeTrackerRef(root, {
+      dispatch,
+      outcome: rows.outcome,
+      artifact: bugKeyOf(FIXTURE_TRACKER, bug.artifact, bug.what),
+      ref: issueRef(bug),
+    }, seams);
+  }
+  writeBugRoutes(root, { dispatch, routes: rows.routes.map((route, entryIndex) => ({ ...route, entryIndex })) }, seams);
+  writeChanges(root, { dispatch, changes: rows.changes }, seams);
+}
+
+/**
+ * Add the report rows of both task sessions to the fixture store under
+ * `root`, written by `writeFixtureStore` first, and three CI heads of the
+ * plan: the first session holds two findings with a kind, a blocker,
+ * {@link FILED_BUG} with its route and reference, the reference of
+ * {@link RECURRING_BUG}, and a patch change; the second a finding,
+ * {@link TEST_BUG} and {@link RECURRING_BUG} with their routes, the
+ * reference of {@link TEST_BUG} only, and a minor change.
+ */
+export function writeFactsFixture(root: string): void {
+  writeSessionRows(root, {
+    sessionId: TASK_SESSIONS[0],
+    outcome: 'blocked',
+    at: '2026-11-02T10:32:00.000Z',
+    findings: [
+      reportFinding({ kind: 'gotcha', what: 'a report helper throws', artifact: 'packages/rafa-effort/src/effort/report.ts: undefined is not a function' }),
+      reportFinding({ kind: 'pattern', what: 'addons/atlas/data holds NULLs distinct in a UNIQUE key', signal: 'silent' }),
+    ],
+    blockers: [{ what: 'the store is locked', artifact: 'database is locked', extras: [] }],
+    bugs: [FILED_BUG],
+    refs: [FILED_BUG, RECURRING_BUG],
+    routes: [{ what: FILED_BUG.what, said: 'bug', kind: 'bug', route: 'filed' }],
+    changes: [{ level: 'patch', area: 'board', summary: 'the stage reader keeps closed epics', extras: [] }],
+  });
+  writeSessionRows(root, {
+    sessionId: TASK_SESSIONS[1],
+    outcome: 'done',
+    at: '2026-11-03T10:47:00.000Z',
+    findings: [reportFinding({ kind: 'location', what: 'the CI reader lives in rafa-pr', artifact: 'ci/read.ts' })],
+    blockers: [],
+    bugs: [TEST_BUG, RECURRING_BUG],
+    refs: [TEST_BUG],
+    routes: [
+      { what: TEST_BUG.what, said: 'bug', kind: 'bug', route: 'filed' },
+      { what: RECURRING_BUG.what, said: 'own-gap', kind: 'own-gap', route: 'repair' },
+    ],
+    changes: [{ level: 'minor', area: null, summary: 'packages/rafa-pr reads draft pull requests', extras: [] }],
+  });
+  const reading = (headSha: string, verdict: 'green' | 'red', readAt: string): void => {
+    writePlanCi(root, {
+      planStub: FIXTURE_PLAN,
+      pr: 7,
+      headSha,
+      verdict,
+      failing: verdict === 'red'
+        ? [`check-${headSha}`]
+        : [],
+      readAt,
+    });
+  };
+  reading(CI_HEADS.flipped, 'red', '2026-11-03T11:00:00.000Z');
+  reading(CI_HEADS.flipped, 'green', '2026-11-03T11:20:00.000Z');
+  reading(CI_HEADS.greenThenRed, 'green', '2026-11-03T12:00:00.000Z');
+  reading(CI_HEADS.greenThenRed, 'red', '2026-11-03T12:20:00.000Z');
+  reading(CI_HEADS.redOnly, 'red', '2026-11-03T13:00:00.000Z');
 }
