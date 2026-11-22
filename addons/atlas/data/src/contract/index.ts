@@ -2,7 +2,8 @@
  * The Atlas contract: what a data source exposes (`DataSourceDescriptor`),
  * what a query accepts (`QueryParams`), what comes back (`QueryResult`,
  * `Envelope`) and what a named metric is (`MetricDefinition`), with a zod
- * schema per type, `validateStandard`, `applyFormula` and `InvalidParams`.
+ * schema per type, `validateStandard`, `applyFormula`, `InvalidParams` and
+ * `ReplicaUnavailable`.
  * Browser-safe: nothing here imports `bun:*`, `node:*` or a rafa package.
  */
 export type { InvalidParamsDetails } from './errors.js';
@@ -35,7 +36,7 @@ export type {
   Threshold,
   Window,
 } from './types.js';
-export { InvalidParams } from './errors.js';
+export { InvalidParams, ReplicaUnavailable } from './errors.js';
 export { applyFormula } from './formula.js';
 export {
   AggregateSchema,

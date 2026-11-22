@@ -1,10 +1,11 @@
 /**
  * Tests for `errors.ts`: `InvalidParams` as an `Error` whose details are
- * the field names it was handed, and nothing else.
+ * the field names it was handed, and nothing else; `ReplicaUnavailable`
+ * as an `Error` of its own.
  */
 import { describe, expect, it } from 'bun:test';
 
-import { InvalidParams } from './errors.js';
+import { InvalidParams, ReplicaUnavailable } from './errors.js';
 
 describe('InvalidParams', () => {
   it('is an Error named InvalidParams carrying its message', () => {
@@ -26,5 +27,17 @@ describe('InvalidParams', () => {
 
   it('holds an empty list when handed no field', () => {
     expect(new InvalidParams('bad').details).toEqual({ fields: [] });
+  });
+});
+
+describe('ReplicaUnavailable', () => {
+  it('is an Error named ReplicaUnavailable carrying its message', () => {
+    const error = new ReplicaUnavailable('no replica');
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toBeInstanceOf(ReplicaUnavailable);
+    expect(error).not.toBeInstanceOf(InvalidParams);
+    expect(error.name).toBe('ReplicaUnavailable');
+    expect(error.message).toBe('no replica');
   });
 });
