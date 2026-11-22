@@ -69,7 +69,7 @@ describe('openAtlasRegistry over a built replica', () => {
     expect(DataSourceDescriptorSchema.safeParse(daily).success).toBe(true);
     expect(tasks.asOf).not.toBeNull();
     expect(daily.partial).toBe(true);
-    expect(daily.partialReasons.join(' ')).toContain('not derived yet');
+    expect(daily.partialReasons.join(' ')).toContain('commits, prs_merged are not read yet');
   });
 
   it('answers the replica\'s build time as its asOf', () => {

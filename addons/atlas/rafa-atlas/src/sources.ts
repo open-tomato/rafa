@@ -104,7 +104,7 @@ export const DAILY_SPEC: TableSourceSpec = {
     source: 'local',
     channel: 'daily',
     title: 'Days',
-    description: 'One row per calendar day a session started on: minutes and tokens by session kind.',
+    description: 'One row per calendar day a session started or a preflight ran on: minutes and tokens by session kind.',
     timeField: 'day',
     grains: ['day', 'week', 'month', 'all'],
     fields: [

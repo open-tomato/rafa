@@ -8,18 +8,18 @@
  *    `local.findings`, `local.bugs`, `local.changes` and `local.ci`. The
  *    `module` column names the folders `DEFAULT_MODULE_GLOBS` finds under
  *    the root (`discoverModules`).
- * 2. `rollupDaily` derives `daily_rollup` from `task_facts`, stamping
- *    `local.daily`.
+ * 2. `deriveBuild` (`derive.ts`) gives each session its work type
+ *    (D4), derives `daily_rollup` from the buckets and the snapshot's
+ *    preflight runs, and `plan_facts` from them and the plan folder
+ *    (`readPlans`), stamping `local.daily` and `local.plans`.
  *
  * Both run inside one `writeReplica`, so the replica at
  * `<root>/.rafa/atlas/atlas.sqlite` is replaced whole by one rename, and
- * a failed step leaves the earlier replica as it was. `plan_facts` is
- * created empty by the DDL and reads 0 rows in the summary until its
- * ingest lands.
+ * a failed step leaves the earlier replica as it was.
  *
- * The options take the project root itself; the project config
- * (`loadAtlasConfig`) and the `offline` switch join them once a source
- * reads them.
+ * The options take the project root and its plan folder; the project
+ * config (`loadAtlasConfig`) and the `offline` switch join them once a
+ * source reads them.
  */
 import type { SnapshotEnvironment } from '../ingest/snapshot.js';
 import type { SourceStamp } from '@open-tomato/atlas-data/replica';
@@ -30,8 +30,9 @@ import { writeReplica } from '@open-tomato/atlas-data/replica';
 
 import { DEFAULT_MODULE_GLOBS, discoverModules } from '../ingest/attribute.js';
 import { ingestEffort } from '../ingest/effort.js';
+import { DEFAULT_PLAN_DIR } from '../ingest/plans.js';
 
-import { rollupDaily } from './daily.js';
+import { deriveBuild } from './derive.js';
 
 /** The live store file a build reads, so a caller (the demo server) checks for it as the build finds it. */
 export { effortStorePathOf } from '../ingest/snapshot.js';
@@ -43,6 +44,8 @@ export const REPLICA_FILE: string = join('.rafa', 'atlas', 'atlas.sqlite');
 export interface BuildOptions {
   /** The project root: the main checkout, which holds the store and the replica. */
   readonly projectRoot: string;
+  /** The plan folder, absolute; defaults to core's default `plan.dir` under the root. */
+  readonly planDir?: string;
   /** Read for `RAFA_EFFORT_DIR`; defaults to `process.env`. */
   readonly env?: SnapshotEnvironment;
   /** The build clock, for the snapshot and the replica stamps; defaults to the system clock. */
@@ -86,8 +89,12 @@ export async function buildAtlas(options: BuildOptions): Promise<BuildSummary> {
         ? {}
         : { now: options.now }),
     });
-    const daily = rollupDaily(build, effort.stamp);
-    return [...effort.stamps, daily];
+    const derived = deriveBuild(build, {
+      planDir: options.planDir ?? join(options.projectRoot, DEFAULT_PLAN_DIR),
+      snapshotPath: effort.snapshot.snapshotPath,
+      stamps: effort.stamps,
+    });
+    return [...effort.stamps, ...derived.stamps];
   });
   return { replicaPath, buildId: result.buildId, tables: result.tables, sources: result.value };
 }

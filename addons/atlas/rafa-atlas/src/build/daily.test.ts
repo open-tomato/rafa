@@ -5,10 +5,9 @@
  * `daily_rollup` are checked against sums taken in TypeScript over the
  * replica's `task_facts`, per day and kind and in total; fixed values for
  * one day and a non-empty rollup keep that comparison from passing over
- * empty tables.
+ * empty tables. The counts `derive.ts` fills read NULL after the rollup
+ * alone.
  */
-import type { SourceStamp } from '@open-tomato/atlas-data/replica';
-
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,10 +16,10 @@ import { openReplica, writeReplica } from '@open-tomato/atlas-data/replica';
 import { openSqliteStore } from '@open-tomato/rafa-core/store/sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ingestEffort, TASKS_SOURCE } from '../ingest/effort.js';
+import { ingestEffort } from '../ingest/effort.js';
 import { sessionRow, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
 
-import { DAILY_SOURCE, KIND_COLUMNS, rollupDaily, UNDERIVED_COLUMNS } from './daily.js';
+import { COUNT_COLUMNS, KIND_COLUMNS, rollupDaily } from './daily.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-build-daily-')));
 afterAll(() => {
@@ -64,14 +63,14 @@ function writeWideFixture(root: string): void {
   ]);
 }
 
-/** Build a replica under a fresh root with the ingest and the rollup; answers its rows and the daily stamp. */
-async function build(name: string): Promise<{ facts: FactRow[]; days: DailyRow[]; stamp: SourceStamp }> {
+/** Build a replica under a fresh root with the ingest and the rollup; answers its rows and the rows the rollup wrote. */
+async function build(name: string): Promise<{ facts: FactRow[]; days: DailyRow[]; written: number }> {
   const root = join(scope, name);
   writeWideFixture(root);
   const replicaPath = join(root, '.rafa', 'atlas', 'atlas.sqlite');
   const result = await writeReplica({ replicaPath, projectLabel: 'fixture' }, (replica) => {
-    const effort = ingestEffort(replica, { root, env: {} });
-    return rollupDaily(replica, effort.stamp);
+    ingestEffort(replica, { root, env: {} });
+    return rollupDaily(replica.database);
   });
   const reader = openReplica(replicaPath);
   try {
@@ -79,7 +78,7 @@ async function build(name: string): Promise<{ facts: FactRow[]; days: DailyRow[]
     return {
       facts: database.query<FactRow, []>('SELECT session_id, kind, day, minutes, tokens FROM task_facts').all(),
       days: database.query<DailyRow, []>('SELECT * FROM daily_rollup ORDER BY day').all(),
-      stamp: result.value,
+      written: result.value,
     };
   } finally {
     reader.close();
@@ -158,15 +157,14 @@ describe('rollupDaily, day sums against task sums', () => {
   });
 });
 
-describe('rollupDaily, the stamp and the columns left NULL', () => {
-  it('leaves every underived column NULL and stamps local.daily partial, naming them', async () => {
-    const { days, stamp } = await build('stamp');
+describe('rollupDaily, the columns left to derive.ts', () => {
+  it('leaves every count column NULL, answering the rows it wrote', async () => {
+    const { days, written } = await build('counts-null');
 
+    expect(written).toBe(days.length);
+    expect(days.length).toBeGreaterThan(0);
     for (const row of days) {
-      for (const column of UNDERIVED_COLUMNS) expect(row[column]).toBeNull();
+      for (const column of COUNT_COLUMNS) expect(row[column]).toBeNull();
     }
-    expect(stamp).toEqual(expect.objectContaining({ source: DAILY_SOURCE, rows: days.length, partial: true }));
-    for (const column of UNDERIVED_COLUMNS) expect(stamp.reason).toContain(column);
-    expect(stamp.reason).not.toContain(TASKS_SOURCE);
   });
 });

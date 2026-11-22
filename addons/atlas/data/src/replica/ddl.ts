@@ -15,7 +15,7 @@
  */
 
 /** The DDL version stamped as `replica_version`; a reader opens only its own. */
-export const REPLICA_VERSION: string = '2';
+export const REPLICA_VERSION: string = '3';
 
 /** One row per stamp: the keys of `META_KEYS`. */
 const ATLAS_META_DDL = 'CREATE TABLE atlas_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)';
@@ -45,11 +45,15 @@ export const META_KEYS: {
   projectLabel: 'project_label',
 };
 
-/** One row per Claude Code session. */
+/**
+ * One row per Claude Code session. `work_type` is the D4 split, from the
+ * session's change level (`feature`, `fix` or `chore`); `branch_type` is
+ * `feat` on every loop branch and says nothing of the work.
+ */
 const TASK_FACTS_DDL = `CREATE TABLE task_facts (
   session_id TEXT PRIMARY KEY, origin_store TEXT, origin_seq INTEGER,
   kind TEXT NOT NULL,
-  plan_stub TEXT, task_line TEXT, task_text TEXT, branch TEXT, branch_type TEXT,
+  plan_stub TEXT, task_line TEXT, task_text TEXT, branch TEXT, branch_type TEXT, work_type TEXT,
   agent TEXT, model TEXT, effort TEXT, budget_usd REAL,
   started_at TEXT, ended_at TEXT, day TEXT, minutes REAL,
   input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER,

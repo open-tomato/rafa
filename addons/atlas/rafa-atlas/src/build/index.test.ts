@@ -1,7 +1,8 @@
 /**
  * Tests for `buildAtlas` over the ingest's fixture store: one build writes
- * the replica under the project root with `task_facts` and `daily_rollup`
- * filled and every source stamped, and a second build replaces it whole.
+ * the replica under the project root with `task_facts`, `daily_rollup`
+ * and `plan_facts` filled and every source stamped, and a second build
+ * replaces it whole.
  */
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,6 +17,7 @@ import { BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from '../inge
 import { sessionRow, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
 
 import { DAILY_SOURCE } from './daily.js';
+import { PLANS_SOURCE } from './derive.js';
 
 import { buildAtlas, replicaPathOf } from './index.js';
 
@@ -27,7 +29,7 @@ afterAll(() => {
 const BUILT_AT = new Date('2026-11-05T12:00:00.000Z');
 
 describe('buildAtlas over the buckets built so far', () => {
-  it('writes the replica under the root with task_facts and daily_rollup filled and every source stamped', async () => {
+  it('writes the replica under the root with task_facts, daily_rollup and plan_facts filled and every source stamped', async () => {
     const root = join(scope, 'one');
     writeFixtureStore(root);
 
@@ -35,9 +37,9 @@ describe('buildAtlas over the buckets built so far', () => {
 
     expect(summary.replicaPath).toBe(join(root, '.rafa', 'atlas', 'atlas.sqlite'));
     expect(summary.replicaPath).toBe(replicaPathOf(root));
-    expect(summary.tables).toEqual(expect.objectContaining({ task_facts: 4, daily_rollup: 4, plan_facts: 0 }));
+    expect(summary.tables).toEqual(expect.objectContaining({ task_facts: 4, daily_rollup: 4, plan_facts: 1 }));
     expect(summary.sources.map((stamp) => stamp.source)).toEqual([
-      TASKS_SOURCE, FINDINGS_SOURCE, BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, DAILY_SOURCE,
+      TASKS_SOURCE, FINDINGS_SOURCE, BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, DAILY_SOURCE, PLANS_SOURCE,
     ]);
     expect(summary.sources[5]).toEqual(expect.objectContaining({ rows: 4, readAt: BUILT_AT.toISOString() }));
 
@@ -46,7 +48,7 @@ describe('buildAtlas over the buckets built so far', () => {
     reader.close();
     expect(replica.meta.buildId).toBe(summary.buildId);
     expect([...replica.sources.keys()].sort()).toEqual([
-      BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, DAILY_SOURCE, FINDINGS_SOURCE, TASKS_SOURCE,
+      BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, DAILY_SOURCE, FINDINGS_SOURCE, PLANS_SOURCE, TASKS_SOURCE,
     ]);
     expect(existsSync(`${summary.replicaPath}.build-${summary.buildId}`)).toBe(false);
   });
