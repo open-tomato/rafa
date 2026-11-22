@@ -5,6 +5,7 @@ The rafa bundle: reads a rafa project into an Atlas replica
 copied with `vacuumInto` and opened read-only; it is never migrated.
 
 `src/ingest/` holds one reader per source, `src/build/` the one-pass
-builder, `src/metrics/` the catalogue per lens, `src/registry.ts` the
-registry the handler serves, and `src/commands/` the rafa module commands
+builder, `src/sources.ts` the descriptor of each bucket's source,
+`src/metrics/` the catalogue per lens, `src/registry.ts` the registry
+the handler serves, and `src/commands/` the rafa module commands
 (`build`, `serve`, `describe`), reached through `rafa module exec`.
