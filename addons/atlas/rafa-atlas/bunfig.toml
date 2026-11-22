@@ -1,0 +1,6 @@
+# `bun test` from this folder reads no `bunfig.toml` of the root, so the
+# root's preload does not run here; this one registers core's config
+# section, as the root's does, so a test reads core's settings the same
+# way from either place.
+[test]
+preload = ["./test-preload.ts"]
