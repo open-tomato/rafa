@@ -28,6 +28,9 @@ import { ingestEffort } from '../ingest/effort.js';
 
 import { rollupDaily } from './daily.js';
 
+/** The live store file a build reads, so a caller (the demo server) checks for it as the build finds it. */
+export { effortStorePathOf } from '../ingest/snapshot.js';
+
 /** The replica file under the project root. */
 export const REPLICA_FILE: string = join('.rafa', 'atlas', 'atlas.sqlite');
 

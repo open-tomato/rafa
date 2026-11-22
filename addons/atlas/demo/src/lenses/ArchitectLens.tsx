@@ -1,6 +1,6 @@
 import type { LensResult } from '../data/source.js';
 
-import { Button, DashboardCard, DataTable, useDashboard, type LegendItem, type ModalEntry } from '@open-tomato/atlas-ui';
+import { Button, DataTable, useDashboard, type LegendItem, type ModalEntry } from '@open-tomato/atlas-ui';
 import { formatCompact, formatDay, formatPercent, useChartEngine, type HeatmapCell } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
@@ -8,10 +8,8 @@ import { COMPONENT_KINDS, COMPONENT_TONES, COMPOSITION_TONES, SIZE_ROSE_TONES } 
 import { LAYER_ORDER, LAYER_TONES } from '../data/graph.js';
 import {
   CHANGE_LEVELS,
-  DAYS,
   HOUR_SLOTS,
   LAST_DAY,
-  MODELS,
   WEEK_DATES,
   WEEKDAYS,
   preflightHaltDetails,
@@ -21,6 +19,7 @@ import {
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { lensActionsVariants, lensInfoVariants, lensNoteVariants } from './ArchitectLens.variants.js';
+import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { MEASURED_SOURCE, cardSpec, plotHeight } from './spec.js';
@@ -105,7 +104,6 @@ const FLOW = cardSpec({
 
 const LAYER_LEGEND: readonly LegendItem[] = LAYER_ORDER.map((layer) => ({ id: layer, label: layer, tone: LAYER_TONES[layer] }));
 const CHANGE_LEGEND: readonly LegendItem[] = CHANGE_LEVELS.map(({ id, label, tone }) => ({ id, label, tone }));
-const MODEL_LEGEND: readonly LegendItem[] = MODELS.map(({ id, label, tone }) => ({ id, label, tone }));
 const COMPONENT_LEGEND: readonly LegendItem[] = COMPONENT_KINDS.map((kind) => ({ id: kind, label: kind, tone: COMPONENT_TONES[kind] }));
 const QUANTILE_LEGEND: readonly LegendItem[] = [
   { id: 'p50', label: 'p50', tone: 'series-1' },
@@ -137,7 +135,15 @@ function ArchitectTiles({ result }: { readonly result: LensResult }): ReactEleme
   return (
     <>
       <LensStat hero label="Debt ratio (fix + refactor + chore minutes)" value={`${gradeOf(mock.debtRatio)} · ${formatPercent(mock.debtRatio)}`} note="proxy: no remediation estimate exists" />
-      <LensStat label="Task minutes p90, this week" value={`${p90} min`} trend={mock.taskMinutesQuantiles.map((week) => week.p90)} delta={{ text: `vs ${P90_AVERAGE} min four-week average`, direction: 'down', upIsGood: false }} />
+      <LensStat
+        label="Task minutes p90, this week"
+        reads={['taskMinutesQuantiles']}
+        value={`${p90} min`}
+        trend={mock.taskMinutesQuantiles.map((week) => week.p90)}
+        delta={result.source === 'mock'
+          ? { text: `vs ${P90_AVERAGE} min four-week average`, direction: 'down', upIsGood: false }
+          : undefined}
+      />
       <LensStat label="Preflight halts, 12 weeks" value={String(totalHalts)} />
       <LensStat label="Workspace members" value={String(workspace.members.length)} note={`${workspace.edges.length} internal dependency edges`} />
     </>
@@ -152,13 +158,22 @@ function haltsTable(halts: readonly (readonly number[])[], zoomed: boolean): { c
   return { columns: ['Weekday', ...columns], rows: WEEKDAYS.map((day, index) => [day, ...(halts[index] ?? [])]) };
 }
 
-/** The tokens-by-model table: the last ten days. */
+/** How many days the tokens-by-model table lists, the latest last. */
+const MODEL_TABLE_DAYS = 10;
+
+/** The tokens-by-model table: the last ten days, one column per model series, each read on the row's day. */
 function modelTable(mock: MockData): { columns: string[]; rows: string[][] } {
-  const LAST_DAYS = 10;
+  const perSeries = mock.tokensByModel.map((series) => new Map(series.points.map((point) => [point.x.getTime(), point.y])));
+  const days = mock.tokensByModel[0]?.points.slice(-MODEL_TABLE_DAYS).map((point) => point.x) ?? [];
   return {
-    columns: ['Day', ...MODELS.map((model) => model.label)],
-    rows: mock.tokensPerDay.slice(-LAST_DAYS).map((point, index) => [formatDay(point.x), ...mock.tokensByModel.map((series) => formatCompact(series.points[DAYS - LAST_DAYS + index]?.y ?? 0))]),
+    columns: ['Day', ...mock.tokensByModel.map((series) => series.label)],
+    rows: days.map((day) => [formatDay(day), ...perSeries.map((values) => formatCompact(values.get(day.getTime()) ?? 0))]),
   };
+}
+
+/** The legend of the tokens-by-model card: one entry per model series the result holds. */
+function modelLegend(mock: MockData): LegendItem[] {
+  return mock.tokensByModel.map(({ id, label, tone }) => ({ id, label, tone }));
 }
 
 /** The Architecture lens: debt, package size and composition, halts and the import flow. */
@@ -211,7 +226,7 @@ export function ArchitectLens(): ReactElement {
         : <ArchitectTiles result={data} />}
       cards={(
         <>
-          <DashboardCard
+          <LensCard
             config={DONUT}
             select={(result: LensResult) => result.mock}
             legend={CHANGE_LEGEND}
@@ -229,9 +244,10 @@ export function ArchitectLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={QUANTILES}
+            reads={['taskMinutesQuantiles']}
             select={(result: LensResult) => result.mock.taskMinutesQuantiles}
             legend={QUANTILE_LEGEND}
             table={(rows) => ({ columns: ['Week', 'p50', 'p90'], rows: rows.map((row) => [formatDay(row.week), row.p50, row.p90]) })}
@@ -249,8 +265,8 @@ export function ArchitectLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard config={MODEL_TOKENS} select={(result: LensResult) => result.mock} legend={MODEL_LEGEND} table={modelTable}>
+          </LensCard>
+          <LensCard config={MODEL_TOKENS} reads={['tokensByModel']} select={(result: LensResult) => result.mock} legend={modelLegend} table={modelTable}>
             {({ data: mock, hidden, animate, height }) => (
               <LineChart
                 ariaLabel="Tokens per day by model, stacked"
@@ -262,8 +278,8 @@ export function ArchitectLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={haltsSpec}
             select={(result: LensResult) => (zoomWeek === null
               ? result.mock.preflightHalts
@@ -301,8 +317,8 @@ export function ArchitectLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={ROSE}
             select={(result: LensResult) => result.workspace.sizeRose}
             info={ROSE_INFO}
@@ -312,8 +328,8 @@ export function ArchitectLens(): ReactElement {
             {({ data: slices, animate, height }) => (
               <Nightingale ariaLabel="Package size as a Nightingale rose, one slice per package" slices={slices} groupTones={SIZE_ROSE_TONES} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(320, height)} />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={COMPOSITION}
             select={(result: LensResult) => result.workspace}
             info={COMPOSITION_INFO}
@@ -323,8 +339,8 @@ export function ArchitectLens(): ReactElement {
             {({ data: workspace, animate, height }) => (
               <Sunburst ariaLabel="Package composition as a sunburst: packages on the inner ring, their parts on the outer ring" nodes={workspace.compositionSunburst} groupTones={COMPOSITION_TONES} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(320, height)} />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={FLOW}
             select={(result: LensResult) => result.workspace}
             info={FLOW_INFO}
@@ -342,7 +358,7 @@ export function ArchitectLens(): ReactElement {
                 height={plotHeight(360, height)}
               />
             )}
-          </DashboardCard>
+          </LensCard>
         </>
       )}
     />

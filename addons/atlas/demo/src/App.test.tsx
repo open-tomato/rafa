@@ -1,20 +1,25 @@
 /**
  * Smoke tests for the demo page over happy-dom: every lens renders its
  * cards' titles once the page source answers, and the range selector asks
- * the source again and the page shows the new result set. happy-dom has
- * no canvas, so the page draws with a stub engine whose primitives render
- * a labelled element; the engine is the charts package's to test. The
- * source answers with no delay.
+ * the source again and the page shows the new result set; with no
+ * `?source` the page draws the mock, and over the live source (a stub
+ * client) the cards a metric feeds draw while the others say "Not wired
+ * yet". happy-dom has no canvas, so the page draws with a stub engine
+ * whose primitives render a labelled element; the engine is the charts
+ * package's to test. The source answers with no delay.
  */
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { ChartPrimitives } from '@open-tomato/charts';
 import type { ReactElement } from 'react';
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { createElement } from 'react';
 
 import { App } from './App.js';
+import { createLiveLensSource } from './data/live.js';
 import { createLensSource, lensResultOf, type LensResult } from './data/source.js';
+import { stubLiveClient } from './data/testdata/live-client.fixture.js';
 
 /** The card titles each lens shows, by the tab that opens it. */
 const LENS_CARDS: Readonly<Record<string, readonly string[]>> = {
@@ -151,5 +156,36 @@ describe('App', () => {
 
     expect(screen.getByRole('tab', { name: 'QA' }).getAttribute('aria-selected')).toBe('true');
     expect(cardTitles()).toContain('Flaky checks, top 10');
+  });
+});
+
+describe('App, by page source', () => {
+  it('draws the mock page with no ?source and no source handed', () => {
+    render(createElement(App, { engine: STUB_ENGINE }));
+
+    expect(screen.getByText(/^Mock data through the card cascade/u)).toBeDefined();
+  });
+
+  it('over the live source, draws the wired cards and marks the others not wired yet', async () => {
+    const { client, calls } = stubLiveClient();
+    renderApp(createLiveLensSource(client));
+    await settle();
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(screen.getByText(/^Live data from the Atlas API/u)).toBeDefined();
+    expect(screen.getByRole('img', { name: /^Tokens per day, this period/u })).toBeDefined();
+    expect(screen.queryByRole('img', { name: /^Tokens used this week/u })).toBeNull();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(4);
+    expect(within(screen.getByRole('region', { name: 'Plans completed this week' })).getByText('not wired yet')).toBeDefined();
+  });
+
+  it('over the live source, draws both Architecture cards a metric feeds', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'Architecture' }));
+    await settle();
+
+    expect(screen.getByRole('img', { name: 'Median and 90th percentile task minutes per week' })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Tokens per day by model, stacked' })).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(5);
   });
 });

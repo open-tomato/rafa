@@ -1,12 +1,13 @@
 import type { LensResult } from '../data/source.js';
 
-import { DashboardCard, DataTable, useDashboard } from '@open-tomato/atlas-ui';
+import { DataTable, useDashboard } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
 import { BUG_KINDS, DEFECT_DENSITY, OPEN_BUGS, ROUTES, WEEK_DATES, type MockData } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
+import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { cardSpec, plotHeight } from './spec.js';
@@ -75,7 +76,7 @@ export function QaLens(): ReactElement {
         : <QaTiles mock={data.mock} />}
       cards={(
         <>
-          <DashboardCard config={BUGS} select={(result: LensResult) => result.mock.bugsByKindPerWeek} legend={BUG_KINDS} table={(rows) => weeklyTable(rows, BUG_KINDS)}>
+          <LensCard config={BUGS} select={(result: LensResult) => result.mock.bugsByKindPerWeek} legend={BUG_KINDS} table={(rows) => weeklyTable(rows, BUG_KINDS)}>
             {({ data: rows, animate, height }) => (
               <BarChart
                 ariaLabel="Bugs by kind per week, stacked"
@@ -86,8 +87,8 @@ export function QaLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={REGRESSIONS}
             select={(result: LensResult) => result.mock.regressionsPerWeek}
             table={(points) => ({ columns: ['Week', 'Regressions'], rows: points.map((point) => [formatDay(point.x), point.y]) })}
@@ -101,8 +102,8 @@ export function QaLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard config={ROUTED} select={(result: LensResult) => result.mock.filedSharePerWeek} legend={ROUTES} table={(rows) => weeklyTable(rows, ROUTES)}>
+          </LensCard>
+          <LensCard config={ROUTED} select={(result: LensResult) => result.mock.filedSharePerWeek} legend={ROUTES} table={(rows) => weeklyTable(rows, ROUTES)}>
             {({ data: rows, animate, height }) => (
               <BarChart
                 ariaLabel="Share of bugs by route per week"
@@ -114,8 +115,8 @@ export function QaLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={RESOLUTION}
             select={(result: LensResult) => result.mock.resolutionByPriority}
             table={(groups) => ({ columns: ['Priority', 'min', 'q1', 'median', 'q3', 'max'], rows: groups.map((group) => [group.label, group.min, group.q1, group.median, group.q3, group.max]) })}
@@ -123,8 +124,8 @@ export function QaLens(): ReactElement {
             {({ data: groups, animate, height }) => (
               <BoxPlot ariaLabel="Resolution days by priority as box plots" groups={groups} unit="days" animate={animate} height={plotHeight(220, height)} />
             )}
-          </DashboardCard>
-          <DashboardCard config={FLAKY} select={(result: LensResult) => result.mock.flakyChecks}>
+          </LensCard>
+          <LensCard config={FLAKY} select={(result: LensResult) => result.mock.flakyChecks}>
             {({ data: checks }) => (
               <DataTable
                 caption="Checks that failed most often across CI readings"
@@ -133,7 +134,7 @@ export function QaLens(): ReactElement {
                 sortable
               />
             )}
-          </DashboardCard>
+          </LensCard>
         </>
       )}
     />

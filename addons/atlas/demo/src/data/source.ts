@@ -5,6 +5,7 @@
  * values. The measured parts (package composition, the import graph) are
  * the same in every range.
  */
+import type { PageSource } from '../url.js';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { GraphLink, GraphNode, RoseSlice, SunburstNode } from '@open-tomato/charts';
 
@@ -25,9 +26,22 @@ export interface MeasuredWorkspace {
   readonly sankeyLinks: readonly GraphLink[];
 }
 
+/** One field of a result set a card reads: a mock series, the balance indices or the measured workspace. */
+export type LensField = keyof MockData | 'balance' | 'workspace';
+
+/** No field marked: what the mock source answers, every field drawn. */
+const NONE_MARKED: ReadonlySet<LensField> = new Set<LensField>();
+
 /** What the page source answers for one range: every card's data. */
 export interface LensResult {
   readonly range: TimeRange;
+  /** Which source answered: the mock, or the live source of `live.ts`. */
+  readonly source: PageSource;
+  /**
+   * The fields no live metric fills yet. A card reading one draws the
+   * "not wired yet" state (`lenses/LensCard.tsx`); the mock marks none.
+   */
+  readonly notWired: ReadonlySet<LensField>;
   readonly mock: MockData;
   /** The balance indices with this range's values. */
   readonly balance: readonly BalanceIndex[];
@@ -79,7 +93,7 @@ function balanceOf(range: TimeRange): readonly BalanceIndex[] {
 
 /** The result set for one range, computed at once. */
 export function lensResultOf(range: TimeRange): LensResult {
-  return { range, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
+  return { range, source: 'mock', notWired: NONE_MARKED, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
 }
 
 /** A page source over the mock that answers after `delayMs`. */

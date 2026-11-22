@@ -1,6 +1,6 @@
 import type { LensResult } from '../data/source.js';
 
-import { DashboardCard, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
@@ -8,6 +8,7 @@ import { BRANCH_TYPES, RED_CI_SHARE, RED_CI_THRESHOLD, WIP_LIMIT, WIP_NOW, WORK_
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { BalanceCard } from './balance/BalanceCard.js';
+import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { cardSpec, plotHeight } from './spec.js';
@@ -89,7 +90,7 @@ export function DeveloperLens(): ReactElement {
       cards={(
         <>
           <BalanceCard />
-          <DashboardCard
+          <LensCard
             config={WORK_DONE}
             select={(result: LensResult) => result.mock.workDoneTree}
             legend={WORK_LEGEND}
@@ -98,8 +99,8 @@ export function DeveloperLens(): ReactElement {
             {({ data: tree, animate, height }) => (
               <Sunburst ariaLabel="Work done by kind and module as a sunburst" nodes={tree} groupTones={WORK_TONES} unit="items" animate={animate} height={plotHeight(300, height)} />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={TASKS_DONE}
             select={(result: LensResult) => result.mock.tasksDonePerWeek}
             legend={BRANCH_TYPES}
@@ -115,8 +116,8 @@ export function DeveloperLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={CYCLE}
             select={(result: LensResult) => result.mock}
             legend={CYCLE_LEGEND}
@@ -136,8 +137,8 @@ export function DeveloperLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={RED_CI}
             select={() => RED_CI_SHARE}
             table={(share) => ({ columns: ['Measure', 'Share'], rows: [['Red CI share', formatPercent(share)], ['Threshold', formatPercent(RED_CI_THRESHOLD)]] })}
@@ -156,8 +157,8 @@ export function DeveloperLens(): ReactElement {
                 height={plotHeight(120, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={MINUTES}
             select={(result: LensResult) => result.mock.taskMinutesBins}
             table={(bins) => ({ columns: ['Minutes', 'Tasks'], rows: bins.map((bin) => [`${bin.from}–${bin.to}`, bin.count]) })}
@@ -165,7 +166,7 @@ export function DeveloperLens(): ReactElement {
             {({ data: bins, animate, height }) => (
               <Histogram ariaLabel="Distribution of task minutes" bins={bins} unit="min" animate={animate} height={plotHeight(220, height)} />
             )}
-          </DashboardCard>
+          </LensCard>
         </>
       )}
     />

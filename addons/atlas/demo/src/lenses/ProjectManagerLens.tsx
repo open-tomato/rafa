@@ -1,12 +1,13 @@
-import type { LensResult } from '../data/source.js';
+import type { LensField, LensResult } from '../data/source.js';
 
-import { DashboardCard, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatCompact, formatDay, formatMinutes, formatPercent, useChartEngine, type LineSeries } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
-import { DAYS, PILE_KINDS, PILE_TONES, WEEKLY_TOKEN_BUDGET_TIGHT, WIP_LIMIT_MINUTES, ACTIVE_BLOCKERS, ON_TIME_SHARE, type MockData } from '../data/mock.js';
+import { PILE_KINDS, PILE_TONES, WEEKLY_TOKEN_BUDGET_TIGHT, WIP_LIMIT_MINUTES, ACTIVE_BLOCKERS, ON_TIME_SHARE, type MockData } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
+import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { zoomFooterVariants } from './ProjectManagerLens.variants.js';
@@ -76,6 +77,21 @@ function tokenSeries(mock: MockData): LineSeries[] {
   ];
 }
 
+/** The fields the tokens card reads, all three filled by `pm.tokens-per-day` on the live page. */
+const TOKEN_FIELDS: readonly LensField[] = ['tokensPerDay', 'tokensPerDayPrevious', 'tokensDailyAverage'];
+
+/** How many days the tokens table lists, the latest last. */
+const TOKEN_TABLE_DAYS = 12;
+
+/** The tokens table: the latest days, each beside the previous period's value drawn on the same day. */
+function tokenTable(mock: MockData): { columns: string[]; rows: string[][] } {
+  const previous = new Map(mock.tokensPerDayPrevious.map((point) => [point.x.getTime(), point.y]));
+  return {
+    columns: ['Day', 'This period', 'Previous'],
+    rows: mock.tokensPerDay.slice(-TOKEN_TABLE_DAYS).map((point) => [formatDay(point.x), formatCompact(point.y), formatCompact(previous.get(point.x.getTime()) ?? 0)]),
+  };
+}
+
 const TOKEN_LEGEND: readonly LegendItem[] = [
   { id: 'current', label: 'This period', tone: 'series-1' },
   { id: 'previous', label: 'Previous 12 weeks', tone: 'series-2' },
@@ -119,7 +135,7 @@ export function ProjectManagerLens(): ReactElement {
         : <ProjectTiles mock={data.mock} />}
       cards={(
         <>
-          <DashboardCard
+          <LensCard
             config={BUDGET}
             select={(result: LensResult) => result.mock}
             table={(mock) => ({ columns: ['Measure', 'Tokens'], rows: [['Used this week', formatCompact(mock.tokensThisWeek)], ['Used last week', formatCompact(mock.tokensLastWeek)], ['Weekly budget', formatCompact(WEEKLY_TOKEN_BUDGET_TIGHT)]] })}
@@ -137,13 +153,14 @@ export function ProjectManagerLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={TOKENS}
+            reads={TOKEN_FIELDS}
             select={(result: LensResult) => result.mock}
             legend={TOKEN_LEGEND}
             footer={<p className={zoomFooterVariants()}>Showing {zoomed}.</p>}
-            table={(mock) => ({ columns: ['Day', 'This period', 'Previous'], rows: mock.tokensPerDay.slice(-12).map((point, index) => [formatDay(point.x), formatCompact(point.y), formatCompact(mock.tokensPerDayPrevious[DAYS - 12 + index]?.y ?? 0)]) })}
+            table={tokenTable}
           >
             {({ data: mock, hidden, animate, height }) => (
               <LineChart
@@ -158,8 +175,8 @@ export function ProjectManagerLens(): ReactElement {
                 height={plotHeight(260, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={PLANNED}
             select={(result: LensResult) => result.mock.plannedVsSessions}
             legend={PLANNED_LEGEND}
@@ -178,8 +195,8 @@ export function ProjectManagerLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={AGENT_HOURS}
             select={(result: LensResult) => result.mock.minutesPerAgent}
             table={(rows) => ({ columns: ['Agent', 'Minutes'], rows: rows.map((row) => [row.agent, formatMinutes(row.minutes)]) })}
@@ -196,8 +213,8 @@ export function ProjectManagerLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={PILE}
             select={(result: LensResult) => result.mock.taskPileTree}
             legend={PILE_LEGEND}
@@ -206,7 +223,7 @@ export function ProjectManagerLens(): ReactElement {
             {({ data: tree, animate, height }) => (
               <Sunburst ariaLabel="Pending work by kind and age as a sunburst" nodes={tree} groupTones={PILE_TONES} unit="items" animate={animate} height={plotHeight(300, height)} />
             )}
-          </DashboardCard>
+          </LensCard>
         </>
       )}
     />
