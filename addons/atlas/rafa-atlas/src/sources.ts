@@ -1,8 +1,9 @@
 /**
  * The table sources the registry serves so far, one spec per replica
- * bucket: `local.tasks` over `task_facts` and `local.daily` over
- * `daily_rollup`. The build stamps the finding, bug, change and CI
- * buckets' sources too, and no spec here defines them yet. Each spec is the descriptor without its build stamps,
+ * bucket: `local.tasks` over `task_facts`, `local.daily` over
+ * `daily_rollup` and `local.plans` over `plan_facts`. The build stamps
+ * the finding, bug, change and CI buckets' sources too, and no spec here
+ * defines them yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
  *
@@ -14,6 +15,7 @@ import type { Aggregate, FieldDescriptor, FieldType } from '@open-tomato/atlas-d
 import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
 
 import { DAILY_SOURCE } from './build/daily.js';
+import { PLANS_SOURCE } from './build/derive.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 
 /** The aggregates a numeric measure takes. */
@@ -73,6 +75,7 @@ export const TASKS_SPEC: TableSourceSpec = {
       dimension('plan_stub', 'Plan'),
       dimension('task_line', 'Task line'),
       dimension('branch_type', 'Branch type', 'feat on every loop branch; split by change level instead'),
+      dimension('work_type', 'Work type', 'feature, fix or chore, read from the session\'s highest change level (a proxy)'),
       dimension('agent', 'Agent'),
       dimension('model', 'Model', 'the model that answered most of the session\'s turns'),
       dimension('effort', 'Effort'),
@@ -112,10 +115,59 @@ export const DAILY_SPEC: TableSourceSpec = {
       ...DAILY_KINDS.map(([suffix, label]) => measure(`minutes_${suffix}`, `Minutes, ${label}`, 'number', 'min')),
       ...DAILY_KINDS.map(([suffix, label]) => measure(`tokens_${suffix}`, `Tokens, ${label}`, 'integer', 'tokens')),
       measure('tokens_total', 'Tokens', 'integer', 'tokens'),
+      measure('sessions', 'Sessions', 'integer', 'sessions'),
+      measure('task_sessions', 'Task sessions', 'integer', 'sessions'),
+      measure('tasks_done', 'Tasks done', 'integer', 'tasks'),
+      measure('tasks_blocked', 'Tasks blocked', 'integer', 'tasks'),
+      measure('findings', 'Findings', 'integer', 'findings'),
+      measure('bugs', 'Bugs', 'integer', 'bugs'),
+      measure('changes', 'Changes', 'integer', 'changes'),
+      measure('commits', 'Commits', 'integer', 'commits'),
+      measure('prs_merged', 'Pull requests merged', 'integer', 'pull requests'),
+      measure('preflight_runs', 'Preflight runs', 'integer', 'runs'),
+      measure('preflight_halts', 'Preflight halts', 'integer', 'runs'),
     ],
   },
   table: 'daily_rollup',
 };
 
+/** `local.plans`: one row per plan the plan folder holds or a session or CI reading names, from `plan_facts`. */
+export const PLANS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: PLANS_SOURCE,
+    source: 'local',
+    channel: 'plans',
+    title: 'Plans',
+    description: 'One row per plan: its task counts from the plan file, and its sessions and CI readings from the effort store.',
+    timeField: 'first_at',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      dimension('plan_stub', 'Plan'),
+      dimension('plan_source', 'Plan source', 'where the plan was read: tracker, plan or missing'),
+      dimension('epic_slug', 'Epic'),
+      dimension('ci_last_verdict', 'Last CI verdict'),
+      { ...measure('issue_number', 'Issue', 'integer', 'issue'), role: 'id', aggregates: COUNT_AGGREGATES },
+      { ...measure('pr_number', 'Pull request', 'integer', 'pull request'), role: 'id', aggregates: COUNT_AGGREGATES },
+      measure('tasks_planned', 'Tasks planned', 'integer', 'tasks'),
+      measure('tasks_done', 'Tasks done', 'integer', 'tasks'),
+      measure('tasks_blocked', 'Tasks blocked', 'integer', 'tasks'),
+      measure('sessions', 'Sessions', 'integer', 'sessions'),
+      measure('task_sessions', 'Task sessions', 'integer', 'sessions'),
+      measure('reports_done', 'Reports done', 'integer', 'reports'),
+      measure('reports_blocked', 'Reports blocked', 'integer', 'reports'),
+      measure('repeat_sessions', 'Repeat sessions', 'integer', 'sessions'),
+      measure('ci_repair_sessions', 'CI-repair sessions', 'integer', 'sessions'),
+      time('first_at', 'First session', 'datetime'),
+      time('last_at', 'Last session', 'datetime'),
+      time('merged_at', 'Merged', 'datetime'),
+      measure('minutes', 'Minutes', 'number', 'min'),
+      measure('tokens', 'Tokens', 'integer', 'tokens'),
+      measure('ci_red_readings', 'Red CI readings', 'integer', 'readings'),
+      measure('completed', 'Completed', 'integer', 'plans'),
+    ],
+  },
+  table: 'plan_facts',
+};
+
 /** Every source spec the registry defines, in the order `/sources` lists them. */
-export const SOURCE_SPECS: readonly TableSourceSpec[] = [TASKS_SPEC, DAILY_SPEC];
+export const SOURCE_SPECS: readonly TableSourceSpec[] = [TASKS_SPEC, DAILY_SPEC, PLANS_SPEC];
