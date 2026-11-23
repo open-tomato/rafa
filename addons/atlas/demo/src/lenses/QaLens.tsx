@@ -4,7 +4,7 @@ import { CardStatus, DataTable, useDashboard } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
-import { BUG_KINDS, DEFECT_DENSITY, OPEN_BUG_LINES, OPEN_BUGS, OUTCOMES, ROUTES, type BugOutcomeDay, type Kind } from '../data/mock.js';
+import { BUG_KINDS, OPEN_BUG_LINES, OPEN_BUGS, OUTCOMES, ROUTES, type BugOutcomeDay, type Kind } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { kindsOf } from './kinds.js';
@@ -85,8 +85,17 @@ function QaTiles({ result }: { readonly result: LensResult }): ReactElement {
           : undefined}
       />
       <LensStat label="Regressions (own-fallout) this week" reads={['regressionsPerWeek']} value={String(mock.regressionsPerWeek.at(-1)?.y ?? 0)} trend={mock.regressionsPerWeek.map((point) => point.y)} />
-      <LensStat label="Open bug issues" value={String(OPEN_BUGS)} />
-      <LensStat label="Defect density" value={`${DEFECT_DENSITY} / kLOC`} note="bugs attributed to modules by the paths their text names" />
+      <LensStat
+        label="Open bug issues"
+        reads={['openBugsPerDay']}
+        value={String(result.source === 'mock'
+          ? OPEN_BUGS
+          : mock.openBugsPerDay.at(-1)?.all ?? 0)}
+        trend={result.source === 'mock'
+          ? undefined
+          : mock.openBugsPerDay.map((day) => day.all)}
+      />
+      <LensStat label="Defect density" reads={['defectDensity']} value={`${mock.defectDensity} / kLOC`} note="bugs attributed to modules by the paths their text names" />
     </>
   );
 }

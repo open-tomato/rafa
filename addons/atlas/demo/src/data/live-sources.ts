@@ -1,7 +1,7 @@
 /**
  * The live source's metrics past the PoC cut: the git, board, module and
- * GitHub metrics of phase 4, asked of the Atlas API and mapped into the
- * fields `SOURCE_METRIC_FIELDS` names. `live.ts` imports this module and
+ * GitHub metrics of phase 4 and the minutes per agent, asked of the
+ * Atlas API and mapped into the fields `SOURCE_METRIC_FIELDS` names. `live.ts` imports this module and
  * lays its fields over the PoC ones; the measured workspace of
  * `composition.ts` and `graph.ts` stays the mock page's.
  *
@@ -27,11 +27,19 @@
  *   row means the replica was built without `--github`, so
  *   `githubPendingOf` names their fields and the card draws "not wired
  *   yet" with `GITHUB_NOT_READ`, the build line that fills them.
+ * - `pm.minutes-per-agent` fills `minutesPerAgent`, the task session
+ *   minutes of each agent over the series window, the most first, a
+ *   session naming no agent as `NO_AGENT`.
+ * - `qa.defect-density` fills `defectDensity`, the bugs per 1,000 lines
+ *   over the module folders that hold code: a folder with no line left
+ *   (one a bug's path names but the tree no longer holds) adds neither
+ *   its bugs nor its lines.
  *
- * Every metric but deploys and resolution is asked with no window:
- * `local.modules` has no time axis, WIP and the outcome read the board as
- * of its cache (`local.issues` bounds a window by `created_at`, NULL
- * offline), and the bugs open on a day include those opened before it.
+ * Every metric but deploys, resolution and the minutes per agent is
+ * asked with no window: `local.modules` has no time axis, WIP and the
+ * outcome read the board as of its cache (`local.issues` bounds a
+ * window by `created_at`, NULL offline), and the bugs open on a day
+ * include those opened before it.
  */
 import type { BugOutcomeDay, MockData, OpenBugsDay, Wip } from './mock.js';
 import type { LensField } from './source.js';
@@ -46,6 +54,7 @@ import {
   dayOf,
   dayStartOf,
   numberOf,
+  round1,
   stampOrNull,
   stringListOf,
   textOf,
@@ -62,7 +71,9 @@ export type SourceMetric =
   | 'wip'
   | 'resolutionTime'
   | 'bugOutcome'
-  | 'openBugsPerDay';
+  | 'openBugsPerDay'
+  | 'minutesPerAgent'
+  | 'defectDensity';
 
 /** The catalogue id of each metric this module runs. */
 export const SOURCE_METRICS: Readonly<Record<SourceMetric, string>> = {
@@ -73,6 +84,8 @@ export const SOURCE_METRICS: Readonly<Record<SourceMetric, string>> = {
   resolutionTime: 'qa.resolution-time',
   bugOutcome: 'qa.bug-outcome-by-loop-start',
   openBugsPerDay: 'qa.open-bugs-per-day',
+  minutesPerAgent: 'pm.minutes-per-agent',
+  defectDensity: 'qa.defect-density',
 };
 
 /** The field each metric fills. */
@@ -84,6 +97,8 @@ export const SOURCE_METRIC_FIELDS: Readonly<Record<SourceMetric, readonly LensFi
   resolutionTime: ['resolutionByPriority'],
   bugOutcome: ['bugOutcomeByLoopStart'],
   openBugsPerDay: ['openBugsPerDay'],
+  minutesPerAgent: ['minutesPerAgent'],
+  defectDensity: ['defectDensity'],
 };
 
 /** The metrics run in `SOURCE_METRICS` order. */
@@ -93,7 +108,7 @@ export const SOURCE_METRIC_KEYS: readonly SourceMetric[] = Object.keys(SOURCE_ME
 export const SOURCE_WIRED_FIELDS: readonly LensField[] = SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key]);
 
 /** The metrics asked over the range's series window; every other one is asked with none (see the module note). */
-export const WINDOWED_SOURCE_METRICS: ReadonlySet<SourceMetric> = new Set<SourceMetric>(['deploysPerWeek', 'resolutionTime']);
+export const WINDOWED_SOURCE_METRICS: ReadonlySet<SourceMetric> = new Set<SourceMetric>(['deploysPerWeek', 'resolutionTime', 'minutesPerAgent']);
 
 /** The source whose `first_at` dates a plan's bugs on the outcome card. */
 export const PLANS_SOURCE_ID = 'local.plans';
@@ -115,7 +130,10 @@ export interface SourceAnswers {
 }
 
 /** The fields of the mock shape this module fills. */
-export type SourceFields = Pick<MockData, 'deploysPerWeek' | 'modules' | 'wip' | 'resolutionByPriority' | 'bugOutcomeByLoopStart' | 'openBugsPerDay'>;
+export type SourceFields = Pick<
+  MockData,
+  'deploysPerWeek' | 'modules' | 'wip' | 'resolutionByPriority' | 'bugOutcomeByLoopStart' | 'openBugsPerDay' | 'minutesPerAgent' | 'defectDensity'
+>;
 
 /** The module graph `arch.coupling` gives: the members and edges of the live `workspace`. */
 export interface ModuleGraph {
@@ -320,6 +338,32 @@ export function openBugsPerDayOf(result: QueryResult, window: QueryResult): Open
   return counted;
 }
 
+/** What the minutes per agent call a task session that names no agent. */
+export const NO_AGENT = 'no agent';
+
+/** The task session minutes of each agent, from `agent` and `minutes` rows, in the answer's order; an agent with none left out. */
+export function minutesPerAgentOf(result: QueryResult): MockData['minutesPerAgent'] {
+  const agent = columnOf(result, 'agent');
+  const minutes = columnOf(result, 'minutes');
+  return result.rows
+    .map((row) => ({ agent: textOf(row[agent], NO_AGENT), minutes: numberOf(row[minutes]) }))
+    .filter((row) => row.minutes > 0);
+}
+
+/** The lines a density counts per bug: per 1,000. */
+const DENSITY_LINES = 1_000;
+
+/** The bugs per 1,000 lines over the folders holding code, from `bugs` and `loc` rows, to one decimal; 0 with no line. */
+export function defectDensityOf(result: QueryResult): number {
+  const bugs = columnOf(result, 'bugs');
+  const loc = columnOf(result, 'loc');
+  const counted = result.rows.filter((row) => numberOf(row[loc]) > 0);
+  const lines = counted.reduce((sum, row) => sum + numberOf(row[loc]), 0);
+  if (lines === 0) return 0;
+  const found = counted.reduce((sum, row) => sum + numberOf(row[bugs]), 0);
+  return round1(found / lines * DENSITY_LINES);
+}
+
 /* ---------- the fields together ---------- */
 
 /** The fields this module fills, each from its answer; the WIP ceiling from the metric's listed goal. */
@@ -332,6 +376,8 @@ export function sourceFieldsOf(answers: SourceAnswers, definitions: readonly Met
     resolutionByPriority: resolutionOf(metrics.resolutionTime),
     bugOutcomeByLoopStart: outcomeByLoopStartOf(metrics.bugOutcome, answers.plans),
     openBugsPerDay: openBugsPerDayOf(metrics.openBugsPerDay, metrics.deploysPerWeek),
+    minutesPerAgent: minutesPerAgentOf(metrics.minutesPerAgent),
+    defectDensity: defectDensityOf(metrics.defectDensity),
   };
 }
 

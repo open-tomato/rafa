@@ -28,7 +28,7 @@ import { NO_FLAKY_TITLE } from './lenses/QaLens.js';
 
 /** The card titles each lens shows, by the tab that opens it. */
 const LENS_CARDS: Readonly<Record<string, readonly string[]>> = {
-  'Project Management': ['Budget burn', 'Tokens per day', 'Planned tasks vs sessions', 'Hours per agent this week', 'The task pile as drag'],
+  'Project Management': ['Budget burn', 'Tokens per day', 'Planned tasks vs sessions', 'Hours per agent', 'The task pile as drag'],
   'Architecture': [
     'Minutes by change kind',
     'Task minutes per week',
@@ -219,7 +219,9 @@ describe('App, by page source', () => {
     expect(screen.getByRole('img', { name: /^Tokens per day, this period/u })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Tokens used this week against last week, no weekly target set' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Planned tasks against task sessions, per plan' })).toBeDefined();
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
+    expect(screen.getByRole('img', { name: 'Hours of task sessions per agent over the range' })).toBeDefined();
+    expect(screen.getByText('task session minutes over the range; no limit is set')).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(1);
     expect(within(screen.getByRole('region', { name: 'Plans completed this week' })).queryByText('not wired yet')).toBeNull();
     expect(within(screen.getByRole('region', { name: 'Active blockers' })).getByText('1')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Plans landed on their CI-green week' })).getByText('not wired yet')).toBeDefined();
@@ -262,7 +264,8 @@ describe('App, by page source', () => {
     expect(screen.getByRole('img', { name: 'Tasks done per week, stacked by branch type' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Task cycle minutes per task with a seven-day moving median' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Red CI share against the ten percent threshold' })).toBeDefined();
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(3);
+    expect(screen.getByRole('img', { name: 'Distribution of task minutes' })).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
     expect(within(screen.getByRole('region', { name: 'Plans completed per week' })).getByText('3')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Releases this week' })).getByText('1')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Work in progress' })).getByText('3')).toBeDefined();
@@ -283,6 +286,9 @@ describe('App, by page source', () => {
     expect(screen.getByRole('table', { name: 'Checks that failed most often across CI readings' })).toBeDefined();
     expect(screen.getByText('counted on the day its loop started')).toBeDefined();
     expect(screen.queryByText('Not wired yet')).toBeNull();
+    expect(screen.queryByText('not wired yet')).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Open bug issues' })).getByText('1')).toBeDefined();
+    expect(within(screen.getByRole('region', { name: 'Defect density' })).getByText('1 / kLOC')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Options for Bugs by kind per week' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Source' }));
     expect(screen.getByRole('columnheader', { name: 'unknown' })).toBeDefined();
@@ -328,8 +334,8 @@ describe('App, by page source', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Development' }));
     await settle();
 
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(3);
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
     expect(screen.queryByText(GITHUB_NOT_READ)).toBeNull();
-    expect(within(screen.getByRole('region', { name: 'Task minutes distribution' })).getByText(/^No live metric feeds this card yet/u)).toBeDefined();
+    expect(within(screen.getByRole('region', { name: 'Work done, 12 weeks' })).getByText(/^No live metric feeds this card yet/u)).toBeDefined();
   });
 });

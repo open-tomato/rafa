@@ -162,6 +162,16 @@ export const STUB_OPEN_BUGS: QueryResult = resultOf(['number', 'plan_stub', 'cre
   [2, null, '2026-11-20T10:00:00.000Z', '2026-11-22T10:00:00.000Z'],
 ], { from: null, to: null });
 
+/** Task session minutes per agent, the most first, one session naming no agent. */
+export const STUB_MINUTES_PER_AGENT: QueryResult = resultOf(['agent', 'minutes', 'sessions'], [['stub-agent-a', 600, 4], [null, 90, 2], ['stub-agent-b', 0, 1]]);
+
+/** Bugs and lines per module folder: a folder with no line left (`src/gone`) counts in neither. */
+export const STUB_DEFECT_DENSITY: QueryResult = resultOf(['path', 'bugs', 'loc', 'bugs_per_line'], [
+  ['src/gone', 7, 0, null],
+  ['packages/stub-a', 3, 2_000, 0.0015],
+  ['packages/stub-b', 1, 2_000, 0.0005],
+], { from: null, to: null });
+
 /** The answer of each metric of `live-sources.ts`. */
 export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = {
   deploysPerWeek: STUB_DEPLOYS,
@@ -171,6 +181,8 @@ export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = 
   resolutionTime: STUB_RESOLUTION,
   bugOutcome: STUB_OUTCOME,
   openBugsPerDay: STUB_OPEN_BUGS,
+  minutesPerAgent: STUB_MINUTES_PER_AGENT,
+  defectDensity: STUB_DEFECT_DENSITY,
 };
 
 /** The metrics the stub lists as GitHub-only, as the catalogue does. */
@@ -189,6 +201,8 @@ export const STUB_PROXIES: readonly string[] = [
   'dev.plans-completed-per-week',
   'arch.loc-per-module',
   'arch.coupling',
+  'pm.minutes-per-agent',
+  'qa.defect-density',
 ];
 
 /** The note the stub lists for proxy `id`. */

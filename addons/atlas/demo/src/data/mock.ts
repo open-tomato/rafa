@@ -242,6 +242,8 @@ export interface MockData {
   readonly regressionsPerWeek: TimePoint[];
   readonly filedSharePerWeek: Record<string, number>[];
   readonly resolutionByPriority: BoxGroup[];
+  /** Bugs per 1,000 lines of code over the module folders. */
+  readonly defectDensity: number;
   readonly wip: Wip;
   readonly bugOutcomeByLoopStart: BugOutcomeDay[];
   readonly openBugsPerDay: OpenBugsDay[];
@@ -287,11 +289,13 @@ function cycleTrendOf(taskCycle: readonly ScatterPoint[]): TimePoint[] {
   });
 }
 
+/** The bin edges of the task minutes histogram, in minutes; the live page adds a bin past the last when a task ran longer. */
+export const TASK_MINUTE_EDGES: readonly number[] = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180];
+
 function taskMinutesBinsFrom(random: () => number): HistogramBin[] {
-  const edges = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180];
   const minutes = Array.from({ length: 400 }, () => skewed(random, 20, 0.7));
-  return edges.slice(0, -1).map((from, index) => {
-    const to = edges[index + 1] ?? from;
+  return TASK_MINUTE_EDGES.slice(0, -1).map((from, index) => {
+    const to = TASK_MINUTE_EDGES[index + 1] ?? from;
     return { from, to, count: minutes.filter((value) => value >= from && value < to).length };
   });
 }
@@ -472,6 +476,7 @@ export function buildMock(seeds: MockSeeds): MockData {
     minutesByChangeKindPrevious,
     workDoneTree,
     taskPileTree,
+    defectDensity: DEFECT_DENSITY,
     tokensThisWeek: sum(project.tokensPerDay.slice(-7).map((point) => point.y)),
     tokensLastWeek: sum(project.tokensPerDay.slice(-14, -7).map((point) => point.y)),
     tokensDailyAverage: Math.round(sum(project.tokensPerDay.map((point) => point.y)) / DAYS),

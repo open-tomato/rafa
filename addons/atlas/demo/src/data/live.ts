@@ -29,8 +29,10 @@
  *
  * Past the PoC cut, the git, board, module and GitHub metrics of phase 4
  * fill `deploysPerWeek`, `modules`, `workspace` (its members and edges),
- * `wip`, `resolutionByPriority`, `bugOutcomeByLoopStart` and
- * `openBugsPerDay`. Their requests and mappers live in `live-sources.ts`,
+ * `wip`, `resolutionByPriority`, `bugOutcomeByLoopStart`,
+ * `openBugsPerDay` and `defectDensity`, and `pm.minutes-per-agent` fills
+ * `minutesPerAgent`. The task cycle's points also fill
+ * `taskMinutesBins`, binned on the page (`taskMinutesBinsOf`). Their requests and mappers live in `live-sources.ts`,
  * and the cell readers both files share in `live-read.ts`. A GitHub-only
  * metric that answers no row adds its fields to `notWired` for that
  * result, with the `--github` build line in `notWiredDetail`.
@@ -40,7 +42,7 @@ import type { FieldMeta, LensField, LensResult, MeasuredWorkspace } from './sour
 import type { MetricDefinition, QueryResult, Window } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
-import type { ChartTone, LineSeries, ScatterPoint, TimePoint } from '@open-tomato/charts';
+import type { ChartTone, HistogramBin, LineSeries, ScatterPoint, TimePoint } from '@open-tomato/charts';
 
 import { AtlasRequestError, AtlasResponseInvalid, AtlasTransportError } from '@open-tomato/atlas-transport/client';
 
@@ -70,7 +72,7 @@ import {
   sourceFieldsOf,
   type SourceAnswers,
 } from './live-sources.js';
-import { BRANCH_TYPES } from './mock.js';
+import { BRANCH_TYPES, TASK_MINUTE_EDGES } from './mock.js';
 import { quantile } from './random.js';
 
 /** Where the demo server mounts the Atlas API. */
@@ -143,7 +145,7 @@ export const METRIC_FIELDS: Readonly<Record<LiveMetric, readonly LensField[]>> =
   tokensByModel: ['tokensByModel'],
   preflightHalts: ['preflightHalts'],
   tasksDonePerWeek: ['tasksDonePerWeek'],
-  taskCycle: ['taskCycle', 'taskCycleTrend'],
+  taskCycle: ['taskCycle', 'taskCycleTrend', 'taskMinutesBins'],
   redCiShare: ['redCiShare'],
   plansCompletedPerWeek: ['plansCompletedPerWeek'],
   bugsByKind: ['bugsByKindPerWeek'],
@@ -221,6 +223,7 @@ function emptyMock(): MockData {
     regressionsPerWeek: [],
     filedSharePerWeek: [],
     resolutionByPriority: [],
+    defectDensity: 0,
     flakyChecks: [],
     workDoneTree: [],
     taskPileTree: [],
@@ -443,6 +446,26 @@ export function taskCycleOf(result: QueryResult): ScatterPoint[] {
 }
 
 /**
+ * The task sessions of `points` counted per bin of `TASK_MINUTE_EDGES`,
+ * a session in the bin its minutes fall in (from included, to not). A
+ * session past the last edge counts in one more bin, from that edge to
+ * the longest session's minutes rounded up (one past the edge at the
+ * least), added only when one ran that long.
+ */
+export function taskMinutesBinsOf(points: readonly ScatterPoint[]): HistogramBin[] {
+  const minutes = points.map((point) => point.y);
+  const bins = TASK_MINUTE_EDGES.slice(0, -1).map((from, index) => {
+    const to = TASK_MINUTE_EDGES[index + 1] ?? from;
+    return { from, to, count: minutes.filter((value) => value >= from && value < to).length };
+  });
+  const last = TASK_MINUTE_EDGES.at(-1) ?? 0;
+  const longer = minutes.filter((value) => value >= last);
+  return longer.length === 0
+    ? bins
+    : [...bins, { from: last, to: Math.max(Math.ceil(Math.max(...longer)), last + 1), count: longer.length }];
+}
+
+/**
  * The seven-day moving median of `points`, one point per day of the
  * window (of the points, when open) whose seven days hold a point.
  */
@@ -618,6 +641,7 @@ function mockOf(answers: Answers, previous: Partial<Answers>, sources: SourceAns
     tasksDonePerWeek: tasksDoneOf(answers.tasksDonePerWeek),
     taskCycle,
     taskCycleTrend: cycleTrendOf(taskCycle, answers.taskCycle),
+    taskMinutesBins: taskMinutesBinsOf(taskCycle),
     redCiShare: redShareOf(answers.redCiShare),
     bugsByKindPerWeek: weeklyGroupsOf(answers.bugsByKind, 'kind', 'bugs'),
     regressionsPerWeek: weeklyPointsOf(answers.regressions, 'bugs'),
