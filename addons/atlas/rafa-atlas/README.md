@@ -47,9 +47,11 @@ of `origin/HEAD`'s target, or of `HEAD` when that names none, with git run in
 the project root), `board.ts` (issues and today's counts by board stage from
 the board cache `<root>/.rafa/cache/board.json`, read once per build and
 stamped with its watermark; no cache stamps both sources missing),
+`modules.ts` (each module's files, LOC, `@open-tomato` imports and fan, and
+its upward edges from `docs/survey/cut-table.json`, NULL with no table),
 `attribute.ts` (the module column), and `snapshot.ts` (the `vacuumInto`
 copy). `src/build/` is the one-pass builder: `index.ts` writes the replica,
-`derive.ts` the work type and the rollups, `daily.ts` the daily rollup.
+`derive.ts` the work type, the rollups and each module's counts, `daily.ts` the daily rollup.
 `src/sources.ts` holds each bucket's source descriptor, `src/metrics/` the
 catalogue per lens, `src/registry.ts` the registry the handler serves, and
 `src/commands/` the three module commands.

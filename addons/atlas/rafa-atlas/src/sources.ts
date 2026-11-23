@@ -4,8 +4,8 @@
  * `daily_rollup`, `local.plans` over `plan_facts`, `local.bugs` over
  * `bug_facts`, `local.findings` over `finding_facts`, `local.ci` over
  * `ci_facts`, `local.commits` over `commit_facts`, `local.marks` over
- * `stretch_marks`, `local.issues` over `issue_facts` and `local.board`
- * over `board_snapshot`. The build stamps `local.changes` too, and no spec here
+ * `stretch_marks`, `local.issues` over `issue_facts`, `local.board`
+ * over `board_snapshot` and `local.modules` over `module_facts`. The build stamps `local.changes` too, and no spec here
  * defines it yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
@@ -24,6 +24,7 @@ import { BOARD_SOURCE, ISSUES_SOURCE } from './ingest/board.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
+import { MODULES_SOURCE } from './ingest/modules.js';
 
 /** The aggregates a numeric measure takes. */
 const MEASURE_AGGREGATES: readonly Aggregate[] = ['sum', 'mean', 'min', 'max', 'p50', 'p90', 'p99'];
@@ -382,7 +383,40 @@ export const BOARD_SPEC: TableSourceSpec = {
   table: 'board_snapshot',
 };
 
+/** `local.modules`: one row per module of the project's tree, from `module_facts`. */
+export const MODULES_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: MODULES_SOURCE,
+    source: 'local',
+    channel: 'modules',
+    title: 'Modules',
+    description: 'One row per module folder of the project tree: its size, its @open-tomato imports, and the bugs, findings and changes the effort store attributes to it.',
+    timeField: null,
+    grains: ['all'],
+    fields: [
+      dimension('path', 'Module', 'the module folder, relative to the project root'),
+      dimension('package', 'Package', 'the name of the module\'s own package.json; NULL for a folder with none'),
+      measure('files', 'Files', 'integer', 'files'),
+      measure('loc', 'Lines of code', 'integer', 'lines'),
+      measure('test_files', 'Test files', 'integer', 'files'),
+      measure('test_loc', 'Test lines of code', 'integer', 'lines'),
+      { ...measure('fan_in', 'Fan-in', 'integer', 'modules'), description: 'the other modules importing its package' },
+      { ...measure('fan_out', 'Fan-out', 'integer', 'modules'), description: 'the other modules whose package it imports' },
+      { ...dimension('imports_json', 'Imports', 'the @open-tomato packages it imports, its own left out, as a JSON array'), type: 'json' },
+      {
+        ...measure('upward_edges', 'Upward edges', 'integer', 'edges'),
+        description: 'the upward imports docs/survey/cut-table.json lists from its files; NULL with no cut table or for a module it does not cover',
+      },
+      measure('bugs', 'Bugs', 'integer', 'bugs'),
+      measure('findings', 'Findings', 'integer', 'findings'),
+      measure('changes', 'Changes', 'integer', 'changes'),
+    ],
+  },
+  table: 'module_facts',
+};
+
 /** Every source spec the registry defines, in the order `/sources` lists them. */
 export const SOURCE_SPECS: readonly TableSourceSpec[] = [
   TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC, ISSUES_SPEC, BOARD_SPEC,
+  MODULES_SPEC,
 ];

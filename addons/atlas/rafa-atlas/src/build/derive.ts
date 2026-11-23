@@ -1,6 +1,6 @@
 /**
- * `deriveBuild`: the buckets derived from the effort, git and board
- * ingests', run after them inside the same build. In order:
+ * `deriveBuild`: the buckets derived from the effort, git, board and
+ * module ingests', run after them inside the same build. In order:
  *
  * 1. **Work type (D4).** `task_facts.work_type` is the session's change
  *    level read as a kind of work ({@link CHANGE_LEVELS}): `major` and
@@ -55,6 +55,13 @@
  *    issue is one. A plan with no issue number, or one the board cache
  *    does not hold, reads NULL; with no cache read every plan does, and
  *    the stamp says so.
+ * 6. **`module_facts` counts**, each module's rows of the effort buckets
+ *    whose `module` is its `path` (`ingest/modules.ts`): `bugs` the
+ *    out-of-scope rows of `bug_facts`, so a routed bug, the same entry
+ *    again, is not counted twice; `findings` the rows of `finding_facts`
+ *    with a kind, blockers left out, as `task_facts.findings` counts
+ *    them; `changes` the rows of `change_facts`. A module no row names
+ *    reads 0. `module_facts` is stamped by its ingest, not here.
  *
  * Each stamp takes the effort ingest's `read_at`, and carries over the
  * reason of each partial input it was derived from. `local.plans`'s
@@ -142,6 +149,8 @@ export interface Derivation {
   readonly commitsLinked: number;
   /** The `plan_facts` rows given an epic through their issue's `issue_facts.epic_slug`. */
   readonly plansEpicLinked: number;
+  /** The `module_facts` rows given their bug, finding and change counts. */
+  readonly modulesCounted: number;
   readonly plans: readonly PlanReading[];
   readonly preflight: PreflightRead;
   /** The stamps written: `local.daily`, then `local.plans`. */
@@ -357,6 +366,19 @@ export function linkPlanEpics(database: Database): number {
   return row?.n ?? 0;
 }
 
+/** The UPDATE counting each module's bugs, findings and changes from the effort buckets. */
+const MODULE_COUNTS = `UPDATE module_facts SET
+  bugs = (SELECT count(*) FROM bug_facts b WHERE b.module = module_facts.path AND b.source = 'out_of_scope'),
+  findings = (SELECT count(*) FROM finding_facts f WHERE f.module = module_facts.path AND f.source = 'finding'),
+  changes = (SELECT count(*) FROM change_facts c WHERE c.module = module_facts.path)`;
+
+/** Fill `module_facts.bugs`, `findings` and `changes` by module; answers the modules counted. */
+export function countModuleFacts(database: Database): number {
+  database.run(MODULE_COUNTS);
+  const row = database.query<{ readonly n: number }, []>('SELECT count(*) AS n FROM module_facts').get();
+  return row?.n ?? 0;
+}
+
 /** The modification time of a plan's file, ISO-8601 UTC, or null for a `missing` plan. */
 function modifiedAt(reading: PlanReading): string | null {
   return reading.path === null
@@ -425,8 +447,9 @@ function plansStamp(stamps: readonly SourceStamp[], readAt: string, rows: number
 
 /**
  * Derive the work type, the whole of `daily_rollup` and `plan_facts` in
- * the build, the plan of each commit and the epic of each plan, after the
- * effort, git and board ingests have filled their buckets, and stamp {@link DAILY_SOURCE} then
+ * the build, the plan of each commit, the epic of each plan and each
+ * module's counts, after the effort, git, board and module ingests have
+ * filled their buckets, and stamp {@link DAILY_SOURCE} then
  * {@link PLANS_SOURCE}; see the module note.
  * Throws when `options.stamps` holds no `local.tasks` stamp.
  */
@@ -446,10 +469,11 @@ export function deriveBuild(build: ReplicaBuild, options: DeriveOptions): Deriva
   const plansEpicLinked = boardRead
     ? linkPlanEpics(database)
     : 0;
+  const modulesCounted = countModuleFacts(database);
   const stamps = [
     dailyStamp(options.stamps, tasks.readAt, days, preflight, gitRead),
     plansStamp(options.stamps, tasks.readAt, planRows, plans, boardRead),
   ];
   stamps.forEach((stamp) => build.stampSource(stamp));
-  return { workTyped, commitsLinked, plansEpicLinked, plans, preflight, stamps };
+  return { workTyped, commitsLinked, plansEpicLinked, modulesCounted, plans, preflight, stamps };
 }
