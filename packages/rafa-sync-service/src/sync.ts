@@ -62,8 +62,8 @@
  *
  * ## The projected pull
  *
- * Under `hub.syncSkew: pull-projected` (core's `effort.syncSkew`,
- * which `selectSync` hands on with the hub; `refuse` when left out),
+ * Under `effort.syncSkew: pull-projected` (core's key, which `selectSync`
+ * hands on with the hub as `hub.syncSkew`; `refuse` when left out),
  * the pull sends the migrations this build knows, so a hub whose status
  * answered `projection: true` answers the rows cut down to this rafa's
  * schema rather than rows it could not read. A hub that cannot project
