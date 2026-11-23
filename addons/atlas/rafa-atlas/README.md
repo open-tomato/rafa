@@ -31,6 +31,13 @@ No build calls `gh` unless `build` or `serve` is given `--github`. With it,
 failed with `gh`'s stderr, warns once, and builds the rest as without the
 flag, exit 0.
 
+The diff stats (`additions`, `deletions`, `changed_files`) come from a
+third call, `gh api graphql --paginate` in pages of 25: GitHub works them
+out from each diff, and the pages of 100 `gh pr list` asks for answer 502
+once a repository holds a few hundred pull requests. When that call fails,
+every pull request keeps NULL stats and `local.prs` is stamped partial with
+the reason; nothing else changes.
+
 ## Config
 
 `<root>/.rafa/atlas/config.json` holds the project's own targets, read by

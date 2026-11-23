@@ -1,7 +1,8 @@
 /**
  * Tests for the GitHub ingest over a stub `gh` answering fixture JSON
  * (`testdata/github.fixture.ts`), so no case runs `gh` or reaches the
- * network: the row parsers, the two list calls and their failures, and
+ * network: the row parsers, the two list calls and their failures, the
+ * diff-stat read and its failure, which keeps the rest of the read, and
  * whole builds over the effort, git and board fixtures in a tmpdir. A
  * build with `github` true fills `pr_facts`, the issue times, the stages
  * read with the closing pull requests, the third stretch shape's mark,
@@ -30,6 +31,7 @@ import {
   ISSUE_LIST_FIELDS,
   issueDatesOf,
   PR_LIST_FIELDS,
+  PR_STATS_ARGS,
   PRS_SOURCE,
   pullRequestOf,
   readGithub,
@@ -48,6 +50,7 @@ import {
   FIXTURE_PRS,
   FIXTURE_PRS_AS_OF,
   fixtureGh,
+  listsGh,
   stubGh,
   throwingGh,
 } from './testdata/github.fixture.js';
@@ -141,7 +144,7 @@ describe('pullRequestOf and issueDatesOf', () => {
 });
 
 describe('readGithub over a stub runner', () => {
-  it('lists every pull request, then every issue, with the fields and the limit it reads', async () => {
+  it('lists every pull request, then every issue, then the diff stats, with the fields and the limit it reads', async () => {
     const gh = fixtureGh();
 
     const read = await readGithub(gh.runner);
@@ -149,10 +152,58 @@ describe('readGithub over a stub runner', () => {
     expect(gh.calls).toEqual([
       ['pr', 'list', '--state', 'all', '--limit', String(GH_LIST_LIMIT), '--json', PR_LIST_FIELDS],
       ['issue', 'list', '--state', 'all', '--limit', String(GH_LIST_LIMIT), '--json', ISSUE_LIST_FIELDS],
+      PR_STATS_ARGS,
     ]);
     expect(read.ok && read.prs.map((pr) => pr.number)).toEqual([7, 44, 45, 46, 61]);
     expect(read.ok && read.issues).toHaveLength(FIXTURE_ISSUE_DATES.length);
     expect(read.ok && read.skipped).toBe(0);
+    expect(read.ok && read.diffStatsFailure).toBeNull();
+  });
+
+  it('asks gh pr list for no diff stats, and reads them in pages of 25 through gh api graphql', () => {
+    const fields = PR_LIST_FIELDS.split(',');
+    const query = PR_STATS_ARGS[PR_STATS_ARGS.indexOf('-f') + 1] ?? '';
+
+    expect(fields).not.toContain('additions');
+    expect(fields).not.toContain('deletions');
+    expect(fields).not.toContain('changedFiles');
+    expect(PR_STATS_ARGS.slice(0, 3)).toEqual(['api', 'graphql', '--paginate']);
+    expect(query).toContain('pullRequests(first: 25, after: $endCursor');
+    expect(query).toContain('pageInfo { hasNextPage endCursor }');
+  });
+
+  it('merges the diff stats into the pull requests gh pr list gave without them, by number', async () => {
+    const read = await readGithub(fixtureGh().runner);
+
+    const pr = read.ok
+      ? read.prs.find((each) => each.number === 7)
+      : undefined;
+    expect(pr).toEqual(expect.objectContaining({ additions: 3, deletions: 1, changedFiles: 2 }));
+  });
+
+  it('keeps the pull requests with NULL diff stats and names the failure when the diff-stat read answers ok false', async () => {
+    const stderr = 'HTTP 502: 502 Bad Gateway (https://api.github.com/graphql)';
+    const gh = listsGh({ ok: false, stdout: '{"number":7,"additions":3}\n', stderr: `${stderr}\n` });
+
+    const read = await readGithub(gh.runner);
+
+    expect(read.ok).toBe(true);
+    expect(read.ok && read.prs.map((pr) => pr.number)).toEqual([7, 44, 45, 46, 61]);
+    expect(read.ok && read.prs.every((pr) => pr.additions === null && pr.deletions === null && pr.changedFiles === null)).toBe(true);
+    expect(read.ok && read.diffStatsFailure).toBe(`gh api graphql failed: ${stderr}`);
+  });
+
+  it('names a diff-stat line that is no JSON object as the failure, and keeps the lists', async () => {
+    const gh = fixtureGh(FIXTURE_PRS, FIXTURE_ISSUE_DATES, ['not an object']);
+    const prose = listsGh({ ok: true, stdout: '{"number":7}\n<html>\n', stderr: '' });
+
+    const skipped = await readGithub(gh.runner);
+    const broken = await readGithub(prose.runner);
+
+    expect(skipped.ok && skipped.skipped).toBe(1);
+    expect(skipped.ok && skipped.diffStatsFailure).toBeNull();
+    expect(broken.ok && broken.prs).toHaveLength(FIXTURE_PRS.length);
+    expect(broken.ok && broken.diffStatsFailure).toStartWith('gh api graphql answered a line that is no JSON (');
   });
 
   it('fails on a first call answering ok false, naming gh\'s stderr, and makes no second call', async () => {
@@ -174,7 +225,7 @@ describe('readGithub over a stub runner', () => {
     expect(object).toEqual({ ok: false, reason: 'gh pr list answered no JSON list' });
   });
 
-  it('fails on a second call answering ok false, after the first answered', async () => {
+  it('fails on the issue list answering ok false, after the pull requests answered, and reads no diff stats', async () => {
     const gh = stubGh((args) => args[0] === 'pr'
       ? { ok: true, stdout: '[]', stderr: '' }
       : { ok: false, stdout: '', stderr: 'gh: issues are off here' });
@@ -201,6 +252,21 @@ describe('buildAtlas with github true', () => {
     expect(stampOf(summary, PRS_SOURCE)).toEqual({
       source: PRS_SOURCE, asOf: FIXTURE_PRS_AS_OF, readAt: BUILT_AT.toISOString(), rows: 5, partial: false, reason: null,
     });
+  });
+
+  it('fills the diff-stat columns, and with a failed diff-stat read keeps every row with NULL stats and stamps local.prs partial', async () => {
+    const whole = await buildOver(fixtureProject('stats'), { github: true, gh: fixtureGh().runner });
+    const lists = listsGh({ ok: false, stdout: '', stderr: 'HTTP 502: 502 Bad Gateway\n' });
+    const failed = await buildOver(fixtureProject('stats-failed'), { github: true, gh: lists.runner });
+
+    expect(rowsOf(whole, 'SELECT additions, deletions, changed_files FROM pr_facts WHERE number = 7')).toEqual([{ additions: 3, deletions: 1, changed_files: 2 }]);
+    expect(rowsOf(failed, 'SELECT count(*) AS n FROM pr_facts WHERE additions IS NULL AND deletions IS NULL AND changed_files IS NULL')).toEqual([{ n: 5 }]);
+    expect(stampOf(failed, PRS_SOURCE)).toEqual(expect.objectContaining({
+      rows: 5,
+      partial: true,
+      reason: 'the diff stats were not read, so additions, deletions and changed_files read NULL: gh api graphql failed: HTTP 502: 502 Bad Gateway',
+    }));
+    expect(rowsOf(failed, 'SELECT DISTINCT stage_basis FROM issue_facts')).toEqual([{ stage_basis: PRS_BASIS }]);
   });
 
   it('fills the issue times and reads each stage with its closing pull requests, a closed unmerged one left out', async () => {
