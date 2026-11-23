@@ -1,9 +1,11 @@
 /**
  * The replica's tables: the seven buckets of the PoC (`task_facts`,
  * `plan_facts`, `daily_rollup`, `bug_facts`, `finding_facts`,
- * `change_facts`, `ci_facts`) and the two meta tables every replica holds (`atlas_meta`,
- * `atlas_sources`). Dates are ISO-8601 UTC text, and `day` is
- * `YYYY-MM-DD`.
+ * `change_facts`, `ci_facts`), the six of the git, GitHub, board and
+ * module sources (`commit_facts`, `pr_facts`, `issue_facts`,
+ * `board_snapshot`, `module_facts`, `stretch_marks`) and the two meta
+ * tables every replica holds (`atlas_meta`, `atlas_sources`). Dates are
+ * ISO-8601 UTC text, and `day` is `YYYY-MM-DD`.
  *
  * `REPLICA_TABLES` is the table whitelist: a source reads only a bucket
  * named as one of its keys, so no table name from outside this file
@@ -15,7 +17,7 @@
  */
 
 /** The DDL version stamped as `replica_version`; a reader opens only its own. */
-export const REPLICA_VERSION: string = '3';
+export const REPLICA_VERSION: string = '4';
 
 /** One row per stamp: the keys of `META_KEYS`. */
 const ATLAS_META_DDL = 'CREATE TABLE atlas_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)';
@@ -115,6 +117,52 @@ const CI_FACTS_DDL = `CREATE TABLE ci_facts (
   flipped INTEGER NOT NULL DEFAULT 0,
   origin_store TEXT, origin_seq INTEGER, PRIMARY KEY (plan_stub, head_sha, read_at))`;
 
+/** One row per commit on the walked branch's first-parent line. */
+const COMMIT_FACTS_DDL = `CREATE TABLE commit_facts (
+  sha TEXT PRIMARY KEY, committed_at TEXT, day TEXT, subject TEXT, type TEXT,
+  plan_stub TEXT, pr_number INTEGER, files_changed INTEGER, insertions INTEGER, deletions INTEGER,
+  is_merge INTEGER NOT NULL, release_tag TEXT)`;
+
+/** One row per pull request, read from GitHub. */
+const PR_FACTS_DDL = `CREATE TABLE pr_facts (
+  number INTEGER PRIMARY KEY, title TEXT, head_ref TEXT, base_ref TEXT, plan_stub TEXT,
+  state TEXT, created_at TEXT, merged_at TEXT, closed_at TEXT, additions INTEGER, deletions INTEGER,
+  changed_files INTEGER, review_count INTEGER, first_review_at TEXT, closing_issues_json TEXT)`;
+
+/**
+ * One row per issue. `module` and `priority` are the `module:<x>` and
+ * `priority:<x>` labels (D15).
+ */
+const ISSUE_FACTS_DDL = `CREATE TABLE issue_facts (
+  number INTEGER PRIMARY KEY, title TEXT, state TEXT, state_reason TEXT, labels_json TEXT,
+  is_bug INTEGER NOT NULL, is_epic INTEGER NOT NULL, epic_slug TEXT, parent_number INTEGER,
+  created_at TEXT, closed_at TEXT, stage TEXT, stage_basis TEXT, horizon TEXT, plan_stub TEXT,
+  module TEXT, priority TEXT)`;
+
+/**
+ * The issue count per board stage, one row per day and stage. The only
+ * bucket carried between builds: the writer copies the old replica's rows
+ * into each new one (D20).
+ */
+const BOARD_SNAPSHOT_DDL = `CREATE TABLE board_snapshot (
+  taken_at TEXT NOT NULL, day TEXT NOT NULL, stage TEXT NOT NULL, count INTEGER NOT NULL,
+  PRIMARY KEY (day, stage))`;
+
+/** One row per module of the project's tree. */
+const MODULE_FACTS_DDL = `CREATE TABLE module_facts (
+  path TEXT PRIMARY KEY, package TEXT, files INTEGER, loc INTEGER, test_files INTEGER, test_loc INTEGER,
+  fan_in INTEGER, fan_out INTEGER, imports_json TEXT, upward_edges INTEGER,
+  bugs INTEGER, findings INTEGER, changes INTEGER)`;
+
+/**
+ * One row per stretch end: `part` is 1, then 2 for a number that ended
+ * twice, and `lane` is `M` or `A`. Stored and served, drawn by no chart
+ * yet (D19).
+ */
+const STRETCH_MARKS_DDL = `CREATE TABLE stretch_marks (
+  number INTEGER NOT NULL, part INTEGER NOT NULL, lane TEXT NOT NULL, ended_at TEXT NOT NULL,
+  pr_number INTEGER, PRIMARY KEY (number, part))`;
+
 /** A bucket a source may read: a key of `REPLICA_TABLES`. */
 export type ReplicaTable =
   | 'task_facts'
@@ -123,9 +171,15 @@ export type ReplicaTable =
   | 'bug_facts'
   | 'finding_facts'
   | 'change_facts'
-  | 'ci_facts';
+  | 'ci_facts'
+  | 'commit_facts'
+  | 'pr_facts'
+  | 'issue_facts'
+  | 'board_snapshot'
+  | 'module_facts'
+  | 'stretch_marks';
 
-/** The table whitelist: each bucket of the PoC with the statement that creates it. */
+/** The table whitelist: each bucket with the statement that creates it, the PoC's seven first. */
 export const REPLICA_TABLES: Readonly<Record<ReplicaTable, string>> = {
   task_facts: TASK_FACTS_DDL,
   plan_facts: PLAN_FACTS_DDL,
@@ -134,6 +188,12 @@ export const REPLICA_TABLES: Readonly<Record<ReplicaTable, string>> = {
   finding_facts: FINDING_FACTS_DDL,
   change_facts: CHANGE_FACTS_DDL,
   ci_facts: CI_FACTS_DDL,
+  commit_facts: COMMIT_FACTS_DDL,
+  pr_facts: PR_FACTS_DDL,
+  issue_facts: ISSUE_FACTS_DDL,
+  board_snapshot: BOARD_SNAPSHOT_DDL,
+  module_facts: MODULE_FACTS_DDL,
+  stretch_marks: STRETCH_MARKS_DDL,
 };
 
 /** Whether `name` is a whitelisted bucket, compared as an own key of `REPLICA_TABLES`. */
