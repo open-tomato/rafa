@@ -104,6 +104,18 @@ store is asked to mint a new `origin_store` on the next write, so the
 incoming store's rows are brought in under the old origin and the new
 device's future writes go under a new one.
 
+**Held copies are taken whole first.** A row a projected pull brought in
+is listed in `held_rows`: it lacks the columns of the migrations its
+listing names. Before the comparison below, `takeHeldCopies`
+(`store/merge-conflicts.ts`) rewrites each matched row here that is listed
+from the incoming row, every column whole except its `seq`, its origin
+pair and its set-once fields, and drops the listing, so the comparison
+finds the pair equal or settles `findings.tracker_ref` by its own rule,
+and no `merge_conflicts` row is recorded for what the truncation left
+out. A table the merge's `projected` map names takes no copy, since its
+incoming rows are cut too, and a rewrite that collides on another UNIQUE
+key is rolled back and leaves the pair to the comparison.
+
 **Set-once fills and conflicts.** For each row the union matched,
 `settleMatches` compares the rows on every column except `seq` and the
 origin pair. An equal pair is skipped. A set-once field NULL here is

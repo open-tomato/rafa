@@ -65,9 +65,11 @@
  * by `vacuumInto` and brought forward there with `builtAside`, each new
  * log row naming this runtime (`appliedByName`). In one transaction on
  * it, the union (`unionStores`) inserts every unmatched row of each
- * merged table, the conflict step (`settleMatches`,
- * `merge-conflicts.ts`) settles each matched pair and records in
- * `merge_conflicts` what no rule settles, a projected merge lists the
+ * merged table, the held-copy step (`takeHeldCopies`,
+ * `merge-conflicts.ts`) rewrites each matched row here that `held_rows`
+ * lists from the incoming row and drops its listing, the conflict step
+ * (`settleMatches`, the same module) settles each matched pair and
+ * records in `merge_conflicts` what no rule settles, a projected merge lists the
  * rows it cut in `held_rows` (below), the commit gaps of each commit
  * brought in and of the commit after it are recomputed
  * (`recomputeCommitGaps`, `merge-commit-gaps.ts`), the supersedes the
@@ -89,8 +91,9 @@
  * the log apart, must hold its live row count plus the rows the merge
  * added to it (`checkedCounts`): the rows added to each merged table,
  * one row in `merges`, one in `merge_conflicts` per conflict, and one
- * in `held_rows` per row a projected merge newly lists. A
- * merged table's fills and gap rewrites change no count. SQLite's
+ * in `held_rows` per row a projected merge newly lists, less one per
+ * listing the held-copy step dropped. A merged table's fills, held
+ * copies and gap rewrites change no count. SQLite's
  * `integrity_check` must answer `ok`, and `planSchema` must find the
  * file one this rafa uses as it is (`refuseUnusable`, `fix-schema.ts`).
  *
@@ -120,6 +123,16 @@
  * ids every listing of a store names, which a later build compares
  * with its own catalogue to know whether it can take the held rows
  * whole.
+ *
+ * Any merge takes a held row whole when the other store holds its pair
+ * matched and the row came whole: the held-copy step, before the conflict
+ * step, rewrites it from the incoming row but for its set-once fields,
+ * which the conflict step then settles by their rule, and drops its
+ * listing, recording no conflict for what the truncation left out
+ * (`merge-conflicts.ts`). {@link MergeResult.rowsRefilled} counts them.
+ * A table the projected map names takes no held copy, since its
+ * incoming rows are cut as well: its held rows are compared as any
+ * other pair and stay listed, as above.
  *
  * ## The store keeps its id
  *
@@ -171,7 +184,7 @@ import { appliedByName, refuseUnownedDevelopmentWrite } from './development-buil
 import { readOnlySchema, refuseUnusable, tableNames } from './fix-schema.js';
 import { guardTestProcess } from './location.js';
 import { recomputeCommitGaps } from './merge-commit-gaps.js';
-import { settleMatches } from './merge-conflicts.js';
+import { settleMatches, takeHeldCopies } from './merge-conflicts.js';
 import { MERGE_RULES } from './merge-rules.js';
 import { carriedColumns, unionStores } from './merge-union.js';
 import { liveLoop } from './migrate.js';
@@ -254,6 +267,8 @@ export interface MergeResult {
   readonly rowsInConflict: number;
   /** Rows a projected merge newly listed in `held_rows`; 0 for every other merge. */
   readonly rowsHeld: number;
+  /** Rows `held_rows` listed that the merge took whole from the other store, their listings dropped. */
+  readonly rowsRefilled: number;
   /** Commit rows whose gap was rewritten. */
   readonly gapsRewritten: number;
   /** Where the original went, for `merged` only. */
@@ -326,7 +341,7 @@ interface MergeStamp {
 }
 
 /** What the build answered. */
-type Merged = Pick<MergeResult, 'tables' | 'rowsAdded' | 'rowsSkipped' | 'rowsInConflict' | 'rowsHeld' | 'gapsRewritten'>;
+type Merged = Pick<MergeResult, 'tables' | 'rowsAdded' | 'rowsSkipped' | 'rowsInConflict' | 'rowsHeld' | 'rowsRefilled' | 'gapsRewritten'>;
 
 /** The origin pair of one incoming row. */
 interface OriginPair {
@@ -566,10 +581,12 @@ interface MergeInto {
   readonly projected: MergeProjection | undefined;
 }
 
-/** Unions `other` into `db`, settles, lists held rows, recomputes gaps, writes supersedes and records the merge, in one transaction. */
+/** Unions `other` into `db`, takes held copies, settles, lists held rows, recomputes gaps, writes supersedes and records the merge, in one transaction. */
 function mergeInto(db: Database, other: Database, { mergeId, otherStore, mergedAt, projected }: MergeInto): Merged {
   return db.transaction((): Merged => {
     const unions = unionStores(db, other);
+    const cut = new Set(Object.keys(projected ?? {}));
+    const rowsRefilled = takeHeldCopies(db, other, unions, cut).reduce((total, { taken }) => total + taken.length, 0);
     const settlements = settleMatches(db, other, unions, { mergeId, recordedAt: mergedAt });
     const rowsHeld = projected === undefined
       ? 0
@@ -593,7 +610,7 @@ function mergeInto(db: Database, other: Database, { mergeId, otherStore, mergedA
     const sum = (field: 'added' | 'skipped' | 'inConflict'): number => tables.reduce((total, entry) => total + entry[field], 0);
     const totals = { rowsAdded: sum('added'), rowsSkipped: sum('skipped'), rowsInConflict: sum('inConflict') };
     db.query(INSERT_MERGE).run(mergeId, otherStore, mergedAt, totals.rowsAdded, totals.rowsSkipped, totals.rowsInConflict);
-    return { tables, ...totals, rowsHeld, gapsRewritten: gaps.length };
+    return { tables, ...totals, rowsHeld, rowsRefilled, gapsRewritten: gaps.length };
   })();
 }
 
@@ -603,7 +620,7 @@ function addedRows(merged: Merged): Readonly<Record<string, number>> {
     ...Object.fromEntries(merged.tables.map(({ table, added }) => [table, added])),
     [MERGES_TABLE]: 1,
     merge_conflicts: merged.rowsInConflict,
-    [HELD_TABLE]: merged.rowsHeld,
+    [HELD_TABLE]: merged.rowsHeld - merged.rowsRefilled,
   };
 }
 

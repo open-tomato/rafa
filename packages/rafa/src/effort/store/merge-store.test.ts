@@ -588,6 +588,30 @@ describe('mergeStore projected', () => {
     expect(readHeldMigrations(testCase.path)).toEqual(['test-later-a', 'test-later-b', 'test-later-c']);
   });
 
+  it('takes the held rows whole when they come whole, dropping their listings, the count check passing over the drop', () => {
+    const testCase = projectedCase();
+    mergeStore(mergeOptions(testCase, { projected: { findings: LACKING } }));
+
+    const whole = mergeStore(mergeOptions(testCase, { stamp: `${STAMP}-2`, newMergeId: () => 'merge-2' }));
+
+    expect(whole).toMatchObject({ status: 'merged', rowsAdded: 0, rowsInConflict: 0, rowsHeld: 0, rowsRefilled: 2 });
+    expect(heldOf(testCase.path)).toEqual([]);
+    expect(readHeldMigrations(testCase.path)).toEqual([]);
+    expect(readRows(testCase.path, 'SELECT count(*) AS n FROM merge_conflicts')).toEqual([{ n: 0 }]);
+  });
+
+  it('takes no held row of a table projected again, refilling nothing (control)', () => {
+    const testCase = projectedCase();
+    mergeStore(mergeOptions(testCase, { projected: { findings: LACKING } }));
+
+    const again = mergeStore(mergeOptions(testCase, {
+      stamp: `${STAMP}-2`, newMergeId: () => 'merge-2', projected: { findings: LACKING },
+    }));
+
+    expect(again).toMatchObject({ status: 'merged', rowsHeld: 0, rowsRefilled: 0 });
+    expect(heldOf(testCase.path)).toHaveLength(2);
+  });
+
   it('counts the listings it would write under dryRun, the count check passing over them, and writes none', () => {
     const testCase = projectedCase();
     const [hereBefore] = snapshotBoth(testCase);

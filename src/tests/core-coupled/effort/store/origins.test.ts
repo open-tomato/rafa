@@ -651,6 +651,7 @@ describe('the production inserts, read from source', () => {
       ['bring-forward.ts: ', '${', 'MIGRATION_LOG_TABLE}'].join(''),
       ['fix-schema.ts: main.', '${', 'quoted(table)}'].join(''),
       ['fixture-extract.ts: ', '${', 'quoted(table)}'].join(''),
+      ['merge-conflicts.ts: ', '${', 'quoted(table)}'].join(''),
       'merge-conflicts.ts: merge_conflicts',
       'merge-store.ts: merges',
       ['merge-union.ts: ', '${', 'quoted(table)}'].join(''),

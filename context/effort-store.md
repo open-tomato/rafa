@@ -832,8 +832,8 @@ runtime that did not know the column wrote the row. `mergeStore`
 swaps in through `rebuildAside`, behind
 `effort.sqlite.before-merge-<stamp>.bak`; its refusals, the forwarded copy of an
 other store that lacks migrations, and its row-count check (each table's old
-count plus the rows the merge added, through `checkedCounts`' `added`) are in
-its module note. `settleMatches` (`store/merge-conflicts.ts`) fills
+count plus the rows the merge added, less the `held_rows` listings its held
+copies dropped, through `checkedCounts`' `added`) are in its module note. `settleMatches` (`store/merge-conflicts.ts`) fills
 `merge_conflicts`: it compares each pair the union matched on every column but
 `seq` and the origin pair, skips an equal pair, fills a set-once field NULL here
 from the other store and keeps a filled one against NULL there, and records the
