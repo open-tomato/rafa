@@ -6,7 +6,7 @@ workspace members under `addons/atlas/*` (the second `workspaces` glob):
 | Layer | Member | Built today |
 |---|---|---|
 | 1 effort storage | rafa core | the live store, read only through core's `vacuumInto`; the board cache, plans, git and the module tree, read in the project root |
-| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | the replica writer and reader, the bucket tables, the query engine, `defineTableSource`; the effort ingest, the plan reader, the git ingest, the board ingest, the module ingest and the GitHub ingest (under `--github`) |
+| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | the replica writer and reader, thirteen bucket tables, the query engine, `defineTableSource`; the effort ingest, the plan reader, the git ingest, the board ingest, the module ingest and the GitHub ingest (under `--github`) |
 | 3 transport | `transport` | the pure handler, the fetch adapter (`toFetchHandler`), the Express adapter over structural types (`toExpressHandler`), the typed client with a replaceable `Transport` (`fetchTransport`, `localTransport`) |
 | 4 contracts | `data/src/contract/` | descriptors, query params, results, metric definitions, the envelope and `ATLAS_CONTRACT_VERSION` |
 | 5 representation | `ui`, `demo`; `@open-tomato/charts` from npm | atoms to templates and the card cascade; the demo page. The chart seam over ECharts is `@open-tomato/charts`, published from another repository |
@@ -16,12 +16,18 @@ GitHub sources: `dev.wip` counts the open issues in Claimed or In
 development by stage, never by label, with `wipLimit` as its goal; every bug
 metric leaves out `module` `cli-gap`, keeping a bug with no module; the
 five GitHub-only metrics (`feasibility` `gh`) answer rows only after a build
-run with `--github`. The demo's live page draws seven of them (deploys per
-week, the module treemap and import graph, WIP, the bug outcome by loop
-start, open bugs per day and resolution time by priority); a GitHub-only
-card with no rows says "Not wired yet" and names the `--github` build line.
-Still design, not built: a chart drawing the stretch marks, which the build
-stores and serves as `local.marks` (D19). The design is the main
+run with `--github`. No build calls `gh` without `--github` (D9); a failed
+`gh` read under it stamps `local.prs` failed with `gh`'s stderr, warns once
+and builds the rest, exit 0 (D18). The bug outcome and the drop rate read
+only the board bugs a loop filed, those whose body names a plan
+(`plan_stub`); a bug filed by hand is left out of both. The demo's live
+page draws seven phase 4 metrics (deploys per week, the module treemap and
+import graph, WIP, the bug outcome by loop start, open bugs per day and
+resolution time by priority), two of them GitHub-only: a card with no rows
+says "Not wired yet" and names the `--github` build line. The stretch marks
+are served but not drawn: the build stores them in `stretch_marks` and the
+API serves them as `local.marks`; no chart draws them yet, since the
+charts package should own the mark (D19). The design is the main
 checkout's `.rafa/specs/draft-atlas-dashboard.md` (gitignored): the metric and
 chart gap lists, the bucket DDL, the contracts, the handler, the PoC cut. The
 3D graph-of-dice proof of concept stays on `spike/atlas-poc`, outside the

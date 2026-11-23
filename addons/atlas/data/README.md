@@ -24,11 +24,13 @@ buckets come from the effort store and plans (`task_facts`, `plan_facts`,
 `daily_rollup`, `bug_facts`, `finding_facts`, `change_facts`,
 `ci_facts`), and six from git, GitHub, the board and the module tree
 (`commit_facts`, `pr_facts`, `issue_facts`, `board_snapshot`,
-`module_facts`, `stretch_marks`). The fact buckets carry a `UNIQUE` key
-over the origin pair; the writer inserts what the build hands it. The
-build (`../rafa-atlas`) fills the origin pair before the insert: a row
-with no origin of its own takes the store's id and its `seq`, so no NULL
-reaches the key (the D3 rule, applied in ingest).
+`module_facts`, `stretch_marks`). The seven effort buckets carry a
+`UNIQUE` key over the origin pair, and the writer inserts what the build
+hands it. The six others key on their own id: `sha`, `number`, `path`,
+`number` with `part`, or `day` with `stage`. The build (`../rafa-atlas`)
+fills the origin pair before the insert: a row with no origin of its own
+takes the store's id and its `seq`, so no NULL reaches the key (the D3
+rule, applied in ingest).
 
 `board_snapshot` is the one bucket carried between builds: before the
 rename, the writer copies the old replica's rows into the build file. A
