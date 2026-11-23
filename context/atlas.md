@@ -20,6 +20,24 @@ chart gap lists, the bucket DDL, the contracts, the handler, the PoC cut. The
 3D graph-of-dice proof of concept stays on `spike/atlas-poc`, outside the
 glob, and ships in no package.
 
+**Turning the module on takes two keys in `.rafa/config.yaml`.**
+Phase 1 core has no `module enable`, so a checkout without the keys answers
+the first `rafa module exec @open-tomato/rafa-atlas build` with
+`no module "@open-tomato/rafa-atlas" is mounted; mounted: none`. Add the path
+under `modules:` and the name under `allowList:`:
+
+```yaml
+modules:
+  - path: addons/atlas/rafa-atlas
+allowList:
+  - "@open-tomato/rafa-atlas"
+```
+
+The file is gitignored, so each checkout sets its own. `rafa module list` is
+the check: it reads `loaded, enabled; types commands; from path
+addons/atlas/rafa-atlas`, with the commands entry `(mounted)`. Run it before
+any build.
+
 **The live effort store is copied, never opened in place.** The build
 takes a `vacuumInto` snapshot under `<root>/.rafa/atlas/snapshot/` and
 opens the copy read-only, so a dev build never migrates the loop's store
