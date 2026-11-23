@@ -190,8 +190,17 @@ export const PR_LIST_FIELDS = 'number,headRefName,body';
 /** The fields the roadmap search asks for. */
 export const ISSUE_LIST_FIELDS = 'number,title';
 
-/** A markdown task-list item opening with an issue reference. */
-const TASK_LINE = /^\s*[-*+]\s+\[([ xX])\]\s+#(\d+)\s*(.*)$/u;
+/**
+ * A markdown task-list item's opening, up to and with its issue reference.
+ * The why is the rest of the line, read by {@link parseRoadmapBody} without
+ * a pattern: a `\s*(.*)$` tail shares one run of spaces between two
+ * quantifiers and backtracks in polynomial time on a public issue body
+ * (CodeQL `js/polynomial-redos`).
+ */
+const TASK_LINE = /^\s*[-*+]\s+\[([ xX])\]\s+#(\d+)/u;
+
+/** A character `.` does not match; a why holding one makes no line, as the old `(.*)` read it. */
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/u;
 
 /** A fence opening or closing a code block, with any info string. */
 const FENCE = /^\s*(?:`{3,}|~{3,})/u;
@@ -199,8 +208,13 @@ const FENCE = /^\s*(?:`{3,}|~{3,})/u;
 /** What a why opens with when the line spells a separator before it. */
 const WHY_SEPARATOR = /^[-:,.–—]\s*/u;
 
-/** GitHub's closing keywords, each with the issue it closes. */
-const CLOSING = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s*:?\s*#(\d+)\b/giu;
+/**
+ * GitHub's closing keywords, each with the issue it closes. The colon sits
+ * in a group with the whitespace after it, so one run of whitespace has one
+ * reading: a `\s*:?\s*` splits it two ways and backtracks in polynomial
+ * time on a public pull request body (CodeQL `js/polynomial-redos`).
+ */
+const CLOSING = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s*(?::\s*)?#(\d+)\b/giu;
 
 /** One `- [ ] #<n>` line of the roadmap, as the body writes it. */
 export interface RoadmapLine {
@@ -239,7 +253,10 @@ export function parseRoadmapBody(body: string): readonly RoadmapLine[] {
     const found = TASK_LINE.exec(text);
     if (found === null) return;
 
-    const [, box = '', digits = '', rest = ''] = found;
+    const rest = text.slice(found[0].length).trimStart();
+    if (LINE_TERMINATOR.test(rest)) return;
+
+    const [, box = '', digits = ''] = found;
     const issue = Number.parseInt(digits, 10);
     if (!Number.isSafeInteger(issue) || issue < 1) return;
 
