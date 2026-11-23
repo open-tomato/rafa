@@ -1,24 +1,38 @@
 /**
  * Tests for the live page source over a stub client: the range windows of
  * D6, the requests the source makes, each of the 17 PoC metrics'
- * `QueryResult` mapped into its `LensResult` fields, each field's meta
+ * `QueryResult` mapped into its `LensResult` fields, each phase-4 metric's
+ * (`live-sources.ts`) mapped into its field, a GitHub-only metric with no
+ * row marked not wired with the `--github` build line, each field's meta
  * (its row count, and a proxy's `ProxyNote`), the weeks the weekly
  * fields span, every other field marked not wired, an API that is not there failing with the start line, and
  * `?source=` reading as the mock unless it names `live`. The stub client
  * (`testdata/live-client.fixture.ts`) records every call. The page drawn
  * over each source is `App.test.tsx`'s, since this file imports no TSX.
  */
+import type { SourceMetric } from './live-sources.js';
 import type { LiveMetric } from './live.js';
 import type { MockData } from './mock.js';
 import type { LensResult } from './source.js';
 import type { StubCall } from './testdata/live-client.fixture.js';
+import type { QueryResult } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
+import type { BoxGroup } from '@open-tomato/charts';
 
 import { AtlasRequestError, AtlasTransportError } from '@open-tomato/atlas-transport/client';
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { readPageSource } from '../url.js';
 
+import {
+  GITHUB_BUILD_LINE,
+  GITHUB_NOT_READ,
+  PLANS_SOURCE_ID,
+  SOURCE_METRIC_FIELDS,
+  SOURCE_METRICS,
+  SOURCE_WIRED_FIELDS,
+  WINDOWED_SOURCE_METRICS,
+} from './live-sources.js';
 import {
   createLiveLensSource,
   KPI_METRICS,
@@ -34,8 +48,11 @@ import {
   failingClient,
   resultOf,
   STUB_ANSWERS,
+  STUB_PLANS,
   STUB_PROXIES,
+  STUB_SOURCE_ANSWERS,
   STUB_WINDOW,
+  STUB_WIP_LIMIT,
   stubLiveClient,
   stubNoteOf,
 } from './testdata/live-client.fixture.js';
@@ -46,16 +63,27 @@ const SPAN_MS = 28 * DAY_MS;
 /** The page's history, read off the DOM global the preload registers. */
 const pageHistory = (globalThis as unknown as { readonly history: { replaceState(data: unknown, unused: string, url: string): void } }).history;
 
-/** A client answering every metric with its stub columns and no row: the control the filled fields are held against. */
+/** Every stub answer by catalogue id, the PoC metrics' and the phase-4 ones'. */
+const ANSWER_OF: ReadonlyMap<string, QueryResult> = new Map([
+  ...(Object.keys(LIVE_METRICS) as LiveMetric[]).map((key) => [LIVE_METRICS[key], STUB_ANSWERS[key]] as const),
+  ...(Object.keys(SOURCE_METRICS) as SourceMetric[]).map((key) => [SOURCE_METRICS[key], STUB_SOURCE_ANSWERS[key]] as const),
+]);
+
+/** `answer`'s columns with no row. */
+function columnsOnly(answer: QueryResult): QueryResult {
+  return resultOf(answer.columns.map((column) => column.key), []);
+}
+
+/** A client answering every metric and the plans query with its stub columns and no row: the control the filled fields are held against. */
 function emptyClient(): AtlasClient {
-  const keyOf = new Map((Object.keys(LIVE_METRICS) as LiveMetric[]).map((key) => [LIVE_METRICS[key], key]));
   return {
     ...stubLiveClient().client,
     runMetric: (id) => {
-      const key = keyOf.get(id);
-      if (key === undefined) return Promise.reject(new Error(`no stub answer for ${id}`));
-      return Promise.resolve(resultOf(STUB_ANSWERS[key].columns.map((column) => column.key), []));
+      const answer = ANSWER_OF.get(id);
+      if (answer === undefined) return Promise.reject(new Error(`no stub answer for ${id}`));
+      return Promise.resolve(columnsOnly(answer));
     },
+    query: () => Promise.resolve(columnsOnly(STUB_PLANS)),
   };
 }
 
@@ -77,16 +105,31 @@ describe('RANGE_WINDOW', () => {
 });
 
 describe('liveResultOf over a stub client: the requests', () => {
-  it('GUARD: asks the stub each of the 17 metrics over the range\'s window, then tokens and debt over the window before it', async () => {
+  it('GUARD: asks the stub each of the 17 metrics over the range\'s window, the phase-4 ones over it or none, then tokens and debt over the window before it', async () => {
     const { calls } = await liveResult();
     const previous = { from: '2026-09-28T00:00:00.000Z', to: STUB_WINDOW.from };
 
     expect(calls.length).toBeGreaterThan(0);
     expect(calls).toEqual([
       ...Object.values(LIVE_METRICS).map((id) => ({ id, window: { last: '28d' } })),
+      { id: 'dev.deploys-per-week', window: { last: '28d' } },
+      { id: 'arch.loc-per-module', window: undefined },
+      { id: 'arch.coupling', window: undefined },
+      { id: 'dev.wip', window: undefined },
+      { id: 'qa.resolution-time', window: { last: '28d' } },
+      { id: 'qa.bug-outcome-by-loop-start', window: undefined },
+      { id: 'qa.open-bugs-per-day', window: undefined },
       { id: 'pm.tokens-per-day', window: previous },
       { id: 'arch.debt-ratio', window: previous },
     ]);
+    expect([...WINDOWED_SOURCE_METRICS].sort()).toEqual(['deploysPerWeek', 'resolutionTime']);
+  });
+
+  it('reads the plans\' first sessions once, over the series window, for the outcome card', async () => {
+    const { client, queries } = stubLiveClient();
+    await liveResultOf(client, 'last-year');
+
+    expect(queries).toEqual([{ id: PLANS_SOURCE_ID, params: { window: { last: '52w' }, fields: ['plan_stub', 'first_at'], limit: 5_000 } }]);
   });
 
   it('asks the two one-number tiles over the KPI window, every other metric over the series window', async () => {
@@ -113,11 +156,14 @@ describe('liveResultOf over a stub client: each field filled', () => {
     const { result } = await liveResult();
     const empty = await liveResultOf(emptyClient(), 'past-month');
     const mockFields = WIRED_FIELDS.filter((field): field is keyof MockData => field in result.mock);
+    const mockNames: readonly string[] = mockFields;
 
-    expect(mockFields).toHaveLength(WIRED_FIELDS.length);
+    expect(mockNames).toEqual(WIRED_FIELDS.filter((field) => field !== 'workspace'));
     for (const field of mockFields) {
       expect({ field, value: result.mock[field] }).not.toEqual({ field, value: empty.mock[field] });
     }
+    expect(result.workspace.members).not.toEqual(empty.workspace.members);
+    expect(result.workspace.edges).not.toEqual(empty.workspace.edges);
   });
 
   it('maps tokens per day to one point a row, and the daily average over the 28 days of the window', async () => {
@@ -269,6 +315,135 @@ describe('liveResultOf over a stub client: each field filled', () => {
   });
 });
 
+describe('liveResultOf over a stub client: the phase-4 fields', () => {
+  it('wires the four fields phase 4 names, WIP and the two bug backlog fields, each from its own metric', () => {
+    expect(SOURCE_WIRED_FIELDS).toEqual(['deploysPerWeek', 'modules', 'workspace', 'wip', 'resolutionByPriority', 'bugOutcomeByLoopStart', 'openBugsPerDay']);
+    expect(Object.keys(SOURCE_METRIC_FIELDS)).toEqual(Object.keys(SOURCE_METRICS));
+    for (const field of SOURCE_WIRED_FIELDS) expect({ field, wired: WIRED_FIELDS.includes(field) }).toEqual({ field, wired: true });
+  });
+
+  it('counts release tags per window week, 0 for a week with none', async () => {
+    const { result } = await liveResult();
+
+    expect(result.mock.deploysPerWeek).toEqual([0, 2, 0, 1]);
+  });
+
+  it('draws one treemap tile per module folder with lines, grouped by the folder it sits in', async () => {
+    const { result } = await liveResult();
+
+    expect(result.mock.modules).toEqual([
+      { id: 'packages/stub-core', label: 'stub-core', group: 'packages', value: 1_200 },
+      { id: 'addons/stub-addon', label: 'stub-addon', group: 'addons', value: 300 },
+    ]);
+  });
+
+  it('lays the module graph into the workspace: a node per module, an edge per import of another module, dependency first', async () => {
+    const { result } = await liveResult();
+
+    expect(result.workspace.members).toEqual([
+      { id: '@open-tomato/stub-core', label: 'stub-core', group: 'packages', value: 3 },
+      { id: '@open-tomato/stub-addon', label: 'stub-addon', group: 'addons', value: 1 },
+      { id: 'packages/stub-loose', label: 'stub-loose', group: 'packages', value: 1 },
+    ]);
+    expect(result.workspace.edges).toEqual([
+      { source: '@open-tomato/stub-core', target: '@open-tomato/stub-addon', value: 1 },
+      { source: '@open-tomato/stub-core', target: 'packages/stub-loose', value: 1 },
+    ]);
+  });
+
+  it('refuses an import list that is not a list of package names', async () => {
+    const stub = stubLiveClient().client;
+    const client: AtlasClient = {
+      ...stub,
+      runMetric: (id, window) => (id === SOURCE_METRICS.coupling
+        ? Promise.resolve(resultOf(['path', 'package', 'imports_json', 'fan_in', 'fan_out'], [['packages/x', null, '[1]', 0, 0]]))
+        : stub.runMetric(id, window)),
+    };
+
+    await expect(liveResultOf(client, 'past-month')).rejects.toThrow('atlas: "[1]" is not a list of packages');
+  });
+
+  it('reads WIP as the issue count against the goal the API lists for dev.wip, and no ceiling with none', async () => {
+    const { result } = await liveResult();
+    const stub = stubLiveClient().client;
+    const noGoal: AtlasClient = {
+      ...stub,
+      listMetrics: async () => (await stub.listMetrics()).map((definition) => (definition.id === SOURCE_METRICS.wip
+        ? { ...definition, goal: undefined }
+        : definition)),
+    };
+
+    expect(result.mock.wip).toEqual({ now: 3, limit: STUB_WIP_LIMIT });
+    expect((await liveResultOf(noGoal, 'past-month')).mock.wip).toEqual({ now: 3, limit: null });
+  });
+
+  it('draws a box per priority of the days each fixed bug was open, a bug with no priority as unknown last', async () => {
+    const { result } = await liveResult();
+    const box = (label: string, days: number): BoxGroup => ({ label, min: days, q1: days, median: days, q3: days, max: days, outliers: [] });
+
+    expect(result.mock.resolutionByPriority).toEqual([box('P1', 0.5), box('P2', 2), box('unknown', 4)]);
+  });
+
+  it('counts each loop\'s bugs on the day its plan started as fixed, dropped or open, leaving out a plan with no start', async () => {
+    const { result } = await liveResult();
+
+    expect(result.mock.bugOutcomeByLoopStart).toEqual([
+      { day: new Date('2026-11-03'), fixed: 0, dropped: 0, open: 4 },
+      { day: new Date('2026-11-10'), fixed: 3, dropped: 1, open: 2 },
+    ]);
+  });
+
+  it('counts the bugs open at the end of each window day, all of them and those a loop filed', async () => {
+    const { result } = await liveResult();
+    const days = result.mock.openBugsPerDay;
+    const on = (day: string): unknown => days.find((entry) => entry.day.getTime() === new Date(day).getTime());
+
+    expect(days).toHaveLength(28);
+    expect(days[0]).toEqual({ day: new Date('2026-10-26'), all: 1, fromLoops: 1 });
+    expect(on('2026-11-20')).toEqual({ day: new Date('2026-11-20'), all: 2, fromLoops: 1 });
+    expect(on('2026-11-21')).toEqual({ day: new Date('2026-11-21'), all: 2, fromLoops: 1 });
+    expect(days.at(-1)).toEqual({ day: new Date('2026-11-22'), all: 1, fromLoops: 1 });
+  });
+
+  it('gives each phase-4 field its metric and row count, a proxy\'s note on the module fields', async () => {
+    const { result } = await liveResult();
+
+    for (const key of Object.keys(SOURCE_METRICS) as SourceMetric[]) {
+      for (const field of SOURCE_METRIC_FIELDS[key]) {
+        expect({ field, metricId: result.fieldMeta.get(field)?.metricId, rowCount: result.fieldMeta.get(field)?.rowCount })
+          .toEqual({ field, metricId: SOURCE_METRICS[key], rowCount: STUB_SOURCE_ANSWERS[key].meta.rowCount });
+      }
+    }
+    expect(result.fieldMeta.get('modules')?.proxyNote).toBe(stubNoteOf('arch.loc-per-module'));
+    expect(result.fieldMeta.get('wip')?.proxyNote).toBeUndefined();
+  });
+});
+
+describe('liveResultOf over a stub client: a replica with no GitHub data', () => {
+  it('marks the fields of a GitHub-only metric that answered no row not wired, with the --github build line', async () => {
+    const result = await liveResultOf(stubLiveClient({ github: false }).client, 'past-month');
+
+    expect(GITHUB_NOT_READ).toContain(GITHUB_BUILD_LINE);
+    expect(GITHUB_BUILD_LINE).toBe('rafa module exec @open-tomato/rafa-atlas build --github');
+    expect(result.notWired.has('resolutionByPriority')).toBe(true);
+    expect(result.notWired.has('openBugsPerDay')).toBe(true);
+    expect([...result.notWiredDetail.entries()]).toEqual([['resolutionByPriority', GITHUB_NOT_READ], ['openBugsPerDay', GITHUB_NOT_READ]]);
+    expect(result.notWired.size).toBe(NOT_WIRED.size + 2);
+  });
+
+  it('control: keeps the offline phase-4 fields wired, and with GitHub data marks neither GitHub field', async () => {
+    const offline = await liveResultOf(stubLiveClient({ github: false }).client, 'past-month');
+    const { result } = await liveResult();
+
+    for (const field of ['deploysPerWeek', 'modules', 'workspace', 'wip', 'bugOutcomeByLoopStart'] as const) {
+      expect({ field, marked: offline.notWired.has(field) }).toEqual({ field, marked: false });
+    }
+    expect(offline.mock.bugOutcomeByLoopStart).toHaveLength(2);
+    expect(result.notWired.has('resolutionByPriority')).toBe(false);
+    expect(result.notWired.has('openBugsPerDay')).toBe(false);
+  });
+});
+
 describe('liveResultOf over a stub client: field meta and the rest', () => {
   it('gives every wired field its metric and its answer\'s row count, the previous-window fields the earlier answer\'s', async () => {
     const { result } = await liveResult();
@@ -299,14 +474,15 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
 
     expect(result.notWired).toBe(NOT_WIRED);
     for (const field of WIRED_FIELDS) expect(result.notWired.has(field)).toBe(false);
-    for (const field of ['minutesPerAgent', 'scopeCreepPerWeek', 'taskMinutesBins', 'deploysPerWeek', 'balance', 'workspace'] as const) {
+    for (const field of ['minutesPerAgent', 'scopeCreepPerWeek', 'taskMinutesBins', 'balance'] as const) {
       expect(result.notWired.has(field)).toBe(true);
     }
     expect(result.notWired.size + WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
+    expect(result.notWiredDetail.size).toBe(0);
     expect(result.mock.minutesPerAgent).toEqual([]);
-    expect(result.mock.deploysPerWeek).toEqual([]);
     expect(result.balance).toEqual([]);
-    expect(result.workspace.members).toEqual([]);
+    expect(result.workspace.composition).toEqual([]);
+    expect(result.workspace.sankeyNodes).toEqual([]);
   });
 
   it('names the series window\'s weeks, one per entry of the weekly fields that hold no dates', async () => {

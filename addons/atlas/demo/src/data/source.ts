@@ -15,7 +15,11 @@ import { SANKEY_LINKS, SANKEY_NODES, WORKSPACE_LINKS, WORKSPACE_NODES } from './
 import { buildMock, MOCK_SEEDS, WEEK_DATES, type MockData, type MockSeeds } from './mock.js';
 import { between, seeded } from './random.js';
 
-/** The workspace as measured on 2026-11-02: package composition and the import graph. */
+/**
+ * The workspace: package composition and the import graph. The mock's is
+ * measured on 2026-11-02 (`composition.ts`, `graph.ts`); the live one holds
+ * only `members` and `edges`, the module graph `arch.coupling` answers.
+ */
 export interface MeasuredWorkspace {
   readonly composition: readonly PackageComposition[];
   readonly sizeRose: readonly RoseSlice[];
@@ -42,6 +46,9 @@ export interface FieldMeta {
 /** No field marked: what the mock source answers, every field drawn. */
 const NONE_MARKED: ReadonlySet<LensField> = new Set<LensField>();
 
+/** No field with a reason of its own for drawing not wired: the mock's. */
+const NO_DETAIL: ReadonlyMap<LensField, string> = new Map<LensField, string>();
+
 /** No field filled by a metric: the mock's meta. */
 const NO_META: ReadonlyMap<LensField, FieldMeta> = new Map<LensField, FieldMeta>();
 
@@ -55,6 +62,12 @@ export interface LensResult {
    * "not wired yet" state (`lenses/LensCard.tsx`); the mock marks none.
    */
   readonly notWired: ReadonlySet<LensField>;
+  /**
+   * Per field of `notWired` that has a reason of its own, the line its
+   * card draws in place of the general one: a GitHub-only metric with no
+   * GitHub data names the `--github` build. The mock holds none.
+   */
+  readonly notWiredDetail: ReadonlyMap<LensField, string>;
   /**
    * Per field a live metric filled: the metric, its answer's row count
    * and, for a proxy, its `ProxyNote`. The mock fills none.
@@ -117,7 +130,7 @@ function balanceOf(range: TimeRange): readonly BalanceIndex[] {
 
 /** The result set for one range, computed at once. */
 export function lensResultOf(range: TimeRange): LensResult {
-  return { range, source: 'mock', notWired: NONE_MARKED, fieldMeta: NO_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
+  return { range, source: 'mock', notWired: NONE_MARKED, notWiredDetail: NO_DETAIL, fieldMeta: NO_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
 }
 
 /** A page source over the mock that answers after `delayMs`. */

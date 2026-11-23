@@ -4,7 +4,7 @@ import { useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
-import { BRANCH_TYPES, RED_CI_THRESHOLD, WIP_LIMIT, WIP_NOW, WORK_KINDS, WORK_TONES } from '../data/mock.js';
+import { BRANCH_TYPES, RED_CI_THRESHOLD, WORK_KINDS, WORK_TONES } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { BalanceCard } from './balance/BalanceCard.js';
@@ -81,8 +81,8 @@ function DeveloperTiles({ result }: { readonly result: LensResult }): ReactEleme
           : undefined}
       />
       <LensStat label="Plans completed per week" reads={['plansCompletedPerWeek']} value={String(mock.plansCompletedPerWeek.at(-1)?.y ?? 0)} trend={mock.plansCompletedPerWeek.map((point) => point.y)} />
-      <LensStat label="Releases this week" value={String(mock.deploysPerWeek.at(-1) ?? 0)} trend={mock.deploysPerWeek} note="release tags and merged PRs from the git log" />
-      <LensStat label="Work in progress" value={WIP_NOW} goal={WIP_LIMIT} note="running loops and claimed issues" />
+      <LensStat label="Releases this week" reads={['deploysPerWeek']} value={String(mock.deploysPerWeek.at(-1) ?? 0)} trend={mock.deploysPerWeek} note="v* release tags on the base branch, from the git log" />
+      <LensStat label="Work in progress" reads={['wip']} value={mock.wip.now} goal={mock.wip.limit ?? undefined} note="open issues in Claimed or In development" />
     </>
   );
 }

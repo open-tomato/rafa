@@ -4,7 +4,7 @@ import { DataTable, useDashboard } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
-import { BUG_KINDS, DEFECT_DENSITY, OPEN_BUGS, ROUTES, type Kind } from '../data/mock.js';
+import { BUG_KINDS, DEFECT_DENSITY, OPEN_BUG_LINES, OPEN_BUGS, OUTCOMES, ROUTES, type BugOutcomeDay, type Kind } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { kindsOf } from './kinds.js';
@@ -27,8 +27,26 @@ const RESOLUTION = cardSpec({
   title: 'Resolution time by priority',
   subtitle: 'days from opened to closed',
   primitive: 'BoxPlot',
-  note: 'a gap chart: the box plot needs the engine; the dates need one gh read.',
+  note: 'the open and close dates come from GitHub: only a build run with --github reads them.',
 });
+
+const OUTCOME = cardSpec({
+  id: 'qa-bug-outcome',
+  title: 'Bug outcome by loop start',
+  subtitle: 'counted on the day its loop started',
+  primitive: 'BarChart',
+  note: 'a view of where bugs come from, not a burndown: each bug counts on its loop\'s start day, whatever became of it. Open bugs per day is the backlog.',
+});
+
+const OPEN_BUGS_PER_DAY = cardSpec({
+  id: 'qa-open-bugs',
+  title: 'Open bugs per day',
+  subtitle: 'open at the end of each day: all of them, and those a loop filed',
+  primitive: 'LineChart',
+});
+
+/** The outcomes stacked on the outcome card, by the key a day holds each under. */
+type Outcome = keyof Omit<BugOutcomeDay, 'day'>;
 
 const FLAKY = cardSpec({
   id: 'qa-flaky-checks',
@@ -92,7 +110,7 @@ function weeklyLegend({ kinds }: WeeklyKinds): Kind[] {
   return kinds.map(({ id, label, tone }) => ({ id, label, tone }));
 }
 
-/** The QA lens: defects, regressions, resolution and flaky checks. */
+/** The QA lens: defects, regressions, the bug backlog pair, resolution and flaky checks. */
 export function QaLens(): ReactElement {
   const { BarChart, LineChart, BoxPlot } = useChartEngine();
   const { data } = useDashboard<LensResult>();
@@ -158,7 +176,46 @@ export function QaLens(): ReactElement {
             )}
           </LensCard>
           <LensCard
+            config={OUTCOME}
+            reads={['bugOutcomeByLoopStart']}
+            select={(result: LensResult) => result.mock.bugOutcomeByLoopStart}
+            legend={OUTCOMES}
+            table={(days) => ({ columns: ['Loop start', ...OUTCOMES.map((outcome) => outcome.label)], rows: days.map((day) => [formatDay(day.day), day.fixed, day.dropped, day.open]) })}
+          >
+            {({ data: days, animate, height }) => (
+              <BarChart
+                ariaLabel="Bugs loops filed by what became of them, stacked per loop start day"
+                categories={days.map((day) => formatDay(day.day))}
+                series={OUTCOMES.map((outcome) => ({ ...outcome, values: days.map((day) => day[outcome.id as Outcome]) }))}
+                mode="stacked"
+                animate={animate}
+                height={plotHeight(220, height)}
+              />
+            )}
+          </LensCard>
+          <LensCard
+            config={OPEN_BUGS_PER_DAY}
+            reads={['openBugsPerDay']}
+            select={(result: LensResult) => result.mock.openBugsPerDay}
+            legend={OPEN_BUG_LINES}
+            table={(days) => ({ columns: ['Day', ...OPEN_BUG_LINES.map((line) => line.label)], rows: days.map((day) => [formatDay(day.day), day.all, day.fromLoops]) })}
+          >
+            {({ data: days, animate, height }) => (
+              <LineChart
+                ariaLabel="Open bugs per day, all of them and those a loop filed"
+                series={OPEN_BUG_LINES.map((line) => ({ ...line, points: days.map((day) => ({ x: day.day, y: line.id === 'all'
+                  ? day.all
+                  : day.fromLoops })) }))}
+                xFormat={formatDay}
+                animate={animate}
+                height={plotHeight(220, height)}
+              />
+            )}
+          </LensCard>
+          <LensCard
             config={RESOLUTION}
+            reads={['resolutionByPriority']}
+            liveSubtitle="days from opened to closed, per bug closed as completed"
             select={(result: LensResult) => result.mock.resolutionByPriority}
             table={(groups) => ({ columns: ['Priority', 'min', 'q1', 'median', 'q3', 'max'], rows: groups.map((group) => [group.label, group.min, group.q1, group.median, group.q3, group.max]) })}
           >

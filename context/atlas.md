@@ -16,9 +16,12 @@ GitHub sources: `dev.wip` counts the open issues in Claimed or In
 development by stage, never by label, with `wipLimit` as its goal; every bug
 metric leaves out `module` `cli-gap`, keeping a bug with no module; the
 five GitHub-only metrics (`feasibility` `gh`) answer rows only after a build
-run with `--github`. Still design, not built: the demo cards over them, and
-a chart drawing the stretch marks, which the build stores and serves as
-`local.marks` (D19). The design is the main
+run with `--github`. The demo's live page draws seven of them (deploys per
+week, the module treemap and import graph, WIP, the bug outcome by loop
+start, open bugs per day and resolution time by priority); a GitHub-only
+card with no rows says "Not wired yet" and names the `--github` build line.
+Still design, not built: a chart drawing the stretch marks, which the build
+stores and serves as `local.marks` (D19). The design is the main
 checkout's `.rafa/specs/draft-atlas-dashboard.md` (gitignored): the metric and
 chart gap lists, the bucket DDL, the contracts, the handler, the PoC cut. The
 3D graph-of-dice proof of concept stays on `spike/atlas-poc`, outside the

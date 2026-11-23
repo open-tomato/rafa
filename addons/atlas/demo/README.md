@@ -45,7 +45,7 @@ animation, for captures). No capture sets `source=live`.
 | Folder | Holds |
 |---|---|
 | `src/App.tsx` | the shell: lens tabs, the `RangeSelector`, the theme button, over one `DashboardData` |
-| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one |
+| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one, with the phase-4 metrics' mappers in `live-sources.ts` and the cell readers both share in `live-read.ts` |
 | `src/lenses/` | one file per lens and the `balance/` card; every card is a `LensCard` (a `DashboardCard` with the fields it `reads`) with a `CardSpec` and a `select` |
 | `src/templates/` | `LensGrid`: the tile row and the card grid |
 
@@ -70,7 +70,22 @@ in the result's `notWired`, and a card or tile that reads one shows
 with `reads`, and one that names none is never live. An API that is not
 there fails every card with the run line above.
 
-Every card and tile a PoC metric feeds names its `reads`. On the live
+`live-sources.ts` adds the metrics over the git, board, module and
+GitHub sources: release tags per week (`deploysPerWeek`), lines of code
+per module (`modules`, the treemap), the module imports (the members and
+edges of `workspace`, the network graph), WIP against the project's
+`wipLimit` (`wip`), and the bug backlog pair: outcome by loop start
+(`bugOutcomeByLoopStart`, each bug a loop filed counted on the day its
+plan's first session started) and open bugs per day (`openBugsPerDay`),
+with the resolution time by priority (`resolutionByPriority`). The
+package composition, the rose and the import flow stay the mock page's
+(`composition.ts`, `graph.ts`). The open bugs and the resolution time
+are GitHub-only: when their metric answers no row, the replica was built
+without `--github`, and the card shows "Not wired yet" with the build
+line `rafa module exec @open-tomato/rafa-atlas build --github` (the
+result's `notWiredDetail`).
+
+Every card and tile a live metric feeds names its `reads`. On the live
 page a wired card's note is `liveNoteOf`'s (`src/lenses/spec.ts`): the
 proxy note, when the metric is a proxy, and the row count behind it, so
 a thin reading says how little stands behind it. The weekly cards whose

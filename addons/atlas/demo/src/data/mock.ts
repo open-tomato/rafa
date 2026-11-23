@@ -4,11 +4,13 @@
  * seeded streams. The fixed parts (dates, kinds, tones, limits) are module
  * constants; the measured-looking parts come from `buildMock(seeds)`, so
  * the page source can ask for one set per range. `MOCK_SEEDS` gives the
- * set the bake-off drew.
+ * set the bake-off drew. The fields past the bake-off (the WIP reading and
+ * the two bug backlog cards) draw last, from the `extra` stream after its
+ * own draws, so every value the bake-off drew stays as it was.
  */
 import type { BoxGroup, ChartTone, HistogramBin, LineSeries, ScatterPoint, TimePoint, TreemapNode } from '@open-tomato/charts';
 
-import { between, quantile, seeded, skewed } from './random.js';
+import { between, boxOf, quantile, seeded, skewed } from './random.js';
 
 /* ---------- the fixed frame ---------- */
 
@@ -82,8 +84,8 @@ export const BRANCH_TYPES: Kind[] = [
 
 export const RED_CI_THRESHOLD = 0.1;
 export const RED_CI_SHARE = 0.064;
-export const WIP_NOW = 7;
-export const WIP_LIMIT = 8;
+/** The WIP ceiling the mock's gauge is drawn against. */
+const MOCK_WIP_LIMIT = 8;
 
 export const BUG_KINDS: Kind[] = [
   { id: 'bug', label: 'bug', tone: 'series-1' },
@@ -100,6 +102,22 @@ export const ROUTES: Kind[] = [
 ];
 
 export const PRIORITIES: string[] = ['P1', 'P2', 'P3', 'P4'];
+
+/** The three outcomes of a bug a loop filed: fixed (closed completed), dropped (closed otherwise), still open. */
+export const OUTCOMES: Kind[] = [
+  { id: 'fixed', label: 'fixed', tone: 'good' },
+  { id: 'dropped', label: 'dropped', tone: 'muted' },
+  { id: 'open', label: 'open', tone: 'series-2' },
+];
+
+/** The two lines of the open bugs card: every open bug, and those a loop filed. */
+export const OPEN_BUG_LINES: Kind[] = [
+  { id: 'all', label: 'all open', tone: 'series-1' },
+  { id: 'fromLoops', label: 'open from loops', tone: 'series-2' },
+];
+
+/** How many days, the last one included, the mock's outcome card spans. */
+const OUTCOME_DAYS = 28;
 
 /** The median resolution days each priority centres on. */
 const PRIORITY_MEDIAN_DAYS = [1.5, 4, 9, 16];
@@ -173,6 +191,27 @@ export interface Blocker {
   readonly what: string;
 }
 
+/** The work in progress now and the ceiling it is held against; null when no ceiling is set. */
+export interface Wip {
+  readonly now: number;
+  readonly limit: number | null;
+}
+
+/** The bugs the loops started on one day filed, by what became of them. */
+export interface BugOutcomeDay {
+  readonly day: Date;
+  readonly fixed: number;
+  readonly dropped: number;
+  readonly open: number;
+}
+
+/** The bugs open at the end of one day: all of them, and those a loop filed. */
+export interface OpenBugsDay {
+  readonly day: Date;
+  readonly all: number;
+  readonly fromLoops: number;
+}
+
 /** One set of mock values: every series the lenses draw. */
 export interface MockData {
   readonly tokensPerDay: TimePoint[];
@@ -203,13 +242,12 @@ export interface MockData {
   readonly regressionsPerWeek: TimePoint[];
   readonly filedSharePerWeek: Record<string, number>[];
   readonly resolutionByPriority: BoxGroup[];
+  readonly wip: Wip;
+  readonly bugOutcomeByLoopStart: BugOutcomeDay[];
+  readonly openBugsPerDay: OpenBugsDay[];
   readonly flakyChecks: { name: string; failures: number; readings: number }[];
   readonly workDoneTree: TreeBranch[];
   readonly taskPileTree: TreeBranch[];
-}
-
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
 }
 
 function sum(values: readonly number[]): number {
@@ -261,20 +299,8 @@ function taskMinutesBinsFrom(random: () => number): HistogramBin[] {
 /** Issue resolution days by priority label, as box statistics. */
 function resolutionFrom(random: () => number): BoxGroup[] {
   return PRIORITIES.map((label, index) => {
-    const days = Array.from({ length: 30 }, () => skewed(random, PRIORITY_MEDIAN_DAYS[index] ?? 1, 0.6)).sort((a, b) => a - b);
-    const q1 = quantile(days, 0.25);
-    const q3 = quantile(days, 0.75);
-    const fence = q3 + 1.5 * (q3 - q1);
-    const inside = days.filter((value) => value <= fence);
-    return {
-      label,
-      min: round1(inside[0] ?? 0),
-      q1: round1(q1),
-      median: round1(quantile(days, 0.5)),
-      q3: round1(q3),
-      max: round1(inside.at(-1) ?? 0),
-      outliers: days.filter((value) => value > fence).map(round1),
-    };
+    const days = Array.from({ length: 30 }, () => skewed(random, PRIORITY_MEDIAN_DAYS[index] ?? 1, 0.6));
+    return boxOf(label, days);
   });
 }
 
@@ -373,6 +399,30 @@ function qualitySeries(random: () => number) {
   return { bugsByKindPerWeek, filedSharePerWeek, resolutionByPriority, flakyChecks };
 }
 
+/**
+ * The bug backlog pair over the last days of the frame: the loops started
+ * on a weekday filed bugs, the older ones mostly fixed or dropped, the
+ * recent ones mostly open; the open count walks up and down around
+ * `OPEN_BUGS`, about two in three of them filed by a loop.
+ */
+function backlogSeries(random: () => number) {
+  const outcomeDays = DAY_DATES.slice(-OUTCOME_DAYS).filter((day) => day.getUTCDay() !== 0 && day.getUTCDay() !== 6);
+  const bugOutcomeByLoopStart: BugOutcomeDay[] = outcomeDays.map((day, index) => {
+    const age = 1 - index / outcomeDays.length;
+    const filed = Math.round(between(random, 1, 7));
+    const open = Math.round(filed * between(random, 0.1, 0.5) * (1.6 - age));
+    const dropped = Math.round((filed - Math.min(open, filed)) * between(random, 0, 0.3));
+    return { day, fixed: Math.max(0, filed - Math.min(open, filed) - dropped), dropped, open: Math.min(open, filed) };
+  });
+  let all = OPEN_BUGS - 6;
+  const openBugsPerDay: OpenBugsDay[] = DAY_DATES.map((day) => {
+    all = Math.max(4, all + Math.round(between(random, -2.4, 2.6)));
+    return { day, all, fromLoops: Math.round(all * between(random, 0.55, 0.75)) };
+  });
+  const wip: Wip = { now: Math.round(between(random, 3, 10)), limit: MOCK_WIP_LIMIT };
+  return { bugOutcomeByLoopStart, openBugsPerDay, wip };
+}
+
 /** The mock's `ACTIVE_BLOCKERS` blockers, one per plan, all on the last day; no stream is drawn. */
 function mockBlockers(): Blocker[] {
   return Array.from({ length: ACTIVE_BLOCKERS }, (_, index) => ({
@@ -403,6 +453,7 @@ export function buildMock(seeds: MockSeeds): MockData {
     ...kind,
     value: Math.round(kind.value * between(extra, 0.7, 1.25)),
   }));
+  const backlog = backlogSeries(extra);
 
   const tree = seeded(seeds.tree);
   const workDoneTree = treeOf(tree, WORK_KINDS, TOP_MODULES);
@@ -416,6 +467,7 @@ export function buildMock(seeds: MockSeeds): MockData {
     ...architecture,
     ...development,
     ...quality,
+    ...backlog,
     tokensPerDayPrevious,
     minutesByChangeKindPrevious,
     workDoneTree,
