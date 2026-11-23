@@ -17,7 +17,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { openSqliteStore, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { exportWirePayload, openSqliteStore, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
@@ -985,3 +985,87 @@ describe('the project', () => {
     expect(over.projectQueries).toEqual(['some-project']);
   });
 });
+
+describe('hubStatus', () => {
+  const served = [{ id: 'some-project', name: 'some/project' }, { id: 'other-project', name: 'other/project' }];
+
+  it('answers the contract, the project and its name and the hub\'s migrations, reading /v1/status once across hubStatus, push and pull', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = device(1);
+    await serviceOf(a, over).push({ to: null });
+    const held = stateOf(a);
+    expect(Object.keys(held.stores)).toHaveLength(1);
+    const before = over.statusReads();
+    const named = { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'other-project' };
+    const service = serviceOf(device(1), over, { hub: named });
+    const answer = await service.hubStatus();
+    expect(answer).toEqual({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      projectId: 'other-project',
+      projectName: 'other/project',
+      migrations: exportWirePayload({ path: a.path }).migrations,
+    });
+    expect(answer.migrations.length).toBeGreaterThan(0);
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect((await service.pull({ from: null, dryRun: false })).status).toBe('pulled');
+    expect(await service.hubStatus()).toEqual(answer);
+    expect(over.statusReads() - before).toBe(1);
+    expect(over.requests.map(({ path }) => path)).toEqual(['/v1/effort/push', '/v1/effort/push', '/v1/effort/pull']);
+  });
+
+  it('reads /v1/status again for a second strategy, so the count of one could have read two', async () => {
+    const over = hub();
+    const a = device(1);
+    await serviceOf(a, over).hubStatus();
+    await serviceOf(a, over).hubStatus();
+    expect(over.statusReads()).toBe(2);
+  });
+
+  it('names the repository\'s root commit, with no name from a hub naming no projects', async () => {
+    const over = hub();
+    const a = device(1);
+    expect(await serviceOf(a, over).hubStatus()).toEqual({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      projectId: rootCommitOf(a.root),
+      projectName: null,
+      migrations: [],
+    });
+  });
+
+  it('answers a hub speaking another contract without refusing it, where push still refuses it', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION + 1);
+    const a = device(1);
+    const service = serviceThrough(a, over);
+    expect(await service.hubStatus()).toMatchObject({ contractVersion: WIRE_CONTRACT_VERSION + 1, projectName: null, migrations: [] });
+    expect(await rejectionOf(service.push({ to: null }))).toBeInstanceOf(HubContractMismatch);
+    expect(over.paths()).toEqual(['/v1/status']);
+  });
+
+  it('answers with no store there yet', async () => {
+    const over = hub();
+    const root = freshRoot();
+    expect(await serviceOf(root, over).hubStatus()).toMatchObject({ contractVersion: WIRE_CONTRACT_VERSION, projectId: rootCommitOf(root) });
+    expect(existsSync(openSqliteStore(root).path('commits'))).toBe(false);
+  });
+
+  it('refuses in a repository with no commit and no hub.project, reading no status, where hub.project lets it answer', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = uncommittedDevice();
+    expect(await rejectionOf(serviceOf(a, over).hubStatus())).toBeInstanceOf(ServiceSyncRefusal);
+    expect(over.statusReads()).toBe(0);
+    const named = serviceOf(a, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'some-project' } });
+    expect(await named.hubStatus()).toMatchObject({ projectId: 'some-project', projectName: 'some/project' });
+    expect(over.statusReads()).toBe(1);
+  });
+
+  it('passes an unreachable hub through as HubUnreachable', async () => {
+    const over = hub();
+    const a = device(1);
+    const service = serviceOf(a, over);
+    await over.stop();
+    expect((await rejectionOf(service.hubStatus())).name).toBe('HubUnreachable');
+  });
+});
+

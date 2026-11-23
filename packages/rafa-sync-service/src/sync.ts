@@ -162,6 +162,20 @@
  * yet answers `nothing-to-sync` with no contact, the status read
  * included.
  *
+ * ## The hub's status
+ *
+ * {@link ServiceSync.hubStatus} answers the hub's contract version, the
+ * project push and pull name with the name the hub gives it, and the
+ * migrations the hub holds, all read off the hub client's kept status
+ * answer: a strategy that answers `hubStatus()` and then pushes and
+ * pulls reads `/v1/status` once. It reads no store and needs none, and
+ * it refuses no contract version: a hub speaking another one is
+ * answered as it is, for the caller to show, and push and pull still
+ * refuse it. Its errors are push's and pull's: the project's refusal
+ * in a repository with no commit and no `hub.project`, the token
+ * reader's, and the status read's, so an unreachable hub is
+ * unreachable here too.
+ *
  * ## After a merge
  *
  * A merged store keeps its origin: core carries the `store_meta` row
@@ -374,10 +388,24 @@ export type ServicePullResult =
     readonly notice: string;
   });
 
-/** The `service` strategy: a `Sync` whose pull answers {@link ServicePullResult}. */
+/** What {@link ServiceSync.hubStatus} answers, read off the kept status answer; see the module note. */
+export interface ServiceHubStatus {
+  /** The wire contract version the hub speaks, which may not be this rafa's. */
+  readonly contractVersion: number;
+  /** The project push and pull name: `hub.project`, or else the repository's root commit. */
+  readonly projectId: string;
+  /** The hub's name for that project; null when its status names none. */
+  readonly projectName: string | null;
+  /** The migration ids the hub holds, in the order it names them. */
+  readonly migrations: readonly string[];
+}
+
+/** The `service` strategy: a `Sync` whose pull answers {@link ServicePullResult}, with the hub's status. */
 export interface ServiceSync extends Sync {
   readonly kind: 'service';
   pull: (request: SyncPullRequest) => Promise<ServicePullResult>;
+  /** The hub's status, from the same kept answer push and pull read; see the module note. */
+  hubStatus: () => Promise<ServiceHubStatus>;
 }
 
 /** The hub a strategy reaches, as `selectSync` hands it: `AdapterContext.hub`. */
@@ -616,7 +644,14 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
       : { status: 'pulled', merge, notice: refilledLine(merge.rowsRefilled, refill.since) });
   };
 
-  return Object.freeze({ kind: 'service', push, pull });
+  const hubStatus = async (): Promise<ServiceHubStatus> => {
+    const reached = await hubClient();
+    const { contractVersion, migrations } = await reached.status();
+    const projectId = project ?? resolveProject(options.repoRoot, hub.project);
+    return Object.freeze({ contractVersion, projectId, projectName: await reached.projectName(), migrations });
+  };
+
+  return Object.freeze({ kind: 'service', push, pull, hubStatus });
 }
 
 /**
