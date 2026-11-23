@@ -548,6 +548,15 @@ imports every section's emitted declaration, and `src/config/shape.test.ts`
 reads `ConfigShape['hub']['url']` as `string` from declarations emitted in
 memory.
 
+**A module's own top-level key is the one merge.** `ConfigShape` also extends
+`ModuleSections`, an empty interface `shape.ts` exports and the `./config`
+subpath publishes. A module that reads a top-level key of its own declares the
+key's file shape by `declare module '@open-tomato/rafa/config'` on
+`ModuleSections`, so a `rafa.config.ts` setting it type-checks where that
+declaration is loaded; a top-level key nothing declares is still refused.
+`src/config/shape.test.ts` checks both in a program holding such a merge, and
+the same merge against the emitted declarations.
+
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under
 `packages/rafa/src/core/` and fails on any import of a `config-schema-*.ts`

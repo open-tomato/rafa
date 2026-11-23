@@ -12,14 +12,22 @@
  * read by its own diagnostics. Each refusal is a control: it proves the
  * acceptance beside it could have failed.
  *
- * A second `describe` emits the declarations of the build's two passes in
+ * A second program holds a module's declaration merge on the subpath,
+ * adding one top-level key to `ModuleSections`: there `ConfigShape` gains
+ * that key's leaf and nothing else, and `ConfigEntry` takes the key while
+ * refusing a wrong value at it and a top-level key nothing declares. The
+ * first program, without the merge, refuses the same entry, so the merge
+ * is what admits it.
+ *
+ * A third `describe` emits the declarations of the build's two passes in
  * memory, core's (`packages/rafa/tsconfig.types.json`, which holds the
  * section files since the third decouple item, rafa-1325) and then
  * `tsconfig.config-types.json`'s over `src/config/index.ts`, and checks a
  * probe in a program that reads those `.d.ts` files and TypeScript's lib
  * alone: a consumer of the published subpath sees
  * `ConfigShape['hub']['url']` as `string`, and a key the hub namespace
- * lacks is refused there.
+ * lacks is refused there, and a merge into `ModuleSections` widens
+ * `ConfigShape` there too.
  */
 import { resolve } from 'node:path';
 
@@ -85,6 +93,12 @@ const MISSPELT = (() => {
   return `${deepest}X`;
 })();
 
+/** The top-level key the module-sections cases declare: a key no core section holds. */
+const MODULE_KEY = 'gadget';
+
+/** An entry setting {@link MODULE_KEY}, refused without the merge and accepted with it. */
+const MODULE_ENTRY = `{ ${MODULE_KEY}: { layers: ['spend', 'flow'] } }`;
+
 /** One case: a module importing the subpath, and whether it type-checks. */
 interface Case {
   readonly name: string;
@@ -137,6 +151,7 @@ const REFUSED: readonly Refusal[] = [
     [MISSPELT, valueAt(defaults, MISSPELT.slice(0, -1))],
   ]), null, 2), `'"${MISSPELT.split('.').pop()}"' does not exist`),
   refusedCase('unknown-key', '{ plan: { injec: \'stage\' } }', '\'injec\' does not exist'),
+  refusedCase('undeclared-top-level-key', MODULE_ENTRY, `'${MODULE_KEY}' does not exist`),
   refusedCase('wrong-value', '{ store: \'mysql\' }', 'Type \'"mysql"\' is not assignable'),
   refusedCase('false-at-named-key', '{ plan: { inject: false } }', 'Type \'false\' is not assignable'),
   refusedCase('replace-on-scalar', '{ plan: { inject: { $replace: true } } }', 'Type \'{ $replace: true; }\' is not assignable'),
@@ -268,6 +283,72 @@ describe('the nested file shape against the registry', () => {
       expect(messages[0]).toContain(because);
     });
   }
+});
+
+/**
+ * The case that widens `ConfigShape` as a module would: a declaration
+ * merge on the subpath adding {@link MODULE_KEY} to `ModuleSections`.
+ */
+const MODULE_DECLARES: Case = {
+  name: 'module-declares',
+  source: [
+    'export {};',
+    '',
+    'declare module \'./index.js\' {',
+    '  interface ModuleSections {',
+    `    readonly ${MODULE_KEY}: { readonly layers: readonly string[] };`,
+    '  }',
+    '}',
+    '',
+  ].join('\n'),
+};
+
+describe('a module\'s key merged into ModuleSections', () => {
+  let program: ts.Program;
+  const settingKeys = SETTING_NAMES.map((setting) => SETTINGS[setting].key);
+
+  beforeAll(() => {
+    program = buildProgram([
+      MODULE_DECLARES,
+      entryCase('module-key', MODULE_ENTRY),
+      {
+        name: 'module-key-in-define-config',
+        source: [
+          'import { defineConfig } from \'./index.js\';',
+          '',
+          `export const config = defineConfig([{ pr: { base: 'main' } }, ${MODULE_ENTRY}]);`,
+          '',
+        ].join('\n'),
+      },
+      entryCase('module-key-wrong-value', `{ ${MODULE_KEY}: { layers: 3 } }`),
+      entryCase('undeclared-beside-module-key', `{ ${MODULE_KEY}X: { layers: [] } }`),
+    ]);
+  }, 60_000);
+
+  test('the merge itself type-checks', () => {
+    expect(diagnosticsOf(program, MODULE_DECLARES.name)).toEqual([]);
+  });
+
+  test('the merge widens ConfigShape by the module\'s key and nothing else', () => {
+    expect(shapeLeaves(program)).toEqual([...settingKeys, `${MODULE_KEY}.layers`].sort());
+  });
+
+  test('ConfigEntry accepts the merged key, alone and beside a core key', () => {
+    expect(diagnosticsOf(program, 'module-key')).toEqual([]);
+    expect(diagnosticsOf(program, 'module-key-in-define-config')).toEqual([]);
+  });
+
+  test('ConfigEntry holds the merged key to the shape the module declared', () => {
+    const messages = diagnosticsOf(program, 'module-key-wrong-value');
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain('Type \'number\' is not assignable');
+  });
+
+  test('ConfigEntry still refuses a top-level key nothing declares', () => {
+    const messages = diagnosticsOf(program, 'undeclared-beside-module-key');
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain(`'${MODULE_KEY}X' does not exist`);
+  });
 });
 
 /** Where the in-memory declarations are written: a path nothing on disk holds. */
@@ -407,6 +488,11 @@ describe('the nested file shape in the emitted declarations', () => {
   test('ConfigShape[\'hub\'][\'url\'] reads as string from the emitted files alone', () => {
     const probe = readProbe(probeEmitted(emitted, hubProbe('url')));
     expect(probe).toEqual({ messages: [], type: 'string' });
+  });
+
+  test('a key merged into ModuleSections reads from the emitted files alone', () => {
+    const merged = `${MODULE_DECLARES.source}\nexport type Probe = import('./index.js').ConfigShape['${MODULE_KEY}']['layers'];\n`;
+    expect(readProbe(probeEmitted(emitted, merged))).toEqual({ messages: [], type: 'readonly string[]' });
   });
 
   test('the control: a key the emitted hub namespace lacks is refused there', () => {

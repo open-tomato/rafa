@@ -5,6 +5,8 @@
  * - `Config`, the list of entries a config module exports, each a
  *   `ConfigEntry`, rafa's deep partial of the nested file shape
  *   `ConfigShape` (`entry.ts`, `shape.ts`).
+ * - `ModuleSections`, the empty interface a module merges its own
+ *   top-level key into, which widens `ConfigShape` (`shape.ts`).
  * - `defineConfig`, the identity, typed for its parameter.
  * - {@link defaults}, the one entry holding every setting's default.
  * - `templates`, the config templates by name (`templates.ts`), each a
@@ -40,7 +42,7 @@ import { CONFIG_DEFAULTS, SETTING_NAMES, SETTINGS } from '../config-registry.js'
 import { entryOf } from './entry.js';
 
 export type { Config, ConfigEntry } from './entry.js';
-export type { ConfigShape } from './shape.js';
+export type { ConfigShape, ModuleSections } from './shape.js';
 
 export { defineConfig } from './entry.js';
 export { CONFIG_TEMPLATES as templates } from './templates.js';
