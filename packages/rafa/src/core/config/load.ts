@@ -64,6 +64,12 @@
  * exports is here once, as the same binding, no other name is here, and
  * no name here is on either of the other two barrels.
  */
-export type { ConfigRoots, ProjectScopeFiles } from './config-load.js';
+export type { ConfigRoots, LoadedConfig, ProjectScopeFiles } from './config-load.js';
 
-export { loadConfig, readConfigFile, readProjectScope } from './config-load.js';
+export {
+  activeModuleConfigKeys,
+  loadConfig,
+  readConfigFile,
+  readProjectScope,
+  setModuleConfigKeys,
+} from './config-load.js';

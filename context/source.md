@@ -555,7 +555,10 @@ key's file shape by `declare module '@open-tomato/rafa/config'` on
 `ModuleSections`, so a `rafa.config.ts` setting it type-checks where that
 declaration is loaded; a top-level key nothing declares is still refused.
 `src/config/shape.test.ts` checks both in a program holding such a merge, and
-the same merge against the emitted declarations.
+the same merge against the emitted declarations. At run time `loadConfig`
+lifts each key `setModuleConfigKeys` names out of every file's unknown keys,
+unwarned, and answers its value in `moduleConfig` from the highest file that
+sets it, whole (`packages/rafa/src/core/config/config-load.ts`).
 
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under

@@ -159,7 +159,13 @@ import {
   resolveConfig,
 } from '@open-tomato/rafa/core/config';
 import * as configBarrel from '@open-tomato/rafa/core/config';
-import { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/load';
+import {
+  activeModuleConfigKeys,
+  loadConfig,
+  readConfigFile,
+  readProjectScope,
+  setModuleConfigKeys,
+} from '@open-tomato/rafa/core/config/load';
 import * as configLoadModule from '@open-tomato/rafa/core/config/load';
 import {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
@@ -296,6 +302,7 @@ const RUNTIME_EXPORTS = [
   'WireExportRefusal',
   'WireFormatError',
   'activeAdapterRegistry',
+  'activeModuleConfigKeys',
   'activeServices',
   'configFilePath',
   'createAdapterRegistry',
@@ -338,6 +345,7 @@ const RUNTIME_EXPORTS = [
   'scopeAt',
   'selectEffortStore',
   'selfAndAncestors',
+  'setModuleConfigKeys',
   'startCommand',
   'validateManifest',
 ];
@@ -387,6 +395,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['WireExportRefusal', entry.WireExportRefusal, WireExportRefusal],
   ['WireFormatError', entry.WireFormatError, WireFormatError],
   ['activeAdapterRegistry', entry.activeAdapterRegistry, activeAdapterRegistry],
+  ['activeModuleConfigKeys', entry.activeModuleConfigKeys, activeModuleConfigKeys],
   ['activeServices', entry.activeServices, activeServices],
   ['configFilePath', entry.configFilePath, configFilePath],
   ['createAdapterRegistry', entry.createAdapterRegistry, createAdapterRegistry],
@@ -429,6 +438,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['scopeAt', entry.scopeAt, scopeAt],
   ['selectEffortStore', entry.selectEffortStore, selectEffortStore],
   ['selfAndAncestors', entry.selfAndAncestors, selfAndAncestors],
+  ['setModuleConfigKeys', entry.setModuleConfigKeys, setModuleConfigKeys],
   ['startCommand', entry.startCommand, start],
   ['validateManifest', entry.validateManifest, validateManifest],
 ];

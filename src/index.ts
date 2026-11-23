@@ -172,7 +172,7 @@ export type {
   TriageServiceOptions,
   TriageServiceResult,
 } from '@open-tomato/rafa/core/services';
-export type { ConfigRoots, ProjectScopeFiles } from '@open-tomato/rafa/core/config/load';
+export type { ConfigRoots, LoadedConfig, ProjectScopeFiles } from '@open-tomato/rafa/core/config/load';
 export type {
   CommandLineSetting,
   ConfigFile,
@@ -335,7 +335,13 @@ export {
   restoreServices,
   SERVICE_REASONS,
 } from '@open-tomato/rafa/core/services';
-export { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/load';
+export {
+  activeModuleConfigKeys,
+  loadConfig,
+  readConfigFile,
+  readProjectScope,
+  setModuleConfigKeys,
+} from '@open-tomato/rafa/core/config/load';
 export { CORE_ADAPTERS, registerCoreAdapters } from './adapter-registry.js';
 export { CONFIG_DEFAULTS, registerCoreConfigSections } from './config-registry.js';
 export { CORE_SERVICES, registerCoreServices } from './service-registry.js';

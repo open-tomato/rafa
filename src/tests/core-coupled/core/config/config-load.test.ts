@@ -65,6 +65,13 @@
  * YAML file's, and `readProjectScope` skipping the duplicate level or
  * answering its two files swapped.
  *
+ * Five more were driven the same way when a mounted module's declared
+ * key came to be lifted out of each file's unknown keys, and all five
+ * reddened at least one case of its describe: no key lifted, the
+ * lowest file's value answered over the highest's, a `null` read as a
+ * value, every unknown key lifted while any key is declared, and a key
+ * lifted by its prefix.
+ *
  * The settings are the sections `src/config-registry.ts` registers when
  * it is imported, as this file imports it. That import also sets the
  * load hook `loadConfig` hands every resolved config to; the cases on
@@ -97,7 +104,13 @@ import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { activeLoggerSettings, setActiveLoggerSettings } from '@open-tomato/rafa/adapters/logger/settings';
 import { ConfigError } from '@open-tomato/rafa/core/config/config';
-import { loadConfig, readConfigFile, readProjectScope } from '@open-tomato/rafa/core/config/config-load';
+import {
+  activeModuleConfigKeys,
+  loadConfig,
+  readConfigFile,
+  readProjectScope,
+  setModuleConfigKeys,
+} from '@open-tomato/rafa/core/config/config-load';
 import { activeConfigLoadHook, setConfigLoadHook } from '@open-tomato/rafa/core/config/section';
 import { setActiveOutput } from '@open-tomato/rafa/core/output/active';
 import { activeStoreSettings, setActiveStoreSettings } from '@open-tomato/rafa/store/settings';
@@ -1019,5 +1032,127 @@ describe('loadConfig refusing a file', () => {
     expect(error.problems).toHaveLength(1);
     expect(error.problems[0]).toStartWith(`${path}: cannot be loaded (`);
     expect(error.problems[0]).toContain('planted');
+  });
+});
+
+/** Runs `body` with `keys` as the mounted modules' declared keys, putting the ones it found back after. */
+async function withModuleKeys<T>(keys: readonly string[], body: () => Promise<T>): Promise<T> {
+  const held = setModuleConfigKeys(keys);
+  try {
+    return await body();
+  } finally {
+    setModuleConfigKeys(held);
+  }
+}
+
+describe('loadConfig on a top-level key a mounted module declares', () => {
+  const layers = { layers: [{ name: 'core', modules: ['@open-tomato/rafa'] }], wip: 3 };
+
+  it('warns about nothing for the declared key, answers it whole, and holds it in no extras list', async () => {
+    const root = freshDir('module-key-declared');
+    write(projectModulePath(root), moduleText({ atlas: layers }));
+    const { lines, warn } = sink();
+    const loaded = await withModuleKeys(['atlas'], () => loadConfig({ root, home: freshDir('home') }, {}, warn));
+
+    expect(lines.filter((line) => line.includes('unknown key'))).toEqual([]);
+    expect(loaded.moduleConfig.get('atlas')).toEqual(layers);
+    expect(loaded.extras).toEqual([]);
+  });
+
+  it('still warns about an undeclared key in the same file, and answers only the declared one', async () => {
+    const root = freshDir('module-key-undeclared');
+    const path = write(projectModulePath(root), moduleText({ atlas: layers, nonesuch: 1 }));
+    const { lines, warn } = sink();
+    const loaded = await withModuleKeys(['atlas'], () => loadConfig({ root, home: freshDir('home') }, {}, warn));
+    const unknown = lines.filter((line) => line.includes('unknown key'));
+
+    expect(unknown).toHaveLength(1);
+    expect(unknown[0]).toStartWith(warningAbout('nonesuch', path));
+    expect([...loaded.moduleConfig.keys()]).toEqual(['atlas']);
+    expect(loaded.extras.map((extra) => extra.key)).toEqual(['nonesuch']);
+  });
+
+  it('answers the local layer\'s value over the module layer\'s, whole, with nothing of the lower one merged in', async () => {
+    const root = freshDir('module-key-local-wins');
+    write(projectModulePath(root), moduleText({ atlas: layers }));
+    plant(root, 'atlas:\n  layers: []\n');
+    const { lines, warn } = sink();
+    const loaded = await withModuleKeys(['atlas'], () => loadConfig({ root, home: freshDir('home') }, {}, warn));
+
+    expect(loaded.moduleConfig.get('atlas')).toEqual({ layers: [] });
+    expect(lines.filter((line) => line.includes('unknown key'))).toEqual([]);
+    expect(loaded.localExtras).toEqual([]);
+  });
+
+  it('answers the module layer\'s value under a local layer that sets the key to null or leaves it out', async () => {
+    const nulled = freshDir('module-key-local-null');
+    write(projectModulePath(nulled), moduleText({ atlas: layers }));
+    plant(nulled, 'atlas: null\n');
+    const silent = freshDir('module-key-local-silent');
+    write(projectModulePath(silent), moduleText({ atlas: layers }));
+    plant(silent, 'store: ndjson\n');
+    const [underNull, underSilence] = await withModuleKeys(['atlas'], async () => [
+      await loadConfig({ root: nulled, home: freshDir('home') }, {}, quiet),
+      await loadConfig({ root: silent, home: freshDir('home') }, {}, quiet),
+    ]);
+
+    expect(underNull?.moduleConfig.get('atlas')).toEqual(layers);
+    expect(underSilence?.moduleConfig.get('atlas')).toEqual(layers);
+    expect(underSilence?.config.store).toBe('ndjson');
+  });
+
+  it('answers the user scope\'s value where no project file sets the key, and the project\'s over it', async () => {
+    const home = freshDir('home');
+    write(userModulePath(home), moduleText({ atlas: { from: 'user' } }));
+    const unset = freshDir('module-key-user-only');
+    const set = freshDir('module-key-project-over-user');
+    write(projectModulePath(set), moduleText({ atlas: { from: 'project' } }));
+    const [fromUser, fromProject] = await withModuleKeys(['atlas'], async () => [
+      await loadConfig({ root: unset, home }, {}, quiet),
+      await loadConfig({ root: set, home }, {}, quiet),
+    ]);
+
+    expect(fromUser?.moduleConfig.get('atlas')).toEqual({ from: 'user' });
+    expect(fromProject?.moduleConfig.get('atlas')).toEqual({ from: 'project' });
+  });
+
+  it('answers no entry for a declared key no file sets', async () => {
+    const root = freshDir('module-key-unset');
+    write(projectModulePath(root), moduleText({ store: 'ndjson' }));
+    const loaded = await withModuleKeys(['atlas'], () => loadConfig({ root, home: freshDir('home') }, {}, quiet));
+
+    expect(loaded.moduleConfig.has('atlas')).toBe(false);
+    expect(loaded.moduleConfig.size).toBe(0);
+  });
+
+  it('warns about the key as before, and answers nothing, while no mounted module declares it', async () => {
+    const root = freshDir('module-key-not-declared');
+    const path = write(projectModulePath(root), moduleText({ atlas: layers }));
+    const [another, none] = [sink(), sink()];
+    const underAnother = await withModuleKeys(['other'], () => loadConfig({ root, home: freshDir('home') }, {}, another.warn));
+    const underNone = await withModuleKeys([], () => loadConfig({ root, home: freshDir('home') }, {}, none.warn));
+
+    for (const [loaded, lines] of [[underAnother, another.lines], [underNone, none.lines]] as const) {
+      const unknown = lines.filter((line) => line.includes('unknown key'));
+      expect(unknown).toHaveLength(1);
+      expect(unknown[0]).toStartWith(warningAbout('atlas', path));
+      expect(loaded.moduleConfig.size).toBe(0);
+      expect(loaded.extras.map((extra) => extra.key)).toEqual(['atlas']);
+    }
+  });
+
+  it('still warns about a flat spelling under the declared key', async () => {
+    const root = plant(freshDir('module-key-flat'), 'atlas.layers: []\n');
+    const { lines, warn } = sink();
+    const loaded = await withModuleKeys(['atlas'], () => loadConfig({ root, home: freshDir('home') }, {}, warn));
+    const unknown = lines.filter((line) => line.includes('unknown key'));
+
+    expect(unknown).toHaveLength(1);
+    expect(unknown[0]).toStartWith(warningAbout('atlas.layers', literalPath(root)));
+    expect(loaded.moduleConfig.size).toBe(0);
+  });
+
+  it('reads no declared key until one is set: the active keys start empty', () => {
+    expect(activeModuleConfigKeys()).toEqual([]);
   });
 });

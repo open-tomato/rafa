@@ -139,6 +139,32 @@
  * as the project scope alone. Read as both, it would read
  * `~/.rafa/config.yaml` twice and warn twice about each unknown key.
  *
+ * ## A mounted module's own key
+ *
+ * A module's manifest may name one top-level key it reads under
+ * `provides.config` (`modules/manifest.ts`). Core reads no section at
+ * that key, so each file retains it as an unknown key, its value whole:
+ * `entriesOf` (`config.ts`) descends into a section's mapping alone.
+ * {@link loadConfig} takes the keys the mounted modules declare off
+ * {@link activeModuleConfigKeys}, which {@link setModuleConfigKeys}
+ * sets, and lifts each such key out of every file's retained keys
+ * before the four are ranked, so no warning names it and no `extras`
+ * list holds it. Its value is answered in
+ * {@link LoadedConfig.moduleConfig}, from the highest of the four files
+ * that sets it, in `resolveConfig`'s order: the project's YAML file,
+ * its module file, the user scope's YAML file, its module file. The
+ * value is handed over whole, never merged with a lower file's, and
+ * unread: the module validates it. A `null` says nothing, as it does
+ * for a setting, so a lower file's value answers it; a key no file sets
+ * is not in the map.
+ *
+ * Only the top-level key is lifted. A flat spelling of a key under it
+ * (`atlas.layers` in a YAML file) is still an unknown key, warned about
+ * as before, and so is the key itself while no mounted module declares
+ * it. A template naming the key is refused as before: a template is
+ * rafa's, and core reads it whole. {@link readProjectScope} answers the
+ * files as read, the key still among their retained ones.
+ *
  * ## The project's two files alone
  *
  * {@link readProjectScope} reads the project scope's two places as
@@ -188,7 +214,7 @@
  * `existsSync`: `Bun.file(path).exists()` answers false for a directory.
  */
 import type { ConfigScopeName } from './config-origins.js';
-import type { DuplicatesLevel, Mapping } from './config-sections.js';
+import type { ConfigExtra, DuplicatesLevel, Mapping } from './config-sections.js';
 import type { ConfigFile, ConfigOverrides, ResolvedConfig, TemplateLayer } from './config.js';
 import type { Diagnostic, LoadResult } from '@open-tomato/define-config';
 
@@ -230,6 +256,20 @@ export interface ProjectScopeFiles {
   readonly local: ConfigFile | null;
   /** The project's module file, `rafa.config.ts` or `rafa.config.mjs`, or null when there is none. */
   readonly file: ConfigFile | null;
+}
+
+/**
+ * What {@link loadConfig} answers: the resolution, and the value of each
+ * top-level key a mounted module declares; see "A mounted module's own
+ * key" in the module note.
+ */
+export interface LoadedConfig extends ResolvedConfig {
+  /**
+   * The raw value of each key {@link activeModuleConfigKeys} named, by
+   * key, from the highest file setting it, whole and unread. A key no
+   * file sets is absent.
+   */
+  readonly moduleConfig: ReadonlyMap<string, unknown>;
 }
 
 /** The module files a scope's module place is looked up for, in order. */
@@ -559,6 +599,54 @@ function printWarning(message: string): void {
   activeOutput().warn(message);
 }
 
+/** The keys {@link activeModuleConfigKeys} answers. */
+let moduleConfigKeys: readonly string[] = Object.freeze([]);
+
+/**
+ * Sets the top-level keys the mounted modules' manifests declare under
+ * `provides.config`, read by every later {@link loadConfig}; see the
+ * module note. Answers the keys it replaced, for a caller to put back.
+ *
+ * @param keys - One key per mounted module declaring one; none clears them.
+ * @returns The keys set before the call.
+ */
+export function setModuleConfigKeys(keys: readonly string[]): readonly string[] {
+  const previous = moduleConfigKeys;
+  moduleConfigKeys = Object.freeze([...keys]);
+  return previous;
+}
+
+/** The top-level keys the mounted modules declare, as {@link setModuleConfigKeys} last set them; none until then. */
+export function activeModuleConfigKeys(): readonly string[] {
+  return moduleConfigKeys;
+}
+
+/** `file` with every retained key in `keys` taken out of its extras, or null for no file. */
+function withoutModuleKeys(file: ConfigFile | null, keys: ReadonlySet<string>): ConfigFile | null {
+  if (file === null) return null;
+  const extras = file.extras.filter((extra) => !keys.has(extra.key));
+  return extras.length === file.extras.length
+    ? file
+    : { ...file, extras };
+}
+
+/**
+ * The value of each of `keys`, by key, from the first of `files` that
+ * retained it with a value other than `null`.
+ *
+ * @param files - The files as read, the highest ranked first.
+ * @param keys - The keys the mounted modules declare.
+ */
+function moduleValuesOf(files: readonly (ConfigFile | null)[], keys: ReadonlySet<string>): ReadonlyMap<string, unknown> {
+  const retained: readonly ConfigExtra[] = files.flatMap((file) => file?.extras ?? []);
+  const values = new Map<string, unknown>();
+  for (const key of keys) {
+    const answer = retained.find((extra) => extra.key === key && extra.value !== null);
+    if (answer !== undefined) values.set(key, answer.value);
+  }
+  return values;
+}
+
 /** Refuses a read by `caller` while no config section is registered. */
 function requireRegisteredSections(caller: string): void {
   if (Object.keys(activeSettings()).length === 0) {
@@ -624,33 +712,40 @@ export async function readProjectScope(root: string): Promise<ProjectScopeFiles>
  * own keys, read through the active template hook; a name the hook does
  * not know is refused. See "Templates" in the module note.
  *
+ * Each top-level key a mounted module declares ({@link activeModuleConfigKeys})
+ * is taken out of every file's unknown keys, so no warning names it, and
+ * its value is answered in `moduleConfig` from the highest file setting
+ * it, whole. See "A mounted module's own key" in the module note.
+ *
  * The files are read and judged before the command line is looked at,
  * the user's first and each scope's module file before its YAML file,
  * so a run with problems in every layer reports the first file's alone.
  * See the module note for the home, the lookup and every refusal.
  *
  * @returns The resolution, with `provenance` naming the file and entry
- *   of each setting a file answered.
+ *   of each setting a file answered, and `moduleConfig` the value of
+ *   each declared key a file sets.
  */
 export async function loadConfig(
   roots: ConfigRoots,
   cli: ConfigOverrides = {},
   warn: (message: string) => void = printWarning,
-): Promise<ResolvedConfig> {
+): Promise<LoadedConfig> {
   requireRegisteredSections('loadConfig');
   const readings = new Map<ConfigScopeName, ScopeReadings>();
   for (const places of scopesOf(roots)) readings.set(places.layer, await readPlaces(places));
   const user = readings.get('user') ?? NO_SCOPE;
   const project = readings.get('project') ?? NO_SCOPE;
   const duplicates = duplicateWarnings([user.module, user.local, project.module, project.local]);
-  const resolved = resolveConfig({
-    cli,
-    local: project.local.file,
-    file: project.module.file,
-    userLocal: user.local.file,
-    user: user.module.file,
-  });
-  const loaded: ResolvedConfig = { ...resolved, warnings: [...duplicates, ...resolved.warnings] };
+  const ranked = [project.local.file, project.module.file, user.local.file, user.module.file];
+  const keys = new Set(activeModuleConfigKeys());
+  const [local, file, userLocal, userModule] = ranked.map((read) => withoutModuleKeys(read, keys));
+  const resolved = resolveConfig({ cli, local, file, userLocal, user: userModule });
+  const loaded: LoadedConfig = {
+    ...resolved,
+    warnings: [...duplicates, ...resolved.warnings],
+    moduleConfig: moduleValuesOf(ranked, keys),
+  };
   activeConfigLoadHook()?.(loaded.config);
   for (const warning of loaded.warnings) warn(warning);
   writeDangerousPassLines(loaded, warn, warn === printWarning
