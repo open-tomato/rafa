@@ -21,6 +21,12 @@
  *    one, a `rafa:` marker comment, a fenced or backticked comment, a
  *    heading quoted in a fence — sits beside the body that differs
  *    only in the part the rule reads.
+ *  - The two timing cases (CodeQL `js/polynomial-redos`, alerts 19 and
+ *    20) each assert the gaps the crafted body answers beside the time,
+ *    so a fast reader that misread the crafted line still fails. Their
+ *    red run, against the old backtracking `HEADING_LINE` and closing-hash
+ *    pattern, was killed at 120 s and took 3.0 s at this size; the
+ *    tracker's close-out notes hold the readings.
  *
  * The self-reference is a case of its own. This module and its spec
  * quote `TBD`, `TODO` and `???` while describing the check, so a body
@@ -207,6 +213,53 @@ describe('a template heading', () => {
 
   it('is not empty when it holds a fenced block and nothing else', () => {
     expect(findReadinessGaps(bodyWith({ Design: '```ts\nconst gate = true;\n```' }))).toEqual([]);
+  });
+});
+
+describe('a heading line built to backtrack', () => {
+  /**
+   * The ceiling a crafted heading's read must end under. The old patterns
+   * took about 3 s (alert 20) and minutes (alert 19, killed at 120 s) at
+   * {@link CRAFTED_SPACES}, and a linear read ends under 10 ms, so the bound
+   * fails the old patterns by an order of magnitude or more and leaves a
+   * loaded CI runner twenty-five times headroom.
+   */
+  const REDOS_BOUND_MS = 250;
+
+  /** The run of spaces in each crafted line, about 50,000 characters of body. */
+  const CRAFTED_SPACES = 50_000;
+
+  /** The spaces themselves. */
+  const spaces = ' '.repeat(CRAFTED_SPACES);
+
+  it('reads a hash, the spaces and a U+2028 ending as no heading in time (alert 19, HEADING_LINE)', () => {
+    const body = bodyWith({ Design: `#${spaces}x\u2028` });
+
+    const started = performance.now();
+    const gaps = findReadinessGaps(body);
+    const elapsed = performance.now() - started;
+
+    expect(gaps).toEqual([]);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('keeps a title whose words the spaces part in time (alert 20, the closing hashes)', () => {
+    const body = `${bodyWith({ 'What can go wrong': null })}\n## What${spaces}can go wrong\n\nA check.\n`;
+
+    const started = performance.now();
+    const gaps = findReadinessGaps(body);
+    const elapsed = performance.now() - started;
+
+    expect(gaps).toEqual([]);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('drops a closing hash run only after a space, and ends no title at a U+2028, which is the control', () => {
+    expect(findReadinessGaps(bodyWith({ Design: null }) + '\n## Design ##  \n\nTwo pure functions.\n')).toEqual([]);
+    expect(findReadinessGaps(bodyWith({ Design: null }) + '\n##\u2028 Design\n\nTwo pure functions.\n')).toEqual([]);
+    expect(gapsIn(bodyWith({ Design: null }) + '\n## Design##\n\nTwo pure functions.\n')).toEqual(['missing-heading Design']);
+    expect(gapsIn(bodyWith({ Design: '## Design\u2028' }))).toEqual([]);
+    expect(gapsIn(bodyWith({ Design: null }) + '\n#\tDesign #\t#\n\nTwo pure functions.\n')).toEqual(['missing-heading Design']);
   });
 });
 
