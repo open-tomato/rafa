@@ -89,13 +89,13 @@ const UNCHECKED_QUESTION = `Merge #${NUMBER} with no checks? [y/N] `;
 /** Typed by every case so the ending never composes the real sources. */
 const NO_HINT = '--no-hint';
 
-/** A base no workflow tests pull requests into, as `verify.yml` leaves a stretch branch. */
+/** A base no workflow tests pull requests into, as the workflow below leaves a stretch branch. */
 const STRETCH = 'stretch/1';
 
 /** The object id the planted `verify.yml` is listed under. */
 const VERIFY_OID = '5003747ae06e6f49f5b3ee77d83106acd6e86876';
 
-/** A workflow running on pull requests into `main` and on pushes to `stretch/**`, as `verify.yml` does. */
+/** A workflow running on pull requests into `main` and on pushes to `stretch/**`, as `verify.yml` did before stretch pull requests ran it. */
 const VERIFY_YML = 'on:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [\'stretch/**\']\njobs: {}\n';
 
 /** A pull request detail as the double answers one, into `base`. */

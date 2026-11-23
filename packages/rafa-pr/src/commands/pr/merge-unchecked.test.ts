@@ -46,13 +46,13 @@ import {
 /** The summary line every case merges under. */
 const SUMMARY = '#86 Merge with no checks — feat/ci-gate → main — squash';
 
-/** A base no workflow tests pull requests into, as `verify.yml` leaves `stretch/1`. */
+/** A base no workflow tests pull requests into, as the workflow below leaves `stretch/1`. */
 const STRETCH = 'stretch/1';
 
 /** The line the no-pull-request-workflow case prints for {@link STRETCH}. */
 const STRETCH_LINE = 'no workflow runs on pull requests into stretch/1';
 
-/** A workflow running on pull requests into `main` and on pushes to `stretch/**`, as `verify.yml` does. */
+/** A workflow running on pull requests into `main` and on pushes to `stretch/**`, as `verify.yml` did before stretch pull requests ran it. */
 const VERIFY_YML = [
   'name: verify',
   'on:',

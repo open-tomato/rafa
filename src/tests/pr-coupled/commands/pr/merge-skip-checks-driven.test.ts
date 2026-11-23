@@ -31,8 +31,9 @@
  * comment `postUncheckedComment` posts, and reads real git for the same
  * clean-up `merge-driven.test.ts` proves for an ordinary merge.
  *
- * The last pair reads the base's real `verify.yml` (`pull_request` into
- * `main`, `push` to `stretch/**`) with the fake reporting one workflow: a
+ * The last pair reads a `verify.yml` on the base in the shape the
+ * repository's own had before stretch pull requests ran it (`pull_request`
+ * into `main`, `push` to `stretch/**`), with the fake reporting one workflow: a
  * pull request into `stretch/x` merges under `--yes`, and one into `main`
  * is refused with the workflows-exist warning.
  */
@@ -128,7 +129,7 @@ interface PlantOptions {
   readonly workflow?: string;
 }
 
-/** The repository's own `verify.yml` shape: pull requests into `main`, pushes to `stretch/**`. */
+/** A `verify.yml` that tests pull requests into `main` only, and pushes to `stretch/**`. */
 const VERIFY_WORKFLOW = `name: verify
 on:
   pull_request:
