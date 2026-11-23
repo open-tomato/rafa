@@ -16,6 +16,12 @@
  *   - A status read answers the hub's status shape with the contract
  *     core's `WIRE_CONTRACT_VERSION` names and no capability, so the
  *     hub client sends `contractVersion` on push and pull.
+ *   - Once {@link StandInHub.setProjection} names a map, the status
+ *     answers `projection: true`, and a pull naming `migrations` that
+ *     lack an id the stand-in holds is answered as a projecting hub
+ *     answers it: the pushed migrations the pull names, the same rows,
+ *     and that map as `projected`. A pull naming none, or naming every
+ *     id held, is answered whole.
  *
  * It merges nothing: a row is matched by its origin pair alone. Every
  * push and pull is recorded in {@link StandInHub.requests}, and
@@ -42,6 +48,8 @@ export interface SeenRequest {
   readonly rows: number;
   /** The `contractVersion` query parameter, or null when it was left out. */
   readonly contractVersion: string | null;
+  /** The `migrations` query parameter, or null when it was left out. */
+  readonly migrations: string | null;
 }
 
 /** A running stand-in. */
@@ -57,6 +65,8 @@ export interface StandInHub {
   readonly setFault: (answer: (() => Response) | null) => void;
   /** Ids a pull names beyond the migrations pushed, as a hub newer than the device's rafa would. */
   readonly setExtraMigrations: (ids: readonly string[]) => void;
+  /** Answers `projection: true` and projects a pull naming `migrations` with `projected`; null answers whole. */
+  readonly setProjection: (projected: Readonly<Record<string, readonly string[]>> | null) => void;
   /** Stops listening, so the next request fails to connect. */
   readonly stop: () => Promise<void>;
 }
@@ -81,6 +91,7 @@ export function startStandInHub(): StandInHub {
   const pairs = new Set<string>();
   let migrations: readonly string[] = [];
   let extra: readonly string[] = [];
+  let projection: Readonly<Record<string, readonly string[]>> | null = null;
   let fault: (() => Response) | null = null;
   let statusReads = 0;
 
@@ -92,7 +103,7 @@ export function startStandInHub(): StandInHub {
       rows: Object.fromEntries([...tables].map(([table, rows]) => [table, rows.length])),
       devices: [],
       contractVersion: WIRE_CONTRACT_VERSION,
-      capabilities: { fts: false, vector: false, graph: false, projection: false },
+      capabilities: { fts: false, vector: false, graph: false, projection: projection !== null },
     });
   };
 
@@ -114,20 +125,26 @@ export function startStandInHub(): StandInHub {
     return success({ received, added, at: PUSHED_AT });
   };
 
-  const pull = (device: string, since: WireCursor): Response => {
+  const pull = (device: string, since: WireCursor, named: readonly string[] | null): Response => {
     const answered: Record<string, readonly WireRow[]> = {};
     const cursor: Record<string, number> = {};
     for (const [table, rows] of tables) {
       answered[table] = rows.filter((row) => Number(row.seq) > (since[table] ?? 0) && row['origin_store'] !== device);
       cursor[table] = rows.length;
     }
-    const payload: WirePayload = {
-      format: WIRE_FORMAT,
-      version: WIRE_VERSION,
-      migrations: [...migrations, ...extra],
-      tables: answered,
-      cursor,
-    };
+    const lacking = named === null
+      ? []
+      : [...migrations, ...extra].filter((id) => !named.includes(id));
+    const payload: WirePayload = projection === null || named === null || lacking.length === 0
+      ? { format: WIRE_FORMAT, version: WIRE_VERSION, migrations: [...migrations, ...extra], tables: answered, cursor }
+      : {
+        format: WIRE_FORMAT,
+        version: WIRE_VERSION,
+        migrations: migrations.filter((id) => named.includes(id)),
+        tables: answered,
+        cursor,
+        projected: projection,
+      };
     return success(payload);
   };
 
@@ -154,12 +171,16 @@ export function startStandInHub(): StandInHub {
           ? 0
           : Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0),
         contractVersion: url.searchParams.get('contractVersion'),
+        migrations: url.searchParams.get('migrations'),
       });
       if (fault !== null) return fault();
       if (payload !== null) return push(payload);
+      const named = url.searchParams.get('migrations');
       return pull(url.searchParams.get('device') ?? '', sinceText === null
         ? {}
-        : JSON.parse(sinceText) as WireCursor);
+        : JSON.parse(sinceText) as WireCursor, named === null
+        ? null
+        : named.split(','));
     },
   });
 
@@ -173,6 +194,9 @@ export function startStandInHub(): StandInHub {
     },
     setExtraMigrations: (ids) => {
       extra = ids;
+    },
+    setProjection: (projected) => {
+      projection = projected;
     },
     stop: () => server.stop(true),
   };

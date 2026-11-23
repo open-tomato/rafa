@@ -17,7 +17,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { openSqliteStore, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { openSqliteStore, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
@@ -150,7 +150,9 @@ function statePathOf(at: Device): string {
 }
 
 /** The state file of `device`'s store, parsed. */
-function stateOf(at: Device): { stores: Record<string, { hub: string; push: Record<string, number>; pull: Record<string, number> }> } {
+function stateOf(at: Device): {
+  stores: Record<string, { hub: string; push: Record<string, number>; pull: Record<string, number>; heldBack?: unknown }>;
+} {
   return JSON.parse(readFileSync(statePathOf(at), 'utf8')) as ReturnType<typeof stateOf>;
 }
 
@@ -167,6 +169,11 @@ function serviceOf(at: Device | string, over: StandInHub, options: Partial<Servi
       : null),
     ...options,
   });
+}
+
+/** The `service` strategy over `at`'s store for `over` under `effort.syncSkew: pull-projected`. */
+function projectingOf(at: Device, over: StandInHub, options: Partial<ServiceSyncOptions> = {}): ReturnType<typeof createServiceSync> {
+  return serviceOf(at, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, syncSkew: 'pull-projected' }, ...options });
 }
 
 /**
@@ -252,7 +259,7 @@ describe('push', () => {
     const a = device(2);
     const answer = await serviceOf(a, over).push({ to: null });
     expect(answer).toEqual({ status: 'pushed', path: null });
-    expect(over.requests).toEqual([{ method: 'POST', path: '/v1/effort/push', device: originOf(a), since: null, authorization: `Bearer ${TOKEN}`, rows: 2, contractVersion: String(WIRE_CONTRACT_VERSION) }]);
+    expect(over.requests).toEqual([{ method: 'POST', path: '/v1/effort/push', device: originOf(a), since: null, authorization: `Bearer ${TOKEN}`, rows: 2, contractVersion: String(WIRE_CONTRACT_VERSION), migrations: null }]);
     expect(over.held('commits').map((row) => `${String(row['origin_store'])}:${String(row['origin_seq'])}`)).toEqual(commitPairs(a));
     const { stores } = stateOf(a);
     expect(Object.keys(stores)).toEqual([originOf(a)]);
@@ -433,6 +440,107 @@ describe('pull', () => {
       `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
         + ' nothing was merged. Next step: rafa self-update, then sync again',
     );
+  });
+});
+
+describe('the projected pull, under effort.syncSkew: pull-projected', () => {
+  /** A clock answering `times` in turn, holding the last. */
+  const clock = (...times: string[]): (() => Date) => {
+    let calls = 0;
+    return () => new Date(times[Math.min(calls++, times.length - 1)] ?? times[0] ?? '');
+  };
+
+  /** The migration ids `at`'s store applied, in apply order. */
+  const migrationsOf = (at: Device): string => read<{ id: string }>(at.path, 'SELECT id FROM schema_migrations ORDER BY rowid')
+    .map(({ id }) => id)
+    .join(',');
+
+  /** A hub one migration ahead of this rafa, projecting `commits` and holding one row of `a`'s. */
+  const aheadHub = async (a: Device): Promise<StandInHub> => {
+    const over = hub();
+    await serviceOf(a, over).push({ to: null });
+    over.setExtraMigrations([FUTURE_MIGRATION]);
+    over.setProjection({ commits: [FUTURE_MIGRATION] });
+    return over;
+  };
+
+  it('sends this build\'s migrations, lists the cut rows in held_rows, keeps heldBack and answers the pulled line, where refuse is refused', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    const refused = await rejectionOf(serviceOf(b, over).pull({ from: null, dryRun: false }));
+    expect(refused).toBeInstanceOf(RafaUpdateRequired);
+    expect(over.requests.at(-1)?.migrations).toBeNull();
+
+    const answer = await projectingOf(b, over, { now: clock('2026-11-01T10:00:00.000Z') }).pull({ from: null, dryRun: false });
+    expect(over.requests.at(-1)?.migrations).toBe(migrationsOf(b));
+    expect(answer).toMatchObject({
+      status: 'pulled',
+      merge: { status: 'merged', rowsAdded: 1, rowsHeld: 1 },
+      notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 1 columns wait for rafa self-update',
+    });
+    expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
+    expect(read<{ pair: string }>(b.path, 'SELECT origin_store || \':\' || origin_seq AS pair FROM held_rows').map(({ pair }) => pair))
+      .toEqual(commitPairs(a));
+    expect(readHeldMigrations(b.path)).toEqual([FUTURE_MIGRATION]);
+    expect(stateOf(b).stores[originOf(b)]).toMatchObject({ pull: { commits: 1 } });
+    expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: '2026-11-01T10:00:00.000Z' });
+  });
+
+  it('keeps heldBack at the first projected contact, as a later one pulls past its cursor', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    await projectingOf(b, over, { now: clock('2026-11-01T10:00:00.000Z') }).pull({ from: null, dryRun: false });
+    a.store.append('commits', [commitRow()]);
+    await serviceOf(a, over).push({ to: null });
+    const later = await projectingOf(b, over, { now: clock('2026-11-02T10:00:00.000Z') }).pull({ from: null, dryRun: false });
+    expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+    expect(later).toMatchObject({ status: 'pulled', merge: { rowsAdded: 1, rowsHeld: 1 } });
+    expect(stateOf(b).stores[originOf(b)]).toMatchObject({ pull: { commits: 2 } });
+    expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: '2026-11-01T10:00:00.000Z' });
+    expect(read<{ n: number }>(b.path, 'SELECT count(*) AS n FROM held_rows')).toEqual([{ n: 2 }]);
+  });
+
+  it('keeps no heldBack and no listing under dryRun, where the same pull run keeps both', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    expect(await projectingOf(b, over).pull({ from: null, dryRun: true })).toMatchObject({ status: 'pulled', merge: { status: 'would-merge' } });
+    expect(existsSync(statePathOf(b))).toBe(false);
+    expect(readHeldMigrations(b.path)).toEqual([]);
+    await projectingOf(b, over).pull({ from: null, dryRun: false });
+    expect(stateOf(b).stores[originOf(b)]).toHaveProperty('heldBack');
+  });
+
+  it('answers a whole pull with no notice and no heldBack, from a hub not ahead', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = hub();
+    await serviceOf(a, over).push({ to: null });
+    over.setProjection({ commits: [FUTURE_MIGRATION] });
+    const answer = await projectingOf(b, over).pull({ from: null, dryRun: false });
+    expect(over.requests.at(-1)?.migrations).toBe(migrationsOf(b));
+    expect(answer).not.toHaveProperty('notice');
+    expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+  });
+
+  it('writes a pull 409 naming missing as the rafa self-update line, moving no cursor, and one naming none as the hub wrote it', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: cannot project', missing: [FUTURE_MIGRATION] }, { status: 409 }));
+    const refused = await rejectionOf(projectingOf(b, over).pull({ from: null, dryRun: false }));
+    expect(refused).toBeInstanceOf(RafaUpdateRequired);
+    expect(refused.message).toBe(
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged. Next step: rafa self-update, then sync again`,
+    );
+    expect(existsSync(statePathOf(b))).toBe(false);
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: cannot project' }, { status: 409 }));
+    expect(await rejectionOf(projectingOf(b, over).pull({ from: null, dryRun: false }))).toMatchObject({ name: 'HubRefused', status: 409 });
+
+    over.setFault(null);
+    expect(await projectingOf(b, over).pull({ from: null, dryRun: false })).toMatchObject({ status: 'pulled' });
   });
 });
 
