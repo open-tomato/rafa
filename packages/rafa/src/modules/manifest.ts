@@ -28,6 +28,13 @@
  *     `commands` names an `entry`; `skills` and `agents` are a directory
  *     path; `mcp` is a non-empty list of servers, each a `name` unique in
  *     the list, a `command`, and optional string `args`.
+ *   - `provides.config`, optional and no feature type: `{ key }`, the one
+ *     top-level config key the module reads, a non-blank string written
+ *     as the config spells it. A key naming a core section, any
+ *     top-level key a registered config section reads, is refused: core
+ *     already reads it, so a module claiming it would read core's value
+ *     as its own. `types` does not list it and the cross checks below
+ *     leave it out.
  *   - `requires`: `rafa`, a version range the running version must
  *     satisfy, and `ports`, the version of each port the module
  *     implements. Every listed type that is a port (`tracker`, `store`,
@@ -93,7 +100,7 @@ import type { PortType, PortVersions } from '../ports/index.js';
 
 import { PORT_VERSIONS } from '../core/adapters/index.js';
 import { RAFA_VERSION } from '../core/command/index.js';
-import { optionalPrerequisite, requiredPrerequisite } from '../core/config/index.js';
+import { activeKnownKeysAbove, optionalPrerequisite, requiredPrerequisite } from '../core/config/index.js';
 import { describeValue, isMapping, listOf } from '../core/config/sections.js';
 
 /** The manifest version this module reads. */
@@ -142,7 +149,12 @@ export interface McpServer {
   readonly args: readonly string[];
 }
 
-/** What a module provides, one entry per listed type. */
+/** A `config` entry: the one top-level config key the module reads. */
+export interface ConfigProvision {
+  readonly key: string;
+}
+
+/** What a module provides, one entry per listed type, and the config key it reads. */
 export interface ManifestProvides {
   readonly output?: OutputProvision;
   readonly tracker?: AdapterProvision;
@@ -154,6 +166,7 @@ export interface ManifestProvides {
   readonly commands?: CommandsProvision;
   readonly sync?: AdapterProvision;
   readonly logger?: AdapterProvision;
+  readonly config?: ConfigProvision;
 }
 
 /** A manifest that passed {@link validateManifest}. */
@@ -180,6 +193,12 @@ export interface ManifestSeams {
   /** A plain `major.minor.patch` version. */
   readonly rafaVersion: string;
   readonly portVersions: Readonly<PortVersions>;
+  /**
+   * The top-level config keys core's sections read, which `provides.config`
+   * may not name. Left out, they are read off the active config registry
+   * when the manifest is validated.
+   */
+  readonly coreConfigKeys?: readonly string[];
 }
 
 /** The manifest, or every problem found in it. */
@@ -403,6 +422,30 @@ const readMcp: Check<readonly McpServer[]> = (raw, label) => {
 /** Reads a directory path: a `skills` or `agents` entry. */
 const readDirectory: Check<string> = (raw, label) => readText(raw, label, 'a directory path');
 
+/** The `provides` key that is no feature type: the config key a module reads. */
+const CONFIG_PROVISION = 'config';
+
+/** The keys `provides` reads: every feature type, then {@link CONFIG_PROVISION}. */
+const PROVIDES_KEYS: readonly string[] = [...FEATURE_TYPES, CONFIG_PROVISION];
+
+/** Every top-level key a registered config section reads, in registration order. */
+function registeredTopKeys(): readonly string[] {
+  return activeKnownKeysAbove('')[1];
+}
+
+/** Reads a `config` entry: a non-blank `key` naming no core section. */
+function readConfigProvision(raw: unknown, label: string, coreKeys: readonly string[]): Checked<ConfigProvision> {
+  const { fields, problems } = readFields(raw, label, ['key'], ['key']);
+  const key = field(fields, 'key', label, nonEmpty);
+  const all = [...problems, ...key.problems];
+  if (key.value !== undefined && coreKeys.includes(key.value)) {
+    all.push(`${label}.key is ${JSON.stringify(key.value)}, a section core reads: a module names a top-level key of its own`);
+  }
+  return all.length > 0 || key.value === undefined
+    ? failed(...all)
+    : passed(Object.freeze({ key: key.value }));
+}
+
 /** The reader of each module type's `provides` entry, by type. `learning` has none. */
 const PROVISION_READERS: ReadonlyMap<string, Check<unknown>> = new Map<string, Check<unknown>>([
   ['output', readOutput],
@@ -429,14 +472,20 @@ function undeclared(declared: Declared, type: string): boolean {
 }
 
 /** Reads `provides`: each entry by its type's shape, held to what `types` declares. */
-function readProvides(raw: unknown, label: string, declared: Declared): Checked<ManifestProvides> {
-  const { fields, problems } = readFields(raw, label, FEATURE_TYPES, []);
+function readProvides(raw: unknown, label: string, declared: Declared, coreKeys: () => readonly string[]): Checked<ManifestProvides> {
+  const { fields, problems } = readFields(raw, label, PROVIDES_KEYS, []);
   if (!isMapping(raw)) return failed(...problems);
 
   const all = [...problems];
   const provided: [string, unknown][] = [];
   for (const [type, value] of fields) {
     const at = `${label}.${type}`;
+    if (type === CONFIG_PROVISION) {
+      const read = readConfigProvision(value, at, coreKeys());
+      all.push(...read.problems);
+      if (read.value !== undefined) provided.push([type, read.value]);
+      continue;
+    }
     const reader = PROVISION_READERS.get(type);
     if (reader === undefined) {
       all.push(`${at} names learning, ${LEARNING_CLOSED}`);
@@ -577,7 +626,8 @@ export function validateManifest(raw: unknown, label = 'rafa', seams: ManifestSe
       : undefined,
     label: `${label}.types`,
   };
-  const provides = field(fields, 'provides', label, (value, at) => readProvides(value, at, declared));
+  const coreKeys = (): readonly string[] => seams.coreConfigKeys ?? registeredTopKeys();
+  const provides = field(fields, 'provides', label, (value, at) => readProvides(value, at, declared, coreKeys));
   const requires = field(fields, 'requires', label, (value, at) => readRequires(value, at, declared, seams));
   const prerequisites = fields.has('prerequisites')
     ? field(fields, 'prerequisites', label, readPrerequisites)
