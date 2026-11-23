@@ -146,7 +146,11 @@ import type {
   Sync,
   Tracker,
 } from '../../ports/index.js';
-import type { ClaudeSettingSource, StoreBackend } from '../config/config-sections.js';
+import type {
+  ClaudeSettingSource,
+  StoreBackend,
+  SyncSkewMode,
+} from '../config/config-sections.js';
 import type { GhRunner } from '../git/gh-runner.js';
 import type { CapturingSpawner } from '../loop/claude.js';
 import type { OutputStream } from '../output/stream.js';
@@ -263,7 +267,8 @@ export interface AdapterContext {
   readonly store?: StoreBackend;
   /**
    * The hub a `service` sync reaches: the run's resolved `hub.url`,
-   * `hub.tokenSecret` and `hub.timeout`, the last in milliseconds.
+   * `hub.tokenSecret` and `hub.timeout`, the last in milliseconds, and
+   * its `effort.syncSkew`.
    * Handed on by `selectSync` whenever `hub.url` is set, and read by a
    * module's `service` strategy alone; core's adapters never read it.
    *
@@ -280,6 +285,8 @@ export interface AdapterContext {
     readonly tokenSecret: string | null;
     /** How long one request may take, in milliseconds: the resolved `hub.timeout`. */
     readonly timeoutMs: number;
+    /** What a sync does when the device is behind its hub: the resolved `effort.syncSkew`. */
+    readonly syncSkew: SyncSkewMode;
   };
 }
 

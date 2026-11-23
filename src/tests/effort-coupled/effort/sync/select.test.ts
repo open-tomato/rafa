@@ -192,7 +192,7 @@ describe('selectSync', () => {
       expect(contexts).toEqual([{
         repoRoot: ROOT,
         store: 'ndjson',
-        hub: { url: 'https://hub.example.org', tokenSecret: 'rafa-hub-token', timeoutMs: 12_000 },
+        hub: { url: 'https://hub.example.org', tokenSecret: 'rafa-hub-token', timeoutMs: 12_000, syncSkew: 'refuse' },
       }]);
       expect(existsSync(ROOT)).toBe(false);
     });
@@ -201,7 +201,7 @@ describe('selectSync', () => {
       const { registry, contexts } = capturing();
       selectSync(ROOT, { effortSync: 'service', hubUrl: 'http://localhost:7373' }, registry);
 
-      expect(contexts[0]?.hub).toEqual({ url: 'http://localhost:7373', tokenSecret: null, timeoutMs: 3000 });
+      expect(contexts[0]?.hub).toEqual({ url: 'http://localhost:7373', tokenSecret: null, timeoutMs: 3000, syncSkew: 'refuse' });
     });
 
     it('hands no hub when the config names no url, the control', () => {

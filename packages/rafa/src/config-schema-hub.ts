@@ -74,14 +74,21 @@
  * `AdapterContext.hub`, the timeout already in milliseconds. It answers
  * undefined with no `hub.url`, since a hub with no address is none an
  * adapter could reach; the refusal above keeps that from happening
- * under `service`.
+ * under `service`. It also carries core's `effortSyncSkew`, the
+ * resolved `effort.syncSkew`, as `syncSkew`, read as `refuse` when the
+ * config names none: the skew mode is read only under `service`, so it
+ * travels with the hub an adapter reaches rather than on its own.
  */
 import type {
   ConfigCheckInput,
   ConfigSection,
   SettingSpec,
 } from './core/config/index.js';
-import type { Reader, SyncStrategy } from './core/config/sections.js';
+import type {
+  Reader,
+  SyncSkewMode,
+  SyncStrategy,
+} from './core/config/sections.js';
 
 import { describeValue, refused, text } from './core/config/sections.js';
 
@@ -227,15 +234,26 @@ export interface HubContext {
   readonly tokenSecret: string | null;
   /** How long one request may take, in milliseconds: the resolved `hub.timeout`. */
   readonly timeoutMs: number;
+  /**
+   * What a sync does when the device is behind its hub: the resolved
+   * `effort.syncSkew`, `refuse` when the config names none.
+   */
+  readonly syncSkew: SyncSkewMode;
 }
+
+/** The skew mode {@link hubContextOf} reads when the config names none. */
+const DEFAULT_SYNC_SKEW: SyncSkewMode = 'refuse';
+
+/** What {@link hubContextOf} reads: the `hub` settings and core's `effortSyncSkew`. */
+export type HubContextInput = Partial<HubSettings> & { readonly effortSyncSkew?: SyncSkewMode };
 
 /**
  * The {@link HubContext} the resolved settings name, frozen, or
  * undefined when `hub.url` is null or left out. A `hub.timeout` left out
- * is read as its default, and one the reader would refuse throws a
+ * is read as its default, an `effortSyncSkew` left out as `refuse`, and one the reader would refuse throws a
  * `TypeError`: only a config built by hand can carry one.
  */
-export function hubContextOf(config: Partial<HubSettings>): HubContext | undefined {
+export function hubContextOf(config: HubContextInput): HubContext | undefined {
   const url = config.hubUrl ?? null;
   if (url === null) return undefined;
 
@@ -244,5 +262,10 @@ export function hubContextOf(config: Partial<HubSettings>): HubContext | undefin
   if (timeoutMs === null) {
     throw new TypeError(`hub.timeout is ${describeValue(timeout)}, which no config accepts`);
   }
-  return Object.freeze({ url, tokenSecret: config.hubTokenSecret ?? null, timeoutMs });
+  return Object.freeze({
+    url,
+    tokenSecret: config.hubTokenSecret ?? null,
+    timeoutMs,
+    syncSkew: config.effortSyncSkew ?? DEFAULT_SYNC_SKEW,
+  });
 }
