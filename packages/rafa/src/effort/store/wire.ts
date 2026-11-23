@@ -16,7 +16,14 @@
  *     (`merge-rules.ts`) the sending store holds, its rows past the
  *     cursor in `seq` order, each row every column the table has by name,
  *     `seq` and the origin pair (`origin_store`, `origin_seq`) included;
- *   - `cursor`, the highest `seq` each table has now sent.
+ *   - `cursor`, the highest `seq` each table has now sent;
+ *   - `projected`, only on a payload a hub projected to an older
+ *     receiver's schema: for each merged table whose rows were cut, the
+ *     migration ids those rows lack. A table it leaves out came whole.
+ *     Decoding refuses a table that is no merged table, an empty or
+ *     repeated id list, and an id the payload's own `migrations` name,
+ *     since rows cannot lack a migration their store holds. An export
+ *     never sets it, and encoding carries it as it stands.
  *
  * A `local` table (the migration log, `store_meta`, `store_replaced`,
  * the merge trail, `held_rows`) never travels, as a merge never reads it. So the
@@ -117,7 +124,12 @@ export interface WirePayload {
   readonly tables: Readonly<Record<string, readonly WireRow[]>>;
   /** The cursor the next export starts from. */
   readonly cursor: WireCursor;
+  /** Present only on a projected payload: each cut table's lacking migration ids; see the module note. */
+  readonly projected?: WireProjection;
 }
+
+/** Per projected merged table, the migration ids its rows lack; a table left out came whole. */
+export type WireProjection = Readonly<Record<string, readonly string[]>>;
 
 /** A payload, or a cursor, this rafa cannot read or cannot build a store from. */
 export class WireFormatError extends Error {
@@ -232,18 +244,41 @@ function checkTables(value: unknown): WirePayload['tables'] {
   return Object.freeze(Object.fromEntries(entries));
 }
 
+/** The projection, checked: merged tables only, each a list of ids, none twice and none `migrations` names. */
+function checkProjected(value: unknown, migrations: readonly string[]): WireProjection {
+  if (!isRecord(value)) throw new WireFormatError('wire: projected is not an object');
+  const entries = Object.entries(value).map(([table, ids]): [string, readonly string[]] => {
+    if (!isMergedTable(table)) throw new WireFormatError(`wire: projected names ${JSON.stringify(table)}, which is no merged table`);
+    if (!Array.isArray(ids) || ids.length === 0) throw new WireFormatError(`wire: projected.${table} is not a list of migration ids`);
+    const checked = ids.map((id: unknown) => {
+      if (typeof id !== 'string' || id === '') throw new WireFormatError(`wire: projected.${table} id ${JSON.stringify(id)} is not a name`);
+      return id;
+    });
+    const twice = checked.filter((id, index) => checked.indexOf(id) !== index);
+    if (twice.length > 0) throw new WireFormatError(`wire: projected.${table} names ${twice.join(', ')} more than once`);
+    const held = checked.filter((id) => migrations.includes(id));
+    if (held.length > 0) throw new WireFormatError(`wire: projected.${table} names ${held.join(', ')}, which the payload's migrations hold`);
+    return [table, Object.freeze(checked)];
+  });
+  return Object.freeze(Object.fromEntries(entries));
+}
+
 /** A payload, checked whole and copied; throws {@link WireFormatError} naming the first fault. */
 function checkPayload(value: unknown): WirePayload {
   if (!isRecord(value)) throw new WireFormatError('wire: the payload is not an object');
   if (value.format !== WIRE_FORMAT) throw new WireFormatError(`wire: format is ${JSON.stringify(value.format) ?? 'undefined'}, expected ${JSON.stringify(WIRE_FORMAT)}`);
   if (value.version !== WIRE_VERSION) throw new WireFormatError(`wire: version is ${JSON.stringify(value.version) ?? 'undefined'}; this rafa reads version ${String(WIRE_VERSION)}`);
-  return Object.freeze({
+  const migrations = checkMigrations(value.migrations);
+  const payload: WirePayload = {
     format: WIRE_FORMAT,
     version: WIRE_VERSION,
-    migrations: checkMigrations(value.migrations),
+    migrations,
     tables: checkTables(value.tables),
     cursor: checkCursor(value.cursor),
-  });
+  };
+  return Object.freeze(value.projected === undefined
+    ? payload
+    : { ...payload, projected: checkProjected(value.projected, migrations) });
 }
 
 /** The payload as the JSON text the wire carries. */

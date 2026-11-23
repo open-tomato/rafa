@@ -336,6 +336,62 @@ describe('the payload as JSON text', () => {
   });
 });
 
+describe('the projected field', () => {
+  /** An id no build of this catalogue holds, as a newer hub's migration would be. */
+  const AHEAD = 'migration-ahead-of-this-build';
+
+  it('is absent on an exported payload and on its decoded text', () => {
+    const payload = exportWirePayload({ path: plantStore('unprojected', plantSender) });
+
+    expect('projected' in payload).toBe(false);
+    expect('projected' in decodeWirePayload(encodeWirePayload(payload))).toBe(false);
+  });
+
+  it('decodes what it encodes, the projection included', () => {
+    const payload = payloadWith({ projected: { findings: [AHEAD, `${AHEAD}-2`] } });
+
+    const decoded = decodeWirePayload(encodeWirePayload(payload));
+
+    expect(decoded).toEqual(payload);
+    expect(decoded.projected).toEqual({ findings: [AHEAD, `${AHEAD}-2`] });
+  });
+
+  it('takes an empty projection as one that cut no table', () => {
+    expect(decodeWirePayload(JSON.stringify(payloadWith({ projected: {} }))).projected).toEqual({});
+  });
+
+  it.each([
+    ['a projection that is not an object', [], 'projected is not an object'],
+    ['a table that is not merged', { store_meta: [AHEAD] }, 'projected names "store_meta", which is no merged table'],
+    ['the local held_rows table', { held_rows: [AHEAD] }, 'projected names "held_rows", which is no merged table'],
+    ['ids that are not a list', { findings: AHEAD }, 'projected.findings is not a list of migration ids'],
+    ['an empty id list', { findings: [] }, 'projected.findings is not a list of migration ids'],
+    ['an empty id', { findings: [''] }, 'projected.findings id "" is not a name'],
+    ['an id named twice', { findings: [AHEAD, AHEAD] }, `projected.findings names ${AHEAD} more than once`],
+    ['an id the payload\'s migrations hold', { findings: [AHEAD, 'kind-tables'] }, 'projected.findings names kind-tables, which the payload\'s migrations hold'],
+  ])('refuses %s', (_label, projected, message) => {
+    const text = JSON.stringify(payloadWith({ projected }));
+    const error = thrownBy(() => decodeWirePayload(text));
+
+    expect(error).toBeInstanceOf(WireFormatError);
+    expect((error as Error).message).toContain(message);
+  });
+
+  it('holds the same payload less the fault, the control for the refusals', () => {
+    const text = JSON.stringify(payloadWith({ projected: { findings: [AHEAD] } }));
+
+    expect(decodeWirePayload(text).projected).toEqual({ findings: [AHEAD] });
+  });
+
+  it('checks the projection on materialise as on decode', () => {
+    const options = scratchOptions('projected-held-id');
+    const payload = payloadWith({ projected: { findings: ['kind-tables'] } });
+
+    expect(thrownBy(() => materialiseWirePayload(payload, options))).toBeInstanceOf(WireFormatError);
+    expect(readdirSync(options.tempDir)).toEqual([]);
+  });
+});
+
 describe('materialiseWirePayload', () => {
   it('builds a store with the sender\'s migrations and rows as sent, seq and origin pair included', () => {
     const payload = exportWirePayload({ path: plantStore('sent', plantSender) });
