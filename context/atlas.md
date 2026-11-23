@@ -11,12 +11,14 @@ workspace members under `addons/atlas/*` (the second `workspaces` glob):
 | 4 contracts | `data/src/contract/` | descriptors, query params, results, metric definitions, the envelope and `ATLAS_CONTRACT_VERSION` |
 | 5 representation | `ui`, `demo`; `@open-tomato/charts` from npm | atoms to templates and the card cascade; the demo page. The chart seam over ECharts is `@open-tomato/charts`, published from another repository |
 
-Still design, not built: the `gh` metrics over the GitHub reads, which
-`build` and `serve` make only under `--github`; the WIP gauge's ceiling
-(`wipLimit` is read, and the board ingest fills `issue_facts.stage`, but no
-metric counts WIP from it yet);
-the bug backlog pair (phase 4); a chart drawing the stretch marks, which the
-build stores and serves as `local.marks` (D19). The design is the main
+The catalogue serves the phase 4 metrics over the git, board, module and
+GitHub sources: `dev.wip` counts the open issues in Claimed or In
+development by stage, never by label, with `wipLimit` as its goal; every bug
+metric leaves out `module` `cli-gap`, keeping a bug with no module; the
+five GitHub-only metrics (`feasibility` `gh`) answer rows only after a build
+run with `--github`. Still design, not built: the demo cards over them, and
+a chart drawing the stretch marks, which the build stores and serves as
+`local.marks` (D19). The design is the main
 checkout's `.rafa/specs/draft-atlas-dashboard.md` (gitignored): the metric and
 chart gap lists, the bucket DDL, the contracts, the handler, the PoC cut. The
 3D graph-of-dice proof of concept stays on `spike/atlas-poc`, outside the

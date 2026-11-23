@@ -6,11 +6,19 @@
  * work type of decision D4, from each task's reported change level, as
  * loop branches carry none; task minutes stand in for loop latency and
  * preflight halts for uptime, neither of which the store records.
+ *
+ * Past the PoC cut, three read `local.modules`, the module ingest's one
+ * row per module folder, each a proxy: lines of code per module stand in
+ * for cyclomatic complexity (entry 17), the `@open-tomato` import fan for
+ * coupling (entry 18), and the upward edges `docs/survey/cut-table.json`
+ * lists for architecture violations (entry 13). `local.modules` has no
+ * time axis, so a window is refused on them: the card asks with none.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
 import { DAILY_SOURCE } from '../build/daily.js';
 import { TASKS_SOURCE } from '../ingest/effort.js';
+import { MODULES_SOURCE } from '../ingest/modules.js';
 
 /** Task minutes by work type, with each type's share: fix and chore over all is the debt ratio. */
 export const DEBT_RATIO: MetricDefinition = {
@@ -99,5 +107,71 @@ export const PREFLIGHT_HALTS: MetricDefinition = {
   proxyNote: 'A halted preflight is a run the loop could not start; the store records no uptime of a service.',
 };
 
-/** The architect lens's metrics, in the order section G lists them. */
-export const ARCHITECT_METRICS: readonly MetricDefinition[] = [DEBT_RATIO, TASK_MINUTES_P50_P90, TOKENS_BY_MODEL, PREFLIGHT_HALTS];
+/** The lines of code and files of each module, the largest first: the treemap. */
+export const LOC_PER_MODULE: MetricDefinition = {
+  id: 'arch.loc-per-module',
+  title: 'Lines of code per module',
+  lenses: ['architect'],
+  description: 'Per module folder, the lines of code and the files of its source, test files left out, the largest first.',
+  sourceId: MODULES_SOURCE,
+  params: {
+    groupBy: ['path'],
+    measures: [
+      { field: 'loc', agg: 'sum', as: 'loc' },
+      { field: 'files', agg: 'sum', as: 'files' },
+    ],
+    orderBy: [{ key: 'loc', dir: 'desc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'lines',
+  chart: 'treemap',
+  feasibility: 'proxy',
+  proxyFor: 'cyclomatic complexity',
+  proxyNote: 'Lines of code stand in for complexity: no complexity scan is run, and a larger module is read as a more complex one.',
+};
+
+/** Each module's package, imports and fan: the card draws the matrix from the import lists. */
+export const COUPLING: MetricDefinition = {
+  id: 'arch.coupling',
+  title: 'Coupling',
+  lenses: ['architect'],
+  description: 'One row per module folder: its package, the @open-tomato packages it imports (a JSON array), and its fan-in and fan-out; the card draws the dependency matrix from the import lists.',
+  sourceId: MODULES_SOURCE,
+  params: {
+    fields: ['path', 'package', 'imports_json', 'fan_in', 'fan_out'],
+    orderBy: [{ key: 'path', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'modules',
+  chart: 'heatmap',
+  feasibility: 'proxy',
+  proxyFor: 'coupling / cohesion',
+  proxyNote: 'Coupling is read from the @open-tomato imports between module packages, found by an import scan; relative imports and cohesion inside a module are not measured.',
+};
+
+/** The upward edges of each module the cut table covers, the most first. */
+export const VIOLATIONS: MetricDefinition = {
+  id: 'arch.violations',
+  title: 'Architecture violations',
+  lenses: ['architect'],
+  description: 'Per module folder the cut table covers, the upward imports docs/survey/cut-table.json lists from its files, the most first; no rows when the project has no cut table.',
+  sourceId: MODULES_SOURCE,
+  params: {
+    filters: [{ field: 'upward_edges', op: 'is_null', value: false }],
+    groupBy: ['path'],
+    measures: [{ field: 'upward_edges', agg: 'sum', as: 'edges' }],
+    orderBy: [{ key: 'edges', dir: 'desc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'edges',
+  chart: 'bar',
+  feasibility: 'proxy',
+  proxyFor: 'architecture violations',
+  proxyNote: 'A violation is an upward import the survey\'s cut table lists: a module it does not cover, or a project with no cut table, shows none.',
+};
+
+/** The architect lens's PoC metrics, in the order section G lists them. */
+export const ARCHITECT_POC_METRICS: readonly MetricDefinition[] = [DEBT_RATIO, TASK_MINUTES_P50_P90, TOKENS_BY_MODEL, PREFLIGHT_HALTS];
+
+/** The architect lens's metrics: the PoC cut, then those over the module source. */
+export const ARCHITECT_METRICS: readonly MetricDefinition[] = [...ARCHITECT_POC_METRICS, LOC_PER_MODULE, COUPLING, VIOLATIONS];

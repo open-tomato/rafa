@@ -3,7 +3,7 @@
  * written in a tmpdir: no file reads as every target null, both keys
  * read back, `null` is no target, and every bad value, unknown key or
  * non-JSON file is refused with each problem named. The targets reach
- * `pm.budget-burn` as its goal, and nothing else changes.
+ * `pm.budget-burn` and `dev.wip` as their goals, and nothing else changes.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { AtlasConfigError, atlasConfigPathOf, BUDGET_METRIC, DEFAULT_ATLAS_CONFIG, loadAtlasConfig, withAtlasTargets } from './config.js';
+import { AtlasConfigError, atlasConfigPathOf, BUDGET_METRIC, DEFAULT_ATLAS_CONFIG, loadAtlasConfig, WIP_METRIC, withAtlasTargets } from './config.js';
 import { METRIC_CATALOGUE } from './metrics/catalogue.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-config-')));
@@ -100,7 +100,23 @@ describe('withAtlasTargets', () => {
     for (const [id, metric] of targeted) if (id !== BUDGET_METRIC) expect(metric).toBe(metrics.get(id) as MetricDefinition);
   });
 
-  it('control: hands the metrics back as they were with no budget set', () => {
+  it('sets wipLimit as the goal of dev.wip alone, the budget metric left as it was', () => {
+    const targeted = withAtlasTargets(metrics, { budget: { tokensPerWeek: null }, wipLimit: 3 });
+
+    expect(targeted).not.toBe(metrics);
+    expect(targeted.get(WIP_METRIC)?.goal).toBe(3);
+    expect(metrics.get(WIP_METRIC)?.goal).toBeUndefined();
+    expect(targeted.get(BUDGET_METRIC)).toBe(metrics.get(BUDGET_METRIC) as MetricDefinition);
+    for (const [id, metric] of targeted) if (id !== WIP_METRIC) expect(metric).toBe(metrics.get(id) as MetricDefinition);
+  });
+
+  it('sets both goals when both targets are set', () => {
+    const targeted = withAtlasTargets(metrics, { budget: { tokensPerWeek: 18_000_000 }, wipLimit: 3 });
+
+    expect([targeted.get(BUDGET_METRIC)?.goal, targeted.get(WIP_METRIC)?.goal]).toEqual([18_000_000, 3]);
+  });
+
+  it('control: hands the metrics back as they were with no target set', () => {
     expect(withAtlasTargets(metrics, DEFAULT_ATLAS_CONFIG)).toBe(metrics);
   });
 });

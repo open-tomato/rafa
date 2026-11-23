@@ -41,7 +41,8 @@ flag, exit 0.
 ```
 
 Both keys are optional and null when unset. With no `budget.tokensPerWeek`,
-`pm.budget-burn` draws the spend and says no target is set. Any other key,
+`pm.budget-burn` draws the spend and says no target is set; `wipLimit` is the
+goal of `dev.wip`, which draws the count alone without one. Any other key,
 or a value that is not a whole number above zero, refuses the file with
 every problem named at once. The module reads no core `loadConfig`, and
 calls `gh` only under `--github`.

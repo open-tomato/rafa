@@ -6,18 +6,40 @@
  * `local.plans` buckets a plan by the week of its first session, its
  * time field, as the store records no time a plan completed; so
  * `dev.plans-completed-per-week` is a proxy, and says so.
+ *
+ * Past the PoC cut, three read the git, board and GitHub sources:
+ * release tags per week (entry 21), WIP (entry 25) and the pull request
+ * cycle (entry 22). WIP counts the open issues whose board stage is
+ * Claimed or In development (D16), never the `rafa:in-development`
+ * label, which closed issues keep; it reads the board as of its cache's
+ * watermark, so the card asks it with no window (`local.issues` bounds a
+ * window by `created_at`, NULL offline). Its ceiling is the project's
+ * `wipLimit`, laid over it as its goal by `withAtlasTargets`. The pull
+ * request cycle is GitHub-only: `local.prs` holds rows only after a
+ * `--github` build, and the engine computes no duration, so the metric
+ * answers each merged pull request's two times and the card buckets the
+ * span.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
 import { PLANS_SOURCE } from '../build/derive.js';
+import { ISSUES_SOURCE } from '../ingest/board.js';
 import { TASKS_SOURCE } from '../ingest/effort.js';
 import { CI_SOURCE } from '../ingest/facts.js';
+import { COMMITS_SOURCE } from '../ingest/git.js';
+import { PRS_SOURCE } from '../ingest/github.js';
 
 /** How many task sessions the cycle scatter answers at most: past the store's 11 weeks of about 3,000. */
 const TASK_CYCLE_LIMIT = 5_000;
 
 /** The red share above which the CI tile draws as danger. */
 const RED_CI_THRESHOLD = 0.1;
+
+/** How many merged pull requests the cycle histogram answers at most. */
+const PR_CYCLE_LIMIT = 5_000;
+
+/** The board stages an open issue is work in progress in (D16). */
+export const WIP_STAGES: readonly string[] = ['Claimed', 'In development'];
 
 /** Task sessions reported done per week, stacked by work type. */
 export const TASKS_DONE_PER_WEEK: MetricDefinition = {
@@ -103,5 +125,66 @@ export const PLANS_COMPLETED_PER_WEEK: MetricDefinition = {
   proxyNote: 'A plan counts in the week its first session started: the store records no time a plan completed, and merge times wait for the GitHub source.',
 };
 
-/** The developer lens's metrics, in the order section G lists them. */
-export const DEVELOPER_METRICS: readonly MetricDefinition[] = [TASKS_DONE_PER_WEEK, TASK_CYCLE, RED_CI_SHARE, PLANS_COMPLETED_PER_WEEK];
+/** The release tags per week: a `v*` tag on a commit of the base branch is a deploy (D13). */
+export const DEPLOYS_PER_WEEK: MetricDefinition = {
+  id: 'dev.deploys-per-week',
+  title: 'Deploys per week',
+  lenses: ['developer'],
+  description: 'The first-parent commits of the base branch carrying a v* release tag, per ISO week of the tagged commit.',
+  sourceId: COMMITS_SOURCE,
+  params: {
+    grain: 'week',
+    filters: [{ field: 'release_tag', op: 'is_null', value: false }],
+    measures: [{ field: 'release_tag', agg: 'count', as: 'deploys' }],
+    orderBy: [{ key: 'week', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'releases',
+  chart: 'line',
+  feasibility: 'direct',
+};
+
+/** The open issues in Claimed or In development, against the project's `wipLimit`. */
+export const WIP: MetricDefinition = {
+  id: 'dev.wip',
+  title: 'Work in progress',
+  lenses: ['developer'],
+  description: 'The open issues whose board stage is Claimed or In development, as of the board cache; a closed issue still labelled rafa:in-development is not counted. Drawn against wipLimit of the Atlas config, or alone with none set.',
+  sourceId: ISSUES_SOURCE,
+  params: {
+    filters: [
+      { field: 'state', op: 'eq', value: 'OPEN' },
+      { field: 'stage', op: 'in', value: WIP_STAGES },
+    ],
+    measures: [{ field: 'number', agg: 'count', as: 'issues' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'issues',
+  chart: 'gauge',
+  feasibility: 'direct',
+};
+
+/** Each merged pull request's open and merge times: the card buckets the span. */
+export const PR_CYCLE_TIME: MetricDefinition = {
+  id: 'dev.pr-cycle-time',
+  title: 'Pull request cycle time',
+  lenses: ['developer'],
+  description: 'One row per merged pull request: when it was opened and merged, with its plan; the card buckets the span under 4 hours, 4 to 24 hours, 1 to 3 days and over 3 days. Read from GitHub: only a build run with --github fills it.',
+  sourceId: PRS_SOURCE,
+  params: {
+    fields: ['number', 'plan_stub', 'created_at', 'merged_at'],
+    filters: [{ field: 'state', op: 'eq', value: 'MERGED' }],
+    orderBy: [{ key: 'merged_at', dir: 'asc' }],
+    limit: PR_CYCLE_LIMIT,
+  },
+  formula: { kind: 'none' },
+  unit: 'pull requests',
+  chart: 'histogram',
+  feasibility: 'gh',
+};
+
+/** The developer lens's PoC metrics, in the order section G lists them. */
+export const DEVELOPER_POC_METRICS: readonly MetricDefinition[] = [TASKS_DONE_PER_WEEK, TASK_CYCLE, RED_CI_SHARE, PLANS_COMPLETED_PER_WEEK];
+
+/** The developer lens's metrics: the PoC cut, then those over the git, board and GitHub sources. */
+export const DEVELOPER_METRICS: readonly MetricDefinition[] = [...DEVELOPER_POC_METRICS, DEPLOYS_PER_WEEK, WIP, PR_CYCLE_TIME];
