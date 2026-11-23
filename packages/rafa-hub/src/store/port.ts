@@ -59,6 +59,15 @@
  *     caller relayed it.
  *   - **The answered cursor is a snapshot.** Pulling again with it
  *     answers only rows pushed since.
+ *   - **A pull is projected only to a caller behind the store.** A pull
+ *     naming the caller's `migrations` while the store holds an id they
+ *     leave out is answered at the caller's schema: the held ids it
+ *     names as the payload's `migrations`, every table its schema does
+ *     not make left out of `tables` and `cursor`, and each table whose
+ *     rows lost a column named in `projected` with the ids it lacks. A
+ *     caller naming every held id, or more, is answered whole, with no
+ *     `projected`, as a pull naming none is; a store answering
+ *     `projection: false` is never handed a pull naming `migrations`.
  *   - **Every push is a device's last push**, a repeated push that adds
  *     nothing included, stamped by the clock the adapter was made with.
  *     A pull is no push and names no device.
@@ -92,6 +101,12 @@ export interface HubPullRequest {
   readonly device: string;
   /** The hub cursor a previous pull answered; a table left out is read from the start. */
   readonly since: WireCursor;
+  /**
+   * The pulling device's migration ids, in its apply order, asking for
+   * rows projected to its schema; every row is answered as held when
+   * left out. See the module note on projection.
+   */
+  readonly migrations?: readonly string[];
 }
 
 /** One device the hub has taken a push from. */
@@ -187,7 +202,7 @@ export interface HubContract {
 export interface HubStore {
   /** Takes a device's rows; see the module note on idempotence. */
   readonly push: (request: HubPushRequest) => Promise<HubPushResult>;
-  /** The rows other origins created past `since`, with the cursor to pass next. */
+  /** The rows other origins created past `since`, projected to `migrations` when it is given, with the cursor to pass next. */
   readonly pull: (request: HubPullRequest) => Promise<WirePayload>;
   /** Row counts, the schema and every device's last push. */
   readonly status: () => Promise<HubStoreStatus>;
