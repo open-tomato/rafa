@@ -64,7 +64,7 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
   entry(7, 'pm', 'Scope creep', 'proxy', 'bug_routes follow-up + filed per tasks_planned', 'stacked column'),
   entry(8, 'pm', 'Active blockers and risks', 'direct', 'finding_facts source=blocker, outcome blocked; issue_facts stage Blocked', 'row list, risk heatmap', ['pm.active-blockers']),
   entry(9, 'pm', 'Defect / rework rate', 'direct', 'repeat_sessions + ci_repair_sessions / task_sessions', 'KPI + trend'),
-  entry(10, 'pm', 'Resource utilization', 'proxy', 'session minutes by model and agent per day / wall-clock hours', 'stacked area'),
+  entry(10, 'pm', 'Resource utilization', 'proxy', 'task session minutes per agent; no wall-clock capacity is recorded', 'horizontal bar', ['pm.minutes-per-agent']),
   entry(11, 'architect', 'Tech debt ratio', 'proxy', 'minutes of fix and chore work (D4, from change level) / all task minutes', 'KPI grade', ['arch.debt-ratio']),
   entry(12, 'architect', 'Duplication', 'collect', 'needs a duplication scan; no proxy', 'KPI empty'),
   entry(13, 'architect', 'Architecture violations', 'proxy', 'module_facts.upward_edges from docs/survey/cut-table.json, when present', 'dependency matrix', ['arch.violations']),
