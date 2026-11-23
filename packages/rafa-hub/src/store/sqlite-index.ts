@@ -51,7 +51,9 @@
  *     embedder was given. Otherwise it is `false`, and the half keeps the
  *     why: the loader's, the load's, or `no embedder configured`.
  *   - `graph` is whether the store holds a `ref_links` table at open.
- *   - `projection` is `false`: this connector projects no pull.
+ *
+ * The index answers no `projection`: whether a pull is projected is the
+ * store's answer, which `connectSqliteHub` composes beside these three.
  *
  * ## Refusals
  *
@@ -71,7 +73,7 @@
  * built under the answer `capabilities()` gives.
  */
 import type {
-  HubCapabilities,
+  HubIndexCapabilities,
   HubIndex,
   IndexLinksRequest,
   IndexLinksResult,
@@ -248,7 +250,7 @@ export async function openSqliteHubIndex(options: SqliteHubIndexOptions): Promis
 
   const first = openStore();
   let state: VectorState;
-  let capabilities: HubCapabilities;
+  let capabilities: HubIndexCapabilities;
   try {
     if (!compiledWith(first.database, FTS5_OPTION)) {
       throw new Error('hub index: this SQLite engine has no FTS5 compiled in, which every index table set needs');
@@ -259,7 +261,6 @@ export async function openSqliteHubIndex(options: SqliteHubIndexOptions): Promis
     capabilities = Object.freeze({
       fts: true,
       graph: holdsRefLinks({ database: first.database, schema: 'main' }),
-      projection: false,
       vector: state.vector,
     });
   } catch (error) {

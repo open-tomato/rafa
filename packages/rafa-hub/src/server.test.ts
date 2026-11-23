@@ -773,7 +773,7 @@ function standInIndex(outcome: (call: number) => Promise<IndexRebuildResult> = (
     },
     search: () => Promise.resolve({ hits: [] }),
     links: () => Promise.resolve({ graph: false, links: [] }),
-    capabilities: () => ({ fts: true, vector: false, graph: false, projection: false }),
+    capabilities: () => ({ fts: true, vector: false, graph: false }),
   };
   return { index, asked, started: (call) => startOf(call).promise };
 }

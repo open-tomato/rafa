@@ -3,7 +3,7 @@
  * port's contract suites running over it by name in `contract.test.ts`.
  * That covers the refusal of a push naming a migration the hub lacks,
  * the files it keeps and the ones it leaves behind, a push holding no
- * row, and a store reopened over its directory.
+ * row, its capabilities, and a store reopened over its directory.
  *
  * Payloads here are built as the contract suite builds them. A real
  * store is opened under the temporary directory and given one commit,
@@ -171,6 +171,15 @@ describe('the SQLite hub store', () => {
       expect(empty).toEqual({ received: 0, added: 0, at: T1 });
       expect(readFileSync(join(directory, DEFAULT_STORE_FILE)).equals(before)).toBe(true);
       expect(devices).toEqual([{ device: A, lastPushAt: T0 }, { device: B, lastPushAt: T1 }]);
+    });
+  });
+
+  describe('its capabilities', () => {
+    it('answers projection true, frozen, beside fts, vector and graph false, since it has no index', () => {
+      const capabilities = hub().contract().capabilities;
+
+      expect(capabilities).toEqual({ fts: false, graph: false, projection: true, vector: false });
+      expect(Object.isFrozen(capabilities)).toBe(true);
     });
   });
 

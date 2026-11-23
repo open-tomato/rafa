@@ -75,9 +75,12 @@
  * `contract()` answers `WIRE_CONTRACT_VERSION`, the contract version
  * this build's rafa speaks, with the migration ids the store file holds,
  * read from the file as `status()` reads them so the two never disagree.
- * The store {@link openSqliteHubStore} opens answers every capability
- * `false`: it answers push, pull and status and nothing beyond them. The
- * store {@link connectSqliteHub} opens answers its index's capabilities.
+ * The store {@link openSqliteHubStore} opens answers `projection: true`
+ * and `fts`, `vector` and `graph` `false`: projection is a promise about
+ * its own pull, and it has no index to search or walk. The store
+ * {@link connectSqliteHub} opens answers `fts`, `vector` and `graph` from
+ * its index and `projection` from the store, since the index answers no
+ * `projection`.
  *
  * ## The connector
  *
@@ -187,8 +190,8 @@ interface Catalogue {
 /** The merge's project reader: the hub's store names no project. */
 const NO_PROJECT: NonNullable<MergeOptions['readProject']> = () => ({ rootCommit: null, remote: null });
 
-/** What the adapter can answer beyond push, pull and status: nothing. */
-const CAPABILITIES: HubCapabilities = Object.freeze({ fts: false, vector: false, graph: false, projection: false });
+/** What the adapter can answer beyond push, pull and status: a projected pull, and no index of its own. */
+const CAPABILITIES: HubCapabilities = Object.freeze({ fts: false, vector: false, graph: false, projection: true });
 
 const DEVICES_SCHEMA = 'CREATE TABLE IF NOT EXISTS devices (device TEXT PRIMARY KEY NOT NULL, last_push_at TEXT NOT NULL) STRICT';
 
@@ -389,7 +392,11 @@ export async function connectSqliteHub(context: HubStoreContext, options: Sqlite
         half.close();
         await store.close();
       },
-      contract: (): HubContract => Object.freeze({ ...store.contract(), capabilities: index.capabilities() }),
+      contract: (): HubContract => {
+        const own = store.contract();
+        const capabilities: HubCapabilities = Object.freeze({ ...index.capabilities(), projection: own.capabilities.projection });
+        return Object.freeze({ ...own, capabilities });
+      },
     }),
   };
 }

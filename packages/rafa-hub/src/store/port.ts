@@ -18,7 +18,9 @@
  * engine-shaped crosses it; `search` answers row references, a table
  * and an origin pair with a score, never a row body, which a reader
  * fetches through the store. What an index can do is answered by
- * {@link HubIndex.capabilities}, measured when the connector opened.
+ * {@link HubIndex.capabilities}, measured when the connector opened;
+ * whether a pull can be projected is the store's own answer, its
+ * {@link HubContract.capabilities}' `projection`.
  *
  * ## Devices and origins
  *
@@ -146,11 +148,21 @@ export type HubCapabilities = Readonly<{
    * Projected rows answered to a device whose schema is behind the
    * hub's. `true` promises that a pull from such a device answers its
    * rows projected to the device's schema rather than refusing it; a
-   * connector answers `false` until it can project, and then that
-   * device is refused.
+   * store answers `false` until it can project, and then that device is
+   * refused. The store answers it, never the index: it is a promise
+   * about {@link HubStore.pull}, so {@link HubIndexCapabilities} leaves
+   * it out.
    */
   projection: boolean;
 }>;
+
+/**
+ * What an index can answer: {@link HubCapabilities} without
+ * `projection`, which is the store's. A connector composes its store's
+ * {@link HubContract.capabilities} from these three and the store's own
+ * `projection`.
+ */
+export type HubIndexCapabilities = Omit<HubCapabilities, 'projection'>;
 
 /**
  * The wire contract a store speaks: two numbers, never one.
@@ -297,8 +309,8 @@ export interface HubIndex {
   readonly search: (request: IndexSearchRequest) => Promise<IndexSearchResult>;
   /** The nodes reached from one node over `ref_links`, recursively. */
   readonly links: (request: IndexLinksRequest) => Promise<IndexLinksResult>;
-  /** What the index can answer, computed once when the connector opened. */
-  readonly capabilities: () => HubCapabilities;
+  /** What the index can answer, computed once when the connector opened; `projection` is the store's. */
+  readonly capabilities: () => HubIndexCapabilities;
 }
 
 /** What an adapter factory is handed, by the hub or by the contract suite. */
