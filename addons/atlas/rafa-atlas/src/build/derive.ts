@@ -1,6 +1,6 @@
 /**
- * `deriveBuild`: the buckets derived from the effort and git ingests',
- * run after them inside the same build. In order:
+ * `deriveBuild`: the buckets derived from the effort, git and board
+ * ingests', run after them inside the same build. In order:
  *
  * 1. **Work type (D4).** `task_facts.work_type` is the session's change
  *    level read as a kind of work ({@link CHANGE_LEVELS}): `major` and
@@ -43,12 +43,18 @@
  *    `tokens` (summed as the day columns are; null for a plan with no
  *    session). From `ci_facts`: `ci_last_verdict` (the latest reading's),
  *    `ci_red_readings` and `pr_number` (the latest reading's that names
- *    one). `epic_slug` and `merged_at` read NULL until the board and
- *    GitHub sources land, so `local.plans` is stamped partial.
+ *    one). `merged_at` reads NULL until the GitHub source lands, so
+ *    `local.plans` is stamped partial.
  * 4. **`commit_facts.plan_stub`**, the plan whose `plan_facts.pr_number`
  *    is the commit's `pr_number`. A pull request two plans name links
  *    neither, and the commit's plan reads NULL, as does a commit naming
  *    no pull request.
+ * 5. **`plan_facts.epic_slug`**, the `issue_facts.epic_slug` of the
+ *    plan's `issue_number` (`ingest/board.ts`): the slug of the epic the
+ *    plan's issue is a member of, or of the epic itself when the plan's
+ *    issue is one. A plan with no issue number, or one the board cache
+ *    does not hold, reads NULL; with no cache read every plan does, and
+ *    the stamp says so.
  *
  * Each stamp takes the effort ingest's `read_at`, and carries over the
  * reason of each partial input it was derived from. `local.plans`'s
@@ -98,7 +104,7 @@ export const PREFLIGHT_COLUMNS: readonly string[] = ['run_id', 'tier', 'outcome'
 export const UNREAD_DAILY_COLUMNS: readonly string[] = ['prs_merged'];
 
 /** The `plan_facts` columns no source read here fills; they read NULL. */
-export const UNREAD_PLAN_COLUMNS: readonly string[] = ['epic_slug', 'merged_at'];
+export const UNREAD_PLAN_COLUMNS: readonly string[] = ['merged_at'];
 
 /** What one derivation is handed. */
 export interface DeriveOptions {
@@ -106,10 +112,12 @@ export interface DeriveOptions {
   readonly planDir: string;
   /** The effort snapshot the ingest read, opened read-only here for `preflight`. */
   readonly snapshotPath: string;
-  /** The effort ingest's stamps, then the git ingest's; `local.tasks` must be among them. */
+  /** The effort ingest's stamps, then the git and board ingests'; `local.tasks` must be among them. */
   readonly stamps: readonly SourceStamp[];
   /** True when the git ingest read the history into `commit_facts`; `daily_rollup.commits` reads NULL otherwise. */
   readonly gitRead?: boolean;
+  /** True when the board ingest read the cache into `issue_facts`; `plan_facts.epic_slug` reads NULL otherwise. */
+  readonly boardRead?: boolean;
 }
 
 /** One day's preflight runs, and how many of them halted. */
@@ -132,6 +140,8 @@ export interface Derivation {
   readonly workTyped: number;
   /** The `commit_facts` rows given a plan through `plan_facts.pr_number`. */
   readonly commitsLinked: number;
+  /** The `plan_facts` rows given an epic through their issue's `issue_facts.epic_slug`. */
+  readonly plansEpicLinked: number;
   readonly plans: readonly PlanReading[];
   readonly preflight: PreflightRead;
   /** The stamps written: `local.daily`, then `local.plans`. */
@@ -335,6 +345,18 @@ export function linkCommitPlans(database: Database): number {
   return row?.n ?? 0;
 }
 
+/** The UPDATE giving each plan the epic slug of its issue. */
+const PLAN_EPICS = `UPDATE plan_facts SET epic_slug = (
+    SELECT i.epic_slug FROM issue_facts i WHERE i.number = plan_facts.issue_number)
+  WHERE issue_number IS NOT NULL`;
+
+/** Fill `plan_facts.epic_slug` through the plan's `issue_number`; answers the plans given an epic. */
+export function linkPlanEpics(database: Database): number {
+  database.run(PLAN_EPICS);
+  const row = database.query<{ readonly n: number }, []>('SELECT count(*) AS n FROM plan_facts WHERE epic_slug IS NOT NULL').get();
+  return row?.n ?? 0;
+}
+
 /** The modification time of a plan's file, ISO-8601 UTC, or null for a `missing` plan. */
 function modifiedAt(reading: PlanReading): string | null {
   return reading.path === null
@@ -388,18 +410,23 @@ function dailyStamp(stamps: readonly SourceStamp[], readAt: string, rows: number
   return stampOf(DAILY_SOURCE, rows, asOf, readAt, reasonOf(own, inputs));
 }
 
-/** The `local.plans` stamp: the unread columns and its inputs' reasons, as of the newest plan file or input. */
-function plansStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, plans: readonly PlanReading[]): SourceStamp {
+/** The `local.plans` stamp: the unread columns, a missing board cache, and its inputs' reasons, as of the newest plan file or input. */
+function plansStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, plans: readonly PlanReading[], boardRead: boolean): SourceStamp {
   const inputs = inputsOf(stamps, [TASKS_SOURCE, CI_SOURCE]);
-  const own = [unreadSentence(UNREAD_PLAN_COLUMNS, 'the board and GitHub sources')];
+  const own = [
+    unreadSentence(UNREAD_PLAN_COLUMNS, 'the GitHub source'),
+    ...(boardRead
+      ? []
+      : ['no board cache was read; epic_slug reads NULL']),
+  ];
   const asOf = newest([...plans.map(modifiedAt), ...inputs.map((input) => input.asOf)]);
   return stampOf(PLANS_SOURCE, rows, asOf, readAt, reasonOf(own, inputs));
 }
 
 /**
  * Derive the work type, the whole of `daily_rollup` and `plan_facts` in
- * the build, and the plan of each commit, after the effort and git
- * ingests have filled their buckets, and stamp {@link DAILY_SOURCE} then
+ * the build, the plan of each commit and the epic of each plan, after the
+ * effort, git and board ingests have filled their buckets, and stamp {@link DAILY_SOURCE} then
  * {@link PLANS_SOURCE}; see the module note.
  * Throws when `options.stamps` holds no `local.tasks` stamp.
  */
@@ -415,10 +442,14 @@ export function deriveBuild(build: ReplicaBuild, options: DeriveOptions): Deriva
   const plans = readPlans({ planDir: options.planDir, stubs: storeStubs(database) });
   const planRows = insertPlanFacts(database, plans);
   const commitsLinked = linkCommitPlans(database);
+  const boardRead = options.boardRead ?? false;
+  const plansEpicLinked = boardRead
+    ? linkPlanEpics(database)
+    : 0;
   const stamps = [
     dailyStamp(options.stamps, tasks.readAt, days, preflight, gitRead),
-    plansStamp(options.stamps, tasks.readAt, planRows, plans),
+    plansStamp(options.stamps, tasks.readAt, planRows, plans, boardRead),
   ];
   stamps.forEach((stamp) => build.stampSource(stamp));
-  return { workTyped, commitsLinked, plans, preflight, stamps };
+  return { workTyped, commitsLinked, plansEpicLinked, plans, preflight, stamps };
 }

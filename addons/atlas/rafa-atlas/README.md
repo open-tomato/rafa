@@ -44,7 +44,9 @@ every problem named at once. The module reads no core `loadConfig` and no
 bugs, changes and CI from the snapshot), `plans.ts` (plan files), `git.ts`
 (commits, `v*` release tags and stretch marks from the first-parent history
 of `origin/HEAD`'s target, or of `HEAD` when that names none, with git run in
-the project root),
+the project root), `board.ts` (issues and today's counts by board stage from
+the board cache `<root>/.rafa/cache/board.json`, read once per build and
+stamped with its watermark; no cache stamps both sources missing),
 `attribute.ts` (the module column), and `snapshot.ts` (the `vacuumInto`
 copy). `src/build/` is the one-pass builder: `index.ts` writes the replica,
 `derive.ts` the work type and the rollups, `daily.ts` the daily rollup.

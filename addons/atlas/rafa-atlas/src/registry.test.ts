@@ -1,7 +1,8 @@
 /**
  * Tests for `openAtlasRegistry` over a replica built from the ingest's
  * fixture store and the git ingest's fixture repository, made in the same
- * root with `git init`: the eight sources and the metrics by id, each source's
+ * root with `git init`, and the board ingest's fixture cache: the ten
+ * sources and the metrics by id, each source's
  * descriptor with the freshness its build stamped, the replica's build
  * time, the token sum one source answers equal to the other's, the derived
  * columns (`work_type`, the day counts, `local.plans`) read through the
@@ -21,9 +22,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { DAILY_SOURCE } from './build/daily.js';
 import { PLANS_SOURCE } from './build/derive.js';
 import { buildAtlas } from './build/index.js';
+import { BOARD_SOURCE, ISSUES_SOURCE } from './ingest/board.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
+import { FIXTURE_EPIC_SLUG, writeBoardFixture } from './ingest/testdata/board-cache.fixture.js';
 import { writeFactsFixture, writeFixtureStore } from './ingest/testdata/effort-store.fixture.js';
 import { writeGitFixture } from './ingest/testdata/git-repo.fixture.js';
 import { METRIC_CATALOGUE } from './metrics/catalogue.js';
@@ -38,6 +41,7 @@ beforeAll(async () => {
   writeFixtureStore(root);
   writeFactsFixture(root);
   writeGitFixture(root);
+  writeBoardFixture(root);
   await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
   registry = await openAtlasRegistry({ projectRoot: root });
 });
@@ -65,9 +69,9 @@ async function totalOf(id: string, field: string): Promise<unknown> {
 }
 
 describe('openAtlasRegistry over a built replica', () => {
-  it('lists local.tasks, local.daily, local.plans, local.bugs, local.findings, local.ci, local.commits then local.marks, and the catalogue by id', () => {
+  it('lists local.tasks, local.daily, local.plans, local.bugs, local.findings, local.ci, local.commits, local.marks, local.issues then local.board, and the catalogue by id', () => {
     expect([...open().sources.keys()]).toEqual([
-      TASKS_SOURCE, DAILY_SOURCE, PLANS_SOURCE, BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE, COMMITS_SOURCE, MARKS_SOURCE,
+      TASKS_SOURCE, DAILY_SOURCE, PLANS_SOURCE, BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE, COMMITS_SOURCE, MARKS_SOURCE, ISSUES_SOURCE, BOARD_SOURCE,
     ]);
     expect([...open().metrics.keys()]).toEqual(METRIC_CATALOGUE.map((metric) => metric.id));
   });
@@ -81,7 +85,8 @@ describe('openAtlasRegistry over a built replica', () => {
     expect(DataSourceDescriptorSchema.safeParse(daily).success).toBe(true);
     expect(DataSourceDescriptorSchema.safeParse(plans).success).toBe(true);
     expect(plans.partial).toBe(true);
-    expect(plans.partialReasons.join(' ')).toContain('epic_slug, merged_at are not read yet');
+    expect(plans.partialReasons.join(' ')).toContain('merged_at is not read yet');
+    expect(plans.partialReasons.join(' ')).not.toContain('epic_slug');
     expect(tasks.asOf).not.toBeNull();
     expect(daily.partial).toBe(true);
     expect(daily.partialReasons.join(' ')).toContain('prs_merged is not read yet');
@@ -102,6 +107,26 @@ describe('openAtlasRegistry over a built replica', () => {
     expect(Object.fromEntries(marks.rows)).toEqual({ A: 1, M: 3 });
     expect(tags.rows[0]?.[0]).toBe(2);
     expect(await totalOf(DAILY_SOURCE, 'commits')).toBe(7);
+  });
+
+  it('describes local.issues and local.board in the contract\'s shape, and reads WIP by stage and the epic of a bug', async () => {
+    const described = await Promise.all([ISSUES_SOURCE, BOARD_SOURCE].map(async (id) => sourceOf(id).describe()));
+    const stages = await sourceOf(ISSUES_SOURCE).query({
+      filters: [{ field: 'state', op: 'eq', value: 'OPEN' }],
+      groupBy: ['stage'],
+      measures: [{ field: 'number', agg: 'count', as: 'n' }],
+    });
+    const bugs = await sourceOf(ISSUES_SOURCE).query({
+      filters: [{ field: 'is_bug', op: 'eq', value: 1 }, { field: 'epic_slug', op: 'eq', value: FIXTURE_EPIC_SLUG }],
+      measures: [{ field: 'number', agg: 'count', as: 'n' }],
+    });
+    const snapshot = await sourceOf(BOARD_SOURCE).query({ measures: [{ field: 'count', agg: 'sum', as: 'issues' }] });
+
+    expect(described.every((descriptor) => DataSourceDescriptorSchema.safeParse(descriptor).success)).toBe(true);
+    expect(described.map((descriptor) => descriptor.partial)).toEqual([true, false]);
+    expect(Object.fromEntries(stages.rows)).toEqual(expect.objectContaining({ 'In development': 1, 'Claimed': 1 }));
+    expect(bugs.rows[0]?.[0]).toBe(1);
+    expect(snapshot.rows[0]?.[0]).toBe(6);
   });
 
   it('describes local.bugs, local.findings and local.ci in the contract\'s shape, each with the rows its build stamped', async () => {

@@ -14,13 +14,18 @@
  *    `local.marks`; git runs in the project root through the options'
  *    runner. When git gives no history for the root, both are stamped
  *    missing and the build goes on.
- * 3. `deriveBuild` (`derive.ts`) gives each session its work type
+ * 3. `ingestBoard` reads the board cache at `<root>/.rafa/cache/board.json`
+ *    once (D14) into `issue_facts` and today's counts by stage into
+ *    `board_snapshot`, stamping `local.issues` and `local.board` with the
+ *    cache's watermark; no `gh` call is made. With no cache both are
+ *    stamped missing and the build goes on.
+ * 4. `deriveBuild` (`derive.ts`) gives each session its work type
  *    (D4), derives `daily_rollup` from the buckets and the snapshot's
  *    preflight runs, `plan_facts` from them and the plan folder
- *    (`readPlans`), and each commit's plan, stamping `local.daily` and
- *    `local.plans`.
+ *    (`readPlans`), each commit's plan and each plan's epic, stamping
+ *    `local.daily` and `local.plans`.
  *
- * All three run inside one `writeReplica`, so the replica at
+ * All four run inside one `writeReplica`, so the replica at
  * `<root>/.rafa/atlas/atlas.sqlite` is replaced whole by one rename, and
  * a failed step leaves the earlier replica as it was.
  *
@@ -37,6 +42,7 @@ import { basename, join } from 'node:path';
 import { writeReplica } from '@open-tomato/atlas-data/replica';
 
 import { DEFAULT_MODULE_GLOBS, discoverModules } from '../ingest/attribute.js';
+import { ingestBoard } from '../ingest/board.js';
 import { ingestEffort } from '../ingest/effort.js';
 import { createGitRunner, ingestGit } from '../ingest/git.js';
 import { DEFAULT_PLAN_DIR } from '../ingest/plans.js';
@@ -106,13 +112,20 @@ export async function buildAtlas(options: BuildOptions): Promise<BuildSummary> {
         ? {}
         : { now: options.now }),
     });
+    const board = ingestBoard(build, {
+      root: options.projectRoot,
+      ...(options.now === undefined
+        ? {}
+        : { now: options.now }),
+    });
     const derived = deriveBuild(build, {
       planDir: options.planDir ?? join(options.projectRoot, DEFAULT_PLAN_DIR),
       snapshotPath: effort.snapshot.snapshotPath,
-      stamps: [...effort.stamps, ...git.stamps],
+      stamps: [...effort.stamps, ...git.stamps, ...board.stamps],
       gitRead: git.read,
+      boardRead: board.read,
     });
-    return [...effort.stamps, ...git.stamps, ...derived.stamps];
+    return [...effort.stamps, ...git.stamps, ...board.stamps, ...derived.stamps];
   });
   return { replicaPath, buildId: result.buildId, tables: result.tables, sources: result.value };
 }

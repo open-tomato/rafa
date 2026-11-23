@@ -17,6 +17,11 @@
  * `git init` there, so no case reads the project's history: the commit
  * counts per day of `daily_rollup` are checked against counts taken in
  * TypeScript over the replica's `commit_facts`.
+ *
+ * The board cases plant the board ingest's fixture cache
+ * (`ingest/testdata/board-cache.fixture.ts`) in the same root, written in
+ * tmpdir with invented bodies: the fixture plan's issue 42 is a member of
+ * the fixture epic, and the done plan's issue 7 of none.
  */
 import type { Derivation } from './derive.js';
 import type { ReportChange } from '@open-tomato/rafa-core/report/parse';
@@ -34,9 +39,11 @@ import { writeTaskReport } from '@open-tomato/rafa-core/store/reports';
 import { openSqliteStore } from '@open-tomato/rafa-core/store/sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { ingestBoard } from '../ingest/board.js';
 import { ingestEffort, TASKS_SOURCE } from '../ingest/effort.js';
 import { COMMITS_SOURCE, createGitRunner, ingestGit } from '../ingest/git.js';
 import { DEFAULT_PLAN_DIR } from '../ingest/plans.js';
+import { FIXTURE_EPIC_SLUG, writeBoardFixture } from '../ingest/testdata/board-cache.fixture.js';
 import {
   FIXTURE_PLAN,
   FIXTURE_TASK_LINE,
@@ -54,6 +61,7 @@ import {
   deriveBuild,
   deriveWorkType,
   linkCommitPlans,
+  linkPlanEpics,
   PLANS_SOURCE,
   UNREAD_DAILY_COLUMNS,
   UNREAD_PLAN_COLUMNS,
@@ -154,23 +162,36 @@ function writeDeriveFixture(root: string): void {
   writeFileSync(join(planDir, `PLAN-${DONE_PLAN}.md`), planText(DONE_PLAN, '#7', ['[x]', '[x]']));
 }
 
-/** Build the fixture under a fresh root, `widen` run on it first and git read as `git` says; answers the derivation and the replica's rows. */
-async function build(name: string, widen: (root: string) => void = () => undefined, git: GitCase = 'skipped'): Promise<Built> {
+/** Whether a build runs the board ingest: not at all, over the fixture cache, or over a root holding none. */
+type BoardCase = 'skipped' | 'cache' | 'no-cache';
+
+/** Build the fixture under a fresh root, `widen` run on it first and git and the board read as `git` and `board` say; answers the derivation and the replica's rows. */
+async function build(
+  name: string,
+  widen: (root: string) => void = () => undefined,
+  git: GitCase = 'skipped',
+  board: BoardCase = 'skipped',
+): Promise<Built> {
   const root = join(scope, name);
   writeDeriveFixture(root);
   widen(root);
   if (git === 'repo') writeGitFixture(root);
+  if (board === 'cache') writeBoardFixture(root);
   const replicaPath = join(root, '.rafa', 'atlas', 'atlas.sqlite');
   const result = await writeReplica({ replicaPath, projectLabel: 'fixture' }, (replica) => {
     const effort = ingestEffort(replica, { root, env: {} });
     const read = git === 'skipped'
       ? null
       : ingestGit(replica, { runner: createGitRunner(root) });
+    const cache = board === 'skipped'
+      ? null
+      : ingestBoard(replica, { root });
     return deriveBuild(replica, {
       planDir: join(root, DEFAULT_PLAN_DIR),
       snapshotPath: effort.snapshot.snapshotPath,
-      stamps: [...effort.stamps, ...(read?.stamps ?? [])],
+      stamps: [...effort.stamps, ...(read?.stamps ?? []), ...(cache?.stamps ?? [])],
       gitRead: read?.read ?? false,
+      boardRead: cache?.read ?? false,
     });
   });
   const reader = openReplica(replicaPath);
@@ -341,12 +362,15 @@ describe('deriveBuild, plan_facts', () => {
     }));
   });
 
-  it('stamps local.plans partial, naming the columns no source fills', async () => {
+  it('stamps local.plans partial, naming the columns no source fills and epic_slug with no board cache read', async () => {
     const { derivation, plans } = await mainBuild();
 
     const stamp = derivation.stamps.find((each) => each.source === PLANS_SOURCE);
     expect(stamp).toEqual(expect.objectContaining({ rows: plans.length, partial: true }));
     for (const column of UNREAD_PLAN_COLUMNS) expect(stamp?.reason).toContain(column);
+    expect(stamp?.reason).toContain('no board cache was read; epic_slug reads NULL');
+    expect(plans.map((plan) => plan.epic_slug)).toEqual([null, null, null]);
+    expect(derivation.plansEpicLinked).toBe(0);
     expect(stamp?.asOf).not.toBeNull();
   });
 });
@@ -506,6 +530,78 @@ describe('deriveBuild over a root holding a git repository', () => {
     for (const row of days) expect(row['commits']).toBeNull();
     expect(reason).toContain('no git history was read; commits reads NULL');
     expect(reason).toContain(`${COMMITS_SOURCE}: no git history read`);
+  });
+});
+
+describe('deriveBuild over a root holding the board cache', () => {
+  let withBoard: Promise<Built> | undefined;
+
+  /** The fixture built with the board fixture cache in its root. */
+  function boardBuild(): Promise<Built> {
+    withBoard ??= build('board', () => undefined, 'skipped', 'cache');
+    return withBoard;
+  }
+
+  it('gives a plan the epic slug of its issue, and NULL to a plan whose issue has none or that names no issue', async () => {
+    const { plans, derivation } = await boardBuild();
+
+    expect(Object.fromEntries(plans.map((plan) => [plan.plan_stub, [plan.issue_number, plan.epic_slug]]))).toEqual({
+      [FIXTURE_PLAN]: [42, FIXTURE_EPIC_SLUG],
+      [DONE_PLAN]: [7, null],
+      [GONE_PLAN]: [null, null],
+    });
+    expect(derivation.plansEpicLinked).toBe(1);
+  });
+
+  it('names only merged_at in the local.plans stamp once the cache is read', async () => {
+    const { derivation } = await boardBuild();
+    const reason = derivation.stamps.find((each) => each.source === PLANS_SOURCE)?.reason;
+
+    expect(reason).toContain('merged_at is not read yet (the GitHub source)');
+    expect(reason).not.toContain('epic_slug');
+  });
+
+  it('control: over a root holding no cache, reads every epic_slug NULL and names the missing cache', async () => {
+    const { plans, derivation } = await build('board-none', () => undefined, 'skipped', 'no-cache');
+
+    expect(plans.map((plan) => plan.epic_slug)).toEqual([null, null, null]);
+    expect(derivation.stamps.find((each) => each.source === PLANS_SOURCE)?.reason)
+      .toContain('no board cache was read; epic_slug reads NULL');
+  });
+});
+
+describe('linkPlanEpics', () => {
+  it('copies the epic slug of the plan\'s issue, leaving a plan with no issue or an unknown one NULL', async () => {
+    const replicaPath = join(scope, 'link-epics', 'atlas.sqlite');
+    const result = await writeReplica({ replicaPath, projectLabel: 'link-epics' }, (replica) => {
+      const { database } = replica;
+      const plan = database.prepare<unknown, [string, number | null]>(
+        `INSERT INTO plan_facts (plan_stub, plan_source, issue_number, sessions, task_sessions, reports_done, reports_blocked,
+          repeat_sessions, ci_repair_sessions) VALUES (?, 'plan', ?, 0, 0, 0, 0, 0, 0)`,
+      );
+      plan.run('member-plan', 1);
+      plan.run('loose-plan', 2);
+      plan.run('no-issue', null);
+      plan.run('unknown-issue', 9);
+      const issue = database.prepare<unknown, [number, string | null]>(
+        'INSERT INTO issue_facts (number, is_bug, is_epic, epic_slug) VALUES (?, 0, 0, ?)',
+      );
+      issue.run(1, 'slug-one');
+      issue.run(2, null);
+      const linked = linkPlanEpics(database);
+      const rows = database.query<{ readonly plan_stub: string; readonly epic_slug: string | null }, []>(
+        'SELECT plan_stub, epic_slug FROM plan_facts ORDER BY plan_stub',
+      ).all();
+      return { linked, rows };
+    });
+
+    expect(result.value.linked).toBe(1);
+    expect(result.value.rows).toEqual([
+      { plan_stub: 'loose-plan', epic_slug: null },
+      { plan_stub: 'member-plan', epic_slug: 'slug-one' },
+      { plan_stub: 'no-issue', epic_slug: null },
+      { plan_stub: 'unknown-issue', epic_slug: null },
+    ]);
   });
 });
 

@@ -3,8 +3,9 @@
  * bucket: `local.tasks` over `task_facts`, `local.daily` over
  * `daily_rollup`, `local.plans` over `plan_facts`, `local.bugs` over
  * `bug_facts`, `local.findings` over `finding_facts`, `local.ci` over
- * `ci_facts`, `local.commits` over `commit_facts` and `local.marks` over
- * `stretch_marks`. The build stamps `local.changes` too, and no spec here
+ * `ci_facts`, `local.commits` over `commit_facts`, `local.marks` over
+ * `stretch_marks`, `local.issues` over `issue_facts` and `local.board`
+ * over `board_snapshot`. The build stamps `local.changes` too, and no spec here
  * defines it yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
@@ -19,6 +20,7 @@ import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
 
 import { DAILY_SOURCE } from './build/daily.js';
 import { PLANS_SOURCE } from './build/derive.js';
+import { BOARD_SOURCE, ISSUES_SOURCE } from './ingest/board.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
@@ -322,7 +324,65 @@ export const MARKS_SPEC: TableSourceSpec = {
   table: 'stretch_marks',
 };
 
+/** A 0-or-1 column, summed to count the rows it holds for. */
+function flagMeasure(key: string, label: string, unit: string, description: string): FieldDescriptor {
+  return { ...measure(key, label, 'integer', unit), description };
+}
+
+/** `local.issues`: one row per issue the board cache holds, from `issue_facts`. */
+export const ISSUES_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: ISSUES_SOURCE,
+    source: 'local',
+    channel: 'issues',
+    title: 'Issues',
+    description: 'One row per issue of the board cache rafa keeps, read offline as of its watermark; created and closed times come from the GitHub source.',
+    timeField: 'created_at',
+    grains: ['day', 'week', 'month', 'all'],
+    fields: [
+      numberId('number', 'Issue', 'issue'),
+      dimension('title', 'Title'),
+      dimension('state', 'State', 'OPEN or CLOSED'),
+      dimension('state_reason', 'Close reason', 'GitHub\'s value: COMPLETED, NOT_PLANNED or DUPLICATE; NULL while open'),
+      { ...dimension('labels_json', 'Labels', 'the label names, as a JSON array'), type: 'json' },
+      flagMeasure('is_bug', 'Bug', 'issues', '1 for an issue labelled type:bug or bug'),
+      flagMeasure('is_epic', 'Epic', 'issues', '1 for an issue labelled type:epic'),
+      dimension('epic_slug', 'Epic', 'the slug of the first epic: label'),
+      numberId('parent_number', 'Parent epic', 'issue'),
+      time('created_at', 'Created', 'datetime'),
+      time('closed_at', 'Closed', 'datetime'),
+      dimension('stage', 'Stage', 'the board Stage its state and labels read; NULL for an epic'),
+      dimension('stage_basis', 'Stage basis', 'labels offline; labels+prs when the GitHub source read the closing pull requests'),
+      dimension('horizon', 'Horizon', 'now, next or later for an epic; NULL for any other issue'),
+      dimension('plan_stub', 'Plan', 'the plan its body names in a ## Plan block or a follow-ups comment; NULL for one filed by hand'),
+      dimension('module', 'Module', 'the module:<x> label\'s value'),
+      dimension('priority', 'Priority', 'the priority:<x> label\'s value'),
+    ],
+  },
+  table: 'issue_facts',
+};
+
+/** `local.board`: one row per day and board stage a build counted, from `board_snapshot`. */
+export const BOARD_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: BOARD_SOURCE,
+    source: 'local',
+    channel: 'board',
+    title: 'Board snapshots',
+    description: 'One row per day and board stage: the issues in the stage on the day a build ran, carried from build to build.',
+    timeField: 'day',
+    grains: ['day', 'week', 'month', 'all'],
+    fields: [
+      time('day', 'Day', 'date'),
+      time('taken_at', 'Taken', 'datetime'),
+      dimension('stage', 'Stage'),
+      measure('count', 'Issues', 'integer', 'issues'),
+    ],
+  },
+  table: 'board_snapshot',
+};
+
 /** Every source spec the registry defines, in the order `/sources` lists them. */
 export const SOURCE_SPECS: readonly TableSourceSpec[] = [
-  TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC,
+  TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC, ISSUES_SPEC, BOARD_SPEC,
 ];
