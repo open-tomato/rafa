@@ -12,9 +12,9 @@
  * plain 404, which the live page shows as its error state.
  *
  * With a store and no replica at `<root>/.rafa/atlas/atlas.sqlite`, the
- * server builds the replica before it listens, until rafa-atlas's `build`
- * command takes that over. The build copies the live store with core's
- * `vacuumInto` and reads only the copy.
+ * server builds nothing: it mounts no API and prints the rafa-atlas
+ * `build` line that writes the replica, `BUILD_LINE`. The build copies the
+ * live store with core's `vacuumInto` and reads only the copy.
  */
 import type { Server } from 'bun';
 
@@ -22,7 +22,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createAtlasHandler, toFetchHandler } from '@open-tomato/atlas-transport/server';
-import { buildAtlas, effortStorePathOf, replicaPathOf } from '@open-tomato/rafa-atlas/build';
+import { effortStorePathOf, replicaPathOf } from '@open-tomato/rafa-atlas/build';
 import { openAtlasRegistry } from '@open-tomato/rafa-atlas/registry';
 
 import { LIVE_API_BASE } from './data/live.js';
@@ -33,6 +33,9 @@ export const DEFAULT_PORT = 4319;
 
 /** Loopback only: the API serves a project's effort data with no auth. */
 const HOSTNAME = '127.0.0.1';
+
+/** The line that writes the replica, as rafa-atlas's `build` command names it. */
+export const BUILD_LINE = 'rafa module exec @open-tomato/rafa-atlas build';
 
 /** The repository this file sits in: src, demo, atlas, addons, then the root. */
 const REPOSITORY_ROOT: string = resolve(import.meta.dir, '..', '..', '..', '..');
@@ -53,12 +56,18 @@ export interface AtlasMount {
   readonly projectRoot: string;
   readonly storePath: string;
   readonly replicaPath: string;
-  /** True when this start built the replica, which was not there. */
-  readonly built: boolean;
   /** The fetch adapter, mounted at `/api/atlas`. */
   readonly fetch: (request: Request) => Promise<Response>;
   /** Closes the replica reader. */
   close(): void;
+}
+
+/** Why the API is not mounted: no effort store, or a store with no replica built yet. */
+export interface MountAbsence {
+  readonly reason: 'no-store' | 'no-replica';
+  readonly projectRoot: string;
+  readonly storePath: string;
+  readonly replicaPath: string;
 }
 
 export interface MountOptions {
@@ -70,17 +79,17 @@ export interface MountOptions {
 }
 
 /**
- * The API over `options.projectRoot`, or null when no effort store is
- * there. Builds the replica first when there is none; throws when
- * `RAFA_EFFORT_DIR` is set but not usable, as `effortStoreDir` does.
+ * The API over `options.projectRoot`, or the absence that keeps it
+ * unmounted: no effort store there, or no replica built from it. Builds
+ * nothing; throws when `RAFA_EFFORT_DIR` is set but not usable, as
+ * `effortStoreDir` does.
  */
-export async function mountAtlas(options: MountOptions): Promise<AtlasMount | null> {
+export async function mountAtlas(options: MountOptions): Promise<AtlasMount | MountAbsence> {
   const { projectRoot, env } = options;
   const storePath = effortStorePathOf(projectRoot, env);
-  if (!existsSync(storePath)) return null;
   const replicaPath = replicaPathOf(projectRoot);
-  const built = !existsSync(replicaPath);
-  if (built) await buildAtlas({ projectRoot, env });
+  if (!existsSync(storePath)) return { reason: 'no-store', projectRoot, storePath, replicaPath };
+  if (!existsSync(replicaPath)) return { reason: 'no-replica', projectRoot, storePath, replicaPath };
   const registry = await openAtlasRegistry({ projectRoot });
   const handler = createAtlasHandler(registry, options.onError === undefined
     ? {}
@@ -89,7 +98,6 @@ export async function mountAtlas(options: MountOptions): Promise<AtlasMount | nu
     projectRoot,
     storePath,
     replicaPath,
-    built,
     fetch: toFetchHandler(handler, { basePath: LIVE_API_BASE }),
     close: () => {
       registry.close();
@@ -108,24 +116,32 @@ export interface DemoServerOptions {
   readonly onError?: (error: unknown) => void;
 }
 
-/** A started demo: the server, the API it mounted (null for none), and a stop for both. */
+/** A started demo: the server, the API it mounted (null for none) or why not, and a stop for both. */
 export interface DemoServer {
   readonly server: Server<undefined>;
   readonly projectRoot: string;
   readonly mount: AtlasMount | null;
+  /** Why no API is mounted; null when one is. */
+  readonly absence: MountAbsence | null;
   stop(): Promise<void>;
 }
 
 /** Starts the demo: the page at `/`, and the API under `/api/atlas` when a store resolves. */
 export async function startDemoServer(options: DemoServerOptions): Promise<DemoServer> {
   const projectRoot = resolveProjectRoot(options.env, options.defaultRoot);
-  const mount = await mountAtlas({
+  const mounted = await mountAtlas({
     projectRoot,
     env: options.env,
     ...(options.onError === undefined
       ? {}
       : { onError: options.onError }),
   });
+  const mount = 'fetch' in mounted
+    ? mounted
+    : null;
+  const absence = 'fetch' in mounted
+    ? null
+    : mounted;
   const api = mount === null
     ? {}
     : { [`${LIVE_API_BASE}/*`]: (request: Request) => mount.fetch(request) };
@@ -142,6 +158,7 @@ export async function startDemoServer(options: DemoServerOptions): Promise<DemoS
     server,
     projectRoot,
     mount,
+    absence,
     stop: async () => {
       await server.stop(true);
       mount?.close();
@@ -151,14 +168,15 @@ export async function startDemoServer(options: DemoServerOptions): Promise<DemoS
 
 /** The line the server prints about the API: where it reads, or why it is not mounted. */
 export function apiLine(demo: DemoServer): string {
+  if (demo.absence?.reason === 'no-replica') {
+    return `Atlas API not mounted: no replica at ${demo.absence.replicaPath}. Build it with`
+      + ` ATLAS_PROJECT_ROOT=${demo.projectRoot} ${BUILD_LINE}, then start the demo again.`;
+  }
   if (demo.mount === null) {
     return `Atlas API not mounted: no effort store under ${demo.projectRoot}. From a worktree, set`
       + ' ATLAS_PROJECT_ROOT to the main checkout; the page draws mock data without it.';
   }
-  const built = demo.mount.built
-    ? ', built on this start'
-    : '';
-  return `Atlas API at ${new URL(LIVE_API_BASE, demo.server.url).href} over ${demo.mount.replicaPath}${built}; open the page with ?source=live.`;
+  return `Atlas API at ${new URL(LIVE_API_BASE, demo.server.url).href} over ${demo.mount.replicaPath}; open the page with ?source=live.`;
 }
 
 if (import.meta.main) {

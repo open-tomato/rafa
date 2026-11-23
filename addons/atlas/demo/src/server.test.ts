@@ -2,8 +2,9 @@
  * Tests for the demo server: `Bun.serve` on port 0 over a fixture replica
  * in a tmpdir answers the six sources on `GET /api/atlas/sources`, lists
  * the metrics the live source runs, and feeds the live source end to end;
- * a root with no effort store mounts no API (D7), and `RAFA_EFFORT_DIR`
- * wins over the root.
+ * a root with no effort store mounts no API (D7), a store with no replica
+ * mounts none either and names the `build` line, building nothing, and
+ * `RAFA_EFFORT_DIR` wins over the root.
  *
  * The replica is written with the replica writer, rows made up here and
  * dated yesterday and the day before, so the live source's `last` windows
@@ -21,7 +22,7 @@ import type { LensResult } from './data/source.js';
 import type { DemoServer } from './server.js';
 import type { DataSourceDescriptor, Envelope, MetricDefinition } from '@open-tomato/atlas-data/contract';
 
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -32,7 +33,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { useBunNetwork } from '../test/bun-network.js';
 
 import { createLiveLensSource, LIVE_API_BASE, LIVE_METRICS, LIVE_UNAVAILABLE } from './data/live.js';
-import { resolveProjectRoot, startDemoServer } from './server.js';
+import { apiLine, BUILD_LINE, resolveProjectRoot, startDemoServer } from './server.js';
 
 const DAY_MS = 86_400_000;
 
@@ -44,6 +45,8 @@ const bare = join(scope, 'bare');
 /** A replica but no store of its own; a store elsewhere for `RAFA_EFFORT_DIR`. */
 const copied = join(scope, 'copied');
 const storeCopy = join(scope, 'store-copy');
+/** A store and no replica: the API does not mount, and the line names the build. */
+const unbuilt = join(scope, 'unbuilt');
 
 /** A day `back` days before today (UTC), as `YYYY-MM-DD`. */
 function daysAgo(back: number): string {
@@ -85,6 +88,7 @@ beforeAll(async () => {
   mkdirSync(bare, { recursive: true });
   await writeFixtureReplica(copied);
   plantStore(storeCopy);
+  plantStore(join(unbuilt, '.rafa', 'effort'));
   demo = await startDemoServer({ env: { ATLAS_PROJECT_ROOT: project }, port: 0 });
 });
 
@@ -123,7 +127,8 @@ describe('the demo server over a fixture replica', () => {
     const { mount } = started();
 
     expect(mount?.projectRoot).toBe(project);
-    expect(mount?.built).toBe(false);
+    expect(started().absence).toBeNull();
+    expect(apiLine(started())).toContain('?source=live');
     expect(started().server.port).toBeGreaterThan(0);
   });
 
@@ -150,6 +155,34 @@ describe('the demo server over a fixture replica', () => {
     expect(result.mock.tokensPerDay.map((point) => point.y)).toEqual([1_000, 3_000]);
     expect(result.mock.tokensByModel.map((series) => series.id)).toEqual(['stub-model-b', 'stub-model-a']);
     expect(result.mock.taskMinutesQuantiles.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the demo server over a store with no replica', () => {
+  it('mounts no API, builds nothing, and names the build line', async () => {
+    const plain = await startDemoServer({ env: { ATLAS_PROJECT_ROOT: unbuilt }, port: 0 });
+    try {
+      const replicaPath = join(unbuilt, '.rafa', 'atlas', 'atlas.sqlite');
+
+      expect(plain.mount).toBeNull();
+      expect(plain.absence?.reason).toBe('no-replica');
+      expect(existsSync(replicaPath)).toBe(false);
+      expect((await fetch(apiUrl(plain, '/sources'))).status).toBe(404);
+      expect(apiLine(plain)).toContain(`ATLAS_PROJECT_ROOT=${unbuilt} ${BUILD_LINE}`);
+      expect(apiLine(plain)).toContain(replicaPath);
+    } finally {
+      await plain.stop();
+    }
+  });
+
+  it('control: a root with no store at all names the missing store, not the build', async () => {
+    const plain = await startDemoServer({ env: {}, port: 0, defaultRoot: bare });
+    try {
+      expect(plain.absence?.reason).toBe('no-store');
+      expect(apiLine(plain)).not.toContain(BUILD_LINE);
+    } finally {
+      await plain.stop();
+    }
   });
 });
 
