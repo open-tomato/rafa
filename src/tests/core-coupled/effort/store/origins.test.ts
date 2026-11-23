@@ -653,6 +653,7 @@ describe('the production inserts, read from source', () => {
       ['fixture-extract.ts: ', '${', 'quoted(table)}'].join(''),
       ['merge-conflicts.ts: ', '${', 'quoted(table)}'].join(''),
       'merge-conflicts.ts: merge_conflicts',
+      ['merge-store.ts: ', '${', 'HELD_TABLE}'].join(''),
       'merge-store.ts: merges',
       ['merge-union.ts: ', '${', 'quoted(table)}'].join(''),
       'store-meta.ts: store_meta',
