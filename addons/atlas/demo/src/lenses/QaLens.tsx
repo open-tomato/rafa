@@ -1,6 +1,6 @@
 import type { LensResult } from '../data/source.js';
 
-import { DataTable, useDashboard } from '@open-tomato/atlas-ui';
+import { CardStatus, DataTable, useDashboard } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
@@ -55,6 +55,12 @@ const FLAKY = cardSpec({
   primitive: 'DataTable',
   span: 'two',
 });
+
+/** What the flaky card says over a window with no flaky reading in it. */
+export const NO_FLAKY_TITLE = 'No flaky check in this range';
+
+/** The line under it: what a flaky reading is, and where to look for one. */
+const NO_FLAKY_DETAIL = 'A check counts as flaky when a head read red and later green with no new commit. No reading in this range did; a longer range may hold one.';
 
 function sumOf(row: Readonly<Record<string, number>>): number {
   return Object.values(row).reduce((sum, value) => sum + value, 0);
@@ -228,14 +234,16 @@ export function QaLens(): ReactElement {
             reads={['flakyChecks']}
             liveSubtitle="checks failing on heads that later read green; readings counts those heads"
             select={(result: LensResult) => result.mock.flakyChecks}>
-            {({ data: checks }) => (
-              <DataTable
-                caption="Checks that failed most often across CI readings"
-                columns={['Check', 'Failures', 'Readings', 'Failure share']}
-                rows={checks.map((check) => [check.name, check.failures, check.readings, formatPercent(check.failures / check.readings)])}
-                sortable
-              />
-            )}
+            {({ data: checks }) => (checks.length === 0
+              ? <CardStatus kind="empty" title={NO_FLAKY_TITLE} detail={NO_FLAKY_DETAIL} />
+              : (
+                <DataTable
+                  caption="Checks that failed most often across CI readings"
+                  columns={['Check', 'Failures', 'Readings', 'Failure share']}
+                  rows={checks.map((check) => [check.name, check.failures, check.readings, formatPercent(check.failures / check.readings)])}
+                  sortable
+                />
+              ))}
           </LensCard>
         </>
       )}

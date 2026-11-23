@@ -10,6 +10,7 @@
  * whose primitives render a labelled element; the engine is the charts
  * package's to test. The source answers with no delay.
  */
+import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { ChartPrimitives } from '@open-tomato/charts';
 import type { ReactElement } from 'react';
@@ -20,9 +21,10 @@ import { createElement } from 'react';
 
 import { App } from './App.js';
 import { GITHUB_BUILD_LINE, GITHUB_NOT_READ } from './data/live-sources.js';
-import { createLiveLensSource } from './data/live.js';
+import { createLiveLensSource, LIVE_METRICS } from './data/live.js';
 import { createLensSource, lensResultOf, type LensResult } from './data/source.js';
-import { stubLiveClient } from './data/testdata/live-client.fixture.js';
+import { noRowsOf, stubLiveClient } from './data/testdata/live-client.fixture.js';
+import { NO_FLAKY_TITLE } from './lenses/QaLens.js';
 
 /** The card titles each lens shows, by the tab that opens it. */
 const LENS_CARDS: Readonly<Record<string, readonly string[]>> = {
@@ -299,6 +301,26 @@ describe('App, by page source', () => {
     expect(within(openBugs).getByText(GITHUB_NOT_READ)).toBeDefined();
     expect(within(resolution).getByText(GITHUB_NOT_READ)).toBeDefined();
     expect(within(openBugs).getByText((text) => text.includes(GITHUB_BUILD_LINE))).toBeDefined();
+  });
+
+  it('over a range with no flaky reading, says so on the flaky card in place of a table with no rows', async () => {
+    const { client } = stubLiveClient();
+    const noFlaky: AtlasClient = {
+      ...client,
+      runMetric: async (id, window, signal) => {
+        const answer = await client.runMetric(id, window, signal);
+        return id === LIVE_METRICS.flakyChecks
+          ? noRowsOf(answer)
+          : answer;
+      },
+    };
+    renderApp(createLiveLensSource(noFlaky));
+    fireEvent.click(screen.getByRole('tab', { name: 'QA' }));
+    await settle();
+    const flaky = screen.getByRole('region', { name: 'Flaky checks, top 10' });
+
+    expect(within(flaky).getByText(NO_FLAKY_TITLE)).toBeDefined();
+    expect(within(flaky).queryByRole('table')).toBeNull();
   });
 
   it('control: a card no live metric feeds keeps the general not-wired line, not the --github one', async () => {
