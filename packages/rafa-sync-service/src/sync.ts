@@ -93,6 +93,33 @@
  * names them. A projected answer naming no `projectedColumns` counts
  * none.
  *
+ * ## The refill
+ *
+ * The refill is the first pull, under either `syncSkew`, from a build
+ * whose catalogue knows every migration id the store's `held_rows`
+ * lists (core's `readHeldMigrations`) while the state file keeps a
+ * `heldBack`: that pull asks the hub past `heldBack`'s cursor rather
+ * than the pull cursor, so every row a projected contact cut comes
+ * again. A build still lacking a listed id pulls past the pull cursor,
+ * projected under `pull-projected` as above. The refill's answer is
+ * merged as any pull's, and a whole one, naming no `projected`, takes
+ * each held row whole (`mergeStore`'s held-copy step); outside a dry
+ * run `heldBack` is then cleared, once the pull cursor is written. A
+ * refill that merged answers `pulled` with the notice `effort sync:
+ * refilled <n> rows held back since <date>`, `<n>` the merge's
+ * `rowsRefilled` and `<date>` the UTC date `heldBack` was kept. A
+ * refill answered projected again, by a hub that went further ahead
+ * than this build, keeps `heldBack` and answers the `pulled <n> rows
+ * projected` line; a dry run merges, checks and deletes and clears
+ * nothing.
+ *
+ * A `heldBack` with nothing listed in `held_rows`, kept by a projected
+ * answer that cut no table, is no refill: its contact pulls past the
+ * pull cursor, since a pull past `heldBack` would refill nothing and,
+ * on a build still behind, be projected again on every contact. A
+ * whole answer to it clears `heldBack` outside a dry run, as nothing
+ * waits to be refilled.
+ *
  * The request's `sessionId` is the merge's own: a loop run's end-of-task
  * pull names its session id, and the merge's live-loop guard passes that
  * run's record and refuses any other live one, sharing its pid or not.
@@ -157,6 +184,7 @@ import {
   materialiseWirePayload,
   mergeStore,
   openSqliteStore,
+  readHeldMigrations,
   STORE_BACKENDS,
   WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
@@ -165,11 +193,14 @@ import {
 import { Database } from 'bun:sqlite';
 
 import { createHubClient, HubRefused } from './client.js';
-import { keepHeldBack, readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
+import { clearHeldBack, keepHeldBack, readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
 import { defaultSecretReader, readHubToken } from './token.js';
 
 /** The status a hub's migration refusal answers with. */
 const CONFLICT = 409;
+
+/** How many characters of an ISO 8601 time are its date: `YYYY-MM-DD`. */
+const ISO_DATE_LENGTH = 10;
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync (service)';
@@ -271,6 +302,18 @@ async function pullOrRefuse(client: HubClient, origin: string, since: WireCursor
 /** The line a projected pull that merged answers; see the module note for what `rows` and `columns` count. */
 export function projectedPullLine(rows: number, columns: number): string {
   return `effort sync: pulled ${String(rows)} rows projected to this rafa's schema; ${String(columns)} columns wait for ${SELF_UPDATE}`;
+}
+
+/**
+ * The line a refill that merged answers: `rows` the held rows the merge
+ * took whole, `since` the time `heldBack` was kept, written as its UTC
+ * date. See the module note.
+ */
+export function refilledLine(rows: number, since: string): string {
+  const date = new Date(since)
+    .toISOString()
+    .slice(0, ISO_DATE_LENGTH);
+  return `effort sync: refilled ${String(rows)} rows held back since ${date}`;
 }
 
 /** The next step a contract mismatch names when this rafa is ahead of the hub at `url`. */
@@ -512,7 +555,16 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
     if (origin === undefined) return NOTHING_TO_SYNC;
     const reached = await agreedClient();
     known ??= learnMigrations(now);
-    const since = readSyncCursors(statePath, origin, hub.url).pull;
+    const cursors = readSyncCursors(statePath, origin, hub.url);
+    const { heldBack } = cursors;
+    const held = heldBack === undefined
+      ? []
+      : readHeldMigrations(storePath);
+    const caughtUp = held.every((id) => known?.includes(id) === true);
+    const refill = heldBack !== undefined && held.length > 0 && caughtUp
+      ? heldBack
+      : undefined;
+    const since = refill?.cursor ?? cursors.pull;
     const payload = await pullOrRefuse(reached, origin, since, hub.syncSkew === 'pull-projected'
       ? { migrations: known }
       : {});
@@ -523,10 +575,14 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
       ? undefined
       : mergePayload(storePath, payload, request, now);
     if (!dryRun) writeSyncCursor(statePath, origin, hub.url, 'pull', payload.cursor);
+    if (heldBack !== undefined && projected === undefined && caughtUp && !dryRun) clearHeldBack(statePath, origin, hub.url);
     if (merge === undefined) return NOTHING_TO_SYNC;
-    return Object.freeze(projected === undefined
+    if (projected !== undefined) {
+      return Object.freeze({ status: 'pulled', merge, notice: projectedPullLine(rowsIn(payload), waitingIn(payload)) });
+    }
+    return Object.freeze(refill === undefined
       ? { status: 'pulled', merge }
-      : { status: 'pulled', merge, notice: projectedPullLine(rowsIn(payload), waitingIn(payload)) });
+      : { status: 'pulled', merge, notice: refilledLine(merge.rowsRefilled, refill.since) });
   };
 
   return Object.freeze({ kind: 'service', push, pull });

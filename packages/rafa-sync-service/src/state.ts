@@ -20,7 +20,8 @@
  *     set at the first projected contact only: a later projected
  *     contact leaves it where it is, since moving it forward would
  *     leave the rows the first contact cut out of the refill. It is
- *     cleared once the refill has merged.
+ *     cleared once the refill has merged, or once a whole pull finds
+ *     nothing listed in `held_rows` to refill (`sync.ts`).
  *
  * ## Keyed by origin
  *
@@ -266,7 +267,8 @@ export function keepHeldBack(statePath: string, origin: string, hub: string, hel
 
 /**
  * Clears `origin`'s `heldBack` for `hub`, keeping both cursors; a no-op
- * when the entry holds none. The refill calls it once it has merged.
+ * when the entry holds none. A whole pull with nothing left to refill
+ * calls it (`sync.ts`).
  */
 export function clearHeldBack(statePath: string, origin: string, hub: string): void {
   const kept = readEntry(statePath, origin, hub);

@@ -553,6 +553,136 @@ describe('the projected pull, under effort.syncSkew: pull-projected', () => {
     over.setFault(null);
     expect(await projectingOf(b, over).pull({ from: null, dryRun: false })).toMatchObject({ status: 'pulled' });
   });
+
+  describe('the refill, from a build knowing every id held_rows lists', () => {
+    /** When `b`'s first projected contact is taken, and the date the refilled line names. */
+    const FIRST = '2026-11-01T10:00:00.000Z';
+
+    /** The pairs `at`'s `held_rows` lists, sorted. */
+    const heldPairs = (at: Device): string[] => read<{ pair: string }>(at.path, 'SELECT origin_store || \':\' || origin_seq AS pair FROM held_rows')
+      .map(({ pair }) => pair)
+      .sort();
+
+    /**
+     * Rewrites every listing of `at`'s `held_rows` to name the newest
+     * migration its store applied, as a build whose catalogue knows the
+     * ids a projected contact listed finds them, and has `over` answer
+     * whole from then on.
+     */
+    const catchUp = (at: Device, over: StandInHub): void => {
+      const newest = migrationsOf(at)
+        .split(',')
+        .at(-1) ?? '';
+      const db = new Database(at.path);
+      try {
+        db.query('UPDATE held_rows SET missing = json_array(?)').run(newest);
+      } finally {
+        db.close();
+      }
+      over.setExtraMigrations([]);
+    };
+
+    /** `b` after one projected contact with a hub ahead holding one row of `a`'s, its pull cursor past that row. */
+    const heldDevice = async (): Promise<{ a: Device; b: Device; over: StandInHub }> => {
+      const a = device(1);
+      const b = device(1);
+      const over = await aheadHub(a);
+      await projectingOf(b, over, { now: clock(FIRST) }).pull({ from: null, dryRun: false });
+      return { a, b, over };
+    };
+
+    it('pulls from heldBack, takes the held rows whole, clears heldBack and answers the refilled line, where a build lacking an id pulls projected past its cursor', async () => {
+      const { a, b, over } = await heldDevice();
+      a.store.append('commits', [commitRow()]);
+      await serviceOf(a, over).push({ to: null });
+      const behind = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+      expect(behind).toMatchObject({ notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 2 columns wait for rafa self-update' });
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+
+      catchUp(b, over);
+      a.store.append('commits', [commitRow()]);
+      await serviceOf(a, over).push({ to: null });
+      const refilled = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toBeNull();
+      expect(refilled).toMatchObject({
+        status: 'pulled',
+        merge: { status: 'merged', rowsAdded: 1, rowsHeld: 0, rowsRefilled: 2, rowsInConflict: 0 },
+        notice: 'effort sync: refilled 2 rows held back since 2026-11-01',
+      });
+      expect(heldPairs(b)).toEqual([]);
+      expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
+      expect(stateOf(b).stores[originOf(b)]).toMatchObject({ pull: { commits: 3 } });
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+
+      a.store.append('commits', [commitRow()]);
+      await serviceOf(a, over).push({ to: null });
+      const after = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 3 });
+      expect(after).toMatchObject({ status: 'pulled', merge: { rowsAdded: 1, rowsRefilled: 0 } });
+      expect(after).not.toHaveProperty('notice');
+    });
+
+    it('refills under effort.syncSkew: refuse too, sending no migrations', async () => {
+      const { b, over } = await heldDevice();
+      catchUp(b, over);
+      const refilled = await serviceOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)).toMatchObject({ since: null, migrations: null });
+      expect(refilled).toMatchObject({ merge: { rowsRefilled: 1 }, notice: 'effort sync: refilled 1 rows held back since 2026-11-01' });
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+    });
+
+    it('keeps heldBack, the listings and the cursor under dryRun, where the same refill run clears them', async () => {
+      const { a, b, over } = await heldDevice();
+      catchUp(b, over);
+      const state = readFileSync(statePathOf(b), 'utf8');
+      const dry = await projectingOf(b, over).pull({ from: null, dryRun: true });
+      expect(dry).toMatchObject({ merge: { status: 'would-merge' }, notice: 'effort sync: refilled 1 rows held back since 2026-11-01' });
+      expect(readFileSync(statePathOf(b), 'utf8')).toBe(state);
+      expect(heldPairs(b)).toEqual(commitPairs(a));
+
+      await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(heldPairs(b)).toEqual([]);
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+    });
+
+    it('keeps heldBack and lists the rows again when the refill is answered projected, by a hub gone further ahead', async () => {
+      const { a, b, over } = await heldDevice();
+      catchUp(b, over);
+      over.setExtraMigrations([SECOND_FUTURE_MIGRATION]);
+      over.setProjection({ commits: [SECOND_FUTURE_MIGRATION] });
+      const answer = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toBeNull();
+      expect(answer).toMatchObject({
+        merge: { rowsRefilled: 0 },
+        notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 0 columns wait for rafa self-update',
+      });
+      expect(heldPairs(b)).toEqual(commitPairs(a));
+      expect(readHeldMigrations(b.path)).toContain(SECOND_FUTURE_MIGRATION);
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+    });
+
+    it('takes a heldBack with nothing listed for no refill, pulling past its cursor and clearing it at the first whole answer', async () => {
+      const a = device(1);
+      const b = device(1);
+      const over = await aheadHub(a);
+      over.setProjection({});
+      await projectingOf(b, over, { now: clock(FIRST) }).pull({ from: null, dryRun: false });
+      expect(heldPairs(b)).toEqual([]);
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+
+      const behind = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+      expect(behind).toEqual({ status: 'nothing-to-sync' });
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+
+      over.setExtraMigrations([]);
+      const whole = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+      expect(whole).toEqual({ status: 'nothing-to-sync' });
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+    });
+  });
 });
 
 describe('keyed by origin_store', () => {
