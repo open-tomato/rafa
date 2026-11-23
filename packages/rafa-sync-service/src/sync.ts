@@ -31,14 +31,22 @@
  * taken them, the push cursor becomes the export's. Every push reaches
  * the hub, one with no rows included, so the hub records the device's
  * last push and refuses a store newer than it at once. It answers
- * `pushed` with no path: the rows were delivered.
+ * `pushed` with no path: the rows were delivered. A hub whose store
+ * lacks a migration this one applied refuses the push with a `409`
+ * naming the ids in `missing`, written as {@link HubUpgradeRequired}:
+ * `effort sync: the hub is behind this rafa (migration <ids>); nothing
+ * was sent. Next step: upgrade the hub, then sync again`. A `409` naming
+ * no `missing`, from an older hub, passes on as `HubRefused` with its
+ * message as it stands. Neither moves the push cursor.
  *
  * ## Pull
  *
  * Asks the hub for the rows other origins created past the pull cursor.
  * A payload naming a migration this rafa does not know is refused with
- * {@link RafaUpdateRequired}, naming the ids and `rafa self-update`,
- * whether or not it holds rows: its rows could not be read here. Then:
+ * {@link RafaUpdateRequired}, `effort sync: this rafa is behind the hub
+ * (migration <ids>); nothing was merged. Next step: rafa self-update,
+ * then sync again`, whether or not it holds rows: its rows could not be
+ * read here. Then:
  *
  *   - A payload holding no row is not merged, since a merge rewrites the
  *     whole file to add nothing. It answers `nothing-to-sync`.
@@ -96,8 +104,8 @@
  *
  * The hub client's own errors pass through: `HubUnreachable` (named so,
  * which core's contact matches) for a connect failure, the timeout or a
- * `5xx`, and `HubRefused` for a `4xx` such as a token or migration
- * refusal, which is not unreachable. So does the token reader's
+ * `5xx`, and `HubRefused` for a `4xx` such as a token refusal or a
+ * `409` naming no `missing`, which is not unreachable. So does the token reader's
  * `HubTokenError`. A status read that fails passes its error through
  * the same way, so an unreachable hub is unreachable for push and pull
  * alike. The token is read once per strategy, at its first
@@ -123,9 +131,12 @@ import {
 } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 
-import { createHubClient } from './client.js';
+import { createHubClient, HubRefused } from './client.js';
 import { readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
 import { defaultSecretReader, readHubToken } from './token.js';
+
+/** The status a hub's migration refusal answers with. */
+const CONFLICT = 409;
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync (service)';
@@ -153,6 +164,14 @@ export class ServiceSyncRefusal extends Error {
   override readonly name = 'ServiceSyncRefusal';
 }
 
+/** The next step a hub behind this rafa names: the hub's store lacks a migration this rafa applied. */
+export const UPGRADE_HUB = 'upgrade the hub';
+
+/** The ids `missing` names, as the refusal lines spell them. */
+function idsOf(missing: readonly string[]): string {
+  return missing.join(', ');
+}
+
 /** A pull whose rows name migrations this rafa does not know. */
 export class RafaUpdateRequired extends Error {
   override readonly name = 'RafaUpdateRequired';
@@ -163,10 +182,39 @@ export class RafaUpdateRequired extends Error {
 
   constructor(missing: readonly string[]) {
     super(
-      `${REFUSAL}: the hub's store has applied migration ${missing.join(', ')}, which this rafa does not know,`
-        + ` so its rows cannot be merged here. Nothing was merged. Next step: ${SELF_UPDATE}, then sync again.`,
+      `effort sync: this rafa is behind the hub (migration ${idsOf(missing)}); nothing was merged.`
+        + ` Next step: ${SELF_UPDATE}, then sync again`,
     );
     this.missing = Object.freeze([...missing]);
+  }
+}
+
+/** A push the hub refused with a `409` naming the migrations it lacks: the hub is behind this rafa. */
+export class HubUpgradeRequired extends Error {
+  override readonly name = 'HubUpgradeRequired';
+  /** The ids the hub's `409` named in `missing`, in the hub's order. */
+  readonly missing: readonly string[];
+  /** The one thing to do next: {@link UPGRADE_HUB}. */
+  readonly nextStep: string = UPGRADE_HUB;
+
+  constructor(missing: readonly string[]) {
+    super(
+      `effort sync: the hub is behind this rafa (migration ${idsOf(missing)}); nothing was sent.`
+        + ` Next step: ${UPGRADE_HUB}, then sync again`,
+    );
+    this.missing = Object.freeze([...missing]);
+  }
+}
+
+/** Sends `payload` under `origin`, writing a `409` that names `missing` as {@link HubUpgradeRequired}. */
+async function pushOrRefuse(client: HubClient, origin: string, payload: WirePayload): Promise<void> {
+  try {
+    await client.push(origin, payload);
+  } catch (error) {
+    if (error instanceof HubRefused && error.status === CONFLICT && error.missing !== undefined && error.missing.length > 0) {
+      throw new HubUpgradeRequired(error.missing);
+    }
+    throw error;
   }
 }
 
@@ -357,7 +405,7 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
     if (origin === undefined) return NOTHING_TO_SYNC;
     const reached = await agreedClient();
     const payload = exportWirePayload({ path: storePath, cursor: readSyncCursors(statePath, origin, hub.url).push });
-    await reached.push(origin, payload);
+    await pushOrRefuse(reached, origin, payload);
     writeSyncCursor(statePath, origin, hub.url, 'push', payload.cursor);
     return PUSHED;
   };

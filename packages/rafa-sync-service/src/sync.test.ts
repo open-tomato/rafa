@@ -22,7 +22,16 @@ import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { SYNC_STATE_FILE_NAME } from './state.js';
-import create, { createServiceSync, HubContractMismatch, MOVE_TO_SQLITE, RafaUpdateRequired, SELF_UPDATE, ServiceSyncRefusal } from './sync.js';
+import create, {
+  createServiceSync,
+  HubContractMismatch,
+  HubUpgradeRequired,
+  MOVE_TO_SQLITE,
+  RafaUpdateRequired,
+  SELF_UPDATE,
+  ServiceSyncRefusal,
+  UPGRADE_HUB,
+} from './sync.js';
 import { startStandInHub } from './testdata/stand-in-hub.js';
 
 const TOKEN = 'ghp_service_sync_test_token';
@@ -30,6 +39,9 @@ const TOKEN_SECRET = 'hub-token';
 
 /** A migration id no rafa build has, as a hub a newer rafa brought forward names. */
 const FUTURE_MIGRATION = '9999-from-a-newer-rafa';
+
+/** A second id no rafa build has, for a refusal naming more than one. */
+const SECOND_FUTURE_MIGRATION = '9999-also-from-a-newer-rafa';
 
 /** Long enough for a local answer. */
 const TIMEOUT_MS = 2000;
@@ -374,9 +386,10 @@ describe('pull', () => {
     const refused = await rejectionOf(serviceOf(b, over).pull({ from: null, dryRun: false }));
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
     expect(refused.message).toBe(
-      `effort sync (service): the hub's store has applied migration ${FUTURE_MIGRATION}, which this rafa does not know,`
-        + ` so its rows cannot be merged here. Nothing was merged. Next step: ${SELF_UPDATE}, then sync again.`,
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged.`
+        + ' Next step: rafa self-update, then sync again',
     );
+    expect((refused as RafaUpdateRequired).nextStep).toBe(SELF_UPDATE);
     expect((refused as RafaUpdateRequired).missing).toEqual([FUTURE_MIGRATION]);
     expect(commitPairs(b)).toEqual([`${originOf(b)}:1`]);
     expect(existsSync(statePathOf(b))).toBe(false);
@@ -410,6 +423,16 @@ describe('pull', () => {
     over.setExtraMigrations([FUTURE_MIGRATION]);
     const refused = await rejectionOf(serviceOf(device(1), over).pull({ from: null, dryRun: false }));
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
+  });
+
+  it('names every id the hub applied that this rafa lacks, in the hub\'s order', async () => {
+    const over = hub();
+    over.setExtraMigrations([FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION]);
+    const refused = await rejectionOf(serviceOf(device(1), over).pull({ from: null, dryRun: false }));
+    expect(refused.message).toBe(
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
+        + ' nothing was merged. Next step: rafa self-update, then sync again',
+    );
   });
 });
 
@@ -489,6 +512,35 @@ describe('when the hub cannot be reached or refuses', () => {
 
     over.setFault(null);
     expect(await serviceOf(a, over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+  });
+
+  it('writes a 409 naming missing as the hub-behind line, moving no cursor, where the same hub taking it pushes', async () => {
+    const over = hub();
+    const a = device(1);
+    over.setFault(() => Response.json(
+      { success: false, error: 'rafa-hub: upgrade the hub', missing: [FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION] },
+      { status: 409 },
+    ));
+    const refused = await rejectionOf(serviceOf(a, over).push({ to: null }));
+    expect(refused).toBeInstanceOf(HubUpgradeRequired);
+    expect(refused.message).toBe(
+      `effort sync: the hub is behind this rafa (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
+        + ' nothing was sent. Next step: upgrade the hub, then sync again',
+    );
+    expect((refused as HubUpgradeRequired).missing).toEqual([FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION]);
+    expect((refused as HubUpgradeRequired).nextStep).toBe(UPGRADE_HUB);
+    expect(existsSync(statePathOf(a))).toBe(false);
+
+    over.setFault(null);
+    expect(await serviceOf(a, over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+  });
+
+  it('keeps a 409 naming an empty missing as the hub\'s own line', async () => {
+    const over = hub();
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: upgrade the hub', missing: [] }, { status: 409 }));
+    const refused = await rejectionOf(serviceOf(device(1), over).push({ to: null }));
+    expect(refused.name).toBe('HubRefused');
+    expect(refused.message).toBe('the hub refused push: HTTP 409: rafa-hub: upgrade the hub');
   });
 
   it('rejects with the token reader\'s refusal before any contact when no token is stored', async () => {
