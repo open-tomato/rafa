@@ -56,6 +56,11 @@
  * `project=<id>` only when the kept status answer names `projects`, for
  * the same reason as `contractVersion`: that older hub refuses a query
  * name it does not read. A client made with no project sends none.
+ * {@link HubClient.projectName} answers the name the kept status answer
+ * gives the client's project, {@link projectNameOf} read over it: null
+ * when that answer names no entry with the project's id, a hub naming
+ * no `projects` and a client made with none among them. It reads no
+ * second `/v1/status`.
  *
  * Every call sends the token as `Authorization: Bearer <token>` and
  * reads the hub's one envelope, `{ "success": true, "data": … }` or
@@ -223,6 +228,8 @@ export interface HubClient {
   readonly pull: (device: string, since: WireCursor, options?: HubPullOptions) => Promise<WirePayload>;
   /** The hub's status, read once per client and kept; see the module note. */
   readonly status: () => Promise<HubStatusAnswer>;
+  /** The kept status answer's name for the client's project, or null when it names none; see the module note. */
+  readonly projectName: () => Promise<string | null>;
 }
 
 /** One call to make: its method, path, query and body, and what it is called in a message. */
@@ -371,6 +378,15 @@ function readStatusAnswer(data: unknown): HubStatusAnswer {
   return Object.freeze({ version, migrations, rows, devices, ...readContract(data), ...readProjects(data) });
 }
 
+/**
+ * The name `status` gives `project`: its `projects` entry whose id is
+ * `project`, or null when it names no such entry or `project` is left out.
+ */
+export function projectNameOf(status: HubStatusAnswer, project: string | undefined): string | null {
+  if (project === undefined) return null;
+  return status.projects.find(({ id }) => id === project)?.name ?? null;
+}
+
 /** The `contractVersion` query a push or pull sends to the hub `status` answered: none when it named none. */
 function contractQuery(status: HubStatusAnswer): Readonly<Record<string, string>> {
   return status.contractNamed
@@ -504,5 +520,6 @@ export function createHubClient(options: HubClientOptions): HubClient {
       }));
     },
     status,
+    projectName: async () => projectNameOf(await status(), options.project),
   });
 }
