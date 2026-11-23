@@ -1,6 +1,6 @@
 /**
  * Tests for `openAtlasRegistry` over a replica built from the ingest's
- * fixture store: the three sources and the metrics by id, each source's
+ * fixture store: the six sources and the metrics by id, each source's
  * descriptor with the freshness its build stamped, the replica's build
  * time, the token sum one source answers equal to the other's, the derived
  * columns (`work_type`, the day counts, `local.plans`) read through the
@@ -21,6 +21,7 @@ import { DAILY_SOURCE } from './build/daily.js';
 import { PLANS_SOURCE } from './build/derive.js';
 import { buildAtlas } from './build/index.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
+import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 import { writeFactsFixture, writeFixtureStore } from './ingest/testdata/effort-store.fixture.js';
 import { METRIC_CATALOGUE } from './metrics/catalogue.js';
 import { openAtlasRegistry } from './registry.js';
@@ -60,8 +61,8 @@ async function totalOf(id: string, field: string): Promise<unknown> {
 }
 
 describe('openAtlasRegistry over a built replica', () => {
-  it('lists local.tasks, local.daily then local.plans, and the catalogue by id', () => {
-    expect([...open().sources.keys()]).toEqual([TASKS_SOURCE, DAILY_SOURCE, PLANS_SOURCE]);
+  it('lists local.tasks, local.daily, local.plans, local.bugs, local.findings then local.ci, and the catalogue by id', () => {
+    expect([...open().sources.keys()]).toEqual([TASKS_SOURCE, DAILY_SOURCE, PLANS_SOURCE, BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE]);
     expect([...open().metrics.keys()]).toEqual(METRIC_CATALOGUE.map((metric) => metric.id));
   });
 
@@ -78,6 +79,20 @@ describe('openAtlasRegistry over a built replica', () => {
     expect(tasks.asOf).not.toBeNull();
     expect(daily.partial).toBe(true);
     expect(daily.partialReasons.join(' ')).toContain('commits, prs_merged are not read yet');
+  });
+
+  it('describes local.bugs, local.findings and local.ci in the contract\'s shape, each with the rows its build stamped', async () => {
+    const described = await Promise.all([BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE].map(async (id) => sourceOf(id).describe()));
+    const counts = await Promise.all([BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE].map(async (id) => {
+      const result = await sourceOf(id).query({ measures: [{ field: id === CI_SOURCE
+        ? 'head_sha'
+        : 'id', agg: 'count', as: 'n' }] });
+      return result.rows[0]?.[0];
+    }));
+
+    expect(described.every((descriptor) => DataSourceDescriptorSchema.safeParse(descriptor).success)).toBe(true);
+    expect(described.map((descriptor) => descriptor.asOf === null)).toEqual([false, false, false]);
+    expect(counts).toEqual([6, 4, 5]);
   });
 
   it('answers the replica\'s build time as its asOf', () => {

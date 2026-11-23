@@ -1,6 +1,6 @@
 /**
  * Tests for the demo server: `Bun.serve` on port 0 over a fixture replica
- * in a tmpdir answers the three sources on `GET /api/atlas/sources`, lists
+ * in a tmpdir answers the six sources on `GET /api/atlas/sources`, lists
  * the metrics the live source runs, and feeds the live source end to end;
  * a root with no effort store mounts no API (D7), and `RAFA_EFFORT_DIR`
  * wins over the root.
@@ -127,13 +127,13 @@ describe('the demo server over a fixture replica', () => {
     expect(started().server.port).toBeGreaterThan(0);
   });
 
-  it('answers the three sources on GET /api/atlas/sources', async () => {
+  it('answers the six sources on GET /api/atlas/sources', async () => {
     const response = await fetch(apiUrl(started(), '/sources'));
     const body = await envelopeOf<DataSourceDescriptor[]>(response);
 
     expect(response.status).toBe(200);
     expect(body.status).toBe('ok');
-    expect(body.data?.map((source) => source.id)).toEqual(['local.tasks', 'local.daily', 'local.plans']);
+    expect(body.data?.map((source) => source.id)).toEqual(['local.tasks', 'local.daily', 'local.plans', 'local.bugs', 'local.findings', 'local.ci']);
   });
 
   it('lists every metric the live source runs', async () => {

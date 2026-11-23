@@ -1,15 +1,17 @@
 /**
  * The table sources the registry serves so far, one spec per replica
  * bucket: `local.tasks` over `task_facts`, `local.daily` over
- * `daily_rollup` and `local.plans` over `plan_facts`. The build stamps
- * the finding, bug, change and CI buckets' sources too, and no spec here
- * defines them yet. Each spec is the descriptor without its build stamps,
+ * `daily_rollup`, `local.plans` over `plan_facts`, `local.bugs` over
+ * `bug_facts`, `local.findings` over `finding_facts` and `local.ci` over
+ * `ci_facts`. The build stamps `local.changes` too, and no spec here
+ * defines it yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
  *
  * Only the descriptor's field keys reach the engine's SQL, so a column
- * left out here cannot be read: `task_facts`'s `origin_store` and
- * `origin_seq` are the dedupe key of the build and are not exposed.
+ * left out here cannot be read: the `origin_store` and `origin_seq` of
+ * each bucket are the dedupe key of the build and are not exposed, nor is
+ * `finding_facts.tracker_ref`, the stored issue reference.
  */
 import type { Aggregate, FieldDescriptor, FieldType } from '@open-tomato/atlas-data/contract';
 import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
@@ -17,6 +19,7 @@ import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
 import { DAILY_SOURCE } from './build/daily.js';
 import { PLANS_SOURCE } from './build/derive.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
+import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 
 /** The aggregates a numeric measure takes. */
 const MEASURE_AGGREGATES: readonly Aggregate[] = ['sum', 'mean', 'min', 'max', 'p50', 'p90', 'p99'];
@@ -169,5 +172,104 @@ export const PLANS_SPEC: TableSourceSpec = {
   table: 'plan_facts',
 };
 
+/** An id field: counted, filtered, never grouped. */
+function id(key: string, label: string): FieldDescriptor {
+  return { key, label, type: 'string', role: 'id', aggregates: COUNT_AGGREGATES, filterable: true, groupable: false };
+}
+
+/** An issue or pull request number: an id that is an integer. */
+function numberId(key: string, label: string, unit: string): FieldDescriptor {
+  return { ...measure(key, label, 'integer', unit), role: 'id', aggregates: COUNT_AGGREGATES };
+}
+
+/** The fields every report-row bucket opens with: its id, the session and the task it came from. */
+function reportFields(): FieldDescriptor[] {
+  return [
+    id('id', 'Id'),
+    id('session_id', 'Session'),
+    dimension('plan_stub', 'Plan'),
+    dimension('task_line', 'Task line'),
+  ];
+}
+
+/** `local.bugs`: one row per out-of-scope bug a task reported, and one per route the loop gave one, from `bug_facts`. */
+export const BUGS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: BUGS_SOURCE,
+    source: 'local',
+    channel: 'bugs',
+    title: 'Bugs',
+    description: 'One row per out-of-scope bug a task reported, and one per route the loop gave a bug, read from the effort store.',
+    timeField: 'day',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      ...reportFields(),
+      dimension('source', 'Source', 'out_of_scope: the bug as reported; routed: the route the loop gave it, the same entry again'),
+      dimension('what', 'What'),
+      dimension('artifact', 'Artifact'),
+      dimension('module', 'Module', 'the longest module path the artifact, then the what, names; NULL when neither names one'),
+      { ...measure('security', 'Security', 'integer', 'bugs'), description: '1 for a bug reported as a security issue; out-of-scope bugs only' },
+      dimension('scope', 'Scope', 'out-of-scope bugs only'),
+      dimension('kind', 'Kind', 'bug, own-fallout, own-gap, convention, docs or machine; routed bugs only'),
+      dimension('route', 'Route', 'filed, private, machine, inherited, repair, follow-up, pr-body or docs; routed bugs only'),
+      dimension('outcome', 'Outcome', 'the outcome of the task that reported the bug: done or blocked'),
+      numberId('issue_number', 'Issue', 'issue'),
+      time('day', 'Day', 'date'),
+    ],
+  },
+  table: 'bug_facts',
+};
+
+/** `local.findings`: one row per finding with a kind and one per blocker a task reported, from `finding_facts`. */
+export const FINDINGS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: FINDINGS_SOURCE,
+    source: 'local',
+    channel: 'findings',
+    title: 'Findings',
+    description: 'One row per finding with a kind and one per blocker a task reported, read from the effort store.',
+    timeField: 'day',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      ...reportFields(),
+      dimension('source', 'Source', 'finding or blocker'),
+      dimension('kind', 'Kind', 'gotcha, pattern, location or skill-suggestion; findings only'),
+      dimension('signal', 'Signal', 'loud or silent; findings only'),
+      dimension('trigger', 'Trigger'),
+      dimension('what', 'What'),
+      dimension('artifact', 'Artifact'),
+      dimension('module', 'Module', 'the longest module path the artifact, then the what, names; NULL when neither names one'),
+      dimension('outcome', 'Outcome', 'the outcome of the task that reported the row: done or blocked'),
+      time('day', 'Day', 'date'),
+    ],
+  },
+  table: 'finding_facts',
+};
+
+/** `local.ci`: one row per CI reading of a plan's head, from `ci_facts`. */
+export const CI_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: CI_SOURCE,
+    source: 'local',
+    channel: 'ci',
+    title: 'CI readings',
+    description: 'One row per CI reading of a plan\'s head commit, read from the effort store.',
+    timeField: 'read_at',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      dimension('plan_stub', 'Plan'),
+      numberId('pr', 'Pull request', 'pull request'),
+      id('head_sha', 'Head commit'),
+      dimension('verdict', 'Verdict', 'green, red or none (no check ran)'),
+      { ...dimension('failing_json', 'Failing checks', 'the names of the checks that failed, as a JSON array'), type: 'json' },
+      measure('failing_count', 'Failing checks', 'integer', 'checks'),
+      time('read_at', 'Read', 'datetime'),
+      { ...time('day', 'Day', 'date'), role: 'dimension' },
+      { ...measure('flipped', 'Flipped', 'integer', 'readings'), description: '1 on every reading of a head read red and, at a later reading, green' },
+    ],
+  },
+  table: 'ci_facts',
+};
+
 /** Every source spec the registry defines, in the order `/sources` lists them. */
-export const SOURCE_SPECS: readonly TableSourceSpec[] = [TASKS_SPEC, DAILY_SPEC, PLANS_SPEC];
+export const SOURCE_SPECS: readonly TableSourceSpec[] = [TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC];
