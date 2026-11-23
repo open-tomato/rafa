@@ -29,8 +29,21 @@ export interface MeasuredWorkspace {
 /** One field of a result set a card reads: a mock series, the balance indices or the measured workspace. */
 export type LensField = keyof MockData | 'balance' | 'workspace';
 
+/** What a live field says about the answer that filled it. */
+export interface FieldMeta {
+  /** The catalogue metric whose answer filled the field. */
+  readonly metricId: string;
+  /** That answer's `meta.rowCount`. */
+  readonly rowCount: number;
+  /** The metric's `proxyNote`, for a metric whose feasibility is `proxy`; absent for a direct one. */
+  readonly proxyNote?: string;
+}
+
 /** No field marked: what the mock source answers, every field drawn. */
 const NONE_MARKED: ReadonlySet<LensField> = new Set<LensField>();
+
+/** No field filled by a metric: the mock's meta. */
+const NO_META: ReadonlyMap<LensField, FieldMeta> = new Map<LensField, FieldMeta>();
 
 /** What the page source answers for one range: every card's data. */
 export interface LensResult {
@@ -42,6 +55,11 @@ export interface LensResult {
    * "not wired yet" state (`lenses/LensCard.tsx`); the mock marks none.
    */
   readonly notWired: ReadonlySet<LensField>;
+  /**
+   * Per field a live metric filled: the metric, its answer's row count
+   * and, for a proxy, its `ProxyNote`. The mock fills none.
+   */
+  readonly fieldMeta: ReadonlyMap<LensField, FieldMeta>;
   readonly mock: MockData;
   /** The balance indices with this range's values. */
   readonly balance: readonly BalanceIndex[];
@@ -93,7 +111,7 @@ function balanceOf(range: TimeRange): readonly BalanceIndex[] {
 
 /** The result set for one range, computed at once. */
 export function lensResultOf(range: TimeRange): LensResult {
-  return { range, source: 'mock', notWired: NONE_MARKED, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
+  return { range, source: 'mock', notWired: NONE_MARKED, fieldMeta: NO_META, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
 }
 
 /** A page source over the mock that answers after `delayMs`. */

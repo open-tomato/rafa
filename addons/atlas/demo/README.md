@@ -55,11 +55,15 @@ values. A card's `info` and `table` feed the registry's `info` and
 `source` entries; the balance card's index picker is its `indices` entry.
 
 The live source (`createLiveLensSource(client)`, under `?source=live`)
-runs the catalogue metrics over each range's window (`RANGE_WINDOW`:
-`now` is today for a KPI and the last 7 days for a series, `last-week`
-`7d`, `past-month` `28d`, `last-year` `52w`) and maps them into
-`tokensPerDay` (with the previous window and the daily average),
-`tokensByModel` and `taskMinutesQuantiles`. Every other field is marked
+runs the 17 catalogue metrics of the PoC cut over each range's window
+(`RANGE_WINDOW`: `now` is today for a KPI and the last 7 days for a
+series, `last-week` `7d`, `past-month` `28d`, `last-year` `52w`; only the
+red CI share and the active blockers read the KPI window) and maps each
+answer into the fields `METRIC_FIELDS` names for it; the tokens per day
+and the debt ratio also run over the window before. Each filled field
+gets a `FieldMeta` in the result's `fieldMeta`: its metric, its answer's
+`meta.rowCount` and, for a proxy, the `proxyNote` `/metrics` lists.
+Every other field is marked
 in the result's `notWired`, and a card or tile that reads one shows
 "Not wired yet" instead of a number; a card names the fields it reads
 with `reads`, and one that names none is never live. An API that is not

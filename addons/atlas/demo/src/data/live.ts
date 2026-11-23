@@ -2,29 +2,41 @@
  * The live page source: the catalogue metrics, asked of the Atlas API for
  * one range, mapped into the `LensResult` fields the cards read.
  *
- * The client runs each metric over the range's window (`RANGE_WINDOW`)
- * and this file maps each `QueryResult` into its field: `pm.tokens-per-day`
- * fills `tokensPerDay` (and, run again over the window just before,
- * `tokensPerDayPrevious`, with `tokensDailyAverage` from the same rows),
- * `arch.tokens-by-model` fills `tokensByModel` and
- * `arch.task-minutes-p50-p90` fills `taskMinutesQuantiles`. Every other
- * field is marked in `notWired` and holds an empty value, so a card that
- * reads one draws "not wired yet" and never a number (Q1 of the data
- * integration plan).
+ * The client runs each of the PoC cut's 17 metrics (spec section G's 16
+ * rows; its fourth PM row names two) over the range's window
+ * (`RANGE_WINDOW`), and this file maps each `QueryResult` into the fields
+ * `METRIC_FIELDS` names for it. Two metrics also run over the window just
+ * before: `pm.tokens-per-day` for `tokensPerDayPrevious` and
+ * `arch.debt-ratio` for `minutesByChangeKindPrevious`. Every field a
+ * metric fills gets a `FieldMeta` in `fieldMeta`: the metric, its answer's
+ * `meta.rowCount` and, for a proxy metric, the `proxyNote` the API's
+ * `/metrics` answer gives. Every other field is marked in `notWired` and
+ * holds an empty value, so a card that reads one draws "not wired yet"
+ * and never a number (Q1 of the data integration plan).
  *
  * The windows are fixed per range (D6): `now` is today for a KPI and the
  * last 7 days for a series, `last-week` is `7d`, `past-month` is `28d`
- * and `last-year` is `52w`. A `last` window ends with today (UTC), as the
- * engine resolves it.
+ * and `last-year` is `52w`. Only the two tiles that are one number,
+ * `dev.red-ci-share` and `pm.active-blockers`, read the KPI window. A
+ * `last` window ends with today (UTC), as the engine resolves it.
+ *
+ * The weekly count series (bugs by kind, routes, regressions, tasks done)
+ * hold one entry per ISO week of the window, 0 where the answer has no
+ * row, since the engine answers no row for an empty bucket. A row whose
+ * group is NULL counts as `unknown`, except a task with no work type,
+ * which the three work-type columns leave out.
  */
-import type { MockData } from './mock.js';
-import type { LensField, LensResult, MeasuredWorkspace } from './source.js';
-import type { QueryResult, Scalar, Window } from '@open-tomato/atlas-data/contract';
+import type { Blocker, ChangeSlice, MockData } from './mock.js';
+import type { FieldMeta, LensField, LensResult, MeasuredWorkspace } from './source.js';
+import type { MetricDefinition, QueryResult, Scalar, Window } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
-import type { ChartTone, LineSeries, TimePoint } from '@open-tomato/charts';
+import type { ChartTone, LineSeries, ScatterPoint, TimePoint } from '@open-tomato/charts';
 
 import { AtlasRequestError, AtlasResponseInvalid, AtlasTransportError } from '@open-tomato/atlas-transport/client';
+
+import { BRANCH_TYPES } from './mock.js';
+import { quantile } from './random.js';
 
 /** Where the demo server mounts the Atlas API. */
 export const LIVE_API_BASE: string = '/api/atlas';
@@ -35,7 +47,7 @@ export interface RangeWindow {
   readonly kpi: Window;
 }
 
-/** Range to window (D6). A KPI tile reads `kpi`; no KPI is wired yet, so only `series` is asked today. */
+/** Range to window (D6). The tiles of `KPI_METRICS` read `kpi`; every other metric reads `series`. */
 export const RANGE_WINDOW: Readonly<Record<TimeRange, RangeWindow>> = {
   'now': { series: { last: '7d' }, kpi: { last: '1d' } },
   'last-week': { series: { last: '7d' }, kpi: { last: '7d' } },
@@ -43,21 +55,82 @@ export const RANGE_WINDOW: Readonly<Record<TimeRange, RangeWindow>> = {
   'last-year': { series: { last: '52w' }, kpi: { last: '52w' } },
 };
 
-/** The catalogue metrics this source runs, by the field each one fills. */
-export const LIVE_METRICS: Readonly<Record<'tokensPerDay' | 'tokensByModel' | 'taskMinutesQuantiles', string>> = {
+/** The PoC metrics this source runs, by a short name. */
+export type LiveMetric =
+  | 'budgetBurn'
+  | 'tokensPerDay'
+  | 'planCompletion'
+  | 'plannedVsSessions'
+  | 'activeBlockers'
+  | 'debtRatio'
+  | 'taskMinutesQuantiles'
+  | 'tokensByModel'
+  | 'preflightHalts'
+  | 'tasksDonePerWeek'
+  | 'taskCycle'
+  | 'redCiShare'
+  | 'plansCompletedPerWeek'
+  | 'bugsByKind'
+  | 'regressions'
+  | 'flakyChecks'
+  | 'filedShare';
+
+/** The catalogue id of each metric this source runs, in section G's order. */
+export const LIVE_METRICS: Readonly<Record<LiveMetric, string>> = {
+  budgetBurn: 'pm.budget-burn',
   tokensPerDay: 'pm.tokens-per-day',
-  tokensByModel: 'arch.tokens-by-model',
+  planCompletion: 'pm.plan-completion',
+  plannedVsSessions: 'pm.planned-vs-sessions',
+  activeBlockers: 'pm.active-blockers',
+  debtRatio: 'arch.debt-ratio',
   taskMinutesQuantiles: 'arch.task-minutes-p50-p90',
+  tokensByModel: 'arch.tokens-by-model',
+  preflightHalts: 'arch.preflight-halts',
+  tasksDonePerWeek: 'dev.tasks-done-per-week',
+  taskCycle: 'dev.task-cycle',
+  redCiShare: 'dev.red-ci-share',
+  plansCompletedPerWeek: 'dev.plans-completed-per-week',
+  bugsByKind: 'qa.bugs-by-kind',
+  regressions: 'qa.regressions',
+  flakyChecks: 'qa.flaky-checks',
+  filedShare: 'qa.filed-share',
 };
 
+/** The fields each metric fills, its card's own field first. */
+export const METRIC_FIELDS: Readonly<Record<LiveMetric, readonly LensField[]>> = {
+  budgetBurn: ['tokensThisWeek', 'tokensLastWeek'],
+  tokensPerDay: ['tokensPerDay', 'tokensPerDayPrevious', 'tokensDailyAverage'],
+  planCompletion: ['plansPerWeek'],
+  plannedVsSessions: ['plannedVsSessions'],
+  activeBlockers: ['activeBlockers'],
+  debtRatio: ['debtRatio', 'minutesByChangeKind', 'minutesByChangeKindPrevious'],
+  taskMinutesQuantiles: ['taskMinutesQuantiles'],
+  tokensByModel: ['tokensByModel'],
+  preflightHalts: ['preflightHalts'],
+  tasksDonePerWeek: ['tasksDonePerWeek'],
+  taskCycle: ['taskCycle', 'taskCycleTrend'],
+  redCiShare: ['redCiShare'],
+  plansCompletedPerWeek: ['plansCompletedPerWeek'],
+  bugsByKind: ['bugsByKindPerWeek'],
+  regressions: ['regressionsPerWeek'],
+  flakyChecks: ['flakyChecks'],
+  filedShare: ['filedSharePerWeek'],
+};
+
+/** The metrics run in `LIVE_METRICS` order. */
+const METRIC_KEYS = Object.keys(LIVE_METRICS) as LiveMetric[];
+
 /** The fields a live metric fills; every other field is not wired yet. */
-export const WIRED_FIELDS: readonly LensField[] = [
-  'tokensPerDay',
-  'tokensPerDayPrevious',
-  'tokensDailyAverage',
-  'tokensByModel',
-  'taskMinutesQuantiles',
-];
+export const WIRED_FIELDS: readonly LensField[] = METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key]);
+
+/** The metrics that are one number on a tile, run over the range's KPI window. */
+export const KPI_METRICS: ReadonlySet<LiveMetric> = new Set<LiveMetric>(['redCiShare', 'activeBlockers']);
+
+/** The fields filled from the window just before the range's, by the metric run over it. */
+const PREVIOUS_FIELDS: Readonly<Partial<Record<LensField, LiveMetric>>> = {
+  tokensPerDayPrevious: 'tokensPerDay',
+  minutesByChangeKindPrevious: 'debtRatio',
+};
 
 /** What a card's error says when the API is not there: how to start the demo with it. */
 export const LIVE_UNAVAILABLE: string = 'The Atlas API under /api/atlas did not answer. Start the demo with'
@@ -65,12 +138,25 @@ export const LIVE_UNAVAILABLE: string = 'The Atlas API under /api/atlas did not 
   + ' when none exists, then open the page with ?source=live again.';
 
 const DAY_MS = 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
+
+/** The days a point of the task cycle trend looks back over, its own included. */
+const TREND_DAYS = 7;
+
+/** How many checks the flaky table keeps. */
+const FLAKY_TOP = 10;
 
 /** The tones of the model series, in order of tokens spent; a model past the eighth draws muted. */
 const SERIES_TONES: readonly ChartTone[] = ['series-1', 'series-2', 'series-3', 'series-4', 'series-5', 'series-6', 'series-7', 'series-8'];
 
-/** The label of a session whose model the store did not record. */
-const UNKNOWN_MODEL = 'unknown';
+/** The label of a row whose group (model, plan, kind, route) the store did not record. */
+const UNKNOWN = 'unknown';
+
+/** The work types of decision D4, as the debt ratio's slices and the tasks-done columns. */
+const WORK_TYPES = ['feature', 'fix', 'chore'] as const;
+
+/** The work types the debt ratio sums. */
+const DEBT_TYPES: ReadonlySet<string> = new Set(['fix', 'chore']);
 
 /** Every mock field with no value in it: a fresh set of empty arrays and zeros. */
 function emptyMock(): MockData {
@@ -81,7 +167,9 @@ function emptyMock(): MockData {
     tokensLastWeek: 0,
     tokensDailyAverage: 0,
     plansPerWeek: [],
+    plansCompletedPerWeek: [],
     plannedVsSessions: [],
+    activeBlockers: [],
     minutesPerAgent: [],
     scopeCreepPerWeek: [],
     minutesByChangeKind: [],
@@ -95,6 +183,7 @@ function emptyMock(): MockData {
     taskCycle: [],
     taskCycleTrend: [],
     taskMinutesBins: [],
+    redCiShare: 0,
     deploysPerWeek: [],
     bugsByKindPerWeek: [],
     regressionsPerWeek: [],
@@ -123,6 +212,8 @@ const ALL_FIELDS: readonly LensField[] = [...(Object.keys(emptyMock()) as (keyof
 /** The fields the live result marks: all of them but `WIRED_FIELDS`. */
 export const NOT_WIRED: ReadonlySet<LensField> = new Set(ALL_FIELDS.filter((field) => !WIRED_FIELDS.includes(field)));
 
+/* ---------- reading a cell ---------- */
+
 /** The position of column `key` in `result`; an answer without it is refused. */
 function columnOf(result: QueryResult, key: string): number {
   const index = result.columns.findIndex((column) => column.key === key);
@@ -137,7 +228,14 @@ function numberOf(value: Scalar | undefined): number {
     : 0;
 }
 
-/** A `YYYY-MM-DD` key as the UTC midnight it names; anything else is refused. */
+/** A cell as text, or `fallback` for a NULL or a number. */
+function textOf(value: Scalar | undefined, fallback: string): string {
+  return typeof value === 'string'
+    ? value
+    : fallback;
+}
+
+/** A `YYYY-MM-DD` key or a stamp as the instant it names; anything else is refused. */
 function dayOf(value: Scalar | undefined): Date {
   const ms = typeof value === 'string'
     ? Date.parse(value)
@@ -149,6 +247,59 @@ function dayOf(value: Scalar | undefined): Date {
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+/** The `YYYY-MM-DD` key of the ISO week (its Monday, UTC) holding `ms`, as the engine keys a week. */
+function weekKeyOf(ms: number): string {
+  const date = new Date(ms);
+  const monday = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  return new Date(monday)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/** The window's bounds as instants, or null for a window open at either end. */
+function boundsOf(result: QueryResult): { readonly from: Date; readonly to: Date } | null {
+  const { from, to } = result.meta.window;
+  return from === null || to === null
+    ? null
+    : { from: new Date(from), to: new Date(to) };
+}
+
+/**
+ * The ISO week keys of the window, the first to the one holding its last
+ * day; for an open window, the weeks from the answer's first to its last.
+ */
+function windowWeeksOf(result: QueryResult, timeKey: string): string[] {
+  const bounds = boundsOf(result);
+  const time = columnOf(result, timeKey);
+  const stamps = result.rows.map((row) => dayOf(row[time]).getTime());
+  const first = bounds?.from.getTime() ?? Math.min(...stamps);
+  const last = bounds === null
+    ? Math.max(...stamps)
+    : bounds.to.getTime() - 1;
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return [];
+  const weeks: string[] = [];
+  for (let monday = Date.parse(weekKeyOf(first)); monday <= last; monday += WEEK_MS) weeks.push(weekKeyOf(monday));
+  return weeks;
+}
+
+/** The sum of `valueKey` per week key and per group, NULL groups as `unknown`. */
+function sumsByWeek(result: QueryResult, groupKey: string, valueKey: string): Map<string, Map<string, number>> {
+  const week = columnOf(result, 'week');
+  const group = columnOf(result, groupKey);
+  const value = columnOf(result, valueKey);
+  const byWeek = new Map<string, Map<string, number>>();
+  for (const row of result.rows) {
+    const key = String(row[week]);
+    const name = textOf(row[group], UNKNOWN);
+    const groups = byWeek.get(key) ?? new Map<string, number>();
+    groups.set(name, (groups.get(name) ?? 0) + numberOf(row[value]));
+    byWeek.set(key, groups);
+  }
+  return byWeek;
+}
+
+/* ---------- one field per answer ---------- */
 
 /** One point per row: `timeKey` on x, `valueKey` on y. */
 export function timePointsOf(result: QueryResult, timeKey: string, valueKey: string): TimePoint[] {
@@ -174,9 +325,7 @@ export function modelSeriesOf(result: QueryResult): LineSeries[] {
   const days = [...new Set(result.rows.map((row) => String(row[day])))].sort();
   const byModel = new Map<string, Map<string, number>>();
   for (const row of result.rows) {
-    const name = typeof row[model] === 'string'
-      ? row[model]
-      : UNKNOWN_MODEL;
+    const name = textOf(row[model], UNKNOWN);
     const perDay = byModel.get(name) ?? new Map<string, number>();
     perDay.set(String(row[day]), (perDay.get(String(row[day])) ?? 0) + numberOf(row[tokens]));
     byModel.set(name, perDay);
@@ -199,14 +348,6 @@ export function quantilesOf(result: QueryResult): MockData['taskMinutesQuantiles
   return result.rows.map((row) => ({ week: dayOf(row[week]), p50: round1(numberOf(row[p50])), p90: round1(numberOf(row[p90])) }));
 }
 
-/** The window's bounds as instants, or null for a window open at either end. */
-function boundsOf(result: QueryResult): { readonly from: Date; readonly to: Date } | null {
-  const { from, to } = result.meta.window;
-  return from === null || to === null
-    ? null
-    : { from: new Date(from), to: new Date(to) };
-}
-
 /** Tokens per day of the window, the days with no session counted as 0. */
 function dailyAverageOf(points: readonly TimePoint[], result: QueryResult): number {
   const total = points.reduce((sum, point) => sum + point.y, 0);
@@ -219,34 +360,326 @@ function dailyAverageOf(points: readonly TimePoint[], result: QueryResult): numb
     : 0;
 }
 
-/** Tokens per day over the window just before `current`'s, drawn over the current days; none for an open window. */
-async function previousTokensOf(client: AtlasClient, current: QueryResult, signal?: AbortSignal): Promise<TimePoint[]> {
-  const bounds = boundsOf(current);
-  if (bounds === null) return [];
-  const span = bounds.to.getTime() - bounds.from.getTime();
-  const window: Window = { from: new Date(bounds.from.getTime() - span).toISOString(), to: bounds.from.toISOString() };
-  const previous = await client.runMetric(LIVE_METRICS.tokensPerDay, window, signal);
-  return shiftPoints(timePointsOf(previous, 'day', 'tokens'), span);
+/**
+ * The tokens of the week holding the window's last day and of the week
+ * before, from `week` and `tokens` rows; an open window reads its last row's week.
+ */
+export function budgetWeeksOf(result: QueryResult): { readonly thisWeek: number; readonly lastWeek: number } {
+  const week = columnOf(result, 'week');
+  const tokens = columnOf(result, 'tokens');
+  const bounds = boundsOf(result);
+  const lastRow = result.rows.at(-1);
+  const current = bounds === null
+    ? lastRow === undefined
+      ? null
+      : weekKeyOf(dayOf(lastRow[week]).getTime())
+    : weekKeyOf(bounds.to.getTime() - 1);
+  if (current === null) return { thisWeek: 0, lastWeek: 0 };
+  const previous = weekKeyOf(Date.parse(current) - WEEK_MS);
+  const tokensOf = (key: string): number => result.rows
+    .filter((row) => row[week] === key)
+    .reduce((sum, row) => sum + numberOf(row[tokens]), 0);
+  return { thisWeek: tokensOf(current), lastWeek: tokensOf(previous) };
 }
 
-/** The live result set for `range`: the wired fields from the API, every other field marked. */
-export async function liveResultOf(client: AtlasClient, range: TimeRange, signal?: AbortSignal): Promise<LensResult> {
-  const window = RANGE_WINDOW[range].series;
-  const [tokens, byModel, quantiles] = await Promise.all([
-    client.runMetric(LIVE_METRICS.tokensPerDay, window, signal),
-    client.runMetric(LIVE_METRICS.tokensByModel, window, signal),
-    client.runMetric(LIVE_METRICS.taskMinutesQuantiles, window, signal),
-  ]);
-  const tokensPerDay = timePointsOf(tokens, 'day', 'tokens');
-  const mock: MockData = {
+/** Plans started and completed per week, from `week`, `started` and `completed` rows. */
+export function plansOf(result: QueryResult): MockData['plansPerWeek'] {
+  const week = columnOf(result, 'week');
+  const started = columnOf(result, 'started');
+  const completed = columnOf(result, 'completed');
+  return result.rows.map((row) => ({ week: dayOf(row[week]), started: numberOf(row[started]), completed: numberOf(row[completed]) }));
+}
+
+/** Planned tasks against task sessions per plan, a plan the store did not name as `unknown`. */
+export function plannedVsSessionsOf(result: QueryResult): MockData['plannedVsSessions'] {
+  const plan = columnOf(result, 'plan_stub');
+  const planned = columnOf(result, 'planned');
+  const sessions = columnOf(result, 'sessions');
+  return result.rows.map((row) => ({ plan: textOf(row[plan], UNKNOWN), planned: numberOf(row[planned]), sessions: numberOf(row[sessions]) }));
+}
+
+/** One blocker per row, in the answer's order (the newest first). */
+export function blockersOf(result: QueryResult): Blocker[] {
+  const day = columnOf(result, 'day');
+  const plan = columnOf(result, 'plan_stub');
+  const line = columnOf(result, 'task_line');
+  const what = columnOf(result, 'what');
+  return result.rows.map((row) => {
+    const taskLine = row[line];
+    return {
+      day: dayOf(row[day]),
+      plan: typeof row[plan] === 'string'
+        ? row[plan]
+        : null,
+      taskLine: typeof taskLine === 'number'
+        ? taskLine
+        : null,
+      what: textOf(row[what], ''),
+    };
+  });
+}
+
+/** Task minutes by work type, one slice per D4 type in feature, fix, chore order; a NULL type has no slice. */
+export function changeSlicesOf(result: QueryResult): ChangeSlice[] {
+  const type = columnOf(result, 'work_type');
+  const minutes = columnOf(result, 'minutes');
+  return WORK_TYPES.map((id) => {
+    const kind = BRANCH_TYPES.find((entry) => entry.id === id) ?? { id, label: id, tone: 'muted' as const };
+    const value = result.rows.filter((row) => row[type] === id).reduce((sum, row) => sum + numberOf(row[minutes]), 0);
+    return { ...kind, value: Math.round(value) };
+  });
+}
+
+/** The fix and chore shares of all task minutes summed: the debt ratio. */
+export function debtRatioOf(result: QueryResult): number {
+  const type = columnOf(result, 'work_type');
+  const share = columnOf(result, 'share');
+  return result.rows
+    .filter((row) => typeof row[type] === 'string' && DEBT_TYPES.has(row[type]))
+    .reduce((sum, row) => sum + numberOf(row[share]), 0);
+}
+
+/** Halts per weekday (Monday first) and window week, from `day` and `halts` rows. */
+export function preflightGridOf(result: QueryResult): number[][] {
+  const day = columnOf(result, 'day');
+  const halts = columnOf(result, 'halts');
+  const weeks = windowWeeksOf(result, 'day');
+  const counts = new Map<string, number>();
+  for (const row of result.rows) {
+    const date = dayOf(row[day]);
+    const cell = `${(date.getUTCDay() + 6) % 7}:${weekKeyOf(date.getTime())}`;
+    counts.set(cell, (counts.get(cell) ?? 0) + numberOf(row[halts]));
+  }
+  return Array.from({ length: 7 }, (_, weekday) => weeks.map((week) => counts.get(`${weekday}:${week}`) ?? 0));
+}
+
+/** Tasks done per window week by work type, 0 for a week with none; a NULL type is left out. */
+export function tasksDoneOf(result: QueryResult): MockData['tasksDonePerWeek'] {
+  const sums = sumsByWeek(result, 'work_type', 'tasks');
+  return windowWeeksOf(result, 'week').map((week) => {
+    const types = sums.get(week);
+    return { week: dayOf(week), feature: types?.get('feature') ?? 0, fix: types?.get('fix') ?? 0, chore: types?.get('chore') ?? 0 };
+  });
+}
+
+/** One point per task session with its minutes: when it started, its minutes, its plan and task line. */
+export function taskCycleOf(result: QueryResult): ScatterPoint[] {
+  const started = columnOf(result, 'started_at');
+  const plan = columnOf(result, 'plan_stub');
+  const line = columnOf(result, 'task_line');
+  const minutes = columnOf(result, 'minutes');
+  return result.rows
+    .filter((row) => typeof row[minutes] === 'number')
+    .map((row) => {
+      const taskLine = row[line];
+      const label = typeof taskLine === 'number'
+        ? `${textOf(row[plan], UNKNOWN)} task ${taskLine}`
+        : textOf(row[plan], UNKNOWN);
+      return { x: dayOf(row[started]), y: round1(numberOf(row[minutes])), label };
+    });
+}
+
+/**
+ * The seven-day moving median of `points`, one point per day of the
+ * window (of the points, when open) whose seven days hold a point.
+ */
+export function cycleTrendOf(points: readonly ScatterPoint[], result: QueryResult): TimePoint[] {
+  const bounds = boundsOf(result);
+  const stamps = points.map((point) => point.x.getTime());
+  const first = Math.floor((bounds?.from.getTime() ?? Math.min(...stamps)) / DAY_MS) * DAY_MS;
+  const end = bounds?.to.getTime() ?? Math.max(...stamps) + 1;
+  if (!Number.isFinite(first) || !Number.isFinite(end)) return [];
+  const trend: TimePoint[] = [];
+  for (let dayStart = first; dayStart < end; dayStart += DAY_MS) {
+    const seen = points
+      .filter((point) => point.x.getTime() < dayStart + DAY_MS && point.x.getTime() >= dayStart - (TREND_DAYS - 1) * DAY_MS)
+      .map((point) => point.y)
+      .sort((a, b) => a - b);
+    if (seen.length > 0) trend.push({ x: new Date(dayStart), y: quantile(seen, 0.5) });
+  }
+  return trend;
+}
+
+/** The red verdict's share of the readings; 0 when no reading is red. */
+export function redShareOf(result: QueryResult): number {
+  const verdict = columnOf(result, 'verdict');
+  const share = columnOf(result, 'share');
+  return numberOf(result.rows.find((row) => row[verdict] === 'red')?.[share]);
+}
+
+/** The check names of one `failing_json` cell; a cell that is no list of names is refused. */
+function checkNamesOf(value: Scalar | undefined): string[] {
+  const parsed: unknown = typeof value === 'string'
+    ? JSON.parse(value)
+    : null;
+  if (!Array.isArray(parsed) || !parsed.every((name) => typeof name === 'string')) {
+    throw new Error(`atlas: ${JSON.stringify(value)} is not a list of checks`);
+  }
+  return parsed;
+}
+
+/**
+ * The ten checks failing most on heads that later read green: each
+ * `failing_json` set split into its names, its `failures` summed per name
+ * and its `heads` summed into `readings`, which here counts the flipped
+ * heads a check failed on, not every reading of the check.
+ */
+export function flakyChecksOf(result: QueryResult): MockData['flakyChecks'] {
+  const failing = columnOf(result, 'failing_json');
+  const failures = columnOf(result, 'failures');
+  const heads = columnOf(result, 'heads');
+  const byName = new Map<string, { failures: number; readings: number }>();
+  for (const row of result.rows) {
+    for (const name of checkNamesOf(row[failing])) {
+      const seen = byName.get(name) ?? { failures: 0, readings: 0 };
+      byName.set(name, { failures: seen.failures + numberOf(row[failures]), readings: seen.readings + numberOf(row[heads]) });
+    }
+  }
+  return [...byName.entries()]
+    .map(([name, counts]) => ({ name, ...counts }))
+    .sort((a, b) => b.failures - a.failures || a.name.localeCompare(b.name))
+    .slice(0, FLAKY_TOP);
+}
+
+/** One record per window week of `valueKey` per group: every group the answer names, 0 where a week has none. */
+export function weeklyGroupsOf(result: QueryResult, groupKey: string, valueKey: string): Record<string, number>[] {
+  const sums = sumsByWeek(result, groupKey, valueKey);
+  const groups = [...new Set([...sums.values()].flatMap((entry) => [...entry.keys()]))];
+  return windowWeeksOf(result, 'week').map((week) => Object.fromEntries(groups.map((name) => [name, sums.get(week)?.get(name) ?? 0])));
+}
+
+/** `valueKey` per window week as points, 0 for a week with no row. */
+export function weeklyPointsOf(result: QueryResult, valueKey: string): TimePoint[] {
+  const week = columnOf(result, 'week');
+  const value = columnOf(result, valueKey);
+  return windowWeeksOf(result, 'week').map((key) => ({
+    x: dayOf(key),
+    y: result.rows.filter((row) => row[week] === key).reduce((sum, row) => sum + numberOf(row[value]), 0),
+  }));
+}
+
+/* ---------- the result set ---------- */
+
+/** One answer per metric. */
+type Answers = Readonly<Record<LiveMetric, QueryResult>>;
+
+/** The window just before `current`'s, as long; null for an open window. */
+function previousWindowOf(current: QueryResult): Window | null {
+  const bounds = boundsOf(current);
+  if (bounds === null) return null;
+  const span = bounds.to.getTime() - bounds.from.getTime();
+  return { from: new Date(bounds.from.getTime() - span).toISOString(), to: bounds.from.toISOString() };
+}
+
+/** `key`'s metric over the window just before `current`'s; null for an open window. */
+async function previousOf(client: AtlasClient, key: LiveMetric, current: QueryResult, signal?: AbortSignal): Promise<QueryResult | null> {
+  const window = previousWindowOf(current);
+  return window === null
+    ? null
+    : client.runMetric(LIVE_METRICS[key], window, signal);
+}
+
+/** Every metric over its window for `range`, asked at once in `LIVE_METRICS` order. */
+async function answersOf(client: AtlasClient, range: TimeRange, signal?: AbortSignal): Promise<Answers> {
+  const windows = RANGE_WINDOW[range];
+  const entries = await Promise.all(METRIC_KEYS.map(async (key) => {
+    const window = KPI_METRICS.has(key)
+      ? windows.kpi
+      : windows.series;
+    return [key, await client.runMetric(LIVE_METRICS[key], window, signal)] as const;
+  }));
+  return Object.fromEntries(entries) as Answers;
+}
+
+/** The `proxyNote` of each proxy metric the API lists, by id. */
+function proxyNotesOf(definitions: readonly MetricDefinition[]): ReadonlyMap<string, string> {
+  return new Map(definitions.flatMap((definition) => (definition.feasibility === 'proxy' && definition.proxyNote !== undefined
+    ? [[definition.id, definition.proxyNote] as const]
+    : [])));
+}
+
+/** The meta of every wired field: its metric, the row count of the answer that filled it and the metric's proxy note. */
+function fieldMetaOf(answers: Answers, previous: Partial<Answers>, notes: ReadonlyMap<string, string>): ReadonlyMap<LensField, FieldMeta> {
+  return new Map(METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key].map((field) => {
+    const metricId = LIVE_METRICS[key];
+    const answer = PREVIOUS_FIELDS[field] === undefined
+      ? answers[key]
+      : previous[key];
+    const rowCount = answer?.meta.rowCount ?? 0;
+    const proxyNote = notes.get(metricId);
+    const meta: FieldMeta = proxyNote === undefined
+      ? { metricId, rowCount }
+      : { metricId, rowCount, proxyNote };
+    return [field, meta] as const;
+  })));
+}
+
+/** The wired fields of the mock shape, each filled from its metric's answer. */
+function mockOf(answers: Answers, previous: Partial<Answers>): MockData {
+  const tokensPerDay = timePointsOf(answers.tokensPerDay, 'day', 'tokens');
+  const previousTokens = previous.tokensPerDay;
+  const previousWindow = boundsOf(answers.tokensPerDay);
+  const span = previousWindow === null
+    ? 0
+    : previousWindow.to.getTime() - previousWindow.from.getTime();
+  const budget = budgetWeeksOf(answers.budgetBurn);
+  const taskCycle = taskCycleOf(answers.taskCycle);
+  return {
     ...emptyMock(),
     tokensPerDay,
-    tokensPerDayPrevious: await previousTokensOf(client, tokens, signal),
-    tokensDailyAverage: dailyAverageOf(tokensPerDay, tokens),
-    tokensByModel: modelSeriesOf(byModel),
-    taskMinutesQuantiles: quantilesOf(quantiles),
+    tokensPerDayPrevious: previousTokens === undefined
+      ? []
+      : shiftPoints(timePointsOf(previousTokens, 'day', 'tokens'), span),
+    tokensDailyAverage: dailyAverageOf(tokensPerDay, answers.tokensPerDay),
+    tokensThisWeek: budget.thisWeek,
+    tokensLastWeek: budget.lastWeek,
+    plansPerWeek: plansOf(answers.planCompletion),
+    plansCompletedPerWeek: timePointsOf(answers.plansCompletedPerWeek, 'week', 'completed'),
+    plannedVsSessions: plannedVsSessionsOf(answers.plannedVsSessions),
+    activeBlockers: blockersOf(answers.activeBlockers),
+    debtRatio: debtRatioOf(answers.debtRatio),
+    minutesByChangeKind: changeSlicesOf(answers.debtRatio),
+    minutesByChangeKindPrevious: previous.debtRatio === undefined
+      ? []
+      : changeSlicesOf(previous.debtRatio),
+    taskMinutesQuantiles: quantilesOf(answers.taskMinutesQuantiles),
+    tokensByModel: modelSeriesOf(answers.tokensByModel),
+    preflightHalts: preflightGridOf(answers.preflightHalts),
+    tasksDonePerWeek: tasksDoneOf(answers.tasksDonePerWeek),
+    taskCycle,
+    taskCycleTrend: cycleTrendOf(taskCycle, answers.taskCycle),
+    redCiShare: redShareOf(answers.redCiShare),
+    bugsByKindPerWeek: weeklyGroupsOf(answers.bugsByKind, 'kind', 'bugs'),
+    regressionsPerWeek: weeklyPointsOf(answers.regressions, 'bugs'),
+    flakyChecks: flakyChecksOf(answers.flakyChecks),
+    filedSharePerWeek: weeklyGroupsOf(answers.filedShare, 'route', 'bugs'),
   };
-  return { range, source: 'live', notWired: NOT_WIRED, mock, balance: [], workspace: EMPTY_WORKSPACE };
+}
+
+/** The live result set for `range`: the wired fields from the API with their meta, every other field marked. */
+export async function liveResultOf(client: AtlasClient, range: TimeRange, signal?: AbortSignal): Promise<LensResult> {
+  const [answers, definitions] = await Promise.all([answersOf(client, range, signal), client.listMetrics(undefined, signal)]);
+  const [tokens, debt] = await Promise.all([
+    previousOf(client, 'tokensPerDay', answers.tokensPerDay, signal),
+    previousOf(client, 'debtRatio', answers.debtRatio, signal),
+  ]);
+  const previous: Partial<Answers> = {
+    ...(tokens === null
+      ? {}
+      : { tokensPerDay: tokens }),
+    ...(debt === null
+      ? {}
+      : { debtRatio: debt }),
+  };
+  return {
+    range,
+    source: 'live',
+    notWired: NOT_WIRED,
+    fieldMeta: fieldMetaOf(answers, previous, proxyNotesOf(definitions)),
+    mock: mockOf(answers, previous),
+    balance: [],
+    workspace: EMPTY_WORKSPACE,
+  };
 }
 
 /** True for an answer that says the API is not there: unreachable, not mounted (a 404 that is no envelope), or no replica (503). */
