@@ -36,7 +36,7 @@
  * with a `409` naming the ids in `missing`, written as
  * {@link HubUpgradeRequired}:
  * `effort sync: the hub is behind this rafa (migration <ids>); nothing
- * was sent. Next step: upgrade the hub, then sync again`. A `409` naming
+ * was sent. Next step: upgrade the hub, then rafa effort sync`. A `409` naming
  * no `missing`, from an older hub, passes on as `HubRefused` with its
  * message as it stands. Neither moves the push cursor.
  *
@@ -64,7 +64,7 @@
  * A payload naming a migration this rafa does not know is refused with
  * {@link RafaUpdateRequired}, `effort sync: this rafa is behind the hub
  * (migration <ids>); nothing was merged. Next step: rafa self-update,
- * then sync again`, whether or not it holds rows: its rows could not be
+ * then rafa effort sync`, whether or not it holds rows: its rows could not be
  * read here. Then:
  *
  *   - A payload holding no row is not merged, since a merge rewrites the
@@ -294,7 +294,7 @@ export class RafaUpdateRequired extends Error {
   constructor(missing: readonly string[]) {
     super(
       `effort sync: this rafa is behind the hub (migration ${idsOf(missing)}); nothing was merged.`
-        + ` Next step: ${SELF_UPDATE}, then sync again`,
+        + ` Next step: ${SELF_UPDATE}, then rafa effort sync`,
     );
     this.missing = Object.freeze([...missing]);
   }
@@ -311,7 +311,7 @@ export class HubUpgradeRequired extends Error {
   constructor(missing: readonly string[]) {
     super(
       `effort sync: the hub is behind this rafa (migration ${idsOf(missing)}); nothing was sent.`
-        + ` Next step: ${UPGRADE_HUB}, then sync again`,
+        + ` Next step: ${UPGRADE_HUB}, then rafa effort sync`,
     );
     this.missing = Object.freeze([...missing]);
   }

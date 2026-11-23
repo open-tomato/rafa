@@ -58,9 +58,9 @@
  * is behind this rafa's, or one ahead of it: the `service` strategy's
  * refusal names the migration ids and the next step, `effort sync: the
  * hub is behind this rafa (migration <ids>); nothing was sent. Next
- * step: upgrade the hub, then sync again` and `effort sync: this rafa is
+ * step: upgrade the hub, then rafa effort sync` and `effort sync: this rafa is
  * behind the hub (migration <ids>); nothing was merged. Next step: rafa
- * self-update, then sync again`. Each is matched by its `name`
+ * self-update, then rafa effort sync`. Each is matched by its `name`
  * ({@link isSkewRefusal}) and its message is the whole line, written
  * through `warn` as it stands, its first line alone, and never inside
  * the `<direction> over <kind> failed:` wrap below. Each line is written

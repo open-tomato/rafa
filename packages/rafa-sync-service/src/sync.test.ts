@@ -487,7 +487,7 @@ describe('pull', () => {
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
     expect(refused.message).toBe(
       `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged.`
-        + ' Next step: rafa self-update, then sync again',
+        + ' Next step: rafa self-update, then rafa effort sync',
     );
     expect((refused as RafaUpdateRequired).nextStep).toBe(SELF_UPDATE);
     expect((refused as RafaUpdateRequired).missing).toEqual([FUTURE_MIGRATION]);
@@ -531,7 +531,7 @@ describe('pull', () => {
     const refused = await rejectionOf(serviceOf(device(1), over).pull({ from: null, dryRun: false }));
     expect(refused.message).toBe(
       `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
-        + ' nothing was merged. Next step: rafa self-update, then sync again',
+        + ' nothing was merged. Next step: rafa self-update, then rafa effort sync',
     );
   });
 });
@@ -637,7 +637,7 @@ describe('the projected pull, under effort.syncSkew: pull-projected', () => {
     const refused = await rejectionOf(projectingOf(b, over).pull({ from: null, dryRun: false }));
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
     expect(refused.message).toBe(
-      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged. Next step: rafa self-update, then sync again`,
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged. Next step: rafa self-update, then rafa effort sync`,
     );
     expect(existsSync(statePathOf(b))).toBe(false);
     over.setFault(() => Response.json({ success: false, error: 'rafa-hub: cannot project' }, { status: 409 }));
@@ -867,7 +867,7 @@ describe('when the hub cannot be reached or refuses', () => {
     expect(refused).toBeInstanceOf(HubUpgradeRequired);
     expect(refused.message).toBe(
       `effort sync: the hub is behind this rafa (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
-        + ' nothing was sent. Next step: upgrade the hub, then sync again',
+        + ' nothing was sent. Next step: upgrade the hub, then rafa effort sync',
     );
     expect((refused as HubUpgradeRequired).missing).toEqual([FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION]);
     expect((refused as HubUpgradeRequired).nextStep).toBe(UPGRADE_HUB);

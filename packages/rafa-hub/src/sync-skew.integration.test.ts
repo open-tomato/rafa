@@ -142,11 +142,11 @@ interface CollectRun {
 
 /** The line a device two behind writes for rows it cannot read, naming both migrations. */
 const SELF_UPDATE_LINE = `effort sync: this rafa is behind the hub (migration ${TAG_MIGRATION}, ${NOTE_MIGRATION}); nothing was merged.`
-  + ' Next step: rafa self-update, then sync again';
+  + ' Next step: rafa self-update, then rafa effort sync';
 
 /** The line a device ahead of a hub one migration short writes, naming the migration the hub lacks. */
 const UPGRADE_HUB_LINE = `effort sync: the hub is behind this rafa (migration ${NOTE_MIGRATION}); nothing was sent.`
-  + ' Next step: upgrade the hub, then sync again';
+  + ' Next step: upgrade the hub, then rafa effort sync';
 
 /** The environment this process runs `git` fixture steps under: its own, with no `GIT_*` variable reaching it. */
 function gitEnv(): Record<string, string> {

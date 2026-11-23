@@ -512,9 +512,9 @@ once per contact, under the offline rule above, and `<ids>` is the ids the
 
 | Case | `refuse` (default) | `pull-projected` |
 | --- | --- | --- |
-| This rafa is behind the hub, and the hub's store can project | `effort sync: this rafa is behind the hub (migration <ids>); nothing was merged. Next step: rafa self-update, then sync again` | `effort sync: pulled <n> rows projected to this rafa's schema; <m> columns wait for rafa self-update`; `heldBack` is kept |
+| This rafa is behind the hub, and the hub's store can project | `effort sync: this rafa is behind the hub (migration <ids>); nothing was merged. Next step: rafa self-update, then rafa effort sync` | `effort sync: pulled <n> rows projected to this rafa's schema; <m> columns wait for rafa self-update`; `heldBack` is kept |
 | This rafa is behind the hub, and the hub cannot project (its status says so, or its store answers `409` naming `missing`) | The line above | The line above: a device that sends no migrations gets whole rows, which name ids it lacks |
-| The hub is behind this rafa (the push is refused `409` naming `missing`) | `effort sync: the hub is behind this rafa (migration <ids>); nothing was sent. Next step: upgrade the hub, then sync again` | The same line |
+| The hub is behind this rafa (the push is refused `409` naming `missing`) | `effort sync: the hub is behind this rafa (migration <ids>); nothing was sent. Next step: upgrade the hub, then rafa effort sync` | The same line |
 | A refill: every id `held_rows` lists is known to this build, and `heldBack` is set | `effort sync: refilled <n> rows held back since <date>`; `heldBack` is cleared | The same line |
 | A refill that still lacks an id `held_rows` lists | The first row's line | Projected again: the `pulled <n> rows projected` line, with `heldBack` kept |
 
