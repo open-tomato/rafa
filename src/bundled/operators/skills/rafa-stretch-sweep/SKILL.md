@@ -4,9 +4,9 @@ description: "Use at a stretch's sweep: group duplicate bugs, rank the board, an
 provenance: first-party
 source: rafa
 stage: alpha
-prevents: "a bucket that refiles the same failing test, chases a feature over a blocker, or pulls in a chain of issues"
+prevents: "a bucket that refiles the same failing test, chases a feature over a blocker, pulls in a chain of issues, or misses a security alert nobody filed"
 signal: silent
-when_to_use: "You are rafa-stretch-engineer in phase 1 of a stretch, choosing which issues the stretch will run. Prevents: a bucket that refiles the same failing test, chases a feature over a blocker, or pulls in a chain of issues"
+when_to_use: "You are rafa-stretch-engineer in phase 1 of a stretch, choosing which issues the stretch will run. Prevents: a bucket that refiles the same failing test, chases a feature over a blocker, pulls in a chain of issues, or misses a security alert nobody filed"
 tags:
   - rafa
   - stretch
@@ -19,8 +19,8 @@ Alpha: tested on rafa's own development, may become a feature.
 
 # Sweep and bucket
 
-The sweep reads the board, groups what is filed twice, ranks what is
-left, and proposes a *bucket*: the issues this stretch will run, at most
+The sweep reads the board and the repository's security alerts, groups
+what is filed twice, ranks what is left, and proposes a *bucket*: the issues this stretch will run, at most
 10. It ends with the bucket written and the stretch stopped for the
 person's approval.
 
@@ -41,6 +41,52 @@ of its own, never read as fixed.
 
 Read the roadmap's "now" epics first: their members are where the
 project already said the work is.
+
+## Read the security alerts
+
+The board holds only what someone filed. A finding that GitHub's
+security features or the lockfile hold never reaches it by itself, so
+the sweep reads those too, in the main checkout:
+
+```bash
+gh api repos/{owner}/{repo} --jq .security_and_analysis
+gh api repos/{owner}/{repo}/private-vulnerability-reporting
+gh api repos/{owner}/{repo}/code-scanning/default-setup --jq .state
+gh api 'repos/{owner}/{repo}/code-scanning/alerts?state=open' --jq '.[] | [.number, (.rule.security_severity_level // .rule.severity), .rule.id, .most_recent_instance.location.path] | @tsv'
+gh api 'repos/{owner}/{repo}/secret-scanning/alerts?state=open' --jq '.[] | [.number, .secret_type, .validity] | @tsv'
+gh api 'repos/{owner}/{repo}/dependabot/alerts?state=open' --jq '.[] | [.number, .security_advisory.severity, .dependency.package.name, .dependency.scope, .security_advisory.ghsa_id] | @tsv'
+bun audit
+```
+
+`gh api` fills `{owner}/{repo}` from the checkout's remote. No rafa line
+reads these yet (#1636), so run them raw and do not log that gap again.
+
+- **Never print a secret.** A secret alert's `secret` field holds the
+  value itself. The jq above leaves it out, and no file, issue, comment
+  or report ever holds it.
+- **A read that answers 403 or 404** means the feature is off. That is a
+  finding too, routed below.
+- **`bun audit`** runs where the project has a `bun.lock`, until
+  `rafa dep advisories` (#1599) replaces it. GitHub's dependency graph
+  does not read `bun.lock`, so the Dependabot alerts stay empty while
+  the lockfile holds advisories. Read each path `bun audit` prints: one
+  that starts from a lint, test or build tool is development only.
+
+Each finding goes one way:
+
+| Finding | Where it goes | First |
+|---|---|---|
+| An open secret alert | the top of the bucket report, as a step for the person: rotate the secret, then close the alert; never an issue | before everything |
+| A code scanning alert with a security severity | the bucket report's Security section, by alert number and rule only; a fix item is filed once the person says how, as a private advisory draft or a public issue | critical and high first |
+| A dependency advisory on a runtime dependency | a fix item: refresh the lockfile, or bump the dependency that pulls the package in; the advisory is already public, so the issue may name it | the first fix slot when critical or high |
+| A dependency advisory on a development dependency | a fix item, ranked with the other fixes | by severity |
+| A code scanning alert with no security severity | a fix item, like any other quality finding | with the fixes |
+| A security setting that is off | a step for the person in the bucket report; turning it on is the person's, never yours | |
+
+The sweep expects these on: private vulnerability reporting, secret
+scanning, push protection, CodeQL default setup (`configured`) and
+Dependabot alerts. Where the project's rules keep installs with the
+person, a lockfile refresh is a step for the person, not a loop item.
 
 ## The five steps
 
@@ -89,6 +135,15 @@ File that spec with `rafa issue create --type=spec --body-file <path>`.
 | Slot | Issue | Tier | Why it is here |
 |---|---|---|---|
 | 1 | #485 | fix | every loop inherits its red tests |
+
+## Security
+
+| Source | Open | Routed |
+|---|---|---|
+| secret scanning | 0 | |
+| code scanning | 1 high | alert 3, waits on the person |
+| dependencies | 7 runtime, 3 development | slot 1; slot 8 |
+| settings off | validity checks | a step for the person |
 
 ## Duplicate groups
 

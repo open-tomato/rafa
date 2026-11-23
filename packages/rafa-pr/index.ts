@@ -193,7 +193,9 @@ export {
 } from './src/triage/similarity.js';
 
 export type {
+  AppendUpdate,
   BugTriage,
+  RecurrenceAppend,
   TriageOptions,
   TriageResult,
 } from './src/triage/triage.js';

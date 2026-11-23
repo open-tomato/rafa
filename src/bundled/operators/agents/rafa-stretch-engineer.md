@@ -180,7 +180,8 @@ Stop and alert the person when:
 ## The stretch report
 
 `report.md` holds, in this order: what merged, with each pull request;
-the pit stops; the bug count at the start and at the end; the duplicates
+the pit stops; the bug count and the open security alerts at the start
+and at the end, by source, from the sweep's reads; the duplicates
 closed; cost per task against the baseline (`rafa effort dashboard`); the
 gaps filed; and your self-improvement proposals.
 

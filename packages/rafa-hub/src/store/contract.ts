@@ -23,6 +23,13 @@
  * a migration the hub lacks is refused with is the adapter's own, and
  * its own suite's.
  *
+ * The project cases run over a hub listing two projects: an unlisted
+ * project refused with the line naming `hub.projects`, a pull answering
+ * none of the other project's rows, a push leaving the other project's
+ * row counts and devices as they were, a request naming no project
+ * landing in the first listed project, and `status()` naming every
+ * project's `id` and `name`.
+ *
  * ## The payloads it pushes
  *
  * Real ones. A store is opened through `@open-tomato/rafa/store` under
@@ -44,6 +51,7 @@
  */
 import type {
   HubPullRequest,
+  HubServedProject,
   HubStore,
   HubStoreFactory,
   HubStoreStatus,
@@ -94,6 +102,14 @@ const T2 = '2026-09-30T11:00:00.000Z';
 /** The two tables the suite fills. */
 const COMMITS = 'commits';
 const SESSIONS = 'sessions';
+
+/** The two projects the project cases list, in this order, and one no case lists. */
+const PROJECT_ONE: HubServedProject = { id: '1'.repeat(40), name: 'open-tomato/one' };
+const PROJECT_TWO: HubServedProject = { id: '2'.repeat(40), name: 'open-tomato/two' };
+const UNLISTED = '3'.repeat(40);
+
+/** The line a request naming a project not listed is refused with. */
+const NOT_SERVED = `rafa-hub: project ${UNLISTED} is not served here; add it under hub.projects`;
 
 /** What every payload is built from: a real export's migrations and row columns. */
 export interface WireTemplate {
@@ -222,12 +238,14 @@ export function builders(template: () => WireTemplate): {
   return { commit, session, payload };
 }
 
-/** Opens a fresh adapter over a new directory and a settable clock. */
-async function openWorld(factory: HubStoreFactory): Promise<World> {
+/** Opens a fresh adapter over a new directory and a settable clock, listing `projects` when given. */
+async function openWorld(factory: HubStoreFactory, projects?: readonly HubServedProject[]): Promise<World> {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hub-contract-')));
   let reading = T0;
   try {
-    const store = await factory({ directory, now: () => new Date(reading) });
+    const store = await factory({ directory, now: () => new Date(reading), ...(projects === undefined
+      ? {}
+      : { projects }) });
     return {
       store,
       setClock: (iso) => {
@@ -265,6 +283,18 @@ function countIn(status: HubStoreStatus, table: string): number {
 /** Every row a pull answered, across its tables. */
 function rowsIn(payload: WirePayload): number {
   return Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
+}
+
+/** The outcome of `run`, a refusal whether it threw at once or rejected. */
+async function refusalOf(run: () => Promise<unknown>): Promise<string> {
+  try {
+    await run();
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : String(error);
+  }
+  return '';
 }
 
 /**
@@ -567,6 +597,77 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
 
         expect([again.added, again.at]).toEqual([0, T2]);
         expect(devices).toEqual([{ device: A, lastPushAt: T2 }]);
+      });
+    });
+
+    describe('projects', () => {
+      /** Replaces the case's adapter with one listing both projects. */
+      beforeEach(async () => {
+        const single = world;
+        world = undefined;
+        await single?.close();
+        world = await openWorld(factory, [PROJECT_ONE, PROJECT_TWO]);
+      });
+
+      const pushTo = (project: string, device: string, tables: Readonly<Record<string, readonly WireRow[]>>): Promise<unknown> => hub().push({ device, project, payload: payload(tables) });
+      const pullFrom = (project: string, device: string): Promise<WirePayload> => hub().pull({ device, project, since: {} });
+      const statusOf = (project: string): Promise<HubStoreStatus> => hub().status({ project });
+
+      it('refuses a push, a pull and a status naming a project not listed, with the line naming hub.projects, and adds nothing', async () => {
+        const pushed = await refusalOf(() => pushTo(UNLISTED, A, { [COMMITS]: [commit(A, 1)] }));
+        const pulled = await refusalOf(() => pullFrom(UNLISTED, B));
+        const read = await refusalOf(() => hub().status({ project: UNLISTED }));
+        const one = await statusOf(PROJECT_ONE.id);
+
+        expect([pushed, pulled, read]).toEqual([NOT_SERVED, NOT_SERVED, NOT_SERVED]);
+        expect([one.rows[COMMITS] ?? 0, one.devices]).toEqual([0, []]);
+      });
+
+      it('answers a pull from one project none of the other project\'s rows', async () => {
+        await pushTo(PROJECT_ONE.id, A, { [COMMITS]: [commit(A, 1)], [SESSIONS]: [session(A, 2)] });
+        await pushTo(PROJECT_TWO.id, B, { [COMMITS]: [commit(B, 1), commit(B, 2)] });
+        const fromOne = await pullFrom(PROJECT_ONE.id, C);
+        const fromTwo = await pullFrom(PROJECT_TWO.id, C);
+
+        expect([pairsIn(fromOne, COMMITS), pairsIn(fromOne, SESSIONS)]).toEqual([pairsOf(commit(A, 1)), pairsOf(session(A, 2))]);
+        expect([pairsIn(fromTwo, COMMITS), pairsIn(fromTwo, SESSIONS)]).toEqual([pairsOf(commit(B, 1), commit(B, 2)), []]);
+      });
+
+      it('leaves the other project\'s row counts and devices unchanged by a push to one', async () => {
+        await pushTo(PROJECT_TWO.id, B, { [COMMITS]: [commit(B, 1)] });
+        const before = await statusOf(PROJECT_TWO.id);
+        await pushTo(PROJECT_ONE.id, A, { [COMMITS]: [commit(A, 1), commit(A, 2)], [SESSIONS]: [session(A, 3)] });
+        const after = await statusOf(PROJECT_TWO.id);
+        const one = await statusOf(PROJECT_ONE.id);
+
+        expect({ rows: after.rows, devices: after.devices }).toEqual({ rows: before.rows, devices: before.devices });
+        expect([countIn(after, COMMITS), countIn(after, SESSIONS)]).toEqual([1, 0]);
+        expect(after.devices).toEqual([{ device: B, lastPushAt: T0 }]);
+        expect([countIn(one, COMMITS), countIn(one, SESSIONS)]).toEqual([2, 1]);
+        expect(one.devices).toEqual([{ device: A, lastPushAt: T0 }]);
+      });
+
+      it('serves a request naming no project in the first listed project', async () => {
+        await hub().push({ device: A, payload: payload({ [COMMITS]: [commit(A, 1)] }) });
+        await pushTo(PROJECT_TWO.id, B, { [COMMITS]: [commit(B, 1)] });
+        const unnamed = await hub().pull({ device: C, since: {} });
+        const fromOne = await pullFrom(PROJECT_ONE.id, C);
+        const statusUnnamed = await hub().status();
+        const one = await statusOf(PROJECT_ONE.id);
+
+        expect(pairsIn(unnamed, COMMITS)).toEqual(pairsOf(commit(A, 1)));
+        expect(pairsIn(fromOne, COMMITS)).toEqual(pairsOf(commit(A, 1)));
+        expect([statusUnnamed.rows, statusUnnamed.devices]).toEqual([one.rows, one.devices]);
+        expect(countIn(await statusOf(PROJECT_TWO.id), COMMITS)).toBe(1);
+      });
+
+      it('names every project\'s id and name in status, in listed order, whichever project it reads', async () => {
+        const unnamed = await hub().status();
+        const one = await statusOf(PROJECT_ONE.id);
+        const two = await statusOf(PROJECT_TWO.id);
+        const listed = [PROJECT_ONE, PROJECT_TWO].map(({ id, name }) => ({ id, name }));
+
+        expect([unnamed.projects, one.projects, two.projects]).toEqual([listed, listed, listed]);
       });
     });
   });

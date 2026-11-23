@@ -5,13 +5,14 @@
  * values. The measured parts (package composition, the import graph) are
  * the same in every range.
  */
+import type { PageSource } from '../url.js';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { GraphLink, GraphNode, RoseSlice, SunburstNode } from '@open-tomato/charts';
 
 import { BALANCE_CATALOGUE, type BalanceIndex } from './balance.js';
 import { COMPOSITION_SUNBURST, PACKAGE_COMPOSITION, SIZE_ROSE, type PackageComposition } from './composition.js';
 import { SANKEY_LINKS, SANKEY_NODES, WORKSPACE_LINKS, WORKSPACE_NODES } from './graph.js';
-import { buildMock, MOCK_SEEDS, type MockData, type MockSeeds } from './mock.js';
+import { buildMock, MOCK_SEEDS, WEEK_DATES, type MockData, type MockSeeds } from './mock.js';
 import { between, seeded } from './random.js';
 
 /** The workspace as measured on 2026-11-02: package composition and the import graph. */
@@ -25,9 +26,46 @@ export interface MeasuredWorkspace {
   readonly sankeyLinks: readonly GraphLink[];
 }
 
+/** One field of a result set a card reads: a mock series, the balance indices or the measured workspace. */
+export type LensField = keyof MockData | 'balance' | 'workspace';
+
+/** What a live field says about the answer that filled it. */
+export interface FieldMeta {
+  /** The catalogue metric whose answer filled the field. */
+  readonly metricId: string;
+  /** That answer's `meta.rowCount`. */
+  readonly rowCount: number;
+  /** The metric's `proxyNote`, for a metric whose feasibility is `proxy`; absent for a direct one. */
+  readonly proxyNote?: string;
+}
+
+/** No field marked: what the mock source answers, every field drawn. */
+const NONE_MARKED: ReadonlySet<LensField> = new Set<LensField>();
+
+/** No field filled by a metric: the mock's meta. */
+const NO_META: ReadonlyMap<LensField, FieldMeta> = new Map<LensField, FieldMeta>();
+
 /** What the page source answers for one range: every card's data. */
 export interface LensResult {
   readonly range: TimeRange;
+  /** Which source answered: the mock, or the live source of `live.ts`. */
+  readonly source: PageSource;
+  /**
+   * The fields no live metric fills yet. A card reading one draws the
+   * "not wired yet" state (`lenses/LensCard.tsx`); the mock marks none.
+   */
+  readonly notWired: ReadonlySet<LensField>;
+  /**
+   * Per field a live metric filled: the metric, its answer's row count
+   * and, for a proxy, its `ProxyNote`. The mock fills none.
+   */
+  readonly fieldMeta: ReadonlyMap<LensField, FieldMeta>;
+  /**
+   * The Monday (UTC) of each week a weekly field without its own dates
+   * holds one entry for (bugs by kind, routes, preflight halts), oldest
+   * first: the mock's 12 weeks, or the live series window's weeks.
+   */
+  readonly weeks: readonly Date[];
   readonly mock: MockData;
   /** The balance indices with this range's values. */
   readonly balance: readonly BalanceIndex[];
@@ -79,7 +117,7 @@ function balanceOf(range: TimeRange): readonly BalanceIndex[] {
 
 /** The result set for one range, computed at once. */
 export function lensResultOf(range: TimeRange): LensResult {
-  return { range, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
+  return { range, source: 'mock', notWired: NONE_MARKED, fieldMeta: NO_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
 }
 
 /** A page source over the mock that answers after `delayMs`. */

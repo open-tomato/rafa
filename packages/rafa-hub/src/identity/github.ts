@@ -1,11 +1,28 @@
 /**
  * The repository-permission identity adapter: the hub's default
  * {@link HubIdentity}. It reads the caller's GitHub token from the
- * request, asks GitHub for the repository `hub.repository` names with
- * that token, and serves the caller when the permission GitHub answers
+ * request, asks GitHub for the repository the request's project is
+ * kept in with that token, and serves the caller when the permission GitHub answers
  * is one of `TRUSTED_PERMISSIONS` (`admin`, `maintain`, `write`), the
  * ones the board's trust check trusts (`packages/rafa-board/src/board/trust.ts`, reached
  * through `@open-tomato/rafa/store`).
+ *
+ * ## Which repository a request is checked against
+ *
+ * The adapter is opened with `repository`: one `owner/name` every
+ * request is checked against, or a {@link RepositoryResolver} answering
+ * one per request. {@link projectRepositoryResolver} is the hub's:
+ * over the listed projects (`hub.projects`, or the one `default`
+ * project of `hub.repository`), a push or a pull whose `project` query
+ * names a listed project is checked against that project's
+ * `repository`, and every other request against the first listed
+ * project's. That is a push or a pull naming none, `GET /v1/status`
+ * and every other route whatever its query says, and a push or a pull
+ * naming a project not listed or not spelt as a root commit: the
+ * server refuses those once the caller is served, so a caller learns a
+ * project is not served only after proving trust on the first one. A
+ * single-project hub lists only `default`, which no request names, so
+ * every request is checked against `hub.repository`, as before #1431.
  *
  * ## What it asks GitHub
  *
@@ -22,9 +39,10 @@
  *      and a role outside `TRUSTED_PERMISSIONS`, or no `permissions` at
  *      all, is `forbidden`.
  *
- * The repository asked about is always the one the adapter was opened
- * with. Nothing a request carries, a path, a query or a header, names
- * another: a token with write access to some other repository is
+ * The repository asked about is always one the adapter was opened
+ * with, the resolver's answer. Nothing else a request carries, a path,
+ * a header or a query other than a listed `project`, names another: a
+ * token with write access to a repository no listed project keeps is
  * refused.
  *
  * A request GitHub did not answer, answered with a rate limit (`429`,
@@ -44,8 +62,9 @@
  * about again on its next request, so a caller granted write, or a
  * GitHub back from an outage, is served at once.
  *
- * The cache is keyed by the token's SHA-256, never the token, and an
- * entry past its time is dropped when it is next looked up or when
+ * The cache is keyed by the token's SHA-256, never the token, and the
+ * repository asked about, so a token served on one project's
+ * repository is asked about again on another's. An entry past its time is dropped when it is next looked up or when
  * another answer is kept.
  *
  * ## What it never does
@@ -58,6 +77,8 @@
 import type { HubAction, HubIdentity, IdentityAnswer, IdentityRefusalReason } from './port.js';
 
 import { TRUSTED_PERMISSIONS } from '@open-tomato/rafa/store';
+
+import { HUB_ROUTES } from '../server.js';
 
 import { HUB_ACTIONS } from './port.js';
 
@@ -97,10 +118,48 @@ const ROLE_FLAGS: readonly (readonly [string, string])[] = Object.freeze([
   ['pull', 'read'],
 ]);
 
+/** Answers the `owner/name` one request is checked against. */
+export type RepositoryResolver = (request: Request) => string;
+
+/** One listed project as {@link projectRepositoryResolver} reads it: its wire id and its repository. */
+export interface ProjectRepository {
+  readonly id: string;
+  readonly repository: string;
+}
+
+/** The routes whose `project` query names the project a request is checked against. */
+const PROJECT_ROUTES: readonly string[] = Object.freeze([HUB_ROUTES.push, HUB_ROUTES.pull]);
+
+/**
+ * The hub's resolver over `projects`, in `hub.projects` order: a push or
+ * a pull naming a listed project by `project` is checked against that
+ * project's repository, and every other request against the first
+ * listed project's; see the module note.
+ */
+export function projectRepositoryResolver(projects: readonly ProjectRepository[]): RepositoryResolver {
+  const [first] = projects;
+  if (first === undefined) throw new Error('projectRepositoryResolver needs at least one project.');
+
+  const byId = new Map(projects.map(({ id, repository }) => [id, repository]));
+  return (request) => {
+    const url = new URL(request.url);
+    if (!PROJECT_ROUTES.includes(url.pathname)) return first.repository;
+
+    const named = url.searchParams.get('project');
+    return (named === null
+      ? undefined
+      : byId.get(named)) ?? first.repository;
+  };
+}
+
 /** What {@link openGitHubIdentity} is opened with. */
 export interface GitHubIdentityOptions {
-  /** `hub.repository`: the `owner/name` every request is checked against. */
-  readonly repository: string;
+  /**
+   * The `owner/name` every request is checked against, such as
+   * `hub.repository`, or a resolver answering one per request, such as
+   * {@link projectRepositoryResolver}'s.
+   */
+  readonly repository: string | RepositoryResolver;
   /** `hub.auth.cacheFor` in milliseconds, or null to ask GitHub on every request. */
   readonly cacheForMs: number | null;
   /** GitHub's API root, {@link GITHUB_API} in production and a stand-in's URL in tests. */
@@ -132,11 +191,12 @@ function tokenOf(request: Request): string | undefined {
   return CREDENTIAL.exec(request.headers.get('authorization') ?? '')?.[1];
 }
 
-/** The cache key of `token`: its SHA-256, so the cache holds no token. */
-function keyOf(token: string): string {
-  return new Bun.CryptoHasher('sha256')
+/** The cache key of `token` on `repository`: the token's SHA-256, so the cache holds no token, and the repository. */
+function keyOf(token: string, repository: string): string {
+  const digest = new Bun.CryptoHasher('sha256')
     .update(token)
     .digest('hex');
+  return `${digest} ${repository}`;
 }
 
 /** Whether `raw` is a JSON object, rather than a list, a scalar or null. */
@@ -178,18 +238,26 @@ function repositoryPath(repository: string): string {
   return `/repos/${parts.join('/')}`;
 }
 
+/** A resolver answering `repository` for every request. */
+function constantRepository(repository: string): RepositoryResolver {
+  return () => repository;
+}
+
 /**
  * Opens the repository-permission adapter over `options`. The answer
  * cache lives as long as the adapter, one per hub process.
  */
 export function openGitHubIdentity(options: GitHubIdentityOptions): HubIdentity {
-  const { repository, cacheForMs } = options;
+  const { cacheForMs } = options;
+  const repositoryOf: RepositoryResolver = typeof options.repository === 'string'
+    ? constantRepository(options.repository)
+    : options.repository;
   const apiBase = options.apiBase.replace(/\/+$/, '');
   const timeoutMs = options.timeoutMs ?? DEFAULT_GITHUB_TIMEOUT_MS;
   const now = options.now ?? Date.now;
   const kept = new Map<string, Kept>();
 
-  const unavailable = (detail: string): IdentityAnswer => refused(
+  const unavailable = (repository: string, detail: string): IdentityAnswer => refused(
     'unavailable',
     oneLine(`GitHub did not answer the permission check for ${repository}: ${detail}; try again.`),
   );
@@ -229,32 +297,32 @@ export function openGitHubIdentity(options: GitHubIdentityOptions): HubIdentity 
   };
 
   /** What GitHub's reading of a request other than a success means, or null for a success. */
-  const failureOf = (asked: Asked, forbidden: string): IdentityAnswer | null => {
-    if (!asked.answered) return unavailable(asked.detail);
-    if (isRateLimited(asked.status, asked.headers)) return unavailable(`its rate limit refused it (HTTP ${String(asked.status)})`);
+  const failureOf = (repository: string, asked: Asked, forbidden: string): IdentityAnswer | null => {
+    if (!asked.answered) return unavailable(repository, asked.detail);
+    if (isRateLimited(asked.status, asked.headers)) return unavailable(repository, `its rate limit refused it (HTTP ${String(asked.status)})`);
     if (asked.status === 401) return refused('unauthenticated', `GitHub did not accept the token; send one for a login with ${SERVED_ROLES} on ${repository}.`);
     if (asked.status === 403) return refused('forbidden', forbidden);
-    if (asked.status < 200 || asked.status >= 300) return unavailable(`HTTP ${String(asked.status)}`);
-    if (!isRecord(asked.body)) return unavailable(`HTTP ${String(asked.status)} with a body that is not a JSON object`);
+    if (asked.status < 200 || asked.status >= 300) return unavailable(repository, `HTTP ${String(asked.status)}`);
+    if (!isRecord(asked.body)) return unavailable(repository, `HTTP ${String(asked.status)} with a body that is not a JSON object`);
     return null;
   };
 
   /** Asks GitHub who holds `token` and what they hold on `repository`. */
-  const lookUp = async (token: string): Promise<IdentityAnswer> => {
+  const lookUp = async (token: string, repository: string): Promise<IdentityAnswer> => {
     const user = await ask('/user', token);
-    const userFailure = failureOf(user, 'GitHub refused this token a user lookup (HTTP 403); send a user\'s token.');
+    const userFailure = failureOf(repository, user, 'GitHub refused this token a user lookup (HTTP 403); send a user\'s token.');
     if (userFailure !== null) return userFailure;
 
     const login = user.answered && isRecord(user.body)
       ? user.body['login']
       : undefined;
-    if (typeof login !== 'string' || login.trim() === '') return unavailable('the user lookup named no login');
+    if (typeof login !== 'string' || login.trim() === '') return unavailable(repository, 'the user lookup named no login');
 
     const repo = await ask(repositoryPath(repository), token);
     if (repo.answered && repo.status === 404) {
       return refused('forbidden', `${login} cannot see ${repository} on GitHub; the hub serves ${SERVED_ROLES}.`);
     }
-    const repoFailure = failureOf(repo, `GitHub refused ${login} a lookup of ${repository} (HTTP 403); the hub serves ${SERVED_ROLES}.`);
+    const repoFailure = failureOf(repository, repo, `GitHub refused ${login} a lookup of ${repository} (HTTP 403); the hub serves ${SERVED_ROLES}.`);
     if (repoFailure !== null) return repoFailure;
 
     const role = roleOf(repo.answered && isRecord(repo.body)
@@ -289,14 +357,15 @@ export function openGitHubIdentity(options: GitHubIdentityOptions): HubIdentity 
 
   const identify = async (request: Request): Promise<IdentityAnswer> => {
     const token = tokenOf(request);
+    const repository = repositoryOf(request);
     if (token === undefined) {
       return refused('unauthenticated', `Send a GitHub token for a login with ${SERVED_ROLES} on ${repository} as Authorization: Bearer.`);
     }
-    const key = keyOf(token);
+    const key = keyOf(token, repository);
     const remembered = recall(key);
     if (remembered !== undefined) return remembered;
 
-    const answer = await lookUp(token);
+    const answer = await lookUp(token, repository);
     keep(key, answer);
     return answer;
   };

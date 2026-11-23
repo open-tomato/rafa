@@ -914,3 +914,74 @@ describe('a hub speaking another contract version', () => {
     expect(over.paths()).toEqual([]);
   });
 });
+
+/**
+ * A device whose store was minted in a repository with a commit, and
+ * whose repository was then made again with no commit, so its store
+ * records an origin and its repository has no root commit. A store
+ * first written in a repository with no commit records no origin, and
+ * is refused for that before its project is read.
+ */
+function uncommittedDevice(): Device {
+  const at = device(1);
+  rmSync(join(at.root, '.git'), { recursive: true, force: true });
+  git(at.root, 'init', '-q');
+  return at;
+}
+
+/** The root commit of the repository at `root`, as git prints it. */
+function rootCommitOf(root: string): string {
+  const ran = Bun.spawnSync(['git', 'rev-list', '--max-parents=0', 'HEAD'], { cwd: root, env: gitEnv() });
+  return ran.stdout.toString().trim();
+}
+
+describe('the project', () => {
+  const served = [{ id: 'some-project', name: 'some/project' }];
+
+  it('names the repository\'s root commit on push and pull to a hub naming projects, and none to a hub naming none', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = device(1);
+    await serviceOf(a, over).push({ to: null });
+    await serviceOf(a, over).pull({ from: null, dryRun: false });
+    expect(rootCommitOf(a.root)).toMatch(/^[0-9a-f]{40}$/);
+    expect(over.projectQueries).toEqual([rootCommitOf(a.root), rootCommitOf(a.root)]);
+    const behind = hub();
+    await serviceOf(a, behind).push({ to: null });
+    expect(behind.projectQueries).toEqual([null]);
+  });
+
+  it('names hub.project over the repository\'s root commit', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = device(1);
+    const service = serviceOf(a, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'some-project' } });
+    await service.push({ to: null });
+    await service.pull({ from: null, dryRun: false });
+    expect(over.projectQueries).toEqual(['some-project', 'some-project']);
+    expect(over.projectQueries).not.toContain(rootCommitOf(a.root));
+  });
+
+  it('refuses push and pull in a repository with no commit and no hub.project, sending nothing, where hub.project lets it sync', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = uncommittedDevice();
+    expect(originOf(a)).not.toBe('');
+    expect(rootCommitOf(a.root)).toBe('');
+    const refusal = `effort sync (service): the repository at ${a.root} has no root commit and hub.project is not set,`
+      + ' so the hub could not tell which project its rows belong to. Nothing was sent.'
+      + ' Next safe step: commit once in the repository, or set hub.project in .rafa/config.yaml';
+    const pushing = await rejectionOf(serviceOf(a, over).push({ to: null }));
+    const pulling = await rejectionOf(serviceOf(a, over).pull({ from: null, dryRun: false }));
+    expect(pushing).toBeInstanceOf(ServiceSyncRefusal);
+    expect(pushing.message).toBe(refusal);
+    expect(pulling).toBeInstanceOf(ServiceSyncRefusal);
+    expect(pulling.message).toBe(refusal);
+    expect(refusal).not.toContain('\n');
+    expect([over.requests, over.statusReads()]).toEqual([[], 0]);
+    expect(existsSync(statePathOf(a))).toBe(false);
+    const named = serviceOf(a, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'some-project' } });
+    expect(await named.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(over.projectQueries).toEqual(['some-project']);
+  });
+});

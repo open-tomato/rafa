@@ -1,13 +1,14 @@
 import type { LensResult } from '../data/source.js';
 
-import { DashboardCard, useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
+import { useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
-import { BRANCH_TYPES, RED_CI_SHARE, RED_CI_THRESHOLD, WIP_LIMIT, WIP_NOW, WORK_KINDS, WORK_TONES, type MockData } from '../data/mock.js';
+import { BRANCH_TYPES, RED_CI_THRESHOLD, WIP_LIMIT, WIP_NOW, WORK_KINDS, WORK_TONES } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { BalanceCard } from './balance/BalanceCard.js';
+import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
 import { cardSpec, plotHeight } from './spec.js';
@@ -61,15 +62,25 @@ const CYCLE_LEGEND: readonly LegendItem[] = [
 
 type BranchType = 'feature' | 'fix' | 'chore';
 
-function DeveloperTiles({ mock }: { readonly mock: MockData }): ReactElement {
+function DeveloperTiles({ result }: { readonly result: LensResult }): ReactElement {
+  const { mock } = result;
   const totals = mock.tasksDonePerWeek.map((week) => week.feature + week.fix + week.chore);
   const doneLastWeek = totals.at(-1) ?? 0;
   return (
     <>
-      <LensStat hero label="Tasks done this week" value={String(doneLastWeek)} trend={totals} delta={{ text: `vs ${TASKS_AVERAGE} four-week average`, direction: doneLastWeek > TASKS_AVERAGE
-        ? 'up'
-        : 'down' }} />
-      <LensStat label="Plans completed per week" value={String(mock.plansPerWeek.at(-1)?.completed ?? 0)} trend={mock.plansPerWeek.map((week) => week.completed)} />
+      <LensStat
+        hero
+        label="Tasks done this week"
+        reads={['tasksDonePerWeek']}
+        value={String(doneLastWeek)}
+        trend={totals}
+        delta={result.source === 'mock'
+          ? { text: `vs ${TASKS_AVERAGE} four-week average`, direction: doneLastWeek > TASKS_AVERAGE
+            ? 'up'
+            : 'down' }
+          : undefined}
+      />
+      <LensStat label="Plans completed per week" reads={['plansCompletedPerWeek']} value={String(mock.plansCompletedPerWeek.at(-1)?.y ?? 0)} trend={mock.plansCompletedPerWeek.map((point) => point.y)} />
       <LensStat label="Releases this week" value={String(mock.deploysPerWeek.at(-1) ?? 0)} trend={mock.deploysPerWeek} note="release tags and merged PRs from the git log" />
       <LensStat label="Work in progress" value={WIP_NOW} goal={WIP_LIMIT} note="running loops and claimed issues" />
     </>
@@ -85,11 +96,11 @@ export function DeveloperLens(): ReactElement {
     <LensGrid
       tiles={data === undefined
         ? <LoadingTiles count={4} />
-        : <DeveloperTiles mock={data.mock} />}
+        : <DeveloperTiles result={data} />}
       cards={(
         <>
           <BalanceCard />
-          <DashboardCard
+          <LensCard
             config={WORK_DONE}
             select={(result: LensResult) => result.mock.workDoneTree}
             legend={WORK_LEGEND}
@@ -98,9 +109,11 @@ export function DeveloperLens(): ReactElement {
             {({ data: tree, animate, height }) => (
               <Sunburst ariaLabel="Work done by kind and module as a sunburst" nodes={tree} groupTones={WORK_TONES} unit="items" animate={animate} height={plotHeight(300, height)} />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={TASKS_DONE}
+            reads={['tasksDonePerWeek']}
+            liveSubtitle="by work type, read from each task's change level"
             select={(result: LensResult) => result.mock.tasksDonePerWeek}
             legend={BRANCH_TYPES}
             table={(rows) => ({ columns: ['Week', 'feature', 'fix', 'chore'], rows: rows.map((row) => [formatDay(row.week), row.feature, row.fix, row.chore]) })}
@@ -115,9 +128,11 @@ export function DeveloperLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={CYCLE}
+            reads={['taskCycle', 'taskCycleTrend']}
+            liveSubtitle="dispatch to report, minutes, over the range"
             select={(result: LensResult) => result.mock}
             legend={CYCLE_LEGEND}
             table={(mock) => ({ columns: ['Task', 'Day', 'Minutes'], rows: mock.taskCycle.slice(-CYCLE_TABLE_ROWS).map((point) => [point.label, formatDay(point.x), point.y]) })}
@@ -136,10 +151,12 @@ export function DeveloperLens(): ReactElement {
                 height={plotHeight(220, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={RED_CI}
-            select={() => RED_CI_SHARE}
+            reads={['redCiShare']}
+            liveSubtitle="red readings over all readings, over the range"
+            select={(result: LensResult) => result.mock.redCiShare}
             table={(share) => ({ columns: ['Measure', 'Share'], rows: [['Red CI share', formatPercent(share)], ['Threshold', formatPercent(RED_CI_THRESHOLD)]] })}
           >
             {({ data: share, animate, height }) => (
@@ -156,8 +173,8 @@ export function DeveloperLens(): ReactElement {
                 height={plotHeight(120, height)}
               />
             )}
-          </DashboardCard>
-          <DashboardCard
+          </LensCard>
+          <LensCard
             config={MINUTES}
             select={(result: LensResult) => result.mock.taskMinutesBins}
             table={(bins) => ({ columns: ['Minutes', 'Tasks'], rows: bins.map((bin) => [`${bin.from}–${bin.to}`, bin.count]) })}
@@ -165,7 +182,7 @@ export function DeveloperLens(): ReactElement {
             {({ data: bins, animate, height }) => (
               <Histogram ariaLabel="Distribution of task minutes" bins={bins} unit="min" animate={animate} height={plotHeight(220, height)} />
             )}
-          </DashboardCard>
+          </LensCard>
         </>
       )}
     />

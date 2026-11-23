@@ -67,9 +67,11 @@ summary ("Command did not complete within its 120s timeout"). The same
 applies to a task that changes `package.json` or `bun.lock`, whose
 `--changed` run selects nearly the whole suite. **Pass a changed-file list
 to `bunx eslint` through `xargs`**, never as an unquoted shell variable:
+write the list to a file and pipe it in (`xargs bunx eslint < files.txt`).
 zsh does not word-split `$FILES`, so eslint gets one path holding newlines
 and answers "No files matching the pattern" or "Please check for typing
-mistakes in the pattern".
+mistakes in the pattern". The same holds for any command handed a captured
+file list on this shell.
 
 The full-suite scripts treat the workspace packages apart only for types:
 `check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`
@@ -281,9 +283,10 @@ on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs two jobs under two triggers, each
-with three gates. **Triggers:** pull requests into `main` or `integration`,
-and pushes to `stretch/**`. **Gates** (each step runs unless the job was
-cancelled): ring 0's job `verify` runs `bun test`, `bunx eslint .`, and
+with three gates. **Triggers:** pull requests into `main`, `integration`
+or `stretch/**`, and pushes to `stretch/**`. **Gates** (each step runs
+unless the job was cancelled): ring 0's job `verify` runs `bun test`,
+`bunx eslint .`, and
 `bun run check-types`, the root config and the ten composite members,
 which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
 (`turbo run lint check-types test --affected`), `bunx tsc --build
@@ -304,8 +307,11 @@ key. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` and `affected` checks (merge with
 `rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports
-the `fragment` check (merge with `rafa pr merge <n>`; `--skip-checks` is refused
-there). One more gate runs
+the same two and the `fragment` check (merge with `rafa pr merge <n>`, which
+`rafa stretch item --wait` runs once they pass; `--skip-checks` is refused
+there). So an item's red shows on its pull request, before the merge into
+the stretch branch, and each item merge waits for one hosted run. One more
+gate runs
 at `git commit`: `.githooks/pre-commit`
 runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
 refusing a commit whose staged blobs carry a raw control byte or an
@@ -635,12 +641,21 @@ nonzero exit whose stdout is ESLint's JSON report names the files with errors
 and the command to run: `found ESLint errors in the task's diff`. A nonzero
 exit with no report is a step that could not run ESLint, and its blocker
 gives the exit code and the first stderr line under the crash banner, as
-in `could not run ESLint: bunx eslint exited 2 and printed no report:
-ResolveMessage {}`. Exit 2 with no report is a config ESLint could not
+in `could not run ESLint: node_modules/.bin/eslint exited 2 and printed no
+report: Error: boom`. Exit 2 with no report is a config ESLint could not
 load (a config that throws `boom` prints `Error: boom`, measured on
-ESLint 9.39.5) or no ESLint for `bunx` to resolve (`ResolveMessage {}`).
-Neither is a rule the task broke, so read that blocker as a setup
-problem in the checkout, not as lint errors to fix in the diff.
+ESLint 9.39.5). It is not a rule the task broke, so read that blocker as a
+setup problem in the checkout, not as lint errors to fix in the diff.
+
+**The lint step runs the checkout's own ESLint, never `bunx`**: its
+`node_modules/.bin/eslint`, else the `eslint` package's bin that
+`Bun.resolveSync` finds from the checkout. With none, the step prints
+`no ESLint installed in the checkout (...); nothing to lint.` and passes
+the task, as with no `eslint.config` file: `bunx` would have fetched the
+latest ESLint from the registry and run it (#1602). The command the
+blocker hands the session is that local bin, relative to the checkout, as
+in `Run node_modules/.bin/eslint --no-warn-ignored a.json and make them
+pass.`
 
 ### The summary line is what the runner reads
 

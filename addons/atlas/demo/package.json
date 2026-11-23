@@ -1,7 +1,7 @@
 {
   "name": "@open-tomato/atlas-demo",
   "version": "0.0.0",
-  "description": "Bun.serve demo, not shipped: the four lens dashboards over a local Atlas replica, the fetch adapter mounted under /api/atlas, configured by atlas.config.json to point at a rafa project.",
+  "description": "Bun.serve demo, not shipped: the four lens dashboards over a local Atlas replica, the fetch adapter mounted under /api/atlas, reading the rafa project named by ATLAS_PROJECT_ROOT or the repository root.",
   "private": true,
   "license": "Apache-2.0",
   "openTomato": {
@@ -22,7 +22,7 @@
     "@open-tomato/charts": "^0.1.2",
     "@open-tomato/rafa-atlas": "workspace:*",
     "class-variance-authority": "^0.7.1",
-    "lucide-react": "^1.71.0",
+    "lucide-react": "^1.74.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

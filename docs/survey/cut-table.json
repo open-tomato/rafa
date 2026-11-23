@@ -4989,8 +4989,8 @@
         }
       ],
       "fileCounts": {
-        "source": 80,
-        "test": 78,
+        "source": 81,
+        "test": 79,
         "testSupport": 2
       },
       "files": [
@@ -5132,6 +5132,8 @@
         "packages/rafa-pr/src/triage/own-check.ts",
         "packages/rafa-pr/src/triage/plan-commits.test.ts",
         "packages/rafa-pr/src/triage/plan-commits.ts",
+        "packages/rafa-pr/src/triage/recurrence-append.test.ts",
+        "packages/rafa-pr/src/triage/recurrence-append.ts",
         "packages/rafa-pr/src/triage/refs-section.test.ts",
         "packages/rafa-pr/src/triage/refs-section.ts",
         "packages/rafa-pr/src/triage/scoring-fixture.test.ts",
@@ -5156,7 +5158,7 @@
         "src/triage/own-check.integration.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-pr/": 134,
+        "packages/rafa-pr/": 136,
         "src/commands/pr/": 4,
         "src/pr/": 2,
         "src/triage/": 2
@@ -5844,28 +5846,40 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 10,
-        "test": 28,
+        "source": 11,
+        "test": 40,
         "testSupport": 8
       },
       "files": [
         "packages/rafa-hub/src/bin.test.ts",
         "packages/rafa-hub/src/bin.ts",
+        "packages/rafa-hub/src/cli-keys.test.ts",
+        "packages/rafa-hub/src/config-login.test.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
         "packages/rafa-hub/src/contract-skew.integration.test.ts",
         "packages/rafa-hub/src/core-subpaths.test.ts",
         "packages/rafa-hub/src/hub-index.integration.test.ts",
+        "packages/rafa-hub/src/hub-keys.integration.test.ts",
+        "packages/rafa-hub/src/hub-oauth.integration.test.ts",
         "packages/rafa-hub/src/hub-unreachable.integration.test.ts",
         "packages/rafa-hub/src/hub.integration.test.ts",
+        "packages/rafa-hub/src/identity/api-key.test.ts",
         "packages/rafa-hub/src/identity/contract.test.ts",
         "packages/rafa-hub/src/identity/contract.ts",
         "packages/rafa-hub/src/identity/github.test.ts",
         "packages/rafa-hub/src/identity/github.ts",
+        "packages/rafa-hub/src/identity/key-store.test.ts",
+        "packages/rafa-hub/src/identity/login-store.test.ts",
         "packages/rafa-hub/src/identity/port.ts",
         "packages/rafa-hub/src/identity/testdata/broken-identity.fixture.ts",
         "packages/rafa-hub/src/identity/testdata/memory-identity.ts",
         "packages/rafa-hub/src/identity/testdata/stand-in-github.ts",
+        "packages/rafa-hub/src/login/basic.test.ts",
+        "packages/rafa-hub/src/login/oauth.test.ts",
+        "packages/rafa-hub/src/server-keys.test.ts",
+        "packages/rafa-hub/src/server-login.test.ts",
+        "packages/rafa-hub/src/server-query.ts",
         "packages/rafa-hub/src/server.test.ts",
         "packages/rafa-hub/src/server.ts",
         "packages/rafa-hub/src/stand-in-adapters.integration.test.ts",
@@ -5886,6 +5900,7 @@
         "packages/rafa-hub/src/testdata/test-secrets.test.ts",
         "packages/rafa-hub/src/testdata/test-secrets.ts",
         "packages/rafa-hub/src/two-devices.integration.test.ts",
+        "packages/rafa-hub/src/two-projects.integration.test.ts",
         "packages/rafa-index/src/fusion.test.ts",
         "packages/rafa-index/src/imports.test.ts",
         "packages/rafa-index/src/index.integration.test.ts",
@@ -5897,7 +5912,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 37,
+        "packages/rafa-hub/": 50,
         "packages/rafa-index/": 9
       },
       "folders": [

@@ -136,11 +136,12 @@ describe('hub.url', () => {
 });
 
 describe('the defaults', () => {
-  it('answer no url, no secret name and 3s when no layer names the section', () => {
+  it('answer no url, no secret name, 3s and no project when no layer names the section', () => {
     const { config, sources } = resolveConfig();
 
-    expect([config.hubUrl, config.hubTokenSecret, config.hubTimeout]).toEqual([null, null, '3s']);
-    expect([sources.hubUrl, sources.hubTokenSecret, sources.hubTimeout]).toEqual(['default', 'default', 'default']);
+    expect([config.hubUrl, config.hubTokenSecret, config.hubTimeout, config.hubProject]).toEqual([null, null, '3s', null]);
+    expect([sources.hubUrl, sources.hubTokenSecret, sources.hubTimeout, sources.hubProject])
+      .toEqual(['default', 'default', 'default', 'default']);
   });
 
   it('are not settings the command line can name', () => {
@@ -148,6 +149,19 @@ describe('the defaults', () => {
     const { config } = resolveConfig({ cli });
 
     expect([config.hubUrl, config.hubTimeout]).toEqual([null, '3s']);
+  });
+
+  it('read a hub.project a file sets, kept as written', () => {
+    const file = parseConfigText('hub:\n  project: a1b2c3\n', PROJECT);
+    const { config, sources } = resolveConfig({ file });
+
+    expect([config.hubProject, sources.hubProject]).toEqual(['a1b2c3', 'file']);
+  });
+
+  it('leave hub.project to the defaults when only the command line names it', () => {
+    const cli = { hubProject: 'a1b2c3' } as Record<string, string>;
+
+    expect(resolveConfig({ cli }).config.hubProject).toBeNull();
   });
 });
 
@@ -271,13 +285,13 @@ describe('hubContextOf', () => {
   it('answers the url, the secret name and the timeout in milliseconds, frozen', () => {
     const context = hubContextOf({ hubUrl: 'https://hub.example.org', hubTokenSecret: 'rafa-hub-token', hubTimeout: '7s' });
 
-    expect(context).toEqual({ url: 'https://hub.example.org', tokenSecret: 'rafa-hub-token', timeoutMs: 7000, syncSkew: 'refuse' });
+    expect(context).toEqual({ url: 'https://hub.example.org', tokenSecret: 'rafa-hub-token', timeoutMs: 7000, syncSkew: 'refuse', project: null });
     expect(Object.isFrozen(context)).toBe(true);
   });
 
   it('answers the resolved defaults for a url alone', () => {
     expect(hubContextOf({ hubUrl: 'https://hub.example.org' }))
-      .toEqual({ url: 'https://hub.example.org', tokenSecret: null, timeoutMs: 3000, syncSkew: 'refuse' });
+      .toEqual({ url: 'https://hub.example.org', tokenSecret: null, timeoutMs: 3000, syncSkew: 'refuse', project: null });
   });
 
   it('carries effortSyncSkew as syncSkew, either word as written', () => {
@@ -292,6 +306,10 @@ describe('hubContextOf', () => {
     const { config } = resolveConfig({ file });
 
     expect(hubContextOf(config)?.syncSkew).toBe('pull-projected');
+  });
+
+  it('carries a set hub.project as project', () => {
+    expect(hubContextOf({ hubUrl: 'https://hub.example.org', hubProject: 'a1b2c3' })?.project).toBe('a1b2c3');
   });
 
   it('answers nothing with no url, whatever else is named', () => {
@@ -314,11 +332,13 @@ describe('the section', () => {
       ['hubUrl', 'hub.url'],
       ['hubTokenSecret', 'hub.tokenSecret'],
       ['hubTimeout', 'hub.timeout'],
+      ['hubProject', 'hub.project'],
     ]);
     expect(HUB_SECTION.defaults).toEqual({
       hubUrl: null,
       hubTokenSecret: null,
       hubTimeout: '3s',
+      hubProject: null,
     });
     expect(HUB_SECTION.checks).toEqual([hubUrlProblems]);
   });

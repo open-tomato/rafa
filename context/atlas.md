@@ -3,19 +3,22 @@
 Dashboards and metrics over rafa's effort data, as five layers and five
 workspace members under `addons/atlas/*` (the second `workspaces` glob):
 
-| Layer | Member | Owns |
+| Layer | Member | Built today |
 |---|---|---|
-| 1 effort storage | rafa core | the live store, the board cache, plans, git |
-| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | bucket tables in a SQLite replica, a tabular query engine |
-| 3 transport | `transport` | a pure request handler, fetch and Express adapters, a typed client with a replaceable `Transport` |
+| 1 effort storage | rafa core | the live store, the board cache, plans, git. Read only through core's `vacuumInto` |
+| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | the replica writer and reader, the bucket tables, the query engine, `defineTableSource`; the effort ingest and the plan reader |
+| 3 transport | `transport` | the pure handler, the fetch adapter (`toFetchHandler`), the typed client with a replaceable `Transport` (`fetchTransport`, `localTransport`). No Express adapter |
 | 4 contracts | `data/src/contract/` | descriptors, query params, results, metric definitions, the envelope and `ATLAS_CONTRACT_VERSION` |
 | 5 representation | `ui`, `demo`; `@open-tomato/charts` from npm | atoms to templates and the card cascade; the demo page. The chart seam over ECharts is `@open-tomato/charts`, published from another repository |
 
-The design is the main checkout's `.rafa/specs/draft-atlas-dashboard.md`
-(gitignored): the metric and chart gap lists, the bucket DDL, the
-contracts, the handler, the PoC cut. The 3D graph-of-dice proof of
-concept stays on `spike/atlas-poc`, outside the glob, and ships in no
-package.
+Still design, not built: the GitHub reads (the `gh` metrics, phase 4, behind
+a `--github` flag the build does not take yet); the WIP gauge's ceiling
+(`wipLimit` is read, and the board ingest that would draw it is not built);
+the bug backlog pair and the stretch marks (phase 4). The design is the main
+checkout's `.rafa/specs/draft-atlas-dashboard.md` (gitignored): the metric and
+chart gap lists, the bucket DDL, the contracts, the handler, the PoC cut. The
+3D graph-of-dice proof of concept stays on `spike/atlas-poc`, outside the
+glob, and ships in no package.
 
 **The live effort store is copied, never opened in place.** The build
 takes a `vacuumInto` snapshot under `<root>/.rafa/atlas/snapshot/` and
@@ -30,10 +33,37 @@ real data names the main checkout through `ATLAS_PROJECT_ROOT`;
 
 **`rafa-atlas` is a rafa module, reached through exec.** Its commands are
 `rafa module exec @open-tomato/rafa-atlas build|serve|describe`; `rafa
-atlas` routes nothing. The module imports core types with `import type`
-and calls only pure core functions, because the repo's source can be a
-second copy of core beside the runtime that loaded the module: a refusal
-is `ctx.output.error` plus a plain `Error`, never a `CommandExit`.
+atlas` routes nothing. `build` writes the replica. `serve` builds one when
+none exists, then serves the API at `/api/atlas` on `127.0.0.1:4317` (the
+port `--port` changes), with the targets of
+`<root>/.rafa/atlas/config.json` laid over the metrics: `budget.tokensPerWeek`
+and `wipLimit`, both null when unset. `describe` opens no replica. The module
+imports core types with `import type` and calls only pure core functions,
+because the repo's source can be a second copy of core beside the runtime
+that loaded the module: a refusal is `ctx.output.error` plus a plain
+`Error`, never a `CommandExit`.
+
+**The demo's `?source=live` switch.** The demo page draws the seeded mock
+unless the URL says `?source=live`, and no capture sets it. Live reads the
+API under `/api/atlas`, which the demo server mounts only when the project
+root holds a store and a replica. A run whose root holds no store (a worktree
+with no `ATLAS_PROJECT_ROOT`) mounts no API, and each card shows its error
+state with the build line
+(`rafa module exec @open-tomato/rafa-atlas build`) to run. A solo developer
+runs `ATLAS_PROJECT_ROOT=<main checkout> bun run --cwd addons/atlas/demo dev`
+from a worktree, then opens `?source=live`.
+
+**Work type is a proxy (D4).** Loop branches carry no type, so the split
+reads the highest change level a session reported: `major` and `minor` are
+feature, `patch` is fix, `none` is chore or docs. Every metric over it
+carries a `ProxyNote`. Dedupe of rows without an origin pair (D3) keys on
+the store's own id and `seq`, as `rafa-atlas`'s README sets out.
+
+**Ranges are windows (D6).** The page's four ranges map to fixed windows in
+the demo's live source (`RANGE_WINDOW`): `last-week` is `7d`, `past-month`
+`28d`, `last-year` `52w`. `now` is the one range whose KPI tiles read today
+(`1d`) while its series read the last 7 days. A store of 11 weeks shows the
+11 weeks there are.
 
 **The public members depend on public packages only.** `atlas-data`,
 `atlas-transport` and `@open-tomato/atlas-ui` are written to publish, so

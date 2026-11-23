@@ -267,8 +267,8 @@ export interface AdapterContext {
   readonly store?: StoreBackend;
   /**
    * The hub a `service` sync reaches: the run's resolved `hub.url`,
-   * `hub.tokenSecret` and `hub.timeout`, the last in milliseconds, and
-   * its `effort.syncSkew`.
+   * `hub.tokenSecret`, `hub.timeout` and `hub.project`, the timeout in
+   * milliseconds, and its `effort.syncSkew`.
    * Handed on by `selectSync` whenever `hub.url` is set, and read by a
    * module's `service` strategy alone; core's adapters never read it.
    *
@@ -287,6 +287,8 @@ export interface AdapterContext {
     readonly timeoutMs: number;
     /** What a sync does when the device is behind its hub: the resolved `effort.syncSkew`. */
     readonly syncSkew: SyncSkewMode;
+    /** The project synced on the hub, or null to read the root commit: the resolved `hub.project`. */
+    readonly project: string | null;
   };
 }
 

@@ -1,20 +1,25 @@
 /**
  * Smoke tests for the demo page over happy-dom: every lens renders its
  * cards' titles once the page source answers, and the range selector asks
- * the source again and the page shows the new result set. happy-dom has
- * no canvas, so the page draws with a stub engine whose primitives render
- * a labelled element; the engine is the charts package's to test. The
- * source answers with no delay.
+ * the source again and the page shows the new result set; with no
+ * `?source` the page draws the mock, and over the live source (a stub
+ * client) the cards and tiles a metric feeds draw, with the row count
+ * behind them, while the others say "Not wired yet". happy-dom has no canvas, so the page draws with a stub engine
+ * whose primitives render a labelled element; the engine is the charts
+ * package's to test. The source answers with no delay.
  */
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { ChartPrimitives } from '@open-tomato/charts';
 import type { ReactElement } from 'react';
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { createElement } from 'react';
 
 import { App } from './App.js';
+import { createLiveLensSource } from './data/live.js';
 import { createLensSource, lensResultOf, type LensResult } from './data/source.js';
+import { stubLiveClient } from './data/testdata/live-client.fixture.js';
 
 /** The card titles each lens shows, by the tab that opens it. */
 const LENS_CARDS: Readonly<Record<string, readonly string[]>> = {
@@ -151,5 +156,82 @@ describe('App', () => {
 
     expect(screen.getByRole('tab', { name: 'QA' }).getAttribute('aria-selected')).toBe('true');
     expect(cardTitles()).toContain('Flaky checks, top 10');
+  });
+});
+
+describe('App, by page source', () => {
+  it('draws the mock page with no ?source and no source handed', () => {
+    render(createElement(App, { engine: STUB_ENGINE }));
+
+    expect(screen.getByText(/^Mock data through the card cascade/u)).toBeDefined();
+  });
+
+  it('over the live source, draws the wired Project Management cards and tiles and marks the others not wired yet', async () => {
+    const { client, calls } = stubLiveClient();
+    renderApp(createLiveLensSource(client));
+    await settle();
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(screen.getByText(/^Live data from the Atlas API/u)).toBeDefined();
+    expect(screen.getByRole('img', { name: /^Tokens per day, this period/u })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Tokens used this week against last week, no weekly target set' })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Planned tasks against task sessions, per plan' })).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
+    expect(within(screen.getByRole('region', { name: 'Plans completed this week' })).queryByText('not wired yet')).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Active blockers' })).getByText('1')).toBeDefined();
+    expect(within(screen.getByRole('region', { name: 'Plans landed on their CI-green week' })).getByText('not wired yet')).toBeDefined();
+  });
+
+  it('over the live source, notes the row count behind a wired card in place of the mock note', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Budget burn' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Info' }));
+
+    expect(screen.getByText('2 rows behind it (pm.budget-burn).')).toBeDefined();
+    expect(screen.queryByText(/^The exceeded case/u)).toBeNull();
+  });
+
+  it('over the live source, draws the Architecture cards a metric feeds, the halts over the window\'s weeks', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'Architecture' }));
+    await settle();
+
+    expect(screen.getByRole('img', { name: 'Median and 90th percentile task minutes per week' })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Tokens per day by model, stacked' })).toBeDefined();
+    expect(screen.getByRole('img', { name: /^Share of minutes by change kind/u })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Preflight halts per weekday and week' })).toBeDefined();
+    expect(within(screen.getByRole('region', { name: 'Preflight halts, over the range' })).getByText('3')).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Preflight halts' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Source' }));
+    expect(screen.getByRole('columnheader', { name: '26 Oct' })).toBeDefined();
+  });
+
+  it('over the live source, draws the Development cards a metric feeds', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'Development' }));
+    await settle();
+
+    expect(screen.getByRole('img', { name: 'Tasks done per week, stacked by branch type' })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Task cycle minutes per task with a seven-day moving median' })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Red CI share against the ten percent threshold' })).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(3);
+    expect(within(screen.getByRole('region', { name: 'Plans completed per week' })).getByText('3')).toBeDefined();
+  });
+
+  it('over the live source, draws the four QA cards a metric feeds, with the kinds the answer names', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'QA' }));
+    await settle();
+
+    expect(screen.getByRole('img', { name: 'Bugs by kind per week, stacked' })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Regressions per week' })).toBeDefined();
+    expect(screen.getByRole('img', { name: 'Share of bugs by route per week' })).toBeDefined();
+    expect(screen.getByRole('table', { name: 'Checks that failed most often across CI readings' })).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Bugs by kind per week' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Source' }));
+    expect(screen.getByRole('columnheader', { name: 'unknown' })).toBeDefined();
   });
 });

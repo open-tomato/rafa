@@ -66,14 +66,28 @@ const FAULTS: Readonly<Record<string, (store: HubStore) => HubStore>> = {
     ...store,
     pull: async (request) => mapRows(await store.pull(request), (row) => ({ ...row, row_json: withKey(row['row_json'] ?? null, 'minutesSincePrevious', 42) })),
   }),
-  'forgets-last-push': (store) => ({ ...store, status: async () => ({ ...await store.status(), devices: [] }) }),
-  'miscounts': (store) => ({ ...store, status: async () => ({ ...await store.status(), rows: {} }) }),
+  'forgets-last-push': (store) => ({ ...store, status: async (request) => ({ ...await store.status(request), devices: [] }) }),
+  'shares-projects': (store) => store,
+  'miscounts': (store) => ({ ...store, status: async (request) => ({ ...await store.status(request), rows: {} }) }),
 };
+
+/**
+ * A hub sharing one file across its projects: the stand-in opened with no
+ * project listed, so every request lands in one state whatever project it
+ * names, while `status()` still names the projects the context lists.
+ */
+function sharesProjects(context: HubStoreContext): HubStore {
+  const shared = openMemoryHubStore({ directory: context.directory, now: context.now });
+  const projects = (context.projects ?? []).map(({ id, name }) => ({ id, name }));
+  return { ...shared, status: async (request) => ({ ...await shared.status(request), projects }) };
+}
 
 const fault = process.env[FAULT_ENV] ?? '';
 const plant = FAULTS[fault];
 if (plant === undefined) throw new Error(`${FAULT_ENV} is ${JSON.stringify(fault)}; expected one of ${Object.keys(FAULTS).join(', ')}`);
 
-const factory: HubStoreFactory = (context: HubStoreContext) => plant(openMemoryHubStore(context));
+const factory: HubStoreFactory = (context: HubStoreContext) => plant(fault === 'shares-projects'
+  ? sharesProjects(context)
+  : openMemoryHubStore(context));
 
 hubStoreContract(fault, factory);

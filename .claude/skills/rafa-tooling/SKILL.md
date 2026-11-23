@@ -170,8 +170,9 @@ that skill too.
   `rafa pr wait <n>`, waiting for the checks to pass or fail, then
   `rafa pr merge <n>`. Never use `--skip-checks` on either.
 - **Pull request into `stretch/**`.** A pull request into a `stretch/` branch
-  reports the `fragment` check, so `--skip-checks` is refused on it as on
-  the two above. Merge by handing over `rafa pr merge <n>`. `rafa stretch
+  reports the `fragment` check, and in this repository the `verify` checks
+  too, so `--skip-checks` is refused on it as on the two above. Merge by
+  handing over `rafa pr merge <n>` once they pass. `rafa stretch
   item --wait` waits for the checks and merges with `rafa pr merge <n>
   --yes`, without that flag. An item whose loop ended on a refused merge is
   finished with `rafa stretch item <issue> --resume`, which merges the same way.

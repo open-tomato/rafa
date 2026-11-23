@@ -10,7 +10,10 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./contract": "./src/contract/index.ts"
+    "./contract": "./src/contract/index.ts",
+    "./query": "./src/query/index.ts",
+    "./replica": "./src/replica/index.ts",
+    "./source": "./src/source.ts"
   },
   "scripts": {
     "check-types": "tsc --build",

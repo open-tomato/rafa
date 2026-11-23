@@ -32,6 +32,14 @@
  * dropped from 2 to 1, so nothing retries, left 26 pass and 4 fail
  * against 30 pass either side — the three retry cases here and the
  * failed-board case next door.
+ *
+ * The last describe holds the timing cases for `roadmap.ts` (CodeQL
+ * `js/polynomial-redos`, alerts 21 and 22), here because this module
+ * already reads {@link parseRoadmapBody}. Each asserts what the crafted
+ * body answers beside the time, so a fast reader that misread it still
+ * fails. Their red run, against the old backtracking `TASK_LINE` and
+ * `CLOSING`, was killed at 120 s and took about 2 s at this size; the
+ * tracker's close-out notes hold the readings.
  */
 import type { RoadmapBody } from './roadmap-tick.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -48,6 +56,7 @@ import {
   tickRoadmapLines,
   tickSentence,
 } from './roadmap-tick.js';
+import { closedIssuesIn, parseRoadmapBody } from './roadmap.js';
 
 /** A roadmap body whose lines are joined with `break`. */
 function roadmap(lineBreak = '\n'): string {
@@ -394,5 +403,56 @@ describe('createGhRoadmapBody over the gh fake', () => {
     expect(result.ok).toBe(false);
     expect(result.stderr).toContain('body alone');
     expect(fake.issue('1')?.state).toBe('OPEN');
+  });
+});
+
+describe('a roadmap or pull request body built to backtrack', () => {
+  /**
+   * The ceiling a crafted body's read must end under. The old patterns
+   * took about 2 s (alert 22) and minutes (alert 21, killed at 120 s) at
+   * {@link CRAFTED_SPACES}, and a linear read ends under 10 ms, so the bound
+   * fails the old patterns eight times over or more and leaves a loaded CI
+   * runner twenty-five times headroom.
+   */
+  const REDOS_BOUND_MS = 250;
+
+  /** The run of spaces in each crafted line, about 50,000 characters of body. */
+  const CRAFTED_SPACES = 50_000;
+
+  /** The spaces themselves. */
+  const spaces = ' '.repeat(CRAFTED_SPACES);
+
+  it('reads a task line whose why ends at a U+2028 as no line in time (alert 21, TASK_LINE)', () => {
+    const body = `- [ ] #20 plans from the board\n* [ ] #1${spaces}x\u2028`;
+
+    const started = performance.now();
+    const lines = parseRoadmapBody(body);
+    const elapsed = performance.now() - started;
+
+    expect(lines).toEqual([{ issue: 20, ticked: false, why: 'plans from the board', lineNumber: 1 }]);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('reads a closing keyword followed by spaces and no reference as closing nothing in time (alert 22, CLOSING)', () => {
+    const body = `Fixes #4\ncloses${spaces}`;
+
+    const started = performance.now();
+    const closed = closedIssuesIn(body);
+    const elapsed = performance.now() - started;
+
+    expect(closed).toEqual([4]);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('keeps the whitespace, colon and line-end readings the old patterns gave, which is the control', () => {
+    expect(parseRoadmapBody('- [ ] #5 \u2028 the why\n- [x] #6\n+ [X] #12abc\n- [ ] #7 why\u2028\n- [ ] #8\u2029'))
+      .toEqual([
+        { issue: 5, ticked: false, why: 'the why', lineNumber: 1 },
+        { issue: 6, ticked: true, why: '', lineNumber: 2 },
+        { issue: 12, ticked: true, why: 'abc', lineNumber: 3 },
+        { issue: 8, ticked: false, why: '', lineNumber: 5 },
+      ]);
+    expect(closedIssuesIn('Fixes: #3, closes : #4, resolved:#5, close #6x, closes  :\u2028 #7, fix :: #8'))
+      .toEqual([3, 4, 5, 7]);
   });
 });

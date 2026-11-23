@@ -2,7 +2,8 @@
  * The task step's diff checks (`start/task-step-checks.ts`), driven over
  * seams: a scripted git whose diffs name one file and one test file, a
  * scripted lint runner and a scripted tsc runner, in a temporary checkout
- * holding an `eslint.config.mjs` and a `tsconfig.json`.
+ * holding an `eslint.config.mjs`, a stand-in `node_modules/.bin/eslint`
+ * and a `tsconfig.json`.
  *
  * What the checks find through `runTaskStep` is covered in
  * `suite-step.test.ts`; these cases hold the module's own answer: the
@@ -20,7 +21,7 @@ import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { SuiteResult } from '@open-tomato/rafa/suite/run';
 import type { GitResult, GitRunner } from '@open-tomato/rafa-pr/pr/index';
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -28,6 +29,7 @@ import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { LOCAL_ESLINT_BIN } from './lint-step.js';
 import { seamsOf, settleStep, SIGINT_EXIT_CODE } from './suite-step.js';
 import { isCheckUnstartable, lintTask, taskDiffChecks, typeCheckTask } from './task-step-checks.js';
 
@@ -43,6 +45,8 @@ let typeCalls: number;
 beforeEach(() => {
   checkout = mkdtempSync(join(tmpdir(), 'task-step-checks-'));
   writeFileSync(join(checkout, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+  mkdirSync(join(checkout, 'node_modules', '.bin'), { recursive: true });
+  writeFileSync(join(checkout, LOCAL_ESLINT_BIN), '#!/bin/sh\nexit 0\n', 'utf8');
   writeFileSync(join(checkout, 'tsconfig.json'), '{}\n', 'utf8');
   lintCalls = 0;
   typeCalls = 0;

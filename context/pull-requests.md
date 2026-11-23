@@ -347,7 +347,8 @@ cases (`packages/rafa-pr/src/pr/unchecked.ts`):
 - `no-pull-request-workflow`: the count read one or more, and no workflow
   file on the base has a `pull_request` trigger naming the base (a
   `verify.yml` that runs on pull requests into `main` or `integration`
-  and on pushes to `stretch/**`, for a PR into `stretch/1`).
+  only, and on pushes to `stretch/**`, for a PR into `stretch/1`; this
+  repository's own also names `stretch/**` under `pull_request`).
 - `workflows-exist`, the riskier one: everything else. That is a file on
   the base naming it, a count that could not be read (whatever the files
   say), and any git failure — a base opening with `-`, `fetch`, `ls-tree` or

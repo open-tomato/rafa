@@ -4,7 +4,11 @@
  * Testing Library is imported after the registration so it sees a DOM.
  * The page reads and writes its URL parameters, so the window has an
  * http URL; on the default `about:blank`, `replaceState` keeps no query.
+ * `./bun-network.ts` is imported first, so it keeps Bun's own `fetch`
+ * globals for a test that serves over HTTP.
  */
+import './bun-network.js';
+
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach } from 'bun:test';
 

@@ -24,6 +24,11 @@
  *     any, as `projectedColumns`. A pull naming none, or naming every
  *     id held, is answered whole.
  *
+ *   - {@link StandInHub.setProjects} makes the status answer name
+ *     `projects`, as a hub serving projects does, so the client sends
+ *     `project` on push and pull; each push and pull's `project` query
+ *     is recorded in {@link StandInHub.projectQueries}.
+ *
  * It merges nothing: a row is matched by its origin pair alone. Every
  * push and pull is recorded in {@link StandInHub.requests}, and
  * {@link StandInHub.setFault} answers each with a response of the
@@ -71,6 +76,10 @@ export interface StandInHub {
     projected: Readonly<Record<string, readonly string[]>> | null,
     columns?: Readonly<Record<string, readonly string[]>>,
   ) => void;
+  /** The `project` query parameter of every push and pull seen, in order, null when it was left out. */
+  readonly projectQueries: readonly (string | null)[];
+  /** Names `projects` on the status answer from now on; null names none, as a hub one release behind. */
+  readonly setProjects: (projects: readonly { readonly id: string; readonly name: string }[] | null) => void;
   /** Stops listening, so the next request fails to connect. */
   readonly stop: () => Promise<void>;
 }
@@ -99,6 +108,8 @@ export function startStandInHub(): StandInHub {
   let cutColumns: Readonly<Record<string, readonly string[]>> | undefined;
   let fault: (() => Response) | null = null;
   let statusReads = 0;
+  const projectQueries: (string | null)[] = [];
+  let projects: readonly { readonly id: string; readonly name: string }[] | null = null;
 
   const status = (): Response => {
     statusReads += 1;
@@ -109,6 +120,9 @@ export function startStandInHub(): StandInHub {
       devices: [],
       contractVersion: WIRE_CONTRACT_VERSION,
       capabilities: { fts: false, vector: false, graph: false, projection: projection !== null },
+      ...projects === null
+        ? {}
+        : { projects },
     });
   };
 
@@ -181,6 +195,7 @@ export function startStandInHub(): StandInHub {
         contractVersion: url.searchParams.get('contractVersion'),
         migrations: url.searchParams.get('migrations'),
       });
+      projectQueries.push(url.searchParams.get('project'));
       if (fault !== null) return fault();
       if (payload !== null) return push(payload);
       const named = url.searchParams.get('migrations');
@@ -206,6 +221,10 @@ export function startStandInHub(): StandInHub {
     setProjection: (projected, columns) => {
       projection = projected;
       cutColumns = columns;
+    },
+    projectQueries,
+    setProjects: (named) => {
+      projects = named;
     },
     stop: () => server.stop(true),
   };

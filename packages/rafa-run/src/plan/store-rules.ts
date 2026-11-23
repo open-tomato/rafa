@@ -28,7 +28,9 @@
  *     whose `PREREQUISITES-<stub>.md` holds no `[auto]` item probing
  *     exactly `rafa effort schema --check`, the probe that holds a
  *     store-changing plan back until the installed rafa reads the store.
- *     A missing file carries no such item.
+ *     A missing file carries no such item. A ticked item counts as an
+ *     unticked one does, a note after its probe allowed, since the tick
+ *     only records that the probe ran (#1591).
  *
  * ## What "runs" is
  *
@@ -178,11 +180,49 @@ function migrationTask(tasks: readonly PlanTask[]): PlanTask | null {
   return tasks.find((task) => MIGRATION_BY_ID.test(task.task)) ?? null;
 }
 
-/** True when `prerequisites` holds an `[auto]` item probing {@link STORE_SCHEMA_PROBE}. */
+/** A ticked item's box, `- [x] ` or `- [X] `, which `parsePrerequisites` skips. */
+const TICKED_BOX = /^-(\s+)\[[xX]\](?=\s)/u;
+
+/** A ticked item's probe: the first backticked span after a `: `, a note after it allowed. */
+const TICKED_PROBE = /:\s+`([^`]+)`/u;
+
+/** `prerequisites` with every ticked box read as open, and the indexes of the lines that were ticked. */
+function openTickedBoxes(prerequisites: string): { readonly text: string; readonly ticked: ReadonlySet<number> } {
+  const ticked = new Set<number>();
+  const lines = prerequisites.split('\n').map((line, index) => {
+    if (!TICKED_BOX.test(line)) return line;
+    ticked.add(index);
+    return line.replace(TICKED_BOX, '-$1[ ]');
+  });
+  return { text: lines.join('\n'), ticked };
+}
+
+/** `probe` with its whitespace collapsed, as the probe is compared. */
+function collapsed(probe: string | null | undefined): string | undefined {
+  return probe?.trim().replace(/\s+/gu, ' ');
+}
+
+/**
+ * True when `prerequisites` holds an `[auto]` item probing {@link STORE_SCHEMA_PROBE}.
+ *
+ * A tick only records that the probe ran, so a ticked item counts as an
+ * unticked one does (#1591): its box is read as open for this check
+ * alone, and `parsePrerequisites` and what preflight sees are unchanged.
+ * A ticked item may carry a note after the probe's span, so its probe is
+ * the first span after a `: `; an unticked one is read as preflight
+ * reads it. Either way the span must be the probe exactly, so an edited
+ * probe, ticked or not, is no probe.
+ */
 function hasSchemaProbe(prerequisites: string | null): boolean {
   if (prerequisites === null) return false;
-  return parsePrerequisites(prerequisites)
-    .some((item) => item.tag === 'auto' && item.probe?.replace(/\s+/gu, ' ') === STORE_SCHEMA_PROBE);
+  const { text, ticked } = openTickedBoxes(prerequisites);
+  return parsePrerequisites(text).some((item) => {
+    if (item.tag !== 'auto') return false;
+    const probe = ticked.has(item.lineIndex)
+      ? TICKED_PROBE.exec(item.description)?.[1]
+      : item.probe;
+    return collapsed(probe) === STORE_SCHEMA_PROBE;
+  });
 }
 
 /** The pinned-number problems of `plan`. */

@@ -125,6 +125,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['hubUrl', 'hub.url'],
   ['hubTokenSecret', 'hub.tokenSecret'],
   ['hubTimeout', 'hub.timeout'],
+  ['hubProject', 'hub.project'],
   ['inject', 'plan.inject'],
   ['planDir', 'plan.dir'],
   ['specsDir', 'specs.dir'],
@@ -652,7 +653,7 @@ describe('knownKeysAbove', () => {
 
   it('answers the nearest section for a key under it', () => {
     expect(knownKeysAbove('plan.depth')).toEqual(['plan', ['inject', 'dir']]);
-    expect(knownKeysAbove('hub.port')).toEqual(['hub', ['url', 'tokenSecret', 'timeout']]);
+    expect(knownKeysAbove('hub.port')).toEqual(['hub', ['url', 'tokenSecret', 'timeout', 'project']]);
     expect(knownKeysAbove('plan.a.b')).toEqual(['plan', ['inject', 'dir']]);
     expect(knownKeysAbove('nonesuch.deeper.deepest')).toEqual(['', TOP]);
   });
