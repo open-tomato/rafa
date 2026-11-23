@@ -807,7 +807,7 @@ busy timeout.
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`, `report_absences`,
 `task_reports`, `preflight`, `dispatches`, `skill_invocations`, `plan_ci`,
 `stale_docs`, `bug_routes`, `reading_supersedes`, `store_meta`, `merges`,
-`merge_conflicts` and `store_replaced` are SQLite-only and stay out of the port's row map. Migration
+`merge_conflicts`, `held_rows` and `store_replaced` are SQLite-only and stay out of the port's row map. Migration
 `store-replaced` creates the last one, `store_replaced` (`store_id` as its
 primary key, `replaced_at`): one row per id this store carried before its
 present one, `local` in `MERGE_RULES`, never left the machine. `settleUnderLock`

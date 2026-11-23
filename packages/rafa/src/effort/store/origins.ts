@@ -74,9 +74,9 @@
  * local `seq` and keeps its origin; and the restore in
  * `fixture-extract.ts`, which builds a store from an extract's rows.
  * `origins.test.ts` reads every insert from source and spells both
- * lists. `schema_migrations`, `store_meta`, `store_replaced`, `merges`
- * and `merge_conflicts` are the store's own bookkeeping and carry no
- * origin.
+ * lists. `schema_migrations`, `store_meta`, `store_replaced`, `merges`,
+ * `merge_conflicts` and `held_rows` are the store's own bookkeeping and
+ * carry no origin of their own.
  */
 export const ORIGIN_TABLES = [
   'sessions',

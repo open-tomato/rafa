@@ -702,6 +702,23 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
     WHERE origin_store IS NOT NULL;
   `,
   },
+  // One row per row a projected pull brought in cut down to this store's
+  // schema, local as `merge_conflicts` is: the row's table and origin
+  // pair, together the primary key, and `missing`, the JSON array of the
+  // migration ids the row lacked. Taking the row whole drops the listing.
+  {
+    id: 'held-rows',
+    breaks: [],
+    sql: `
+  CREATE TABLE held_rows (
+    table_name   TEXT NOT NULL CHECK (table_name <> ''),
+    origin_store TEXT NOT NULL CHECK (origin_store <> ''),
+    origin_seq   INTEGER NOT NULL CHECK (typeof(origin_seq) = 'integer'),
+    missing      TEXT NOT NULL CHECK (json_valid(missing) AND json_type(missing) = 'array' AND json_array_length(missing) > 0),
+    PRIMARY KEY (table_name, origin_store, origin_seq)
+  );
+  `,
+  },
 ];
 
 /**

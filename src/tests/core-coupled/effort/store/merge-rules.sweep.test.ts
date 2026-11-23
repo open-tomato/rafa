@@ -275,9 +275,9 @@ function scratchFaults(scratch: SqliteMigration, rules: Readonly<Record<string, 
 describe('MERGE_RULES against the schema every migration builds', () => {
   const schema = withStore(SQLITE_MIGRATIONS, liveSchema);
 
-  it('reads the twenty tables the migrations create', () => {
+  it('reads the twenty-one tables the migrations create', () => {
     expect(Object.keys(schema).sort()).toEqual([
-      'blockers', 'bug_routes', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges',
+      'blockers', 'bug_routes', 'changes', 'commits', 'dispatches', 'findings', 'held_rows', 'merge_conflicts', 'merges',
       'out_of_scope_bugs', 'plan_ci', 'preflight', 'reading_supersedes', 'report_absences', 'schema_migrations',
       'sessions', 'skill_invocations', 'stale_docs', 'store_meta', 'store_replaced', 'task_reports',
     ]);

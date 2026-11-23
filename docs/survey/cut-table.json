@@ -3890,7 +3890,7 @@
       "edges": [],
       "fileCounts": {
         "source": 210,
-        "test": 154,
+        "test": 155,
         "testSupport": 9
       },
       "files": [
@@ -4091,6 +4091,7 @@
         "packages/rafa/src/effort/store/fix-schema.test.ts",
         "packages/rafa/src/effort/store/fix-schema.ts",
         "packages/rafa/src/effort/store/fixture-extract.ts",
+        "packages/rafa/src/effort/store/held-rows-migration.test.ts",
         "packages/rafa/src/effort/store/index.ts",
         "packages/rafa/src/effort/store/legacy.test.ts",
         "packages/rafa/src/effort/store/legacy.ts",
@@ -4269,7 +4270,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 373
+        "packages/rafa/": 374
       },
       "folders": [
         "packages/rafa/"

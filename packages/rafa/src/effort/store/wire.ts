@@ -19,7 +19,7 @@
  *   - `cursor`, the highest `seq` each table has now sent.
  *
  * A `local` table (the migration log, `store_meta`, `store_replaced`,
- * the merge trail) never travels, as a merge never reads it. So the
+ * the merge trail, `held_rows`) never travels, as a merge never reads it. So the
  * payload names no store and no project: a materialised file holds no
  * `store_meta` row, its merge records no other store in `merges`, and
  * the merge's other-project refusal has nothing to compare. Keeping a hub's
