@@ -2,8 +2,9 @@
  * Tests for the hub HTTP client (`client.ts`), each against a
  * `Bun.serve` stand-in on a free port rather than the real hub: what
  * each call sends and reads, and which of unreachable, refused and
- * malformed each failure is, and the one status read a client keeps
- * for its push and pull. Every unreachable reading is paired with a
+ * malformed each failure is, the one status read a client keeps
+ * for its push and pull, the projected pull's `migrations` field and
+ * the `missing` a `409` names. Every unreachable reading is paired with a
  * control on the same client that proves the call could have succeeded.
  */
 import type { HubClient, HubClientOptions } from './client.js';
@@ -269,6 +270,99 @@ describe('the contract version', () => {
     up = true;
     await client.push('dev-a', PAYLOAD);
     expect(hub.seen.map(({ path }) => path)).toEqual(['/v1/status', '/v1/status', '/v1/effort/push']);
+  });
+});
+
+describe('the projected pull', () => {
+  const MIGRATIONS = ['0001-init', '0002-sessions'];
+
+  /** A payload a hub projected: `sessions` cut to a schema lacking `0003-worktree`. */
+  const PROJECTED: WirePayload = { ...PAYLOAD, projected: { sessions: ['0003-worktree'] } };
+
+  it('sends this store\'s migrations, comma-separated, to a hub whose status answered projection: true', async () => {
+    const hub = standIn(behind(() => success(PAYLOAD), CONTRACT_STATUS));
+    await clientOf(hub.url).pull('dev-a', { commits: 1 }, { migrations: MIGRATIONS });
+    expect(pastStatus(hub)[0]?.query).toEqual({
+      device: 'dev-a',
+      since: '{"commits":1}',
+      contractVersion: String(WIRE_CONTRACT_VERSION),
+      migrations: '0001-init,0002-sessions',
+    });
+  });
+
+  it.each([
+    ['a hub one release behind', STATUS],
+    ['a hub answering projection: false', { ...CONTRACT_STATUS, capabilities: { ...CAPABILITIES, projection: false } }],
+    ['a hub naming no projection capability', { ...CONTRACT_STATUS, capabilities: { fts: true } }],
+  ])('sends no migrations to %s', async (_label: string, status: unknown) => {
+    const hub = standIn(behind(() => success(PAYLOAD), status));
+    await clientOf(hub.url).pull('dev-a', {}, { migrations: MIGRATIONS });
+    expect(pastStatus(hub)[0]?.query).not.toHaveProperty('migrations');
+    expect(pastStatus(hub)).toHaveLength(1);
+  });
+
+  it('sends no migrations on a pull that does not ask for projection, to a hub that projects', async () => {
+    const hub = standIn(behind(() => success(PAYLOAD), CONTRACT_STATUS));
+    await clientOf(hub.url).pull('dev-a', {});
+    expect(pastStatus(hub)[0]?.query).toEqual({ device: 'dev-a', contractVersion: String(WIRE_CONTRACT_VERSION) });
+  });
+
+  it('reads the answer\'s projected map, and a whole answer as holding none', async () => {
+    const projecting = standIn(behind(() => success(PROJECTED), CONTRACT_STATUS));
+    const whole = standIn(behind(() => success(PAYLOAD), CONTRACT_STATUS));
+    const projected = await clientOf(projecting.url).pull('dev-a', {}, { migrations: MIGRATIONS });
+    const unprojected = await clientOf(whole.url).pull('dev-a', {}, { migrations: MIGRATIONS });
+    expect(projected.projected).toEqual({ sessions: ['0003-worktree'] });
+    expect(unprojected.projected).toBeUndefined();
+  });
+
+  it('refuses a projected map naming an id the payload holds as malformed', async () => {
+    const hub = standIn(behind(() => success({ ...PAYLOAD, projected: { sessions: ['0001-init'] } }), CONTRACT_STATUS));
+    const error = await rejectionOf(clientOf(hub.url).pull('dev-a', {}, { migrations: MIGRATIONS }));
+    expect(error).toBeInstanceOf(HubAnswerMalformed);
+    expect(error.message).toStartWith('the hub\'s answer to pull is not a wire payload: wire: projected.sessions names 0001-init');
+  });
+});
+
+describe('the migration refusal', () => {
+  const SAID = 'The hub lacks migration 0002-x; upgrade the hub.';
+
+  /** A hub refusing every push or pull with a `409` whose envelope adds `fields`. */
+  function refusing(fields: Record<string, unknown>): StandIn {
+    return standIn(behind(() => Response.json({ success: false, error: SAID, ...fields }, { status: 409 }), CONTRACT_STATUS));
+  }
+
+  it('reads missing off a 409 into the refusal, its message as it stands', async () => {
+    const hub = refusing({ missing: ['0002-x', '0003-y'] });
+    const error = await rejectionOf(clientOf(hub.url).push('dev-a', PAYLOAD));
+    expect(error).toBeInstanceOf(HubRefused);
+    expect((error as HubRefused).missing).toEqual(['0002-x', '0003-y']);
+    expect(error.message).toBe(`the hub refused push: HTTP 409: ${SAID}`);
+  });
+
+  it('reads missing off a 409 refusing a projected pull', async () => {
+    const hub = refusing({ missing: ['0003-y'] });
+    const error = await rejectionOf(clientOf(hub.url).pull('dev-a', {}, { migrations: ['0001-init'] }));
+    expect((error as HubRefused).missing).toEqual(['0003-y']);
+  });
+
+  it.each([
+    ['names no missing', {}],
+    ['names a missing that is not a list of ids', { missing: '0002-x' }],
+    ['names a missing holding an empty id', { missing: [''] }],
+  ])('carries no missing for a 409 that %s, its message as it stands', async (_label: string, fields: Record<string, unknown>) => {
+    const hub = refusing(fields);
+    const error = await rejectionOf(clientOf(hub.url).push('dev-a', PAYLOAD));
+    expect(error).toBeInstanceOf(HubRefused);
+    expect((error as HubRefused).missing).toBeUndefined();
+    expect(error.message).toBe(`the hub refused push: HTTP 409: ${SAID}`);
+  });
+
+  it('reads no missing off a refusal that is not a 409', async () => {
+    const hub = standIn(behind(() => Response.json({ success: false, error: 'no', missing: ['0002-x'] }, { status: 400 })));
+    const error = await rejectionOf(clientOf(hub.url).push('dev-a', PAYLOAD));
+    expect((error as HubRefused).status).toBe(400);
+    expect((error as HubRefused).missing).toBeUndefined();
   });
 });
 
