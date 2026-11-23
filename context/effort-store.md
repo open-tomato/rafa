@@ -371,8 +371,13 @@ from core. A rejection named `HubContractMismatch` (the hub speaks another
 wire contract version) is written as its message stands, one line per
 contact, `effort sync: the hub speaks contract <v>, this rafa contract <w>;
 nothing was sent. Next step: <step>`, and a mismatched push skips its pull.
-Any other rejection is written as `effort sync: <push|pull> over
-service failed: <message>`, and a refused push still attempts its pull.
+A rejection named `HubUpgradeRequired` or `RafaUpdateRequired` (the hub or
+this rafa is behind the other's migrations) is also written as its message
+stands, each line once per contact, and its push still pulls. A pull answer
+carrying a `notice` (the `pulled <n> rows projected` and `refilled <n> rows`
+lines) is written as it stands, once per pull. Any other rejection is written
+as `effort sync: <push|pull> over service failed: <message>`, and a refused
+push still attempts its pull.
 `pullBeforeRead` reads the config without writing its warnings and contacts
 nothing when the config is refused, leaving the refusal to the command.
 

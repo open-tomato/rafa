@@ -13,7 +13,10 @@
  * line a contact writes beside a second contact writing its own, the
  * skipped pull beside a refused push that still pulls, and the core
  * strategies writing nothing beside the same config naming `service`,
- * and the mismatched push skipping its pull beside the refused one.
+ * and the mismatched push skipping its pull beside the refused one. A
+ * skew refusal's line written as it stands sits beside the same line
+ * under another name wrapped as a failure, and a pull's notice written
+ * beside answers whose notice is absent, empty or misplaced.
  *
  * Every root is a path under a temporary directory of this file's own
  * that is never made, and the core cases hold it absent after, but for
@@ -22,7 +25,7 @@
  */
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
-import type { Sync, SyncPullRequest, SyncPushRequest } from '@open-tomato/rafa/ports';
+import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest } from '@open-tomato/rafa/ports';
 import type { HubContactSeams } from '@open-tomato/rafa-effort/effort/sync/contact';
 
 import '../../../../config-registry.js';
@@ -41,11 +44,15 @@ import {
   createHubContact,
   HUB_CONTRACT_MISMATCH,
   HUB_UNREACHABLE,
+  HUB_UPGRADE_REQUIRED,
   HubUnreachable,
   hubUnreachableLine,
   isHubContractMismatch,
   isHubUnreachable,
+  isSkewRefusal,
+  noticeOf,
   pullBeforeRead,
+  RAFA_UPDATE_REQUIRED,
 } from '@open-tomato/rafa-effort/effort/sync/contact';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-sync-contact-')));
@@ -78,7 +85,16 @@ function resolving(text: string): ResolvedConfig {
 const SERVICE = `effort:\n  sync: service\nhub:\n  url: ${HUB_URL}\n`;
 
 /** What one direction of the fixture does when called. */
-type Behaviour = 'answer' | 'unreachable' | 'renamed-unreachable' | 'mismatch' | 'refuse' | 'throw-now' | 'throw-string';
+type Behaviour =
+  | 'answer'
+  | 'unreachable'
+  | 'renamed-unreachable'
+  | 'mismatch'
+  | 'hub-behind'
+  | 'rafa-behind'
+  | 'refuse'
+  | 'throw-now'
+  | 'throw-string';
 
 /** The line the `service` strategy's `HubContractMismatch` carries for a hub one contract ahead. */
 const MISMATCH_LINE = 'effort sync: the hub speaks contract 2, this rafa contract 1; nothing was sent. Next step: rafa self-update';
@@ -86,6 +102,19 @@ const MISMATCH_LINE = 'effort sync: the hub speaks contract 2, this rafa contrac
 /** A contract mismatch as the `service` strategy throws it: an error of that name, its fields beside the line. */
 function mismatch(): Error {
   return Object.assign(new Error(MISMATCH_LINE), { name: HUB_CONTRACT_MISMATCH, hubVersion: 2, rafaVersion: 1, nextStep: 'rafa self-update' });
+}
+
+/** The line the `service` strategy's `HubUpgradeRequired` carries for a hub lacking two migrations. */
+const HUB_BEHIND_LINE = 'effort sync: the hub is behind this rafa (migration held-rows, extra); nothing was sent.'
+  + ' Next step: upgrade the hub, then sync again';
+
+/** The line the `service` strategy's `RafaUpdateRequired` carries for a hub ahead by one migration. */
+const RAFA_BEHIND_LINE = 'effort sync: this rafa is behind the hub (migration held-rows); nothing was merged.'
+  + ' Next step: rafa self-update, then sync again';
+
+/** A skew refusal as the `service` strategy throws it: an error of `name`, its fields beside the line. */
+function skewRefusal(name: string, line: string): Error {
+  return Object.assign(new Error(line), { name, missing: ['held-rows'] });
 }
 
 /** A fixture `service` strategy and what it was asked. */
@@ -104,6 +133,8 @@ function actOut<Result>(behaviour: Behaviour, direction: string, answer: Result)
       return Promise.reject(Object.assign(new Error(`timed out after 3000 ms on ${direction}\nsecond line`), { name: HUB_UNREACHABLE }));
     }
     case 'mismatch': return Promise.reject(mismatch());
+    case 'hub-behind': return Promise.reject(skewRefusal(HUB_UPGRADE_REQUIRED, HUB_BEHIND_LINE));
+    case 'rafa-behind': return Promise.reject(skewRefusal(RAFA_UPDATE_REQUIRED, RAFA_BEHIND_LINE));
     case 'refuse': return Promise.reject(new Error(`the hub refused the token on ${direction} (403)`));
     case 'throw-now': throw new Error(`thrown before any promise on ${direction}`);
     case 'throw-string': return Promise.reject(`a bare string on ${direction}`);
@@ -394,6 +425,165 @@ describe('a hub speaking another contract', () => {
 
     expect(await contact.pushThenPull()).toMatchObject({ push: { outcome: 'failed' }, pull: { outcome: 'mismatch' } });
     expect(lines).toEqual(['effort sync: push over service failed: the hub refused the token on push (403)', MISMATCH_LINE]);
+  });
+});
+
+describe('a skew refusal', () => {
+  it('writes the hub-behind line unwrapped and still pulls', async () => {
+    const service = fixture('hub-behind', 'answer');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    expect(await contact.pushThenPull()).toEqual({
+      state: 'contacted',
+      strategy: 'service',
+      push: { outcome: 'refused', problem: HUB_BEHIND_LINE },
+      pull: { outcome: 'done', result: { status: 'nothing-to-sync' } },
+    });
+    expect(service.calls).toEqual(['push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+    expect(lines).toEqual([HUB_BEHIND_LINE]);
+  });
+
+  it('writes the rafa-behind line unwrapped for a pull alone', async () => {
+    const service = fixture('answer', 'rafa-behind');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    expect(await contact.pull()).toEqual({
+      state: 'contacted',
+      strategy: 'service',
+      push: null,
+      pull: { outcome: 'refused', problem: RAFA_BEHIND_LINE },
+    });
+    expect(lines).toEqual([RAFA_BEHIND_LINE]);
+  });
+
+  it('writes both lines when the push and the pull each meet one, neither inside the failed wrap', async () => {
+    const service = fixture('hub-behind', 'rafa-behind');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    await contact.pushThenPull();
+
+    expect(lines).toEqual([HUB_BEHIND_LINE, RAFA_BEHIND_LINE]);
+    expect(lines.filter((line) => line.includes(' failed: '))).toEqual([]);
+  });
+
+  it('writes each line once per contact, and still tries each later run', async () => {
+    const service = fixture('hub-behind', 'rafa-behind');
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    await contact.pushThenPull();
+    await contact.pushThenPull();
+    await contact.pull();
+
+    expect(lines).toEqual([HUB_BEHIND_LINE, RAFA_BEHIND_LINE]);
+    expect(service.calls).toHaveLength(5);
+  });
+
+  it('writes the first line alone of a refusal holding more', async () => {
+    const refusing = (): Promise<never> => Promise.reject(skewRefusal(RAFA_UPDATE_REQUIRED, `${RAFA_BEHIND_LINE}\nsecond line`));
+    const adapters = CORE_ADAPTER_REGISTRY.register({
+      port: 'sync',
+      kind: 'service',
+      portVersion: PORT_VERSIONS.sync,
+      create: (): Sync => ({ kind: 'service', push: refusing, pull: refusing }),
+    });
+    const { lines, contact } = contacting(resolving(SERVICE), { modules: { adapters } });
+
+    expect(await contact.pull()).toMatchObject({ pull: { outcome: 'refused', problem: RAFA_BEHIND_LINE } });
+    expect(lines).toEqual([RAFA_BEHIND_LINE]);
+  });
+
+  it('while the same line under another name is wrapped as a failure, the control', async () => {
+    const refusing = (): Promise<never> => Promise.reject(new Error(RAFA_BEHIND_LINE));
+    const adapters = CORE_ADAPTER_REGISTRY.register({
+      port: 'sync',
+      kind: 'service',
+      portVersion: PORT_VERSIONS.sync,
+      create: (): Sync => ({ kind: 'service', push: refusing, pull: refusing }),
+    });
+    const { lines, contact } = contacting(resolving(SERVICE), { modules: { adapters } });
+
+    expect(await contact.pull()).toMatchObject({ pull: { outcome: 'failed' } });
+    expect(lines).toEqual([`effort sync: pull over service failed: ${RAFA_BEHIND_LINE}`]);
+  });
+
+  it('isSkewRefusal knows the two names on an error, and nothing else', () => {
+    expect(isSkewRefusal(skewRefusal(HUB_UPGRADE_REQUIRED, HUB_BEHIND_LINE))).toBe(true);
+    expect(isSkewRefusal(skewRefusal(RAFA_UPDATE_REQUIRED, RAFA_BEHIND_LINE))).toBe(true);
+    expect(isSkewRefusal(new Error(RAFA_BEHIND_LINE))).toBe(false);
+    expect(isSkewRefusal(mismatch())).toBe(false);
+    expect(isSkewRefusal({ name: RAFA_UPDATE_REQUIRED, message: RAFA_BEHIND_LINE })).toBe(false);
+    expect(isSkewRefusal(RAFA_UPDATE_REQUIRED)).toBe(false);
+  });
+});
+
+/** The `pulled <n> rows projected` line the `service` strategy answers for a projected pull. */
+const PROJECTED_LINE = 'effort sync: pulled 4 rows projected to this rafa\'s schema; 2 columns wait for rafa self-update';
+
+/** The `refilled <n> rows` line the `service` strategy answers for a refill. */
+const REFILLED_LINE = 'effort sync: refilled 3 rows held back since 2026-11-20';
+
+/** A merge result standing in for the merge's own, which the contact never reads. */
+const MERGED = Object.freeze({ dryRun: false }) as unknown as Extract<SyncPullResult, { readonly status: 'pulled' }>['merge'];
+
+/** Registers a `service` whose push answers and whose every pull answers `answer`. */
+function answering(answer: unknown): { readonly calls: string[]; readonly seams: HubContactSeams } {
+  const calls: string[] = [];
+  const adapters = CORE_ADAPTER_REGISTRY.register({
+    port: 'sync',
+    kind: 'service',
+    portVersion: PORT_VERSIONS.sync,
+    create: (): Sync => ({
+      kind: 'service',
+      push: () => Promise.resolve({ status: 'pushed', path: null } as const),
+      pull: () => {
+        calls.push('pull');
+        return Promise.resolve(answer as SyncPullResult);
+      },
+    }),
+  });
+  return { calls, seams: { modules: { adapters, manifest: MANIFEST_SEAMS } } };
+}
+
+describe('a pull answering a notice', () => {
+  it.each([
+    ['the projected pull', PROJECTED_LINE],
+    ['the refill', REFILLED_LINE],
+  ])('writes %s\'s line as it stands, unwrapped', async (_label, notice) => {
+    const service = answering({ status: 'pulled', merge: MERGED, notice });
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    expect(await contact.pushThenPull()).toMatchObject({ push: { outcome: 'done' }, pull: { outcome: 'done' } });
+    expect(lines).toEqual([notice]);
+  });
+
+  it('writes the line once for each pull that answers one', async () => {
+    const service = answering({ status: 'pulled', merge: MERGED, notice: PROJECTED_LINE });
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    await contact.pushThenPull();
+    await contact.pull();
+
+    expect(service.calls).toHaveLength(2);
+    expect(lines).toEqual([PROJECTED_LINE, PROJECTED_LINE]);
+  });
+
+  it.each([
+    ['a pulled answer naming no notice', { status: 'pulled', merge: MERGED }],
+    ['an empty notice', { status: 'pulled', merge: MERGED, notice: '  ' }],
+    ['a notice that is no string', { status: 'pulled', merge: MERGED, notice: 4 }],
+    ['a notice beside nothing-to-sync', { status: 'nothing-to-sync', notice: PROJECTED_LINE }],
+  ])('writes nothing for %s, the control', async (_label, answer) => {
+    const service = answering(answer);
+    const { lines, contact } = contacting(resolving(SERVICE), service.seams);
+
+    expect(await contact.pull()).toMatchObject({ pull: { outcome: 'done' } });
+    expect(lines).toEqual([]);
+  });
+
+  it('noticeOf reads the notice off a pulled answer alone', () => {
+    expect(noticeOf({ status: 'pulled', merge: MERGED, notice: REFILLED_LINE } as SyncPullResult)).toBe(REFILLED_LINE);
+    expect(noticeOf({ status: 'pulled', merge: MERGED })).toBeNull();
+    expect(noticeOf({ status: 'nothing-to-sync' })).toBeNull();
   });
 });
 
