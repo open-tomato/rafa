@@ -8,6 +8,9 @@
  * Every refusal comes before anything is built or copied, so both files
  * keep their bytes. In the order they are asked:
  *
+ *   - A `projected` option naming a table that is no merged table, or
+ *     an empty or blank id (below). It is the caller's fault, not a
+ *     store's, so it is a `TypeError` and no {@link MergeRefusal}.
  *   - A project whose `store` is `ndjson`: its sessions and commits are
  *     NDJSON, which carries no origin, so a merge needs the SQLite
  *     backend. The text names {@link MOVE_TO_SQLITE}. The backend is the
@@ -64,7 +67,8 @@
  * it, the union (`unionStores`) inserts every unmatched row of each
  * merged table, the conflict step (`settleMatches`,
  * `merge-conflicts.ts`) settles each matched pair and records in
- * `merge_conflicts` what no rule settles, the commit gaps of each commit
+ * `merge_conflicts` what no rule settles, a projected merge lists the
+ * rows it cut in `held_rows` (below), the commit gaps of each commit
  * brought in and of the commit after it are recomputed
  * (`recomputeCommitGaps`, `merge-commit-gaps.ts`), the supersedes the
  * readings brought in call for are written (`writeSupersedes`,
@@ -84,7 +88,8 @@
  * The live store is then attached, and every table both files hold,
  * the log apart, must hold its live row count plus the rows the merge
  * added to it (`checkedCounts`): the rows added to each merged table,
- * one row in `merges`, and one in `merge_conflicts` per conflict. A
+ * one row in `merges`, one in `merge_conflicts` per conflict, and one
+ * in `held_rows` per row a projected merge newly lists. A
  * merged table's fills and gap rewrites change no count. SQLite's
  * `integrity_check` must answer `ok`, and `planSchema` must find the
  * file one this rafa uses as it is (`refuseUnusable`, `fix-schema.ts`).
@@ -95,6 +100,26 @@
  * to `<store>.before-merge-<stamp>.bak` with `VACUUM INTO`, its identity
  * is carried onto the parallel file (`carryStoreIdentity`,
  * `store-meta.ts`), and the parallel file is renamed into its place.
+ *
+ * ## A projected merge
+ *
+ * A pull a hub cut down to this rafa's schema passes the payload's
+ * `projected` map (`WirePayload.projected`, `wire.ts`) as the option of
+ * that name: for each merged table whose rows were cut, the migration
+ * ids those rows lack. After the conflict step, inside the same
+ * transaction, every row of such a table in the other store is listed
+ * in `held_rows` by its table and origin pair, with those ids as
+ * `missing`, when this store now holds a row under that pair: one the
+ * union added, or one it matched by origin. A row with no origin pair,
+ * one matched only by identity under another pair, and one a UNIQUE
+ * key refused are not listed, since no row here is a copy of it. A row
+ * listed already keeps one listing, its `missing` the ids of both
+ * lists. A table the map leaves out came whole and lists nothing, and
+ * a merge with no map lists nothing. {@link MergeResult.rowsHeld}
+ * counts the new listings, and {@link readHeldMigrations} answers the
+ * ids every listing of a store names, which a later build compares
+ * with its own catalogue to know whether it can take the held rows
+ * whole.
  *
  * ## The store keeps its id
  *
@@ -147,12 +172,14 @@ import { readOnlySchema, refuseUnusable, tableNames } from './fix-schema.js';
 import { guardTestProcess } from './location.js';
 import { recomputeCommitGaps } from './merge-commit-gaps.js';
 import { settleMatches } from './merge-conflicts.js';
+import { MERGE_RULES } from './merge-rules.js';
 import { carriedColumns, unionStores } from './merge-union.js';
 import { liveLoop } from './migrate.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
 import { checkedCounts, quoted, rebuildAside, RebuildRefusal, refuseCorrupt, refuseInFlight } from './rebuild-aside.js';
 import { readingKey, REPOSITORY_FACTS, writeSupersedes } from './repository-facts.js';
 import { planSchema, sqliteCatalogue } from './schema-plan.js';
+import { activeStoreSettings } from './settings.js';
 import { readProjectIdentity } from './store-identity.js';
 import { readStoreMeta } from './store-meta.js';
 
@@ -225,6 +252,8 @@ export interface MergeResult {
   readonly rowsAdded: number;
   readonly rowsSkipped: number;
   readonly rowsInConflict: number;
+  /** Rows a projected merge newly listed in `held_rows`; 0 for every other merge. */
+  readonly rowsHeld: number;
   /** Commit rows whose gap was rewritten. */
   readonly gapsRewritten: number;
   /** Where the original went, for `merged` only. */
@@ -256,13 +285,29 @@ export interface MergeOptions extends DevelopmentProbe {
    * live-loop guard passes; absent or null for a caller that is no run.
    */
   readonly sessionId?: string | null;
+  /**
+   * The `projected` map of the payload the other store was built from:
+   * each cut merged table, with the migration ids its rows lack. Absent
+   * for a merge of rows that came whole; see the module note.
+   */
+  readonly projected?: MergeProjection;
 }
+
+/**
+ * Per cut merged table, the migration ids its rows lack: the shape of
+ * `WirePayload.projected` (`wire.ts`), spelled here so the published
+ * types of this module reach no further into the wire codec.
+ */
+type MergeProjection = Readonly<Record<string, readonly string[]>>;
 
 /** The name the attached live store is reached by. */
 const LIVE = 'live';
 
 /** The table the merge records itself in, which a development build's refusal names. */
 const MERGES_TABLE = 'merges';
+
+/** The local table a projected merge lists the rows it cut in. */
+const HELD_TABLE = 'held_rows';
 
 /** The table the supersedes of the readings brought in are written to. */
 const SUPERSEDES_TABLE = 'reading_supersedes';
@@ -281,7 +326,13 @@ interface MergeStamp {
 }
 
 /** What the build answered. */
-type Merged = Pick<MergeResult, 'tables' | 'rowsAdded' | 'rowsSkipped' | 'rowsInConflict' | 'gapsRewritten'>;
+type Merged = Pick<MergeResult, 'tables' | 'rowsAdded' | 'rowsSkipped' | 'rowsInConflict' | 'rowsHeld' | 'gapsRewritten'>;
+
+/** The origin pair of one incoming row. */
+interface OriginPair {
+  readonly origin_store: string;
+  readonly origin_seq: number;
+}
 
 /** The other store as the union reads it. */
 interface OtherStore {
@@ -430,11 +481,99 @@ function writeMergedSupersedes(db: Database, unions: readonly TableUnion[]): num
     .reduce((written, union) => written + writeSupersedes(db, union.table, addedKeys(db, union)), 0);
 }
 
-/** Unions `other` into `db`, settles, recomputes gaps, writes supersedes and records the merge, in one transaction. */
-function mergeInto(db: Database, other: Database, mergeId: string, otherStore: string | null, mergedAt: string): Merged {
+/** Refuses a `projected` map naming a table that is no merged table, or an empty or blank id. */
+function refuseUnknownProjection(projected: MergeProjection | undefined): void {
+  Object.entries(projected ?? {}).forEach(([table, ids]) => {
+    const rule = Object.hasOwn(MERGE_RULES, table)
+      ? MERGE_RULES[table]
+      : undefined;
+    if (rule?.scope !== 'merged') {
+      throw new TypeError(`effort store: projected names ${JSON.stringify(table)}, which is no merged table. ${NOTHING_MERGED}`);
+    }
+    if (ids.length === 0 || ids.some((id) => typeof id !== 'string' || id === '')) {
+      throw new TypeError(`effort store: projected.${table} is not a list of migration ids. ${NOTHING_MERGED}`);
+    }
+  });
+}
+
+/**
+ * The listing of one row of `table`, when this store holds a row under
+ * its pair: the new ids in their order, then any id a listing already
+ * there names and they do not. A replace rather than an upsert, which
+ * the merge-rules sweep refuses to read.
+ */
+function listHeldSql(table: string): string {
+  return `INSERT OR REPLACE INTO ${HELD_TABLE} (table_name, origin_store, origin_seq, missing)
+    SELECT ?1, here.origin_store, here.origin_seq, (
+      SELECT json_group_array(id) FROM (
+        SELECT value AS id FROM json_each(?2)
+        UNION ALL
+        SELECT value FROM json_each(held.missing) WHERE value NOT IN (SELECT value FROM json_each(?2))
+      )
+    )
+    FROM ${quoted(table)} AS here
+    LEFT JOIN ${HELD_TABLE} AS held
+      ON held.table_name = ?1 AND held.origin_store = here.origin_store AND held.origin_seq = here.origin_seq
+    WHERE here.origin_store = ?3 AND here.origin_seq = ?4`;
+}
+
+/** Lists in `held_rows` each row of a projected table of `other` that `db` now holds by its pair; answers the new listings. */
+function listHeld(db: Database, other: Database, projected: MergeProjection): number {
+  const count = (): number => db.query<{ n: number }, []>(`SELECT count(*) AS n FROM ${HELD_TABLE}`).get()?.n ?? 0;
+  const before = count();
+  Object.entries(projected).forEach(([table, missing]) => {
+    const list = db.query(listHeldSql(table));
+    const ids = JSON.stringify(missing);
+    other
+      .query<OriginPair, []>(`SELECT origin_store, origin_seq FROM ${quoted(table)}`
+        + ' WHERE origin_store IS NOT NULL AND origin_seq IS NOT NULL ORDER BY seq')
+      .all()
+      .forEach((pair) => list.run(table, ids, pair.origin_store, pair.origin_seq));
+  });
+  return count() - before;
+}
+
+/**
+ * The migration ids every `held_rows` listing of the store at `path`
+ * names, each once, in code-point order: what its held rows lack. Empty
+ * for a store with nothing listed, one whose schema predates the table,
+ * and a path where no store is. Only reads; see the module note.
+ */
+export function readHeldMigrations(path: string): readonly string[] {
+  guardTestProcess(path);
+  if (!existsSync(path)) return [];
+  const db = new Database(path, { readonly: true });
+  try {
+    db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);
+    const hasTable = db
+      .query<{ n: number }, [string]>('SELECT count(*) AS n FROM sqlite_master WHERE type = \'table\' AND name = ?')
+      .get(HELD_TABLE)?.n === 1;
+    if (!hasTable) return [];
+    return db
+      .query<{ id: string }, []>(`SELECT DISTINCT ids.value AS id FROM ${HELD_TABLE}, json_each(${HELD_TABLE}.missing) AS ids ORDER BY id`)
+      .all()
+      .map(({ id }) => id);
+  } finally {
+    db.close();
+  }
+}
+
+/** What one build is handed beside the two stores. */
+interface MergeInto {
+  readonly mergeId: string;
+  readonly otherStore: string | null;
+  readonly mergedAt: string;
+  readonly projected: MergeProjection | undefined;
+}
+
+/** Unions `other` into `db`, settles, lists held rows, recomputes gaps, writes supersedes and records the merge, in one transaction. */
+function mergeInto(db: Database, other: Database, { mergeId, otherStore, mergedAt, projected }: MergeInto): Merged {
   return db.transaction((): Merged => {
     const unions = unionStores(db, other);
     const settlements = settleMatches(db, other, unions, { mergeId, recordedAt: mergedAt });
+    const rowsHeld = projected === undefined
+      ? 0
+      : listHeld(db, other, projected);
     const gaps = recomputeCommitGaps(db, unions.find(({ table }) => table === 'commits')?.added ?? []);
     const supersedes = writeMergedSupersedes(db, unions);
     const tables = unions.map((union, index): TableMerge => {
@@ -454,7 +593,7 @@ function mergeInto(db: Database, other: Database, mergeId: string, otherStore: s
     const sum = (field: 'added' | 'skipped' | 'inConflict'): number => tables.reduce((total, entry) => total + entry[field], 0);
     const totals = { rowsAdded: sum('added'), rowsSkipped: sum('skipped'), rowsInConflict: sum('inConflict') };
     db.query(INSERT_MERGE).run(mergeId, otherStore, mergedAt, totals.rowsAdded, totals.rowsSkipped, totals.rowsInConflict);
-    return { tables, ...totals, gapsRewritten: gaps.length };
+    return { tables, ...totals, rowsHeld, gapsRewritten: gaps.length };
   })();
 }
 
@@ -464,6 +603,7 @@ function addedRows(merged: Merged): Readonly<Record<string, number>> {
     ...Object.fromEntries(merged.tables.map(({ table, added }) => [table, added])),
     [MERGES_TABLE]: 1,
     merge_conflicts: merged.rowsInConflict,
+    [HELD_TABLE]: merged.rowsHeld,
   };
 }
 
@@ -472,13 +612,23 @@ function buildMerged(
   path: string,
   parallelPath: string,
   other: Database,
-  merge: { readonly id: string; readonly otherStore: string | null; readonly stamp: MergeStamp },
+  merge: {
+    readonly id: string;
+    readonly otherStore: string | null;
+    readonly stamp: MergeStamp;
+    readonly projected: MergeProjection | undefined;
+  },
 ): Merged {
   vacuumInto(path, parallelPath);
   const db = new Database(parallelPath, { readwrite: true });
   try {
     bringForward(db, parallelPath, 'write', 'open', { ...merge.stamp, builtAside: true });
-    const merged = mergeInto(db, other, merge.id, merge.otherStore, merge.stamp.now().toISOString());
+    const merged = mergeInto(db, other, {
+      mergeId: merge.id,
+      otherStore: merge.otherStore,
+      mergedAt: merge.stamp.now().toISOString(),
+      projected: merge.projected,
+    });
     db.run(`ATTACH DATABASE ? AS ${LIVE}`, [path]);
     const live = new Set(tableNames(db, LIVE));
     checkedCounts(db, tableNames(db, 'main').filter((table) => live.has(table)), LIVE, addedRows(merged));
@@ -497,6 +647,7 @@ function refuseUnmergeable(options: MergeOptions, migrations: readonly SqliteMig
   readonly otherStore: string | null;
 } {
   const { path, otherPath } = options;
+  refuseUnknownProjection(options.projected);
   refuseNdjson(options.backend);
   refuseMissing(path, 'this store');
   refuseMissing(otherPath, 'the other store');
@@ -534,7 +685,12 @@ export function mergeStore(options: MergeOptions): MergeResult {
       parallelPath: `${path}.merge-${stamp}`,
       backupPath: `${path}.before-merge-${stamp}.bak`,
       dryRun,
-      build: (parallelPath) => buildMerged(path, parallelPath, other.db, { id: mergeId, otherStore, stamp: mergeStamp }),
+      build: (parallelPath) => buildMerged(path, parallelPath, other.db, {
+        id: mergeId,
+        otherStore,
+        stamp: mergeStamp,
+        projected: options.projected,
+      }),
     });
     const status = dryRun
       ? 'would-merge'

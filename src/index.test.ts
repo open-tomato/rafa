@@ -213,7 +213,7 @@ import {
   selectEffortStore,
 } from '@open-tomato/rafa/store';
 import * as storeEntry from '@open-tomato/rafa/store';
-import { mergeStore } from '@open-tomato/rafa/store/merge-store';
+import { mergeStore, readHeldMigrations } from '@open-tomato/rafa/store/merge-store';
 import {
   decodeWirePayload,
   encodeWirePayload,
@@ -321,6 +321,7 @@ const RUNTIME_EXPORTS = [
   'planPrerequisites',
   'prerequisitesPathForPlan',
   'readConfigFile',
+  'readHeldMigrations',
   'readProjectScope',
   'readRafaBlocks',
   'registerAdapters',
@@ -412,6 +413,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['planPrerequisites', entry.planPrerequisites, planPrerequisites],
   ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readConfigFile', entry.readConfigFile, readConfigFile],
+  ['readHeldMigrations', entry.readHeldMigrations, readHeldMigrations],
   ['readProjectScope', entry.readProjectScope, readProjectScope],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
   ['registerAdapters', entry.registerAdapters, registerAdapters],
