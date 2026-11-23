@@ -101,8 +101,13 @@ function spanMinutes(row: EpicCostRow): number | null {
   return minutesBetween(first, last);
 }
 
-/** The run's tokens, summed as the report's `totalTokens` is. */
-function tokensOf(row: EpicCostRow): number {
+/**
+ * A session's tokens: input, output, cache read and cache write, summed
+ * as the report's `totalTokens` is. `thinkingTokens` and the two
+ * ephemeral counts are left out, the ephemeral ones being a split of the
+ * cache write already counted.
+ */
+export function sessionTokenSum(row: Pick<EpicCostRow, 'usage'>): number {
   const usage = row.usage;
   return usage.inputTokens + usage.outputTokens + usage.cacheReadInputTokens + usage.cacheCreationInputTokens;
 }
@@ -123,7 +128,7 @@ export function summariseEpicCost(rows: readonly EpicCostRow[], members: readonl
     } else {
       minutes += span;
     }
-    tokens += tokensOf(row);
+    tokens += sessionTokenSum(row);
   }
   return {
     runs: seen.size,

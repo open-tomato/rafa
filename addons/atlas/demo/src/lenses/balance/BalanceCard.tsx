@@ -1,6 +1,6 @@
 import type { LensResult } from '../../data/source.js';
 
-import { DashboardCard, Segmented, useDashboard, type ModalEntry } from '@open-tomato/atlas-ui';
+import { Segmented, useDashboard, type ModalEntry } from '@open-tomato/atlas-ui';
 import { useChartEngine } from '@open-tomato/charts';
 import { ListChecks } from 'lucide-react';
 import { useState, type ReactElement } from 'react';
@@ -16,6 +16,7 @@ import {
   defaultEnabled,
   toggleIndex,
 } from '../../data/balance.js';
+import { LensCard } from '../LensCard.js';
 import { cardSpec, plotHeight } from '../spec.js';
 
 import { balanceCardBodyVariants, balanceInfoVariants } from './BalanceCard.variants.js';
@@ -71,7 +72,7 @@ export function BalanceCard(): ReactElement {
   };
 
   return (
-    <DashboardCard
+    <LensCard
       config={BALANCE}
       select={(result: LensResult) => result.balance}
       info={INFO}
@@ -104,6 +105,6 @@ export function BalanceCard(): ReactElement {
           </div>
         );
       }}
-    </DashboardCard>
+    </LensCard>
   );
 }

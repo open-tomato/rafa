@@ -67,9 +67,11 @@ summary ("Command did not complete within its 120s timeout"). The same
 applies to a task that changes `package.json` or `bun.lock`, whose
 `--changed` run selects nearly the whole suite. **Pass a changed-file list
 to `bunx eslint` through `xargs`**, never as an unquoted shell variable:
+write the list to a file and pipe it in (`xargs bunx eslint < files.txt`).
 zsh does not word-split `$FILES`, so eslint gets one path holding newlines
 and answers "No files matching the pattern" or "Please check for typing
-mistakes in the pattern".
+mistakes in the pattern". The same holds for any command handed a captured
+file list on this shell.
 
 The full-suite scripts treat the workspace packages apart only for types:
 `check-types` runs `tsc --noEmit` over the root, which leaves out `packages/`

@@ -1,0 +1,210 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`z.toJSONSchema(QueryParamsSchema) renders the same JSON Schema as the snapshot 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "compare": {
+      "const": "previous",
+      "type": "string",
+    },
+    "fields": {
+      "items": {
+        "type": "string",
+      },
+      "maxItems": 32,
+      "readOnly": true,
+      "type": "array",
+    },
+    "filters": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+          },
+          "op": {
+            "enum": [
+              "eq",
+              "ne",
+              "in",
+              "nin",
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "contains",
+              "is_null",
+            ],
+            "type": "string",
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null",
+                ],
+              },
+              {
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null",
+                  ],
+                },
+                "readOnly": true,
+                "type": "array",
+              },
+            ],
+          },
+        },
+        "required": [
+          "field",
+          "op",
+        ],
+        "type": "object",
+      },
+      "maxItems": 16,
+      "readOnly": true,
+      "type": "array",
+    },
+    "grain": {
+      "enum": [
+        "day",
+        "week",
+        "month",
+        "plan",
+        "all",
+      ],
+      "type": "string",
+    },
+    "groupBy": {
+      "items": {
+        "type": "string",
+      },
+      "maxItems": 3,
+      "readOnly": true,
+      "type": "array",
+    },
+    "limit": {
+      "maximum": 10000,
+      "minimum": 1,
+      "type": "integer",
+    },
+    "measures": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "agg": {
+            "enum": [
+              "count",
+              "count_distinct",
+              "sum",
+              "mean",
+              "min",
+              "max",
+              "p50",
+              "p90",
+              "p99",
+            ],
+            "type": "string",
+          },
+          "as": {
+            "type": "string",
+          },
+          "field": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "field",
+          "agg",
+        ],
+        "type": "object",
+      },
+      "maxItems": 8,
+      "readOnly": true,
+      "type": "array",
+    },
+    "orderBy": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "dir": {
+            "enum": [
+              "asc",
+              "desc",
+            ],
+            "type": "string",
+          },
+          "key": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "key",
+          "dir",
+        ],
+        "type": "object",
+      },
+      "maxItems": 3,
+      "readOnly": true,
+      "type": "array",
+    },
+    "window": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string",
+            },
+            {
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+              "type": "string",
+            },
+          ],
+        },
+        "last": {
+          "pattern": "^\\d{1,4}[dwm]$",
+          "type": "string",
+        },
+        "to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string",
+            },
+            {
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+              "type": "string",
+            },
+          ],
+        },
+      },
+      "type": "object",
+    },
+  },
+  "type": "object",
+  "~standard": {
+    "jsonSchema": {
+      "input": [Function],
+      "output": [Function],
+    },
+    "validate": [Function],
+    "vendor": "zod",
+    "version": 1,
+  },
+}
+`;

@@ -165,6 +165,14 @@ export interface ChangeSlice extends Kind {
   readonly value: number;
 }
 
+/** One blocker a task reported when it stopped: its day, plan, task line and what it said. */
+export interface Blocker {
+  readonly day: Date;
+  readonly plan: string | null;
+  readonly taskLine: number | null;
+  readonly what: string;
+}
+
 /** One set of mock values: every series the lenses draw. */
 export interface MockData {
   readonly tokensPerDay: TimePoint[];
@@ -173,7 +181,9 @@ export interface MockData {
   readonly tokensLastWeek: number;
   readonly tokensDailyAverage: number;
   readonly plansPerWeek: { week: Date; started: number; completed: number }[];
+  readonly plansCompletedPerWeek: TimePoint[];
   readonly plannedVsSessions: { plan: string; planned: number; sessions: number }[];
+  readonly activeBlockers: Blocker[];
   readonly minutesPerAgent: { agent: string; minutes: number }[];
   readonly scopeCreepPerWeek: number[];
   readonly minutesByChangeKind: ChangeSlice[];
@@ -187,6 +197,7 @@ export interface MockData {
   readonly taskCycle: ScatterPoint[];
   readonly taskCycleTrend: TimePoint[];
   readonly taskMinutesBins: HistogramBin[];
+  readonly redCiShare: number;
   readonly deploysPerWeek: number[];
   readonly bugsByKindPerWeek: Record<string, number>[];
   readonly regressionsPerWeek: TimePoint[];
@@ -362,6 +373,16 @@ function qualitySeries(random: () => number) {
   return { bugsByKindPerWeek, filedSharePerWeek, resolutionByPriority, flakyChecks };
 }
 
+/** The mock's `ACTIVE_BLOCKERS` blockers, one per plan, all on the last day; no stream is drawn. */
+function mockBlockers(): Blocker[] {
+  return Array.from({ length: ACTIVE_BLOCKERS }, (_, index) => ({
+    day: LAST_DAY,
+    plan: PLAN_NAMES[index] ?? null,
+    taskLine: 3 + index * 2,
+    what: 'mock blocker: the task could not run its gate',
+  }));
+}
+
 /**
  * One set of mock values from three seeded streams. The draws happen in
  * the bake-off's order, so `buildMock(MOCK_SEEDS)` gives its values.
@@ -403,6 +424,9 @@ export function buildMock(seeds: MockSeeds): MockData {
     tokensLastWeek: sum(project.tokensPerDay.slice(-14, -7).map((point) => point.y)),
     tokensDailyAverage: Math.round(sum(project.tokensPerDay.map((point) => point.y)) / DAYS),
     debtRatio: debtMinutes / allMinutes,
+    plansCompletedPerWeek: project.plansPerWeek.map((week) => ({ x: week.week, y: week.completed })),
+    activeBlockers: mockBlockers(),
+    redCiShare: RED_CI_SHARE,
     taskCycleTrend: cycleTrendOf(development.taskCycle),
     regressionsPerWeek: WEEK_DATES.map((week, index) => ({ x: week, y: quality.bugsByKindPerWeek[index]?.['own-fallout'] ?? 0 })),
   };
