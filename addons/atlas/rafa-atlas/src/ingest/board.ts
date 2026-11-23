@@ -51,12 +51,31 @@ import type { ReplicaBuild, SourceStamp } from '@open-tomato/atlas-data/replica'
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { BOARD_CACHE_FILE, BOARD_CACHE_VERSION } from '@open-tomato/rafa-board/board/board-cache';
-import { EPIC_TYPE_LABEL } from '@open-tomato/rafa-board/board/epic-context';
-import { epicSlugsOf } from '@open-tomato/rafa-board/board/epics';
-import { STAGE_OPTIONS } from '@open-tomato/rafa-board/board/project/options';
-import { stageOf } from '@open-tomato/rafa-board/board/project/rules';
-import { horizonOf } from '@open-tomato/rafa-board/board/roadmap-epic-rows';
+import { epicSlugsOf, horizonOf, stageOf } from '@open-tomato/rafa-board';
+
+/** The cache file under the project root; the facade does not export rafa-board's own constant. */
+const BOARD_CACHE_FILE = join('.rafa', 'cache', 'board.json');
+
+/** The cache shape version this reader takes. */
+const BOARD_CACHE_VERSION = 1;
+
+/** The label that marks an epic. */
+const EPIC_TYPE_LABEL = 'type:epic';
+
+/** The board's stages, in column order; the facade does not export them. */
+const STAGE_OPTIONS: readonly string[] = [
+  'Backlog',
+  'Triage',
+  'Needs work',
+  'Ready',
+  'Blocked',
+  'Claimed',
+  'In development',
+  'Waiting for approval',
+  'In review',
+  'Done',
+  'Cancelled',
+];
 
 import { dayOf } from './columns.js';
 
