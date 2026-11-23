@@ -1,6 +1,7 @@
 /**
  * Tests for `openAtlasRegistry` over a replica built from the ingest's
- * fixture store: the six sources and the metrics by id, each source's
+ * fixture store and the git ingest's fixture repository, made in the same
+ * root with `git init`: the eight sources and the metrics by id, each source's
  * descriptor with the freshness its build stamped, the replica's build
  * time, the token sum one source answers equal to the other's, the derived
  * columns (`work_type`, the day counts, `local.plans`) read through the
@@ -22,7 +23,9 @@ import { PLANS_SOURCE } from './build/derive.js';
 import { buildAtlas } from './build/index.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
+import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
 import { writeFactsFixture, writeFixtureStore } from './ingest/testdata/effort-store.fixture.js';
+import { writeGitFixture } from './ingest/testdata/git-repo.fixture.js';
 import { METRIC_CATALOGUE } from './metrics/catalogue.js';
 import { openAtlasRegistry } from './registry.js';
 
@@ -34,6 +37,7 @@ let registry: AtlasRegistry | null = null;
 beforeAll(async () => {
   writeFixtureStore(root);
   writeFactsFixture(root);
+  writeGitFixture(root);
   await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
   registry = await openAtlasRegistry({ projectRoot: root });
 });
@@ -61,8 +65,10 @@ async function totalOf(id: string, field: string): Promise<unknown> {
 }
 
 describe('openAtlasRegistry over a built replica', () => {
-  it('lists local.tasks, local.daily, local.plans, local.bugs, local.findings then local.ci, and the catalogue by id', () => {
-    expect([...open().sources.keys()]).toEqual([TASKS_SOURCE, DAILY_SOURCE, PLANS_SOURCE, BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE]);
+  it('lists local.tasks, local.daily, local.plans, local.bugs, local.findings, local.ci, local.commits then local.marks, and the catalogue by id', () => {
+    expect([...open().sources.keys()]).toEqual([
+      TASKS_SOURCE, DAILY_SOURCE, PLANS_SOURCE, BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE, COMMITS_SOURCE, MARKS_SOURCE,
+    ]);
     expect([...open().metrics.keys()]).toEqual(METRIC_CATALOGUE.map((metric) => metric.id));
   });
 
@@ -78,7 +84,24 @@ describe('openAtlasRegistry over a built replica', () => {
     expect(plans.partialReasons.join(' ')).toContain('epic_slug, merged_at are not read yet');
     expect(tasks.asOf).not.toBeNull();
     expect(daily.partial).toBe(true);
-    expect(daily.partialReasons.join(' ')).toContain('commits, prs_merged are not read yet');
+    expect(daily.partialReasons.join(' ')).toContain('prs_merged is not read yet');
+    expect(daily.partialReasons.join(' ')).not.toContain('commits');
+  });
+
+  it('describes local.commits and local.marks stamped whole, and sums daily commits to the commits read', async () => {
+    const described = await Promise.all([COMMITS_SOURCE, MARKS_SOURCE].map(async (id) => sourceOf(id).describe()));
+    const commits = await sourceOf(COMMITS_SOURCE).query({ measures: [{ field: 'sha', agg: 'count', as: 'n' }] });
+    const marks = await sourceOf(MARKS_SOURCE).query({ groupBy: ['lane'], measures: [{ field: 'number', agg: 'count', as: 'n' }] });
+    const tags = await sourceOf(COMMITS_SOURCE).query({ measures: [{ field: 'release_tag', agg: 'count', as: 'n' }] });
+
+    expect(described.every((descriptor) => DataSourceDescriptorSchema.safeParse(descriptor).success)).toBe(true);
+    expect(described.map((descriptor) => [descriptor.partial, descriptor.asOf])).toEqual([
+      [false, '2026-11-05T09:00:00.000Z'], [false, '2026-11-05T09:00:00.000Z'],
+    ]);
+    expect(commits.rows[0]?.[0]).toBe(7);
+    expect(Object.fromEntries(marks.rows)).toEqual({ A: 1, M: 3 });
+    expect(tags.rows[0]?.[0]).toBe(2);
+    expect(await totalOf(DAILY_SOURCE, 'commits')).toBe(7);
   });
 
   it('describes local.bugs, local.findings and local.ci in the contract\'s shape, each with the rows its build stamped', async () => {

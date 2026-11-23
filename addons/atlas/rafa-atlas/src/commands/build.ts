@@ -5,8 +5,10 @@
  * It prints the replica's path, the rows of each bucket and a warning
  * per source read in part, and in json mode hands the build summary to
  * `output.result`. The live effort store is copied with core's
- * `vacuumInto` and only the copy is read. With no store under the root
- * the build refuses, naming the path it looked at, and writes nothing.
+ * `vacuumInto` and only the copy is read. Git runs in the root; when it
+ * gives no history there, both git sources are stamped missing and the
+ * build goes on. With no store under the root the build refuses, naming
+ * the path it looked at, and writes nothing.
  * The build reads no `gh`: GitHub reads are phase 4's, behind a flag.
  */
 import type { BuildSummary } from '../build/index.js';
@@ -46,7 +48,7 @@ export const buildCommand: RafaCommand = {
   subject: SUBJECT,
   action: 'build',
   summary: 'build the Atlas replica from a copy of the effort store',
-  description: 'Copies the effort store with vacuumInto, reads the copy and the plan folder, and writes the replica at <root>/.rafa/atlas/atlas.sqlite in one rename. Prints the rows of each bucket and every source read in part. The root is ATLAS_PROJECT_ROOT, or the working directory; RAFA_EFFORT_DIR names the store and wins. Exits 1 with an error line when there is no store.',
+  description: 'Copies the effort store with vacuumInto, reads the copy, the plan folder and the root\'s git history, and writes the replica at <root>/.rafa/atlas/atlas.sqlite in one rename. Prints the rows of each bucket and every source read in part. The root is ATLAS_PROJECT_ROOT, or the working directory; RAFA_EFFORT_DIR names the store and wins. Exits 1 with an error line when there is no store.',
   args: [],
   flags: [],
   examples: [

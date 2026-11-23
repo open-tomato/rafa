@@ -2,8 +2,9 @@
  * The table sources the registry serves so far, one spec per replica
  * bucket: `local.tasks` over `task_facts`, `local.daily` over
  * `daily_rollup`, `local.plans` over `plan_facts`, `local.bugs` over
- * `bug_facts`, `local.findings` over `finding_facts` and `local.ci` over
- * `ci_facts`. The build stamps `local.changes` too, and no spec here
+ * `bug_facts`, `local.findings` over `finding_facts`, `local.ci` over
+ * `ci_facts`, `local.commits` over `commit_facts` and `local.marks` over
+ * `stretch_marks`. The build stamps `local.changes` too, and no spec here
  * defines it yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
@@ -20,6 +21,7 @@ import { DAILY_SOURCE } from './build/daily.js';
 import { PLANS_SOURCE } from './build/derive.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
+import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
 
 /** The aggregates a numeric measure takes. */
 const MEASURE_AGGREGATES: readonly Aggregate[] = ['sum', 'mean', 'min', 'max', 'p50', 'p90', 'p99'];
@@ -271,5 +273,56 @@ export const CI_SPEC: TableSourceSpec = {
   table: 'ci_facts',
 };
 
+/** `local.commits`: one row per first-parent commit of the base branch, from `commit_facts`. */
+export const COMMITS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: COMMITS_SOURCE,
+    source: 'local',
+    channel: 'commits',
+    title: 'Commits',
+    description: 'One row per first-parent commit of the branch origin/HEAD names (HEAD when it names none), read from git in the project root.',
+    timeField: 'committed_at',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      id('sha', 'Commit'),
+      time('committed_at', 'Committed', 'datetime'),
+      { ...time('day', 'Day', 'date'), role: 'dimension' },
+      dimension('subject', 'Subject'),
+      dimension('type', 'Type', 'the conventional prefix: feat, fix, chore, docs and the rest; NULL for a subject with none'),
+      dimension('plan_stub', 'Plan', 'the plan whose pull request the commit landed, through plan_facts.pr_number'),
+      numberId('pr_number', 'Pull request', 'pull request'),
+      measure('files_changed', 'Files changed', 'integer', 'files'),
+      measure('insertions', 'Insertions', 'integer', 'lines'),
+      measure('deletions', 'Deletions', 'integer', 'lines'),
+      { ...measure('is_merge', 'Merge', 'integer', 'commits'), description: '1 for a commit with two parents or more' },
+      dimension('release_tag', 'Release tag', 'the v* tag on the commit, an annotated tag peeled; NULL for an untagged commit'),
+    ],
+  },
+  table: 'commit_facts',
+};
+
+/** `local.marks`: one row per stretch end the base branch's merge subjects name, from `stretch_marks`. */
+export const MARKS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: MARKS_SOURCE,
+    source: 'local',
+    channel: 'marks',
+    title: 'Stretch marks',
+    description: 'One row per stretch end, read from the merge subjects Stretch <n> (#<pr>) and Merge pull request #<pr> from <owner>/stretch/<n>.',
+    timeField: 'ended_at',
+    grains: ['day', 'week', 'month', 'all'],
+    fields: [
+      numberId('number', 'Stretch', 'stretch'),
+      { ...measure('part', 'Part', 'integer', 'part'), role: 'dimension', aggregates: COUNT_AGGREGATES, groupable: true, description: '1, then 2 for a stretch number merged again' },
+      dimension('lane', 'Lane', 'M for a three-digit stretch number, A for one or two digits'),
+      time('ended_at', 'Ended', 'datetime'),
+      numberId('pr_number', 'Pull request', 'pull request'),
+    ],
+  },
+  table: 'stretch_marks',
+};
+
 /** Every source spec the registry defines, in the order `/sources` lists them. */
-export const SOURCE_SPECS: readonly TableSourceSpec[] = [TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC];
+export const SOURCE_SPECS: readonly TableSourceSpec[] = [
+  TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC,
+];

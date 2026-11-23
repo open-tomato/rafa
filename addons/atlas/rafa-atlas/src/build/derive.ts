@@ -1,6 +1,6 @@
 /**
- * `deriveBuild`: the buckets derived from the effort ingest's, run after
- * it inside the same build. In order:
+ * `deriveBuild`: the buckets derived from the effort and git ingests',
+ * run after them inside the same build. In order:
  *
  * 1. **Work type (D4).** `task_facts.work_type` is the session's change
  *    level read as a kind of work ({@link CHANGE_LEVELS}): `major` and
@@ -24,9 +24,13 @@
  *    written that day, `preflight_halts` those of them with a required
  *    check that did not pass, the rule `runPreflight` halts by; both are
  *    read from the snapshot's `preflight` table and read NULL when it
- *    lacks a column of {@link PREFLIGHT_COLUMNS}. `commits` and
- *    `prs_merged` read NULL until the git and GitHub sources land, so
- *    `local.daily` is stamped partial and names them.
+ *    lacks a column of {@link PREFLIGHT_COLUMNS}. `commits` counts the
+ *    `commit_facts` rows of the day (`ingest/git.ts`), and each day a
+ *    commit landed on with no session gets a row, its minutes and tokens
+ *    0, so the column summed equals the commits read; it reads NULL on
+ *    every day when no git history was read, and the stamp says so.
+ *    `prs_merged` reads NULL until the GitHub source lands, so
+ *    `local.daily` is stamped partial and names it.
  * 3. **`plan_facts`**, one row per plan the plan folder holds or a
  *    session or CI reading names (`readPlans`, `ingest/plans.ts`). From
  *    the plan file: `plan_source`, `issue_number`, `tasks_planned`,
@@ -41,6 +45,10 @@
  *    `ci_red_readings` and `pr_number` (the latest reading's that names
  *    one). `epic_slug` and `merged_at` read NULL until the board and
  *    GitHub sources land, so `local.plans` is stamped partial.
+ * 4. **`commit_facts.plan_stub`**, the plan whose `plan_facts.pr_number`
+ *    is the commit's `pr_number`. A pull request two plans name links
+ *    neither, and the commit's plan reads NULL, as does a commit naming
+ *    no pull request.
  *
  * Each stamp takes the effort ingest's `read_at`, and carries over the
  * reason of each partial input it was derived from. `local.plans`'s
@@ -58,6 +66,7 @@ import { Database } from 'bun:sqlite';
 import { dayOf, newest } from '../ingest/columns.js';
 import { TASKS_SOURCE } from '../ingest/effort.js';
 import { BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from '../ingest/facts.js';
+import { COMMITS_SOURCE } from '../ingest/git.js';
 import { readPlans } from '../ingest/plans.js';
 
 import { DAILY_SOURCE, KIND_SUFFIXES, rollupDaily } from './daily.js';
@@ -86,7 +95,7 @@ export const CHANGE_LEVELS: Readonly<Record<string, ChangeLevel>> = {
 export const PREFLIGHT_COLUMNS: readonly string[] = ['run_id', 'tier', 'outcome', 'collected_at'];
 
 /** The `daily_rollup` columns no source read here fills; they read NULL. */
-export const UNREAD_DAILY_COLUMNS: readonly string[] = ['commits', 'prs_merged'];
+export const UNREAD_DAILY_COLUMNS: readonly string[] = ['prs_merged'];
 
 /** The `plan_facts` columns no source read here fills; they read NULL. */
 export const UNREAD_PLAN_COLUMNS: readonly string[] = ['epic_slug', 'merged_at'];
@@ -97,8 +106,10 @@ export interface DeriveOptions {
   readonly planDir: string;
   /** The effort snapshot the ingest read, opened read-only here for `preflight`. */
   readonly snapshotPath: string;
-  /** The effort ingest's stamps; `local.tasks` must be among them. */
+  /** The effort ingest's stamps, then the git ingest's; `local.tasks` must be among them. */
   readonly stamps: readonly SourceStamp[];
+  /** True when the git ingest read the history into `commit_facts`; `daily_rollup.commits` reads NULL otherwise. */
+  readonly gitRead?: boolean;
 }
 
 /** One day's preflight runs, and how many of them halted. */
@@ -119,6 +130,8 @@ export interface PreflightRead {
 export interface Derivation {
   /** The sessions given a work type. */
   readonly workTyped: number;
+  /** The `commit_facts` rows given a plan through `plan_facts.pr_number`. */
+  readonly commitsLinked: number;
   readonly plans: readonly PlanReading[];
   readonly preflight: PreflightRead;
   /** The stamps written: `local.daily`, then `local.plans`. */
@@ -187,8 +200,20 @@ const DAY_COUNTS = `UPDATE daily_rollup SET
   changes = (SELECT count(*) FROM change_facts c JOIN task_facts t ON t.session_id = c.session_id
     WHERE t.day = daily_rollup.day)`;
 
-/** Add the preflight-only days, then fill every day's counts; answers the rows the bucket holds. */
-function fillDailyCounts(database: Database, preflight: PreflightRead): number {
+/** Each day's commit count, from `commit_facts`. */
+const DAY_COMMITS = `UPDATE daily_rollup SET
+  commits = (SELECT count(*) FROM commit_facts c WHERE c.day = daily_rollup.day)`;
+
+/** The days a commit landed on. */
+function commitDays(database: Database): readonly string[] {
+  return database
+    .query<{ readonly day: string }, []>('SELECT DISTINCT day FROM commit_facts WHERE day IS NOT NULL')
+    .all()
+    .map((row) => row.day);
+}
+
+/** Add the commit-only and preflight-only days, then fill every day's counts; answers the rows the bucket holds. */
+function fillDailyCounts(database: Database, preflight: PreflightRead, gitRead: boolean): number {
   const zeros = [...KIND_SUFFIXES.flatMap((suffix) => [`minutes_${suffix}`, `tokens_${suffix}`]), 'tokens_total'];
   const addDay = database.prepare<unknown, [string]>(
     `INSERT OR IGNORE INTO daily_rollup (day, ${zeros.join(', ')}) VALUES (?, ${zeros.map(() => '0').join(', ')})`,
@@ -197,6 +222,7 @@ function fillDailyCounts(database: Database, preflight: PreflightRead): number {
     'UPDATE daily_rollup SET preflight_runs = ?, preflight_halts = ? WHERE day = ?',
   );
   database.transaction(() => {
+    if (gitRead) for (const day of commitDays(database)) addDay.run(day);
     const days = preflight.days;
     if (days !== null) {
       for (const day of days.keys()) addDay.run(day);
@@ -204,6 +230,7 @@ function fillDailyCounts(database: Database, preflight: PreflightRead): number {
       for (const [day, counts] of days) setPreflight.run(counts.runs, counts.halts, day);
     }
     database.run(DAY_COUNTS);
+    if (gitRead) database.run(DAY_COMMITS);
   })();
   const row = database.query<{ readonly n: number }, []>('SELECT count(*) AS n FROM daily_rollup').get();
   return row?.n ?? 0;
@@ -295,6 +322,19 @@ function insertPlanFacts(database: Database, readings: readonly PlanReading[]): 
   return readings.length;
 }
 
+/** The UPDATE giving each commit the one plan naming its pull request. */
+const COMMIT_PLANS = `UPDATE commit_facts SET plan_stub = (
+    SELECT min(p.plan_stub) FROM plan_facts p WHERE p.pr_number = commit_facts.pr_number)
+  WHERE pr_number IS NOT NULL
+    AND (SELECT count(*) FROM plan_facts p WHERE p.pr_number = commit_facts.pr_number) = 1`;
+
+/** Fill `commit_facts.plan_stub` through `plan_facts.pr_number`; answers the commits given a plan. */
+export function linkCommitPlans(database: Database): number {
+  database.run(COMMIT_PLANS);
+  const row = database.query<{ readonly n: number }, []>('SELECT count(*) AS n FROM commit_facts WHERE plan_stub IS NOT NULL').get();
+  return row?.n ?? 0;
+}
+
 /** The modification time of a plan's file, ISO-8601 UTC, or null for a `missing` plan. */
 function modifiedAt(reading: PlanReading): string | null {
   return reading.path === null
@@ -325,11 +365,21 @@ function stampOf(source: string, rows: number, asOf: string | null, readAt: stri
   return { source, asOf, readAt, rows, partial: reason !== null, reason };
 }
 
-/** The `local.daily` stamp: the unread columns, a missing preflight column, and its inputs' reasons. */
-function dailyStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, preflight: PreflightRead): SourceStamp {
-  const inputs = inputsOf(stamps, [TASKS_SOURCE, FINDINGS_SOURCE, BUGS_SOURCE, CHANGES_SOURCE]);
+/** The sentence naming `columns` a later source fills. */
+function unreadSentence(columns: readonly string[], sources: string): string {
+  return columns.length === 1
+    ? `${columns.join(', ')} is not read yet (${sources}) and reads NULL`
+    : `${columns.join(', ')} are not read yet (${sources}) and read NULL`;
+}
+
+/** The `local.daily` stamp: the unread columns, a missing preflight column or git history, and its inputs' reasons. */
+function dailyStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, preflight: PreflightRead, gitRead: boolean): SourceStamp {
+  const inputs = inputsOf(stamps, [TASKS_SOURCE, FINDINGS_SOURCE, BUGS_SOURCE, CHANGES_SOURCE, COMMITS_SOURCE]);
   const own = [
-    `${UNREAD_DAILY_COLUMNS.join(', ')} are not read yet (the git and GitHub sources) and read NULL`,
+    unreadSentence(UNREAD_DAILY_COLUMNS, 'the GitHub source'),
+    ...(gitRead
+      ? []
+      : ['no git history was read; commits reads NULL']),
     ...(preflight.missing.length === 0
       ? []
       : [`the effort store has no ${preflight.missing.join(', ')}; preflight_runs, preflight_halts read NULL`]),
@@ -341,15 +391,16 @@ function dailyStamp(stamps: readonly SourceStamp[], readAt: string, rows: number
 /** The `local.plans` stamp: the unread columns and its inputs' reasons, as of the newest plan file or input. */
 function plansStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, plans: readonly PlanReading[]): SourceStamp {
   const inputs = inputsOf(stamps, [TASKS_SOURCE, CI_SOURCE]);
-  const own = [`${UNREAD_PLAN_COLUMNS.join(', ')} are not read yet (the board and GitHub sources) and read NULL`];
+  const own = [unreadSentence(UNREAD_PLAN_COLUMNS, 'the board and GitHub sources')];
   const asOf = newest([...plans.map(modifiedAt), ...inputs.map((input) => input.asOf)]);
   return stampOf(PLANS_SOURCE, rows, asOf, readAt, reasonOf(own, inputs));
 }
 
 /**
  * Derive the work type, the whole of `daily_rollup` and `plan_facts` in
- * the build, after the effort ingest has filled its buckets, and stamp
- * {@link DAILY_SOURCE} then {@link PLANS_SOURCE}; see the module note.
+ * the build, and the plan of each commit, after the effort and git
+ * ingests have filled their buckets, and stamp {@link DAILY_SOURCE} then
+ * {@link PLANS_SOURCE}; see the module note.
  * Throws when `options.stamps` holds no `local.tasks` stamp.
  */
 export function deriveBuild(build: ReplicaBuild, options: DeriveOptions): Derivation {
@@ -358,14 +409,16 @@ export function deriveBuild(build: ReplicaBuild, options: DeriveOptions): Deriva
   const { database } = build;
   const workTyped = deriveWorkType(database);
   rollupDaily(database);
+  const gitRead = options.gitRead ?? false;
   const preflight = readSnapshotPreflight(options.snapshotPath);
-  const days = fillDailyCounts(database, preflight);
+  const days = fillDailyCounts(database, preflight, gitRead);
   const plans = readPlans({ planDir: options.planDir, stubs: storeStubs(database) });
   const planRows = insertPlanFacts(database, plans);
+  const commitsLinked = linkCommitPlans(database);
   const stamps = [
-    dailyStamp(options.stamps, tasks.readAt, days, preflight),
+    dailyStamp(options.stamps, tasks.readAt, days, preflight, gitRead),
     plansStamp(options.stamps, tasks.readAt, planRows, plans),
   ];
   stamps.forEach((stamp) => build.stampSource(stamp));
-  return { workTyped, plans, preflight, stamps };
+  return { workTyped, commitsLinked, plans, preflight, stamps };
 }

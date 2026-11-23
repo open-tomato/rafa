@@ -6,7 +6,7 @@ workspace members under `addons/atlas/*` (the second `workspaces` glob):
 | Layer | Member | Built today |
 |---|---|---|
 | 1 effort storage | rafa core | the live store, the board cache, plans, git. Read only through core's `vacuumInto` |
-| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | the replica writer and reader, the bucket tables, the query engine, `defineTableSource`; the effort ingest and the plan reader |
+| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | the replica writer and reader, the bucket tables, the query engine, `defineTableSource`; the effort ingest, the plan reader and the git ingest |
 | 3 transport | `transport` | the pure handler, the fetch adapter (`toFetchHandler`), the typed client with a replaceable `Transport` (`fetchTransport`, `localTransport`). No Express adapter |
 | 4 contracts | `data/src/contract/` | descriptors, query params, results, metric definitions, the envelope and `ATLAS_CONTRACT_VERSION` |
 | 5 representation | `ui`, `demo`; `@open-tomato/charts` from npm | atoms to templates and the card cascade; the demo page. The chart seam over ECharts is `@open-tomato/charts`, published from another repository |
@@ -14,7 +14,8 @@ workspace members under `addons/atlas/*` (the second `workspaces` glob):
 Still design, not built: the GitHub reads (the `gh` metrics, phase 4, behind
 a `--github` flag the build does not take yet); the WIP gauge's ceiling
 (`wipLimit` is read, and the board ingest that would draw it is not built);
-the bug backlog pair and the stretch marks (phase 4). The design is the main
+the bug backlog pair (phase 4); a chart drawing the stretch marks, which the
+build stores and serves as `local.marks` (D19). The design is the main
 checkout's `.rafa/specs/draft-atlas-dashboard.md` (gitignored): the metric and
 chart gap lists, the bucket DDL, the contracts, the handler, the PoC cut. The
 3D graph-of-dice proof of concept stays on `spike/atlas-poc`, outside the

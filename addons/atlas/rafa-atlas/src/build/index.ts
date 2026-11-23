@@ -8,12 +8,19 @@
  *    `local.findings`, `local.bugs`, `local.changes` and `local.ci`. The
  *    `module` column names the folders `DEFAULT_MODULE_GLOBS` finds under
  *    the root (`discoverModules`).
- * 2. `deriveBuild` (`derive.ts`) gives each session its work type
+ * 2. `ingestGit` reads the root's first-parent history (D12) into
+ *    `commit_facts`, with the `v*` release tags (D13), and the stretch
+ *    merges into `stretch_marks`, stamping `local.commits` and
+ *    `local.marks`; git runs in the project root through the options'
+ *    runner. When git gives no history for the root, both are stamped
+ *    missing and the build goes on.
+ * 3. `deriveBuild` (`derive.ts`) gives each session its work type
  *    (D4), derives `daily_rollup` from the buckets and the snapshot's
- *    preflight runs, and `plan_facts` from them and the plan folder
- *    (`readPlans`), stamping `local.daily` and `local.plans`.
+ *    preflight runs, `plan_facts` from them and the plan folder
+ *    (`readPlans`), and each commit's plan, stamping `local.daily` and
+ *    `local.plans`.
  *
- * Both run inside one `writeReplica`, so the replica at
+ * All three run inside one `writeReplica`, so the replica at
  * `<root>/.rafa/atlas/atlas.sqlite` is replaced whole by one rename, and
  * a failed step leaves the earlier replica as it was.
  *
@@ -21,6 +28,7 @@
  * config (`loadAtlasConfig`) and the `offline` switch join them once a
  * source reads them.
  */
+import type { GitRunner } from '../ingest/git.js';
 import type { SnapshotEnvironment } from '../ingest/snapshot.js';
 import type { SourceStamp } from '@open-tomato/atlas-data/replica';
 
@@ -30,6 +38,7 @@ import { writeReplica } from '@open-tomato/atlas-data/replica';
 
 import { DEFAULT_MODULE_GLOBS, discoverModules } from '../ingest/attribute.js';
 import { ingestEffort } from '../ingest/effort.js';
+import { createGitRunner, ingestGit } from '../ingest/git.js';
 import { DEFAULT_PLAN_DIR } from '../ingest/plans.js';
 
 import { deriveBuild } from './derive.js';
@@ -52,6 +61,8 @@ export interface BuildOptions {
   readonly now?: () => Date;
   /** Stamped as the replica's `project_label`; defaults to the root's folder name. */
   readonly projectLabel?: string;
+  /** Git over the project root; defaults to `createGitRunner(projectRoot)`. */
+  readonly git?: GitRunner;
 }
 
 /** What one build wrote. */
@@ -89,12 +100,19 @@ export async function buildAtlas(options: BuildOptions): Promise<BuildSummary> {
         ? {}
         : { now: options.now }),
     });
+    const git = ingestGit(build, {
+      runner: options.git ?? createGitRunner(options.projectRoot),
+      ...(options.now === undefined
+        ? {}
+        : { now: options.now }),
+    });
     const derived = deriveBuild(build, {
       planDir: options.planDir ?? join(options.projectRoot, DEFAULT_PLAN_DIR),
       snapshotPath: effort.snapshot.snapshotPath,
-      stamps: effort.stamps,
+      stamps: [...effort.stamps, ...git.stamps],
+      gitRead: git.read,
     });
-    return [...effort.stamps, ...derived.stamps];
+    return [...effort.stamps, ...git.stamps, ...derived.stamps];
   });
   return { replicaPath, buildId: result.buildId, tables: result.tables, sources: result.value };
 }
