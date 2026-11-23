@@ -374,12 +374,40 @@ nothing was sent. Next step: <step>`, and a mismatched push skips its pull.
 A rejection named `HubUpgradeRequired` or `RafaUpdateRequired` (the hub or
 this rafa is behind the other's migrations) is also written as its message
 stands, each line once per contact, and its push still pulls. A pull answer
-carrying a `notice` (the `pulled <n> rows projected` and `refilled <n> rows`
-lines) is written as it stands, once per pull. Any other rejection is written
-as `effort sync: <push|pull> over service failed: <message>`, and a refused
-push still attempts its pull.
+carrying a `notice` (the `pulled <n> rows projected` and `refilled <n> rows held
+back since <date>` lines) is written as it stands, once per pull. Any other
+rejection is written as `effort sync: <push|pull> over service failed:
+<message>`, and a refused push still attempts its pull.
 `pullBeforeRead` reads the config without writing its warnings and contacts
 nothing when the config is refused, leaving the refusal to the command.
+
+**`effort.syncSkew` in the project's config says what a device does when the
+hub and this rafa are on different migrations.** It takes `refuse`, the
+default, or `pull-projected`, and is read only under `effort.sync: service`:
+beside `effort.sync: local` it has no effect. Core declares it as
+`effortSyncSkew` (`packages/rafa/src/core/config/core-section.ts`), the
+key is among `LOCKED_SETTINGS`, and `selectSync` hands it to the service
+adapter as `syncSkew` (`packages/rafa/src/config-schema-hub.ts`). An example:
+`effort: { sync: service, syncSkew: pull-projected }`. The cases and the
+line each writes are in the wire contract's skew table below.
+
+**A projected pull leaves two marks: rows listed in `held_rows`, and a
+`heldBack` mark in `sync-service.json`.** A pull the hub answers projected
+passes the payload's `projected` map to `mergeStore`, which lists each row
+it cut in the local table `held_rows` (migration `held-rows`). The table
+holds one row per listed row, keyed by table name and origin pair, with
+`missing`, a JSON array of the migration ids that row lacks. Before that
+merge, the service adapter keeps `heldBack` in the state file beside the
+store file: the pull cursor the contact started from, with its time, set
+by the first projected contact only. The refill pulls from `heldBack`
+once this build's catalogue knows every id `held_rows` lists
+(`readHeldMigrations`), and clears `heldBack` after its merge.
+
+**The state file is at version 2 and reads version 1 down.** A version 1
+entry keeps its push and pull cursors and holds no `heldBack`, and the
+next write makes the file version 2. A build that reads only version 1
+reads a version 2 file as holding no cursors, so its first pull is whole
+and merges as a no-op, since its store holds every row.
 
 **Merge requires the SQLite backend.** A project configured with
 `store: ndjson` is refused by `rafa effort merge <file>`, which names
@@ -464,6 +492,24 @@ leaves the exit code as the command set it. The offline rule above gives the
 line's place in a contact. A device that has read the status refuses first, so
 the `409` above only answers a request that names a version the hub does not
 speak.
+
+**The skew table gives the line each case writes under each setting.** A
+contact compares the migrations its payload names with the ones this build
+knows, and the hub's status with its own pull options. Each line is written
+once per contact, under the offline rule above, and `<ids>` is the ids the
+`409` named in `missing`, in the hub's order.
+
+| Case | `refuse` (default) | `pull-projected` |
+| --- | --- | --- |
+| This rafa is behind the hub, and the hub's store can project | `effort sync: this rafa is behind the hub (migration <ids>); nothing was merged. Next step: rafa self-update, then sync again` | `effort sync: pulled <n> rows projected to this rafa's schema; <m> columns wait for rafa self-update`; `heldBack` is kept |
+| This rafa is behind the hub, and the hub cannot project (its status says so, or its store answers `409` naming `missing`) | The line above | The line above: a device that sends no migrations gets whole rows, which name ids it lacks |
+| The hub is behind this rafa (the push is refused `409` naming `missing`) | `effort sync: the hub is behind this rafa (migration <ids>); nothing was sent. Next step: upgrade the hub, then sync again` | The same line |
+| A refill: every id `held_rows` lists is known to this build, and `heldBack` is set | `effort sync: refilled <n> rows held back since <date>`; `heldBack` is cleared | The same line |
+| A refill that still lacks an id `held_rows` lists | The first row's line | Projected again: the `pulled <n> rows projected` line, with `heldBack` kept |
+
+The push is refused the same way under both settings, so a development build
+ahead of the hub sends none of its new columns to the hub. A refused pull
+never moves the pull cursor, and a refused push never moves the push cursor.
 
 ### Row origins
 

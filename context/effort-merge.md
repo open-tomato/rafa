@@ -67,6 +67,22 @@ the insert's column list with no trigger and no `UPDATE`. A store with
 no `store_meta` row stamps NULL in both columns. A row an older runtime
 inserted reads as any other (with NULL origin fields).
 
+**The held-copy step takes a row a projected pull cut whole.** A row here
+listed in `held_rows` is held back: a projected pull brought its cut copy
+in. When the other store holds that row's origin pair matched, the step runs
+before the conflict step, in the same transaction, and rewrites the row here
+from the incoming one. Every column is taken whole, with no column rule
+consulted, except the row's `seq`, its origin pair, and each set-once field
+(`findings.tracker_ref` today). The listing is then dropped. The set-once
+field is settled by its rule in the conflict step, so a value written here
+while the row was held is kept against NULL there. A held copy records no
+`merge_conflicts` row for what its truncation left out. The step runs in any
+merge, and a table the projected map names takes no copy, since its incoming
+rows were cut too. A rewrite that collides with another row on a UNIQUE key
+is rolled back, and the row stays listed. `rowsRefilled` counts the rows
+taken, and the `held_rows` count check holds the table to the rows a merge
+listed (`rowsHeld`) less those it took (`merge-store.ts`).
+
 ### Rafa effort merge
 
 **`rafa effort merge <file> [--dry-run]` joins another device's store into the
@@ -104,17 +120,10 @@ store is asked to mint a new `origin_store` on the next write, so the
 incoming store's rows are brought in under the old origin and the new
 device's future writes go under a new one.
 
-**Held copies are taken whole first.** A row a projected pull brought in
-is listed in `held_rows`: it lacks the columns of the migrations its
-listing names. Before the comparison below, `takeHeldCopies`
-(`store/merge-conflicts.ts`) rewrites each matched row here that is listed
-from the incoming row, every column whole except its `seq`, its origin
-pair and its set-once fields, and drops the listing, so the comparison
-finds the pair equal or settles `findings.tracker_ref` by its own rule,
-and no `merge_conflicts` row is recorded for what the truncation left
-out. A table the merge's `projected` map names takes no copy, since its
-incoming rows are cut too, and a rewrite that collides on another UNIQUE
-key is rolled back and leaves the pair to the comparison.
+**Held copies are taken whole first.** The held-copy step, `takeHeldCopies`
+(`store/merge-conflicts.ts`), runs before the comparison below. Its rule is
+under Merge rules above, and a table the merge's `projected` map names takes
+no copy.
 
 **Set-once fills and conflicts.** For each row the union matched,
 `settleMatches` compares the rows on every column except `seq` and the
