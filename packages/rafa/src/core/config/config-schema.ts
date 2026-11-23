@@ -40,6 +40,7 @@ import type {
   RouteTarget,
   SkillResolverName,
   StoreBackend,
+  SyncSkewMode,
   SyncStrategy,
   TierPin,
   TierSwitch,
@@ -63,6 +64,11 @@ export interface RafaConfig {
   effortBusyTimeoutMs: number;
   /** How the effort store travels between devices. `effort.sync`. */
   effortSync: SyncStrategy;
+  /**
+   * What a sync does when this device and its hub hold different store
+   * migrations; read only under `effort.sync: service`. `effort.syncSkew`.
+   */
+  effortSyncSkew: SyncSkewMode;
   /** How much of the plan a task prompt receives. `plan.inject`. */
   inject: InjectMode;
   /** Where plans are written and read. `plan.dir`. */

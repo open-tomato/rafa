@@ -41,7 +41,7 @@
  * {@link SETTINGS} keeps the order the schema has always reported
  * problems in, which is not the order of the list: core's settings are
  * taken in runs, and each section's settings are spread whole between
- * two of them, so `hub.url` follows `effort.sync` and the `board.project`
+ * two of them, so `hub.url` follows `effort.syncSkew` and the `board.project`
  * limits follow `board.project.number`. The `release` section is spread
  * in three parts, its `pr`, `release` and `dangerous.` keys, each where
  * its keys have always stood.
@@ -52,7 +52,7 @@
  * in (`inSettingOrder`), each cut under its section's package and a
  * section's checks on its first cut, and core's registry holds every
  * setting in this order. Registering the list whole would put core's
- * forty-five first, and the warning recorded in
+ * forty-seven first, and the warning recorded in
  * `src/tests/fixtures/config-parity/` would list `hub` after `task`.
  * `config-registry.test.ts` holds that the registry holds the same
  * settings, in the same order, as the same specs, and the same defaults,
@@ -181,8 +181,14 @@ export function handConfigToLogger(config: Readonly<RafaConfig>): void {
   setActiveLoggerSettings(loggerSettingsOf(config));
 }
 
-/** Core's settings up to `effort.sync`, before the `hub` section. */
-const CORE_HEAD = ['version', 'store', 'effortBusyTimeoutMs', 'effortSync'] as const;
+/** Core's settings up to `effort.syncSkew`, before the `hub` section. */
+const CORE_HEAD = [
+  'version',
+  'store',
+  'effortBusyTimeoutMs',
+  'effortSync',
+  'effortSyncSkew',
+] as const;
 
 /** Core's settings from `plan.inject` to `loop.worktreeSetup`, before the `loop` sections and `pr`. */
 const CORE_PLAN_TO_LOOP = [

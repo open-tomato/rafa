@@ -384,7 +384,8 @@ of merge. `rafa effort move --to=sqlite` is already documented as
 migrating the store from NDJSON to SQLite.
 
 **The locked settings of the first release are `effort.sync`,
-`prerequisites.required`, `claims.staleAfter` and `claims.ahead`.**
+`effort.syncSkew`, `prerequisites.required`, `claims.staleAfter` and
+`claims.ahead`.**
 `src/config-locked.ts` declares them as `LOCKED_SETTINGS`, a frozen list
 of setting names in file-key order. The module enforces nothing, and only
 its test reads the list. These keys cannot be changed by a plan pushing a

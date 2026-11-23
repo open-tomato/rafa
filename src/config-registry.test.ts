@@ -121,6 +121,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['store', 'store'],
   ['effortBusyTimeoutMs', 'effort.busyTimeoutMs'],
   ['effortSync', 'effort.sync'],
+  ['effortSyncSkew', 'effort.syncSkew'],
   ['hubUrl', 'hub.url'],
   ['hubTokenSecret', 'hub.tokenSecret'],
   ['hubTimeout', 'hub.timeout'],

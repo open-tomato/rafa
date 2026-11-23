@@ -116,6 +116,7 @@ export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   '# effort:',
   `#   busyTimeoutMs: ${String(CONFIG_DEFAULTS.effortBusyTimeoutMs)}          # 1..60000 ms; how long a store open waits for another process's lock`,
   `#   sync: ${CONFIG_DEFAULTS.effortSync}                  # local | file | git | service | p2p; how the store travels between devices`,
+  `#   syncSkew: ${CONFIG_DEFAULTS.effortSyncSkew}             # refuse | pull-projected; what effort.sync: service does when this rafa and its hub hold different migrations`,
   '# hub:',
   '#   url:                         # the hub effort.sync: service reaches, required with it',
   '#   tokenSecret:                 # the secret store name the hub token is kept under, never the token',

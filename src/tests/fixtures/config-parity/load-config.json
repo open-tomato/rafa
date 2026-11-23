@@ -120,6 +120,10 @@
       "value": "local",
       "source": "default"
     },
+    "effortSyncSkew": {
+      "value": "refuse",
+      "source": "default"
+    },
     "errorsCodes": {
       "value": [],
       "source": "default"
