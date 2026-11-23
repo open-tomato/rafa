@@ -1,13 +1,16 @@
 /**
- * Tests for `catalogue.ts`: the PoC cut of spec section G, every
- * definition passing the contract's schema, naming a source the registry
- * defines, and having params the engine plans against that source's
- * descriptor, with and without a window, and a formula that reads the
- * columns those params answer; then every metric over a replica built
- * from the fixture store, with rows behind each and the readings the
- * fixture fixes. Controls show each check can fail: the schema refuses a
- * definition with an extra key, the engine refuses a measure on a field
- * the descriptor lacks, and the formula refuses a column the result lacks.
+ * Tests for `catalogue.ts`: the PoC cut of spec section G first in each
+ * lens, then the phase 4 metrics, every definition passing the contract's
+ * schema, naming a source the registry defines, and having params the
+ * engine plans against that source's descriptor, with and without a
+ * window (a source with no time axis refusing one), and a formula that
+ * reads the columns those params answer; then every PoC metric over a
+ * replica built from the fixture store, with rows behind each and the
+ * readings the fixture fixes. `catalogue-sources.test.ts` runs the phase 4 metrics
+ * over a replica of every source. Controls show each check can fail: the
+ * schema refuses a definition with an extra key, the engine refuses a
+ * measure on a field the descriptor lacks, and the formula refuses a
+ * column the result lacks.
  */
 import type { DataSourceDescriptor, MetricDefinition, QueryParams, QueryResult, Scalar } from '@open-tomato/atlas-data/contract';
 import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
@@ -27,7 +30,7 @@ import { openAtlasRegistry, type AtlasRegistry } from '../registry.js';
 import { SOURCE_SPECS } from '../sources.js';
 
 import { METRIC_CATALOGUE } from './catalogue.js';
-import { NOT_CLI_GAP } from './qa.js';
+import { BOARD_BUGS, NOT_CLI_GAP } from './qa.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-catalogue-')));
 const BUILT_AT = new Date('2026-11-05T12:00:00.000Z');
@@ -55,15 +58,46 @@ const POC_IDS = [
   'qa.filed-share',
 ];
 
+/** The phase 4 metrics of each lens, in the order each lens lists them after its PoC cut. */
+const PHASE_FOUR_IDS = {
+  pm: ['pm.milestone-completion'],
+  architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations'],
+  developer: ['dev.deploys-per-week', 'dev.wip', 'dev.pr-cycle-time'],
+  qa: [
+    'qa.defect-density',
+    'qa.bug-outcome-by-loop-start',
+    'qa.drop-rate',
+    'qa.defect-age',
+    'qa.resolution-time',
+    'qa.open-bugs-per-day',
+    'qa.bugs-per-stretch',
+  ],
+} as const;
+
+/** Every id the catalogue serves, by lens: each lens's PoC rows, then its phase 4 metrics. */
+const ALL_IDS = [
+  ...POC_IDS.slice(0, 5), ...PHASE_FOUR_IDS.pm,
+  ...POC_IDS.slice(5, 9), ...PHASE_FOUR_IDS.architect,
+  ...POC_IDS.slice(9, 13), ...PHASE_FOUR_IDS.developer,
+  ...POC_IDS.slice(13), ...PHASE_FOUR_IDS.qa,
+];
+
 /** The metrics labelled proxy, each with what it stands in for. */
 const PROXY_IDS = [
   'pm.plan-completion',
   'arch.debt-ratio',
   'arch.task-minutes-p50-p90',
   'arch.preflight-halts',
+  'arch.loc-per-module',
+  'arch.coupling',
+  'arch.violations',
   'dev.tasks-done-per-week',
   'dev.plans-completed-per-week',
+  'qa.defect-density',
 ];
+
+/** The metrics that answer rows only after a build run with --github. */
+const GITHUB_IDS = ['dev.pr-cycle-time', 'qa.defect-age', 'qa.resolution-time', 'qa.open-bugs-per-day', 'qa.bugs-per-stretch'];
 
 /** The routed bug the test plants beside the fixture's: the one own-fallout row. */
 const FALLOUT_BUG = 'the replica drops a routed bug';
@@ -115,26 +149,32 @@ async function answerOf(id: string): Promise<QueryResult> {
   return applyFormula(await source.query({ ...metric.params, window: WINDOW }), metric.formula);
 }
 
+/** True for params that measure with no group key: the engine answers one total row, 0 over no rows. */
+function isOneTotal(params: QueryParams): boolean {
+  return (params.measures ?? []).length > 0 && (params.grain ?? 'all') === 'all' && (params.groupBy ?? []).length === 0;
+}
+
 /** The rows of `result` as records by column key. */
 function recordsOf(result: QueryResult): Readonly<Record<string, Scalar>>[] {
   return result.rows.map((row) => Object.fromEntries(result.columns.map((column, index) => [column.key, row[index] ?? null])));
 }
 
 describe('METRIC_CATALOGUE', () => {
-  it('holds the PoC cut of section G in its order, each id once', () => {
+  it('holds the PoC cut of section G in its order, each lens\'s phase 4 metrics after its own rows, each id once', () => {
     const ids = METRIC_CATALOGUE.map((metric) => metric.id);
 
-    expect(ids).toEqual(POC_IDS);
+    expect(ids).toEqual(ALL_IDS);
+    expect(ids.filter((id) => POC_IDS.includes(id))).toEqual(POC_IDS);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five on the PM rows, four on each other lens', () => {
+  it('gives each lens the metrics of its rows: five then one on PM, four then three, four then three, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([5, 4, 4, 4]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([6, 7, 7, 11]);
   });
 
-  it.each(POC_IDS)('%s passes the MetricDefinition schema', (id) => {
+  it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
     expect(MetricDefinitionSchema.safeParse(metricOf(id)).success).toBe(true);
   });
 
@@ -151,35 +191,55 @@ describe('METRIC_CATALOGUE', () => {
     expect(proxies.every((metric) => (metric.proxyFor ?? '') !== '' && (metric.proxyNote ?? '') !== '')).toBe(true);
   });
 
-  it('serves only metrics it can measure: none needs the GitHub source or a collector', () => {
-    expect(METRIC_CATALOGUE.filter((metric) => metric.feasibility === 'gh' || metric.feasibility === 'collect')).toEqual([]);
+  it('serves no metric that needs a collector, and labels gh the five that need the GitHub times', () => {
+    expect(METRIC_CATALOGUE.filter((metric) => metric.feasibility === 'collect')).toEqual([]);
+    expect(METRIC_CATALOGUE.filter((metric) => metric.feasibility === 'gh').map((metric) => metric.id)).toEqual(GITHUB_IDS);
   });
 
-  it('keeps cli-gap bugs out of every bug metric', () => {
+  it('keeps cli-gap bugs out of every bug metric over local.bugs and over the board\'s bug issues', () => {
     const bugMetrics = METRIC_CATALOGUE.filter((metric) => metric.sourceId === 'local.bugs');
+    const boardBugMetrics = METRIC_CATALOGUE.filter((metric) => metric.params.filters?.some((filter) => filter.field === 'is_bug') === true);
 
     expect(bugMetrics.map((metric) => metric.id)).toEqual(['qa.bugs-by-kind', 'qa.regressions', 'qa.filed-share']);
     expect(bugMetrics.every((metric) => NOT_CLI_GAP.every((filter) => metric.params.filters?.includes(filter) === true))).toBe(true);
+    expect(boardBugMetrics.map((metric) => metric.id)).toEqual(PHASE_FOUR_IDS.qa.slice(1));
+    expect(boardBugMetrics.every((metric) => BOARD_BUGS.every((filter) => metric.params.filters?.includes(filter) === true))).toBe(true);
   });
 
-  it.each(POC_IDS)('%s names a source the registry defines', (id) => {
+  it.each(ALL_IDS)('%s names a source the registry defines', (id) => {
     expect(SOURCE_SPECS.map((spec) => spec.descriptor.id)).toContain(metricOf(id).sourceId);
   });
 });
 
 describe('the catalogue params against the engine', () => {
-  it.each(POC_IDS)('%s plans and runs against its source\'s descriptor, with and without a window, and its formula reads the answer', (id) => {
-    const metric = metricOf(id);
-    const spec = specOf(metric);
+  it.each(ALL_IDS.filter((id) => specOf(metricOf(id)).descriptor.timeField !== null))(
+    '%s plans and runs against its source\'s descriptor, with and without a window, and its formula reads the answer',
+    (id) => {
+      const metric = metricOf(id);
+      const spec = specOf(metric);
 
-    const bare = runEmpty(spec, metric.params);
-    const windowed = runEmpty(spec, { ...metric.params, window: WINDOW });
+      const bare = runEmpty(spec, metric.params);
+      const windowed = runEmpty(spec, { ...metric.params, window: WINDOW });
 
-    expect(bare.rows).toEqual([]);
-    expect(bare.columns.map((column) => column.key)).toEqual(windowed.columns.map((column) => column.key));
-    expect(windowed.meta.window.from).not.toBeNull();
-    expect(() => applyFormula(windowed, metric.formula)).not.toThrow();
-  });
+      expect(bare.rows).toEqual(isOneTotal(metric.params)
+        ? [(metric.params.measures ?? []).map(() => 0)]
+        : []);
+      expect(bare.columns.map((column) => column.key)).toEqual(windowed.columns.map((column) => column.key));
+      expect(windowed.meta.window.from).not.toBeNull();
+      expect(() => applyFormula(windowed, metric.formula)).not.toThrow();
+    },
+  );
+
+  it.each(ALL_IDS.filter((id) => specOf(metricOf(id)).descriptor.timeField === null))(
+    '%s, over a source with no time axis, plans and runs with no window, its formula reads the answer, and a window is refused',
+    (id) => {
+      const metric = metricOf(id);
+      const spec = specOf(metric);
+
+      expect(() => applyFormula(runEmpty(spec, metric.params), metric.formula)).not.toThrow();
+      expect(() => runEmpty(spec, { ...metric.params, window: WINDOW })).toThrow(InvalidParams);
+    },
+  );
 
   it('control: the engine refuses a catalogue params whose measure names a field the descriptor lacks', () => {
     const metric = metricOf('pm.tokens-per-day');

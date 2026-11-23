@@ -10,7 +10,13 @@
  *    project label.
  * 3. Hand the open build to the caller's `fill`, which inserts the bucket
  *    rows and stamps each source it read in `atlas_sources`.
- * 4. Count the rows of each bucket, close the file and rename it over the
+ * 4. Copy the old replica's `board_snapshot` rows into the build file, the
+ *    one bucket carried between builds (D20). A row of the same day and
+ *    stage that `fill` wrote stays, so a second build on one day keeps its
+ *    own count. No old replica, or one of an older version with no such
+ *    table, adds no row; an old replica that cannot be read fails the
+ *    build and stays as it was, so no snapshot history is lost.
+ * 5. Count the rows of each bucket, close the file and rename it over the
  *    replica path.
  *
  * Any failure before the rename closes and removes the build file and
@@ -139,6 +145,52 @@ function sourceStamper(database: Database): (stamp: SourceStamp) => void {
   };
 }
 
+/** One `board_snapshot` row, as the old replica holds it. */
+interface SnapshotRow {
+  readonly taken_at: string;
+  readonly day: string;
+  readonly stage: string;
+  readonly count: number;
+}
+
+/** The old replica's `board_snapshot` rows, or none when it has no such table. */
+function readSnapshotRows(replicaPath: string): readonly SnapshotRow[] {
+  const old = new Database(replicaPath, { readonly: true, strict: true });
+  try {
+    const table = old
+      .query<{ readonly name: string }, [string, string]>('SELECT name FROM sqlite_master WHERE type = ? AND name = ?')
+      .get('table', 'board_snapshot');
+    if (table === null) return [];
+    return old.query<SnapshotRow, []>('SELECT taken_at, day, stage, count FROM board_snapshot').all();
+  } finally {
+    old.close();
+  }
+}
+
+/** As `readSnapshotRows`, with no row for a missing replica and a failure naming the file. */
+function oldSnapshotRows(replicaPath: string): readonly SnapshotRow[] {
+  if (!existsSync(replicaPath)) return [];
+  try {
+    return readSnapshotRows(replicaPath);
+  } catch (error: unknown) {
+    const reason = error instanceof Error
+      ? error.message
+      : String(error);
+    throw new Error(`replica: the board snapshot of ${replicaPath} cannot be read (${reason}); the build keeps it`);
+  }
+}
+
+/** Copy the old replica's snapshot rows into the build; a row `fill` wrote for the same day and stage wins. */
+function carryBoardSnapshot(database: Database, replicaPath: string): void {
+  const rows = oldSnapshotRows(replicaPath);
+  const insert = database.prepare(
+    'INSERT OR IGNORE INTO board_snapshot (taken_at, day, stage, count) VALUES (?, ?, ?, ?)',
+  );
+  database.transaction(() => {
+    for (const row of rows) insert.run(row.taken_at, row.day, row.stage, row.count);
+  })();
+}
+
 function countTables(database: Database): Readonly<Record<ReplicaTable, number>> {
   const entries = Object.keys(REPLICA_TABLES).map((table) => {
     const row = database.query<{ readonly n: number }, []>(`SELECT count(*) AS n FROM ${table}`).get();
@@ -182,6 +234,7 @@ export async function writeReplica<T>(
       [META_KEYS.projectLabel]: options.projectLabel,
     });
     const value = await fill({ database, buildPath, buildId, builtAt, stampSource: sourceStamper(database) });
+    carryBoardSnapshot(database, replicaPath);
     const tables = countTables(database);
     database.close();
     open = false;

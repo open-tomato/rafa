@@ -26,16 +26,50 @@
  * group is NULL counts as `unknown`, except a task with no work type,
  * which the three work-type columns leave out. The result's `weeks`
  * names those weeks, for the cards whose field holds no dates of its own.
+ *
+ * Past the PoC cut, the git, board, module and GitHub metrics of phase 4
+ * fill `deploysPerWeek`, `modules`, `workspace` (its members and edges),
+ * `wip`, `resolutionByPriority`, `bugOutcomeByLoopStart` and
+ * `openBugsPerDay`. Their requests and mappers live in `live-sources.ts`,
+ * and the cell readers both files share in `live-read.ts`. A GitHub-only
+ * metric that answers no row adds its fields to `notWired` for that
+ * result, with the `--github` build line in `notWiredDetail`.
  */
 import type { Blocker, ChangeSlice, MockData } from './mock.js';
 import type { FieldMeta, LensField, LensResult, MeasuredWorkspace } from './source.js';
-import type { MetricDefinition, QueryResult, Scalar, Window } from '@open-tomato/atlas-data/contract';
+import type { MetricDefinition, QueryResult, Window } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { ChartTone, LineSeries, ScatterPoint, TimePoint } from '@open-tomato/charts';
 
 import { AtlasRequestError, AtlasResponseInvalid, AtlasTransportError } from '@open-tomato/atlas-transport/client';
 
+import {
+  boundsOf,
+  columnOf,
+  DAY_MS,
+  dayOf,
+  numberOf,
+  round1,
+  stringListOf,
+  textOf,
+  UNKNOWN,
+  WEEK_MS,
+  weekKeyOf,
+  windowWeeksOf,
+} from './live-read.js';
+import {
+  GITHUB_NOT_READ,
+  githubPendingOf,
+  moduleGraphOf,
+  SOURCE_METRIC_FIELDS,
+  SOURCE_METRIC_KEYS,
+  SOURCE_METRICS,
+  SOURCE_WIRED_FIELDS,
+  sourceAnswersOf,
+  sourceFieldsOf,
+  type SourceAnswers,
+} from './live-sources.js';
 import { BRANCH_TYPES } from './mock.js';
 import { quantile } from './random.js';
 
@@ -121,8 +155,8 @@ export const METRIC_FIELDS: Readonly<Record<LiveMetric, readonly LensField[]>> =
 /** The metrics run in `LIVE_METRICS` order. */
 const METRIC_KEYS = Object.keys(LIVE_METRICS) as LiveMetric[];
 
-/** The fields a live metric fills; every other field is not wired yet. */
-export const WIRED_FIELDS: readonly LensField[] = METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key]);
+/** The fields a live metric fills, the PoC metrics' then `live-sources.ts`'s; every other field is not wired yet. */
+export const WIRED_FIELDS: readonly LensField[] = [...METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key]), ...SOURCE_WIRED_FIELDS];
 
 /** The metrics that are one number on a tile, run over the range's KPI window. */
 export const KPI_METRICS: ReadonlySet<LiveMetric> = new Set<LiveMetric>(['redCiShare', 'activeBlockers']);
@@ -138,9 +172,6 @@ export const LIVE_UNAVAILABLE: string = 'The Atlas API under /api/atlas did not 
   + ' ATLAS_PROJECT_ROOT=<main checkout> bun run --cwd addons/atlas/demo dev, which builds the replica'
   + ' when none exists, then open the page with ?source=live again.';
 
-const DAY_MS = 86_400_000;
-const WEEK_MS = 7 * DAY_MS;
-
 /** The days a point of the task cycle trend looks back over, its own included. */
 const TREND_DAYS = 7;
 
@@ -149,9 +180,6 @@ const FLAKY_TOP = 10;
 
 /** The tones of the model series, in order of tokens spent; a model past the eighth draws muted. */
 const SERIES_TONES: readonly ChartTone[] = ['series-1', 'series-2', 'series-3', 'series-4', 'series-5', 'series-6', 'series-7', 'series-8'];
-
-/** The label of a row whose group (model, plan, kind, route) the store did not record. */
-const UNKNOWN = 'unknown';
 
 /** The work types of decision D4, as the debt ratio's slices and the tasks-done columns. */
 const WORK_TYPES = ['feature', 'fix', 'chore'] as const;
@@ -186,6 +214,9 @@ function emptyMock(): MockData {
     taskMinutesBins: [],
     redCiShare: 0,
     deploysPerWeek: [],
+    wip: { now: 0, limit: null },
+    bugOutcomeByLoopStart: [],
+    openBugsPerDay: [],
     bugsByKindPerWeek: [],
     regressionsPerWeek: [],
     filedSharePerWeek: [],
@@ -196,7 +227,7 @@ function emptyMock(): MockData {
   };
 }
 
-/** The measured workspace with nothing in it: no live source measures it yet. */
+/** The workspace with nothing in it: the live one lays the module graph's members and edges over it. */
 const EMPTY_WORKSPACE: MeasuredWorkspace = {
   composition: [],
   sizeRose: [],
@@ -214,75 +245,6 @@ const ALL_FIELDS: readonly LensField[] = [...(Object.keys(emptyMock()) as (keyof
 export const NOT_WIRED: ReadonlySet<LensField> = new Set(ALL_FIELDS.filter((field) => !WIRED_FIELDS.includes(field)));
 
 /* ---------- reading a cell ---------- */
-
-/** The position of column `key` in `result`; an answer without it is refused. */
-function columnOf(result: QueryResult, key: string): number {
-  const index = result.columns.findIndex((column) => column.key === key);
-  if (index < 0) throw new Error(`atlas: the answer holds no ${key} column`);
-  return index;
-}
-
-/** A cell as a number: an aggregate over no value reads 0. */
-function numberOf(value: Scalar | undefined): number {
-  return typeof value === 'number'
-    ? value
-    : 0;
-}
-
-/** A cell as text, or `fallback` for a NULL or a number. */
-function textOf(value: Scalar | undefined, fallback: string): string {
-  return typeof value === 'string'
-    ? value
-    : fallback;
-}
-
-/** A `YYYY-MM-DD` key or a stamp as the instant it names; anything else is refused. */
-function dayOf(value: Scalar | undefined): Date {
-  const ms = typeof value === 'string'
-    ? Date.parse(value)
-    : Number.NaN;
-  if (Number.isNaN(ms)) throw new Error(`atlas: ${JSON.stringify(value)} is not a day`);
-  return new Date(ms);
-}
-
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
-}
-
-/** The `YYYY-MM-DD` key of the ISO week (its Monday, UTC) holding `ms`, as the engine keys a week. */
-function weekKeyOf(ms: number): string {
-  const date = new Date(ms);
-  const monday = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
-  return new Date(monday)
-    .toISOString()
-    .slice(0, 10);
-}
-
-/** The window's bounds as instants, or null for a window open at either end. */
-function boundsOf(result: QueryResult): { readonly from: Date; readonly to: Date } | null {
-  const { from, to } = result.meta.window;
-  return from === null || to === null
-    ? null
-    : { from: new Date(from), to: new Date(to) };
-}
-
-/**
- * The ISO week keys of the window, the first to the one holding its last
- * day; for an open window, the weeks from the answer's first to its last.
- */
-function windowWeeksOf(result: QueryResult, timeKey: string): string[] {
-  const bounds = boundsOf(result);
-  const time = columnOf(result, timeKey);
-  const stamps = result.rows.map((row) => dayOf(row[time]).getTime());
-  const first = bounds?.from.getTime() ?? Math.min(...stamps);
-  const last = bounds === null
-    ? Math.max(...stamps)
-    : bounds.to.getTime() - 1;
-  if (!Number.isFinite(first) || !Number.isFinite(last)) return [];
-  const weeks: string[] = [];
-  for (let monday = Date.parse(weekKeyOf(first)); monday <= last; monday += WEEK_MS) weeks.push(weekKeyOf(monday));
-  return weeks;
-}
 
 /** The sum of `valueKey` per week key and per group, NULL groups as `unknown`. */
 function sumsByWeek(result: QueryResult, groupKey: string, valueKey: string): Map<string, Map<string, number>> {
@@ -508,17 +470,6 @@ export function redShareOf(result: QueryResult): number {
   return numberOf(result.rows.find((row) => row[verdict] === 'red')?.[share]);
 }
 
-/** The check names of one `failing_json` cell; a cell that is no list of names is refused. */
-function checkNamesOf(value: Scalar | undefined): string[] {
-  const parsed: unknown = typeof value === 'string'
-    ? JSON.parse(value)
-    : null;
-  if (!Array.isArray(parsed) || !parsed.every((name) => typeof name === 'string')) {
-    throw new Error(`atlas: ${JSON.stringify(value)} is not a list of checks`);
-  }
-  return parsed;
-}
-
 /**
  * The ten checks failing most on heads that later read green: each
  * `failing_json` set split into its names, its `failures` summed per name
@@ -531,7 +482,7 @@ export function flakyChecksOf(result: QueryResult): MockData['flakyChecks'] {
   const heads = columnOf(result, 'heads');
   const byName = new Map<string, { failures: number; readings: number }>();
   for (const row of result.rows) {
-    for (const name of checkNamesOf(row[failing])) {
+    for (const name of stringListOf(row[failing], 'checks')) {
       const seen = byName.get(name) ?? { failures: 0, readings: 0 };
       byName.set(name, { failures: seen.failures + numberOf(row[failures]), readings: seen.readings + numberOf(row[heads]) });
     }
@@ -608,24 +559,33 @@ function proxyNotesOf(definitions: readonly MetricDefinition[]): ReadonlyMap<str
     : [])));
 }
 
-/** The meta of every wired field: its metric, the row count of the answer that filled it and the metric's proxy note. */
-function fieldMetaOf(answers: Answers, previous: Partial<Answers>, notes: ReadonlyMap<string, string>): ReadonlyMap<LensField, FieldMeta> {
-  return new Map(METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key].map((field) => {
-    const metricId = LIVE_METRICS[key];
-    const answer = PREVIOUS_FIELDS[field] === undefined
-      ? answers[key]
-      : previous[key];
-    const rowCount = answer?.meta.rowCount ?? 0;
-    const proxyNote = notes.get(metricId);
-    const meta: FieldMeta = proxyNote === undefined
-      ? { metricId, rowCount }
-      : { metricId, rowCount, proxyNote };
-    return [field, meta] as const;
-  })));
+/** One field's meta: its metric, the row count of the answer that filled it and the metric's proxy note. */
+function metaOf(field: LensField, metricId: string, answer: QueryResult | undefined, notes: ReadonlyMap<string, string>): readonly [LensField, FieldMeta] {
+  const rowCount = answer?.meta.rowCount ?? 0;
+  const proxyNote = notes.get(metricId);
+  return [field, proxyNote === undefined
+    ? { metricId, rowCount }
+    : { metricId, rowCount, proxyNote }];
+}
+
+/** The meta of every wired field, the PoC metrics' then `live-sources.ts`'s. */
+function fieldMetaOf(answers: Answers, previous: Partial<Answers>, sources: SourceAnswers, notes: ReadonlyMap<string, string>): ReadonlyMap<LensField, FieldMeta> {
+  const poc = METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key].map((field) => metaOf(field, LIVE_METRICS[key], PREVIOUS_FIELDS[field] === undefined
+    ? answers[key]
+    : previous[key], notes)));
+  const past = SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key].map((field) => metaOf(field, SOURCE_METRICS[key], sources.metrics[key], notes)));
+  return new Map([...poc, ...past]);
+}
+
+/** The fields marked not wired for one result: `NOT_WIRED` itself, or with the GitHub fields that answered no row. */
+function notWiredOf(pending: readonly LensField[]): ReadonlySet<LensField> {
+  return pending.length === 0
+    ? NOT_WIRED
+    : new Set([...NOT_WIRED, ...pending]);
 }
 
 /** The wired fields of the mock shape, each filled from its metric's answer. */
-function mockOf(answers: Answers, previous: Partial<Answers>): MockData {
+function mockOf(answers: Answers, previous: Partial<Answers>, sources: SourceAnswers, definitions: readonly MetricDefinition[]): MockData {
   const tokensPerDay = timePointsOf(answers.tokensPerDay, 'day', 'tokens');
   const previousTokens = previous.tokensPerDay;
   const previousWindow = boundsOf(answers.tokensPerDay);
@@ -663,12 +623,17 @@ function mockOf(answers: Answers, previous: Partial<Answers>): MockData {
     regressionsPerWeek: weeklyPointsOf(answers.regressions, 'bugs'),
     flakyChecks: flakyChecksOf(answers.flakyChecks),
     filedSharePerWeek: weeklyGroupsOf(answers.filedShare, 'route', 'bugs'),
+    ...sourceFieldsOf(sources, definitions),
   };
 }
 
 /** The live result set for `range`: the wired fields from the API with their meta, every other field marked. */
 export async function liveResultOf(client: AtlasClient, range: TimeRange, signal?: AbortSignal): Promise<LensResult> {
-  const [answers, definitions] = await Promise.all([answersOf(client, range, signal), client.listMetrics(undefined, signal)]);
+  const [answers, sources, definitions] = await Promise.all([
+    answersOf(client, range, signal),
+    sourceAnswersOf(client, RANGE_WINDOW[range].series, signal),
+    client.listMetrics(undefined, signal),
+  ]);
   const [tokens, debt] = await Promise.all([
     previousOf(client, 'tokensPerDay', answers.tokensPerDay, signal),
     previousOf(client, 'debtRatio', answers.debtRatio, signal),
@@ -681,15 +646,17 @@ export async function liveResultOf(client: AtlasClient, range: TimeRange, signal
       ? {}
       : { debtRatio: debt }),
   };
+  const pending = githubPendingOf(sources, definitions);
   return {
     range,
     source: 'live',
-    notWired: NOT_WIRED,
-    fieldMeta: fieldMetaOf(answers, previous, proxyNotesOf(definitions)),
+    notWired: notWiredOf(pending),
+    notWiredDetail: new Map(pending.map((field) => [field, GITHUB_NOT_READ])),
+    fieldMeta: fieldMetaOf(answers, previous, sources, proxyNotesOf(definitions)),
     weeks: seriesWeeksOf(answers.bugsByKind, 'week'),
-    mock: mockOf(answers, previous),
+    mock: mockOf(answers, previous, sources, definitions),
     balance: [],
-    workspace: EMPTY_WORKSPACE,
+    workspace: { ...EMPTY_WORKSPACE, ...moduleGraphOf(sources.metrics.coupling) },
   };
 }
 

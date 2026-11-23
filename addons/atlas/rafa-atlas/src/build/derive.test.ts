@@ -11,6 +11,17 @@
  * wrap-up session of a plan with no file, and three preflight runs, one on
  * a day no session started on. The plan folder is planted under the root.
  * No row is copied from a real store.
+ *
+ * The git cases plant the git ingest's fixture repository
+ * (`ingest/testdata/git-repo.fixture.ts`) in the same root, made with
+ * `git init` there, so no case reads the project's history: the commit
+ * counts per day of `daily_rollup` are checked against counts taken in
+ * TypeScript over the replica's `commit_facts`.
+ *
+ * The board cases plant the board ingest's fixture cache
+ * (`ingest/testdata/board-cache.fixture.ts`) in the same root, written in
+ * tmpdir with invented bodies: the fixture plan's issue 42 is a member of
+ * the fixture epic, and the done plan's issue 7 of none.
  */
 import type { Derivation } from './derive.js';
 import type { ReportChange } from '@open-tomato/rafa-core/report/parse';
@@ -28,8 +39,11 @@ import { writeTaskReport } from '@open-tomato/rafa-core/store/reports';
 import { openSqliteStore } from '@open-tomato/rafa-core/store/sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { ingestBoard } from '../ingest/board.js';
 import { ingestEffort, TASKS_SOURCE } from '../ingest/effort.js';
+import { COMMITS_SOURCE, createGitRunner, ingestGit } from '../ingest/git.js';
 import { DEFAULT_PLAN_DIR } from '../ingest/plans.js';
+import { FIXTURE_EPIC_SLUG, writeBoardFixture } from '../ingest/testdata/board-cache.fixture.js';
 import {
   FIXTURE_PLAN,
   FIXTURE_TASK_LINE,
@@ -39,9 +53,19 @@ import {
   writeFactsFixture,
   writeFixtureStore,
 } from '../ingest/testdata/effort-store.fixture.js';
+import { FIXTURE_COMMITS_PER_DAY, FIXTURE_SQUASH_PR, writeGitFixture } from '../ingest/testdata/git-repo.fixture.js';
 
 import { DAILY_SOURCE } from './daily.js';
-import { CHANGE_LEVELS, deriveBuild, deriveWorkType, PLANS_SOURCE, UNREAD_DAILY_COLUMNS, UNREAD_PLAN_COLUMNS } from './derive.js';
+import {
+  CHANGE_LEVELS,
+  deriveBuild,
+  deriveWorkType,
+  linkCommitPlans,
+  linkPlanEpics,
+  PLANS_SOURCE,
+  UNREAD_DAILY_COLUMNS,
+  UNREAD_PLAN_COLUMNS,
+} from './derive.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-build-derive-')));
 afterAll(() => {
@@ -71,7 +95,11 @@ interface Built {
   readonly changes: readonly Row[];
   readonly plans: readonly Row[];
   readonly days: readonly Row[];
+  readonly commits: readonly Row[];
 }
+
+/** Whether a build runs the git ingest: not at all, over the fixture repository, or over a root holding none. */
+type GitCase = 'skipped' | 'repo' | 'no-repo';
 
 /** A plan document with `issue` in its header and one task line per entry of `boxes`. */
 function planText(stub: string, issue: string, boxes: readonly string[]): string {
@@ -134,15 +162,37 @@ function writeDeriveFixture(root: string): void {
   writeFileSync(join(planDir, `PLAN-${DONE_PLAN}.md`), planText(DONE_PLAN, '#7', ['[x]', '[x]']));
 }
 
-/** Build the fixture under a fresh root, `widen` run on it first; answers the derivation and the replica's rows. */
-async function build(name: string, widen: (root: string) => void = () => undefined): Promise<Built> {
+/** Whether a build runs the board ingest: not at all, over the fixture cache, or over a root holding none. */
+type BoardCase = 'skipped' | 'cache' | 'no-cache';
+
+/** Build the fixture under a fresh root, `widen` run on it first and git and the board read as `git` and `board` say; answers the derivation and the replica's rows. */
+async function build(
+  name: string,
+  widen: (root: string) => void = () => undefined,
+  git: GitCase = 'skipped',
+  board: BoardCase = 'skipped',
+): Promise<Built> {
   const root = join(scope, name);
   writeDeriveFixture(root);
   widen(root);
+  if (git === 'repo') writeGitFixture(root);
+  if (board === 'cache') writeBoardFixture(root);
   const replicaPath = join(root, '.rafa', 'atlas', 'atlas.sqlite');
   const result = await writeReplica({ replicaPath, projectLabel: 'fixture' }, (replica) => {
     const effort = ingestEffort(replica, { root, env: {} });
-    return deriveBuild(replica, { planDir: join(root, DEFAULT_PLAN_DIR), snapshotPath: effort.snapshot.snapshotPath, stamps: effort.stamps });
+    const read = git === 'skipped'
+      ? null
+      : ingestGit(replica, { runner: createGitRunner(root) });
+    const cache = board === 'skipped'
+      ? null
+      : ingestBoard(replica, { root });
+    return deriveBuild(replica, {
+      planDir: join(root, DEFAULT_PLAN_DIR),
+      snapshotPath: effort.snapshot.snapshotPath,
+      stamps: [...effort.stamps, ...(read?.stamps ?? []), ...(cache?.stamps ?? [])],
+      gitRead: read?.read ?? false,
+      boardRead: cache?.read ?? false,
+    });
   });
   const reader = openReplica(replicaPath);
   try {
@@ -154,6 +204,7 @@ async function build(name: string, widen: (root: string) => void = () => undefin
       changes: all('SELECT * FROM change_facts'),
       plans: all('SELECT * FROM plan_facts ORDER BY plan_stub'),
       days: all('SELECT * FROM daily_rollup ORDER BY day'),
+      commits: all('SELECT * FROM commit_facts ORDER BY committed_at'),
     };
   } finally {
     reader.close();
@@ -311,12 +362,15 @@ describe('deriveBuild, plan_facts', () => {
     }));
   });
 
-  it('stamps local.plans partial, naming the columns no source fills', async () => {
+  it('stamps local.plans partial, naming the columns no source fills and epic_slug with no board cache read', async () => {
     const { derivation, plans } = await mainBuild();
 
     const stamp = derivation.stamps.find((each) => each.source === PLANS_SOURCE);
     expect(stamp).toEqual(expect.objectContaining({ rows: plans.length, partial: true }));
     for (const column of UNREAD_PLAN_COLUMNS) expect(stamp?.reason).toContain(column);
+    expect(stamp?.reason).toContain('no board cache was read; epic_slug reads NULL');
+    expect(plans.map((plan) => plan.epic_slug)).toEqual([null, null, null]);
+    expect(derivation.plansEpicLinked).toBe(0);
     expect(stamp?.asOf).not.toBeNull();
   });
 });
@@ -379,15 +433,17 @@ describe('deriveBuild, the count columns of daily_rollup', () => {
     }));
   });
 
-  it('leaves commits and prs_merged NULL and stamps local.daily partial, naming them and no input', async () => {
+  it('leaves commits and prs_merged NULL with no git read and stamps local.daily partial, naming both and no input', async () => {
     const { derivation, days } = await mainBuild();
 
+    expect(UNREAD_DAILY_COLUMNS).toEqual(['prs_merged']);
     for (const row of days) {
-      for (const column of UNREAD_DAILY_COLUMNS) expect(row[column]).toBeNull();
+      for (const column of [...UNREAD_DAILY_COLUMNS, 'commits']) expect(row[column]).toBeNull();
     }
     const stamp = derivation.stamps.find((each) => each.source === DAILY_SOURCE);
     expect(stamp).toEqual(expect.objectContaining({ rows: days.length, partial: true }));
-    expect(stamp?.reason).toContain('commits, prs_merged');
+    expect(stamp?.reason).toContain('prs_merged is not read yet (the GitHub source)');
+    expect(stamp?.reason).toContain('no git history was read; commits reads NULL');
     expect(stamp?.reason).not.toContain(TASKS_SOURCE);
     expect(stamp?.reason).not.toContain('preflight');
   });
@@ -413,5 +469,172 @@ describe('deriveBuild, refused', () => {
       snapshotPath: join(scope, 'refused', 'none.sqlite'),
       stamps: [],
     }))).rejects.toThrow(TASKS_SOURCE);
+  });
+});
+
+describe('deriveBuild over a root holding a git repository', () => {
+  let withGit: Promise<Built> | undefined;
+
+  /** The fixture built with the git fixture in its root, the preflight table dropped so a day only commits are on gets its row from them alone. */
+  function gitBuild(): Promise<Built> {
+    withGit ??= build('git', (root) => {
+      withFixtureDatabase(root, (database) => database.run('DROP TABLE preflight'));
+    }, 'repo');
+    return withGit;
+  }
+
+  it('fills daily_rollup.commits with the commit_facts rows of each day, 0 on a day with none', async () => {
+    const { commits, days } = await gitBuild();
+    const perDay: Record<string, number> = {};
+    for (const row of commits) perDay[String(row['day'])] = (perDay[String(row['day'])] ?? 0) + 1;
+    const rolled = Object.fromEntries(days.filter((row) => row['commits'] !== 0).map((row) => [row['day'], row['commits']]));
+
+    expect(commits).toHaveLength(7);
+    expect(perDay).toEqual(FIXTURE_COMMITS_PER_DAY);
+    expect(rolled).toEqual(perDay);
+    expect(rowOf(days, 'day', '2026-10-30')['commits']).toBe(0);
+    expect(days.reduce((sum, row) => sum + Number(row['commits']), 0)).toBe(commits.length);
+  });
+
+  it('gives a day only commits landed on its row, with no session and no preflight run behind it', async () => {
+    const { days } = await gitBuild();
+
+    expect(rowOf(days, 'day', PREFLIGHT_ONLY_DAY)).toEqual(expect.objectContaining({
+      commits: 1, sessions: 0, minutes_task: 0, tokens_total: 0, preflight_runs: null,
+    }));
+  });
+
+  it('gives the squash commit the plan whose pull request it names, and no other commit a plan', async () => {
+    const { commits, derivation, plans } = await gitBuild();
+    const linked = commits.filter((row) => row['plan_stub'] !== null);
+
+    expect(rowOf(plans, 'plan_stub', FIXTURE_PLAN)['pr_number']).toBe(FIXTURE_SQUASH_PR);
+    expect(linked.map((row) => [row['pr_number'], row['plan_stub']])).toEqual([[FIXTURE_SQUASH_PR, FIXTURE_PLAN]]);
+    expect(derivation.commitsLinked).toBe(1);
+  });
+
+  it('names only prs_merged in the local.daily stamp once the history is read', async () => {
+    const { derivation } = await gitBuild();
+    const stamp = derivation.stamps.find((each) => each.source === DAILY_SOURCE);
+
+    expect(stamp?.reason).toContain('prs_merged is not read yet');
+    expect(stamp?.reason).not.toContain('commits');
+    expect(stamp?.asOf).not.toBeNull();
+  });
+
+  it('control: over a root holding no repository, reads commits NULL and carries the missing local.commits stamp', async () => {
+    const { days, commits, derivation } = await build('git-none', () => undefined, 'no-repo');
+    const reason = derivation.stamps.find((each) => each.source === DAILY_SOURCE)?.reason;
+
+    expect(commits).toEqual([]);
+    for (const row of days) expect(row['commits']).toBeNull();
+    expect(reason).toContain('no git history was read; commits reads NULL');
+    expect(reason).toContain(`${COMMITS_SOURCE}: no git history read`);
+  });
+});
+
+describe('deriveBuild over a root holding the board cache', () => {
+  let withBoard: Promise<Built> | undefined;
+
+  /** The fixture built with the board fixture cache in its root. */
+  function boardBuild(): Promise<Built> {
+    withBoard ??= build('board', () => undefined, 'skipped', 'cache');
+    return withBoard;
+  }
+
+  it('gives a plan the epic slug of its issue, and NULL to a plan whose issue has none or that names no issue', async () => {
+    const { plans, derivation } = await boardBuild();
+
+    expect(Object.fromEntries(plans.map((plan) => [plan.plan_stub, [plan.issue_number, plan.epic_slug]]))).toEqual({
+      [FIXTURE_PLAN]: [42, FIXTURE_EPIC_SLUG],
+      [DONE_PLAN]: [7, null],
+      [GONE_PLAN]: [null, null],
+    });
+    expect(derivation.plansEpicLinked).toBe(1);
+  });
+
+  it('names only merged_at in the local.plans stamp once the cache is read', async () => {
+    const { derivation } = await boardBuild();
+    const reason = derivation.stamps.find((each) => each.source === PLANS_SOURCE)?.reason;
+
+    expect(reason).toContain('merged_at is not read yet (the GitHub source)');
+    expect(reason).not.toContain('epic_slug');
+  });
+
+  it('control: over a root holding no cache, reads every epic_slug NULL and names the missing cache', async () => {
+    const { plans, derivation } = await build('board-none', () => undefined, 'skipped', 'no-cache');
+
+    expect(plans.map((plan) => plan.epic_slug)).toEqual([null, null, null]);
+    expect(derivation.stamps.find((each) => each.source === PLANS_SOURCE)?.reason)
+      .toContain('no board cache was read; epic_slug reads NULL');
+  });
+});
+
+describe('linkPlanEpics', () => {
+  it('copies the epic slug of the plan\'s issue, leaving a plan with no issue or an unknown one NULL', async () => {
+    const replicaPath = join(scope, 'link-epics', 'atlas.sqlite');
+    const result = await writeReplica({ replicaPath, projectLabel: 'link-epics' }, (replica) => {
+      const { database } = replica;
+      const plan = database.prepare<unknown, [string, number | null]>(
+        `INSERT INTO plan_facts (plan_stub, plan_source, issue_number, sessions, task_sessions, reports_done, reports_blocked,
+          repeat_sessions, ci_repair_sessions) VALUES (?, 'plan', ?, 0, 0, 0, 0, 0, 0)`,
+      );
+      plan.run('member-plan', 1);
+      plan.run('loose-plan', 2);
+      plan.run('no-issue', null);
+      plan.run('unknown-issue', 9);
+      const issue = database.prepare<unknown, [number, string | null]>(
+        'INSERT INTO issue_facts (number, is_bug, is_epic, epic_slug) VALUES (?, 0, 0, ?)',
+      );
+      issue.run(1, 'slug-one');
+      issue.run(2, null);
+      const linked = linkPlanEpics(database);
+      const rows = database.query<{ readonly plan_stub: string; readonly epic_slug: string | null }, []>(
+        'SELECT plan_stub, epic_slug FROM plan_facts ORDER BY plan_stub',
+      ).all();
+      return { linked, rows };
+    });
+
+    expect(result.value.linked).toBe(1);
+    expect(result.value.rows).toEqual([
+      { plan_stub: 'loose-plan', epic_slug: null },
+      { plan_stub: 'member-plan', epic_slug: 'slug-one' },
+      { plan_stub: 'no-issue', epic_slug: null },
+      { plan_stub: 'unknown-issue', epic_slug: null },
+    ]);
+  });
+});
+
+describe('linkCommitPlans', () => {
+  it('links a commit to the one plan naming its pull request, and leaves a pull request two plans name unlinked', async () => {
+    const replicaPath = join(scope, 'link', 'atlas.sqlite');
+    const result = await writeReplica({ replicaPath, projectLabel: 'link' }, (replica) => {
+      const { database } = replica;
+      const plan = database.prepare<unknown, [string, number]>(
+        `INSERT INTO plan_facts (plan_stub, plan_source, pr_number, sessions, task_sessions, reports_done, reports_blocked,
+          repeat_sessions, ci_repair_sessions) VALUES (?, 'plan', ?, 0, 0, 0, 0, 0, 0)`,
+      );
+      plan.run('one-plan', 1);
+      plan.run('twin-a', 2);
+      plan.run('twin-b', 2);
+      const commit = database.prepare<unknown, [string, number | null]>('INSERT INTO commit_facts (sha, pr_number, is_merge) VALUES (?, ?, 0)');
+      commit.run('c-one', 1);
+      commit.run('c-twin', 2);
+      commit.run('c-none', null);
+      commit.run('c-unknown', 3);
+      const linked = linkCommitPlans(database);
+      const rows = database.query<{ readonly sha: string; readonly plan_stub: string | null }, []>(
+        'SELECT sha, plan_stub FROM commit_facts ORDER BY sha',
+      ).all();
+      return { linked, rows };
+    });
+
+    expect(result.value.linked).toBe(1);
+    expect(result.value.rows).toEqual([
+      { sha: 'c-none', plan_stub: null },
+      { sha: 'c-one', plan_stub: 'one-plan' },
+      { sha: 'c-twin', plan_stub: null },
+      { sha: 'c-unknown', plan_stub: null },
+    ]);
   });
 });

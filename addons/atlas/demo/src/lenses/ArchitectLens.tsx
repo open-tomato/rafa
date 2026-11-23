@@ -17,6 +17,7 @@ import {
 import { LensGrid } from '../templates/LensGrid.js';
 
 import { lensActionsVariants, lensInfoVariants, lensNoteVariants } from './ArchitectLens.variants.js';
+import { groupTonesOf } from './kinds.js';
 import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
@@ -29,7 +30,7 @@ const GRADE_B_BELOW = 0.45;
 /** The four-week p90 average the tile compares against. */
 const P90_AVERAGE = 58;
 
-/** How many rows the import-flow source table shows. */
+/** How many rows the import-flow and module-import source tables show. */
 const SANKEY_TABLE_LIMIT = 16;
 
 const GRAPH_SOURCE = 'The workspace members and their dependencies, read from each package.json on 2026-11-02 (src/data/graph.ts).';
@@ -71,6 +72,21 @@ const HALTS = cardSpec({
   subtitle: 'per weekday and week; click a cell for the checks behind it',
   primitive: 'HeatmapGrid',
   note: 'proxy for uptime: a halt is a preflight check that stopped a loop.',
+});
+
+const MODULE_SIZE = cardSpec({
+  id: 'arch-module-size',
+  title: 'Lines of code per module',
+  subtitle: 'one tile per module, the area is its lines of code; tone by layer',
+  primitive: 'Treemap',
+});
+
+const MODULE_GRAPH = cardSpec({
+  id: 'arch-module-graph',
+  title: 'Module imports',
+  subtitle: 'one node per workspace member, sized by its dependents; an edge per dependency',
+  primitive: 'NetworkGraph',
+  source: GRAPH_SOURCE,
 });
 
 const ROSE = cardSpec({
@@ -161,7 +177,7 @@ function ArchitectTiles({ result }: { readonly result: LensResult }): ReactEleme
         reads={['preflightHalts']}
         value={String(totalHalts)}
       />
-      <LensStat label="Workspace members" value={String(workspace.members.length)} note={`${workspace.edges.length} internal dependency edges`} />
+      <LensStat label="Workspace members" reads={['workspace']} value={String(workspace.members.length)} note={`${workspace.edges.length} internal dependency edges`} />
     </>
   );
 }
@@ -192,9 +208,9 @@ function modelLegend(mock: MockData): LegendItem[] {
   return mock.tokensByModel.map(({ id, label, tone }) => ({ id, label, tone }));
 }
 
-/** The Architecture lens: debt, package size and composition, halts and the import flow. */
+/** The Architecture lens: debt, module size and imports, package size and composition, halts and the import flow. */
 export function ArchitectLens(): ReactElement {
-  const { Donut, LineChart, HeatmapGrid, Nightingale, Sunburst, Sankey } = useChartEngine();
+  const { Donut, LineChart, HeatmapGrid, Treemap, NetworkGraph, Nightingale, Sunburst, Sankey } = useChartEngine();
   const { data } = useDashboard<LensResult>();
   const [cell, setCell] = useState<HeatmapCell | null>(null);
   const [zoomWeek, setZoomWeek] = useState<number | null>(null);
@@ -341,6 +357,28 @@ export function ArchitectLens(): ReactElement {
                 animate={animate}
                 height={plotHeight(220, height)}
               />
+            )}
+          </LensCard>
+          <LensCard
+            config={MODULE_SIZE}
+            reads={['modules']}
+            liveSubtitle="one tile per module folder, test files left out; tone by the folder it sits in"
+            select={(result: LensResult) => result.mock.modules}
+            table={(nodes) => ({ columns: ['Module', 'Group', 'Lines'], rows: nodes.map((node) => [node.id, node.group, formatCompact(node.value)]) })}
+          >
+            {({ data: nodes, animate, height }) => (
+              <Treemap ariaLabel="Lines of code per module as a treemap" nodes={nodes} groupTones={groupTonesOf(nodes, LAYER_TONES)} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(260, height)} />
+            )}
+          </LensCard>
+          <LensCard
+            config={MODULE_GRAPH}
+            reads={['workspace']}
+            liveSubtitle="one node per module folder, sized by the modules importing it; an edge per @open-tomato import"
+            select={(result: LensResult) => result.workspace}
+            table={(workspace) => ({ columns: ['From', 'To'], rows: workspace.edges.map((link) => [link.source, link.target]), limit: SANKEY_TABLE_LIMIT })}
+          >
+            {({ data: workspace, animate, height }) => (
+              <NetworkGraph ariaLabel="Imports between modules as a network graph" nodes={workspace.members} links={workspace.edges} groupTones={groupTonesOf(workspace.members, LAYER_TONES)} animate={animate} height={plotHeight(300, height)} />
             )}
           </LensCard>
           <LensCard

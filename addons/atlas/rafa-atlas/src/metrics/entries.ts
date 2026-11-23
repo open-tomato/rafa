@@ -16,6 +16,13 @@
  * share of routed bugs per route. Entry 8 reads a blocker as active by
  * its task's outcome, `blocked`: the store keeps no open or closed state
  * of a blocker.
+ *
+ * Entries 1 and 25 are offline (D17): milestone completion and WIP read
+ * only states and labels, which the board cache holds. The four `gh`
+ * entries with a metric (22, 29 and 33, and 20's lead time, which waits)
+ * are drawn by a metric that answers rows only after a `--github` build.
+ * The bug backlog metrics ({@link UNNUMBERED_METRIC_IDS}) came after the
+ * B4 table and have no row in it.
  */
 import type { Feasibility, Lens } from '@open-tomato/atlas-data/contract';
 
@@ -48,7 +55,7 @@ function entry(
 
 /** The 35 metrics of section B4, in its order. */
 export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
-  entry(1, 'pm', 'Milestone completion', 'gh', 'epics closed completed / epics in Now or Done (issue_facts)', 'bullet'),
+  entry(1, 'pm', 'Milestone completion', 'direct', 'epics closed completed / epics in Now or Done (issue_facts, offline, D17)', 'bullet', ['pm.milestone-completion']),
   entry(2, 'pm', 'Schedule variance', 'proxy', 'plan burn-up: cumulative tasks done vs tasks_planned (plan_facts, task_facts)', 'burn-up line'),
   entry(3, 'pm', 'Sprint predictability', 'proxy', 'plans completed per week / plans started per week', 'grouped bar', ['pm.plan-completion', 'dev.plans-completed-per-week']),
   entry(4, 'pm', 'On-time delivery', 'collect', 'needs a due date on plans; no proxy', 'KPI empty'),
@@ -60,27 +67,40 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
   entry(10, 'pm', 'Resource utilization', 'proxy', 'session minutes by model and agent per day / wall-clock hours', 'stacked area'),
   entry(11, 'architect', 'Tech debt ratio', 'proxy', 'minutes of fix and chore work (D4, from change level) / all task minutes', 'KPI grade', ['arch.debt-ratio']),
   entry(12, 'architect', 'Duplication', 'collect', 'needs a duplication scan; no proxy', 'KPI empty'),
-  entry(13, 'architect', 'Architecture violations', 'proxy', 'module_facts.upward_edges from docs/survey/cut-table.json, when present', 'dependency matrix'),
+  entry(13, 'architect', 'Architecture violations', 'proxy', 'module_facts.upward_edges from docs/survey/cut-table.json, when present', 'dependency matrix', ['arch.violations']),
   entry(14, 'architect', 'Latency p50/p99', 'proxy', 'task minutes p50/p90 per week as loop latency', 'dual line', ['arch.task-minutes-p50-p90']),
   entry(15, 'architect', 'Resource utilization trend', 'direct', 'tokens by model per day', 'stacked area', ['arch.tokens-by-model']),
   entry(16, 'architect', 'Uptime / SLA', 'proxy', 'preflight halts per day', 'calendar heatmap', ['arch.preflight-halts']),
-  entry(17, 'architect', 'Cyclomatic complexity', 'proxy', 'LOC per module', 'treemap'),
-  entry(18, 'architect', 'Coupling / cohesion', 'proxy', 'fan_in, fan_out from the import scan', 'dependency matrix'),
+  entry(17, 'architect', 'Cyclomatic complexity', 'proxy', 'LOC per module', 'treemap', ['arch.loc-per-module']),
+  entry(18, 'architect', 'Coupling / cohesion', 'proxy', 'fan_in, fan_out from the import scan', 'dependency matrix', ['arch.coupling']),
   entry(19, 'developer', 'Sprint velocity', 'proxy', 'tasks done per week, stacked by work type (D4)', 'stacked bar', ['dev.tasks-done-per-week']),
   entry(20, 'developer', 'Cycle / lead time', 'direct', 'task minutes (cycle); plan first_at to merged_at (lead, gh)', 'scatter + moving average, histogram', ['dev.task-cycle']),
-  entry(21, 'developer', 'Deployment frequency', 'direct', 'release tags per week (commit_facts.release_tag)', 'sparkline'),
-  entry(22, 'developer', 'PR cycle time', 'gh', 'created_at to merged_at; buckets <4h, 4–24h, 1–3d, >3d', 'histogram'),
+  entry(21, 'developer', 'Deployment frequency', 'direct', 'release tags per week (commit_facts.release_tag)', 'sparkline', ['dev.deploys-per-week']),
+  entry(22, 'developer', 'PR cycle time', 'gh', 'created_at to merged_at; buckets <4h, 4–24h, 1–3d, >3d', 'histogram', ['dev.pr-cycle-time']),
   entry(23, 'developer', 'Review turnaround', 'gh', 'created_at to first_review_at; sparse in a solo repo', 'leaderboard'),
   entry(24, 'developer', 'Change failure rate', 'direct', 'plans with any red CI reading / plans with a reading', 'KPI + threshold', ['dev.red-ci-share']),
-  entry(25, 'developer', 'WIP', 'gh', 'issues in Claimed or In development vs wipLimit', 'horizontal gauge'),
+  entry(25, 'developer', 'WIP', 'direct', 'open issues in Claimed or In development by stage, never by label (D16), vs wipLimit', 'horizontal gauge', ['dev.wip']),
   entry(26, 'developer', 'Active blockers', 'direct', 'as entry 8, by plan', 'row list', ['pm.active-blockers']),
-  entry(27, 'qa', 'Defect density', 'proxy', 'bugs per module / module LOC (per 1k)', 'horizontal bar'),
+  entry(27, 'qa', 'Defect density', 'proxy', 'bugs per module / module LOC (per 1k)', 'horizontal bar', ['qa.defect-density']),
   entry(28, 'qa', 'Defect leakage', 'proxy', 'bug-labelled issues with no loop match / all bugs', '100% stacked bar', ['qa.filed-share']),
-  entry(29, 'qa', 'Defect resolution time', 'gh', 'linked issue created_at to closed_at', 'box plot'),
+  entry(29, 'qa', 'Defect resolution time', 'gh', 'linked issue created_at to closed_at, by priority', 'box plot', ['qa.resolution-time']),
   entry(30, 'qa', 'Test coverage', 'collect', 'needs bun test --coverage lcov collection', 'radial gauge empty'),
   entry(31, 'qa', 'Test pass/fail trend', 'proxy', 'CI verdicts per week, green vs red', 'stacked column'),
   entry(32, 'qa', 'Flaky tests', 'direct', 'ci_facts.flipped, failing names top 10', 'top-10 table', ['qa.flaky-checks']),
-  entry(33, 'qa', 'Defect age', 'gh', 'open bug issues in buckets 0–7d, 8–30d, 30d+', 'ageing bar'),
+  entry(33, 'qa', 'Defect age', 'gh', 'open bug issues in buckets 0–7d, 8–30d, 30d+', 'ageing bar', ['qa.defect-age']),
   entry(34, 'qa', 'Regression defects', 'direct', 'bug_facts kind own-fallout per week', 'line', ['qa.regressions']),
   entry(35, 'qa', 'Bugs by kind', 'direct', 'bug_facts by kind and route', 'stacked bar', ['qa.bugs-by-kind']),
+];
+
+/**
+ * The served metrics no B4 row names: the bug backlog metrics, added from
+ * the burndown session after the table was written. Outcome by loop start
+ * and the drop rate are offline; open bugs per day and bugs per stretch
+ * need the GitHub times.
+ */
+export const UNNUMBERED_METRIC_IDS: readonly string[] = [
+  'qa.bug-outcome-by-loop-start',
+  'qa.drop-rate',
+  'qa.open-bugs-per-day',
+  'qa.bugs-per-stretch',
 ];

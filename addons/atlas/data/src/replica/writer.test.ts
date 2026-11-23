@@ -1,15 +1,16 @@
 /**
  * Tests for `writer.ts`, in a tmpdir: a build lands as one file at the
  * replica path with its meta and source stamps, its row counts and no build
- * file beside it, and a failed or refused build leaves the live replica as
- * it was.
+ * file beside it, a failed or refused build leaves the live replica as it
+ * was, and `board_snapshot` is carried from the old replica into the new.
  */
-import type { WriteReplicaOptions, WriteReplicaResult } from './writer.js';
+import type { ReplicaBuild, WriteReplicaOptions, WriteReplicaResult } from './writer.js';
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { ATLAS_CONTRACT_VERSION } from '../contract/version.js';
@@ -114,6 +115,12 @@ describe('writeReplica', () => {
       finding_facts: 0,
       change_facts: 0,
       ci_facts: 0,
+      commit_facts: 0,
+      pr_facts: 0,
+      issue_facts: 0,
+      board_snapshot: 0,
+      module_facts: 0,
+      stretch_marks: 0,
     });
   });
 
@@ -173,5 +180,102 @@ describe('writeReplica', () => {
   ])('refuses %s before it writes anything', async (_label, options, message) => {
     await expect(buildWithSessions(['s1'], options)).rejects.toThrow(message);
     expect(existsSync(dir) && readdirSync(dir)).toEqual([]);
+  });
+});
+
+/** One `board_snapshot` row, as a test writes and reads it. */
+interface SnapshotRow {
+  readonly taken_at: string;
+  readonly day: string;
+  readonly stage: string;
+  readonly count: number;
+}
+
+/** A `fill` that writes `rows` into the build's `board_snapshot`. */
+function snapshotFill(rows: readonly SnapshotRow[]): (build: ReplicaBuild) => void {
+  return (build) => {
+    const insert = build.database.prepare('INSERT INTO board_snapshot (taken_at, day, stage, count) VALUES (?, ?, ?, ?)');
+    for (const row of rows) insert.run(row.taken_at, row.day, row.stage, row.count);
+  };
+}
+
+/** The snapshot rows the replica at the path holds, by day and stage. */
+function snapshotAt(path: string): SnapshotRow[] {
+  const reader = openReplica(path);
+  try {
+    return reader.current().database
+      .query<SnapshotRow, []>('SELECT taken_at, day, stage, count FROM board_snapshot ORDER BY day, stage')
+      .all();
+  } finally {
+    reader.close();
+  }
+}
+
+const MONDAY_BACKLOG: SnapshotRow = { taken_at: '2026-11-16T09:00:00.000Z', day: '2026-11-16', stage: 'Backlog', count: 12 };
+const MONDAY_IN_DEV: SnapshotRow = {
+  taken_at: '2026-11-16T09:00:00.000Z', day: '2026-11-16', stage: 'In development', count: 3,
+};
+const TUESDAY_BACKLOG: SnapshotRow = { taken_at: '2026-11-17T09:00:00.000Z', day: '2026-11-17', stage: 'Backlog', count: 11 };
+
+const MONDAY: readonly SnapshotRow[] = [MONDAY_BACKLOG, MONDAY_IN_DEV];
+const TUESDAY: readonly SnapshotRow[] = [TUESDAY_BACKLOG];
+
+describe('writeReplica, board_snapshot', () => {
+  it('starts an empty snapshot when there is no old replica', async () => {
+    const result = await writeReplica({ replicaPath, projectLabel: 'fixture' }, () => undefined);
+
+    expect(result.tables.board_snapshot).toBe(0);
+    expect(snapshotAt(replicaPath)).toEqual([]);
+  });
+
+  it('keeps the first build\'s snapshot rows in a second build that writes none', async () => {
+    await writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b1' }, snapshotFill(MONDAY));
+
+    const second = await writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b2' }, () => undefined);
+
+    expect(second.tables.board_snapshot).toBe(2);
+    expect(snapshotAt(replicaPath)).toEqual([...MONDAY]);
+  });
+
+  it('adds the second build\'s rows to the first build\'s, and carries both into a third', async () => {
+    await writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b1' }, snapshotFill(MONDAY));
+    await writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b2' }, snapshotFill(TUESDAY));
+
+    const third = await writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b3' }, () => undefined);
+
+    expect(third.tables.board_snapshot).toBe(3);
+    expect(snapshotAt(replicaPath)).toEqual([MONDAY_BACKLOG, MONDAY_IN_DEV, TUESDAY_BACKLOG]);
+  });
+
+  it('keeps the row this build wrote over the old one of the same day and stage', async () => {
+    await writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b1' }, snapshotFill(MONDAY));
+    const recount = { taken_at: '2026-11-16T17:00:00.000Z', day: '2026-11-16', stage: 'Backlog', count: 9 };
+
+    await writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b2' }, snapshotFill([recount]));
+
+    expect(snapshotAt(replicaPath)).toEqual([recount, MONDAY_IN_DEV]);
+  });
+
+  it('starts an empty snapshot over an old replica that has no board_snapshot table', async () => {
+    mkdirSync(join(dir, 'atlas'), { recursive: true });
+    const older = new Database(replicaPath, { create: true });
+    older.run('CREATE TABLE task_facts (session_id TEXT PRIMARY KEY, kind TEXT NOT NULL)');
+    older.close();
+
+    const result = await writeReplica({ replicaPath, projectLabel: 'fixture' }, () => undefined);
+
+    expect(result.tables.board_snapshot).toBe(0);
+    expect(snapshotAt(replicaPath)).toEqual([]);
+  });
+
+  it('fails the build and leaves the old file as it was when the old replica cannot be read', async () => {
+    mkdirSync(join(dir, 'atlas'), { recursive: true });
+    writeFileSync(replicaPath, 'not a database, but long enough to be read as a header by sqlite at all');
+
+    const failed = writeReplica({ replicaPath, projectLabel: 'fixture', buildId: 'b2' }, () => undefined);
+
+    await expect(failed).rejects.toThrow('the board snapshot of');
+    expect(readdirSync(join(dir, 'atlas'))).toEqual(['atlas.sqlite']);
+    expect(readFileSync(replicaPath, 'utf8')).toStartWith('not a database');
   });
 });

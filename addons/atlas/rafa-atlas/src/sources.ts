@@ -2,8 +2,11 @@
  * The table sources the registry serves so far, one spec per replica
  * bucket: `local.tasks` over `task_facts`, `local.daily` over
  * `daily_rollup`, `local.plans` over `plan_facts`, `local.bugs` over
- * `bug_facts`, `local.findings` over `finding_facts` and `local.ci` over
- * `ci_facts`. The build stamps `local.changes` too, and no spec here
+ * `bug_facts`, `local.findings` over `finding_facts`, `local.ci` over
+ * `ci_facts`, `local.commits` over `commit_facts`, `local.marks` over
+ * `stretch_marks`, `local.issues` over `issue_facts`, `local.board`
+ * over `board_snapshot`, `local.modules` over `module_facts` and
+ * `local.prs` over `pr_facts`, which only a `--github` build fills. The build stamps `local.changes` too, and no spec here
  * defines it yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
@@ -18,8 +21,12 @@ import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
 
 import { DAILY_SOURCE } from './build/daily.js';
 import { PLANS_SOURCE } from './build/derive.js';
+import { BOARD_SOURCE, ISSUES_SOURCE } from './ingest/board.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
+import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
+import { PRS_SOURCE } from './ingest/github.js';
+import { MODULES_SOURCE } from './ingest/modules.js';
 
 /** The aggregates a numeric measure takes. */
 const MEASURE_AGGREGATES: readonly Aggregate[] = ['sum', 'mean', 'min', 'max', 'p50', 'p90', 'p99'];
@@ -271,5 +278,181 @@ export const CI_SPEC: TableSourceSpec = {
   table: 'ci_facts',
 };
 
+/** `local.commits`: one row per first-parent commit of the base branch, from `commit_facts`. */
+export const COMMITS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: COMMITS_SOURCE,
+    source: 'local',
+    channel: 'commits',
+    title: 'Commits',
+    description: 'One row per first-parent commit of the branch origin/HEAD names (HEAD when it names none), read from git in the project root.',
+    timeField: 'committed_at',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      id('sha', 'Commit'),
+      time('committed_at', 'Committed', 'datetime'),
+      { ...time('day', 'Day', 'date'), role: 'dimension' },
+      dimension('subject', 'Subject'),
+      dimension('type', 'Type', 'the conventional prefix: feat, fix, chore, docs and the rest; NULL for a subject with none'),
+      dimension('plan_stub', 'Plan', 'the plan whose pull request the commit landed, through plan_facts.pr_number'),
+      numberId('pr_number', 'Pull request', 'pull request'),
+      measure('files_changed', 'Files changed', 'integer', 'files'),
+      measure('insertions', 'Insertions', 'integer', 'lines'),
+      measure('deletions', 'Deletions', 'integer', 'lines'),
+      { ...measure('is_merge', 'Merge', 'integer', 'commits'), description: '1 for a commit with two parents or more' },
+      dimension('release_tag', 'Release tag', 'the v* tag on the commit, an annotated tag peeled; NULL for an untagged commit'),
+    ],
+  },
+  table: 'commit_facts',
+};
+
+/** `local.marks`: one row per stretch end the base branch's merge subjects name, from `stretch_marks`. */
+export const MARKS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: MARKS_SOURCE,
+    source: 'local',
+    channel: 'marks',
+    title: 'Stretch marks',
+    description: 'One row per stretch end, read from the merge subjects Stretch <n> (#<pr>) and Merge pull request #<pr> from <owner>/stretch/<n>, and under --github from a commit whose pull request\'s head is stretch/<n>.',
+    timeField: 'ended_at',
+    grains: ['day', 'week', 'month', 'all'],
+    fields: [
+      numberId('number', 'Stretch', 'stretch'),
+      { ...measure('part', 'Part', 'integer', 'part'), role: 'dimension', aggregates: COUNT_AGGREGATES, groupable: true, description: '1, then 2 for a stretch number merged again' },
+      dimension('lane', 'Lane', 'M for a three-digit stretch number, A for one or two digits'),
+      time('ended_at', 'Ended', 'datetime'),
+      numberId('pr_number', 'Pull request', 'pull request'),
+    ],
+  },
+  table: 'stretch_marks',
+};
+
+/** A 0-or-1 column, summed to count the rows it holds for. */
+function flagMeasure(key: string, label: string, unit: string, description: string): FieldDescriptor {
+  return { ...measure(key, label, 'integer', unit), description };
+}
+
+/** `local.issues`: one row per issue the board cache holds, from `issue_facts`. */
+export const ISSUES_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: ISSUES_SOURCE,
+    source: 'local',
+    channel: 'issues',
+    title: 'Issues',
+    description: 'One row per issue of the board cache rafa keeps, read offline as of its watermark; created and closed times come from the GitHub source.',
+    timeField: 'created_at',
+    grains: ['day', 'week', 'month', 'all'],
+    fields: [
+      numberId('number', 'Issue', 'issue'),
+      dimension('title', 'Title'),
+      dimension('state', 'State', 'OPEN or CLOSED'),
+      dimension('state_reason', 'Close reason', 'GitHub\'s value: COMPLETED, NOT_PLANNED or DUPLICATE; NULL while open'),
+      { ...dimension('labels_json', 'Labels', 'the label names, as a JSON array'), type: 'json' },
+      flagMeasure('is_bug', 'Bug', 'issues', '1 for an issue labelled type:bug or bug'),
+      flagMeasure('is_epic', 'Epic', 'issues', '1 for an issue labelled type:epic'),
+      dimension('epic_slug', 'Epic', 'the slug of the first epic: label'),
+      numberId('parent_number', 'Parent epic', 'issue'),
+      time('created_at', 'Created', 'datetime'),
+      time('closed_at', 'Closed', 'datetime'),
+      dimension('stage', 'Stage', 'the board Stage its state and labels read; NULL for an epic'),
+      dimension('stage_basis', 'Stage basis', 'labels offline; labels+prs when the GitHub source read the closing pull requests'),
+      dimension('horizon', 'Horizon', 'now, next or later for an epic; NULL for any other issue'),
+      dimension('plan_stub', 'Plan', 'the plan its body names in a ## Plan block or a follow-ups comment; NULL for one filed by hand'),
+      dimension('module', 'Module', 'the module:<x> label\'s value'),
+      dimension('priority', 'Priority', 'the priority:<x> label\'s value'),
+    ],
+  },
+  table: 'issue_facts',
+};
+
+/** `local.board`: one row per day and board stage a build counted, from `board_snapshot`. */
+export const BOARD_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: BOARD_SOURCE,
+    source: 'local',
+    channel: 'board',
+    title: 'Board snapshots',
+    description: 'One row per day and board stage: the issues in the stage on the day a build ran, carried from build to build.',
+    timeField: 'day',
+    grains: ['day', 'week', 'month', 'all'],
+    fields: [
+      time('day', 'Day', 'date'),
+      time('taken_at', 'Taken', 'datetime'),
+      dimension('stage', 'Stage'),
+      measure('count', 'Issues', 'integer', 'issues'),
+    ],
+  },
+  table: 'board_snapshot',
+};
+
+/** `local.modules`: one row per module of the project's tree, from `module_facts`. */
+export const MODULES_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: MODULES_SOURCE,
+    source: 'local',
+    channel: 'modules',
+    title: 'Modules',
+    description: 'One row per module folder of the project tree: its size, its @open-tomato imports, and the bugs, findings and changes the effort store attributes to it.',
+    timeField: null,
+    grains: ['all'],
+    fields: [
+      dimension('path', 'Module', 'the module folder, relative to the project root'),
+      dimension('package', 'Package', 'the name of the module\'s own package.json; NULL for a folder with none'),
+      measure('files', 'Files', 'integer', 'files'),
+      measure('loc', 'Lines of code', 'integer', 'lines'),
+      measure('test_files', 'Test files', 'integer', 'files'),
+      measure('test_loc', 'Test lines of code', 'integer', 'lines'),
+      { ...measure('fan_in', 'Fan-in', 'integer', 'modules'), description: 'the other modules importing its package' },
+      { ...measure('fan_out', 'Fan-out', 'integer', 'modules'), description: 'the other modules whose package it imports' },
+      { ...dimension('imports_json', 'Imports', 'the @open-tomato packages it imports, its own left out, as a JSON array'), type: 'json' },
+      {
+        ...measure('upward_edges', 'Upward edges', 'integer', 'edges'),
+        description: 'the upward imports docs/survey/cut-table.json lists from its files; NULL with no cut table or for a module it does not cover',
+      },
+      measure('bugs', 'Bugs', 'integer', 'bugs'),
+      measure('findings', 'Findings', 'integer', 'findings'),
+      measure('changes', 'Changes', 'integer', 'changes'),
+    ],
+  },
+  table: 'module_facts',
+};
+
+/** `local.prs`: one row per pull request `gh pr list` answered, from `pr_facts`; empty unless the build ran with `--github`. */
+export const PRS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: PRS_SOURCE,
+    source: 'local',
+    channel: 'prs',
+    title: 'Pull requests',
+    description: 'One row per pull request of the project, read from GitHub with gh pr list --state all; only a build run with --github reads it.',
+    timeField: 'created_at',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      numberId('number', 'Pull request', 'pull request'),
+      dimension('title', 'Title'),
+      dimension('head_ref', 'Head branch'),
+      dimension('base_ref', 'Base branch'),
+      dimension('plan_stub', 'Plan', 'the plan whose plan_facts.pr_number is this pull request'),
+      dimension('state', 'State', 'OPEN, CLOSED or MERGED'),
+      time('created_at', 'Created', 'datetime'),
+      time('merged_at', 'Merged', 'datetime'),
+      time('closed_at', 'Closed', 'datetime'),
+      measure('additions', 'Additions', 'integer', 'lines'),
+      measure('deletions', 'Deletions', 'integer', 'lines'),
+      measure('changed_files', 'Files changed', 'integer', 'files'),
+      measure('review_count', 'Reviews', 'integer', 'reviews'),
+      time('first_review_at', 'First review', 'datetime'),
+      {
+        ...dimension('closing_issues_json', 'Closing issues', 'the issues it closes in its own repository, as a JSON array; GitHub links them only into the default branch'),
+        type: 'json',
+      },
+    ],
+  },
+  table: 'pr_facts',
+};
+
 /** Every source spec the registry defines, in the order `/sources` lists them. */
-export const SOURCE_SPECS: readonly TableSourceSpec[] = [TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC];
+export const SOURCE_SPECS: readonly TableSourceSpec[] = [
+  TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC, ISSUES_SPEC, BOARD_SPEC,
+  MODULES_SPEC, PRS_SPEC,
+];

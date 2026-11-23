@@ -8,11 +8,22 @@
  * reads with `loadAtlasConfig` and lays over the served metric as its
  * goal (`withAtlasTargets`, `src/config.ts`). With none set, the card
  * draws the spend with no target set.
+ *
+ * Past the PoC cut, `pm.milestone-completion` (entry 1) reads the epics of
+ * the board cache, offline (D17): the epics closed as completed over the
+ * epics in Now or Done. The engine counts no condition per row, so it
+ * answers the epics by horizon, state and close reason, and the card
+ * takes the share: the numerator is the CLOSED rows with reason
+ * COMPLETED, the denominator those rows with every open epic in the
+ * `now` horizon and every closed one. It reads the board as of its
+ * cache's watermark, so the card asks it with no window
+ * (`local.issues` bounds a window by `created_at`, NULL offline).
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
 import { DAILY_SOURCE } from '../build/daily.js';
 import { PLANS_SOURCE } from '../build/derive.js';
+import { ISSUES_SOURCE } from '../ingest/board.js';
 import { FINDINGS_SOURCE } from '../ingest/facts.js';
 
 /** How many blockers the active-blockers list answers, the newest first. */
@@ -119,5 +130,27 @@ export const ACTIVE_BLOCKERS: MetricDefinition = {
   feasibility: 'direct',
 };
 
-/** The project management lens's metrics, in the order section G lists them. */
-export const PM_METRICS: readonly MetricDefinition[] = [BUDGET_BURN, TOKENS_PER_DAY, PLAN_COMPLETION, PLANNED_VS_SESSIONS, ACTIVE_BLOCKERS];
+/** The epics by horizon, state and close reason: the card reads the completed share of those in Now or Done. */
+export const MILESTONE_COMPLETION: MetricDefinition = {
+  id: 'pm.milestone-completion',
+  title: 'Milestone completion',
+  lenses: ['pm'],
+  description: 'The epics of the board cache by horizon, state and close reason; the card divides the epics closed as completed by the epics in the now horizon or closed.',
+  sourceId: ISSUES_SOURCE,
+  params: {
+    filters: [{ field: 'is_epic', op: 'eq', value: 1 }],
+    groupBy: ['horizon', 'state', 'state_reason'],
+    measures: [{ field: 'number', agg: 'count', as: 'epics' }],
+    orderBy: [{ key: 'epics', dir: 'desc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'epics',
+  chart: 'bullet',
+  feasibility: 'direct',
+};
+
+/** The project management lens's PoC metrics, in the order section G lists them. */
+export const PM_POC_METRICS: readonly MetricDefinition[] = [BUDGET_BURN, TOKENS_PER_DAY, PLAN_COMPLETION, PLANNED_VS_SESSIONS, ACTIVE_BLOCKERS];
+
+/** The project management lens's metrics: the PoC cut, then the one over the board source. */
+export const PM_METRICS: readonly MetricDefinition[] = [...PM_POC_METRICS, MILESTONE_COMPLETION];

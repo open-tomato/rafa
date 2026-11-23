@@ -7,12 +7,12 @@
  *
  *   - `budget.tokensPerWeek`: the weekly token budget `pm.budget-burn`
  *     draws as its goal.
- *   - `wipLimit`: the ceiling the WIP gauge draws against, once the board
- *     ingest serves it.
+ *   - `wipLimit`: the ceiling the WIP gauge, `dev.wip`, draws as its
+ *     goal.
  *
  * Both are null when the file or the key is absent, or when the file
  * writes `null`: with no target, `pm.budget-burn` draws the spend alone
- * and says no target is set. A value is a whole number above zero; any
+ * and says no target is set, and `dev.wip` the count alone. A value is a whole number above zero; any
  * other value, an unknown key, or a file that is not a JSON object
  * throws `AtlasConfigError`, naming every problem at once.
  *
@@ -30,6 +30,9 @@ export const ATLAS_CONFIG_FILE: string = join('.rafa', 'atlas', 'config.json');
 
 /** The metric whose goal is the weekly token budget. */
 export const BUDGET_METRIC = 'pm.budget-burn';
+
+/** The metric whose goal is the WIP ceiling. */
+export const WIP_METRIC = 'dev.wip';
 
 /** What the project sets for Atlas; every target is null when unset. */
 export interface AtlasProjectConfig {
@@ -136,18 +139,25 @@ export async function loadAtlasConfig(projectRoot: string): Promise<AtlasProject
 
 /**
  * The metrics with the config's targets laid over them, as a new map:
- * `pm.budget-burn` takes `budget.tokensPerWeek` as its goal when one is
- * set. Every other metric, and the budget metric with no target, is the
- * one handed in.
+ * `pm.budget-burn` takes `budget.tokensPerWeek` as its goal and `dev.wip`
+ * takes `wipLimit`, each when one is set. Every other metric, and a
+ * targeted one with no target, is the one handed in; with no target set
+ * the map handed in is answered.
  */
 export function withAtlasTargets(
   metrics: ReadonlyMap<string, MetricDefinition>,
   config: AtlasProjectConfig,
 ): ReadonlyMap<string, MetricDefinition> {
-  const goal = config.budget.tokensPerWeek;
-  const budget = metrics.get(BUDGET_METRIC);
-  if (goal === null || budget === undefined) return metrics;
-  return new Map([...metrics].map(([id, metric]) => [id, id === BUDGET_METRIC
-    ? { ...budget, goal }
-    : metric]));
+  const goals: ReadonlyMap<string, number | null> = new Map([
+    [BUDGET_METRIC, config.budget.tokensPerWeek],
+    [WIP_METRIC, config.wipLimit],
+  ]);
+  const targeted = [...goals].filter(([id, goal]) => goal !== null && metrics.has(id));
+  if (targeted.length === 0) return metrics;
+  return new Map([...metrics].map(([id, metric]) => {
+    const goal = goals.get(id) ?? null;
+    return [id, goal === null
+      ? metric
+      : { ...metric, goal }];
+  }));
 }
