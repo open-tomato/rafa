@@ -99,8 +99,17 @@ export const DATE_SHAPE = 'YYYY-MM-DD';
 /** A fence opening or closing a code block; `parseRoadmapBody`'s own rule. */
 const FENCE = /^\s*(?:`{3,}|~{3,})/u;
 
-/** An ATX heading: its hashes and its text. */
-const HEADING = /^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$/u;
+/**
+ * An ATX heading's opening: up to three spaces, its hashes, and the one
+ * whitespace character it needs after them. The title is the rest of the
+ * line, cut by {@link headingTitle} with a scan rather than by a pattern: a
+ * `(.*?)\s*#*\s*$` tail splits one run of spaces three ways and backtracks
+ * in cubic time on a public issue body (CodeQL `js/polynomial-redos`).
+ */
+const HEADING = /^ {0,3}(#{1,6})\s/u;
+
+/** A character `.` does not match; a title holding one makes no heading, as the old `(.*?)` read it. */
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/u;
 
 /** The criteria heading's text, trailing colon allowed. */
 const CRITERIA_TITLE = /^acceptance\s+criteria\s*:?$/iu;
@@ -186,16 +195,46 @@ export function findField(lines: readonly BodyLine[], name: string): FieldLine |
   return null;
 }
 
+/** One heading line, read: its level and its title. */
+interface Heading {
+  readonly level: number;
+  readonly title: string;
+}
+
+/**
+ * `rest`, the text after a heading's hashes, as a title: the closing `#` run
+ * and the whitespace on both sides of it dropped from the end, then the
+ * leading whitespace. `trimEnd` and `trimStart` drop the set `\s` matches.
+ */
+function headingTitle(rest: string): string {
+  const open = rest.trimEnd();
+  let end = open.length;
+  while (end > 0 && open[end - 1] === '#') end -= 1;
+  return open.slice(0, end).trimEnd()
+    .trimStart();
+}
+
+/** The heading `line` is, or null when it is fenced or not one. */
+function readHeading(line: BodyLine): Heading | null {
+  if (line.fenced) return null;
+  const opening = HEADING.exec(line.text);
+  if (opening === null) return null;
+  const title = headingTitle(line.text.slice(opening[0].length));
+  if (LINE_TERMINATOR.test(title)) return null;
+  return { level: opening[1]?.length ?? 0, title };
+}
+
 /** The level of the heading `line` is, or 0 when it is not one. */
 function headingLevel(line: BodyLine): number {
-  if (line.fenced) return 0;
-  return HEADING.exec(line.text)?.[1]?.length ?? 0;
+  return readHeading(line)?.level ?? 0;
 }
 
 /** The criteria heading and the text under it, or null when there is no heading. */
 function findCriteria(lines: readonly BodyLine[]): FieldLine | null {
-  const start = lines.findIndex((line) => headingLevel(line) > 0
-    && CRITERIA_TITLE.test(HEADING.exec(line.text)?.[2] ?? ''));
+  const start = lines.findIndex((line) => {
+    const heading = readHeading(line);
+    return heading !== null && CRITERIA_TITLE.test(heading.title);
+  });
   const opening = lines[start];
   if (opening === undefined) return null;
 

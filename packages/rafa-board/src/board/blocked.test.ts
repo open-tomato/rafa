@@ -27,6 +27,12 @@
  *    same ids with no foreign token and holds the whole reading equal to
  *    what it was before foreign tokens were read, so a reader that
  *    dropped every id on a line holding a `/` fails there.
+ *  - The two timing cases (CodeQL `js/polynomial-redos`, alerts 14 and 15)
+ *    each assert what the crafted line reads as beside the time, so a fast
+ *    reader that dropped the ids or the tokens still fails, and the case
+ *    beside them holds the tokens a scan that skipped starts inside a run
+ *    would lose. Their red run, against the old `FOREIGN_ID`, took 5.0 and
+ *    9.9 s at this size; the tracker's close-out notes hold the readings.
  */
 import { describe, expect, it } from 'bun:test';
 
@@ -261,5 +267,51 @@ describe('a blocker on another repository', () => {
     expect(blockedFaultMessage(readBlockedBy(57, body('Blocked by: the API work')))).toContain(
       'naming no issue: "the API work"',
     );
+  });
+});
+
+describe('a Blocked by line built to backtrack', () => {
+  /**
+   * The ceiling a crafted line's read must end under. The old `FOREIGN_ID`
+   * took about 10 s on a 50,000-character run here and grows quadratically,
+   * and a linear read ends under 10 ms, so the bound fails the old pattern
+   * forty times over and leaves a loaded CI runner twenty-five times headroom.
+   */
+  const REDOS_BOUND_MS = 250;
+
+  /** The length of the crafted run after the colon, about 50,000 characters of body. */
+  const CRAFTED_LENGTH = 50_000;
+
+  it('reads a run of owner characters with no slash as no foreign token in time (alert 14, foreignIn)', () => {
+    const run = '0-'.repeat(CRAFTED_LENGTH / 2);
+
+    const started = performance.now();
+    const read = readBlockedBy(57, body(`Blocked by: ${run}`));
+    const elapsed = performance.now() - started;
+
+    expect(read.kind).toBe('no-ids');
+    expect(read.foreign).toEqual([]);
+    expect(read.text).toBe(run);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('reads the local ids beside a run of owner characters in time (alert 15, the replace)', () => {
+    const run = '0'.repeat(CRAFTED_LENGTH);
+
+    const started = performance.now();
+    const read = readBlockedBy(57, body(`Blocked by: #24 acme/api#9 #26 ${run}`));
+    const elapsed = performance.now() - started;
+
+    expect(read.kind).toBe('blocked');
+    expect(read.blockers).toEqual([24, 26]);
+    expect(read.foreign).toEqual(['acme/api#9']);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('reads a token after leading hyphens and one straight after another, which is the control', () => {
+    const read = readBlockedBy(57, body('Blocked by: -org/repo#1 a/b#2c-d/e#3 #4 x/y#5-z/w#6'));
+
+    expect(read.foreign).toEqual(['org/repo#1', 'a/b#2', 'c-d/e#3', 'x/y#5', 'z/w#6']);
+    expect(read.blockers).toEqual([4]);
   });
 });

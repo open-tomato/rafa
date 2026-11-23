@@ -135,3 +135,46 @@ describe('originalPartHolds', () => {
     expect(originalPartHolds(BODY, `${BODY}${BLOCK}`, BLOCK)).toBe(false);
   });
 });
+
+describe('a body built to backtrack (alert 18)', () => {
+  /**
+   * The ceiling a crafted body's read must end under. The old trailing-whitespace
+   * pattern took about 2.5 s at {@link CRAFTED_SPACES}, and a linear read ends
+   * under 10 ms, so the bound fails the old pattern ten times over and leaves a
+   * loaded CI runner twenty-five times headroom.
+   */
+  const REDOS_BOUND_MS = 250;
+
+  /** The run of spaces inside the crafted text, about 50,000 characters of body. */
+  const CRAFTED_SPACES = 50_000;
+
+  /** Spaces then `'x'`: whitespace the old pattern tried to end the text at from every start. */
+  const crafted = `${' '.repeat(CRAFTED_SPACES)}x`;
+
+  test('replaces with the crafted text in time (replacedBody)', () => {
+    const started = performance.now();
+    const replaced = replacedBody(`a${crafted}`);
+    const elapsed = performance.now() - started;
+
+    expect(replaced).toBe(`a${crafted}`);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  test('reads the crafted body as carrying no block in time (carriesUpdateBlock)', () => {
+    const started = performance.now();
+    const carries = carriesUpdateBlock(`a${crafted}`, BLOCK);
+    const elapsed = performance.now() - started;
+
+    expect(carries).toBe(false);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  test('reads the crafted re-read as a conflict in time (originalPartHolds)', () => {
+    const started = performance.now();
+    const holds = originalPartHolds('b', `b${crafted}`, BLOCK);
+    const elapsed = performance.now() - started;
+
+    expect(holds).toBe(false);
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+});

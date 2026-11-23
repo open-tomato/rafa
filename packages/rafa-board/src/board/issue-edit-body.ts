@@ -49,12 +49,9 @@
 import { normaliseReason } from './epic-trail.js';
 import { localDay } from './epics.js';
 
-/** Whitespace closing a string, which a block and a replaced body drop. */
-const TRAILING_WHITESPACE = /\s+$/u;
-
 /** The text with its trailing whitespace dropped, refused when nothing is left. */
 function trimmedText(text: string, what: string): string {
-  const trimmed = text.replace(TRAILING_WHITESPACE, '');
+  const trimmed = text.trimEnd();
   if (trimmed.trim() === '') throw new RangeError(`${what} holds nothing but whitespace`);
   return trimmed;
 }
@@ -97,7 +94,7 @@ export function replacedBody(text: string): string {
  * aside, and opens a line: the update was appended already.
  */
 export function carriesUpdateBlock(body: string, block: string): boolean {
-  const trimmed = body.replace(TRAILING_WHITESPACE, '');
+  const trimmed = body.trimEnd();
   if (!trimmed.endsWith(block)) return false;
   const before = trimmed.slice(0, trimmed.length - block.length);
   return before === '' || before.endsWith('\n');
@@ -111,6 +108,6 @@ export function carriesUpdateBlock(body: string, block: string): boolean {
  */
 export function originalPartHolds(before: string, after: string, block: string): boolean {
   if (!after.startsWith(before)) return false;
-  const added = after.slice(before.length).replace(TRAILING_WHITESPACE, '');
+  const added = after.slice(before.length).trimEnd();
   return added === `${separatorAfter(before)}${block}`;
 }

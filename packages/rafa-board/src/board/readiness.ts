@@ -220,8 +220,19 @@ interface PlaceholderShape {
   readonly pattern: RegExp;
 }
 
-/** An ATX heading: up to three spaces, one to six hashes, then text. */
-const HEADING_LINE = /^ {0,3}(#{1,6})\s+(.*)$/u;
+/**
+ * An ATX heading's opening: up to three spaces, one to six hashes, and the
+ * one whitespace character it needs after them. The title is the rest of
+ * the line, cut by {@link headingTitle} with a scan rather than by a
+ * pattern: a `\s+(.*)$` tail, and the `\s+#+\s*$` that took the closing
+ * hashes off it, share one run of spaces between two quantifiers and
+ * backtrack in polynomial time on a public issue body (CodeQL
+ * `js/polynomial-redos`).
+ */
+const HEADING_LINE = /^ {0,3}(#{1,6})\s/u;
+
+/** A character `.` does not match; a title holding one makes no heading, as the old `(.*)` read it. */
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/u;
 
 /** A fenced block's opening or closing line. */
 const FENCE_LINE = /^ {0,3}(?:```|~~~)/u;
@@ -373,13 +384,34 @@ function stripComments(line: string, carried: boolean): StrippedLine {
   return { visible, comments, open: inside };
 }
 
+/**
+ * `rest`, the text after a heading's opening, as a title: the leading and
+ * trailing whitespace dropped, then a closing `#` run with the whitespace
+ * before it, when whitespace does stand before it (`Design##` keeps its
+ * hashes). `trimStart` and `trimEnd` drop the set `\s` matches.
+ */
+function headingTitle(rest: string): string {
+  const title = rest.trimStart().trimEnd();
+  let end = title.length;
+  while (end > 0 && title[end - 1] === '#') end -= 1;
+  if (end === title.length) return title;
+
+  const kept = title.slice(0, end).trimEnd();
+  return kept.length < end
+    ? kept
+    : title;
+}
+
 /** The heading a visible line opens, or null when it opens none. */
 function headingOf(visible: string): BodyLine['heading'] {
   const match = HEADING_LINE.exec(visible);
   if (match === null) return null;
 
-  const [, hashes = '', title = ''] = match;
-  return { level: hashes.length, title: title.replace(/\s+#+\s*$/u, '').trim() };
+  const rest = visible.slice(match[0].length).trimStart();
+  if (LINE_TERMINATOR.test(rest)) return null;
+
+  const [, hashes = ''] = match;
+  return { level: hashes.length, title: headingTitle(rest) };
 }
 
 /** A line inside a fenced block, or a fence itself: quoted, read as written. */

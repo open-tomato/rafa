@@ -20,6 +20,11 @@
  *  - The missing criteria section is read beside the full body, which
  *    must carry no problem at all; a reader that always reported the
  *    section would pass the missing case alone.
+ *  - The two timing cases (CodeQL `js/polynomial-redos`, alerts 16 and 17)
+ *    each assert what the crafted body reads as beside the time, so a fast
+ *    reader that dropped the crafted heading still fails. Their red run,
+ *    against the old backtracking `HEADING`, was killed at 120 s at this
+ *    size; the tracker's close-out notes hold the readings.
  */
 import { describe, expect, it } from 'bun:test';
 
@@ -126,6 +131,48 @@ describe('the criteria section', () => {
     ].join('\n');
 
     expect(readEpicBody(body).criteria).toBe('real\n```\n## Not a heading\n```\nstill real');
+  });
+});
+
+describe('a heading line built to backtrack', () => {
+  /**
+   * The ceiling a crafted heading's read must end under. The old pattern took
+   * minutes at {@link CRAFTED_SPACES} (killed at 120 s) and 2.3 to 5.2 s at 2,000, and a
+   * linear read ends under 10 ms, so the bound fails the old pattern by orders
+   * of magnitude and leaves a loaded CI runner twenty-five times headroom.
+   */
+  const REDOS_BOUND_MS = 250;
+
+  /** The run of spaces between the title's two words, about 50,000 characters of body. */
+  const CRAFTED_SPACES = 50_000;
+
+  /** `'x'`, the spaces, `'x'`: a title whose spaces the old pattern split three ways. */
+  const craftedTitle = `x${' '.repeat(CRAFTED_SPACES)}x`;
+
+  it('ends a criteria section at the crafted heading in time (alert 16, headingLevel)', () => {
+    const body = `## Acceptance criteria\n- done when it ships\n# ${craftedTitle}`;
+
+    const started = performance.now();
+    const read = readEpicBody(body);
+    const elapsed = performance.now() - started;
+
+    expect(read.criteria).toBe('- done when it ships');
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('reads the crafted heading title as no criteria heading in time (alert 17, findCriteria)', () => {
+    const body = `## Acceptance criteria ${craftedTitle}\n- not these\n## Acceptance criteria\n- these`;
+
+    const started = performance.now();
+    const read = readEpicBody(body);
+    const elapsed = performance.now() - started;
+
+    expect(read.criteria).toBe('- these');
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+  });
+
+  it('drops a closing hash run and its spaces from the title, which is the control', () => {
+    expect(readEpicBody('## Acceptance criteria:  ##  \nmet\n# Next ###').criteria).toBe('met');
   });
 });
 
