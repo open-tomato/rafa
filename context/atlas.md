@@ -6,13 +6,13 @@ workspace members under `addons/atlas/*` (the second `workspaces` glob):
 | Layer | Member | Built today |
 |---|---|---|
 | 1 effort storage | rafa core | the live store, read only through core's `vacuumInto`; the board cache, plans, git and the module tree, read in the project root |
-| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | the replica writer and reader, the bucket tables, the query engine, `defineTableSource`; the effort ingest, the plan reader, the git ingest, the board ingest and the module ingest |
+| 2 data sources | `data` (`@open-tomato/atlas-data`) + the readers in `rafa-atlas` | the replica writer and reader, the bucket tables, the query engine, `defineTableSource`; the effort ingest, the plan reader, the git ingest, the board ingest, the module ingest and the GitHub ingest (under `--github`) |
 | 3 transport | `transport` | the pure handler, the fetch adapter (`toFetchHandler`), the typed client with a replaceable `Transport` (`fetchTransport`, `localTransport`). No Express adapter |
 | 4 contracts | `data/src/contract/` | descriptors, query params, results, metric definitions, the envelope and `ATLAS_CONTRACT_VERSION` |
 | 5 representation | `ui`, `demo`; `@open-tomato/charts` from npm | atoms to templates and the card cascade; the demo page. The chart seam over ECharts is `@open-tomato/charts`, published from another repository |
 
-Still design, not built: the GitHub reads (the `gh` metrics, phase 4, behind
-a `--github` flag the build does not take yet); the WIP gauge's ceiling
+Still design, not built: the `gh` metrics over the GitHub reads, which
+`build` and `serve` make only under `--github`; the WIP gauge's ceiling
 (`wipLimit` is read, and the board ingest fills `issue_facts.stage`, but no
 metric counts WIP from it yet);
 the bug backlog pair (phase 4); a chart drawing the stretch marks, which the

@@ -23,6 +23,14 @@ and takes `--port` (0 picks a free one; 4317 by default) and
 `--rebuild-every=<minutes>` (0 by default: build only when no replica
 exists). A failed rebuild keeps the replica it had.
 
+No build calls `gh` unless `build` or `serve` is given `--github`. With it,
+`gh pr list --state all` fills `pr_facts` (`local.prs`), `gh issue list
+--state all` the issue times, each stage reads the closing pull requests
+(`stage_basis` `labels+prs`), and `plan_facts.merged_at` and
+`daily_rollup.prs_merged` are filled. A failed `gh` read stamps `local.prs`
+failed with `gh`'s stderr, warns once, and builds the rest as without the
+flag, exit 0.
+
 ## Config
 
 `<root>/.rafa/atlas/config.json` holds the project's own targets, read by
@@ -35,8 +43,8 @@ exists). A failed rebuild keeps the replica it had.
 Both keys are optional and null when unset. With no `budget.tokensPerWeek`,
 `pm.budget-burn` draws the spend and says no target is set. Any other key,
 or a value that is not a whole number above zero, refuses the file with
-every problem named at once. The module reads no core `loadConfig` and no
-`gh`; GitHub reads wait for a later phase behind a flag.
+every problem named at once. The module reads no core `loadConfig`, and
+calls `gh` only under `--github`.
 
 ## Layout
 
@@ -49,6 +57,8 @@ the board cache `<root>/.rafa/cache/board.json`, read once per build and
 stamped with its watermark; no cache stamps both sources missing),
 `modules.ts` (each module's files, LOC, `@open-tomato` imports and fan, and
 its upward edges from `docs/survey/cut-table.json`, NULL with no table),
+`github.ts` (pull requests and issue times through `gh`, under `--github`
+only),
 `attribute.ts` (the module column), and `snapshot.ts` (the `vacuumInto`
 copy). `src/build/` is the one-pass builder: `index.ts` writes the replica,
 `derive.ts` the work type, the rollups and each module's counts, `daily.ts` the daily rollup.

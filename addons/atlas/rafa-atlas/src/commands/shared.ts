@@ -1,6 +1,7 @@
 /**
  * What every Atlas command does around its step: find the project root,
- * and refuse the way a module must.
+ * read the `--github` switch into the build's options, and refuse the way
+ * a module must.
  *
  * `module exec` resolves no project, so the root is `ATLAS_PROJECT_ROOT`
  * when it is set, the context's project when the dispatcher handed one,
@@ -12,8 +13,14 @@
  * source can be a second copy of core beside the runtime that loaded it,
  * so a refusal is `output.error` for each line and then a plain `Error`,
  * which the dispatcher ends with exit code 1 (`context/atlas.md`).
+ *
+ * `--github` (D9) is the one switch that lets a build call `gh`: bare, or
+ * `--github=true`, it is on; left out, `--no-github` or `--github=false`,
+ * it is off, and any other value refuses naming the flag.
  */
-import type { RafaContext } from '@open-tomato/rafa-core/core/command';
+import type { BuildOptions } from '../build/index.js';
+import type { GhRunner } from '@open-tomato/rafa-board';
+import type { RafaContext, RafaFlagSpec } from '@open-tomato/rafa-core/core/command';
 
 import { resolve } from 'node:path';
 
@@ -37,6 +44,33 @@ export function projectRootOf(context: RafaContext, cwd: string = process.cwd())
   const named = context.env['ATLAS_PROJECT_ROOT'];
   if (named !== undefined && named !== '') return resolve(named);
   return context.project?.root ?? cwd;
+}
+
+/** The `--github` flag `build` and `serve` declare. */
+export const GITHUB_FLAG: RafaFlagSpec = {
+  name: 'github',
+  description: 'also read pull requests and issue times from GitHub with gh; a failed read warns, and the rest is built without it',
+  type: 'boolean',
+};
+
+/** Whether the context asks for the GitHub read; see the module note. Throws naming the flag on another value. */
+export function githubFlagOf(context: RafaContext): boolean {
+  const value = context.flags[GITHUB_FLAG.name];
+  if (value === undefined || value === false || value === 'false') return false;
+  if (value === true || value === 'true') return true;
+  throw new Error(`--${GITHUB_FLAG.name} is ${JSON.stringify(value)}, expected no value, true or false`);
+}
+
+/** The build options of the context: its root, its environment and `--github`; `gh`, when given, stands in for `gh`. */
+export function buildOptionsOf(context: RafaContext, gh?: GhRunner): BuildOptions {
+  return {
+    projectRoot: projectRootOf(context),
+    env: context.env,
+    github: githubFlagOf(context),
+    ...(gh === undefined
+      ? {}
+      : { gh }),
+  };
 }
 
 /** Prints each line as an error, then throws the summary. */

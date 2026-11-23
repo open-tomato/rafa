@@ -1,6 +1,6 @@
 /**
- * `deriveBuild`: the buckets derived from the effort, git, board and
- * module ingests', run after them inside the same build. In order:
+ * `deriveBuild`: the buckets derived from the effort, git, board, module
+ * and GitHub ingests', run after them inside the same build. In order:
  *
  * 1. **Work type (D4).** `task_facts.work_type` is the session's change
  *    level read as a kind of work ({@link CHANGE_LEVELS}): `major` and
@@ -29,8 +29,10 @@
  *    commit landed on with no session gets a row, its minutes and tokens
  *    0, so the column summed equals the commits read; it reads NULL on
  *    every day when no git history was read, and the stamp says so.
- *    `prs_merged` reads NULL until the GitHub source lands, so
- *    `local.daily` is stamped partial and names it.
+ *    `prs_merged` counts the `pr_facts` rows merged on the day (UTC), and
+ *    each day a pull request merged on with no session gets a row, as a
+ *    commit day does; with no GitHub read (no `--github`, or a failed
+ *    read) it reads NULL, and `local.daily` is stamped partial naming it.
  * 3. **`plan_facts`**, one row per plan the plan folder holds or a
  *    session or CI reading names (`readPlans`, `ingest/plans.ts`). From
  *    the plan file: `plan_source`, `issue_number`, `tasks_planned`,
@@ -43,12 +45,14 @@
  *    `tokens` (summed as the day columns are; null for a plan with no
  *    session). From `ci_facts`: `ci_last_verdict` (the latest reading's),
  *    `ci_red_readings` and `pr_number` (the latest reading's that names
- *    one). `merged_at` reads NULL until the GitHub source lands, so
- *    `local.plans` is stamped partial.
+ *    one). `merged_at` is the `pr_facts.merged_at` of that pull request,
+ *    NULL for one not merged; with no GitHub read it reads NULL, and
+ *    `local.plans` is stamped partial naming it.
  * 4. **`commit_facts.plan_stub`**, the plan whose `plan_facts.pr_number`
  *    is the commit's `pr_number`. A pull request two plans name links
  *    neither, and the commit's plan reads NULL, as does a commit naming
- *    no pull request.
+ *    no pull request. With a GitHub read, `pr_facts.plan_stub` is linked
+ *    the same way: the one plan whose `pr_number` is the pull request's.
  * 5. **`plan_facts.epic_slug`**, the `issue_facts.epic_slug` of the
  *    plan's `issue_number` (`ingest/board.ts`): the slug of the epic the
  *    plan's issue is a member of, or of the epic itself when the plan's
@@ -107,10 +111,10 @@ export const CHANGE_LEVELS: Readonly<Record<string, ChangeLevel>> = {
 /** The `preflight` columns the day counts read; a missing one leaves both preflight columns NULL. */
 export const PREFLIGHT_COLUMNS: readonly string[] = ['run_id', 'tier', 'outcome', 'collected_at'];
 
-/** The `daily_rollup` columns no source read here fills; they read NULL. */
+/** The `daily_rollup` columns only the GitHub source fills; they read NULL without a GitHub read. */
 export const UNREAD_DAILY_COLUMNS: readonly string[] = ['prs_merged'];
 
-/** The `plan_facts` columns no source read here fills; they read NULL. */
+/** The `plan_facts` columns only the GitHub source fills; they read NULL without a GitHub read. */
 export const UNREAD_PLAN_COLUMNS: readonly string[] = ['merged_at'];
 
 /** What one derivation is handed. */
@@ -125,6 +129,8 @@ export interface DeriveOptions {
   readonly gitRead?: boolean;
   /** True when the board ingest read the cache into `issue_facts`; `plan_facts.epic_slug` reads NULL otherwise. */
   readonly boardRead?: boolean;
+  /** True when the GitHub ingest read the pull requests into `pr_facts`; `prs_merged` and `merged_at` read NULL otherwise. */
+  readonly prsRead?: boolean;
 }
 
 /** One day's preflight runs, and how many of them halted. */
@@ -147,6 +153,8 @@ export interface Derivation {
   readonly workTyped: number;
   /** The `commit_facts` rows given a plan through `plan_facts.pr_number`. */
   readonly commitsLinked: number;
+  /** The `plan_facts` rows given a merge time through their pull request's `pr_facts.merged_at`. */
+  readonly plansMerged: number;
   /** The `plan_facts` rows given an epic through their issue's `issue_facts.epic_slug`. */
   readonly plansEpicLinked: number;
   /** The `module_facts` rows given their bug, finding and change counts. */
@@ -223,6 +231,10 @@ const DAY_COUNTS = `UPDATE daily_rollup SET
 const DAY_COMMITS = `UPDATE daily_rollup SET
   commits = (SELECT count(*) FROM commit_facts c WHERE c.day = daily_rollup.day)`;
 
+/** Each day's pull requests merged, from `pr_facts`; `merged_at` is ISO-8601 UTC, so its first ten characters are its day. */
+const DAY_MERGES = `UPDATE daily_rollup SET
+  prs_merged = (SELECT count(*) FROM pr_facts p WHERE p.merged_at IS NOT NULL AND substr(p.merged_at, 1, 10) = daily_rollup.day)`;
+
 /** The days a commit landed on. */
 function commitDays(database: Database): readonly string[] {
   return database
@@ -231,8 +243,23 @@ function commitDays(database: Database): readonly string[] {
     .map((row) => row.day);
 }
 
-/** Add the commit-only and preflight-only days, then fill every day's counts; answers the rows the bucket holds. */
-function fillDailyCounts(database: Database, preflight: PreflightRead, gitRead: boolean): number {
+/** The days a pull request merged on. */
+function mergeDays(database: Database): readonly string[] {
+  return database
+    .query<{ readonly day: string }, []>('SELECT DISTINCT substr(merged_at, 1, 10) AS day FROM pr_facts WHERE merged_at IS NOT NULL')
+    .all()
+    .map((row) => row.day);
+}
+
+/** Which sources the day counts read past the effort store. */
+interface DailyInputs {
+  readonly gitRead: boolean;
+  readonly prsRead: boolean;
+}
+
+/** Add the commit-only, merge-only and preflight-only days, then fill every day's counts; answers the rows the bucket holds. */
+function fillDailyCounts(database: Database, preflight: PreflightRead, inputs: DailyInputs): number {
+  const { gitRead, prsRead } = inputs;
   const zeros = [...KIND_SUFFIXES.flatMap((suffix) => [`minutes_${suffix}`, `tokens_${suffix}`]), 'tokens_total'];
   const addDay = database.prepare<unknown, [string]>(
     `INSERT OR IGNORE INTO daily_rollup (day, ${zeros.join(', ')}) VALUES (?, ${zeros.map(() => '0').join(', ')})`,
@@ -242,6 +269,7 @@ function fillDailyCounts(database: Database, preflight: PreflightRead, gitRead: 
   );
   database.transaction(() => {
     if (gitRead) for (const day of commitDays(database)) addDay.run(day);
+    if (prsRead) for (const day of mergeDays(database)) addDay.run(day);
     const days = preflight.days;
     if (days !== null) {
       for (const day of days.keys()) addDay.run(day);
@@ -250,6 +278,7 @@ function fillDailyCounts(database: Database, preflight: PreflightRead, gitRead: 
     }
     database.run(DAY_COUNTS);
     if (gitRead) database.run(DAY_COMMITS);
+    if (prsRead) database.run(DAY_MERGES);
   })();
   const row = database.query<{ readonly n: number }, []>('SELECT count(*) AS n FROM daily_rollup').get();
   return row?.n ?? 0;
@@ -354,6 +383,24 @@ export function linkCommitPlans(database: Database): number {
   return row?.n ?? 0;
 }
 
+/** The UPDATE giving each pull request the one plan naming it. */
+const PR_PLANS = `UPDATE pr_facts SET plan_stub = (
+    SELECT min(p.plan_stub) FROM plan_facts p WHERE p.pr_number = pr_facts.number)
+  WHERE (SELECT count(*) FROM plan_facts p WHERE p.pr_number = pr_facts.number) = 1`;
+
+/** The UPDATE giving each plan the merge time of its pull request. */
+const PLAN_MERGES = `UPDATE plan_facts SET merged_at = (
+    SELECT r.merged_at FROM pr_facts r WHERE r.number = plan_facts.pr_number)
+  WHERE pr_number IS NOT NULL`;
+
+/** Fill `pr_facts.plan_stub` and `plan_facts.merged_at` through `plan_facts.pr_number`; answers the plans given a merge time. */
+export function linkPullRequests(database: Database): number {
+  database.run(PR_PLANS);
+  database.run(PLAN_MERGES);
+  const row = database.query<{ readonly n: number }, []>('SELECT count(*) AS n FROM plan_facts WHERE merged_at IS NOT NULL').get();
+  return row?.n ?? 0;
+}
+
 /** The UPDATE giving each plan the epic slug of its issue. */
 const PLAN_EPICS = `UPDATE plan_facts SET epic_slug = (
     SELECT i.epic_slug FROM issue_facts i WHERE i.number = plan_facts.issue_number)
@@ -416,11 +463,18 @@ function unreadSentence(columns: readonly string[], sources: string): string {
     : `${columns.join(', ')} are not read yet (${sources}) and read NULL`;
 }
 
-/** The `local.daily` stamp: the unread columns, a missing preflight column or git history, and its inputs' reasons. */
-function dailyStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, preflight: PreflightRead, gitRead: boolean): SourceStamp {
+/**
+ * The `local.daily` stamp: the unread columns, a missing preflight column
+ * or git history, and its inputs' reasons. `local.prs` is no input here,
+ * so a failed GitHub read is named once, by its own stamp (D18).
+ */
+function dailyStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, preflight: PreflightRead, read: DailyInputs): SourceStamp {
+  const { gitRead, prsRead } = read;
   const inputs = inputsOf(stamps, [TASKS_SOURCE, FINDINGS_SOURCE, BUGS_SOURCE, CHANGES_SOURCE, COMMITS_SOURCE]);
   const own = [
-    unreadSentence(UNREAD_DAILY_COLUMNS, 'the GitHub source'),
+    ...(prsRead
+      ? []
+      : [unreadSentence(UNREAD_DAILY_COLUMNS, 'the GitHub source')]),
     ...(gitRead
       ? []
       : ['no git history was read; commits reads NULL']),
@@ -433,10 +487,13 @@ function dailyStamp(stamps: readonly SourceStamp[], readAt: string, rows: number
 }
 
 /** The `local.plans` stamp: the unread columns, a missing board cache, and its inputs' reasons, as of the newest plan file or input. */
-function plansStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, plans: readonly PlanReading[], boardRead: boolean): SourceStamp {
+function plansStamp(stamps: readonly SourceStamp[], readAt: string, rows: number, plans: readonly PlanReading[], read: { readonly boardRead: boolean; readonly prsRead: boolean }): SourceStamp {
+  const { boardRead, prsRead } = read;
   const inputs = inputsOf(stamps, [TASKS_SOURCE, CI_SOURCE]);
   const own = [
-    unreadSentence(UNREAD_PLAN_COLUMNS, 'the GitHub source'),
+    ...(prsRead
+      ? []
+      : [unreadSentence(UNREAD_PLAN_COLUMNS, 'the GitHub source')]),
     ...(boardRead
       ? []
       : ['no board cache was read; epic_slug reads NULL']),
@@ -447,8 +504,9 @@ function plansStamp(stamps: readonly SourceStamp[], readAt: string, rows: number
 
 /**
  * Derive the work type, the whole of `daily_rollup` and `plan_facts` in
- * the build, the plan of each commit, the epic of each plan and each
- * module's counts, after the effort, git, board and module ingests have
+ * the build, the plan of each commit, the merge time and epic of each
+ * plan and each module's counts, after the effort, git, board, module and
+ * GitHub ingests have
  * filled their buckets, and stamp {@link DAILY_SOURCE} then
  * {@link PLANS_SOURCE}; see the module note.
  * Throws when `options.stamps` holds no `local.tasks` stamp.
@@ -460,20 +518,24 @@ export function deriveBuild(build: ReplicaBuild, options: DeriveOptions): Deriva
   const workTyped = deriveWorkType(database);
   rollupDaily(database);
   const gitRead = options.gitRead ?? false;
+  const prsRead = options.prsRead ?? false;
   const preflight = readSnapshotPreflight(options.snapshotPath);
-  const days = fillDailyCounts(database, preflight, gitRead);
+  const days = fillDailyCounts(database, preflight, { gitRead, prsRead });
   const plans = readPlans({ planDir: options.planDir, stubs: storeStubs(database) });
   const planRows = insertPlanFacts(database, plans);
   const commitsLinked = linkCommitPlans(database);
+  const plansMerged = prsRead
+    ? linkPullRequests(database)
+    : 0;
   const boardRead = options.boardRead ?? false;
   const plansEpicLinked = boardRead
     ? linkPlanEpics(database)
     : 0;
   const modulesCounted = countModuleFacts(database);
   const stamps = [
-    dailyStamp(options.stamps, tasks.readAt, days, preflight, gitRead),
-    plansStamp(options.stamps, tasks.readAt, planRows, plans, boardRead),
+    dailyStamp(options.stamps, tasks.readAt, days, preflight, { gitRead, prsRead }),
+    plansStamp(options.stamps, tasks.readAt, planRows, plans, { boardRead, prsRead }),
   ];
   stamps.forEach((stamp) => build.stampSource(stamp));
-  return { workTyped, commitsLinked, plansEpicLinked, modulesCounted, plans, preflight, stamps };
+  return { workTyped, commitsLinked, plansMerged, plansEpicLinked, modulesCounted, plans, preflight, stamps };
 }

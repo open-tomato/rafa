@@ -5,7 +5,8 @@
  * `bug_facts`, `local.findings` over `finding_facts`, `local.ci` over
  * `ci_facts`, `local.commits` over `commit_facts`, `local.marks` over
  * `stretch_marks`, `local.issues` over `issue_facts`, `local.board`
- * over `board_snapshot` and `local.modules` over `module_facts`. The build stamps `local.changes` too, and no spec here
+ * over `board_snapshot`, `local.modules` over `module_facts` and
+ * `local.prs` over `pr_facts`, which only a `--github` build fills. The build stamps `local.changes` too, and no spec here
  * defines it yet. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
@@ -24,6 +25,7 @@ import { BOARD_SOURCE, ISSUES_SOURCE } from './ingest/board.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
+import { PRS_SOURCE } from './ingest/github.js';
 import { MODULES_SOURCE } from './ingest/modules.js';
 
 /** The aggregates a numeric measure takes. */
@@ -311,7 +313,7 @@ export const MARKS_SPEC: TableSourceSpec = {
     source: 'local',
     channel: 'marks',
     title: 'Stretch marks',
-    description: 'One row per stretch end, read from the merge subjects Stretch <n> (#<pr>) and Merge pull request #<pr> from <owner>/stretch/<n>.',
+    description: 'One row per stretch end, read from the merge subjects Stretch <n> (#<pr>) and Merge pull request #<pr> from <owner>/stretch/<n>, and under --github from a commit whose pull request\'s head is stretch/<n>.',
     timeField: 'ended_at',
     grains: ['day', 'week', 'month', 'all'],
     fields: [
@@ -415,8 +417,42 @@ export const MODULES_SPEC: TableSourceSpec = {
   table: 'module_facts',
 };
 
+/** `local.prs`: one row per pull request `gh pr list` answered, from `pr_facts`; empty unless the build ran with `--github`. */
+export const PRS_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: PRS_SOURCE,
+    source: 'local',
+    channel: 'prs',
+    title: 'Pull requests',
+    description: 'One row per pull request of the project, read from GitHub with gh pr list --state all; only a build run with --github reads it.',
+    timeField: 'created_at',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      numberId('number', 'Pull request', 'pull request'),
+      dimension('title', 'Title'),
+      dimension('head_ref', 'Head branch'),
+      dimension('base_ref', 'Base branch'),
+      dimension('plan_stub', 'Plan', 'the plan whose plan_facts.pr_number is this pull request'),
+      dimension('state', 'State', 'OPEN, CLOSED or MERGED'),
+      time('created_at', 'Created', 'datetime'),
+      time('merged_at', 'Merged', 'datetime'),
+      time('closed_at', 'Closed', 'datetime'),
+      measure('additions', 'Additions', 'integer', 'lines'),
+      measure('deletions', 'Deletions', 'integer', 'lines'),
+      measure('changed_files', 'Files changed', 'integer', 'files'),
+      measure('review_count', 'Reviews', 'integer', 'reviews'),
+      time('first_review_at', 'First review', 'datetime'),
+      {
+        ...dimension('closing_issues_json', 'Closing issues', 'the issues it closes in its own repository, as a JSON array; GitHub links them only into the default branch'),
+        type: 'json',
+      },
+    ],
+  },
+  table: 'pr_facts',
+};
+
 /** Every source spec the registry defines, in the order `/sources` lists them. */
 export const SOURCE_SPECS: readonly TableSourceSpec[] = [
   TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC, ISSUES_SPEC, BOARD_SPEC,
-  MODULES_SPEC,
+  MODULES_SPEC, PRS_SPEC,
 ];

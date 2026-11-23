@@ -23,6 +23,7 @@ import { BOARD_SOURCE, ISSUES_SOURCE } from '../ingest/board.js';
 import { TASKS_SOURCE } from '../ingest/effort.js';
 import { BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from '../ingest/facts.js';
 import { COMMITS_SOURCE, MARKS_SOURCE } from '../ingest/git.js';
+import { PRS_SOURCE } from '../ingest/github.js';
 import { MODULES_SOURCE } from '../ingest/modules.js';
 import { FIXTURE_ROWS, FIXTURE_WATERMARK, writeBoardFixture } from '../ingest/testdata/board-cache.fixture.js';
 import { sessionRow, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
@@ -52,10 +53,11 @@ describe('buildAtlas over the buckets built so far', () => {
     expect(summary.tables).toEqual(expect.objectContaining({ task_facts: 4, daily_rollup: 4, plan_facts: 1 }));
     expect(summary.sources.map((stamp) => stamp.source)).toEqual([
       TASKS_SOURCE, FINDINGS_SOURCE, BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, COMMITS_SOURCE, MARKS_SOURCE,
-      ISSUES_SOURCE, BOARD_SOURCE, MODULES_SOURCE, DAILY_SOURCE, PLANS_SOURCE,
+      ISSUES_SOURCE, BOARD_SOURCE, MODULES_SOURCE, PRS_SOURCE, DAILY_SOURCE, PLANS_SOURCE,
     ]);
-    expect(summary.sources[10]).toEqual(expect.objectContaining({ rows: 4, readAt: BUILT_AT.toISOString() }));
-    expect(summary.sources.slice(5, 10).map((stamp) => [stamp.rows, stamp.partial])).toEqual([[0, true], [0, true], [0, true], [0, true], [0, true]]);
+    expect(summary.sources[11]).toEqual(expect.objectContaining({ rows: 4, readAt: BUILT_AT.toISOString() }));
+    expect(summary.sources.slice(5, 11).map((stamp) => [stamp.rows, stamp.partial])).toEqual([[0, true], [0, true], [0, true], [0, true], [0, true], [0, true]]);
+    expect(summary.sources[10]?.reason).toBe('not read: the build ran without --github');
 
     const reader = openReplica(summary.replicaPath);
     const replica = reader.current();
@@ -63,7 +65,7 @@ describe('buildAtlas over the buckets built so far', () => {
     expect(replica.meta.buildId).toBe(summary.buildId);
     expect([...replica.sources.keys()].sort()).toEqual([
       BOARD_SOURCE, BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, COMMITS_SOURCE, DAILY_SOURCE, FINDINGS_SOURCE, ISSUES_SOURCE, MARKS_SOURCE,
-      MODULES_SOURCE, PLANS_SOURCE, TASKS_SOURCE,
+      MODULES_SOURCE, PLANS_SOURCE, PRS_SOURCE, TASKS_SOURCE,
     ]);
     expect(existsSync(`${summary.replicaPath}.build-${summary.buildId}`)).toBe(false);
   });

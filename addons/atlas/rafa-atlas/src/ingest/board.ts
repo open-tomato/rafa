@@ -27,8 +27,10 @@
  *    epics carrying it, leave it NULL, as does an epic itself. `stage` is
  *    `stageOf` over the labels with `pullRequests: []`, so a closed issue
  *    still labelled `rafa:in-development` reads Done (D16, trap 2) and an
- *    epic reads NULL; `stage_basis` is `labels` on every row (`--github`
- *    reads the closing pull requests in P4.6). `horizon` is `horizonOf`
+ *    epic reads NULL; `stage_basis` is `labels` on every row. Under
+ *    `--github` (`github.ts`), the options' `github` facts hand `stageOf`
+ *    each issue's closing pull requests, open or merged, and
+ *    `stage_basis` reads `labels+prs` on every row. `horizon` is `horizonOf`
  *    for an epic, `now`, `next` or `later` (the roadmap's fallback for no
  *    single known `horizon:` label), and NULL for any other issue, which
  *    gets no Horizon on the board either. `module` and `priority` are the
@@ -36,10 +38,13 @@
  *    NULL. `plan_stub` is the first line of the fenced block under a
  *    `## Plan` heading, then the stub of a `<!-- rafa:follow-ups <stub> -->`
  *    comment, else NULL: a bug filed by hand. `created_at` and `closed_at`
- *    stay NULL (trap 3): the cache holds no time but `updatedAt`, which any
- *    comment moves, so `local.issues` is stamped partial naming them.
+ *    stay NULL offline (trap 3): the cache holds no time but `updatedAt`,
+ *    which any comment moves, so `local.issues` is stamped partial naming
+ *    them. Under `--github` they are the times `gh issue list` answered,
+ *    and an issue it listed no times for is counted in the stamp.
  * 4. **`board_snapshot`**, today's count of each of the eleven
- *    `STAGE_OPTIONS`, zeros included, taken over the rows just written,
+ *    `STAGE_OPTIONS`, zeros included, taken over the rows just written
+ *    (so under `--github` over the stages the pull requests moved),
  *    the day the build clock's UTC calendar day (D20). Every stage gets a
  *    row so the writer's carry, which keeps the build's own row of a day
  *    and stage, never brings back an earlier build's count of today for
@@ -88,11 +93,14 @@ export const BOARD_SOURCE = 'local.board';
 /** The labels that make an issue a bug. */
 export const BUG_LABELS: readonly string[] = ['type:bug', 'bug'];
 
-/** The `issue_facts` columns no offline source fills; they read NULL until the GitHub source lands. */
+/** The `issue_facts` columns no offline source fills; they read NULL unless `--github` reads them. */
 export const UNREAD_ISSUE_COLUMNS: readonly string[] = ['created_at', 'closed_at'];
 
 /** What every row's `stage_basis` reads offline. */
 export const LABELS_BASIS = 'labels';
+
+/** What every row's `stage_basis` reads when the GitHub source handed the closing pull requests. */
+export const PRS_BASIS = 'labels+prs';
 
 /** The prefix of the label naming an issue's module (D15). */
 const MODULE_PREFIX = 'module:';
@@ -138,10 +146,23 @@ export interface BoardIngest {
   readonly stamps: readonly SourceStamp[];
 }
 
+/** A pull request closing an issue, as `stageOf` reads it: open or merged, with the fragment it added. */
+export type StageLink = Parameters<typeof stageOf>[0]['pullRequests'][number];
+
+/** What the GitHub source tells the board ingest about each issue, by number. */
+export interface IssueGithubFacts {
+  /** The pull requests that close the issue, open or merged; none when no pull request names it. */
+  readonly pullRequestsOf: (issue: number) => readonly StageLink[];
+  /** The issue's open and close times, or undefined when `gh` listed none for it. */
+  readonly datesOf: (issue: number) => { readonly createdAt: string | null; readonly closedAt: string | null } | undefined;
+}
+
 /** What one board ingest is handed. */
 export interface BoardIngestOptions {
   /** The project root: the main checkout, which holds the cache. */
   readonly root: string;
+  /** The GitHub source's facts, under `--github` with a read that gave them; offline when left out. */
+  readonly github?: IssueGithubFacts;
   /** The build clock: each source's `read_at` and the snapshot's day; defaults to the system clock. */
   readonly now?: () => Date;
 }
@@ -277,7 +298,7 @@ function epicsBySlug(rows: readonly BoardRow[]): ReadonlyMap<string, number> {
 /** The `issue_facts` columns written, in the order {@link issueRow} binds them. */
 const ISSUE_COLUMNS: readonly string[] = [
   'number', 'title', 'state', 'state_reason', 'labels_json', 'is_bug', 'is_epic', 'epic_slug', 'parent_number',
-  'stage', 'stage_basis', 'horizon', 'plan_stub', 'module', 'priority',
+  'stage', 'stage_basis', 'horizon', 'plan_stub', 'module', 'priority', 'created_at', 'closed_at',
 ];
 
 /** 1 for true, 0 for false: SQLite's boolean. */
@@ -287,8 +308,8 @@ function flag(value: boolean): number {
     : 0;
 }
 
-/** One issue's row, in {@link ISSUE_COLUMNS} order. */
-export function issueRow(row: BoardRow, epics: ReadonlyMap<string, number>): (string | number | null)[] {
+/** One issue's row, in {@link ISSUE_COLUMNS} order; `github` gives its stage the closing pull requests and its times. */
+export function issueRow(row: BoardRow, epics: ReadonlyMap<string, number>, github?: IssueGithubFacts): (string | number | null)[] {
   const { labels } = row;
   const isEpic = labels.includes(EPIC_TYPE_LABEL);
   const isBug = BUG_LABELS.some((label) => labels.includes(label));
@@ -296,24 +317,29 @@ export function issueRow(row: BoardRow, epics: ReadonlyMap<string, number>): (st
   const parent = isEpic || slug === null
     ? null
     : epics.get(slug) ?? null;
-  const stage = stageOf({ state: row.state, stateReason: row.stateReason, labels, pullRequests: [] });
+  const pullRequests = github?.pullRequestsOf(row.number) ?? [];
+  const stage = stageOf({ state: row.state, stateReason: row.stateReason, labels, pullRequests });
+  const dates = github?.datesOf(row.number);
   const horizon = isEpic
     ? horizonOf(labels)
     : null;
   return [
     row.number, row.title, row.state, row.stateReason, JSON.stringify(labels), flag(isBug), flag(isEpic), slug, parent,
-    stage, LABELS_BASIS, horizon, row.planStub, labelValue(labels, MODULE_PREFIX), labelValue(labels, PRIORITY_PREFIX),
+    stage, github === undefined
+      ? LABELS_BASIS
+      : PRS_BASIS, horizon, row.planStub, labelValue(labels, MODULE_PREFIX), labelValue(labels, PRIORITY_PREFIX),
+    dates?.createdAt ?? null, dates?.closedAt ?? null,
   ];
 }
 
 /** Insert one `issue_facts` row per issue. */
-function insertIssues(build: ReplicaBuild, rows: readonly BoardRow[]): void {
+function insertIssues(build: ReplicaBuild, rows: readonly BoardRow[], github: IssueGithubFacts | undefined): void {
   const epics = epicsBySlug(rows);
   const insert = build.database.prepare<unknown, (string | number | null)[]>(
     `INSERT INTO issue_facts (${ISSUE_COLUMNS.join(', ')}) VALUES (${ISSUE_COLUMNS.map(() => '?').join(', ')})`,
   );
   build.database.transaction(() => {
-    for (const row of rows) insert.run(...issueRow(row, epics));
+    for (const row of rows) insert.run(...issueRow(row, epics, github));
   })();
 }
 
@@ -341,15 +367,33 @@ function missingStamp(source: string, readAt: string, reason: string): SourceSta
   return { source, asOf: null, readAt, rows: 0, partial: true, reason: `no board cache read: ${reason}` };
 }
 
-/** The `local.issues` stamp: the unread time columns, and the rows skipped. */
-function issuesStamp(readAt: string, watermark: string, rows: number, skipped: number): SourceStamp {
+/** The sentence on the time columns: unread offline, or the issues `gh` listed no times for. */
+function datesReasons(cacheRows: readonly BoardRow[], github: IssueGithubFacts | undefined): readonly string[] {
+  if (github === undefined) return [`${UNREAD_ISSUE_COLUMNS.join(', ')} are not read yet (the GitHub source) and read NULL`];
+  const undated = cacheRows.filter((row) => github.datesOf(row.number) === undefined).length;
+  return undated === 0
+    ? []
+    : [`gh issue list gave no times for ${String(undated)} cached issues; their ${UNREAD_ISSUE_COLUMNS.join(', ')} read NULL`];
+}
+
+/** The `local.issues` stamp: the time columns, and the rows skipped; partial only when one has a reason. */
+function issuesStamp(readAt: string, watermark: string, cacheRows: readonly BoardRow[], skipped: number, github: IssueGithubFacts | undefined): SourceStamp {
   const reasons = [
-    `${UNREAD_ISSUE_COLUMNS.join(', ')} are not read yet (the GitHub source) and read NULL`,
+    ...datesReasons(cacheRows, github),
     ...(skipped === 0
       ? []
       : [`${String(skipped)} cache rows were skipped: no issue the cache writes, or a number held twice`]),
   ];
-  return { source: ISSUES_SOURCE, asOf: watermark, readAt, rows, partial: true, reason: reasons.join('; ') };
+  return {
+    source: ISSUES_SOURCE,
+    asOf: watermark,
+    readAt,
+    rows: cacheRows.length,
+    partial: reasons.length > 0,
+    reason: reasons.length === 0
+      ? null
+      : reasons.join('; '),
+  };
 }
 
 /** Read the board cache under the root into `issue_facts` and today's `board_snapshot`, and stamp both; see the module note. */
@@ -361,10 +405,10 @@ export function ingestBoard(build: ReplicaBuild, options: BoardIngestOptions): B
     stamps.forEach((stamp) => build.stampSource(stamp));
     return { read: false, issues: 0, skipped: 0, snapshotRows: 0, stamps };
   }
-  insertIssues(build, cache.rows);
+  insertIssues(build, cache.rows, options.github);
   const snapshotRows = takeSnapshot(build, readAt);
   const stamps = [
-    issuesStamp(readAt, cache.watermark, cache.rows.length, cache.skipped),
+    issuesStamp(readAt, cache.watermark, cache.rows, cache.skipped, options.github),
     { source: BOARD_SOURCE, asOf: cache.watermark, readAt, rows: snapshotRows, partial: false, reason: null },
   ];
   stamps.forEach((stamp) => build.stampSource(stamp));

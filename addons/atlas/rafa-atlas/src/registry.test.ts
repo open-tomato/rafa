@@ -26,6 +26,7 @@ import { BOARD_SOURCE, ISSUES_SOURCE } from './ingest/board.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
 import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
+import { PRS_SOURCE } from './ingest/github.js';
 import { MODULES_SOURCE } from './ingest/modules.js';
 import { FIXTURE_EPIC_SLUG, writeBoardFixture } from './ingest/testdata/board-cache.fixture.js';
 import { writeFactsFixture, writeFixtureStore } from './ingest/testdata/effort-store.fixture.js';
@@ -70,10 +71,10 @@ async function totalOf(id: string, field: string): Promise<unknown> {
 }
 
 describe('openAtlasRegistry over a built replica', () => {
-  it('lists local.tasks, local.daily, local.plans, local.bugs, local.findings, local.ci, local.commits, local.marks, local.issues, local.board then local.modules, and the catalogue by id', () => {
+  it('lists local.tasks, local.daily, local.plans, local.bugs, local.findings, local.ci, local.commits, local.marks, local.issues, local.board, local.modules then local.prs, and the catalogue by id', () => {
     expect([...open().sources.keys()]).toEqual([
       TASKS_SOURCE, DAILY_SOURCE, PLANS_SOURCE, BUGS_SOURCE, FINDINGS_SOURCE, CI_SOURCE, COMMITS_SOURCE, MARKS_SOURCE, ISSUES_SOURCE, BOARD_SOURCE,
-      MODULES_SOURCE,
+      MODULES_SOURCE, PRS_SOURCE,
     ]);
     expect([...open().metrics.keys()]).toEqual(METRIC_CATALOGUE.map((metric) => metric.id));
   });

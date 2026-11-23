@@ -5,9 +5,11 @@
  * `pm.budget-burn` as its goal (and with no config it carries none), a
  * rebuild reads rows the store gained, the command runs until its signal
  * aborts, and a root with no store or a bad flag refuses with an error
- * line.
+ * line. Under `--github` the first build and each rebuild ask the stub
+ * `gh` they are handed; without it neither does.
  */
 import type { AtlasServer } from './serve.js';
+import type { GhRunner } from '@open-tomato/rafa-board';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,7 +20,9 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { replicaPathOf } from '../build/index.js';
 import { atlasConfigPathOf } from '../config.js';
+import { PRS_SOURCE } from '../ingest/github.js';
 import { sessionRow, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
+import { fixtureGh, throwingGh } from '../ingest/testdata/github.fixture.js';
 
 import { serveCommand, startAtlasServer } from './serve.js';
 import { testContext } from './testdata/context.js';
@@ -39,10 +43,16 @@ function fixtureProject(name: string): string {
   return root;
 }
 
-/** Starts the API over `root` on a free port, stopped after the test. */
-async function serveOver(root: string): Promise<{ atlas: AtlasServer; printed: ReturnType<typeof testContext>['printed'] }> {
-  const { context, printed } = testContext({ env: { ATLAS_PROJECT_ROOT: root } });
-  const atlas = await startAtlasServer({ context, port: 0, rebuildEveryMinutes: 0 });
+/** Starts the API over `root` on a free port, stopped after the test; `flags` and `gh` reach every build. */
+async function serveOver(
+  root: string,
+  flags: Readonly<Record<string, string | boolean>> = {},
+  gh?: GhRunner,
+): Promise<{ atlas: AtlasServer; printed: ReturnType<typeof testContext>['printed'] }> {
+  const { context, printed } = testContext({ env: { ATLAS_PROJECT_ROOT: root }, flags });
+  const atlas = await startAtlasServer({ context, port: 0, rebuildEveryMinutes: 0, ...(gh === undefined
+    ? {}
+    : { gh }) });
   started.push(atlas);
   return { atlas, printed };
 }
@@ -143,6 +153,38 @@ describe('startAtlasServer over a fixture project', () => {
   });
 });
 
+describe('startAtlasServer and --github', () => {
+  it('asks gh on the first build and on each rebuild under --github, and serves local.prs', async () => {
+    const gh = fixtureGh();
+    const { atlas } = await serveOver(fixtureProject('github'), { github: true }, gh.runner);
+    const prs = async (): Promise<unknown> => {
+      const response = await fetch(`${atlas.apiUrl}/sources/${PRS_SOURCE}/query`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ measures: [{ field: 'number', agg: 'count', as: 'prs' }] }),
+      });
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { data: { rows: readonly unknown[][] } }).data.rows[0]?.[0];
+    };
+
+    expect(gh.calls.map((args) => args[0])).toEqual(['pr', 'issue']);
+    expect(await prs()).toBe(5);
+    await atlas.rebuild();
+    expect(gh.calls.map((args) => args[0])).toEqual(['pr', 'issue', 'pr', 'issue']);
+  });
+
+  it('never asks gh without --github, on the first build or a rebuild', async () => {
+    const gh = throwingGh();
+    const { atlas, printed } = await serveOver(fixtureProject('no-github'), {}, gh.runner);
+
+    await atlas.rebuild();
+
+    expect(gh.calls).toEqual([]);
+    expect(printed.error).toEqual([]);
+    expect(printed.info.at(-1)).toStartWith('atlas: rebuilt ');
+  });
+});
+
 describe('the serve command', () => {
   it('runs until its signal aborts, printing where the API listens', async () => {
     const root = fixtureProject('command');
@@ -172,6 +214,7 @@ describe('the serve command', () => {
     [{ port: 'eighty' }, '--port is "eighty"'],
     [{ port: '70000' }, '--port is 70000'],
     [{ 'rebuild-every': '-5' }, '--rebuild-every is "-5"'],
+    [{ github: 'maybe' }, '--github is "maybe"'],
   ])('refuses the flags %p with an error line before it builds', async (flags, message) => {
     const root = join(scope, 'flags');
     const { context, printed } = testContext({ env: { ATLAS_PROJECT_ROOT: root }, flags });

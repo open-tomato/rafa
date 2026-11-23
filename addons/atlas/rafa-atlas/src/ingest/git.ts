@@ -37,9 +37,13 @@
  *    for one or two digits; a number of another length is skipped and
  *    counted in `unlanedMarks`. A number seen again is its next part, in
  *    walk order from the oldest commit: part 1, then 2. `ended_at` is the
- *    commit's `committed_at`. A third shape, an item subject, carries item
- *    numbers, never a stretch number (trap 5): it is read under `--github`
- *    through `pr_facts.head_ref`, not here.
+ *    commit's `committed_at`. A third shape, an item subject such as
+ *    `<item> (#<a>) (#<b>)`, carries item numbers, never a stretch number
+ *    (trap 5), so offline it gives no mark. Under `--github` the options'
+ *    `stretchHeads` (`github.ts`) name each pull request whose head ref is
+ *    `stretch/<n>`, and a commit of neither offline shape whose pull
+ *    request (`pr_number`'s rule) is one of them is a mark of `n`, laned
+ *    and numbered in the same walk; `headMarks` counts them.
  *
  * Each stamp's `as_of` is the newest time its rows hold, its `read_at` the
  * build clock.
@@ -146,6 +150,8 @@ export interface GitIngest {
   /** The `v*` tags whose commit is not on the walk. */
   readonly tagsOffWalk: readonly string[];
   readonly marks: number;
+  /** The marks of the third shape, read through `stretchHeads`. */
+  readonly headMarks: number;
   /** Stretch subjects whose number has no lane (not one to three digits). */
   readonly unlanedMarks: number;
   /** `local.commits`, then `local.marks`. */
@@ -156,6 +162,8 @@ export interface GitIngest {
 export interface GitIngestOptions {
   /** Git over the project root; {@link createGitRunner} makes the real one. */
   readonly runner: GitRunner;
+  /** Under `--github`: each pull request whose head ref is `stretch/<n>`, with `n` as its digits. */
+  readonly stretchHeads?: ReadonlyMap<number, string>;
   /** The build clock, stamped as each source's `read_at`; defaults to the system clock. */
   readonly now?: () => Date;
 }
@@ -275,13 +283,39 @@ function laneOf(digits: string): 'A' | 'M' | null {
     : null;
 }
 
-/** The marks of `commits` (newest first, as the log answers them), parts numbered from the oldest. */
-export function stretchMarksOf(commits: readonly CommitRead[]): { readonly marks: readonly StretchMark[]; readonly unlaned: number } {
+/** The stretch a commit's subject names: an offline shape, else the stretch head of its pull request, or null. */
+function stretchOfCommit(subject: string, heads: ReadonlyMap<number, string>): { readonly number: string; readonly prNumber: number; readonly byHead: boolean } | null {
+  const offline = stretchOf(subject);
+  if (offline !== null) return { ...offline, byHead: false };
+  const prNumber = prNumberOf(subject);
+  const digits = prNumber === null
+    ? undefined
+    : heads.get(prNumber);
+  return prNumber === null || digits === undefined
+    ? null
+    : { number: digits, prNumber, byHead: true };
+}
+
+/** What {@link stretchMarksOf} read. */
+export interface MarksRead {
+  readonly marks: readonly StretchMark[];
+  readonly unlaned: number;
+  /** The marks read through a stretch head, not a subject shape. */
+  readonly byHead: number;
+}
+
+/**
+ * The marks of `commits` (newest first, as the log answers them), parts
+ * numbered from the oldest; `heads` names the stretch pull requests of
+ * the third shape, none when left out.
+ */
+export function stretchMarksOf(commits: readonly CommitRead[], heads: ReadonlyMap<number, string> = new Map()): MarksRead {
   const parts = new Map<number, number>();
   const marks: StretchMark[] = [];
   let unlaned = 0;
+  let byHead = 0;
   for (const commit of [...commits].reverse()) {
-    const stretch = stretchOf(commit.subject);
+    const stretch = stretchOfCommit(commit.subject, heads);
     if (stretch === null) continue;
     const lane = laneOf(stretch.number);
     if (lane === null) {
@@ -292,8 +326,9 @@ export function stretchMarksOf(commits: readonly CommitRead[]): { readonly marks
     const part = (parts.get(number) ?? 0) + 1;
     parts.set(number, part);
     marks.push({ number, part, lane, endedAt: commit.committedAt, prNumber: stretch.prNumber });
+    if (stretch.byHead) byHead += 1;
   }
-  return { marks, unlaned };
+  return { marks, unlaned, byHead };
 }
 
 /** The `v*` tags by the commit they point at (an annotated tag peeled), the higher version winning; empty when git refuses. */
@@ -364,7 +399,7 @@ export function ingestGit(build: ReplicaBuild, options: GitIngestOptions): GitIn
   const unread = (reason: string): GitIngest => {
     const stamps = [missingStamp(COMMITS_SOURCE, readAt, reason), missingStamp(MARKS_SOURCE, readAt, reason)];
     stamps.forEach((stamp) => build.stampSource(stamp));
-    return { read: false, base: null, fellBack: false, commits: 0, tagged: 0, tagsOffWalk: [], marks: 0, unlanedMarks: 0, stamps };
+    return { read: false, base: null, fellBack: false, commits: 0, tagged: 0, tagsOffWalk: [], marks: 0, headMarks: 0, unlanedMarks: 0, stamps };
   };
   const base = resolveBase(runner);
   if (!base.ok) return unread(base.reason);
@@ -374,7 +409,7 @@ export function ingestGit(build: ReplicaBuild, options: GitIngestOptions): GitIn
   const tags = readReleaseTags(runner);
   const onWalk = new Set(commits.map((commit) => commit.sha));
   const tagsOffWalk = [...tags].filter(([sha]) => !onWalk.has(sha)).map(([, name]) => name);
-  const { marks, unlaned } = stretchMarksOf(commits);
+  const { marks, unlaned, byHead } = stretchMarksOf(commits, options.stretchHeads);
   insertCommits(build, commits, tags);
   insertMarks(build, marks);
   const stamps = [
@@ -390,6 +425,7 @@ export function ingestGit(build: ReplicaBuild, options: GitIngestOptions): GitIn
     tagged: commits.filter((commit) => tags.has(commit.sha)).length,
     tagsOffWalk,
     marks: marks.length,
+    headMarks: byHead,
     unlanedMarks: unlaned,
     stamps,
   };

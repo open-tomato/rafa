@@ -10,12 +10,15 @@
  * `--rebuild-every=<minutes>` above 0 it builds again on that period;
  * the replica reader reopens the file each build renames in, and a
  * failed rebuild prints an error line and keeps the replica it had.
+ * `--github` is read by every build the command makes, the first and each
+ * rebuild, as `build` reads it.
  *
  * The command runs until its context's signal aborts, and the process
  * ends with it; a test aborts the signal to stop the server.
  */
 import type { AtlasProjectConfig } from '../config.js';
 import type { AtlasRegistry } from '../registry.js';
+import type { GhRunner } from '@open-tomato/rafa-board';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '@open-tomato/rafa-core/core/command';
 import type { Server } from 'bun';
 
@@ -28,7 +31,7 @@ import { loadAtlasConfig, withAtlasTargets } from '../config.js';
 import { openAtlasRegistry } from '../registry.js';
 
 import { runBuild } from './build.js';
-import { execLine, projectRootOf, refusing, SUBJECT, wholeFlag } from './shared.js';
+import { buildOptionsOf, execLine, GITHUB_FLAG, projectRootOf, refusing, SUBJECT, wholeFlag } from './shared.js';
 
 /** The port `serve` listens on unless `--port` names another; 0 picks a free one. */
 export const DEFAULT_SERVE_PORT = 4317;
@@ -64,6 +67,8 @@ export interface ServeOptions {
   readonly port: number;
   /** Minutes between builds; 0 builds only when there is no replica. */
   readonly rebuildEveryMinutes: number;
+  /** Stands in for `gh` in every build under `--github` (a test's stub); never asked without the flag. */
+  readonly gh?: GhRunner;
 }
 
 /** The registry the handler serves: the replica's sources, and the metrics with the project's targets. */
@@ -74,10 +79,11 @@ function servedRegistry(registry: AtlasRegistry, config: AtlasProjectConfig): At
 /** Starts the API over the context's project root; see the module note. */
 export async function startAtlasServer(options: ServeOptions): Promise<AtlasServer> {
   const { context } = options;
-  const projectRoot = projectRootOf(context);
+  const buildOptions = buildOptionsOf(context, options.gh);
+  const { projectRoot } = buildOptions;
   const config = await loadAtlasConfig(projectRoot);
   const built = !existsSync(replicaPathOf(projectRoot));
-  if (built) await runBuild(context);
+  if (built) await runBuild(context, options.gh);
   const registry = await openAtlasRegistry({ projectRoot });
   const handler = createAtlasHandler(servedRegistry(registry, config), {
     onError: (error) => {
@@ -101,7 +107,7 @@ export async function startAtlasServer(options: ServeOptions): Promise<AtlasServ
 
   let building: Promise<void> | null = null;
   const rebuild = (): Promise<void> => {
-    building ??= buildAtlas({ projectRoot, env: context.env })
+    building ??= buildAtlas(buildOptions)
       .then((summary) => {
         context.output.info(`atlas: rebuilt ${summary.replicaPath} (build ${summary.buildId})`);
       }, (error: unknown) => {
@@ -147,6 +153,7 @@ function untilAborted(signal: AbortSignal): Promise<void> {
 const FLAGS: RafaFlagSpec[] = [
   { name: 'port', description: `the port to listen on, from 0 (a free one) to ${MAX_PORT}; ${DEFAULT_SERVE_PORT} when left out`, type: 'number' },
   { name: 'rebuild-every', description: 'minutes between builds while serving; 0, the default, builds only when there is no replica', type: 'number' },
+  GITHUB_FLAG,
 ];
 
 export const serveCommand: RafaCommand = {
@@ -154,7 +161,7 @@ export const serveCommand: RafaCommand = {
   subject: SUBJECT,
   action: 'serve',
   summary: 'serve the Atlas API over the replica, on loopback',
-  description: `Builds the replica when there is none, then serves the Atlas API at ${API_BASE} on 127.0.0.1, with the targets of <root>/.rafa/atlas/config.json laid over the metrics. Serves no page. Runs until stopped; exits 1 with an error line when there is no store to build from or the config does not read.`,
+  description: `Builds the replica when there is none, then serves the Atlas API at ${API_BASE} on 127.0.0.1, with the targets of <root>/.rafa/atlas/config.json laid over the metrics. Each build calls no gh unless --github is given. Serves no page. Runs until stopped; exits 1 with an error line when there is no store to build from or the config does not read.`,
   args: [],
   flags: FLAGS,
   examples: [

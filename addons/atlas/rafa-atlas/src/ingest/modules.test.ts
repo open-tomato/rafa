@@ -235,14 +235,14 @@ describe('countModuleFacts over the effort buckets', () => {
 });
 
 describe('buildAtlas over the tree', () => {
-  it('fills module_facts and stamps local.modules between the board and the derived sources', async () => {
+  it('fills module_facts and stamps local.modules between the board and the GitHub source', async () => {
     const root = rootWith('build');
     writeFixtureStore(root);
 
     const summary = await buildAtlas({ projectRoot: root, env: {}, now: () => READ_AT, projectLabel: 'modules-fixture' });
 
     expect(summary.tables).toEqual(expect.objectContaining({ module_facts: 2 }));
-    expect(summary.sources.map((stamp) => stamp.source).slice(8, 11)).toEqual(['local.board', MODULES_SOURCE, 'local.daily']);
+    expect(summary.sources.map((stamp) => stamp.source).slice(8, 12)).toEqual(['local.board', MODULES_SOURCE, 'local.prs', 'local.daily']);
     expect(summary.sources.find((stamp) => stamp.source === MODULES_SOURCE)).toEqual(expect.objectContaining({ rows: 2, partial: true }));
   });
 });
