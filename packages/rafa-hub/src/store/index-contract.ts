@@ -295,21 +295,21 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
     });
 
     describe('capabilities', () => {
-      it('answers fts true and projection false, frozen, as measured at open', async () => {
+      it('answers fts true and no projection, frozen, as measured at open', async () => {
         const { index } = await connect();
 
         const capabilities = index.capabilities();
 
         expect(capabilities.fts).toBe(true);
-        expect(capabilities.projection).toBe(false);
         expect(Object.isFrozen(capabilities)).toBe(true);
-        expect(Object.keys(capabilities).sort()).toEqual(['fts', 'graph', 'projection', 'vector']);
+        expect(Object.keys(capabilities).sort()).toEqual(['fts', 'graph', 'vector']);
       });
 
-      it('answers the store\'s contract the index\'s capabilities', async () => {
+      it('answers the store\'s contract the index\'s fts, vector and graph', async () => {
         const { index, store } = await connect();
+        const { fts, graph, vector } = store.contract().capabilities;
 
-        expect(store.contract().capabilities).toEqual(index.capabilities());
+        expect({ fts, graph, vector }).toEqual(index.capabilities());
       });
 
       it('answers graph false over a store holding no ref_links, and true over one holding it', async () => {

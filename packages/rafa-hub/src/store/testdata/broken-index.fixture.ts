@@ -115,7 +115,10 @@ const connect: HubIndexConnector = async (context, setup) => {
     index: planted.index,
     store: Object.freeze({
       ...hub.store,
-      contract: () => Object.freeze({ ...hub.store.contract(), capabilities: planted.index.capabilities() }),
+      contract: () => {
+        const own = hub.store.contract();
+        return Object.freeze({ ...own, capabilities: Object.freeze({ ...planted.index.capabilities(), projection: own.capabilities.projection }) });
+      },
     }),
   };
 };

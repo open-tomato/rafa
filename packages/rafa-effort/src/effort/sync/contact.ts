@@ -51,6 +51,35 @@
  * since the same hub refuses the pull for the same reason; a later run
  * still tries, and writes nothing more.
  *
+ * ## Skew refusals
+ *
+ * A push or pull that rejects with an error named `HubUpgradeRequired`
+ * or `RafaUpdateRequired` ({@link SKEW_REFUSALS}) met a hub whose store
+ * is behind this rafa's, or one ahead of it: the `service` strategy's
+ * refusal names the migration ids and the next step, `effort sync: the
+ * hub is behind this rafa (migration <ids>); nothing was sent. Next
+ * step: upgrade the hub, then sync again` and `effort sync: this rafa is
+ * behind the hub (migration <ids>); nothing was merged. Next step: rafa
+ * self-update, then sync again`. Each is matched by its `name`
+ * ({@link isSkewRefusal}) and its message is the whole line, written
+ * through `warn` as it stands, its first line alone, and never inside
+ * the `<direction> over <kind> failed:` wrap below. Each line is written
+ * once per contact however many runs meet it. A push the hub refused
+ * this way still pulls, since the hub still answers the rows this rafa
+ * can read; a later run still tries both.
+ *
+ * ## A pull's notice
+ *
+ * A pull that merged may answer a `notice` beside its `pulled` status,
+ * the line the `service` strategy has for a projected pull, `effort
+ * sync: pulled <n> rows projected to this rafa's schema; <m> columns
+ * wait for rafa self-update`, or for a refill, `effort sync: refilled
+ * <n> rows held back since <date>`. Core's `SyncPullResult` names no
+ * such field, so it is read off the answer by shape ({@link noticeOf}):
+ * a non-empty string `notice` on a `pulled` answer is written through
+ * `warn` as it stands, once for each pull that answers one, since each
+ * reports rows that pull merged.
+ *
  * ## Never the exit code
  *
  * A contact never throws and never sets `process.exitCode`, so the
@@ -63,10 +92,10 @@
  *     `modules:` and `allowList:` lines that load the module. Any other
  *     selection or loading throw is written the same way. Selection
  *     runs once per contact, so it is written once.
- *   - A push or pull that rejects with anything but `HubUnreachable` or
- *     `HubContractMismatch` —
- *     a refused token, a migration the hub or this rafa lacks, the
- *     merge's own refusal — is written as `effort sync: <direction> over
+ *   - A push or pull that rejects with anything but `HubUnreachable`,
+ *     `HubContractMismatch` or a skew refusal —
+ *     a refused token, a `409` from an older hub naming no migration,
+ *     the merge's own refusal — is written as `effort sync: <direction> over
  *     <kind> failed: <message>`, and a refused push still pulls.
  *
  * Each run answers a {@link HubContactReading} saying what was done.
@@ -117,6 +146,15 @@ export const HUB_UNREACHABLE = 'HubUnreachable';
 /** The `name` an error carries when the hub speaks another wire contract version than this rafa. */
 export const HUB_CONTRACT_MISMATCH = 'HubContractMismatch';
 
+/** The `name` an error carries when the hub's store lacks a migration this rafa's applied: the hub is behind. */
+export const HUB_UPGRADE_REQUIRED = 'HubUpgradeRequired';
+
+/** The `name` an error carries when the hub's rows name a migration this rafa lacks: this rafa is behind. */
+export const RAFA_UPDATE_REQUIRED = 'RafaUpdateRequired';
+
+/** The names of the two skew refusals, whose messages are written as they stand; see the module note. */
+export const SKEW_REFUSALS: readonly string[] = Object.freeze([HUB_UPGRADE_REQUIRED, RAFA_UPDATE_REQUIRED]);
+
 /** What every line a contact writes opens with. */
 const OPENING = 'effort sync';
 
@@ -136,6 +174,20 @@ export function isHubUnreachable(error: unknown): boolean {
 /** Whether a thrown value says the hub speaks another contract version; see the module note. */
 export function isHubContractMismatch(error: unknown): boolean {
   return error instanceof Error && error.name === HUB_CONTRACT_MISMATCH;
+}
+
+/** Whether a thrown value is a skew refusal, `HubUpgradeRequired` or `RafaUpdateRequired`; see the module note. */
+export function isSkewRefusal(error: unknown): boolean {
+  return error instanceof Error && SKEW_REFUSALS.includes(error.name);
+}
+
+/** The `notice` a `pulled` answer carries, or null when it carries none; see the module note's `A pull's notice`. */
+export function noticeOf(result: SyncPullResult): string | null {
+  if (result.status !== 'pulled' || !('notice' in result)) return null;
+  const { notice } = result as { readonly notice: unknown };
+  return typeof notice === 'string' && notice.trim() !== ''
+    ? notice
+    : null;
 }
 
 /** The first line of `text` holding anything, trimmed, or the whole text described when none does. */
@@ -168,6 +220,8 @@ export type HubContactStep<Result> =
   | { readonly outcome: 'unreachable'; readonly problem: string }
   /** The hub speaks another contract version; `problem` is the line, written through `warn` once per contact. */
   | { readonly outcome: 'mismatch'; readonly problem: string }
+  /** The hub or this rafa is behind the other's migrations; `problem` is the line, written through `warn` once per contact. */
+  | { readonly outcome: 'refused'; readonly problem: string }
   /** The strategy refused or failed for another reason, written through `warn`. */
   | { readonly outcome: 'failed'; readonly problem: string }
   /** Not run: the push before it found the hub unreachable or speaking another contract. */
@@ -261,6 +315,7 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
   let selection: Promise<Selection> | null = null;
   let toldUnreachable = false;
   let toldMismatch = false;
+  const toldRefusals = new Set<string>();
   const pullRequest: SyncPullRequest = Object.freeze({
     from: null,
     dryRun: false,
@@ -278,7 +333,7 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     return selection;
   };
 
-  /** Runs one direction, writing the unreachable and mismatch lines once per contact and any other failure each time. */
+  /** Runs one direction, writing the unreachable, mismatch and skew lines once per contact and any other failure each time. */
   const attempt = async <Result>(direction: 'push' | 'pull', run: () => Promise<Result>): Promise<HubContactStep<Result>> => {
     try {
       return { outcome: 'done', result: await run() };
@@ -289,6 +344,12 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
         if (!toldMismatch) input.warn(line);
         toldMismatch = true;
         return { outcome: 'mismatch', problem: line };
+      }
+      if (isSkewRefusal(error)) {
+        const line = firstLine(problem);
+        if (!toldRefusals.has(line)) input.warn(line);
+        toldRefusals.add(line);
+        return { outcome: 'refused', problem: line };
       }
       if (!isHubUnreachable(error)) {
         input.warn(`${OPENING}: ${direction} over ${strategy} failed: ${problem}`);
@@ -312,6 +373,10 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     const pull: HubContactStep<SyncPullResult> = push?.outcome === 'unreachable' || push?.outcome === 'mismatch'
       ? { outcome: 'skipped' }
       : await attempt('pull', () => sync.pull(pullRequest));
+    const notice = pull.outcome === 'done'
+      ? noticeOf(pull.result)
+      : null;
+    if (notice !== null) input.warn(notice);
     return { state: 'contacted', strategy, push, pull };
   };
 

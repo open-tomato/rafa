@@ -51,9 +51,43 @@
  *
  * The union's collisions, rows it refused on another UNIQUE key, are
  * not matches and are not read here.
+ *
+ * ## A held copy
+ *
+ * A row a projected pull brought in is listed in `held_rows` by its
+ * table and origin pair (`merge-store.ts`): it lacks the columns of the
+ * migrations its listing names, so it is a truncated copy of a row, not
+ * a settled one. Before the comparison, {@link takeHeldCopies} reads
+ * each pair whose row here is listed. It rewrites that row from the
+ * incoming one, every column taken whole and no column rule consulted,
+ * except three kept from the row here: its `seq`, its origin pair, and
+ * each {@link SET_ONCE} field, today `findings.tracker_ref`. The listing
+ * is then dropped, and the pair goes on to the comparison above, which
+ * now finds the two rows equal, or differing only in a set-once field,
+ * and settles that field by its rule (`settleSetOnce`): a value here,
+ * written while the row was held, is kept against NULL there, and NULL
+ * here takes the value there. So a held copy records no
+ * `merge_conflicts` row for what its truncation left out; only two
+ * different filled values of a set-once field, one finding filed twice,
+ * are recorded, as for any pair. A pair whose row here is not listed is
+ * compared as it always was, and so is every pair of a table the
+ * caller names as cut: under a projected merge the incoming rows of a
+ * projected table lack columns too, so none of them is a full row, and
+ * the listing step (`merge-store.ts`) keeps the row listed, its
+ * `missing` the ids of both lists.
+ *
+ * The rewrite deletes the row here and inserts the incoming one under
+ * the same `seq`, since a statement whose table and columns are read
+ * from the store is one `merge-rules.sweep.test.ts` cannot read. When
+ * the incoming row collides with another row here on a UNIQUE key, the
+ * rewrite is rolled back: the row here stays as it was and listed, and
+ * the pair is compared as any other, a difference outside every edited
+ * field recorded as a conflict.
  */
 import type { TableUnion, UnionMatch } from './merge-union.js';
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
+
+import { SQLiteError } from 'bun:sqlite';
 
 import { storedLogPathOf } from '../session-log-path.js';
 
@@ -254,4 +288,118 @@ export function settleMatches(
   trail: ConflictTrail,
 ): TableSettlement[] {
   return local.transaction(() => unions.map((union) => settleTable(local, other, union, trail)))();
+}
+
+/** What the held-copy step did with one merged table's matched pairs. */
+export interface HeldCopy {
+  readonly table: string;
+  /** The local `seq` of each listed row rewritten from the incoming row, its listing dropped. */
+  readonly taken: readonly number[];
+  /** The local `seq` of each listed row the incoming row collided on another UNIQUE key, left as it was and listed. */
+  readonly refused: readonly number[];
+}
+
+/** The local table naming each row a projected pull brought in truncated. */
+const HELD_TABLE = 'held_rows';
+
+const HELD_LISTING = 'SELECT count(*) AS n FROM held_rows WHERE table_name = ? AND origin_store = ? AND origin_seq = ?';
+
+const DROP_LISTING = 'DELETE FROM held_rows WHERE table_name = ? AND origin_store = ? AND origin_seq = ?';
+
+/** The columns a held copy keeps from the row here besides `seq`: the origin pair. */
+const KEPT_ORIGIN = ['origin_store', 'origin_seq'];
+
+/** Whether the store open on `db` holds a listing in `held_rows`; false for a schema before the table. */
+function holdsListings(db: Database): boolean {
+  const table = db
+    .query<{ n: number }, [string]>('SELECT count(*) AS n FROM sqlite_master WHERE type = \'table\' AND name = ?')
+    .get(HELD_TABLE);
+  if (table?.n !== 1) return false;
+  return (db.query<{ n: number }, []>('SELECT count(*) AS n FROM held_rows').get()?.n ?? 0) > 0;
+}
+
+/** Whether `row`, a row of `table` here, is listed in `held_rows` by its origin pair. */
+function isListed(db: Database, table: string, row: StoredRow): boolean {
+  const { origin_store: store, origin_seq: seq } = row;
+  if (typeof store !== 'string' || typeof seq !== 'number') return false;
+  return (db.query<{ n: number }, [string, string, number]>(HELD_LISTING).get(table, store, seq)?.n ?? 0) > 0;
+}
+
+/** Whether `error` is SQLite refusing a row on a constraint. */
+function isConstraintRefusal(error: unknown): boolean {
+  return error instanceof SQLiteError && (error.code ?? '').startsWith('SQLITE_CONSTRAINT');
+}
+
+/**
+ * Rewrites the listed row `here` from `there` and drops its listing, in
+ * one savepoint, as the module note says; answers false, with nothing
+ * written, when the incoming row collides on another UNIQUE key.
+ */
+function rewriteHeld(
+  local: Database,
+  table: string,
+  columns: readonly string[],
+  kept: ReadonlySet<string>,
+  here: StoredRow,
+  there: StoredRow,
+): boolean {
+  const values = columns.map((column) => (kept.has(column)
+    ? here[column]
+    : there[column]) ?? null);
+  const placeholders = columns.map(() => '?').join(', ');
+  try {
+    local.transaction(() => {
+      local.query<unknown, [number]>(`DELETE FROM ${quoted(table)} WHERE seq = ?`).run(Number(here.seq));
+      local
+        .query<unknown, SQLQueryBindings[]>(`INSERT INTO ${quoted(table)} (seq, ${columns.map(quoted).join(', ')}) VALUES (?, ${placeholders})`)
+        .run(Number(here.seq), ...values);
+      local.query<unknown, SQLQueryBindings[]>(DROP_LISTING).run(table, here.origin_store ?? null, here.origin_seq ?? null);
+    })();
+    return true;
+  } catch (error) {
+    if (isConstraintRefusal(error)) return false;
+    throw error;
+  }
+}
+
+/** Takes the held copies among one table's matched pairs. */
+function takeTableCopies(local: Database, other: Database, union: TableUnion): HeldCopy {
+  const rule = MERGE_RULES[union.table];
+  if (rule?.scope !== 'merged') throw new Error(`${union.table} is not a merged table in MERGE_RULES`);
+  const columns = carriedColumns(local, union.table);
+  const setOnce = Object.keys(rule.edited).filter((field) => rule.edited[field] === SET_ONCE);
+  const kept = new Set([...KEPT_ORIGIN, ...setOnce]);
+  const outcomes = union.matched.flatMap((match: UnionMatch) => {
+    const here = rowAt(local, union.table, columns, match.localSeq, 'here');
+    if (!isListed(local, union.table, here)) return [];
+    const there = rowAt(other, union.table, columns, match.incomingSeq, 'in the other store');
+    return [{ localSeq: match.localSeq, taken: rewriteHeld(local, union.table, columns, kept, here, there) }];
+  });
+  return {
+    table: union.table,
+    taken: outcomes.filter(({ taken }) => taken).map(({ localSeq }) => localSeq),
+    refused: outcomes.filter(({ taken }) => !taken).map(({ localSeq }) => localSeq),
+  };
+}
+
+/**
+ * The held-copy step, run before {@link settleMatches} over the same
+ * `unions`: rewrites each matched row here that `held_rows` lists from
+ * the incoming row and drops its listing, as the module note says, in
+ * one transaction. A table in `cut`, whose incoming rows a projected
+ * pull cut down, takes no copy. `other` is only read, and a store with
+ * nothing listed is not read at all. Answers one entry per union entry,
+ * in its order; every pair stays in `unions` for the comparison.
+ */
+export function takeHeldCopies(
+  local: Database,
+  other: Database,
+  unions: readonly TableUnion[],
+  cut: ReadonlySet<string> = new Set(),
+): HeldCopy[] {
+  const none = (table: string): HeldCopy => ({ table, taken: [], refused: [] });
+  if (!holdsListings(local)) return unions.map(({ table }) => none(table));
+  return local.transaction(() => unions.map((union) => cut.has(union.table)
+    ? none(union.table)
+    : takeTableCopies(local, other, union)))();
 }

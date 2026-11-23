@@ -44,6 +44,7 @@ import { builders, hubStoreContract, readTemplate } from './contract.js';
 import { hubIndexContract, INDEX_CONTRACT_EMBEDDER } from './index-contract.js';
 import { connectSqliteHub, indexFileName } from './sqlite.js';
 import { openMemoryHubStore } from './testdata/memory-store.js';
+import { openNoProjectionHubStore } from './testdata/no-projection-store.js';
 
 /** How the index suite opens one connector of {@link HUB_CONNECTORS}, and the files it reads. */
 interface IndexSetup {
@@ -85,6 +86,7 @@ for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
 }
 
 hubStoreContract('in-memory stand-in', openMemoryHubStore);
+hubStoreContract('no-projection fixture', openNoProjectionHubStore);
 
 /** Two listed projects, as `hub.projects` would name them. */
 const PROJECT_ONE: HubServedProject = { id: '1'.repeat(40), name: 'open-tomato/one' };

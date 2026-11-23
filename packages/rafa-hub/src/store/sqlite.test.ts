@@ -3,7 +3,9 @@
  * port's contract suites running over it by name in `contract.test.ts`.
  * That covers the refusal of a push naming a migration the hub lacks,
  * the files it keeps and the ones it leaves behind, a push holding no
- * row, a store reopened over its directory, and the projects it serves:
+ * row, its capabilities, a store reopened over its directory, the
+ * projected pull, a catalogue handed down in place of this build's, and
+ * the projects it serves:
  * one store, devices and index file per listed project under that
  * project's `storePath`, each project's store file hashed before and
  * after a push to the other, and the single-project hub of before
@@ -12,16 +14,28 @@
  * Payloads here are built as the contract suite builds them. A real
  * store is opened under the temporary directory and given one commit,
  * then exported, and the row's key and origin pair are set by the case.
+ * A device behind the hub names a prefix of this build's migration ids;
+ * a hub ahead of this build is handed this build's catalogue with one
+ * fixture migration after it, adding a column to `commits`.
  */
 import type { HubServedProject, HubStore, HubStoreContext } from './port.js';
-import type { SqliteHub, SqliteHubStoreFile } from './sqlite.js';
+import type { HubMigrationCatalogue, SqliteHub, SqliteHubStoreFile } from './sqlite.js';
 import type { CommitEffortRow, WirePayload, WireRow } from '@open-tomato/rafa/store';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { decodeWirePayload, exportWirePayload, openSqliteStore, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import {
+  decodeWirePayload,
+  encodeWirePayload,
+  exportWirePayload,
+  materialiseWirePayload,
+  openSqliteStore,
+  WIRE_FORMAT,
+  WIRE_VERSION,
+} from '@open-tomato/rafa/store';
+import { SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/migrations';
 import { createLoaderState } from '@open-tomato/rafa-index/loader';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
@@ -45,6 +59,18 @@ const T1 = '2026-09-30T10:05:00.000Z';
 
 /** A migration id no rafa has, as a newer store would name one. */
 const FUTURE_MIGRATION = '9999-from-a-newer-rafa';
+
+/** The fixture migration a hub ahead of this build holds: one column added to `commits`. */
+const NOTE_MIGRATION = 'fixture-commit-note';
+
+/** This build's catalogue with {@link NOTE_MIGRATION} after it. */
+const AHEAD: HubMigrationCatalogue = [
+  ...SQLITE_MIGRATIONS,
+  { id: NOTE_MIGRATION, breaks: [], sql: 'ALTER TABLE commits ADD COLUMN fixture_note TEXT;' },
+];
+
+/** The first of this build's migrations a device behind it lacks: it adds `sessions.worktree`. */
+const BEHIND_FROM = 'session-worktree';
 
 /** A real export of one commit: its migrations and the row every case's rows are built from. */
 interface Template {
@@ -98,6 +124,17 @@ describe('the SQLite hub store', () => {
   const hub = (fileName?: string): HubStore => {
     open = openSqliteHubStore({ directory, now }, { fileName });
     return open;
+  };
+  /** The store a hub one migration ahead of this build keeps. */
+  const aheadHub = (): HubStore => {
+    open = openSqliteHubStore({ directory, now }, { migrations: AHEAD });
+    return open;
+  };
+  /** This build's migration ids up to `BEHIND_FROM`, as a device behind it names them. */
+  const behind = (): readonly string[] => held().migrations.slice(0, held().migrations.indexOf(BEHIND_FROM));
+  /** The commits the hub is pushed, from A, for B to pull. */
+  const seed = async (store: HubStore): Promise<void> => {
+    await store.push({ device: A, payload: payload([commit(A, 1), commit(A, 2)]) });
   };
 
   beforeAll(() => {
@@ -189,6 +226,15 @@ describe('the SQLite hub store', () => {
     });
   });
 
+  describe('its capabilities', () => {
+    it('answers projection true, frozen, beside fts, vector and graph false, since it has no index', () => {
+      const capabilities = hub().contract().capabilities;
+
+      expect(capabilities).toEqual({ fts: false, graph: false, projection: true, vector: false });
+      expect(Object.isFrozen(capabilities)).toBe(true);
+    });
+  });
+
   describe('reopened over its directory', () => {
     it('keeps the rows, the hub seq cursor and each device\'s last push', async () => {
       const first = hub();
@@ -204,6 +250,103 @@ describe('the SQLite hub store', () => {
       expect(pulled.tables['commits']?.map((row) => row['origin_seq'])).toEqual([1]);
       expect(since.tables['commits']?.map((row) => row['origin_seq'])).toEqual([2]);
       expect([status.rows['commits'], status.devices]).toEqual([2, [{ device: A, lastPushAt: T0 }]]);
+    });
+  });
+
+  describe('a projected pull', () => {
+    it('answers whole, with no projected, to a device naming every id the hub holds or more', async () => {
+      const store = hub();
+      await seed(store);
+      const { migrations } = await store.status();
+
+      const plain = await store.pull({ device: B, since: {} });
+      const every = await store.pull({ device: B, since: {}, migrations });
+      const more = await store.pull({ device: B, since: {}, migrations: [...migrations, FUTURE_MIGRATION] });
+
+      expect(plain.projected).toBeUndefined();
+      expect(plain.projectedColumns).toBeUndefined();
+      expect(every).toEqual(plain);
+      expect(more).toEqual(plain);
+    });
+
+    it('leaves out the tables a device behind lacks, names each table it cut and answers its own ids', async () => {
+      const store = hub();
+      await seed(store);
+      const whole = await store.pull({ device: B, since: {} });
+
+      const projected = await store.pull({ device: B, since: {}, migrations: [...behind(), FUTURE_MIGRATION] });
+
+      expect(projected.migrations).toEqual(behind());
+      expect(projected.projected).toEqual({ sessions: [BEHIND_FROM] });
+      expect(projected.projectedColumns).toEqual({ sessions: ['worktree'] });
+      const left = Object.keys(whole.tables).filter((table) => !(table in projected.tables));
+      expect(left.sort()).toEqual(['bug_routes', 'reading_supersedes', 'stale_docs']);
+      expect(Object.keys(projected.cursor).sort()).toEqual(Object.keys(projected.tables).sort());
+      expect(projected.tables['commits']).toEqual(whole.tables['commits']);
+      expect(projected.cursor['commits']).toBe(whole.cursor['commits']);
+    });
+
+    it('is built by a device behind through its own migrations, as the whole answer is not', async () => {
+      const store = hub();
+      await seed(store);
+      const device = { migrations: SQLITE_MIGRATIONS.filter(({ id }) => behind().includes(id)) };
+      const whole = await store.pull({ device: B, since: {} });
+      const projected = await store.pull({ device: B, since: {}, migrations: behind() });
+
+      const built = materialiseWirePayload(decodeWirePayload(encodeWirePayload(projected)), device);
+      built.release();
+
+      expect(() => materialiseWirePayload(whole, device)).toThrow('which this rafa does not know');
+    });
+
+    it('cuts the columns a migration the device lacks adds, under a catalogue handed down', async () => {
+      const store = aheadHub();
+      await store.push({ device: A, payload: payload([{ ...commit(A, 1), fixture_note: 'kept on the hub' }], [NOTE_MIGRATION]) });
+
+      const projected = await store.pull({ device: B, since: {}, migrations: held().migrations });
+      const whole = await store.pull({ device: B, since: {}, migrations: [...held().migrations, NOTE_MIGRATION] });
+
+      expect(projected.projected).toEqual({ commits: [NOTE_MIGRATION] });
+      expect(projected.projectedColumns).toEqual({ commits: ['fixture_note'] });
+      expect(projected.migrations).toEqual(held().migrations);
+      expect(projected.tables['commits']?.map((row) => 'fixture_note' in row)).toEqual([false]);
+      expect(whole.projected).toBeUndefined();
+      expect(whole.tables['commits']?.map((row) => row['fixture_note'])).toEqual(['kept on the hub']);
+      expect(projected.tables['commits']).toEqual(whole.tables['commits']?.map((row) => Object.fromEntries(Object.entries(row)
+        .filter(([column]) => column !== 'fixture_note'))));
+    });
+
+    it('answers the same projection to a device pulling again', async () => {
+      const store = hub();
+      await seed(store);
+
+      const first = await store.pull({ device: B, since: {}, migrations: behind() });
+      const again = await store.pull({ device: B, since: {}, migrations: behind() });
+
+      expect(first.projected).toEqual({ sessions: [BEHIND_FROM] });
+      expect(again).toEqual(first);
+    });
+  });
+
+  describe('a catalogue handed down', () => {
+    it('keeps the store at it and takes a push naming its migration, which this build\'s own refuses', async () => {
+      const store = aheadHub();
+      const note = payload([{ ...commit(A, 1), fixture_note: 'n' }], [NOTE_MIGRATION]);
+
+      const taken = await store.push({ device: A, payload: note });
+      const { migrations } = await store.status();
+
+      expect([taken.received, taken.added]).toEqual([1, 1]);
+      expect(migrations.at(-1)).toBe(NOTE_MIGRATION);
+      expect(store.contract().migrations).toEqual(migrations);
+    });
+
+    it('reaches the connector\'s store too', async () => {
+      const connected = await connectSqliteHub({ directory, now }, { loader: { state: createLoaderState() }, migrations: AHEAD });
+      open = connected.store;
+
+      expect(connected.store.contract().migrations.at(-1)).toBe(NOTE_MIGRATION);
+      expect((await connected.store.status()).migrations.at(-1)).toBe(NOTE_MIGRATION);
     });
   });
 });

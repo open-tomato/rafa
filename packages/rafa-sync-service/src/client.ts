@@ -11,7 +11,9 @@
  *     answers what the hub received and added.
  *   - {@link HubClient.pull}: `GET /v1/effort/pull?device=<origin>`, with
  *     `since=<cursor as JSON>` unless the cursor is empty; answers the
- *     payload, checked whole by core's `decodeWirePayload`.
+ *     payload, checked whole by core's `decodeWirePayload`, its
+ *     `projected` and `projectedColumns` maps included when the hub
+ *     projected it.
  *   - {@link HubClient.status}: `GET /v1/status`; answers the hub's
  *     version, migrations, rows per table and each device's last push,
  *     with the wire contract it speaks, `contractVersion` and
@@ -32,6 +34,18 @@
  * client's to judge: it sends what it speaks, and the hub refuses
  * another with a `409`.
  *
+ * ## The projected pull
+ *
+ * A caller asks for a projected pull by handing `pull` its store's
+ * migration ids ({@link HubPullOptions.migrations}). They are sent as
+ * `migrations=<ids>`, comma-separated, only to a hub whose status
+ * answered `capabilities.projection: true`: a hub naming no such
+ * capability, one release behind among them, is sent no such field, as
+ * it is sent no `contractVersion`, and answers the pull whole. The
+ * answer's `projected` field, each cut table's lacking migration ids,
+ * and its `projectedColumns` field, each cut table's lost columns, are
+ * read by core's codec with the rest of the payload; a table
+ * `projected` leaves out came whole.
  * ## The project
  *
  * A hub that serves projects names them on `/v1/status` as `projects`,
@@ -60,7 +74,12 @@
  *     a `409` migration refusal among them, or a redirect. It is NOT
  *     unreachable: hiding it would leave the devices silently apart, so
  *     the caller reports it as the refusal it is, the hub's own error
- *     line quoted.
+ *     line quoted. A `409` whose envelope names `missing`, the
+ *     migration ids the hub's refusal names (the ones the hub lacks for
+ *     a push, the ones the device lacks for a pull the hub cannot
+ *     project), carries them as {@link HubRefused.missing}; a `409`
+ *     without it, from an older hub, carries none. The message is the
+ *     same either way.
  *   - **{@link HubAnswerMalformed}**: a `2xx` whose body is not the
  *     envelope holding the shape the call expects. A hub that answered
  *     is not unreachable either.
@@ -99,6 +118,9 @@ const SERVER_ERROR = 500;
 /** The lowest status a refusal answers with. */
 const CLIENT_ERROR = 400;
 
+/** The status a migration refusal answers with. */
+const CONFLICT = 409;
+
 /** The lowest redirect status. */
 const REDIRECT = 300;
 
@@ -112,10 +134,13 @@ export class HubRefused extends Error {
   override readonly name = 'HubRefused';
   /** The status the hub answered with. */
   readonly status: number;
+  /** The migration ids a `409` named in `missing`; undefined when it named none. */
+  readonly missing?: readonly string[];
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, missing?: readonly string[]) {
     super(message);
     this.status = status;
+    if (missing !== undefined) this.missing = Object.freeze([...missing]);
   }
 }
 
@@ -180,12 +205,22 @@ export interface HubClientOptions {
   readonly fetch?: typeof fetch;
 }
 
+/** How a pull is asked for. */
+export interface HubPullOptions {
+  /**
+   * The pulling store's migration ids, asking for a pull projected to
+   * its schema; sent only to a hub whose status answered
+   * `capabilities.projection: true`. Left out, the pull is whole.
+   */
+  readonly migrations?: readonly string[];
+}
+
 /** The three calls; see the module note. */
 export interface HubClient {
   /** Pushes `payload` as `device`'s rows. */
   readonly push: (device: string, payload: WirePayload) => Promise<HubPushAnswer>;
-  /** Pulls the rows other devices created past `since`. */
-  readonly pull: (device: string, since: WireCursor) => Promise<WirePayload>;
+  /** Pulls the rows other devices created past `since`, projected when `options` asks and the hub can. */
+  readonly pull: (device: string, since: WireCursor, options?: HubPullOptions) => Promise<WirePayload>;
   /** The hub's status, read once per client and kept; see the module note. */
   readonly status: () => Promise<HubStatusAnswer>;
 }
@@ -211,16 +246,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** The `error` line an envelope holds, or undefined when the text is none. */
-function envelopeError(text: string): string | undefined {
+/** `text` read as a JSON object, or undefined when it is none. */
+function envelopeOf(text: string): Record<string, unknown> | undefined {
   try {
     const parsed: unknown = JSON.parse(text);
-    return isRecord(parsed) && typeof parsed.error === 'string'
-      ? parsed.error
+    return isRecord(parsed)
+      ? parsed
       : undefined;
   } catch {
     return undefined;
   }
+}
+
+/** The `error` line an envelope holds, or undefined when the text is none. */
+function envelopeError(text: string): string | undefined {
+  const envelope = envelopeOf(text);
+  return typeof envelope?.error === 'string'
+    ? envelope.error
+    : undefined;
+}
+
+/** Whether `value` is a list of migration ids: names, none of them empty. */
+function isIdList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((id) => typeof id === 'string' && id !== '');
+}
+
+/** The `missing` ids a refusal's envelope names, or undefined when it names no list of ids. */
+function envelopeMissing(text: string): readonly string[] | undefined {
+  const missing = envelopeOf(text)?.missing;
+  return isIdList(missing)
+    ? missing
+    : undefined;
 }
 
 /** Why a call answering `response` with `text` failed, the hub's own line when it sent one. */
@@ -322,6 +378,16 @@ function contractQuery(status: HubStatusAnswer): Readonly<Record<string, string>
     : {};
 }
 
+/**
+ * The `migrations` query a pull sends: the ids `options` names, to a hub
+ * whose status answered `projection: true` only; none otherwise.
+ */
+function projectionQuery(status: HubStatusAnswer, options: HubPullOptions | undefined): Readonly<Record<string, string>> {
+  return options?.migrations !== undefined && status.capabilities.projection === true
+    ? { migrations: options.migrations.join(',') }
+    : {};
+}
+
 /** The `project` query a push or pull sends to the hub `status` answered: none when it named no projects or the client has none. */
 function projectQuery(status: HubStatusAnswer, project: string | undefined): Readonly<Record<string, string>> {
   return status.projectsNamed && project !== undefined
@@ -360,7 +426,10 @@ function refuseStatus(response: Response, text: string, call: Call): void {
     throw new HubUnreachable(`the hub answered ${call.what} with ${reasonOf(response, text)}`);
   }
   if (status >= CLIENT_ERROR) {
-    throw new HubRefused(status, `the hub refused ${call.what}: ${reasonOf(response, text)}`);
+    const missing = status === CONFLICT
+      ? envelopeMissing(text)
+      : undefined;
+    throw new HubRefused(status, `the hub refused ${call.what}: ${reasonOf(response, text)}`, missing);
   }
   if (status >= REDIRECT) {
     const location = response.headers.get('location') ?? 'nowhere';
@@ -422,8 +491,9 @@ export function createHubClient(options: HubClientOptions): HubClient {
         what: 'push',
       }));
     },
-    pull: async (device: string, since: WireCursor) => {
-      const contract = syncQuery(await status(), options);
+    pull: async (device: string, since: WireCursor, pullOptions?: HubPullOptions) => {
+      const answered = await status();
+      const contract = { ...syncQuery(answered, options), ...projectionQuery(answered, pullOptions) };
       return readPullAnswer(await send(options, {
         method: 'GET',
         path: HUB_CLIENT_ROUTES.pull,

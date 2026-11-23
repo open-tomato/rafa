@@ -37,7 +37,7 @@ describe('HUB_CONNECTORS', () => {
       expect(typeof store.push).toBe('function');
       expect(typeof index.search).toBe('function');
       expect((await store.status()).devices).toEqual([]);
-      expect(index.capabilities().projection).toBe(false);
+      expect(store.contract().capabilities.projection).toBe(true);
       expect((await index.search({ mode: 'fts', query: 'x' })).hits).toEqual([]);
 
       await store.close();

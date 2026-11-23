@@ -31,14 +31,22 @@
  * taken them, the push cursor becomes the export's. Every push reaches
  * the hub, one with no rows included, so the hub records the device's
  * last push and refuses a store newer than it at once. It answers
- * `pushed` with no path: the rows were delivered.
+ * `pushed` with no path: the rows were delivered. A hub whose store
+ * lacks a migration this one applied refuses the push with a `409`
+ * naming the ids in `missing`, written as {@link HubUpgradeRequired}:
+ * `effort sync: the hub is behind this rafa (migration <ids>); nothing
+ * was sent. Next step: upgrade the hub, then sync again`. A `409` naming
+ * no `missing`, from an older hub, passes on as `HubRefused` with its
+ * message as it stands. Neither moves the push cursor.
  *
  * ## Pull
  *
  * Asks the hub for the rows other origins created past the pull cursor.
  * A payload naming a migration this rafa does not know is refused with
- * {@link RafaUpdateRequired}, naming the ids and `rafa self-update`,
- * whether or not it holds rows: its rows could not be read here. Then:
+ * {@link RafaUpdateRequired}, `effort sync: this rafa is behind the hub
+ * (migration <ids>); nothing was merged. Next step: rafa self-update,
+ * then sync again`, whether or not it holds rows: its rows could not be
+ * read here. Then:
  *
  *   - A payload holding no row is not merged, since a merge rewrites the
  *     whole file to add nothing. It answers `nothing-to-sync`.
@@ -52,6 +60,66 @@
  *     the end of every task, and the rows the merge added are still
  *     the hub's to answer again.
  *
+ * ## The projected pull
+ *
+ * Under `effort.syncSkew: pull-projected` (core's key, which `selectSync`
+ * hands on with the hub as `hub.syncSkew`; `refuse` when left out),
+ * the pull sends the migrations this build knows, so a hub whose status
+ * answered `projection: true` answers the rows cut down to this rafa's
+ * schema rather than rows it could not read. A hub that cannot project
+ * is sent no migrations (`client.ts`) and its rows are refused as
+ * above, as under `refuse`; one that can but whose store cannot
+ * answers a `409` naming in `missing` the ids this rafa lacks, written
+ * as the same {@link RafaUpdateRequired}. A pull `409` naming no
+ * `missing` passes on as `HubRefused` as it stands.
+ *
+ * A projected answer carries `projected`, each cut table with the ids
+ * its rows lack, and is merged with that map as `mergeStore`'s option
+ * of that name, so the merge lists each cut row in the store's
+ * `held_rows`. Before the merge, outside a dry run, the state file
+ * keeps `heldBack`, the pull cursor this contact started from, with
+ * the time: only the first projected contact sets it, and a later one
+ * leaves it there (`keepHeldBack`, `state.ts`), so the refill pulls
+ * every row a projected contact cut. It is kept before the merge since
+ * a `heldBack` with nothing cut after it costs a refill rows it already
+ * holds, where a merge with no `heldBack` would lose the cut columns.
+ * A projected pull that merged answers `pulled` with
+ * {@link ServicePullResult.notice}, the line the contact writes:
+ * `effort sync: pulled <n> rows projected to this rafa's schema; <m>
+ * columns wait for rafa self-update`. `<n>` is the rows the answer
+ * carried. `<m>` counts the columns the answer's `projectedColumns`
+ * names, one per cut table and column: this build's catalogue cannot
+ * name a newer build's columns, so the hub, whose schema holds them,
+ * names them. A projected answer naming no `projectedColumns` counts
+ * none.
+ *
+ * ## The refill
+ *
+ * The refill is the first pull, under either `syncSkew`, from a build
+ * whose catalogue knows every migration id the store's `held_rows`
+ * lists (core's `readHeldMigrations`) while the state file keeps a
+ * `heldBack`: that pull asks the hub past `heldBack`'s cursor rather
+ * than the pull cursor, so every row a projected contact cut comes
+ * again. A build still lacking a listed id pulls past the pull cursor,
+ * projected under `pull-projected` as above. The refill's answer is
+ * merged as any pull's, and a whole one, naming no `projected`, takes
+ * each held row whole (`mergeStore`'s held-copy step); outside a dry
+ * run `heldBack` is then cleared, once the pull cursor is written. A
+ * refill that merged answers `pulled` with the notice `effort sync:
+ * refilled <n> rows held back since <date>`, `<n>` the merge's
+ * `rowsRefilled` and `<date>` the UTC date `heldBack` was kept. A
+ * refill answered projected again, by a hub that went further ahead
+ * than this build, keeps `heldBack` and answers the `pulled <n> rows
+ * projected` line; a dry run merges, checks and deletes and clears
+ * nothing.
+ *
+ * A `heldBack` with nothing listed in `held_rows`, kept by a projected
+ * answer that cut no table, is no refill: its contact pulls past the
+ * pull cursor, since a pull past `heldBack` would refill nothing and,
+ * on a build still behind, be projected again on every contact. A
+ * whole answer to it clears `heldBack` outside a dry run, as nothing
+ * waits to be refilled.
+ *
  * The request's `sessionId` is the merge's own: a loop run's end-of-task
  * pull names its session id, and the merge's live-loop guard passes that
  * run's record and refuses any other live one, sharing its pid or not.
@@ -61,7 +129,7 @@
  * moves no cursor, and a refusal moves none either.
  *
  * The migrations this rafa knows are learned once per strategy, on its
- * first pull, as `rafa-hub` learns its own: two empty payloads are
+ * first pull before it asks the hub, as `rafa-hub` learns its own: two empty payloads are
  * materialised under the temporary directory, one merged into the
  * other, which brings it to every migration this build knows, and its
  * export names them. The store subpath exports no catalogue.
@@ -109,17 +177,17 @@
  *
  * The hub client's own errors pass through: `HubUnreachable` (named so,
  * which core's contact matches) for a connect failure, the timeout or a
- * `5xx`, and `HubRefused` for a `4xx` such as a token or migration
- * refusal, which is not unreachable. So does the token reader's
+ * `5xx`, and `HubRefused` for a `4xx` such as a token refusal or a
+ * `409` naming no `missing`, which is not unreachable. So does the token reader's
  * `HubTokenError`. A status read that fails passes its error through
  * the same way, so an unreachable hub is unreachable for push and pull
  * alike. The token is read once per strategy, at its first
  * contact, never when it is made.
  */
-import type { HubClient } from './client.js';
+import type { HubClient, HubPullOptions } from './client.js';
 import type { SecretReader } from './token.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '@open-tomato/rafa/ports';
-import type { MergeOptions, StoreBackend, StoreMergeResult, WirePayload } from '@open-tomato/rafa/store';
+import type { MergeOptions, StoreBackend, StoreMergeResult, WireCursor, WirePayload } from '@open-tomato/rafa/store';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
@@ -129,6 +197,7 @@ import {
   materialiseWirePayload,
   mergeStore,
   openSqliteStore,
+  readHeldMigrations,
   STORE_BACKENDS,
   WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
@@ -137,9 +206,15 @@ import {
 import { readProjectIdentity } from '@open-tomato/rafa/store/store-identity';
 import { Database } from 'bun:sqlite';
 
-import { createHubClient } from './client.js';
-import { readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
+import { createHubClient, HubRefused } from './client.js';
+import { clearHeldBack, keepHeldBack, readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
 import { defaultSecretReader, readHubToken } from './token.js';
+
+/** The status a hub's migration refusal answers with. */
+const CONFLICT = 409;
+
+/** How many characters of an ISO 8601 time are its date: `YYYY-MM-DD`. */
+const ISO_DATE_LENGTH = 10;
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync (service)';
@@ -167,6 +242,14 @@ export class ServiceSyncRefusal extends Error {
   override readonly name = 'ServiceSyncRefusal';
 }
 
+/** The next step a hub behind this rafa names: the hub's store lacks a migration this rafa applied. */
+export const UPGRADE_HUB = 'upgrade the hub';
+
+/** The ids `missing` names, as the refusal lines spell them. */
+function idsOf(missing: readonly string[]): string {
+  return missing.join(', ');
+}
+
 /** A pull whose rows name migrations this rafa does not know. */
 export class RafaUpdateRequired extends Error {
   override readonly name = 'RafaUpdateRequired';
@@ -177,11 +260,74 @@ export class RafaUpdateRequired extends Error {
 
   constructor(missing: readonly string[]) {
     super(
-      `${REFUSAL}: the hub's store has applied migration ${missing.join(', ')}, which this rafa does not know,`
-        + ` so its rows cannot be merged here. Nothing was merged. Next step: ${SELF_UPDATE}, then sync again.`,
+      `effort sync: this rafa is behind the hub (migration ${idsOf(missing)}); nothing was merged.`
+        + ` Next step: ${SELF_UPDATE}, then sync again`,
     );
     this.missing = Object.freeze([...missing]);
   }
+}
+
+/** A push the hub refused with a `409` naming the migrations it lacks: the hub is behind this rafa. */
+export class HubUpgradeRequired extends Error {
+  override readonly name = 'HubUpgradeRequired';
+  /** The ids the hub's `409` named in `missing`, in the hub's order. */
+  readonly missing: readonly string[];
+  /** The one thing to do next: {@link UPGRADE_HUB}. */
+  readonly nextStep: string = UPGRADE_HUB;
+
+  constructor(missing: readonly string[]) {
+    super(
+      `effort sync: the hub is behind this rafa (migration ${idsOf(missing)}); nothing was sent.`
+        + ` Next step: ${UPGRADE_HUB}, then sync again`,
+    );
+    this.missing = Object.freeze([...missing]);
+  }
+}
+
+/** The ids a hub's `409` named in `missing`, or undefined for any other error and a `409` naming none. */
+function conflictMissing(error: unknown): readonly string[] | undefined {
+  return error instanceof HubRefused && error.status === CONFLICT && error.missing !== undefined && error.missing.length > 0
+    ? error.missing
+    : undefined;
+}
+
+/** Sends `payload` under `origin`, writing a `409` that names `missing` as {@link HubUpgradeRequired}. */
+async function pushOrRefuse(client: HubClient, origin: string, payload: WirePayload): Promise<void> {
+  try {
+    await client.push(origin, payload);
+  } catch (error) {
+    const missing = conflictMissing(error);
+    if (missing !== undefined) throw new HubUpgradeRequired(missing);
+    throw error;
+  }
+}
+
+/** Pulls past `since` for `origin`, writing a `409` that names `missing` as {@link RafaUpdateRequired}. */
+async function pullOrRefuse(client: HubClient, origin: string, since: WireCursor, options: HubPullOptions): Promise<WirePayload> {
+  try {
+    return await client.pull(origin, since, options);
+  } catch (error) {
+    const missing = conflictMissing(error);
+    if (missing !== undefined) throw new RafaUpdateRequired(missing);
+    throw error;
+  }
+}
+
+/** The line a projected pull that merged answers; see the module note for what `rows` and `columns` count. */
+export function projectedPullLine(rows: number, columns: number): string {
+  return `effort sync: pulled ${String(rows)} rows projected to this rafa's schema; ${String(columns)} columns wait for ${SELF_UPDATE}`;
+}
+
+/**
+ * The line a refill that merged answers: `rows` the held rows the merge
+ * took whole, `since` the time `heldBack` was kept, written as its UTC
+ * date. See the module note.
+ */
+export function refilledLine(rows: number, since: string): string {
+  const date = new Date(since)
+    .toISOString()
+    .slice(0, ISO_DATE_LENGTH);
+  return `effort sync: refilled ${String(rows)} rows held back since ${date}`;
 }
 
 /** The next step a contract mismatch names when this rafa is ahead of the hub at `url`. */
@@ -213,6 +359,27 @@ export class HubContractMismatch extends Error {
   }
 }
 
+/**
+ * What a sync does when this device is behind its hub: core's
+ * `SyncSkewMode`, the resolved `effort.syncSkew`, spelled here as the
+ * adapter context's `hub` spells its own shape.
+ */
+export type ServiceSyncSkew = 'refuse' | 'pull-projected';
+
+/** A pull's answer: core's `SyncPullResult`, a projected pull that merged also carrying the line to write. */
+export type ServicePullResult =
+  | SyncPullResult
+  | (Extract<SyncPullResult, { readonly status: 'pulled' }> & {
+    /** The `pulled <n> rows projected` line; see the module note. */
+    readonly notice: string;
+  });
+
+/** The `service` strategy: a `Sync` whose pull answers {@link ServicePullResult}. */
+export interface ServiceSync extends Sync {
+  readonly kind: 'service';
+  pull: (request: SyncPullRequest) => Promise<ServicePullResult>;
+}
+
 /** The hub a strategy reaches, as `selectSync` hands it: `AdapterContext.hub`. */
 export interface ServiceHub {
   /** The resolved `hub.url`. */
@@ -221,6 +388,8 @@ export interface ServiceHub {
   readonly tokenSecret: string | null;
   /** The resolved `hub.timeout`, in milliseconds. */
   readonly timeoutMs: number;
+  /** The resolved `effort.syncSkew`; `refuse` when left out. See the module note. */
+  readonly syncSkew?: ServiceSyncSkew;
   /** The resolved `hub.project`; null or left out reads the repository's root commit. */
   readonly project?: string | null;
 }
@@ -328,12 +497,29 @@ function refuseUnknownMigrations(payload: WirePayload, known: readonly string[])
   if (missing.length > 0) throw new RafaUpdateRequired(missing);
 }
 
-/** Merges `payload` into the store at `path` through a scratch store; see the module note. */
+/** The columns a projected answer's rows were cut of, one per table and column; see the module note. */
+function waitingIn(payload: WirePayload): number {
+  return Object.values(payload.projectedColumns ?? {}).reduce((total, columns) => total + columns.length, 0);
+}
+
+/** Merges `payload` into the store at `path` through a scratch store, with its `projected` map; see the module note. */
 function mergePayload(path: string, payload: WirePayload, request: SyncPullRequest, now: () => Date): StoreMergeResult {
   const { dryRun, sessionId = null } = request;
+  const { projected } = payload;
   const wire = materialiseWirePayload(payload, { now });
   try {
-    const merge = mergeStore({ path, otherPath: wire.path, backend: 'sqlite', dryRun, stamp: randomUUID(), now, sessionId });
+    const merge = mergeStore({
+      path,
+      otherPath: wire.path,
+      backend: 'sqlite',
+      dryRun,
+      stamp: randomUUID(),
+      now,
+      sessionId,
+      ...(projected === undefined
+        ? {}
+        : { projected }),
+    });
     if (merge.backupPath === null) return merge;
     rmSync(merge.backupPath, { force: true });
     return { ...merge, backupPath: null };
@@ -347,7 +533,7 @@ function mergePayload(path: string, payload: WirePayload, request: SyncPullReque
  * hub `options.hub` names. A new frozen `Sync` on each call; see the
  * module note for what push and pull do.
  */
-export function createServiceSync(options: ServiceSyncOptions): Sync {
+export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
   const { backend, hub } = options;
   const now = options.now ?? ((): Date => new Date());
   const storePath = openSqliteStore(options.repoRoot).path('commits');
@@ -388,26 +574,46 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
     if (origin === undefined) return NOTHING_TO_SYNC;
     const reached = await agreedClient();
     const payload = exportWirePayload({ path: storePath, cursor: readSyncCursors(statePath, origin, hub.url).push });
-    await reached.push(origin, payload);
+    await pushOrRefuse(reached, origin, payload);
     writeSyncCursor(statePath, origin, hub.url, 'push', payload.cursor);
     return PUSHED;
   };
 
-  const pull = async (request: SyncPullRequest): Promise<SyncPullResult> => {
+  const pull = async (request: SyncPullRequest): Promise<ServicePullResult> => {
     const { from, dryRun } = request;
     refusePath('from', from);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
-    const payload = await (await agreedClient()).pull(origin, readSyncCursors(statePath, origin, hub.url).pull);
+    const reached = await agreedClient();
     known ??= learnMigrations(now);
+    const cursors = readSyncCursors(statePath, origin, hub.url);
+    const { heldBack } = cursors;
+    const held = heldBack === undefined
+      ? []
+      : readHeldMigrations(storePath);
+    const caughtUp = held.every((id) => known?.includes(id) === true);
+    const refill = heldBack !== undefined && held.length > 0 && caughtUp
+      ? heldBack
+      : undefined;
+    const since = refill?.cursor ?? cursors.pull;
+    const payload = await pullOrRefuse(reached, origin, since, hub.syncSkew === 'pull-projected'
+      ? { migrations: known }
+      : {});
     refuseUnknownMigrations(payload, known);
+    const { projected } = payload;
+    if (projected !== undefined && !dryRun) keepHeldBack(statePath, origin, hub.url, { cursor: since, since: now().toISOString() });
     const merge = rowsIn(payload) === 0
       ? undefined
       : mergePayload(storePath, payload, request, now);
     if (!dryRun) writeSyncCursor(statePath, origin, hub.url, 'pull', payload.cursor);
-    return merge === undefined
-      ? NOTHING_TO_SYNC
-      : Object.freeze({ status: 'pulled', merge });
+    if (heldBack !== undefined && projected === undefined && caughtUp && !dryRun) clearHeldBack(statePath, origin, hub.url);
+    if (merge === undefined) return NOTHING_TO_SYNC;
+    if (projected !== undefined) {
+      return Object.freeze({ status: 'pulled', merge, notice: projectedPullLine(rowsIn(payload), waitingIn(payload)) });
+    }
+    return Object.freeze(refill === undefined
+      ? { status: 'pulled', merge }
+      : { status: 'pulled', merge, notice: refilledLine(merge.rowsRefilled, refill.since) });
   };
 
   return Object.freeze({ kind: 'service', push, pull });

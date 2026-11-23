@@ -274,21 +274,30 @@ describe('the sqlite connector\'s index half', () => {
   });
 
   describe('capabilities', () => {
-    it('answers fts and vector from the loader and the embedder, graph false with no ref_links, projection false', async () => {
-      const { index, store } = await connect({ embedder: FIXTURE_EMBEDDER });
+    it('answers fts and vector from the loader and the embedder, graph false with no ref_links, and no projection', async () => {
+      const { index } = await connect({ embedder: FIXTURE_EMBEDDER });
 
       const capabilities = index.capabilities();
 
-      expect(capabilities).toEqual({ fts: true, graph: false, projection: false, vector: true });
+      expect(capabilities).toEqual({ fts: true, graph: false, vector: true });
       expect(Object.isFrozen(capabilities)).toBe(true);
-      expect(store.contract().capabilities).toEqual(capabilities);
     });
 
-    it('answers every capability false from the plain store, as the control', async () => {
+    it('composes the store\'s contract from the index\'s fts, vector and graph and the store\'s projection', async () => {
+      const { index, store } = await connect({ embedder: FIXTURE_EMBEDDER });
+
+      const capabilities = store.contract().capabilities;
+
+      expect(capabilities).toEqual({ ...index.capabilities(), projection: true });
+      expect(capabilities).toEqual({ fts: true, graph: false, projection: true, vector: true });
+      expect(Object.isFrozen(capabilities)).toBe(true);
+    });
+
+    it('answers fts, vector and graph false and projection true from the plain store, as the control', async () => {
       const plain = openSqliteHubStore({ directory, now: () => new Date(T0) });
       opened.push(plain);
 
-      expect(plain.contract().capabilities).toEqual({ fts: false, graph: false, projection: false, vector: false });
+      expect(plain.contract().capabilities).toEqual({ fts: false, graph: false, projection: true, vector: false });
     });
 
     it('answers graph true over a store holding ref_links, and walks it', async () => {

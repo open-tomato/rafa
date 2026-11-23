@@ -126,6 +126,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'store',
   'effortBusyTimeoutMs',
   'effortSync',
+  'effortSyncSkew',
   'hubUrl',
   'hubTokenSecret',
   'hubTimeout',
@@ -245,6 +246,7 @@ const DEFAULTS: RafaConfig = {
   store: 'sqlite',
   effortBusyTimeoutMs: 5000,
   effortSync: 'local',
+  effortSyncSkew: 'refuse',
   hubUrl: null,
   hubTokenSecret: null,
   hubTimeout: '3s',
@@ -374,6 +376,7 @@ const FULL = [
   'effort:',
   '  busyTimeoutMs: 250',
   '  sync: file',
+  '  syncSkew: pull-projected',
   'hub:',
   '  url: https://hub.example.org',
   '  tokenSecret: rafa-hub-token',
@@ -554,6 +557,7 @@ const FULL_VALUES: RafaConfig = {
   store: 'ndjson',
   effortBusyTimeoutMs: 250,
   effortSync: 'file',
+  effortSyncSkew: 'pull-projected',
   hubUrl: 'https://hub.example.org',
   hubTokenSecret: 'rafa-hub-token',
   hubTimeout: '10s',
@@ -933,6 +937,11 @@ describe('parseConfigText', () => {
         'effort.sync', 'effort:\n  sync: rsync',
         'effort.sync is "rsync", expected one of: local, file, git, service, p2p',
         'effort:\n  sync: p2p', 'effortSync', 'p2p',
+      ],
+      [
+        'effort.syncSkew', 'effort:\n  syncSkew: pull',
+        'effort.syncSkew is "pull", expected one of: refuse, pull-projected',
+        'effort:\n  syncSkew: pull-projected', 'effortSyncSkew', 'pull-projected',
       ],
       [
         'hub.url', 'hub:\n  url: hub.example.org',
@@ -1997,6 +2006,41 @@ describe('effort.sync', () => {
 
     expect([omitting.config.effortSync, omitting.sources.effortSync]).toEqual(['file', 'user']);
     expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
+  });
+});
+
+describe('effort.syncSkew', () => {
+  it('accepts refuse and pull-projected and refuses 0, -1 and any other word by the same reader', () => {
+    const accepted = ['refuse', 'pull-projected'].map(
+      (mode) => fileOf(`effort:\n  syncSkew: ${mode}\n`).values.effortSyncSkew,
+    );
+
+    expect(accepted).toEqual(['refuse', 'pull-projected']);
+    expect(refusal(() => fileOf('effort:\n  syncSkew: 0\n')).problems).toEqual([
+      `${PATH}: effort.syncSkew is 0, expected one of: refuse, pull-projected`,
+    ]);
+    expect(refusal(() => fileOf('effort:\n  syncSkew: -1\n')).problems).toEqual([
+      `${PATH}: effort.syncSkew is -1, expected one of: refuse, pull-projected`,
+    ]);
+    expect(refusal(() => fileOf('effort:\n  syncSkew: projected\n')).problems).toEqual([
+      `${PATH}: effort.syncSkew is "projected", expected one of: refuse, pull-projected`,
+    ]);
+  });
+
+  it('is not a setting the command line can name', () => {
+    const cli = { effortSyncSkew: 'pull-projected' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect([resolved.config.effortSyncSkew, resolved.sources.effortSyncSkew]).toEqual(['refuse', 'default']);
+  });
+
+  it('answers refuse when no layer names it, and is kept beside an effort.sync other than service', () => {
+    const unnamed = resolveConfig({ file: fileOf('effort:\n  sync: service\nhub:\n  url: https://hub.example.org\n') });
+    const named = resolveConfig({ file: fileOf('effort:\n  sync: file\n  syncSkew: pull-projected\n') });
+
+    expect([unnamed.config.effortSyncSkew, unnamed.sources.effortSyncSkew]).toEqual(['refuse', 'default']);
+    expect([named.config.effortSync, named.config.effortSyncSkew, named.sources.effortSyncSkew])
+      .toEqual(['file', 'pull-projected', 'file']);
   });
 });
 

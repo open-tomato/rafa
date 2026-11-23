@@ -265,6 +265,17 @@ export const SYNC_STRATEGIES = ['local', 'file', 'git', 'service', 'p2p'] as con
 /** One of the five effort-store sync strategies. */
 export type SyncStrategy = (typeof SYNC_STRATEGIES)[number];
 
+/**
+ * What a sync does when this device and its hub hold different store
+ * migrations, as `effort.syncSkew` names it: `refuse` sends and merges
+ * nothing, `pull-projected` pulls rows projected to this device's schema.
+ * Read only under `effort.sync: service`.
+ */
+export const SYNC_SKEW_MODES = ['refuse', 'pull-projected'] as const;
+
+/** One of the two sync-skew modes. */
+export type SyncSkewMode = (typeof SYNC_SKEW_MODES)[number];
+
 /** How the board records epics and blockers: labels, or GitHub's own links. */
 export const BOARD_RELATIONSHIP_MODES = ['labels', 'native'] as const;
 

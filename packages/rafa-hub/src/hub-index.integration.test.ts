@@ -210,7 +210,7 @@ describe('the hub server over the sqlite connector and its index', () => {
     // Wait for the store and its index to open: /status answers once they have.
     const opened = await fetch(`${server.url}${HUB_ROUTES.status}`, { headers: { authorization: `Bearer ${WRITER}` } });
     expect(opened.status).toBe(200);
-    expect(connected().index.capabilities()).toEqual({ fts: true, vector: false, graph: false, projection: false });
+    expect(connected().index.capabilities()).toEqual({ fts: true, vector: false, graph: false });
     const storeAtOpen = inodeOf(storePath);
     const indexAtOpen = inodeOf(indexPath);
 

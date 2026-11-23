@@ -18,7 +18,7 @@
  */
 import type { HubIdentity, IdentityRefusalReason } from './identity/port.js';
 import type { HubLogEntry, HubServer, HubServerOptions } from './server.js';
-import type { HubIndex, HubServedProject, HubStore, IndexRebuildRequest, IndexRebuildResult } from './store/port.js';
+import type { HubIndex, HubPullRequest, HubServedProject, HubStore, IndexRebuildRequest, IndexRebuildResult } from './store/port.js';
 import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 
 import { encodeWirePayload, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
@@ -154,6 +154,7 @@ interface Envelope {
   readonly data?: Record<string, unknown>;
   readonly error?: string;
   readonly code?: string;
+  readonly missing?: readonly string[];
 }
 
 async function envelope(response: Response): Promise<Envelope> {
@@ -427,10 +428,11 @@ describe('POST /v1/effort/push', () => {
     const response = await push(server, A, [commit(A, 1)]);
 
     expect(response.status).toBe(409);
-    const { success, error } = await envelope(response);
+    const { success, error, missing } = await envelope(response);
     expect(success).toBe(false);
     expect(error).toContain('9999-from-a-newer-rafa');
     expect(error).toContain(HUB_UPGRADE);
+    expect(missing).toEqual(['9999-from-a-newer-rafa']);
   });
 
   it('answers 500 without the cause when the store fails, and logs the cause', async () => {
@@ -508,7 +510,13 @@ describe('GET /v1/effort/pull', () => {
     ['a negative cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":-1}')}`, 'wire: cursor for commits is -1'],
     ['a fractional cursor', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"commits":1.5}')}`, 'wire: cursor for commits is 1.5'],
     ['a cursor naming a table that is not merged', `${HUB_ROUTES.pull}?device=${A}&since=${encodeURIComponent('{"merges":1}')}`, 'which is no merged table'],
-    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, project, since, contractVersion.'],
+    ['a misspelt parameter', `${HUB_ROUTES.pull}?device=${A}&cursor={}`, 'The query names "cursor"; expected device, project, since, contractVersion, migrations.'],
+    ['an empty migrations', `${HUB_ROUTES.pull}?device=${A}&migrations=`, 'migrations names ""'],
+    ['an empty id between commas', `${HUB_ROUTES.pull}?device=${A}&migrations=0001-base,,0002-next`, 'migrations names ""'],
+    ['a trailing comma', `${HUB_ROUTES.pull}?device=${A}&migrations=0001-base,`, 'migrations names ""'],
+    ['an id holding a space', `${HUB_ROUTES.pull}?device=${A}&migrations=0001%20base`, 'migrations names "0001 base"'],
+    ['an id named twice', `${HUB_ROUTES.pull}?device=${A}&migrations=0001-base,0001-base`, 'migrations names 0001-base more than once'],
+    ['migrations given twice', `${HUB_ROUTES.pull}?device=${A}&migrations=0001-base&migrations=0002-next`, 'names migrations more than once'],
   ];
   for (const [what, path, says] of refusals) {
     it(`answers 400 for ${what}, reaching no store`, async () => {
@@ -521,6 +529,77 @@ describe('GET /v1/effort/pull', () => {
       expect(calls.pull).toBe(0);
     });
   }
+});
+
+/** A store answering `projection: true` that records each pull it is handed, delegating to the memory store. */
+function projectingStore(pulls: HubPullRequest[]): HubStore {
+  const store = memoryStore();
+  return {
+    ...store,
+    pull: (request) => {
+      pulls.push(request);
+      return store.pull(request);
+    },
+    contract: () => {
+      const contract = store.contract();
+      return { ...contract, capabilities: { ...contract.capabilities, projection: true } };
+    },
+  };
+}
+
+describe('migrations on GET /v1/effort/pull', () => {
+  it('answers 409 with missing for a device lacking an id a store without projection holds, reaching no pull', async () => {
+    const { server, calls, lines } = start();
+    await push(server, B, [commit(B, 1)]);
+
+    const response = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}&migrations=0000-older`, WRITER);
+    const { success, error, missing, code } = await envelope(response);
+
+    expect(response.status).toBe(409);
+    expect(success).toBe(false);
+    expect(missing).toEqual(['0001-base']);
+    expect(code).toBeUndefined();
+    expect(error).toContain('0001-base');
+    expect(error).toContain('rafa self-update');
+    expect(calls.pull).toBe(0);
+    expect(requestLines(lines).at(-1)).toMatchObject({ level: 'warn', status: 409 });
+  });
+
+  it('answers a device naming every id a store without projection holds whole, handing the store no migrations', async () => {
+    const pulls: HubPullRequest[] = [];
+    const store = memoryStore();
+    const { server } = start({
+      openStore: () => ({
+        ...store,
+        pull: (request) => {
+          pulls.push(request);
+          return store.pull(request);
+        },
+      }),
+    });
+    await push(server, B, [commit(B, 1)]);
+
+    const named = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}&migrations=0001-base,0002-ahead`, WRITER);
+    const plain = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}`, WRITER);
+
+    expect(named.status).toBe(200);
+    expect(plain.status).toBe(200);
+    expect((await envelope(named)).data).toEqual((await envelope(plain)).data);
+    expect(pulls).toEqual([{ device: A, since: {} }, { device: A, since: {} }]);
+  });
+
+  it('hands a store with projection the migrations, in their order, and none when the query leaves them out', async () => {
+    const pulls: HubPullRequest[] = [];
+    const { server } = start({ openStore: () => projectingStore(pulls) });
+    await push(server, B, [commit(B, 1)]);
+
+    const named = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}&migrations=0000-older,0001-base`, WRITER);
+    const plain = await send(server, 'GET', `${HUB_ROUTES.pull}?device=${A}`, WRITER);
+
+    expect(named.status).toBe(200);
+    expect(plain.status).toBe(200);
+    expect(pulls).toEqual([{ device: A, since: {}, migrations: ['0000-older', '0001-base'] }, { device: A, since: {} }]);
+  });
 });
 
 describe('the log', () => {
@@ -773,7 +852,7 @@ function standInIndex(outcome: (call: number) => Promise<IndexRebuildResult> = (
     },
     search: () => Promise.resolve({ hits: [] }),
     links: () => Promise.resolve({ graph: false, links: [] }),
-    capabilities: () => ({ fts: true, vector: false, graph: false, projection: false }),
+    capabilities: () => ({ fts: true, vector: false, graph: false }),
   };
   return { index, asked, started: (call) => startOf(call).promise };
 }

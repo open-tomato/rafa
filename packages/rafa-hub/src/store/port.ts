@@ -18,7 +18,9 @@
  * engine-shaped crosses it; `search` answers row references, a table
  * and an origin pair with a score, never a row body, which a reader
  * fetches through the store. What an index can do is answered by
- * {@link HubIndex.capabilities}, measured when the connector opened.
+ * {@link HubIndex.capabilities}, measured when the connector opened;
+ * whether a pull can be projected is the store's own answer, its
+ * {@link HubContract.capabilities}' `projection`.
  *
  * ## Devices and origins
  *
@@ -57,6 +59,16 @@
  *     caller relayed it.
  *   - **The answered cursor is a snapshot.** Pulling again with it
  *     answers only rows pushed since.
+ *   - **A pull is projected only to a caller behind the store.** A pull
+ *     naming the caller's `migrations` while the store holds an id they
+ *     leave out is answered at the caller's schema: the held ids it
+ *     names as the payload's `migrations`, every table its schema does
+ *     not make left out of `tables` and `cursor`, and each table whose
+ *     rows lost a column named in `projected` with the ids it lacks
+ *     and in `projectedColumns` with the columns it lost. A caller
+ *     naming every held id, or more, is answered whole, with neither
+ *     field, as a pull naming none is; a store answering
+ *     `projection: false` is never handed a pull naming `migrations`.
  *   - **Every push is a device's last push**, a repeated push that adds
  *     nothing included, stamped by the clock the adapter was made with.
  *     A pull is no push and names no device.
@@ -135,6 +147,12 @@ export interface HubPullRequest {
   readonly project?: string;
   /** The hub cursor a previous pull answered; a table left out is read from the start. */
   readonly since: WireCursor;
+  /**
+   * The pulling device's migration ids, in its apply order, asking for
+   * rows projected to its schema; every row is answered as held when
+   * left out. See the module note on projection.
+   */
+  readonly migrations?: readonly string[];
 }
 
 /** One status reading: which project's rows, devices and migrations it answers. */
@@ -212,11 +230,21 @@ export type HubCapabilities = Readonly<{
    * Projected rows answered to a device whose schema is behind the
    * hub's. `true` promises that a pull from such a device answers its
    * rows projected to the device's schema rather than refusing it; a
-   * connector answers `false` until it can project, and then that
-   * device is refused.
+   * store answers `false` until it can project, and then that device is
+   * refused. The store answers it, never the index: it is a promise
+   * about {@link HubStore.pull}, so {@link HubIndexCapabilities} leaves
+   * it out.
    */
   projection: boolean;
 }>;
+
+/**
+ * What an index can answer: {@link HubCapabilities} without
+ * `projection`, which is the store's. A connector composes its store's
+ * {@link HubContract.capabilities} from these three and the store's own
+ * `projection`.
+ */
+export type HubIndexCapabilities = Omit<HubCapabilities, 'projection'>;
 
 /**
  * The wire contract a store speaks: two numbers, never one.
@@ -241,7 +269,7 @@ export interface HubContract {
 export interface HubStore {
   /** Takes a device's rows; see the module note on idempotence. */
   readonly push: (request: HubPushRequest) => Promise<HubPushResult>;
-  /** The rows other origins created past `since`, with the cursor to pass next. */
+  /** The rows other origins created past `since`, projected to `migrations` when it is given, with the cursor to pass next. */
   readonly pull: (request: HubPullRequest) => Promise<WirePayload>;
   /**
    * One project's row counts, schema and every device's last push, with
@@ -380,8 +408,8 @@ export interface HubIndex {
   readonly search: (request: IndexSearchRequest) => Promise<IndexSearchResult>;
   /** The nodes reached from one node over `ref_links`, recursively. */
   readonly links: (request: IndexLinksRequest) => Promise<IndexLinksResult>;
-  /** What the index can answer, computed once when the connector opened. */
-  readonly capabilities: () => HubCapabilities;
+  /** What the index can answer, computed once when the connector opened; `projection` is the store's. */
+  readonly capabilities: () => HubIndexCapabilities;
 }
 
 /** What an adapter factory is handed, by the hub or by the contract suite. */

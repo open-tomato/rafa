@@ -15,7 +15,11 @@
  *
  * Push, pull past a cursor excluding the caller's own origin,
  * idempotent repeat pushes, each device's last push, and row counts:
- * the rules `port.ts` lists as what an adapter owes. What a push naming
+ * the rules `port.ts` lists as what an adapter owes, and the projected
+ * pull: a store answering `projection: true` answers a device behind it
+ * rows at the device's schema, one answering `false` is refused by the
+ * hub's route (`409` with `missing`), each run by the capability the
+ * store answers. What a push naming
  * a migration the hub lacks is refused with is the adapter's own, and
  * its own suite's.
  *
@@ -75,10 +79,20 @@ import {
 } from '@open-tomato/rafa/store';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { HUB_ACTIONS } from '../identity/port.js';
+import { openMemoryIdentity } from '../identity/testdata/memory-identity.js';
+import { HUB_ROUTES, startHubServer } from '../server.js';
+
 /** The three devices a case pushes and pulls as, each named by its store origin. */
 const A = 'aaaaaaaa-0000-4000-8000-00000000000a';
 const B = 'bbbbbbbb-0000-4000-8000-00000000000b';
 const C = 'cccccccc-0000-4000-8000-00000000000c';
+
+/** The first migration of the template a device behind the hub lacks: it adds `sessions.worktree`. */
+const BEHIND_FROM = 'session-worktree';
+
+/** The token the refusal case's hub knows. */
+const REFUSAL_TOKEN = 'contract-refusal-token-0001';
 
 /** The clock's first reading, and two later ones. */
 const T0 = '2026-09-30T10:00:00.000Z';
@@ -444,6 +458,79 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
 
         expect(decodeWirePayload(encodeWirePayload(pulled))).toEqual(pulled);
         expect(rowsIn(pulled)).toBe(2);
+      });
+    });
+
+    describe('a pull from a device behind the hub', () => {
+      /** The template's ids up to {@link BEHIND_FROM}: a device that lacks it and every id after. */
+      const behind = (): readonly string[] => {
+        const ids = build.payload({}).migrations;
+        const index = ids.indexOf(BEHIND_FROM);
+        if (index < 0) throw new Error(`hub store contract: the template names no ${BEHIND_FROM}`);
+        return ids.slice(0, index);
+      };
+      const seed = (): Promise<unknown> => hub().push({
+        device: A,
+        payload: payload({ [COMMITS]: [commit(A, 1)], [SESSIONS]: [session(A, 2)] }),
+      });
+
+      it('answers rows projected to its schema, naming each cut table, when the store projects', async () => {
+        if (!hub().contract().capabilities.projection) return;
+        await seed();
+        const whole = await pull(B);
+        const projected = await hub().pull({ device: B, since: {}, migrations: behind() });
+
+        expect(whole.projected).toBeUndefined();
+        expect(projected.migrations).toEqual(behind());
+        expect(projected.projected?.[SESSIONS]).toEqual([BEHIND_FROM]);
+        expect(projected.projectedColumns?.[SESSIONS]).toEqual(['worktree']);
+        expect(Object.keys(projected.cursor).sort()).toEqual(Object.keys(projected.tables).sort());
+        expect(projected.tables[COMMITS]).toEqual(whole.tables[COMMITS]);
+        expect(whole.tables[SESSIONS]?.map((row) => 'worktree' in row)).toEqual([true]);
+        expect(projected.tables[SESSIONS]?.map((row) => 'worktree' in row)).toEqual([false]);
+      });
+
+      it('answers a device naming every id the store holds whole, with no projected, when the store projects', async () => {
+        if (!hub().contract().capabilities.projection) return;
+        await seed();
+        const whole = await pull(B);
+        const named = await hub().pull({ device: B, since: {}, migrations: hub().contract().migrations });
+
+        expect(named.projected).toBeUndefined();
+        expect(named.projectedColumns).toBeUndefined();
+        expect(named).toEqual(whole);
+      });
+
+      it('is refused by the hub with a 409 naming what it lacks, when the store cannot project', async () => {
+        if (hub().contract().capabilities.projection) return;
+        await seed();
+        const store = hub();
+        const server = startHubServer({
+          port: 0,
+          hostname: '127.0.0.1',
+          version: '0.0.0',
+          identity: openMemoryIdentity({ [REFUSAL_TOKEN]: { id: 'contract', may: HUB_ACTIONS } }),
+          openStore: () => ({ ...store, close: () => Promise.resolve() }),
+          log: () => undefined,
+        });
+        try {
+          const ids = behind();
+          const missing = store.contract().migrations.filter((id) => !ids.includes(id));
+          const get = (named: readonly string[]): Promise<Response> => fetch(
+            `${server.url}${HUB_ROUTES.pull}?device=${B}&migrations=${named.join(',')}`,
+            { headers: { authorization: `Bearer ${REFUSAL_TOKEN}` } },
+          );
+          const refused = await get(ids);
+          const body = await refused.json() as { success: boolean; missing?: string[]; error: string };
+          const served = await get(store.contract().migrations);
+
+          expect(refused.status).toBe(409);
+          expect([body.success, body.missing]).toEqual([false, missing]);
+          expect(body.error).toContain('rafa self-update');
+          expect(served.status).toBe(200);
+        } finally {
+          await server.stop();
+        }
       });
     });
 

@@ -51,9 +51,10 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { bringForward } from './bring-forward.js';
 import { EXTRACT_FILE_NAMES, readExtractSide, restoreExtractSide } from './fixture-extract.js';
 import { withoutGap } from './merge-commit-gaps.js';
-import { MergeRefusal, mergeStore } from './merge-store.js';
+import { MergeRefusal, mergeStore, readHeldMigrations } from './merge-store.js';
 import { ORIGIN_TABLES } from './origins.js';
 import {
   buildCleanStarts,
@@ -313,6 +314,112 @@ describe('the cloned disk', () => {
       const incomingContent = Object.fromEntries(Object.entries(incoming).filter(([column]) => column !== 'seq'));
       expect(incomingContent).toEqual(rowAt(clone.path, collision));
     }
+  });
+});
+
+/** The ids a projected payload names its findings rows as lacking: one no real catalogue holds. */
+const LACKED = ['scratch-lacked-columns'];
+
+const HELD_PROJECT = 'root-commit-held';
+const HELD_LOCAL = 'store-held-a';
+const HELD_REMOTE = 'store-held-b';
+const HELD_KEYS = ['h1', 'h2'] as const;
+const HELD_REF = '{"provider":"github","number":101}';
+
+/** The two columns a projected pull lacks, filled for `key` in a whole row. */
+function wholeColumns(key: string): readonly [string, string] {
+  return [`the cause of ${key}`, `the fix for ${key}`];
+}
+
+/** A store of its own under `scope`, brought through every migration, `plant` run on it, answering its path. */
+function heldStore(name: string, storeId: string, plant: (db: Database) => void): string {
+  const path = join(freshDir(scope, name), 'effort.sqlite');
+  const db = new Database(path, { create: true, readwrite: true });
+  try {
+    bringForward(db, path, 'write', 'open', { identity: INSTALLED });
+    db.query(
+      'INSERT INTO store_meta (id, store_id, project_root_commit, project_remote, host_id, store_path, file_dev, file_ino, minted_at)'
+        + ' VALUES (1, ?, ?, NULL, \'host\', ?, 1, 1, \'2026-09-29T10:00:00.000Z\')',
+    ).run(storeId, HELD_PROJECT, path);
+    plant(db);
+  } finally {
+    db.close();
+  }
+  return path;
+}
+
+/** Findings `h1` and `h2` under the remote's origin; `whole` fills `cause` and `resolution`, a projected copy leaves them NULL. */
+function plantHeldFindings(db: Database, whole: boolean): void {
+  HELD_KEYS.forEach((key, index) => {
+    const [cause, resolution] = whole
+      ? wholeColumns(key)
+      : [null, null];
+    db.query(
+      'INSERT INTO findings (seq, origin_store, origin_seq, id, session_id, task_line, kind, what, artifact, signal, outcome, collected_at, cause, resolution)'
+        + ' VALUES (?, ?, ?, ?, ?, ?, \'gotcha\', ?, ?, \'loud\', \'done\', \'2026-09-29T10:00:00.000Z\', ?, ?)',
+    ).run(index + 1, HELD_REMOTE, index + 1, `id-${key}`, `session-${key}`, `task ${key}`, `what ${key}`, `artifact-${key}`, cause, resolution);
+  });
+}
+
+/** One merge of `otherPath` into `path`, projected or whole, counting nothing it is not asked. */
+function mergeHeld(path: string, otherPath: string, projected: boolean): ReturnType<typeof mergeStore> {
+  return mergeStore({ ...options(path, otherPath), ...(projected
+    ? { projected: { findings: LACKED } }
+    : {}) });
+}
+
+/** The findings of the store at `path` by id, `cause`, `resolution` and `tracker_ref`. */
+function findingsAt(path: string): Row[] {
+  return readRows(path, 'SELECT id, cause, resolution, tracker_ref FROM findings ORDER BY id');
+}
+
+describe('a projected payload, then the same rows whole', () => {
+  it('records no conflict, empties held_rows, and ends as a store that took the rows whole once', () => {
+    const projectedPath = heldStore('held-projected', HELD_REMOTE, (db) => plantHeldFindings(db, false));
+    const wholePath = heldStore('held-whole', HELD_REMOTE, (db) => plantHeldFindings(db, true));
+    const local = heldStore('held-local', HELD_LOCAL, () => undefined);
+    const reference = heldStore('held-reference', HELD_LOCAL, () => undefined);
+
+    const first = mergeHeld(local, projectedPath, true);
+    expect(first).toMatchObject({ status: 'merged', rowsAdded: 2, rowsHeld: 2 });
+    expect(readHeldMigrations(local)).toEqual(LACKED);
+
+    const second = mergeHeld(local, wholePath, false);
+    mergeHeld(reference, wholePath, false);
+
+    expect(second).toMatchObject({ status: 'merged', rowsInConflict: 0, rowsHeld: 0, rowsRefilled: 2 });
+    expect(readRows(local, 'SELECT count(*) AS n FROM merge_conflicts')).toEqual([{ n: 0 }]);
+    expect(readRows(local, 'SELECT count(*) AS n FROM held_rows')).toEqual([{ n: 0 }]);
+    expect(readHeldMigrations(local)).toEqual([]);
+    expectSameUnion([local, reference]);
+    expect(findingsAt(local).map((row) => row['cause'])).toEqual(HELD_KEYS.map((key) => wholeColumns(key)[0]));
+  });
+
+  it('keeps a tracker_ref set here meanwhile on a held finding and takes the rest whole', () => {
+    const projectedPath = heldStore('held-projected-ref', HELD_REMOTE, (db) => plantHeldFindings(db, false));
+    const wholePath = heldStore('held-whole-ref', HELD_REMOTE, (db) => plantHeldFindings(db, true));
+    const local = heldStore('held-local-ref', HELD_LOCAL, () => undefined);
+    mergeHeld(local, projectedPath, true);
+    const db = new Database(local, { readwrite: true });
+    try {
+      db.query('UPDATE findings SET tracker_ref = ? WHERE id = ?').run(HELD_REF, 'id-h2');
+    } finally {
+      db.close();
+    }
+
+    const second = mergeHeld(local, wholePath, false);
+
+    expect(second).toMatchObject({ status: 'merged', rowsInConflict: 0, rowsRefilled: 2 });
+    expect(readRows(local, 'SELECT count(*) AS n FROM merge_conflicts')).toEqual([{ n: 0 }]);
+    expect(readRows(local, 'SELECT count(*) AS n FROM held_rows')).toEqual([{ n: 0 }]);
+    expect(findingsAt(local)).toEqual(HELD_KEYS.map((key) => ({
+      id: `id-${key}`,
+      cause: wholeColumns(key)[0],
+      resolution: wholeColumns(key)[1],
+      tracker_ref: key === 'h2'
+        ? HELD_REF
+        : null,
+    })));
   });
 });
 

@@ -3889,8 +3889,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 210,
-        "test": 155,
+        "source": 215,
+        "test": 159,
         "testSupport": 9
       },
       "files": [
@@ -3934,8 +3934,10 @@
         "packages/rafa/src/config-schema-bugs.ts",
         "packages/rafa/src/config-schema-checks.ts",
         "packages/rafa/src/config-schema-collaborate.test.ts",
+        "packages/rafa/src/config-schema-collaborate.ts",
         "packages/rafa/src/config-schema-errors.ts",
         "packages/rafa/src/config-schema-features.ts",
+        "packages/rafa/src/config-schema-hints.ts",
         "packages/rafa/src/config-schema-hub.ts",
         "packages/rafa/src/config-schema-issues.ts",
         "packages/rafa/src/config-schema-logger.ts",
@@ -4010,6 +4012,8 @@
         "packages/rafa/src/core/git/git.ts",
         "packages/rafa/src/core/git/index.test.ts",
         "packages/rafa/src/core/git/index.ts",
+        "packages/rafa/src/core/git/placed-line.test.ts",
+        "packages/rafa/src/core/git/placed-line.ts",
         "packages/rafa/src/core/loop/claude.ts",
         "packages/rafa/src/core/loop/hop-record.test.ts",
         "packages/rafa/src/core/loop/hop-record.ts",
@@ -4063,10 +4067,14 @@
         "packages/rafa/src/core/services/shapes.ts",
         "packages/rafa/src/effort/session-log-dirs.test.ts",
         "packages/rafa/src/effort/session-log-dirs.ts",
+        "packages/rafa/src/effort/session-log-path.test.ts",
+        "packages/rafa/src/effort/session-log-path.ts",
         "packages/rafa/src/effort/session-log.test.ts",
         "packages/rafa/src/effort/session-log.ts",
         "packages/rafa/src/effort/store/absences.test.ts",
         "packages/rafa/src/effort/store/absences.ts",
+        "packages/rafa/src/effort/store/answered-rows.test.ts",
+        "packages/rafa/src/effort/store/answered-rows.ts",
         "packages/rafa/src/effort/store/bring-forward.test.ts",
         "packages/rafa/src/effort/store/bring-forward.ts",
         "packages/rafa/src/effort/store/bug-routes-migration.test.ts",
@@ -4091,6 +4099,7 @@
         "packages/rafa/src/effort/store/fix-schema.test.ts",
         "packages/rafa/src/effort/store/fix-schema.ts",
         "packages/rafa/src/effort/store/fixture-extract.ts",
+        "packages/rafa/src/effort/store/held-rows-migration.test.ts",
         "packages/rafa/src/effort/store/index.ts",
         "packages/rafa/src/effort/store/legacy.test.ts",
         "packages/rafa/src/effort/store/legacy.ts",
@@ -4270,7 +4279,7 @@
         "packages/rafa/src/utils/tracker.ts"
       ],
       "filesByFolder": {
-        "packages/rafa/": 374
+        "packages/rafa/": 383
       },
       "folders": [
         "packages/rafa/"
@@ -5838,7 +5847,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 39,
+        "test": 40,
         "testSupport": 8
       },
       "files": [
@@ -5884,6 +5893,7 @@
         "packages/rafa-hub/src/store/sqlite.ts",
         "packages/rafa-hub/src/store/testdata/broken-store.fixture.ts",
         "packages/rafa-hub/src/store/testdata/memory-store.ts",
+        "packages/rafa-hub/src/sync-skew.integration.test.ts",
         "packages/rafa-hub/src/testdata/compare-merged-stores.ts",
         "packages/rafa-hub/src/testdata/scratch-home-env.test.ts",
         "packages/rafa-hub/src/testdata/scratch-home-env.ts",
@@ -5902,7 +5912,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 49,
+        "packages/rafa-hub/": 50,
         "packages/rafa-index/": 9
       },
       "folders": [
