@@ -167,10 +167,10 @@ describe('startAtlasServer and --github', () => {
       return ((await response.json()) as { data: { rows: readonly unknown[][] } }).data.rows[0]?.[0];
     };
 
-    expect(gh.calls.map((args) => args[0])).toEqual(['pr', 'issue']);
+    expect(gh.calls.map((args) => args[0])).toEqual(['pr', 'issue', 'api']);
     expect(await prs()).toBe(5);
     await atlas.rebuild();
-    expect(gh.calls.map((args) => args[0])).toEqual(['pr', 'issue', 'pr', 'issue']);
+    expect(gh.calls.map((args) => args[0])).toEqual(['pr', 'issue', 'api', 'pr', 'issue', 'api']);
   });
 
   it('never asks gh without --github, on the first build or a rebuild', async () => {

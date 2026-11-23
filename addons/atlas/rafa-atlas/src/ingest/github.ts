@@ -7,14 +7,24 @@
  * timeout, and every test hands a stub.
  *
  * 1. **The read** ({@link readGithub}) runs before the replica is opened,
- *    two calls in order: `gh pr list --state all --limit 5000 --json …`
+ *    three calls in order: `gh pr list --state all --limit 5000 --json …`
  *    ({@link PR_LIST_FIELDS}), then `gh issue list --state all --limit
- *    5000 --json number,createdAt,closedAt`. Each must exit 0 and answer a
- *    JSON list; a call that exits non-zero, times out, throws, or answers
- *    anything else fails the whole read, and the second call is not made
- *    after a failed first. A row that is no pull request or issue `gh`
- *    writes (no positive number, no known state) is skipped and counted.
- *    A list as long as the limit is kept, and named as possibly cut short.
+ *    5000 --json number,createdAt,closedAt`, then the diff stats. Each list
+ *    must exit 0 and answer a JSON list; a list call that exits non-zero,
+ *    times out, throws, or answers anything else fails the whole read, and
+ *    no later call is made after a failed one. A row that is no pull
+ *    request or issue `gh` writes (no positive number, no known state) is
+ *    skipped and counted. A list as long as the limit is kept, and named as
+ *    possibly cut short.
+ * 1a. **The diff stats** (`additions`, `deletions`, `changedFiles`) are no
+ *    field of the list: GitHub works them out from each pull request's
+ *    diff, and a GraphQL page of 100 of them, the page `gh pr list` asks
+ *    for, runs past GitHub's time limit and answers 502 once a repository
+ *    holds a few hundred pull requests. They are read by {@link
+ *    PR_STATS_ARGS}, `gh api graphql --paginate` in pages of {@link
+ *    PR_STATS_PAGE_SIZE}, one JSON object per line, and merged in by
+ *    number. A failed diff-stat read fails nothing else: every pull request
+ *    keeps NULL stats, and `local.prs` is stamped partial with the reason.
  * 2. **A failed read follows D18.** `local.prs` is stamped with no rows,
  *    `partial`, and a reason holding `gh`'s stderr on one line; every
  *    other source is built as without the flag, so the warning that names
@@ -58,11 +68,39 @@ export const GH_TIMEOUT_MS = 300_000;
 /** The most rows each list asks for; a list this long may have been cut short. */
 export const GH_LIST_LIMIT = 5000;
 
-/** The fields `gh pr list` is asked for. */
+/** The fields `gh pr list` is asked for: no diff stat, which {@link PR_STATS_ARGS} reads. */
 export const PR_LIST_FIELDS: string = [
   'number', 'title', 'url', 'headRefName', 'baseRefName', 'state', 'createdAt', 'updatedAt', 'mergedAt', 'closedAt',
-  'additions', 'deletions', 'changedFiles', 'reviews', 'closingIssuesReferences',
+  'reviews', 'closingIssuesReferences',
 ].join(',');
+
+/**
+ * The pull requests per page of the diff-stat read. Measured 2026-11-23 on
+ * a repository of 344 pull requests: pages of 100 answered 502 on the
+ * second page, pages of 50 read every one in 7 tries of 8, and pages of 25
+ * in 5 of 5, in 15 to 25 seconds.
+ */
+export const PR_STATS_PAGE_SIZE = 25;
+
+/** The GraphQL query of the diff-stat read; `gh --paginate` fills `$endCursor`. */
+const PR_STATS_QUERY = [
+  'query($owner: String!, $name: String!, $endCursor: String) {',
+  '  repository(owner: $owner, name: $name) {',
+  `    pullRequests(first: ${String(PR_STATS_PAGE_SIZE)}, after: $endCursor, states: [OPEN, CLOSED, MERGED]) {`,
+  '      nodes { number additions deletions changedFiles }',
+  '      pageInfo { hasNextPage endCursor }',
+  '    }',
+  '  }',
+  '}',
+].join('\n');
+
+/** The diff-stat read's arguments: `{owner}` and `{repo}` are filled by `gh` from the checkout's remote. */
+export const PR_STATS_ARGS: readonly string[] = [
+  'api', 'graphql', '--paginate',
+  '-F', 'owner={owner}', '-F', 'name={repo}',
+  '-f', `query=${PR_STATS_QUERY}`,
+  '--jq', '.data.repository.pullRequests.nodes[]',
+];
 
 /** The fields `gh issue list` is asked for. */
 export const ISSUE_LIST_FIELDS = 'number,createdAt,closedAt';
@@ -113,6 +151,8 @@ export type GithubRead =
     readonly skipped: number;
     /** The commands whose list reached {@link GH_LIST_LIMIT}. */
     readonly capped: readonly string[];
+    /** Why the diff stats were not read, or null when they were. */
+    readonly diffStatsFailure: string | null;
   }
   | { readonly ok: false; readonly reason: string };
 
@@ -249,6 +289,69 @@ export function issueDatesOf(row: unknown): IssueDates | null {
     : { number, createdAt: timeOf(row['createdAt']), closedAt: timeOf(row['closedAt']) };
 }
 
+/** One pull request's diff stats, as the diff-stat read answers them. */
+export interface PullRequestStats {
+  readonly number: number;
+  readonly additions: number | null;
+  readonly deletions: number | null;
+  readonly changedFiles: number | null;
+}
+
+/** One diff-stat row cut to its {@link PullRequestStats}, or null when it names no pull request. */
+export function pullRequestStatsOf(row: unknown): PullRequestStats | null {
+  if (!isRecord(row)) return null;
+  const number = issueNumberOf(row['number']);
+  return number === null
+    ? null
+    : { number, additions: countOf(row['additions']), deletions: countOf(row['deletions']), changedFiles: countOf(row['changedFiles']) };
+}
+
+/** What the diff-stat read gave: its rows cut, or why it failed. */
+type StatsRead =
+  | { readonly ok: true; readonly rows: readonly PullRequestStats[]; readonly skipped: number }
+  | { readonly ok: false; readonly reason: string };
+
+/** Parse the diff-stat read's lines, each one JSON value; fails on the first line that is no JSON. */
+function statsOfLines(stdout: string): StatsRead {
+  const lines = stdout.split('\n').filter((line) => line.trim() !== '');
+  const rows: PullRequestStats[] = [];
+  for (const line of lines) {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(line) as unknown;
+    } catch (error) {
+      return { ok: false, reason: `gh api graphql answered a line that is no JSON (${messageOf(error)})` };
+    }
+    const stats = pullRequestStatsOf(payload);
+    if (stats !== null) rows.push(stats);
+  }
+  return { ok: true, rows, skipped: lines.length - rows.length };
+}
+
+/** Run the diff-stat read ({@link PR_STATS_ARGS}); see the module note. */
+async function readStats(runner: GhRunner): Promise<StatsRead> {
+  let answered: Awaited<ReturnType<GhRunner>>;
+  try {
+    answered = await runner(PR_STATS_ARGS);
+  } catch (error) {
+    return { ok: false, reason: `gh api graphql could not run: ${oneLine(messageOf(error), 'no message')}` };
+  }
+  return answered.ok
+    ? statsOfLines(answered.stdout)
+    : { ok: false, reason: `gh api graphql failed: ${oneLine(answered.stderr, 'gh wrote no stderr')}` };
+}
+
+/** `prs` with the diff stats of `stats` laid over them by number; a pull request with no stats row keeps its own. */
+function withStats(prs: readonly PullRequestRead[], stats: readonly PullRequestStats[]): readonly PullRequestRead[] {
+  const byNumber = new Map(stats.map((each) => [each.number, each]));
+  return prs.map((pr) => {
+    const found = byNumber.get(pr.number);
+    return found === undefined
+      ? pr
+      : { ...pr, additions: found.additions, deletions: found.deletions, changedFiles: found.changedFiles };
+  });
+}
+
 /** What one list call gave: its rows cut, or why it failed. */
 type ListRead<T> =
   | { readonly ok: true; readonly rows: readonly T[]; readonly skipped: number; readonly capped: boolean }
@@ -275,12 +378,13 @@ async function readList<T>(runner: GhRunner, noun: 'pr' | 'issue', fields: strin
   return { ok: true, rows, skipped: payload.length - rows.length, capped: payload.length >= GH_LIST_LIMIT };
 }
 
-/** Read the pull requests, then the issue dates, through `runner`; see the module note. Never rejects. */
+/** Read the pull requests, then the issue dates, then the diff stats, through `runner`; see the module note. Never rejects. */
 export async function readGithub(runner: GhRunner): Promise<GithubRead> {
   const prs = await readList(runner, 'pr', PR_LIST_FIELDS, pullRequestOf);
   if (!prs.ok) return prs;
   const issues = await readList(runner, 'issue', ISSUE_LIST_FIELDS, issueDatesOf);
   if (!issues.ok) return issues;
+  const stats = await readStats(runner);
   const capped = [
     ...(prs.capped
       ? ['gh pr list']
@@ -289,7 +393,9 @@ export async function readGithub(runner: GhRunner): Promise<GithubRead> {
       ? ['gh issue list']
       : []),
   ];
-  return { ok: true, prs: prs.rows, issues: issues.rows, skipped: prs.skipped + issues.skipped, capped };
+  return stats.ok
+    ? { ok: true, prs: withStats(prs.rows, stats.rows), issues: issues.rows, skipped: prs.skipped + issues.skipped + stats.skipped, capped, diffStatsFailure: null }
+    : { ok: true, prs: prs.rows, issues: issues.rows, skipped: prs.skipped + issues.skipped, capped, diffStatsFailure: stats.reason };
 }
 
 /** The closing links of each issue, by number: open or merged pull requests, each with no fragment read. */
@@ -353,6 +459,9 @@ function insertPullRequests(build: ReplicaBuild, prs: readonly PullRequestRead[]
 /** The `local.prs` stamp of a read that gave its lists. */
 function readStamp(read: Extract<GithubRead, { ok: true }>, readAt: string, rows: number): SourceStamp {
   const reasons = [
+    ...(read.diffStatsFailure === null
+      ? []
+      : [`the diff stats were not read, so additions, deletions and changed_files read NULL: ${read.diffStatsFailure}`]),
     ...(read.skipped === 0
       ? []
       : [`${String(read.skipped)} gh rows were skipped: no pull request or issue gh writes`]),

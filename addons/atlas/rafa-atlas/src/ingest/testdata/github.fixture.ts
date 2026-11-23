@@ -1,6 +1,7 @@
 /**
  * A stand-in for `gh` for the GitHub ingest's tests: fixture JSON for
- * `gh pr list` and `gh issue list`, every title invented, and stub
+ * `gh pr list`, `gh issue list` and the diff-stat read through `gh api
+ * graphql`, every title invented, and stub
  * runners that record each call, so no test runs `gh` or reaches the
  * network. Named without `.test` so bun never runs it alone.
  *
@@ -153,18 +154,58 @@ export function stubGh(answer: (args: readonly string[]) => GhResult): GhStub {
   };
 }
 
-/** A runner answering `prs` to `gh pr list` and `issues` to `gh issue list`, exit 0. */
+/** The diff-stat fields: `gh api graphql` answers them, `gh pr list` no longer asks for them. */
+const DIFF_STAT_FIELDS: readonly string[] = ['additions', 'deletions', 'changedFiles'];
+
+/** `row` without its diff-stat fields: what `gh pr list` answers for it. */
+export function listRowOf(row: unknown): unknown {
+  if (typeof row !== 'object' || row === null) return row;
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !DIFF_STAT_FIELDS.includes(key)));
+}
+
+/** `row`'s number and diff-stat fields: one line of what the diff-stat read answers. */
+export function statsRowOf(row: unknown): unknown {
+  if (typeof row !== 'object' || row === null) return row;
+  return Object.fromEntries(Object.entries(row).filter(([key]) => key === 'number' || DIFF_STAT_FIELDS.includes(key)));
+}
+
+/** `rows` as `gh api graphql --jq '….nodes[]'` writes them: one JSON object per line. */
+export function ndjsonOf(rows: readonly unknown[]): string {
+  return rows.map((row) => `${JSON.stringify(row)}\n`).join('');
+}
+
+/**
+ * A runner answering, exit 0: `prs` without their diff stats to `gh pr
+ * list`, `issues` to `gh issue list`, and `stats` (by default the
+ * number and diff stats of each of `prs`) to `gh api graphql`.
+ */
 export function fixtureGh(
   prs: readonly unknown[] = FIXTURE_PRS,
   issues: readonly unknown[] = FIXTURE_ISSUE_DATES,
+  stats: readonly unknown[] = prs.map(statsRowOf),
 ): GhStub {
   return stubGh((args) => ({
     ok: true,
-    stdout: JSON.stringify(args[0] === 'pr'
-      ? prs
-      : issues),
+    stdout: args[0] === 'pr'
+      ? JSON.stringify(prs.map(listRowOf))
+      : args[0] === 'issue'
+        ? JSON.stringify(issues)
+        : ndjsonOf(stats),
     stderr: '',
   }));
+}
+
+/** A runner answering the two lists as {@link fixtureGh} does, and `stats` to the diff-stat read. */
+export function listsGh(stats: GhResult): GhStub {
+  return stubGh((args) => args[0] === 'api'
+    ? stats
+    : {
+      ok: true,
+      stdout: JSON.stringify(args[0] === 'pr'
+        ? FIXTURE_PRS.map(listRowOf)
+        : FIXTURE_ISSUE_DATES),
+      stderr: '',
+    });
 }
 
 /** The stderr {@link failingGh} answers. */
