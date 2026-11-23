@@ -58,9 +58,9 @@ const POC_IDS = [
   'qa.filed-share',
 ];
 
-/** The phase 4 metrics of each lens, in the order each lens lists them after its PoC cut. */
+/** The metrics past the PoC cut of each lens, phase 4's and later, in the order each lens lists them after its PoC cut. */
 const PHASE_FOUR_IDS = {
-  pm: ['pm.milestone-completion'],
+  pm: ['pm.milestone-completion', 'pm.minutes-per-agent'],
   architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations'],
   developer: ['dev.deploys-per-week', 'dev.wip', 'dev.pr-cycle-time'],
   qa: [
@@ -85,6 +85,7 @@ const ALL_IDS = [
 /** The metrics labelled proxy, each with what it stands in for. */
 const PROXY_IDS = [
   'pm.plan-completion',
+  'pm.minutes-per-agent',
   'arch.debt-ratio',
   'arch.task-minutes-p50-p90',
   'arch.preflight-halts',
@@ -168,10 +169,10 @@ describe('METRIC_CATALOGUE', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five then one on PM, four then three, four then three, four then seven', () => {
+  it('gives each lens the metrics of its rows: five then two on PM, four then three, four then three, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([6, 7, 7, 11]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([7, 7, 7, 11]);
   });
 
   it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
@@ -322,5 +323,15 @@ describe('the catalogue over a replica built from the fixture store', () => {
     const rows = recordsOf(await answerOf('pm.planned-vs-sessions'));
 
     expect(rows.find((row) => row.plan_stub === FIXTURE_PLAN)).toMatchObject({ sessions: 2 });
+  });
+});
+
+describe('the minutes per agent over the fixture replica', () => {
+  it('sums both task sessions under their one agent, the minutes the cycle scatter lists for them', async () => {
+    const rows = recordsOf(await answerOf('pm.minutes-per-agent'));
+    const cycle = recordsOf(await answerOf('dev.task-cycle'));
+
+    expect(rows).toEqual([{ agent: 'implementer', minutes: 75, sessions: 2 }]);
+    expect(cycle.reduce((sum, row) => sum + Number(row.minutes), 0)).toBe(75);
   });
 });

@@ -18,12 +18,18 @@
  * `now` horizon and every closed one. It reads the board as of its
  * cache's watermark, so the card asks it with no window
  * (`local.issues` bounds a window by `created_at`, NULL offline).
+ *
+ * `pm.minutes-per-agent` (entry 10) sums the minutes of the task sessions
+ * per agent over the window: a proxy for resource utilization, as the
+ * store records no wall-clock capacity to divide by. A task session
+ * naming no agent counts under a NULL agent, which the card names.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
 import { DAILY_SOURCE } from '../build/daily.js';
 import { PLANS_SOURCE } from '../build/derive.js';
 import { ISSUES_SOURCE } from '../ingest/board.js';
+import { TASKS_SOURCE } from '../ingest/effort.js';
 import { FINDINGS_SOURCE } from '../ingest/facts.js';
 
 /** How many blockers the active-blockers list answers, the newest first. */
@@ -149,8 +155,32 @@ export const MILESTONE_COMPLETION: MetricDefinition = {
   feasibility: 'direct',
 };
 
+/** The minutes of task sessions per agent, the most first. */
+export const MINUTES_PER_AGENT: MetricDefinition = {
+  id: 'pm.minutes-per-agent',
+  title: 'Minutes per agent',
+  lenses: ['pm'],
+  description: 'The minutes of the task sessions over the window, summed per agent, the most first; a session naming no agent counts under a NULL agent.',
+  sourceId: TASKS_SOURCE,
+  params: {
+    filters: [{ field: 'kind', op: 'eq', value: 'task' }],
+    groupBy: ['agent'],
+    measures: [
+      { field: 'minutes', agg: 'sum', as: 'minutes' },
+      { field: 'session_id', agg: 'count', as: 'sessions' },
+    ],
+    orderBy: [{ key: 'minutes', dir: 'desc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'min',
+  chart: 'bar',
+  feasibility: 'proxy',
+  proxyFor: 'resource utilization',
+  proxyNote: 'Task session minutes per agent stand in for utilization: the store records no capacity to divide them by.',
+};
+
 /** The project management lens's PoC metrics, in the order section G lists them. */
 export const PM_POC_METRICS: readonly MetricDefinition[] = [BUDGET_BURN, TOKENS_PER_DAY, PLAN_COMPLETION, PLANNED_VS_SESSIONS, ACTIVE_BLOCKERS];
 
-/** The project management lens's metrics: the PoC cut, then the one over the board source. */
-export const PM_METRICS: readonly MetricDefinition[] = [...PM_POC_METRICS, MILESTONE_COMPLETION];
+/** The project management lens's metrics: the PoC cut, the one over the board source, then the minutes per agent. */
+export const PM_METRICS: readonly MetricDefinition[] = [...PM_POC_METRICS, MILESTONE_COMPLETION, MINUTES_PER_AGENT];

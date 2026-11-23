@@ -10,6 +10,7 @@
  * whose primitives render a labelled element; the engine is the charts
  * package's to test. The source answers with no delay.
  */
+import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { ChartPrimitives } from '@open-tomato/charts';
 import type { ReactElement } from 'react';
@@ -20,13 +21,14 @@ import { createElement } from 'react';
 
 import { App } from './App.js';
 import { GITHUB_BUILD_LINE, GITHUB_NOT_READ } from './data/live-sources.js';
-import { createLiveLensSource } from './data/live.js';
+import { createLiveLensSource, LIVE_METRICS } from './data/live.js';
 import { createLensSource, lensResultOf, type LensResult } from './data/source.js';
-import { stubLiveClient } from './data/testdata/live-client.fixture.js';
+import { noRowsOf, stubLiveClient } from './data/testdata/live-client.fixture.js';
+import { NO_FLAKY_TITLE } from './lenses/QaLens.js';
 
 /** The card titles each lens shows, by the tab that opens it. */
 const LENS_CARDS: Readonly<Record<string, readonly string[]>> = {
-  'Project Management': ['Budget burn', 'Tokens per day', 'Planned tasks vs sessions', 'Hours per agent this week', 'The task pile as drag'],
+  'Project Management': ['Budget burn', 'Tokens per day', 'Planned tasks vs sessions', 'Hours per agent', 'The task pile as drag'],
   'Architecture': [
     'Minutes by change kind',
     'Task minutes per week',
@@ -217,7 +219,9 @@ describe('App, by page source', () => {
     expect(screen.getByRole('img', { name: /^Tokens per day, this period/u })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Tokens used this week against last week, no weekly target set' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Planned tasks against task sessions, per plan' })).toBeDefined();
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
+    expect(screen.getByRole('img', { name: 'Hours of task sessions per agent over the range' })).toBeDefined();
+    expect(screen.getByText('task session minutes over the range; no limit is set')).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(1);
     expect(within(screen.getByRole('region', { name: 'Plans completed this week' })).queryByText('not wired yet')).toBeNull();
     expect(within(screen.getByRole('region', { name: 'Active blockers' })).getByText('1')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Plans landed on their CI-green week' })).getByText('not wired yet')).toBeDefined();
@@ -260,7 +264,8 @@ describe('App, by page source', () => {
     expect(screen.getByRole('img', { name: 'Tasks done per week, stacked by branch type' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Task cycle minutes per task with a seven-day moving median' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Red CI share against the ten percent threshold' })).toBeDefined();
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(3);
+    expect(screen.getByRole('img', { name: 'Distribution of task minutes' })).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
     expect(within(screen.getByRole('region', { name: 'Plans completed per week' })).getByText('3')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Releases this week' })).getByText('1')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Work in progress' })).getByText('3')).toBeDefined();
@@ -281,6 +286,9 @@ describe('App, by page source', () => {
     expect(screen.getByRole('table', { name: 'Checks that failed most often across CI readings' })).toBeDefined();
     expect(screen.getByText('counted on the day its loop started')).toBeDefined();
     expect(screen.queryByText('Not wired yet')).toBeNull();
+    expect(screen.queryByText('not wired yet')).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Open bug issues' })).getByText('1')).toBeDefined();
+    expect(within(screen.getByRole('region', { name: 'Defect density' })).getByText('1 / kLOC')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Options for Bugs by kind per week' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Source' }));
     expect(screen.getByRole('columnheader', { name: 'unknown' })).toBeDefined();
@@ -301,13 +309,33 @@ describe('App, by page source', () => {
     expect(within(openBugs).getByText((text) => text.includes(GITHUB_BUILD_LINE))).toBeDefined();
   });
 
+  it('over a range with no flaky reading, says so on the flaky card in place of a table with no rows', async () => {
+    const { client } = stubLiveClient();
+    const noFlaky: AtlasClient = {
+      ...client,
+      runMetric: async (id, window, signal) => {
+        const answer = await client.runMetric(id, window, signal);
+        return id === LIVE_METRICS.flakyChecks
+          ? noRowsOf(answer)
+          : answer;
+      },
+    };
+    renderApp(createLiveLensSource(noFlaky));
+    fireEvent.click(screen.getByRole('tab', { name: 'QA' }));
+    await settle();
+    const flaky = screen.getByRole('region', { name: 'Flaky checks, top 10' });
+
+    expect(within(flaky).getByText(NO_FLAKY_TITLE)).toBeDefined();
+    expect(within(flaky).queryByRole('table')).toBeNull();
+  });
+
   it('control: a card no live metric feeds keeps the general not-wired line, not the --github one', async () => {
     renderApp(createLiveLensSource(stubLiveClient({ github: false }).client));
     fireEvent.click(screen.getByRole('tab', { name: 'Development' }));
     await settle();
 
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(3);
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
     expect(screen.queryByText(GITHUB_NOT_READ)).toBeNull();
-    expect(within(screen.getByRole('region', { name: 'Task minutes distribution' })).getByText(/^No live metric feeds this card yet/u)).toBeDefined();
+    expect(within(screen.getByRole('region', { name: 'Work done, 12 weeks' })).getByText(/^No live metric feeds this card yet/u)).toBeDefined();
   });
 });

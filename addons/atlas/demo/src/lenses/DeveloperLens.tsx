@@ -176,6 +176,8 @@ export function DeveloperLens(): ReactElement {
           </LensCard>
           <LensCard
             config={MINUTES}
+            reads={['taskMinutesBins']}
+            liveSubtitle="task sessions over the range, by the minutes each ran"
             select={(result: LensResult) => result.mock.taskMinutesBins}
             table={(bins) => ({ columns: ['Minutes', 'Tasks'], rows: bins.map((bin) => [`${bin.from}–${bin.to}`, bin.count]) })}
           >

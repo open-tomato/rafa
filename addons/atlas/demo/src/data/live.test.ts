@@ -25,8 +25,10 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { readPageSource } from '../url.js';
 
 import {
+  defectDensityOf,
   GITHUB_BUILD_LINE,
   GITHUB_NOT_READ,
+  NO_AGENT,
   PLANS_SOURCE_ID,
   SOURCE_METRIC_FIELDS,
   SOURCE_METRICS,
@@ -42,8 +44,10 @@ import {
   METRIC_FIELDS,
   NOT_WIRED,
   RANGE_WINDOW,
+  taskMinutesBinsOf,
   WIRED_FIELDS,
 } from './live.js';
+import { TASK_MINUTE_EDGES } from './mock.js';
 import {
   failingClient,
   resultOf,
@@ -119,10 +123,12 @@ describe('liveResultOf over a stub client: the requests', () => {
       { id: 'qa.resolution-time', window: { last: '28d' } },
       { id: 'qa.bug-outcome-by-loop-start', window: undefined },
       { id: 'qa.open-bugs-per-day', window: undefined },
+      { id: 'pm.minutes-per-agent', window: { last: '28d' } },
+      { id: 'qa.defect-density', window: undefined },
       { id: 'pm.tokens-per-day', window: previous },
       { id: 'arch.debt-ratio', window: previous },
     ]);
-    expect([...WINDOWED_SOURCE_METRICS].sort()).toEqual(['deploysPerWeek', 'resolutionTime']);
+    expect([...WINDOWED_SOURCE_METRICS].sort()).toEqual(['deploysPerWeek', 'minutesPerAgent', 'resolutionTime']);
   });
 
   it('reads the plans\' first sessions once, over the series window, for the outcome card', async () => {
@@ -279,6 +285,22 @@ describe('liveResultOf over a stub client: each field filled', () => {
     ]);
   });
 
+  it('bins the task sessions by their minutes on the mock\'s edges, from included and to not', async () => {
+    const { result } = await liveResult();
+    const counted = result.mock.taskMinutesBins.filter((bin) => bin.count > 0);
+
+    expect(result.mock.taskMinutesBins.map((bin) => bin.from)).toEqual(TASK_MINUTE_EDGES.slice(0, -1));
+    expect(counted).toEqual([{ from: 10, to: 15, count: 1 }, { from: 30, to: 45, count: 1 }]);
+  });
+
+  it('adds one bin past the last edge only when a session ran that long, to its minutes rounded up', () => {
+    const at = new Date('2026-11-20');
+    const points = [180, 412.2, 20].map((y) => ({ x: at, y }));
+
+    expect(taskMinutesBinsOf(points).at(-1)).toEqual({ from: 180, to: 413, count: 2 });
+    expect(taskMinutesBinsOf([{ x: at, y: 179.9 }]).at(-1)).toEqual({ from: 120, to: 180, count: 1 });
+  });
+
   it('reads the red verdict\'s share for the red CI tile', async () => {
     const { result } = await liveResult();
 
@@ -316,8 +338,10 @@ describe('liveResultOf over a stub client: each field filled', () => {
 });
 
 describe('liveResultOf over a stub client: the phase-4 fields', () => {
-  it('wires the four fields phase 4 names, WIP and the two bug backlog fields, each from its own metric', () => {
-    expect(SOURCE_WIRED_FIELDS).toEqual(['deploysPerWeek', 'modules', 'workspace', 'wip', 'resolutionByPriority', 'bugOutcomeByLoopStart', 'openBugsPerDay']);
+  it('wires the four fields phase 4 names, WIP, the two bug backlog fields, the minutes per agent and the defect density, each from its own metric', () => {
+    expect(SOURCE_WIRED_FIELDS).toEqual([
+      'deploysPerWeek', 'modules', 'workspace', 'wip', 'resolutionByPriority', 'bugOutcomeByLoopStart', 'openBugsPerDay', 'minutesPerAgent', 'defectDensity',
+    ]);
     expect(Object.keys(SOURCE_METRIC_FIELDS)).toEqual(Object.keys(SOURCE_METRICS));
     for (const field of SOURCE_WIRED_FIELDS) expect({ field, wired: WIRED_FIELDS.includes(field) }).toEqual({ field, wired: true });
   });
@@ -405,6 +429,20 @@ describe('liveResultOf over a stub client: the phase-4 fields', () => {
     expect(days.at(-1)).toEqual({ day: new Date('2026-11-22'), all: 1, fromLoops: 1 });
   });
 
+  it('sums the task session minutes per agent in the answer\'s order, no agent named as such and an agent with none left out', async () => {
+    const { result } = await liveResult();
+
+    expect(result.mock.minutesPerAgent).toEqual([{ agent: 'stub-agent-a', minutes: 600 }, { agent: NO_AGENT, minutes: 90 }]);
+  });
+
+  it('reads the defect density per 1,000 lines over the folders that hold code, a folder with no line left out', async () => {
+    const { result } = await liveResult();
+
+    // (3 + 1) bugs over 4,000 lines: the 7 bugs of src/gone, a folder with no line, count nowhere.
+    expect(result.mock.defectDensity).toBe(1);
+    expect(defectDensityOf(resultOf(['path', 'bugs', 'loc'], [['src/gone', 7, 0]]))).toBe(0);
+  });
+
   it('gives each phase-4 field its metric and row count, a proxy\'s note on the module fields', async () => {
     const { result } = await liveResult();
 
@@ -474,12 +512,10 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
 
     expect(result.notWired).toBe(NOT_WIRED);
     for (const field of WIRED_FIELDS) expect(result.notWired.has(field)).toBe(false);
-    for (const field of ['minutesPerAgent', 'scopeCreepPerWeek', 'taskMinutesBins', 'balance'] as const) {
-      expect(result.notWired.has(field)).toBe(true);
-    }
+    expect([...result.notWired].sort()).toEqual(['balance', 'scopeCreepPerWeek', 'taskPileTree', 'workDoneTree']);
     expect(result.notWired.size + WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
     expect(result.notWiredDetail.size).toBe(0);
-    expect(result.mock.minutesPerAgent).toEqual([]);
+    expect(result.mock.scopeCreepPerWeek).toEqual([]);
     expect(result.balance).toEqual([]);
     expect(result.workspace.composition).toEqual([]);
     expect(result.workspace.sankeyNodes).toEqual([]);

@@ -47,8 +47,8 @@ const PLANNED = cardSpec({
 
 const AGENT_HOURS = cardSpec({
   id: 'pm-hours-per-agent',
-  title: 'Hours per agent this week',
-  subtitle: 'against the 15-hour limit',
+  title: 'Hours per agent',
+  subtitle: 'this week, against the 15-hour limit',
   primitive: 'BarChart',
 });
 
@@ -172,6 +172,8 @@ function ProjectTiles({ result }: { readonly result: LensResult }): ReactElement
 export function ProjectManagerLens(): ReactElement {
   const { Gauge, LineChart, BarChart, Sunburst } = useChartEngine();
   const { data } = useDashboard<LensResult>();
+  // The live page draws no limit line: the 15 hours are the mock's, no setting of the project.
+  const onLive = data?.source === 'live';
   const [zoomRange, setZoomRange] = useState<{ from: Date; to: Date } | null>(null);
   const zoomed = zoomRange === null
     ? 'the whole period'
@@ -254,16 +256,22 @@ export function ProjectManagerLens(): ReactElement {
           </LensCard>
           <LensCard
             config={AGENT_HOURS}
+            reads={['minutesPerAgent']}
+            liveSubtitle="task session minutes over the range; no limit is set"
             select={(result: LensResult) => result.mock.minutesPerAgent}
             table={(rows) => ({ columns: ['Agent', 'Minutes'], rows: rows.map((row) => [row.agent, formatMinutes(row.minutes)]) })}
           >
             {({ data: rows, animate, height }) => (
               <BarChart
-                ariaLabel="Hours per agent this week with the limit as a line"
+                ariaLabel={onLive
+                  ? 'Hours of task sessions per agent over the range'
+                  : 'Hours per agent this week with the limit as a line'}
                 categories={rows.map((row) => row.agent)}
                 series={[{ id: 'hours', label: 'Hours', tone: 'series-1', values: rows.map((row) => Math.round(row.minutes / 6) / 10) }]}
                 orientation="horizontal"
-                limit={{ value: WIP_LIMIT_MINUTES / MINUTES_PER_HOUR, label: 'limit 15 h' }}
+                limit={onLive
+                  ? undefined
+                  : { value: WIP_LIMIT_MINUTES / MINUTES_PER_HOUR, label: 'limit 15 h' }}
                 valueFormat={(value) => `${value} h`}
                 animate={animate}
                 height={plotHeight(220, height)}
