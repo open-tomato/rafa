@@ -29,5 +29,13 @@
     "@open-tomato/eslint-config": "^0.2.0",
     "eslint": "^9.39.4",
     "typescript": "^5.9.3"
+  },
+  "rafa": {
+    "manifestVersion": 1,
+    "types": ["commands"],
+    "provides": {
+      "commands": { "entry": "./src/commands/index.ts" }
+    },
+    "requires": { "rafa": ">=0.53 <1" }
   }
 }

@@ -3,9 +3,11 @@
  * burn, tokens per day, plan completion, planned tasks against sessions
  * and the active blockers.
  *
- * `pm.budget-burn` carries no `goal`: the weekly token budget is read
- * from the project's Atlas config (decision D10), which no task has
- * built yet, so the card draws the spend with no target set.
+ * `pm.budget-burn` carries no `goal` here: the weekly token budget is
+ * the project's `budget.tokensPerWeek` (decision D10), which `serve`
+ * reads with `loadAtlasConfig` and lays over the served metric as its
+ * goal (`withAtlasTargets`, `src/config.ts`). With none set, the card
+ * draws the spend with no target set.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
@@ -21,7 +23,7 @@ export const BUDGET_BURN: MetricDefinition = {
   id: 'pm.budget-burn',
   title: 'Budget burn',
   lenses: ['pm'],
-  description: 'Tokens of every session summed per ISO week, against the weekly token budget; no budget is set until the Atlas config is read.',
+  description: 'Tokens of every session summed per ISO week, against the weekly token budget, budget.tokensPerWeek of the Atlas config; with none set, the spend alone, no target set.',
   sourceId: DAILY_SOURCE,
   params: {
     grain: 'week',
