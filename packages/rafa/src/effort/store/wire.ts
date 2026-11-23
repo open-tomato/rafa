@@ -23,7 +23,14 @@
  *     Decoding refuses a table that is no merged table, an empty or
  *     repeated id list, and an id the payload's own `migrations` name,
  *     since rows cannot lack a migration their store holds. An export
- *     never sets it, and encoding carries it as it stands.
+ *     never sets it, and encoding carries it as it stands;
+ *   - `projectedColumns`, only beside `projected`: for each cut table,
+ *     the columns the sender's rows hold that the projected rows were
+ *     cut of, so the receiver can count what waits for it, since its
+ *     own catalogue cannot name another build's columns. Decoding
+ *     refuses it without `projected`, a table `projected` does not
+ *     name, and an empty or repeated column list; a projected payload
+ *     naming no `projectedColumns` names no cut column.
  *
  * A `local` table (the migration log, `store_meta`, `store_replaced`,
  * the merge trail, `held_rows`) never travels, as a merge never reads it. So the
@@ -126,10 +133,15 @@ export interface WirePayload {
   readonly cursor: WireCursor;
   /** Present only on a projected payload: each cut table's lacking migration ids; see the module note. */
   readonly projected?: WireProjection;
+  /** Present only beside `projected`: each cut table's columns the projected rows lack; see the module note. */
+  readonly projectedColumns?: WireProjectedColumns;
 }
 
 /** Per projected merged table, the migration ids its rows lack; a table left out came whole. */
 export type WireProjection = Readonly<Record<string, readonly string[]>>;
+
+/** Per projected merged table, the column names its projected rows were cut of. */
+export type WireProjectedColumns = Readonly<Record<string, readonly string[]>>;
 
 /** A payload, or a cursor, this rafa cannot read or cannot build a store from. */
 export class WireFormatError extends Error {
@@ -263,6 +275,35 @@ function checkProjected(value: unknown, migrations: readonly string[]): WireProj
   return Object.freeze(Object.fromEntries(entries));
 }
 
+/** The cut columns, checked: tables `projected` names only, each a list of names, none twice. */
+function checkProjectedColumns(value: unknown, projected: WireProjection): WireProjectedColumns {
+  if (!isRecord(value)) throw new WireFormatError('wire: projectedColumns is not an object');
+  const entries = Object.entries(value).map(([table, columns]): [string, readonly string[]] => {
+    if (!(table in projected)) throw new WireFormatError(`wire: projectedColumns names ${JSON.stringify(table)}, which projected does not name`);
+    if (!Array.isArray(columns) || columns.length === 0) throw new WireFormatError(`wire: projectedColumns.${table} is not a list of column names`);
+    const checked = columns.map((column: unknown) => {
+      if (typeof column !== 'string' || column === '') throw new WireFormatError(`wire: projectedColumns.${table} column ${JSON.stringify(column)} is not a name`);
+      return column;
+    });
+    const twice = checked.filter((column, index) => checked.indexOf(column) !== index);
+    if (twice.length > 0) throw new WireFormatError(`wire: projectedColumns.${table} names ${twice.join(', ')} more than once`);
+    return [table, Object.freeze(checked)];
+  });
+  return Object.freeze(Object.fromEntries(entries));
+}
+
+/** The projection fields of `value` checked against `migrations`, empty when it names none. */
+function checkProjection(value: Readonly<Record<string, unknown>>, migrations: readonly string[]): Pick<WirePayload, 'projected' | 'projectedColumns'> {
+  if (value.projected === undefined) {
+    if (value.projectedColumns !== undefined) throw new WireFormatError('wire: projectedColumns is set on a payload that is not projected');
+    return {};
+  }
+  const projected = checkProjected(value.projected, migrations);
+  return value.projectedColumns === undefined
+    ? { projected }
+    : { projected, projectedColumns: checkProjectedColumns(value.projectedColumns, projected) };
+}
+
 /** A payload, checked whole and copied; throws {@link WireFormatError} naming the first fault. */
 function checkPayload(value: unknown): WirePayload {
   if (!isRecord(value)) throw new WireFormatError('wire: the payload is not an object');
@@ -276,9 +317,7 @@ function checkPayload(value: unknown): WirePayload {
     tables: checkTables(value.tables),
     cursor: checkCursor(value.cursor),
   };
-  return Object.freeze(value.projected === undefined
-    ? payload
-    : { ...payload, projected: checkProjected(value.projected, migrations) });
+  return Object.freeze({ ...payload, ...checkProjection(value, migrations) });
 }
 
 /** The payload as the JSON text the wire carries. */

@@ -392,6 +392,59 @@ describe('the projected field', () => {
   });
 });
 
+describe('the projectedColumns field', () => {
+  /** An id no build of this catalogue holds, as a newer hub's migration would be. */
+  const AHEAD = 'migration-ahead-of-this-build';
+
+  /** A projected payload cutting `findings` by {@link AHEAD}, with `projectedColumns` set to `columns`. */
+  const cutBy = (columns: unknown): string => JSON.stringify(payloadWith({ projected: { findings: [AHEAD] }, projectedColumns: columns }));
+
+  it('is absent on an exported payload and on its decoded text', () => {
+    const payload = exportWirePayload({ path: plantStore('uncut', plantSender) });
+
+    expect('projectedColumns' in payload).toBe(false);
+    expect('projectedColumns' in decodeWirePayload(encodeWirePayload(payload))).toBe(false);
+  });
+
+  it('decodes what it encodes, the cut columns included', () => {
+    const payload = payloadWith({ projected: { findings: [AHEAD] }, projectedColumns: { findings: ['ahead_a', 'ahead_b'] } });
+
+    const decoded = decodeWirePayload(encodeWirePayload(payload));
+
+    expect(decoded).toEqual(payload);
+    expect(decoded.projectedColumns).toEqual({ findings: ['ahead_a', 'ahead_b'] });
+  });
+
+  it('leaves a projected payload naming no cut column without the field', () => {
+    expect('projectedColumns' in decodeWirePayload(JSON.stringify(payloadWith({ projected: { findings: [AHEAD] } })))).toBe(false);
+  });
+
+  it.each([
+    ['cut columns that are not an object', [], 'projectedColumns is not an object'],
+    ['a table projected does not name', { commits: ['ahead_a'] }, 'projectedColumns names "commits", which projected does not name'],
+    ['columns that are not a list', { findings: 'ahead_a' }, 'projectedColumns.findings is not a list of column names'],
+    ['an empty column list', { findings: [] }, 'projectedColumns.findings is not a list of column names'],
+    ['an empty column name', { findings: [''] }, 'projectedColumns.findings column "" is not a name'],
+    ['a column named twice', { findings: ['ahead_a', 'ahead_a'] }, 'projectedColumns.findings names ahead_a more than once'],
+  ])('refuses %s', (_label, columns, message) => {
+    const error = thrownBy(() => decodeWirePayload(cutBy(columns)));
+
+    expect(error).toBeInstanceOf(WireFormatError);
+    expect((error as Error).message).toContain(message);
+  });
+
+  it('refuses cut columns on a payload that is not projected', () => {
+    const error = thrownBy(() => decodeWirePayload(JSON.stringify(payloadWith({ projectedColumns: { findings: ['ahead_a'] } }))));
+
+    expect(error).toBeInstanceOf(WireFormatError);
+    expect((error as Error).message).toContain('projectedColumns is set on a payload that is not projected');
+  });
+
+  it('holds the same payload less the fault, the control for the refusals', () => {
+    expect(decodeWirePayload(cutBy({ findings: ['ahead_a'] })).projectedColumns).toEqual({ findings: ['ahead_a'] });
+  });
+});
+
 describe('materialiseWirePayload', () => {
   it('builds a store with the sender\'s migrations and rows as sent, seq and origin pair included', () => {
     const payload = exportWirePayload({ path: plantStore('sent', plantSender) });

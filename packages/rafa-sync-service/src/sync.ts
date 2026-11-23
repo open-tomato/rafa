@@ -87,10 +87,11 @@
  * {@link ServicePullResult.notice}, the line the contact writes:
  * `effort sync: pulled <n> rows projected to this rafa's schema; <m>
  * columns wait for rafa self-update`. `<n>` is the rows the answer
- * carried. `<m>` counts each cut table's lacking ids, one per table
- * and id: the answer names the migrations a table's rows lack and not
- * their columns, which this build's catalogue cannot name, so a
- * migration adding two columns to one table counts once.
+ * carried. `<m>` counts the columns the answer's `projectedColumns`
+ * names, one per cut table and column: this build's catalogue cannot
+ * name a newer build's columns, so the hub, whose schema holds them,
+ * names them. A projected answer naming no `projectedColumns` counts
+ * none.
  *
  * The request's `sessionId` is the merge's own: a loop run's end-of-task
  * pull names its session id, and the merge's live-loop guard passes that
@@ -425,9 +426,9 @@ function refuseUnknownMigrations(payload: WirePayload, known: readonly string[])
   if (missing.length > 0) throw new RafaUpdateRequired(missing);
 }
 
-/** Each cut table's lacking ids, one per table and id; see the module note. */
-function waitingIn(projected: NonNullable<WirePayload['projected']>): number {
-  return Object.values(projected).reduce((total, ids) => total + ids.length, 0);
+/** The columns a projected answer's rows were cut of, one per table and column; see the module note. */
+function waitingIn(payload: WirePayload): number {
+  return Object.values(payload.projectedColumns ?? {}).reduce((total, columns) => total + columns.length, 0);
 }
 
 /** Merges `payload` into the store at `path` through a scratch store, with its `projected` map; see the module note. */
@@ -525,7 +526,7 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
     if (merge === undefined) return NOTHING_TO_SYNC;
     return Object.freeze(projected === undefined
       ? { status: 'pulled', merge }
-      : { status: 'pulled', merge, notice: projectedPullLine(rowsIn(payload), waitingIn(projected)) });
+      : { status: 'pulled', merge, notice: projectedPullLine(rowsIn(payload), waitingIn(payload)) });
   };
 
   return Object.freeze({ kind: 'service', push, pull });

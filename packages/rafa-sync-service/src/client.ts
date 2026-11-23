@@ -12,7 +12,8 @@
  *   - {@link HubClient.pull}: `GET /v1/effort/pull?device=<origin>`, with
  *     `since=<cursor as JSON>` unless the cursor is empty; answers the
  *     payload, checked whole by core's `decodeWirePayload`, its
- *     `projected` map included when the hub projected it.
+ *     `projected` and `projectedColumns` maps included when the hub
+ *     projected it.
  *   - {@link HubClient.status}: `GET /v1/status`; answers the hub's
  *     version, migrations, rows per table and each device's last push,
  *     with the wire contract it speaks: `contractVersion` and
@@ -42,8 +43,9 @@
  * capability, one release behind among them, is sent no such field, as
  * it is sent no `contractVersion`, and answers the pull whole. The
  * answer's `projected` field, each cut table's lacking migration ids,
- * is read by core's codec with the rest of the payload; a table it
- * leaves out came whole.
+ * and its `projectedColumns` field, each cut table's lost columns, are
+ * read by core's codec with the rest of the payload; a table
+ * `projected` leaves out came whole.
  *
  * Every call sends the token as `Authorization: Bearer <token>` and
  * reads the hub's one envelope, `{ "success": true, "data": … }` or

@@ -92,7 +92,11 @@
  *   - carries every other table's rows with only the columns the
  *     caller's schema gives it, and names each table it cut in
  *     `projected`, with the ids that table lacks. A lacking id that cut
- *     no table leaves `projected` as `{}`, a projection that cut none.
+ *     no table leaves `projected` as `{}`, a projection that cut none;
+ *   - names in `projectedColumns` each such table's columns the store's
+ *     own schema, the last scratch store, holds and the caller's does
+ *     not, so the caller can count the columns waiting for it. A table
+ *     cut by a rebuild that lost no column is left out of it.
  *
  * A plan is kept per pair of held and named lists, up to
  * {@link PROJECTION_PLANS} of them, the oldest dropped first, so a
@@ -237,6 +241,8 @@ interface ProjectionPlan {
   readonly shape: Shape;
   /** Each table of the caller's schema the lacking ids cut, with the ids that cut it. */
   readonly cut: ReadonlyMap<string, readonly string[]>;
+  /** Each cut table's columns the store's schema holds and the caller's does not: the answer's `projectedColumns`. */
+  readonly lost: ReadonlyMap<string, readonly string[]>;
 }
 
 /** The most projection plans one store keeps; see the module note. */
@@ -369,7 +375,14 @@ function planProjection(held: readonly string[], named: readonly string[], catal
       Object.freeze(lacking.filter((_, index) => !sameColumns(steps[index]?.get(table), steps[index + 1]?.get(table)))),
     ])
     .filter(([, ids]) => ids.length > 0);
-  return Object.freeze({ migrations: Object.freeze(kept), shape, cut: new Map(cut) });
+  const full = steps.at(-1) ?? shape;
+  const lost = cut
+    .map(([table]): [string, readonly string[]] => [
+      table,
+      Object.freeze((full.get(table) ?? []).filter((column) => !(shape.get(table) ?? []).includes(column))),
+    ])
+    .filter(([, columns]) => columns.length > 0);
+  return Object.freeze({ migrations: Object.freeze(kept), shape, cut: new Map(cut), lost: new Map(lost) });
 }
 
 /** `row` with only `columns`. */
@@ -389,12 +402,14 @@ function project(payload: WirePayload, plan: ProjectionPlan): WirePayload {
     }));
   const cursor = Object.fromEntries(Object.entries(payload.cursor).filter(([table]) => plan.shape.has(table)));
   const projected = Object.fromEntries([...plan.cut].filter(([table]) => table in tables));
+  const projectedColumns = Object.fromEntries([...plan.lost].filter(([table]) => table in tables));
   return Object.freeze({
     ...payload,
     migrations: plan.migrations,
     tables: Object.freeze(tables),
     cursor: Object.freeze(cursor),
     projected: Object.freeze(projected),
+    projectedColumns: Object.freeze(projectedColumns),
   });
 }
 

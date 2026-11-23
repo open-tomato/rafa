@@ -455,12 +455,15 @@ describe('the projected pull, under effort.syncSkew: pull-projected', () => {
     .map(({ id }) => id)
     .join(',');
 
-  /** A hub one migration ahead of this rafa, projecting `commits` and holding one row of `a`'s. */
-  const aheadHub = async (a: Device): Promise<StandInHub> => {
+  /** The columns the stand-in hub names as cut off `commits`: two, by the one id it projects. */
+  const CUT_COLUMNS = { commits: ['future_a', 'future_b'] };
+
+  /** A hub one migration ahead of this rafa, projecting `commits` of `columns` (null names none) and holding one row of `a`'s. */
+  const aheadHub = async (a: Device, columns: typeof CUT_COLUMNS | null = CUT_COLUMNS): Promise<StandInHub> => {
     const over = hub();
     await serviceOf(a, over).push({ to: null });
     over.setExtraMigrations([FUTURE_MIGRATION]);
-    over.setProjection({ commits: [FUTURE_MIGRATION] });
+    over.setProjection({ commits: [FUTURE_MIGRATION] }, columns ?? undefined);
     return over;
   };
 
@@ -477,7 +480,7 @@ describe('the projected pull, under effort.syncSkew: pull-projected', () => {
     expect(answer).toMatchObject({
       status: 'pulled',
       merge: { status: 'merged', rowsAdded: 1, rowsHeld: 1 },
-      notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 1 columns wait for rafa self-update',
+      notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 2 columns wait for rafa self-update',
     });
     expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
     expect(read<{ pair: string }>(b.path, 'SELECT origin_store || \':\' || origin_seq AS pair FROM held_rows').map(({ pair }) => pair))
@@ -485,6 +488,14 @@ describe('the projected pull, under effort.syncSkew: pull-projected', () => {
     expect(readHeldMigrations(b.path)).toEqual([FUTURE_MIGRATION]);
     expect(stateOf(b).stores[originOf(b)]).toMatchObject({ pull: { commits: 1 } });
     expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: '2026-11-01T10:00:00.000Z' });
+  });
+
+  it('counts the columns the answer names as cut, not its lacking ids, and none when it names no cut column', async () => {
+    const a = device(1);
+    const named = await projectingOf(device(1), await aheadHub(a)).pull({ from: null, dryRun: false });
+    const unnamed = await projectingOf(device(1), await aheadHub(a, null)).pull({ from: null, dryRun: false });
+    expect(named).toMatchObject({ notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 2 columns wait for rafa self-update' });
+    expect(unnamed).toMatchObject({ notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 0 columns wait for rafa self-update' });
   });
 
   it('keeps heldBack at the first projected contact, as a later one pulls past its cursor', async () => {

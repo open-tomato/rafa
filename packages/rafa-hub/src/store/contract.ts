@@ -453,6 +453,7 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
         expect(whole.projected).toBeUndefined();
         expect(projected.migrations).toEqual(behind());
         expect(projected.projected?.[SESSIONS]).toEqual([BEHIND_FROM]);
+        expect(projected.projectedColumns?.[SESSIONS]).toEqual(['worktree']);
         expect(Object.keys(projected.cursor).sort()).toEqual(Object.keys(projected.tables).sort());
         expect(projected.tables[COMMITS]).toEqual(whole.tables[COMMITS]);
         expect(whole.tables[SESSIONS]?.map((row) => 'worktree' in row)).toEqual([true]);
@@ -466,6 +467,7 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
         const named = await hub().pull({ device: B, since: {}, migrations: hub().contract().migrations });
 
         expect(named.projected).toBeUndefined();
+        expect(named.projectedColumns).toBeUndefined();
         expect(named).toEqual(whole);
       });
 

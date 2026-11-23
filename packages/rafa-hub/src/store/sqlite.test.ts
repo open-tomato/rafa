@@ -250,6 +250,7 @@ describe('the SQLite hub store', () => {
       const more = await store.pull({ device: B, since: {}, migrations: [...migrations, FUTURE_MIGRATION] });
 
       expect(plain.projected).toBeUndefined();
+      expect(plain.projectedColumns).toBeUndefined();
       expect(every).toEqual(plain);
       expect(more).toEqual(plain);
     });
@@ -263,6 +264,7 @@ describe('the SQLite hub store', () => {
 
       expect(projected.migrations).toEqual(behind());
       expect(projected.projected).toEqual({ sessions: [BEHIND_FROM] });
+      expect(projected.projectedColumns).toEqual({ sessions: ['worktree'] });
       const left = Object.keys(whole.tables).filter((table) => !(table in projected.tables));
       expect(left.sort()).toEqual(['bug_routes', 'reading_supersedes', 'stale_docs']);
       expect(Object.keys(projected.cursor).sort()).toEqual(Object.keys(projected.tables).sort());
@@ -291,6 +293,7 @@ describe('the SQLite hub store', () => {
       const whole = await store.pull({ device: B, since: {}, migrations: [...held().migrations, NOTE_MIGRATION] });
 
       expect(projected.projected).toEqual({ commits: [NOTE_MIGRATION] });
+      expect(projected.projectedColumns).toEqual({ commits: ['fixture_note'] });
       expect(projected.migrations).toEqual(held().migrations);
       expect(projected.tables['commits']?.map((row) => 'fixture_note' in row)).toEqual([false]);
       expect(whole.projected).toBeUndefined();

@@ -20,7 +20,8 @@
  *     answers `projection: true`, and a pull naming `migrations` that
  *     lack an id the stand-in holds is answered as a projecting hub
  *     answers it: the pushed migrations the pull names, the same rows,
- *     and that map as `projected`. A pull naming none, or naming every
+ *     that map as `projected` and the cut columns it was handed, if
+ *     any, as `projectedColumns`. A pull naming none, or naming every
  *     id held, is answered whole.
  *
  * It merges nothing: a row is matched by its origin pair alone. Every
@@ -65,8 +66,11 @@ export interface StandInHub {
   readonly setFault: (answer: (() => Response) | null) => void;
   /** Ids a pull names beyond the migrations pushed, as a hub newer than the device's rafa would. */
   readonly setExtraMigrations: (ids: readonly string[]) => void;
-  /** Answers `projection: true` and projects a pull naming `migrations` with `projected`; null answers whole. */
-  readonly setProjection: (projected: Readonly<Record<string, readonly string[]>> | null) => void;
+  /** Answers `projection: true` and projects a pull naming `migrations` with `projected` and `columns`; null answers whole. */
+  readonly setProjection: (
+    projected: Readonly<Record<string, readonly string[]>> | null,
+    columns?: Readonly<Record<string, readonly string[]>>,
+  ) => void;
   /** Stops listening, so the next request fails to connect. */
   readonly stop: () => Promise<void>;
 }
@@ -92,6 +96,7 @@ export function startStandInHub(): StandInHub {
   let migrations: readonly string[] = [];
   let extra: readonly string[] = [];
   let projection: Readonly<Record<string, readonly string[]>> | null = null;
+  let cutColumns: Readonly<Record<string, readonly string[]>> | undefined;
   let fault: (() => Response) | null = null;
   let statusReads = 0;
 
@@ -144,6 +149,9 @@ export function startStandInHub(): StandInHub {
         tables: answered,
         cursor,
         projected: projection,
+        ...(cutColumns === undefined
+          ? {}
+          : { projectedColumns: cutColumns }),
       };
     return success(payload);
   };
@@ -195,8 +203,9 @@ export function startStandInHub(): StandInHub {
     setExtraMigrations: (ids) => {
       extra = ids;
     },
-    setProjection: (projected) => {
+    setProjection: (projected, columns) => {
       projection = projected;
+      cutColumns = columns;
     },
     stop: () => server.stop(true),
   };

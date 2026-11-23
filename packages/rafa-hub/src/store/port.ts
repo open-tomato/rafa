@@ -64,9 +64,10 @@
  *     leave out is answered at the caller's schema: the held ids it
  *     names as the payload's `migrations`, every table its schema does
  *     not make left out of `tables` and `cursor`, and each table whose
- *     rows lost a column named in `projected` with the ids it lacks. A
- *     caller naming every held id, or more, is answered whole, with no
- *     `projected`, as a pull naming none is; a store answering
+ *     rows lost a column named in `projected` with the ids it lacks
+ *     and in `projectedColumns` with the columns it lost. A caller
+ *     naming every held id, or more, is answered whole, with neither
+ *     field, as a pull naming none is; a store answering
  *     `projection: false` is never handed a pull naming `migrations`.
  *   - **Every push is a device's last push**, a repeated push that adds
  *     nothing included, stamped by the clock the adapter was made with.
