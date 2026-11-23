@@ -69,6 +69,17 @@ in the result's `notWired`, and a card or tile that reads one shows
 with `reads`, and one that names none is never live. An API that is not
 there fails every card with the run line above.
 
+Every card and tile a PoC metric feeds names its `reads`. On the live
+page a wired card's note is `liveNoteOf`'s (`src/lenses/spec.ts`): the
+proxy note, when the metric is a proxy, and the row count behind it, so
+a thin reading says how little stands behind it. The weekly cards whose
+field holds no dates (bugs by kind, routes, preflight halts) label their
+weeks from the result's `weeks`, the series window's Mondays, and the
+stacked ones draw the kinds the answer names (`src/lenses/kinds.ts`).
+What only the mock knows stays off the live page: the four-week-average
+deltas, the halts' per-check drill-down and the budget's allowance, so
+the budget gauge reads this week against last week with "no target set".
+
 ## The theme values
 
 `src/styles.css` defines every token the charts package names (its

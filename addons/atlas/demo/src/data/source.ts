@@ -12,7 +12,7 @@ import type { GraphLink, GraphNode, RoseSlice, SunburstNode } from '@open-tomato
 import { BALANCE_CATALOGUE, type BalanceIndex } from './balance.js';
 import { COMPOSITION_SUNBURST, PACKAGE_COMPOSITION, SIZE_ROSE, type PackageComposition } from './composition.js';
 import { SANKEY_LINKS, SANKEY_NODES, WORKSPACE_LINKS, WORKSPACE_NODES } from './graph.js';
-import { buildMock, MOCK_SEEDS, type MockData, type MockSeeds } from './mock.js';
+import { buildMock, MOCK_SEEDS, WEEK_DATES, type MockData, type MockSeeds } from './mock.js';
 import { between, seeded } from './random.js';
 
 /** The workspace as measured on 2026-11-02: package composition and the import graph. */
@@ -60,6 +60,12 @@ export interface LensResult {
    * and, for a proxy, its `ProxyNote`. The mock fills none.
    */
   readonly fieldMeta: ReadonlyMap<LensField, FieldMeta>;
+  /**
+   * The Monday (UTC) of each week a weekly field without its own dates
+   * holds one entry for (bugs by kind, routes, preflight halts), oldest
+   * first: the mock's 12 weeks, or the live series window's weeks.
+   */
+  readonly weeks: readonly Date[];
   readonly mock: MockData;
   /** The balance indices with this range's values. */
   readonly balance: readonly BalanceIndex[];
@@ -111,7 +117,7 @@ function balanceOf(range: TimeRange): readonly BalanceIndex[] {
 
 /** The result set for one range, computed at once. */
 export function lensResultOf(range: TimeRange): LensResult {
-  return { range, source: 'mock', notWired: NONE_MARKED, fieldMeta: NO_META, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
+  return { range, source: 'mock', notWired: NONE_MARKED, fieldMeta: NO_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
 }
 
 /** A page source over the mock that answers after `delayMs`. */

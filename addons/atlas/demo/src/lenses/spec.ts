@@ -1,8 +1,9 @@
 /**
  * What every lens card shares: the spec defaults (the mock's source line,
  * no animation under `?still`), the plot height, which fills the box
- * inside the maximise modal, and the rule that says whether a card or a
- * tile draws on the live page (`isWired`).
+ * inside the maximise modal, the rule that says whether a card or a
+ * tile draws on the live page (`isWired`), and the note a wired card
+ * shows there (`liveNoteOf`).
  */
 import type { LensField, LensResult } from '../data/source.js';
 import type { CardSpec } from '@open-tomato/atlas-ui';
@@ -44,6 +45,33 @@ export function plotHeight(base: number, height: ChartHeight): ChartHeight {
   return height === 'fill'
     ? 'fill'
     : base;
+}
+
+/**
+ * The note a wired card shows on the live page: per metric behind
+ * `reads`, its proxy note when it is a proxy, then the answer's row
+ * count, so a thin reading (three red runs in 303) says how little stands
+ * behind it. Undefined over the mock, or when no field read has a meta.
+ */
+export function liveNoteOf(result: LensResult, reads: readonly LensField[]): string | undefined {
+  if (result.source === 'mock') return undefined;
+  const metas = reads.flatMap((field) => {
+    const meta = result.fieldMeta.get(field);
+    return meta === undefined
+      ? []
+      : [meta];
+  });
+  const metrics = [...new Set(metas.map((meta) => meta.metricId))];
+  if (metrics.length === 0) return undefined;
+  return metrics.map((metricId) => {
+    const meta = metas.find((entry) => entry.metricId === metricId);
+    const rows = `${meta?.rowCount ?? 0} ${meta?.rowCount === 1
+      ? 'row'
+      : 'rows'} behind it (${metricId}).`;
+    return meta?.proxyNote === undefined
+      ? rows
+      : `Proxy: ${meta.proxyNote} ${rows}`;
+  }).join(' ');
 }
 
 /**

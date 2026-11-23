@@ -4,9 +4,10 @@ import { DataTable, useDashboard } from '@open-tomato/atlas-ui';
 import { formatDay, formatPercent, useChartEngine } from '@open-tomato/charts';
 import { type ReactElement } from 'react';
 
-import { BUG_KINDS, DEFECT_DENSITY, OPEN_BUGS, ROUTES, WEEK_DATES, type MockData } from '../data/mock.js';
+import { BUG_KINDS, DEFECT_DENSITY, OPEN_BUGS, ROUTES, type Kind } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
+import { kindsOf } from './kinds.js';
 import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
@@ -41,27 +42,54 @@ function sumOf(row: Readonly<Record<string, number>>): number {
   return Object.values(row).reduce((sum, value) => sum + value, 0);
 }
 
-function QaTiles({ mock }: { readonly mock: MockData }): ReactElement {
+function QaTiles({ result }: { readonly result: LensResult }): ReactElement {
+  const { mock } = result;
   const totals = mock.bugsByKindPerWeek.map(sumOf);
   const bugsLastWeek = totals.at(-1) ?? 0;
   return (
     <>
-      <LensStat hero label="Bugs recorded this week" value={String(bugsLastWeek)} trend={totals} delta={{ text: `vs ${BUGS_AVERAGE} four-week average`, direction: bugsLastWeek > BUGS_AVERAGE
-        ? 'up'
-        : 'down', upIsGood: false }} />
-      <LensStat label="Regressions (own-fallout) this week" value={String(mock.bugsByKindPerWeek.at(-1)?.['own-fallout'] ?? 0)} trend={mock.regressionsPerWeek.map((point) => point.y)} />
+      <LensStat
+        hero
+        label="Bugs recorded this week"
+        reads={['bugsByKindPerWeek']}
+        value={String(bugsLastWeek)}
+        trend={totals}
+        delta={result.source === 'mock'
+          ? { text: `vs ${BUGS_AVERAGE} four-week average`, direction: bugsLastWeek > BUGS_AVERAGE
+            ? 'up'
+            : 'down', upIsGood: false }
+          : undefined}
+      />
+      <LensStat label="Regressions (own-fallout) this week" reads={['regressionsPerWeek']} value={String(mock.regressionsPerWeek.at(-1)?.y ?? 0)} trend={mock.regressionsPerWeek.map((point) => point.y)} />
       <LensStat label="Open bug issues" value={String(OPEN_BUGS)} />
       <LensStat label="Defect density" value={`${DEFECT_DENSITY} / kLOC`} note="bugs attributed to modules by the paths their text names" />
     </>
   );
 }
 
+/** One weekly stacked card's slice: an entry per week of `weeks`, and the kinds its rows name. */
+interface WeeklyKinds {
+  readonly weeks: readonly Date[];
+  readonly rows: readonly Readonly<Record<string, number>>[];
+  readonly kinds: readonly Kind[];
+}
+
+/** The slice of a weekly stacked card: the result's weeks, `rows`, and their kinds from `known`. */
+function weeklyKindsOf(result: LensResult, rows: readonly Readonly<Record<string, number>>[], known: readonly Kind[]): WeeklyKinds {
+  return { weeks: result.weeks, rows, kinds: kindsOf(rows, known) };
+}
+
 /** A per-week table of kinds: the week, then one column per kind. */
-function weeklyTable(rows: readonly Readonly<Record<string, number>>[], kinds: readonly { id: string; label: string }[]): { columns: string[]; rows: (string | number)[][] } {
+function weeklyTable({ weeks, rows, kinds }: WeeklyKinds): { columns: string[]; rows: (string | number)[][] } {
   return {
     columns: ['Week', ...kinds.map((kind) => kind.label)],
-    rows: rows.map((row, index) => [formatDay(WEEK_DATES[index] ?? new Date(0)), ...kinds.map((kind) => row[kind.id] ?? 0)]),
+    rows: rows.map((row, index) => [formatDay(weeks[index] ?? new Date(0)), ...kinds.map((kind) => row[kind.id] ?? 0)]),
   };
+}
+
+/** The legend of a weekly stacked card: its kinds. */
+function weeklyLegend({ kinds }: WeeklyKinds): Kind[] {
+  return kinds.map(({ id, label, tone }) => ({ id, label, tone }));
 }
 
 /** The QA lens: defects, regressions, resolution and flaky checks. */
@@ -73,15 +101,21 @@ export function QaLens(): ReactElement {
     <LensGrid
       tiles={data === undefined
         ? <LoadingTiles count={4} />
-        : <QaTiles mock={data.mock} />}
+        : <QaTiles result={data} />}
       cards={(
         <>
-          <LensCard config={BUGS} select={(result: LensResult) => result.mock.bugsByKindPerWeek} legend={BUG_KINDS} table={(rows) => weeklyTable(rows, BUG_KINDS)}>
-            {({ data: rows, animate, height }) => (
+          <LensCard
+            config={BUGS}
+            reads={['bugsByKindPerWeek']}
+            select={(result: LensResult) => weeklyKindsOf(result, result.mock.bugsByKindPerWeek, BUG_KINDS)}
+            legend={weeklyLegend}
+            table={weeklyTable}
+          >
+            {({ data: { weeks, rows, kinds }, animate, height }) => (
               <BarChart
                 ariaLabel="Bugs by kind per week, stacked"
-                categories={WEEK_DATES.map(formatDay)}
-                series={BUG_KINDS.map((kind) => ({ ...kind, values: rows.map((row) => row[kind.id] ?? 0) }))}
+                categories={weeks.map(formatDay)}
+                series={kinds.map((kind) => ({ ...kind, values: rows.map((row) => row[kind.id] ?? 0) }))}
                 mode="stacked"
                 animate={animate}
                 height={plotHeight(220, height)}
@@ -90,6 +124,7 @@ export function QaLens(): ReactElement {
           </LensCard>
           <LensCard
             config={REGRESSIONS}
+            reads={['regressionsPerWeek']}
             select={(result: LensResult) => result.mock.regressionsPerWeek}
             table={(points) => ({ columns: ['Week', 'Regressions'], rows: points.map((point) => [formatDay(point.x), point.y]) })}
           >
@@ -103,12 +138,18 @@ export function QaLens(): ReactElement {
               />
             )}
           </LensCard>
-          <LensCard config={ROUTED} select={(result: LensResult) => result.mock.filedSharePerWeek} legend={ROUTES} table={(rows) => weeklyTable(rows, ROUTES)}>
-            {({ data: rows, animate, height }) => (
+          <LensCard
+            config={ROUTED}
+            reads={['filedSharePerWeek']}
+            select={(result: LensResult) => weeklyKindsOf(result, result.mock.filedSharePerWeek, ROUTES)}
+            legend={weeklyLegend}
+            table={weeklyTable}
+          >
+            {({ data: { weeks, rows, kinds }, animate, height }) => (
               <BarChart
                 ariaLabel="Share of bugs by route per week"
-                categories={WEEK_DATES.map(formatDay)}
-                series={ROUTES.map((route) => ({ ...route, values: rows.map((row) => row[route.id] ?? 0) }))}
+                categories={weeks.map(formatDay)}
+                series={kinds.map((route) => ({ ...route, values: rows.map((row) => row[route.id] ?? 0) }))}
                 mode="stacked100"
                 valueFormat={formatPercent}
                 animate={animate}
@@ -125,7 +166,11 @@ export function QaLens(): ReactElement {
               <BoxPlot ariaLabel="Resolution days by priority as box plots" groups={groups} unit="days" animate={animate} height={plotHeight(220, height)} />
             )}
           </LensCard>
-          <LensCard config={FLAKY} select={(result: LensResult) => result.mock.flakyChecks}>
+          <LensCard
+            config={FLAKY}
+            reads={['flakyChecks']}
+            liveSubtitle="checks failing on heads that later read green; readings counts those heads"
+            select={(result: LensResult) => result.mock.flakyChecks}>
             {({ data: checks }) => (
               <DataTable
                 caption="Checks that failed most often across CI readings"

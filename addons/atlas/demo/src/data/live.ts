@@ -24,7 +24,8 @@
  * hold one entry per ISO week of the window, 0 where the answer has no
  * row, since the engine answers no row for an empty bucket. A row whose
  * group is NULL counts as `unknown`, except a task with no work type,
- * which the three work-type columns leave out.
+ * which the three work-type columns leave out. The result's `weeks`
+ * names those weeks, for the cards whose field holds no dates of its own.
  */
 import type { Blocker, ChangeSlice, MockData } from './mock.js';
 import type { FieldMeta, LensField, LensResult, MeasuredWorkspace } from './source.js';
@@ -558,6 +559,15 @@ export function weeklyPointsOf(result: QueryResult, valueKey: string): TimePoint
   }));
 }
 
+/**
+ * The Mondays (UTC) of the series window's weeks, oldest first: the week
+ * of each entry `weeklyGroupsOf` and `preflightGridOf` answer for the
+ * same window, read from `result`'s window.
+ */
+export function seriesWeeksOf(result: QueryResult, timeKey: string): Date[] {
+  return windowWeeksOf(result, timeKey).map((week) => dayOf(week));
+}
+
 /* ---------- the result set ---------- */
 
 /** One answer per metric. */
@@ -676,6 +686,7 @@ export async function liveResultOf(client: AtlasClient, range: TimeRange, signal
     source: 'live',
     notWired: NOT_WIRED,
     fieldMeta: fieldMetaOf(answers, previous, proxyNotesOf(definitions)),
+    weeks: seriesWeeksOf(answers.bugsByKind, 'week'),
     mock: mockOf(answers, previous),
     balance: [],
     workspace: EMPTY_WORKSPACE,

@@ -2,8 +2,8 @@
  * Tests for the live page source over a stub client: the range windows of
  * D6, the requests the source makes, each of the 17 PoC metrics'
  * `QueryResult` mapped into its `LensResult` fields, each field's meta
- * (its row count, and a proxy's `ProxyNote`), every other field marked
- * not wired, an API that is not there failing with the start line, and
+ * (its row count, and a proxy's `ProxyNote`), the weeks the weekly
+ * fields span, every other field marked not wired, an API that is not there failing with the start line, and
  * `?source=` reading as the mock unless it names `live`. The stub client
  * (`testdata/live-client.fixture.ts`) records every call. The page drawn
  * over each source is `App.test.tsx`'s, since this file imports no TSX.
@@ -307,6 +307,16 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
     expect(result.mock.deploysPerWeek).toEqual([]);
     expect(result.balance).toEqual([]);
     expect(result.workspace.members).toEqual([]);
+  });
+
+  it('names the series window\'s weeks, one per entry of the weekly fields that hold no dates', async () => {
+    const { result } = await liveResult();
+    const mondays = ['2026-10-26', '2026-11-02', '2026-11-09', '2026-11-16'].map((day) => new Date(`${day}T00:00:00.000Z`));
+
+    expect(result.weeks).toEqual(mondays);
+    expect(result.mock.bugsByKindPerWeek).toHaveLength(mondays.length);
+    expect(result.mock.filedSharePerWeek).toHaveLength(mondays.length);
+    expect(result.mock.preflightHalts[0]).toHaveLength(mondays.length);
   });
 
   it('refuses an answer without the column a field is read from', async () => {
