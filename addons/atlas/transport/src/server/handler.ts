@@ -32,7 +32,7 @@ import {
   validateStandard,
 } from '@open-tomato/atlas-data/contract';
 
-/** The handler an adapter (fetch, Express, an in-process call) wraps. */
+/** The handler an adapter (the fetch adapter, an in-process call) wraps. */
 export type AtlasHandler = (request: AtlasRequest) => Promise<AtlasResponse>;
 
 /** What the handler serves: the sources and the metrics by id, and the replica's build time. */

@@ -5,10 +5,10 @@ Atlas replica. It holds what the two libraries, `@open-tomato/charts`
 (from npm) and `@open-tomato/atlas-ui` (`../ui`), leave to their consumer:
 the theme values, the mock data, the live page source and the four lens
 pages. The server mounts the Atlas API under `/api/atlas` when the
-project root holds an effort store: `ATLAS_PROJECT_ROOT` names the root
-(the repository this folder sits in otherwise), which a worktree needs
-because the store lives in the main checkout, and `RAFA_EFFORT_DIR`
-names the store and wins over both.
+project root holds an effort store and a replica built from it:
+`ATLAS_PROJECT_ROOT` names the root (the repository this folder sits in
+otherwise), which a worktree needs because the store lives in the main
+checkout, and `RAFA_EFFORT_DIR` names the store and wins over both.
 
 ## Run it
 
@@ -22,12 +22,13 @@ Real data, from a worktree:
 ATLAS_PROJECT_ROOT=<main checkout> bun run --cwd addons/atlas/demo dev
 ```
 
-then open the page with `?source=live`. With a store and no replica at
-`<root>/.rafa/atlas/atlas.sqlite`, the server builds one before it
-listens (the build copies the store with `vacuumInto` and reads only the
-copy). With no store, it serves the page alone, `/api/atlas` answers
-404, and the server prints why. It binds to loopback, since Atlas has no
-auth.
+then open the page with `?source=live`. The server builds nothing. With
+a store and no replica at `<root>/.rafa/atlas/atlas.sqlite`, it mounts no
+API and prints the build line that writes one, `rafa module exec
+@open-tomato/rafa-atlas build`, which copies the store with `vacuumInto`
+and reads only the copy; run it, then start the demo again. With no
+store, it serves the page alone, `/api/atlas` answers 404, and the
+server prints why. It binds to loopback, since Atlas has no auth.
 
 `src/server.ts` serves `src/index.html` through an HTML import, so Bun
 bundles the page's TSX and its stylesheet on request; `bunfig.toml` runs

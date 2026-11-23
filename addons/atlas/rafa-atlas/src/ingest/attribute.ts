@@ -3,8 +3,8 @@
  * the module a store row is about, read from the paths its text names.
  *
  * 1. **Modules.** {@link discoverModules} expands each of the project's
- *    `moduleGlobs` (`packages/*`, `src/*` and `addons/*` until
- *    `loadAtlasConfig` reads a project's own) into the folders it names
+ *    `moduleGlobs` (`packages/*`, `src/*` and `addons/*`; no config key
+ *    sets them, as `loadAtlasConfig` reads only two) into the folders it names
  *    under the project root, as paths relative to it with `/` between
  *    segments. A segment is a folder name, which takes that folder, or
  *    `*`, which takes every folder there whose name does not start with a
