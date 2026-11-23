@@ -5836,7 +5836,7 @@
       "edges": [],
       "fileCounts": {
         "source": 10,
-        "test": 27,
+        "test": 28,
         "testSupport": 8
       },
       "files": [
@@ -5870,6 +5870,7 @@
         "packages/rafa-hub/src/store/sqlite.ts",
         "packages/rafa-hub/src/store/testdata/broken-store.fixture.ts",
         "packages/rafa-hub/src/store/testdata/memory-store.ts",
+        "packages/rafa-hub/src/sync-skew.integration.test.ts",
         "packages/rafa-hub/src/testdata/compare-merged-stores.ts",
         "packages/rafa-hub/src/testdata/scratch-home-env.test.ts",
         "packages/rafa-hub/src/testdata/scratch-home-env.ts",
@@ -5887,7 +5888,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 36,
+        "packages/rafa-hub/": 37,
         "packages/rafa-index/": 9
       },
       "folders": [
