@@ -28,16 +28,35 @@
  *
  * Exports the rows past the push cursor with core's `exportWirePayload`
  * and sends them to the hub under the store's origin. Once the hub has
- * taken them, the push cursor becomes the export's. Every push reaches
- * the hub, one with no rows included, so the hub records the device's
- * last push and refuses a store newer than it at once. It answers
- * `pushed` with no path: the rows were delivered. A hub whose store
- * lacks a migration this one applied refuses the push with a `409`
- * naming the ids in `missing`, written as {@link HubUpgradeRequired}:
+ * taken them, the push cursor becomes the export's. Every push but a
+ * dry run reaches the hub, one with no rows included, so the hub
+ * records the device's last push and refuses a store newer than it at
+ * once. It answers `pushed` with no path: the rows were delivered. A
+ * hub whose store lacks a migration this one applied refuses the push
+ * with a `409` naming the ids in `missing`, written as
+ * {@link HubUpgradeRequired}:
  * `effort sync: the hub is behind this rafa (migration <ids>); nothing
  * was sent. Next step: upgrade the hub, then sync again`. A `409` naming
  * no `missing`, from an older hub, passes on as `HubRefused` with its
  * message as it stands. Neither moves the push cursor.
+ *
+ * ## The push's dry run and the rows waiting
+ *
+ * A push asked with `dryRun: true` ({@link ServicePushRequest}) does
+ * everything a push does up to the send: it refuses what a push refuses,
+ * reads the hub's status and refuses another contract version, and
+ * exports the rows past the push cursor. Then it sends nothing and
+ * leaves the state file as it was, answering `pushed` with `dryRun:
+ * true` and `rows`, the rows the export holds, which a push would send
+ * ({@link ServicePushResult}). It cannot see the hub's `409`, which
+ * only a sent push is answered with. A store not there yet answers
+ * `nothing-to-sync` with no contact, as a push does.
+ *
+ * {@link ServiceSync.pendingPush} counts the same rows with no contact
+ * at all: no token, no status read and no project. It refuses an
+ * NDJSON project and a store with no origin as a push does, since the
+ * push cursor is kept under the store's origin, and answers 0 for a
+ * store not there yet. Neither writes the state file.
  *
  * ## Pull
  *
@@ -400,10 +419,29 @@ export interface ServiceHubStatus {
   readonly migrations: readonly string[];
 }
 
-/** The `service` strategy: a `Sync` whose pull answers {@link ServicePullResult}, with the hub's status. */
+/** What a push is asked: core's `SyncPushRequest`, with the dry run. */
+export interface ServicePushRequest extends SyncPushRequest {
+  /** Counts the rows the push would send, sending nothing and moving no cursor; see the module note. */
+  readonly dryRun?: boolean;
+}
+
+/** A push's answer: core's `SyncPushResult`, a dry run's also carrying the rows it would have sent. */
+export type ServicePushResult =
+  | SyncPushResult
+  | (Extract<SyncPushResult, { readonly status: 'pushed' }> & {
+    /** Always true: nothing was sent. */
+    readonly dryRun: true;
+    /** The rows past the push cursor, across tables, which a push would send. */
+    readonly rows: number;
+  });
+
+/** The `service` strategy: a `Sync` with the push's dry run, the rows waiting and the hub's status. */
 export interface ServiceSync extends Sync {
   readonly kind: 'service';
+  push: (request: ServicePushRequest) => Promise<ServicePushResult>;
   pull: (request: SyncPullRequest) => Promise<ServicePullResult>;
+  /** The rows past the push cursor, counted with no contact; see the module note. */
+  pendingPush: () => Promise<number>;
   /** The hub's status, from the same kept answer push and pull read; see the module note. */
   hubStatus: () => Promise<ServiceHubStatus>;
 }
@@ -596,15 +634,29 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
       : undefined;
   };
 
-  const push = async ({ to }: SyncPushRequest): Promise<SyncPushResult> => {
+  /** The rows of the store under `origin` past its push cursor; reads only. */
+  const pastPushCursor = (origin: string): WirePayload => exportWirePayload({
+    path: storePath,
+    cursor: readSyncCursors(statePath, origin, hub.url).push,
+  });
+
+  const push = async ({ to, dryRun = false }: ServicePushRequest): Promise<ServicePushResult> => {
     refusePath('to', to);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
     const reached = await agreedClient();
-    const payload = exportWirePayload({ path: storePath, cursor: readSyncCursors(statePath, origin, hub.url).push });
+    const payload = pastPushCursor(origin);
+    if (dryRun) return Object.freeze({ status: 'pushed', path: null, dryRun: true, rows: rowsIn(payload) });
     await pushOrRefuse(reached, origin, payload);
     writeSyncCursor(statePath, origin, hub.url, 'push', payload.cursor);
     return PUSHED;
+  };
+
+  const pendingPush = async (): Promise<number> => {
+    const origin = originOf();
+    return origin === undefined
+      ? 0
+      : rowsIn(pastPushCursor(origin));
   };
 
   const pull = async (request: SyncPullRequest): Promise<ServicePullResult> => {
@@ -651,7 +703,7 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
     return Object.freeze({ contractVersion, projectId, projectName: await reached.projectName(), migrations });
   };
 
-  return Object.freeze({ kind: 'service', push, pull, hubStatus });
+  return Object.freeze({ kind: 'service', push, pull, pendingPush, hubStatus });
 }
 
 /**
