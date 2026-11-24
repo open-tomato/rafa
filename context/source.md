@@ -558,7 +558,12 @@ declaration is loaded; a top-level key nothing declares is still refused.
 the same merge against the emitted declarations. At run time `loadConfig`
 lifts each key `setModuleConfigKeys` names out of every file's unknown keys,
 unwarned, and answers its value in `moduleConfig` from the highest file that
-sets it, whole (`packages/rafa/src/core/config/config-load.ts`).
+sets it, whole (`packages/rafa/src/core/config/config-load.ts`). `src/rafa.ts`
+sets those keys from the loaded modules' command entries (`configKey`), and
+the dispatcher hands a module's command its key's value as
+`RafaContext.moduleConfig`, `undefined` for a core command, a module declaring
+no key, a key no file sets, and a command run with no project
+(`src/cli/dispatch.ts`).
 
 **The sweep holds core off the section files.**
 `src/tests/core-config-sections.sweep.test.ts` reads every code file under

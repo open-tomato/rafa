@@ -522,6 +522,7 @@ type ImportList = readonly (readonly [string, readonly string[]])[];
 
 /** What `src/rafa.ts` imports, spelled here; an import for its effect alone takes no binding. */
 const CLI_IMPORTS: ImportList = [
+  ['@open-tomato/rafa/core/config/load', ['setModuleConfigKeys']],
   ['@open-tomato/rafa/modules/activate', ['activateModuleAdapters']],
   ['@open-tomato/rafa/modules/load', ['loadInvocationModules']],
   ['./adapter-registry.js', ['registerCoreAdapters']],

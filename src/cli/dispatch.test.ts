@@ -135,7 +135,7 @@ import {
   versionLine,
 } from '@open-tomato/rafa/core/command';
 import { dangerousKeys, dangerousPhrases, restoreDangerousPhrases, setDangerousPhrases } from '@open-tomato/rafa/core/config';
-import { loadConfig } from '@open-tomato/rafa/core/config/load';
+import { loadConfig, setModuleConfigKeys } from '@open-tomato/rafa/core/config/load';
 import { activeOutput, activeOutputMode, setActiveOutput } from '@open-tomato/rafa/core/output';
 import { RafaError } from '@open-tomato/rafa/errors/rafa-error';
 import { initHint } from '@open-tomato/rafa/project/scope';
@@ -143,6 +143,7 @@ import { initHint } from '@open-tomato/rafa/project/scope';
 import { version } from '../../package.json';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { CONFIG_DEFAULTS } from '../config-registry.js';
+import { projectConfigText } from '../project/scaffold.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
@@ -1438,5 +1439,59 @@ describe('a flag the command does not declare', () => {
 
     expect(outcome.exitCode).toBe(2);
     expect(outcome.result.error).toMatchObject({ code: 'unknown_flag', cause: 'cli:unknown-flag' });
+  });
+});
+
+describe('dispatch handing a command its module\'s config key', () => {
+  /** The value the project's config sets under the key, a mapping handed over whole. */
+  const layers = { layers: [{ name: 'core', modules: ['@open-tomato/rafa'] }], wip: 3 };
+
+  /** A project setting `atlas` beside the scaffold's settings. */
+  const keyed = join(tempBase, 'module-key-set');
+  plantProjectConfig(keyed, `${projectConfigText()}\natlas:\n  layers:\n    - name: core\n      modules: ['@open-tomato/rafa']\n  wip: 3\n`);
+
+  /** Three entries over one file: one declaring `atlas`, one declaring `other`, one declaring none. */
+  const entries = [
+    { name: 'atlas', entry: '/modules/atlas/commands.ts', configKey: 'atlas' },
+    { name: 'unset', entry: '/modules/unset/commands.ts', configKey: 'other' },
+    { name: 'bare', entry: '/modules/bare/commands.ts' },
+  ];
+  const importAny: ModuleImporter = async () => ({ default: [ISSUE_NEXT] });
+
+  /** The keys in place before the describe, put back after each case. */
+  let held: readonly string[] = [];
+  beforeEach(() => {
+    held = setModuleConfigKeys(['atlas', 'other']);
+  });
+  afterEach(() => {
+    setModuleConfigKeys(held);
+  });
+
+  /** What the last command run saw, read past the narrowing a reset to null leaves. */
+  const lastSeen = (): typeof seen => seen;
+
+  /** The `moduleConfig` the command a line routes to ran with, in `cwd`. */
+  async function moduleConfigFor(argv: readonly string[], cwd: string): Promise<unknown> {
+    seen = null;
+    const { outcome } = await run(argv, { modules: entries, importModule: importAny, cwd });
+    const ran = lastSeen();
+    expect(outcome.exitCode).toBe(0);
+    expect(ran).not.toBeNull();
+    return ran?.context.moduleConfig;
+  }
+
+  it('hands a module declaring a key the config sets that key\'s value, whole', async () => {
+    expect(await moduleConfigFor(['module', 'exec', 'atlas', 'next'], keyed)).toEqual(layers);
+  });
+
+  it('hands undefined to a module whose declared key the config sets nowhere, and to one declaring none', async () => {
+    expect(await moduleConfigFor(['module', 'exec', 'unset', 'next'], keyed)).toBeUndefined();
+    expect(await moduleConfigFor(['module', 'exec', 'bare', 'next'], keyed)).toBeUndefined();
+  });
+
+  it('hands undefined to a core command, in the same project with the same modules mounted', async () => {
+    expect(await moduleConfigFor(['loop', 'start'], keyed)).toBeUndefined();
+    // Control: the module command beside it, in the same invocation shape, reads the value.
+    expect(await moduleConfigFor(['module', 'exec', 'atlas', 'next'], keyed)).toEqual(layers);
   });
 });
