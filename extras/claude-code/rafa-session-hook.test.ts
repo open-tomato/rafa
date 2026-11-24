@@ -118,3 +118,95 @@ describe('the hook, spawned with a stub rafa on PATH', () => {
     expect(runHook(bunDir)).toEqual({ exitCode: 0, stdout: '' });
   });
 });
+
+describe('install.ts, run in a temporary git repository', () => {
+  const INSTALL = `${import.meta.dir}/rafa-hookify/install.ts`;
+  const MIN_TIMEOUT_SECONDS = 90;
+  let repo = '';
+
+  beforeAll(async () => {
+    repo = await mkdtemp(join(tmpdir(), 'rafa-session-install-'));
+    await Bun.write(join(repo, '.rafa/config.yaml'), 'effort:\n  sync: local\n');
+    const init = Bun.spawnSync(['git', 'init', '-q'], { cwd: repo });
+    expect(init.exitCode).toBe(0);
+  });
+
+  afterAll(async () => {
+    await rm(repo, { recursive: true, force: true });
+  });
+
+  const install = (...args: string[]): { exitCode: number; stdout: string } => {
+    const run = Bun.spawnSync([process.execPath, INSTALL, ...args], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
+    return { exitCode: run.exitCode, stdout: run.stdout.toString() };
+  };
+
+  const settingsOf = async (): Promise<{ hooks: Record<string, { matcher?: string; hooks: { command: string; timeout?: number }[] }[]> }> => JSON.parse(await Bun.file(join(repo, '.claude/settings.json')).text());
+
+  test('--dry-run lists every entry and writes nothing', async () => {
+    const run = install('--dry-run');
+    expect(run.exitCode).toBe(0);
+    const rows = run.stdout.split('\n').filter((line) => line.startsWith('  '));
+    expect(rows.map((row) => row.trim().split(/\s+/)
+      .slice(1)
+      .join(' '))).toEqual([
+      '.claude/skills/rafa-tooling/SKILL.md',
+      '.claude/skills/rafa-tooling/help-tree.ts',
+      '.claude/hooks/rafa-tooling-hook.ts',
+      '.claude/hooks/rafa-session-hook.ts',
+      '.claude/settings.json PreToolUse',
+      '.claude/settings.json SessionStart',
+      'CLAUDE.md',
+    ]);
+    expect(rows.every((row) => row.includes('added'))).toBe(true);
+    expect(await Bun.file(join(repo, '.claude/settings.json')).exists()).toBe(false);
+  });
+
+  test('writes the SessionStart entry with a timeout above 90 seconds', async () => {
+    expect(install().exitCode).toBe(0);
+    const settings = await settingsOf();
+    const entries = settings.hooks.SessionStart ?? [];
+    expect(entries).toHaveLength(1);
+    const hook = entries[0]?.hooks[0];
+    expect(hook?.command).toContain('rafa-session-hook.ts');
+    expect(hook?.timeout).toBeGreaterThan(MIN_TIMEOUT_SECONDS);
+    expect(settings.hooks.PreToolUse).toHaveLength(1);
+    expect(await Bun.file(join(repo, '.claude/hooks/rafa-session-hook.ts')).exists()).toBe(true);
+  });
+
+  test('a second install changes nothing', async () => {
+    const before = await Bun.file(join(repo, '.claude/settings.json')).text();
+    const run = install();
+    expect(run.exitCode).toBe(0);
+    const rows = run.stdout.split('\n').filter((line) => line.startsWith('  '));
+    expect(rows).toHaveLength(7);
+    expect(rows.every((row) => row.includes('unchanged'))).toBe(true);
+    expect(run.stdout).toContain('Everything was already in place.');
+    expect(await Bun.file(join(repo, '.claude/settings.json')).text()).toBe(before);
+  });
+});
+
+describe('the hook under effort.sync: local', () => {
+  test('prints nothing and the stub never reaches a hub', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'rafa-session-local-'));
+    try {
+      await Bun.write(join(dir, '.rafa/config.yaml'), 'effort:\n  sync: local\n');
+      const bin = join(dir, 'bin');
+      const contact = join(dir, 'contact.txt');
+      // The stub reads the config as rafa would: it touches `contact.txt` only for a hub strategy.
+      const script = `#!/bin/sh\nif /usr/bin/grep -q 'sync: local' "${dir}/.rafa/config.yaml"; then\n  echo '${done(false, [LOCAL_LINE])}'\nelse\n  echo hub > "${contact}"\n  echo '${done(true, [HUB_LINE])}'\nfi\n`;
+      await Bun.write(join(bin, 'rafa'), script);
+      await chmod(join(bin, 'rafa'), 0o755);
+      const run = Bun.spawnSync([process.execPath, HOOK], {
+        cwd: dir,
+        env: { PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`, HOME: dir, CLAUDE_PROJECT_DIR: dir },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      expect(run.exitCode).toBe(0);
+      expect(run.stdout.toString()).toBe('');
+      expect(await Bun.file(contact).exists()).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
