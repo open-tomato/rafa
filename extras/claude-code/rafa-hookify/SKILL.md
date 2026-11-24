@@ -1,6 +1,6 @@
 ---
 name: rafa-hookify
-description: "Install or refresh the rafa tooling pack in this project: the rafa-tooling skill, its PreToolUse hook and the AGENTS.md pointer."
+description: "Install or refresh the rafa tooling pack in this project: the rafa-tooling skill, its PreToolUse hook, the SessionStart sync hook and the AGENTS.md pointer."
 disable-model-invocation: true
 prevents: "a project where agents run gh chains and user-run rafa commands because the tooling skill or its hook is missing or stale"
 signal: silent

@@ -7,7 +7,7 @@ Code 2.1.283.
 
 ## What it puts in a project
 
-`rafa-hookify/install.ts` copies three files and adds two entries. Each
+`rafa-hookify/install.ts` copies four files and adds three entries. Each
 row is one of them.
 
 | Installed at | From | What it does |
@@ -15,7 +15,9 @@ row is one of them.
 | `.claude/skills/rafa-tooling/SKILL.md` | `files/rafa-tooling-skill.md` | The rules: the `gh`-to-rafa mappings, who runs which command, flag syntax, 🪙 commands, logins, checkouts, `pr merge` checks, the tomato header |
 | `.claude/skills/rafa-tooling/help-tree.ts` | `files/help-tree.ts` | The whole command tree in one page: `rafa describe \| bun .claude/skills/rafa-tooling/help-tree.ts` |
 | `.claude/hooks/rafa-tooling-hook.ts` | `files/rafa-tooling-hook.ts` | The PreToolUse hook below |
+| `.claude/hooks/rafa-session-hook.ts` | `files/rafa-session-hook.ts` | A SessionStart hook that runs `rafa effort sync --output=json` and prints its lines when a hub was contacted |
 | `.claude/settings.json` | | A `PreToolUse` entry with matcher `Bash` that runs the hook; the rest of the file is kept |
+| `.claude/settings.json` | | A `SessionStart` entry that runs the session hook with a 120-second timeout; the rest of the file is kept |
 | `AGENTS.md`, else `CLAUDE.md` | | One line pointing at the skill, appended at the end |
 
 ## Install
