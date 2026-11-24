@@ -11,6 +11,7 @@
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`, `instinct groups`, `instinct pairs`,
  * `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release fragment`, `release list`, `board list`, `board sync`,
+ * `effort dashboard`, `effort fix-schema`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `effort sync`,
  * the four `claim` actions, the eight `update` actions, `config set`, `config show`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `bug recheck`, `docs plan` and the ten `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
