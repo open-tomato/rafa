@@ -2,7 +2,8 @@
  * The one call a command makes to sync its effort store with the other
  * devices of its project: {@link createHubContact}, which selects the
  * `Sync` the project's `effort.sync` names through the loaded module
- * registry, then runs a push followed by a pull, or a pull alone.
+ * registry, then runs a push followed by a pull, or a pull alone, or a
+ * pull answering the hub line's facts after it (`status()`).
  *
  * ## Which strategies are contacted
  *
@@ -99,6 +100,35 @@
  *     <kind> failed: <message>`, and a refused push still pulls.
  *
  * Each run answers a {@link HubContactReading} saying what was done.
+ *
+ * ## The hub line
+ *
+ * A contact's `status()` kind pulls as `pull()` does, with the same
+ * request and the same lines, then answers the facts of the hub line a
+ * command prints after it ({@link HubStatusReading}'s `hub`), which
+ * {@link hubLine} formats: `hub: reachable, contract <n>, project
+ * <name>; pulled <n> rows`, ending `; <m> rows held back` when the pull
+ * held rows back. The contract version and the project come from the
+ * selected `Sync`'s `hubStatus()`, the `service` strategy's answer off
+ * the status read its pull already made and kept, so the line costs no
+ * second read; the counts come from the pull's own merge, `rowsAdded`
+ * and `rowsHeld`, and are 0 for a pull with nothing to merge. Core's
+ * `Sync` names no `hubStatus`, so it is read off the strategy by shape
+ * ({@link hubFactsOf}), as a pull's notice is: a strategy without one,
+ * or one answering a field of another type, answers that fact as
+ * unknown (null) rather than throwing, and the line names it `unknown`.
+ * A project the hub names no entry for is named by its id.
+ *
+ * `hubStatus()` is asked only after a pull that answered, once per run.
+ * A pull that found the hub unreachable, speaking another contract,
+ * refusing for skew or failing is not followed by it: its own line is
+ * the one that stands in the hub line's place, and the hub step is
+ * `skipped`. A `hubStatus()` that rejects is written by the rules a
+ * pull's rejection is, its direction named `hub status`, and that line
+ * replaces the hub line too. The contact writes the pull's notice
+ * through `warn` as `pull()` does and never writes the hub line: the
+ * command prints it, so the notice comes first, then the hub line or
+ * the line in its place, two lines at most.
  *
  * ## The run's own record
  *
@@ -209,6 +239,68 @@ export function hubUnreachableLine(hubUrl: string | null, error: unknown): strin
     + ' this command used the local store, and its rows sync on the next contact';
 }
 
+/** What a hub line names for a fact the strategy answered none of. */
+const UNKNOWN = 'unknown';
+
+/** `value` when it is a string holding anything, else null. */
+function textOf(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== ''
+    ? value
+    : null;
+}
+
+/**
+ * The hub's facts a `hubStatus()` answer carries, read by shape: each
+ * field of another type, and every field of an answer that is no
+ * object, null. See the module note's `The hub line`.
+ */
+export function hubFactsOf(answer: unknown): HubFacts {
+  const fields: Readonly<Record<string, unknown>> = typeof answer === 'object' && answer !== null
+    ? answer as Readonly<Record<string, unknown>>
+    : {};
+  const { contractVersion } = fields;
+  return Object.freeze({
+    contractVersion: typeof contractVersion === 'number' && Number.isInteger(contractVersion)
+      ? contractVersion
+      : null,
+    projectId: textOf(fields.projectId),
+    projectName: textOf(fields.projectName),
+  });
+}
+
+/**
+ * The hub line a command prints after a `status()` run: `hub:
+ * reachable, contract <n>, project <name>; pulled <n> rows`, ending `;
+ * <m> rows held back` when rows were. The project is its id when the
+ * hub names it nothing, and a fact the strategy answered none of is
+ * `unknown`.
+ */
+export function hubLine(facts: HubLineFacts): string {
+  const contract = facts.contractVersion === null
+    ? UNKNOWN
+    : String(facts.contractVersion);
+  const project = facts.projectName ?? facts.projectId ?? UNKNOWN;
+  const held = facts.heldBack > 0
+    ? `; ${String(facts.heldBack)} rows held back`
+    : '';
+  return `hub: reachable, contract ${contract}, project ${project}; pulled ${String(facts.pulled)} rows${held}`;
+}
+
+/** The rows a pull's merge added and held back; both 0 for a pull with nothing to merge. */
+function pulledOf(result: SyncPullResult): Pick<HubLineFacts, 'pulled' | 'heldBack'> {
+  return result.status === 'pulled'
+    ? { pulled: result.merge.rowsAdded, heldBack: result.merge.rowsHeld }
+    : { pulled: 0, heldBack: 0 };
+}
+
+/** The selected `Sync`'s `hubStatus`, read by shape, or null when it has none. */
+function hubStatusOf(sync: Sync): (() => Promise<unknown>) | null {
+  const { hubStatus } = sync as { readonly hubStatus?: unknown };
+  if (typeof hubStatus !== 'function') return null;
+  const ask = hubStatus as (this: Sync) => unknown;
+  return () => Promise.resolve(ask.call(sync));
+}
+
 /** Which directions a run takes. */
 export type HubContactDirection = 'push-then-pull' | 'pull';
 
@@ -241,6 +333,32 @@ export type HubContactReading =
     readonly pull: HubContactStep<SyncPullResult>;
   };
 
+/** The hub's own facts the hub line names, each null when the strategy answered none; see the module note's `The hub line`. */
+export interface HubFacts {
+  /** The wire contract version the hub speaks. */
+  readonly contractVersion: number | null;
+  /** The project push and pull name. */
+  readonly projectId: string | null;
+  /** The hub's name for that project. */
+  readonly projectName: string | null;
+}
+
+/** Everything the hub line says: the hub's facts and what the pull before it merged. */
+export interface HubLineFacts extends HubFacts {
+  /** The rows the pull's merge added; 0 when it had nothing to merge. */
+  readonly pulled: number;
+  /** The rows the pull's merge held back for a later refill; 0 for a pull that was not projected. */
+  readonly heldBack: number;
+}
+
+/** What a `status()` run did: a pull's reading, a contacted one also saying what the hub line names. */
+export type HubStatusReading =
+  | Exclude<HubContactReading, { readonly state: 'contacted' }>
+  | (Extract<HubContactReading, { readonly state: 'contacted' }> & {
+    /** The hub line's facts, or `skipped` when the pull did not answer and its own line stands in the hub line's place. */
+    readonly hub: HubContactStep<HubLineFacts>;
+  });
+
 /** What a contact is made with. */
 export interface HubContactInput {
   /** The project root, which modules and the adapter resolve against. */
@@ -270,6 +388,8 @@ export interface HubContact {
   readonly pushThenPull: () => Promise<HubContactReading>;
   /** Pulls the others' rows alone. */
   readonly pull: () => Promise<HubContactReading>;
+  /** Pulls as {@link HubContact.pull} does, then answers the hub line's facts with no second status read; see the module note. */
+  readonly status: () => Promise<HubStatusReading>;
 }
 
 /** The selected `Sync`, or why there is none. */
@@ -277,7 +397,12 @@ type Selection =
   | { readonly sync: Sync }
   | { readonly problem: string };
 
-/** The strategy as a reading names it: the string itself, or a description of a value that is none. */
+/** What one run came to, and the `Sync` it ran over: null when it contacted none. */
+type Ran =
+  | { readonly reading: Exclude<HubContactReading, { readonly state: 'contacted' }>; readonly sync: null }
+  | { readonly reading: Extract<HubContactReading, { readonly state: 'contacted' }>; readonly sync: Sync };
+
+/** The strategy as a reading names it:the string itself, or a description of a value that is none. */
 function strategyOf(kind: unknown): string {
   return typeof kind === 'string'
     ? kind
@@ -334,7 +459,7 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
   };
 
   /** Runs one direction, writing the unreachable, mismatch and skew lines once per contact and any other failure each time. */
-  const attempt = async <Result>(direction: 'push' | 'pull', run: () => Promise<Result>): Promise<HubContactStep<Result>> => {
+  const attempt = async <Result>(direction: 'push' | 'pull' | 'hub status', run: () => Promise<Result>): Promise<HubContactStep<Result>> => {
     try {
       return { outcome: 'done', result: await run() };
     } catch (error) {
@@ -361,10 +486,11 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     }
   };
 
-  const run = async (direction: HubContactDirection): Promise<HubContactReading> => {
-    if (isCoreStrategy(config.effortSync)) return { state: 'not-contacted', strategy };
+  /** Runs `direction`, answering its reading and the `Sync` it ran over, null when none was. */
+  const run = async (direction: HubContactDirection): Promise<Ran> => {
+    if (isCoreStrategy(config.effortSync)) return { reading: { state: 'not-contacted', strategy }, sync: null };
     const answer = await selected();
-    if ('problem' in answer) return { state: 'unselected', strategy, problem: answer.problem };
+    if ('problem' in answer) return { reading: { state: 'unselected', strategy, problem: answer.problem }, sync: null };
     const { sync } = answer;
 
     const push = direction === 'push-then-pull'
@@ -377,12 +503,30 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
       ? noticeOf(pull.result)
       : null;
     if (notice !== null) input.warn(notice);
-    return { state: 'contacted', strategy, push, pull };
+    return { reading: { state: 'contacted', strategy, push, pull }, sync };
+  };
+
+  /** The hub line's facts after `pull`: skipped unless it answered, and asked of `sync` once; see the module note. */
+  const hubStep = async (sync: Sync, pull: HubContactStep<SyncPullResult>): Promise<HubContactStep<HubLineFacts>> => {
+    if (pull.outcome !== 'done') return { outcome: 'skipped' };
+    const ask = hubStatusOf(sync);
+    const asked: HubContactStep<unknown> = ask === null
+      ? { outcome: 'done', result: null }
+      : await attempt('hub status', ask);
+    if (asked.outcome !== 'done') return asked;
+    return { outcome: 'done', result: Object.freeze({ ...hubFactsOf(asked.result), ...pulledOf(pull.result) }) };
+  };
+
+  const status = async (): Promise<HubStatusReading> => {
+    const ran = await run('pull');
+    if (ran.sync === null) return ran.reading;
+    return { ...ran.reading, hub: await hubStep(ran.sync, ran.reading.pull) };
   };
 
   return Object.freeze({
-    pushThenPull: () => run('push-then-pull'),
-    pull: () => run('pull'),
+    pushThenPull: async () => (await run('push-then-pull')).reading,
+    pull: async () => (await run('pull')).reading,
+    status,
   });
 }
 

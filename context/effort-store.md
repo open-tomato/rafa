@@ -347,7 +347,11 @@ under `packages/`.
 **The `service` strategy makes one contact per command through
 `createHubContact` (`packages/rafa-effort/src/effort/sync/contact.ts`), which
 never throws and never sets the exit code.** A contact runs `pushThenPull()`
-(push then pull) or `pull()` alone. `local` and `file` are never contacted:
+(push then pull), `pull()` alone, or `status()`: a pull alone, then the hub
+line's facts from the strategy's `hubStatus()`, read by shape off the status
+answer the pull kept, which `hubLine` formats as `hub: reachable, contract
+<n>, project <name>; pulled <n> rows` (`; <m> rows held back` when rows were).
+`local` and `file` are never contacted:
 nothing is loaded, selected or written. The `service` adapter is selected once
 per contact by `selectSync` through the registry `loadModules` answers, and a
 selection that fails (e.g., `SyncModuleMissing`) is written once through
