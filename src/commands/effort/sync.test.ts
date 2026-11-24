@@ -22,26 +22,45 @@
  *   line is proved to be the only one.
  * - Both flags at once exit 1 with the seam never called, beside each
  *   flag alone handing the seam its stop.
+ *
+ * ## The fake hub
+ *
+ * The last group runs the real contact over the real `service` strategy
+ * and the in-process `Bun.serve` stand-in the strategy's own tests use
+ * (`packages/rafa-sync-service/src/testdata/stand-in-hub.ts`), the
+ * device a real store under a scratch git repository. It holds each
+ * flag's stop point by what the hub saw and what the device kept:
+ * `--status` reads `/v1/status` and no route past it, `--dry-run` leaves
+ * every file of the store's folder byte-identical and counts the
+ * conflicts, and each exit code is read beside the run on the same hub
+ * with nothing to refuse. Only the token reader is replaced. A hub
+ * speaking another contract or holding a migration this rafa lacks is a
+ * scripted hub answering the status alone, since the stand-in always
+ * speaks this rafa's contract.
  */
 import type { SyncCommandSeams, SyncContactInput } from './sync.js';
+import type { StandInHub } from '../../../packages/rafa-sync-service/src/testdata/stand-in-hub.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '@open-tomato/rafa/ports';
+import type { CommitEffortRow } from '@open-tomato/rafa/store';
 import type { HubSyncContacted, HubSyncReading, HubSyncStatus } from '@open-tomato/rafa-effort/effort/sync/contact';
 
 import '../../config-registry.js';
 
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
-import { WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
+import { openSqliteStore, WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
 import { SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/migrations';
 import { createHubContact, hubLine } from '@open-tomato/rafa-effort/effort/sync/contact';
 
+import { createServiceSync } from '../../../packages/rafa-sync-service/src/sync.js';
+import { startStandInHub } from '../../../packages/rafa-sync-service/src/testdata/stand-in-hub.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import syncCommand, { createSyncCommand, nothingToSyncLine, syncData, syncExitCode, SYNC_REFUSED_EXIT, SYNC_USAGE } from './sync.js';
@@ -505,5 +524,347 @@ describe('the effort sync declaration', () => {
     expect(syncCommand.args).toEqual([]);
     expect(syncCommand.flags.map((flag) => [flag.name, flag.type])).toEqual([['status', 'boolean'], ['dry-run', 'boolean']]);
     expect(syncCommand.outputs).toEqual(['text', 'json']);
+  });
+});
+
+const TOKEN_SECRET = 'hub-token';
+const TOKEN = 'ghp_effort_sync_command_token';
+
+/** A hub the case stops once it ends: the stand-in, or a scripted one. */
+interface RunningHub {
+  readonly stop: () => Promise<void>;
+}
+
+let hubs: RunningHub[] = [];
+
+afterEach(async () => {
+  await Promise.all(hubs.map((started) => started.stop()));
+  hubs = [];
+});
+
+/** A stand-in hub, stopped after the case. */
+function hub(): StandInHub {
+  const started = startStandInHub();
+  hubs = [...hubs, started];
+  return started;
+}
+
+/** A scripted hub's address and the path of every request it saw. */
+interface ScriptedHub {
+  readonly url: string;
+  readonly paths: readonly string[];
+}
+
+/** A hub answering `/v1/status` with `contractVersion` and `migrations`, and every other route with a 500, stopped after the case. */
+function scriptedHub(contractVersion: number, migrations: readonly string[]): ScriptedHub {
+  const paths: string[] = [];
+  const server = Bun.serve({
+    port: 0,
+    hostname: '127.0.0.1',
+    fetch: (request) => {
+      const { pathname } = new URL(request.url);
+      paths.push(pathname);
+      return pathname.endsWith('/v1/status')
+        ? Response.json({
+          success: true,
+          data: { version: '0.0.0-scripted', migrations, rows: {}, devices: [], contractVersion, capabilities: {} },
+        })
+        : Response.json({ success: false, error: 'the scripted hub answers the status alone' }, { status: 500 });
+    },
+  });
+  hubs = [...hubs, { stop: () => server.stop(true) }];
+  return { url: `http://127.0.0.1:${String(server.port)}`, paths };
+}
+
+/** Runs git in `cwd`, failing the case when it fails. */
+function git(cwd: string, ...args: string[]): void {
+  const env = Object.fromEntries(Object.entries(process.env)
+    .filter((entry): entry is [string, string] => !entry[0].startsWith('GIT_') && entry[1] !== undefined));
+  const ran = Bun.spawnSync(['git', '-c', 'user.name=rafa-test', '-c', 'user.email=rafa-test@example.invalid', ...args], { cwd, env });
+  if (ran.exitCode !== 0) throw new Error(`git ${args.join(' ')} failed: ${ran.stderr.toString()}`);
+}
+
+/** A commit row of `seed`'s sha, taken at `timestamp`. */
+function commitOf(seed: string, timestamp = '2026-10-01T08:00:00.000Z'): CommitEffortRow {
+  const sha = new Bun.CryptoHasher('sha1')
+    .update(seed)
+    .digest('hex');
+  return { sha, timestamp } as CommitEffortRow;
+}
+
+/** One device of the fake hub: a project whose root is a git repository holding a store. */
+interface Device {
+  readonly project: PlantedProject;
+  /** The folder holding the store's file and its sync state file. */
+  readonly storeDir: string;
+  /** The project's id: the sha of its root commit, which the hub line names when the hub names no project. */
+  readonly projectId: string;
+  readonly append: (rows: readonly CommitEffortRow[]) => void;
+}
+
+/** The project config naming the `service` strategy and the hub at `url`. */
+function serviceConfig(url: string): string {
+  return `effort:\n  sync: service\nhub:\n  url: ${url}\n`;
+}
+
+/** A device holding `rows` commits of its own, its config naming `url`. */
+function deviceOf(url: string, rows: readonly CommitEffortRow[]): Device {
+  const project = plant(serviceConfig(url));
+  git(project.root, 'init', '-q');
+  git(project.root, 'commit', '-q', '--allow-empty', '--no-verify', '-m', 'root');
+  const store = openSqliteStore(project.root);
+  store.append('commits', [...rows]);
+  const projectId = Bun.spawnSync(['git', 'rev-list', '--max-parents=0', 'HEAD'], { cwd: project.root }).stdout.toString().trim();
+  return { project, storeDir: dirname(store.path('commits')), projectId, append: (more) => store.append('commits', [...more]) };
+}
+
+/** Pushes every row of `at` to `url`, as another device of the project would. */
+async function seed(at: Device, url: string): Promise<void> {
+  await createServiceSync({
+    repoRoot: at.project.root,
+    backend: 'sqlite',
+    hub: { url, tokenSecret: TOKEN_SECRET, timeoutMs: 2000 },
+    readSecret: () => Promise.resolve(TOKEN),
+  }).push({ to: null });
+}
+
+/** What the contact is made with: the token its reader answers and the project it names. */
+interface ServiceOptions {
+  readonly token?: string | null;
+  readonly project?: string;
+}
+
+/** A contact seam over the real contact and the real `service` strategy for the hub at `url`. */
+function serviceContact(url: string, options: ServiceOptions = {}): (input: SyncContactInput) => Promise<HubSyncReading> {
+  const token = options.token === undefined
+    ? TOKEN
+    : options.token;
+  return (input) => {
+    const create = ({ repoRoot }: { readonly repoRoot: string }): Sync => createServiceSync({
+      repoRoot,
+      backend: 'sqlite',
+      hub: { url, tokenSecret: TOKEN_SECRET, timeoutMs: 2000, ...options.project === undefined
+        ? {}
+        : { project: options.project } },
+      readSecret: () => Promise.resolve(token),
+    });
+    const adapters = createAdapterRegistry([{ port: 'sync', kind: 'service', portVersion: PORT_VERSIONS.sync, create }]);
+    const resolved = resolveConfig({ cli: {}, file: parseConfigText(serviceConfig(url), join(input.roots.root, '.rafa', 'config.yaml')), user: null });
+    return createHubContact(
+      { root: input.roots.root, home: input.roots.home, resolved, warn: input.warn },
+      { modules: { adapters, manifest: { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS } } },
+    ).sync({ stop: input.stop });
+  };
+}
+
+/** Dispatches `rafa effort sync <words>` at `at` over the real contact for the hub at `url`. */
+async function syncAt(at: Device, url: string, words: readonly string[] = [], options: ServiceOptions = {}): Promise<CapturedRun> {
+  return dispatchInProject(['effort', 'sync', ...words], [EFFORT_SUBJECT], [createSyncCommand({ contact: serviceContact(url, options) })], at.project);
+}
+
+/** The hash of every file in `dir`, by name: the store, its state file and whatever else a run left. */
+function filesIn(dir: string): Record<string, string> {
+  return Object.fromEntries(readdirSync(dir)
+    .filter((name) => !name.endsWith('-wal') && !name.endsWith('-shm'))
+    .map((name) => [name, new Bun.CryptoHasher('sha256').update(readFileSync(join(dir, name)))
+      .digest('hex')]));
+}
+
+/** A stand-in hub already holding another device's rows, so its migrations are the ones this rafa knows. */
+async function seededHub(): Promise<StandInHub> {
+  const over = hub();
+  await seed(deviceOf(over.url, [commitOf('peer-seed')]), over.url);
+  return over;
+}
+
+describe('rafa effort sync --status over a fake hub', () => {
+  it('reads /v1/status and sends no push or pull, leaving the store folder as it was, where a whole sync sends both', async () => {
+    const over = await seededHub();
+    const at = deviceOf(over.url, [commitOf('own-1'), commitOf('own-2'), commitOf('own-3')]);
+    const requestsBefore = over.requests.length;
+    const readsBefore = over.statusReads();
+    const filesBefore = filesIn(at.storeDir);
+
+    const outcome = await syncAt(at, over.url, ['--status']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout)).toEqual([`hub: reachable, contract ${String(WIRE_CONTRACT_VERSION)}, project ${at.projectId}; 3 rows waiting to push`]);
+    expect(over.requests).toHaveLength(requestsBefore);
+    expect(over.statusReads() - readsBefore).toBe(1);
+    expect(filesIn(at.storeDir)).toEqual(filesBefore);
+
+    const whole = await syncAt(at, over.url);
+
+    expect(whole.exitCode).toBe(0);
+    expect(over.requests.slice(requestsBefore).map(({ method, path }) => `${method} ${path}`)).toEqual(['POST /v1/effort/push', 'GET /v1/effort/pull']);
+    expect(filesIn(at.storeDir)).not.toEqual(filesBefore);
+  });
+
+  it('stops at the skew check of a hub behind this rafa, no request past /v1/status, exiting 1', async () => {
+    const over = hub();
+    const at = deviceOf(over.url, [commitOf('own-1')]);
+
+    const outcome = await syncAt(at, over.url, ['--status']);
+
+    expect(outcome.exitCode).toBe(SYNC_REFUSED_EXIT);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([expect.stringContaining('the hub is behind this rafa')]);
+    expect(over.requests).toEqual([]);
+    expect(over.statusReads()).toBe(1);
+  });
+});
+
+describe('rafa effort sync --dry-run over a fake hub', () => {
+  /** A device synced once with a hub holding a peer's row, a row of the peer's and one of its own sharing a sha, and rows of its own waiting. */
+  async function conflictingDevice(): Promise<{ readonly over: StandInHub; readonly at: Device }> {
+    const over = await seededHub();
+    const at = deviceOf(over.url, [commitOf('own-1')]);
+    expect((await syncAt(at, over.url)).exitCode).toBe(0);
+    await seed(deviceOf(over.url, [commitOf('shared', '2026-10-01T09:00:00.000Z'), commitOf('peer-new')]), over.url);
+    at.append([commitOf('shared', '2026-10-01T10:00:00.000Z'), commitOf('own-2')]);
+    return { over, at };
+  }
+
+  it('leaves every file of the store folder byte-identical, sends no push, and reports the conflict count', async () => {
+    const { over, at } = await conflictingDevice();
+    const filesBefore = filesIn(at.storeDir);
+    const requestsBefore = over.requests.length;
+
+    const outcome = await syncAt(at, over.url, ['--dry-run']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout)).toEqual([
+      expect.stringMatching(new RegExp(`^hub: reachable, contract ${String(WIRE_CONTRACT_VERSION)}, project ${at.projectId}; dry run: \\d+ rows to push, `
+        + '1 rows to pull, 1 rows in conflict; nothing was written$', 'u')),
+    ]);
+    expect(filesIn(at.storeDir)).toEqual(filesBefore);
+    expect(over.requests.slice(requestsBefore).map(({ method }) => method)).toEqual(['GET']);
+  });
+
+  it('is told apart from the whole sync on the same device, which writes the store and the state file', async () => {
+    const { over, at } = await conflictingDevice();
+    const filesBefore = filesIn(at.storeDir);
+    await syncAt(at, over.url, ['--dry-run']);
+
+    const whole = await syncAt(at, over.url);
+
+    expect(whole.exitCode).toBe(0);
+    expect(lines(whole.stdout)).toEqual([expect.stringMatching(/^hub: reachable, contract \d+, project \S+; pulled \d+ rows$/u)]);
+    expect(Object.keys(filesIn(at.storeDir)).length).toBeGreaterThanOrEqual(Object.keys(filesBefore).length);
+    expect(filesIn(at.storeDir)).not.toEqual(filesBefore);
+    expect(over.requests.map(({ method }) => method)).toContain('POST');
+  });
+});
+
+/** The line the real hub refuses a project it does not serve with. */
+const NOT_SERVED = 'rafa-hub: project alpha is not served here; add it under hub.projects';
+
+describe('the exit codes of rafa effort sync over a fake hub', () => {
+  it('exits 0 for a sync that completed, writing the hub line alone', async () => {
+    const over = await seededHub();
+
+    const outcome = await syncAt(deviceOf(over.url, [commitOf('own-1')]), over.url);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([expect.stringMatching(/^hub: reachable, contract \d+, project \S+; pulled 1 rows$/u)]);
+  });
+
+  it.each(['local', 'file'])('exits 0 for effort.sync: %s with one line and no hub contacted', async (strategy) => {
+    const over = await seededHub();
+    const requestsBefore = over.requests.length;
+    const readsBefore = over.statusReads();
+    const project = plant(`effort:\n  sync: ${strategy}\nhub:\n  url: ${over.url}\n`);
+
+    const outcome = await dispatchInProject(['effort', 'sync'], [EFFORT_SUBJECT], [syncCommand], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([nothingToSyncLine(strategy)]);
+    expect(over.requests).toHaveLength(requestsBefore);
+    expect(over.statusReads()).toBe(readsBefore);
+  });
+
+  it('exits 0 for a hub that cannot be reached, its offline line the only one, beside the same hub reachable', async () => {
+    const over = await seededHub();
+    const at = deviceOf(over.url, [commitOf('own-1')]);
+    expect((await syncAt(at, over.url)).exitCode).toBe(0);
+    await over.stop();
+
+    const outcome = await syncAt(at, over.url);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([expect.stringContaining('is unreachable')]);
+    expect(outcome.stdout).not.toContain('hub: reachable');
+  });
+
+  it('exits 1 for a hub behind this rafa, naming the next step and sending nothing, beside the seeded hub exiting 0', async () => {
+    const behind = hub();
+
+    const outcome = await syncAt(deviceOf(behind.url, [commitOf('own-1')]), behind.url);
+
+    expect(outcome.exitCode).toBe(SYNC_REFUSED_EXIT);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([expect.stringContaining('the hub is behind this rafa')]);
+    expect(lines(outcome.stdout + outcome.stderr)[0]).toContain('upgrade the hub');
+    expect(behind.requests).toEqual([]);
+    const seeded = await seededHub();
+    expect((await syncAt(deviceOf(seeded.url, [commitOf('own-1')]), seeded.url)).exitCode).toBe(0);
+  });
+
+  it('exits 1 for a hub holding a migration this rafa lacks, naming rafa self-update and sending nothing, beside the matching hub exiting 0', async () => {
+    const known = SQLITE_MIGRATIONS.map(({ id }) => id);
+    const ahead = scriptedHub(WIRE_CONTRACT_VERSION, [...known, '9999-from-a-newer-rafa']);
+
+    const outcome = await syncAt(deviceOf(ahead.url, [commitOf('own-1')]), ahead.url);
+
+    expect(outcome.exitCode).toBe(SYNC_REFUSED_EXIT);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([expect.stringContaining('rafa self-update')]);
+    expect(ahead.paths).toEqual(['/v1/status']);
+    const matching = scriptedHub(WIRE_CONTRACT_VERSION, known);
+    expect((await syncAt(deviceOf(matching.url, [commitOf('own-1')]), matching.url, ['--status'])).exitCode).toBe(0);
+  });
+
+  it('exits 1 for a hub speaking another contract, naming both versions and sending nothing, beside the same contract exiting 0', async () => {
+    const known = SQLITE_MIGRATIONS.map(({ id }) => id);
+    const other = scriptedHub(WIRE_CONTRACT_VERSION + 1, known);
+
+    const outcome = await syncAt(deviceOf(other.url, [commitOf('own-1')]), other.url);
+
+    expect(outcome.exitCode).toBe(SYNC_REFUSED_EXIT);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([
+      expect.stringContaining(`the hub speaks contract ${String(WIRE_CONTRACT_VERSION + 1)}, this rafa contract ${String(WIRE_CONTRACT_VERSION)}`),
+    ]);
+    expect(other.paths).toEqual(['/v1/status']);
+    const same = scriptedHub(WIRE_CONTRACT_VERSION, known);
+    expect((await syncAt(deviceOf(same.url, [commitOf('own-1')]), same.url, ['--status'])).exitCode).toBe(0);
+  });
+
+  it('exits 1 for a project the hub does not serve, its line naming it, beside the served project exiting 0', async () => {
+    const over = await seededHub();
+    over.setProjects([{ id: 'beta', name: 'Beta' }]);
+    over.setFault(() => Response.json({ success: false, error: NOT_SERVED }, { status: 404 }));
+    const at = deviceOf(over.url, [commitOf('own-1')]);
+
+    const outcome = await syncAt(at, over.url, [], { project: 'alpha' });
+
+    expect(outcome.exitCode).toBe(SYNC_REFUSED_EXIT);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([expect.stringContaining('project alpha is not served here')]);
+    expect(outcome.stdout).not.toContain('hub: reachable');
+    over.setFault(null);
+    over.setProjects([{ id: 'alpha', name: 'Alpha' }]);
+    const served = await syncAt(at, over.url, [], { project: 'alpha' });
+    expect(served.exitCode).toBe(0);
+    expect(lines(served.stdout)).toEqual([expect.stringContaining('project Alpha;')]);
+  });
+
+  it('exits 1 for a missing token, its line naming the secret and nothing sent, beside the stored token exiting 0', async () => {
+    const over = await seededHub();
+    const requestsBefore = over.requests.length;
+    const at = deviceOf(over.url, [commitOf('own-1')]);
+
+    const outcome = await syncAt(at, over.url, [], { token: null });
+
+    expect(outcome.exitCode).toBe(SYNC_REFUSED_EXIT);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([expect.stringContaining(TOKEN_SECRET)]);
+    expect(outcome.stdout).not.toContain('hub: reachable');
+    expect(over.requests).toHaveLength(requestsBefore);
+    expect((await syncAt(at, over.url)).exitCode).toBe(0);
   });
 });
