@@ -377,7 +377,11 @@ the effort module), and `rafa status` pulls alone through a contact's
 `status()` kind, then prints the hub line, `hub: reachable, contract <n>,
 project <name>; pulled <n> rows`, ending `; <m> rows held back` when the
 pull held rows back, or nothing when the pull did not answer and its own
-line stands in its place (`src/commands/status.ts`). **The offline rule:** a push or
+line stands in its place (`src/commands/status.ts`); and `rafa effort sync`
+runs a contact's `sync({ stop })` kind, `--status` and `--dry-run` its two
+stop points, and exits 1 for a refusal or a step that failed and 0 otherwise,
+an unreachable hub and `local` or `file` included
+(`src/commands/effort/sync.ts`). **The offline rule:** a push or
 pull that rejects with an error whose `name` is `HubUnreachable` (network error,
 timeout, or hub unreachable) writes exactly one line per contact, `effort
 sync: the hub at <url> is unreachable (<first line of why>); this command

@@ -42,7 +42,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the hundred and seven registered so far
+ * of each is its command. Four of the hundred and eight registered so far
  * wrap a phase 0 command (`wrap.ts`), which keeps its own parser and its
  * own writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -224,7 +224,9 @@
  *     `file` sync strategy, with `effort merge`'s rendering and exit
  *     codes, and `effort move --to=sqlite`, a `store: ndjson` project's sessions and
  *     commits appended to its SQLite store, the counts checked, and
- *     `store: sqlite` set in its config.
+ *     `store: sqlite` set in its config, and `effort sync [--status |
+ *     --dry-run]`, one contact with the hub through a hub contact's
+ *     `sync({ stop })` kind, exiting 1 for a refusal.
  *   - `module list`, every module the config gives a source for and what
  *     it came to, and `module exec <module> <action>`, the `exec` action a
  *     module's mounted commands are reached through.
@@ -526,6 +528,7 @@ import effortMigrate from './effort/migrate.js';
 import effortMove from './effort/move.js';
 import effortReport from './effort/report.js';
 import effortSchema from './effort/schema.js';
+import effortSync from './effort/sync.js';
 import init from './init.js';
 import instinctCheck from './instinct/check.js';
 import instinctFlag from './instinct/flag.js';
@@ -573,7 +576,7 @@ import updateSelf from './update/self.js';
 
 const PLAN_SUBJECT: SubjectSpec = { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' };
 const LOOP_SUBJECT: SubjectSpec = { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' };
-const EFFORT_SUBJECT: SubjectSpec = { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge or import another device\'s store; move an NDJSON store to SQLite' };
+const EFFORT_SUBJECT: SubjectSpec = { name: 'effort', summary: 'collect session and commit rows; report per plan; sync with the hub; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge or import another device\'s store; move an NDJSON store to SQLite' };
 const MODULE_SUBJECT: SubjectSpec = { name: 'module', summary: 'list the configured modules; run an action a module provides' };
 const AGENT_SUBJECT: SubjectSpec = { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' };
 const SKILL_SUBJECT: SubjectSpec = { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' };
@@ -650,6 +653,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   effortMerge,
   effortImport,
   effortMove,
+  effortSync,
   moduleList,
   moduleExec,
   agentVendor,

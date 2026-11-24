@@ -155,6 +155,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'effort merge': ['text', 'json'],
   'effort import': ['text', 'json'],
   'effort move': ['text', 'json'],
+  'effort sync': ['text', 'json'],
   'module list': ['text', 'json'],
   'module exec': ['text', 'json'],
   'agent vendor': ['text', 'json'],
@@ -307,6 +308,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'effort merge': [['file'], ['dry-run']],
   'effort import': [['file'], ['dry-run']],
   'effort move': [[], ['to']],
+  'effort sync': [[], ['status', 'dry-run']],
   'claim release': [['n'], []],
   'claim hand': [['n'], ['to', 'withdraw']],
   'claim accept': [['n'], []],
@@ -592,6 +594,7 @@ describe('the core roster', () => {
       'effort merge',
       'effort import',
       'effort move',
+      'effort sync',
       'module list',
       'module exec',
       'agent vendor',
@@ -727,8 +730,8 @@ describe('the module note\'s count word', () => {
 
   it('reads a planted wrong word as a count the roster does not match, the control', () => {
     expect(numberWord('forty-two')).not.toBe(ROSTER_COMMANDS.length);
-    expect(numberWord('sixty-eight')).toBe(CORE_COMMANDS.length);
-    expect(numberWord('sixty-eight')).not.toBe(ROSTER_COMMANDS.length);
+    expect(numberWord('sixty-nine')).toBe(CORE_COMMANDS.length);
+    expect(numberWord('sixty-nine')).not.toBe(ROSTER_COMMANDS.length);
   });
 });
 
@@ -744,13 +747,13 @@ describe('createRosterRegistry', () => {
       .toEqual([0, 1, 2, 3]);
   });
 
-  it('holds the 107 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
+  it('holds the 108 commands and the nineteen subjects of CORE_REGISTRY with no feature off', () => {
     const registry = createRosterRegistry();
 
-    expect(registry.commands({ includeHidden: true })).toHaveLength(107);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(108);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(ROSTER_COMMANDS.map((_command, index) => index));
     expect(registry.subjects()).toEqual([...ROSTER_SUBJECTS]);
-    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(107);
+    expect(createRosterRegistry({ off: [] }).commands({ includeHidden: true })).toHaveLength(108);
   });
 
   it('drops the pr subject and its ten commands under off: [\'pr\'], keeping the rest in order', () => {
@@ -759,7 +762,7 @@ describe('createRosterRegistry', () => {
 
     expect(ROSTER_COMMANDS.filter((command) => command.subject === 'pr')).toHaveLength(PR_FEATURE.commands.length);
     expect(PR_FEATURE.commands).toHaveLength(10);
-    expect(registry.commands({ includeHidden: true })).toHaveLength(97);
+    expect(registry.commands({ includeHidden: true })).toHaveLength(98);
     expect(rosterPlaces(registry.commands({ includeHidden: true }))).toEqual(rosterPlaces(kept));
     expect(registry.subjects().map((subject) => subject.name))
       .toEqual(ROSTER_SUBJECTS.map((subject) => subject.name).filter((name) => name !== 'pr'));
@@ -868,7 +871,7 @@ describe('how the command tree routes', () => {
     const issue = await dispatchRecorded('issue');
     const unknown = await dispatchRecorded('stop');
 
-    expect(bare.stderr).toBe('rafa: "effort" needs an action; one of: collect, report, dashboard, fix-schema, copy, schema, migrate, merge, import, move\n');
+    expect(bare.stderr).toBe('rafa: "effort" needs an action; one of: collect, report, dashboard, fix-schema, copy, schema, migrate, merge, import, move, sync\n');
     expect(issue.stderr).toBe('rafa: "issue" needs an action; one of: list, show, create, comment, move, ready, unblock, check, edit\n');
     expect(unknown.stderr).toBe('rafa: unknown subject or command "stop"\n');
     expect([bare.outcome.exitCode, issue.outcome.exitCode, unknown.outcome.exitCode]).toEqual([1, 1, 1]);

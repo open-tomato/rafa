@@ -609,6 +609,11 @@
     },
     {
       "kind": "test",
+      "path": "src/commands/effort/sync.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/commands/index.roster.sweep.test.ts",
       "upwardEdgesIn": 0
     },
@@ -6122,6 +6127,7 @@
         "src/commands/effort/report.ts",
         "src/commands/effort/schema.test.ts",
         "src/commands/effort/schema.ts",
+        "src/commands/effort/sync.test.ts",
         "src/commands/index.roster.sweep.test.ts",
         "src/commands/index.test.ts",
         "src/commands/index.ts",

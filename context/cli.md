@@ -547,7 +547,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue ready`, `issue unblock`, `issue check` and `issue edit`;
   `pr current`, `pr show`, `pr view`, `pr open`, `pr retarget`,
   `pr close`, `pr list`, `pr wait`, `pr merge` and `pr triage`;
-  `effort collect`, `effort report`, `effort dashboard`, `effort fix-schema`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
+  `effort collect`, `effort report`, `effort dashboard`, `effort fix-schema`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `effort sync`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `instinct groups`, `instinct pairs`, `release status`, `release settle`, `release tag`, `release publish`, `release workflows`, `release list`, `board list`, `board sync`, `epic show`, aliased
