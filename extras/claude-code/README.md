@@ -76,8 +76,48 @@ closed state, since `rafa pr list` shows open pull requests only, and
 naming another repository with `-R`/`--repo` passes too, since rafa reads
 only the project's own: the hook reads that from `git remote get-url
 origin`, and when it cannot, any named repository counts as another one.
-To turn the hook off in a project, remove its entry from
+To turn the tooling hook off in a project, remove its entry from
 `.claude/settings.json`.
+
+## The session hook
+
+The SessionStart hook runs `rafa effort sync --output=json` in the
+project when a Claude Code session opens, with `rafa` taken from `PATH`.
+Its output reaches the session as context, so the session starts knowing
+what the sync did.
+
+When a hub was contacted, the hook prints the lines the run wrote, one
+per line. A repo woken after weeks prints:
+
+```text
+hub: reachable, contract 1, project rafa; pulled 312 rows
+```
+
+The line ends `; <m> rows held back` when the pull held rows back. One
+release behind its hub, the hook prints a line saying this rafa is
+behind, and naming `rafa self-update, then rafa effort sync` as the
+next step. When the hub is down, it prints one offline line, naming the
+hub's URL and the reason, and the session starts as usual; the rows sync
+on the next contact.
+
+With no hub (`effort.sync` is `local` or `file`), the hook prints
+nothing. It also prints nothing outside a rafa project, under a rafa
+with no `effort sync` action, or when `rafa` is not on `PATH`. It exits
+0 whatever `rafa` answers, so a session always starts.
+
+To check before a sync writes anything, run these in the project's
+checkout:
+
+- `rafa effort sync --status` asks the hub and moves nothing.
+- `rafa effort sync --dry-run` shows what a sync would push, pull and
+  record as conflicts, and writes neither the store nor the state file.
+
+To remove the session hook, delete its `SessionStart` entry from
+`.claude/settings.json`, the one whose command names
+`rafa-session-hook.ts`, and delete `.claude/hooks/rafa-session-hook.ts`.
+The rest of the file stays. Run `/rafa-hookify` or the installer again
+and both come back, since they install every row, so remove them after
+the last run.
 
 ## What the pack cannot reach
 
