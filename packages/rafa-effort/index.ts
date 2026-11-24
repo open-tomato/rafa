@@ -39,9 +39,12 @@ export {
   compareCliVersions,
 } from './src/effort/skill-use.js';
 
+export type { HubStatusReading } from './src/effort/sync/contact-readings.js';
+
 export type { PullBeforeReadInput } from './src/effort/sync/contact.js';
 export {
   createHubContact,
+  hubLine,
   pullBeforeRead,
 } from './src/effort/sync/contact.js';
 

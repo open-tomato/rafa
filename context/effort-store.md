@@ -370,10 +370,14 @@ contact and pushes then pulls after storing rows and writing its summary;
 `rafa loop start` makes one contact for the run and pushes then pulls at
 the end of each task, whatever its outcome, its pulls naming the run's
 session id as `SyncPullRequest.sessionId` so the merge's live-loop guard
-passes the run's own record; `rafa status`, `rafa next`
-(including `--dry-run`), and `rafa effort report` pull alone before they
-read, through `pullBeforeRead` (`packages/rafa-effort/src/effort/collect.ts`,
-`src/start.ts`, querying in the effort module). **The offline rule:** a push or
+passes the run's own record; `rafa next` (including `--dry-run`) and
+`rafa effort report` pull alone before they read, through `pullBeforeRead`
+(`packages/rafa-effort/src/effort/collect.ts`, `src/start.ts`, querying in
+the effort module), and `rafa status` pulls alone through a contact's
+`status()` kind, then prints the hub line, `hub: reachable, contract <n>,
+project <name>; pulled <n> rows`, ending `; <m> rows held back` when the
+pull held rows back, or nothing when the pull did not answer and its own
+line stands in its place (`src/commands/status.ts`). **The offline rule:** a push or
 pull that rejects with an error whose `name` is `HubUnreachable` (network error,
 timeout, or hub unreachable) writes exactly one line per contact, `effort
 sync: the hub at <url> is unreachable (<first line of why>); this command

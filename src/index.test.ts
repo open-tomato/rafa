@@ -979,9 +979,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/plan', ['plansDirAt', 'isStampableStub', 'planStampLine', 'escapeBlockerText']],
   ]],
   ['./commands/status.js', [
-    ['@open-tomato/rafa-effort', ['pullBeforeRead']],
+    ['@open-tomato/rafa-effort', ['createHubContact', 'hubLine']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/config', ['ConfigError']],
+    ['@open-tomato/rafa/core/config/load', ['loadConfig']],
     ['../status/render.js', ['renderStatus', 'statusData']],
     ['../status/sections.js', ['readStatusSections']],
   ]],
