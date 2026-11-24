@@ -347,10 +347,20 @@ under `packages/`.
 **The `service` strategy makes one contact per command through
 `createHubContact` (`packages/rafa-effort/src/effort/sync/contact.ts`), which
 never throws and never sets the exit code.** A contact runs `pushThenPull()`
-(push then pull), `pull()` alone, or `status()`: a pull alone, then the hub
-line's facts from the strategy's `hubStatus()`, read by shape off the status
-answer the pull kept, which `hubLine` formats as `hub: reachable, contract
-<n>, project <name>; pulled <n> rows` (`; <m> rows held back` when rows were).
+(push then pull), `pull()` alone, `status()`, or `sync({ stop })`. `status()`
+is a pull alone, then the hub line's facts from the strategy's `hubStatus()`,
+read by shape off the status answer the pull kept, which `hubLine` formats as
+`hub: reachable, contract <n>, project <name>; pulled <n> rows` (`; <m> rows
+held back` when rows were). `sync()` reads the hub's status, checks it for
+skew (the contract version, then the hub's migrations against core's
+catalogue; a hub ahead is let through under `effort.syncSkew:
+pull-projected`), pushes, then pulls. `stop: 'status'` ends it after the
+check with the rows waiting to push (`pendingPush()`, read by shape), and
+`stop: 'dry-run'` pushes and pulls with `dryRun`, asking the dry-run push
+only of a strategy carrying `pendingPush`. A run stops at the first refusal,
+whose `refusal` names its cause, `skew`, `contract`, `project` (the hub's
+`project <id> is not served here`) or `token` (`HubTokenError`), and its one
+line, written once per contact in the hub line's place.
 `local` and `file` are never contacted:
 nothing is loaded, selected or written. The `service` adapter is selected once
 per contact by `selectSync` through the registry `loadModules` answers, and a
