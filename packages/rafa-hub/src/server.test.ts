@@ -560,7 +560,7 @@ describe('migrations on GET /v1/effort/pull', () => {
     expect(missing).toEqual(['0001-base']);
     expect(code).toBeUndefined();
     expect(error).toContain('0001-base');
-    expect(error).toContain('rafa self-update');
+    expect(error).toContain('rafa self-update, then rafa effort sync');
     expect(calls.pull).toBe(0);
     expect(requestLines(lines).at(-1)).toMatchObject({ level: 'warn', status: 409 });
   });
