@@ -3,11 +3,15 @@
  * The `rafa-hub` command, the package's `bin`: reads the hub's config
  * from the file `RAFA_HUB_CONFIG` names (`config.ts`), then starts the
  * server (`server.ts`) over the identity adapter `hub.auth.adapter`
- * picks and the `sqlite` connector (`connectSqliteHub` in
- * `store/sqlite.ts`), handed the listed projects (`hub.projects`, or
- * the one default project of `hub.repository` in `hub.storePath`), each
- * project's store at the file its `storePath` names and its index
- * beside it, the loader handed `hub.store.sqliteLibrary`. The server
+ * picks and the connector `hub.store.engine` names, handed the listed
+ * projects (`hub.projects`, or the one default project of
+ * `hub.repository` in `hub.storePath`). Under `sqlite` (the default)
+ * that is `connectSqliteHub` (`store/sqlite.ts`), each project's store
+ * at the file its `storePath` names and its index beside it, the loader
+ * handed `hub.store.sqliteLibrary`; under `postgres` it is
+ * `connectPostgresHub` (`@open-tomato/rafa-hub-postgres`), reading its
+ * URL from the variable `hub.store.postgres.urlVariable` names in the
+ * command's environment. Neither is handed an embedder here. The server
  * rebuilds the pushed project's index after a push that added rows
  * unless `hub.index.rebuildAfterPush` is `false`. Logs are JSON lines on
  * standard output.
@@ -62,10 +66,22 @@
  * is an `api-key` hub whose named variable is unset or empty, the line
  * naming the variable and never a value, a keys file that does not
  * open, an OAuth client secret's variable left unset, and a
- * `RAFA_HUB_LOGIN_USER` no basic login can carry. A store that does not open is
- * no reason to exit: the server answers `503` on `/health` until it
- * opens, which is what an operator reads. `SIGINT` and `SIGTERM` stop
- * the server, close the store and exit 0.
+ * `RAFA_HUB_LOGIN_USER` no basic login can carry. Under `sqlite` a store
+ * that does not open is no reason to exit: the server answers `503` on
+ * `/health` until it opens, which is what an operator reads. `SIGINT`
+ * and `SIGTERM` stop the server, close the store and exit 0.
+ *
+ * ## The start under `postgres`
+ *
+ * Under `postgres` the start opens the connector before it listens,
+ * last of what it opens, and the server serves that open connector
+ * first, opening it again only once the server finds it gone. The open
+ * reads the URL variable and the database's extensions, so a variable
+ * left unset or empty (the line naming the variable, never a value), a
+ * database missing `pg_search` or `pgvector` (the line naming each),
+ * and any other open that fails are logged as one `config.refused`
+ * line, and the command exits 1 without listening, the keys and login
+ * stores already opened closed again.
  *
  * ## `rafa-hub index rebuild`
  *
@@ -75,7 +91,8 @@
  * id. Each rebuild prints one line, its counts on standard output or
  * its failure on standard error, and a failed one does not stop the
  * next. The command exits 0 when every rebuild swapped its index in and
- * 1 otherwise. A refused config and a connector that does not open each
+ * 1 otherwise. It opens the connector `hub.store.engine` names, as the
+ * hub does. A refused config and a connector that does not open each
  * print one line on standard error, and the command exits 1; so do
  * arguments naming no command, the line holding {@link HUB_USAGE}. A
  * rebuild swaps a new index file in, and a server already running over
@@ -102,15 +119,19 @@ import type { HubLogin } from './login/basic.js';
 import type { HubKeyRoutes } from './server-keys.js';
 import type { HubLoginRoutes } from './server-login.js';
 import type { HubConnected, HubLog, HubServer } from './server.js';
-import type { HubServedProject, IndexRebuildResult } from './store/port.js';
+import type { HubServedProject, HubStoreContext, IndexRebuildResult } from './store/port.js';
+import type { PostgresHubOptions } from '@open-tomato/rafa-hub-postgres';
 
 import { mkdirSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
+
+import { connectPostgresHub } from '@open-tomato/rafa-hub-postgres';
 
 import packageJson from '../package.json';
 
 import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { DEFAULT_MAX_PAYLOAD_ROWS, isDangerousPayloadCap, MAX_PAYLOAD_ROWS_KEY } from './config-dangerous.js';
+import { DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
 import { HubConfigError, readHubConfig } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
 import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
@@ -138,8 +159,16 @@ export const HUB_USAGE: string = `usage: rafa-hub (serves the hub), rafa-hub ind
 /** What one run of `rafa-hub` does, by its arguments. */
 export type HubCommand = 'serve' | 'index-rebuild' | 'login' | 'keys';
 
+/** Opens the `postgres` connector: `connectPostgresHub`'s shape. */
+export type PostgresHubOpener = (context: HubStoreContext, options: PostgresHubOptions) => Promise<HubConnected>;
+
+/** The environment `rafa-hub` reads its config file's name, its keys and its URL variable from. */
+type HubEnv = Readonly<Record<string, string | undefined>>;
+
 /** What {@link runHub} may vary beyond the environment. */
 export interface RunHubOptions {
+  /** Opens the connector under `hub.store.engine: postgres`; `connectPostgresHub` when left out. */
+  readonly connectPostgres?: PostgresHubOpener;
   /** Where log lines go; standard output when left out. */
   readonly log?: HubLog;
   /** GitHub's API root; {@link GITHUB_API} when left out. */
@@ -308,9 +337,11 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   const closeOpened = (): void => {
     for (const file of opened.splice(0).reverse()) file.close();
   };
+  const connectPostgres = options.connectPostgres ?? connectPostgresHub;
   let config;
   let identity;
   let keyLogin: OpenedLogin | undefined;
+  let connected: HubConnected | undefined;
   try {
     config = await readHubConfig(env);
     const store = config.authAdapter === 'api-key'
@@ -321,6 +352,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     if (store !== undefined) {
       keyLogin = await openLoginRoutesOver(config, env, log, store, (loginStore) => opened.push(loginStore));
     }
+    connected = await openAtStart(config, env, connectPostgres);
   } catch (error) {
     closeOpened();
     if (!(error instanceof HubConfigError)) throw error;
@@ -330,6 +362,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   }
 
   const { repository, port, rebuildAfterPush } = config;
+  const reopen = (): Promise<HubConnected> => connectHub(config, env, connectPostgres);
   let server;
   try {
     server = startHubServer({
@@ -337,7 +370,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
       hostname,
       version: HUB_VERSION,
       identity,
-      openConnected: () => connectHub(config),
+      openConnected: firstThen(connected, reopen),
       rebuildAfterPush,
       project: repository,
       projects: servedProjects(config),
@@ -345,6 +378,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
       ...keyLogin?.routes,
     });
   } catch (error) {
+    await connected?.store.close();
     closeOpened();
     throw error;
   }
@@ -393,11 +427,21 @@ function servedProjects(config: HubConfig): readonly HubServedProject[] {
   return config.projects.map(({ id, name }) => Object.freeze({ id, name }));
 }
 
-/** Opens the `sqlite` connector over `config`'s projects, their stores and indexes, its library and its payload cap. */
-function connectHub(config: HubConfig): Promise<HubConnected> {
+/**
+ * Opens the connector `hub.store.engine` names over `config`'s projects
+ * and its payload cap: under `postgres` by `connectPostgres`, its URL read
+ * from `env` by the variable `hub.store.postgres.urlVariable` names; under
+ * `sqlite` each project's store and index in its file, over its library.
+ */
+function connectHub(config: HubConfig, env: HubEnv, connectPostgres: PostgresHubOpener): Promise<HubConnected> {
   const { storePath, sqliteLibrary, repository, projects, maxPayloadRows } = config;
+  const context: HubStoreContext = { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config), maxPayloadRows };
+  if (config.storeEngine === 'postgres') {
+    return connectPostgres(context, { urlVariable: config.postgresUrlVariable ?? DEFAULT_POSTGRES_URL_VARIABLE, env });
+  }
+
   return connectSqliteHub(
-    { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config), maxPayloadRows },
+    context,
     {
       fileName: basename(storePath),
       storeFiles: projects.map(({ id, storePath: file }) => ({ id, storePath: file })),
@@ -405,6 +449,43 @@ function connectHub(config: HubConfig): Promise<HubConnected> {
       project: repository,
     },
   );
+}
+
+/**
+ * The connector opened before the hub listens: under `postgres` alone,
+ * whose open reads the URL variable and the extensions, and undefined
+ * under `sqlite`, whose store the server opens once it listens.
+ *
+ * @throws {HubConfigError} When the `postgres` connector does not open,
+ *   the problem its refusal.
+ */
+async function openAtStart(config: HubConfig, env: HubEnv, connectPostgres: PostgresHubOpener): Promise<HubConnected | undefined> {
+  if (config.storeEngine !== 'postgres') return undefined;
+
+  try {
+    return await connectHub(config, env, connectPostgres);
+  } catch (error) {
+    throw refusalOf('hub.store.engine is postgres and its store did not open', error);
+  }
+}
+
+/** An opener answering `first` on its first call when there is one, and `open`'s answer on every other. */
+function firstThen(first: HubConnected | undefined, open: () => Promise<HubConnected>): () => Promise<HubConnected> {
+  let held = first;
+  return () => {
+    if (held === undefined) return open();
+
+    const answer = held;
+    held = undefined;
+    return Promise.resolve(answer);
+  };
+}
+
+/** The store `rafa-hub index rebuild`'s refusal names: the file under `sqlite`, the engine under `postgres`. */
+function storeNamed(config: HubConfig): string {
+  return config.storeEngine === 'postgres'
+    ? 'the postgres store'
+    : `the store at ${config.storePath}`;
 }
 
 /**
@@ -489,9 +570,9 @@ export async function runIndexRebuild(env: Readonly<Record<string, string | unde
 
   let connected;
   try {
-    connected = await connectHub(config);
+    connected = await connectHub(config, env, connectPostgresHub);
   } catch (error) {
-    err(`${REBUILD_PREFIX}: the store at ${config.storePath} did not open: ${oneLine(error)}`);
+    err(`${REBUILD_PREFIX}: ${storeNamed(config)} did not open: ${oneLine(error)}`);
     return 1;
   }
   let code = 0;

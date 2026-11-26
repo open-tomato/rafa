@@ -291,6 +291,80 @@ describe('runHub', () => {
   });
 });
 
+/** The variable the `postgres` cases name in `hub.store.postgres.urlVariable`, set in no case's environment. */
+const PG_URL_VARIABLE = 'RAFA_HUB_BIN_PG_URL';
+
+/** The `hub.store` lines of a hub on `postgres` reading its URL from {@link PG_URL_VARIABLE}. */
+const POSTGRES_STORE = `  store:\n    engine: postgres\n    postgres:\n      urlVariable: ${PG_URL_VARIABLE}\n`;
+
+/** The refusal the `postgres` connector opens with on a database missing `pg_search` alone (`connection.ts`). */
+const MISSING_PG_SEARCH = 'hub postgres: the database lacks the extension pg_search; install pg_search on it (CREATE EXTENSION) before the hub starts on postgres';
+
+/** Whether a server answers at `port` on the loopback address. */
+async function answersAt(port: number): Promise<boolean> {
+  return fetch(`http://127.0.0.1:${String(port)}${HUB_ROUTES.health}`).then(() => true, () => false);
+}
+
+describe('runHub under hub.store.engine postgres', () => {
+  it('answers null with a config.refused line naming the URL variable when it is unset, listening nowhere', async () => {
+    const { log, logged } = collecting();
+    const port = await freePort();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(port, POSTGRES_STORE) }, { log, githubApi: 'http://127.0.0.1:9' });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain(`the environment variable ${PG_URL_VARIABLE} is unset`);
+    expect(await answersAt(port)).toBe(false);
+  });
+
+  it('answers null with a config.refused line naming pg_search when the database misses it, listening nowhere', async () => {
+    const { log, logged } = collecting();
+    const port = await freePort();
+    const handed: { urlVariable: string; env: unknown }[] = [];
+    const env = { [HUB_CONFIG_ENV]: writeConfig(port, POSTGRES_STORE), [PG_URL_VARIABLE]: 'postgres://stand-in' };
+
+    const server = await runHub(env, {
+      log,
+      githubApi: 'http://127.0.0.1:9',
+      connectPostgres: (_context, options) => {
+        handed.push({ urlVariable: options.urlVariable, env: options.env });
+        return Promise.reject(new Error(MISSING_PG_SEARCH));
+      },
+    });
+
+    expect(server).toBeNull();
+    expect(handed).toEqual([{ urlVariable: PG_URL_VARIABLE, env }]);
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain('lacks the extension pg_search');
+    expect(await answersAt(port)).toBe(false);
+  });
+
+  it('serves the connector it opened at start, opening it once, when the open succeeds', async () => {
+    mkdirStore();
+    const { log } = collecting();
+    let opens = 0;
+    const env = { [HUB_CONFIG_ENV]: writeConfig(await freePort(), POSTGRES_STORE), [PG_URL_VARIABLE]: 'postgres://stand-in' };
+
+    const server = await runHub(env, {
+      log,
+      githubApi: 'http://127.0.0.1:9',
+      connectPostgres: (context) => {
+        opens += 1;
+        return connectSqliteHub(context);
+      },
+    });
+    if (server === null) throw new Error('the hub refused its start');
+    running = [...running, server];
+
+    expect(opens).toBe(1);
+    expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(200);
+    expect(opens).toBe(1);
+  });
+});
+
 /** `hub.auth` under `api-key`, naming `RAFA_HUB_BIN_KEY`, plus `login` lines indented under it. */
 function apiKeyAuth(login = ''): string {
   return `  auth:\n    adapter: api-key\n    apiKeys:\n      - RAFA_HUB_BIN_KEY\n${login}`;
@@ -691,6 +765,21 @@ describe('bin.ts as a process', () => {
     expect(lines[0]).toMatchObject({ level: 'error', event: 'config.refused' });
     expect(String(lines[0]?.['problems'])).toContain('hub.auth.apiKeys[0]');
     expect(stdout).not.toContain(API_KEY);
+  });
+
+  it('exits 1 at start under hub.store.engine postgres with one config.refused line naming the unset URL variable', async () => {
+    const env: Record<string, string | undefined> = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373, POSTGRES_STORE) };
+    delete env[PG_URL_VARIABLE];
+
+    const child = Bun.spawn([process.execPath, BIN], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stderr).toBe('');
+    const lines = jsonLines(stdout);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(lines[0]?.['problems'])).toContain(`the environment variable ${PG_URL_VARIABLE} is unset`);
   });
 
   it('serves /health, then stops on SIGTERM and exits 0, every line of standard output JSON', async () => {
