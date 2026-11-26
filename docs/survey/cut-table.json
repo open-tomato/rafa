@@ -5929,6 +5929,7 @@
         "packages/rafa-hub-postgres/src/hub-merge.test.ts",
         "packages/rafa-hub-postgres/src/hub-projects.test.ts",
         "packages/rafa-hub-postgres/src/hub-store.test.ts",
+        "packages/rafa-hub-postgres/src/index-build.test.ts",
         "packages/rafa-hub-postgres/src/migrator.test.ts",
         "packages/rafa-hub-postgres/src/schema.test.ts",
         "packages/rafa-hub-postgres/src/wire-migrations.test.ts",

@@ -33,7 +33,7 @@ import { Database } from 'bun:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { getTableConfig, pgTable, text } from 'drizzle-orm/pg-core';
 
-import { hubDevices, hubStoreMeta, WIRE_TABLES } from './schema.js';
+import { hubDevices, hubIndexServing, hubStoreMeta, WIRE_TABLES } from './schema.js';
 import { DRIZZLE_WIRE_MIGRATIONS } from './wire-migrations.js';
 
 /** One column as `PRAGMA table_info` answers it. */
@@ -192,7 +192,7 @@ describe('the row tables', () => {
   });
 
   it('name no Postgres schema, so a project\'s search_path places them', () => {
-    const schemas = [...Object.values(WIRE_TABLES), hubStoreMeta, hubDevices].map((table) => getTableConfig(table).schema);
+    const schemas = [...Object.values(WIRE_TABLES), hubStoreMeta, hubDevices, hubIndexServing].map((table) => getTableConfig(table).schema);
     expect(schemas.filter((schema) => schema !== undefined)).toEqual([]);
   });
 });

@@ -69,6 +69,7 @@ export interface ShippedMigrationHash {
 export const SHIPPED_MIGRATION_HASHES: readonly ShippedMigrationHash[] = [
   { tag: '0000_wire_contract_1', hash: '05825fa6a7974728683e1f51e402be2c82f6f7e2caf1eaac0797d452c1388f19' },
   { tag: '0001_hub_devices', hash: 'ff4f0da769f1f2dba0987d45bd02a78be86c59b0bb5f83b24c1452381bce84b0' },
+  { tag: '0002_hub_index_serving', hash: '12d518b921c727e17f3b807233ba9c637d0ecee81e28ac6bbf68ead80825c63d' },
 ];
 
 /** A migration of a folder: its journal tag, its journal `when` and its file's hash. */

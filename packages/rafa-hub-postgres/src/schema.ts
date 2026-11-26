@@ -56,6 +56,14 @@
  * the metadata is, and no wire table, so the Drizzle migration that adds
  * it covers no wire id in `wire-migrations.ts`.
  *
+ * ## The serving build
+ *
+ * {@link hubIndexServing}, one row once the project's index has been
+ * built: the schema of the build its searches read. The index itself is
+ * never in the project's schema: each build is a schema of its own
+ * (`index-build.ts`), made at rebuild and never migrated. The pointer is
+ * the hub's own, so its Drizzle migration covers no wire id either.
+ *
  * ## One schema per project
  *
  * The tables are declared with no Postgres schema, so the SQL
@@ -386,6 +394,43 @@ export const hubDevices: HubDevicesTable = pgTable('hub_devices', {
   device: text('device').primaryKey(),
   lastPushAt: text('last_push_at').notNull(),
 });
+
+/** The serving build's columns, as `pgTable` takes them. */
+type HubIndexServingColumns = {
+  readonly id: IsPrimaryKey<NotNull<PgIntegerBuilderInitial<'id'>>>;
+  readonly buildSchema: NotNull<MetaText<'build_schema'>>;
+  readonly stamp: NotNull<MetaText<'stamp'>>;
+  readonly builtAt: NotNull<MetaText<'built_at'>>;
+};
+
+/** The serving build's table type, its columns by name. */
+export type HubIndexServingTable = PgTableWithColumns<{
+  name: 'hub_index_serving';
+  schema: undefined;
+  columns: BuildColumns<'hub_index_serving', HubIndexServingColumns, 'pg'>;
+  dialect: 'pg';
+}>;
+
+/**
+ * The build the project's index is served from, one row once a rebuild
+ * has swapped one in: the build's schema (`index_<project>_<build>`),
+ * its stamp and when it was built. The hub's own, never a wire table.
+ * The rebuild repoints it in the transaction that drops the old build;
+ * a reader locks it `FOR SHARE` (`index-build.ts`).
+ */
+export const hubIndexServing: HubIndexServingTable = pgTable(
+  'hub_index_serving',
+  {
+    id: integer('id').primaryKey(),
+    buildSchema: text('build_schema').notNull(),
+    stamp: text('stamp').notNull(),
+    builtAt: text('built_at').notNull(),
+  },
+  (table) => [
+    check('hub_index_serving_one_row', sql`${table.id} = 1`),
+    check('hub_index_serving_build', sql`${table.buildSchema} LIKE 'index\\_%'`),
+  ],
+);
 
 /** Every row table, by the wire table name it mirrors. */
 export const WIRE_TABLES: Readonly<Record<string, WireTable>> = {

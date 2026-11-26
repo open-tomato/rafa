@@ -50,6 +50,13 @@
  *
  * `close()` closes the client; a request after it is refused.
  *
+ * ## The index beside it
+ *
+ * {@link openPostgresHubStoreParts} answers, beside the store, the
+ * lookup of a project's schema made ready as a push makes it, which the
+ * connector's index rebuild (`index-build.ts`) runs on, so the pointer
+ * to the serving build is there before any build is swapped in.
+ *
  * Nothing here is exported from the package's entry: the client it
  * takes is a `Bun.sql` type the leak rule keeps inside the connector.
  */
@@ -188,6 +195,18 @@ async function recordProject(db: HubDatabase, place: ProjectSchema, now: () => D
   });
 }
 
+/** The store, and what the index beside it shares of it. */
+export interface PostgresHubStoreParts {
+  /** The port's store. */
+  readonly store: HubStore;
+  /**
+   * The schema of the project a request names, the first served one's
+   * for none, migrated and recorded as a push would find it. Rejects for
+   * a project not served, and once the store is closed.
+   */
+  readonly placeOf: (project: string | undefined) => Promise<ProjectSchema>;
+}
+
 /**
  * Opens the connector's store over `context` on `options.client`, the
  * first served project's schema made when it is not there and every
@@ -196,6 +215,11 @@ async function recordProject(db: HubDatabase, place: ProjectSchema, now: () => D
  * module note.
  */
 export async function openPostgresHubStore(context: HubStoreContext, options: PostgresHubStoreOptions): Promise<HubStore> {
+  return (await openPostgresHubStoreParts(context, options)).store;
+}
+
+/** {@link openPostgresHubStore}, answering beside the store the schema lookup the index rebuild runs on. */
+export async function openPostgresHubStoreParts(context: HubStoreContext, options: PostgresHubStoreOptions): Promise<PostgresHubStoreParts> {
   const { client } = options;
   const { now } = context;
   const db: HubDatabase = drizzle({ client });
@@ -261,7 +285,7 @@ export async function openPostgresHubStore(context: HubStoreContext, options: Po
     return { received: rowsIn(payload), added, at };
   };
 
-  return {
+  const store: HubStore = {
     push,
     pull: async (request) => {
       checkLimit(request.limit);
@@ -292,4 +316,5 @@ export async function openPostgresHubStore(context: HubStoreContext, options: Po
       await client.close();
     },
   };
+  return { store, placeOf: async (project) => (await ready(project)).place };
 }

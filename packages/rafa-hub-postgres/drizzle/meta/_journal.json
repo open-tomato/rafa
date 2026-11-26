@@ -15,6 +15,13 @@
       "when": 1795726063628,
       "tag": "0001_hub_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795728765066,
+      "tag": "0002_hub_index_serving",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,11 @@
 /**
  * The connector `HUB_CONNECTORS` names `postgres`: it opens the store on
  * the URL the named environment variable holds, beside an index that
- * answers every capability `false` and refuses every request until the
- * index half lands. Without a database, the cases hold the refusals
+ * rebuilds, answers every capability `false` and refuses a search and a
+ * walk until those land. Without a database, the cases hold the refusals
  * made before anything connects; where `POSTGRES_URL` is set, the live
  * case opens both halves under a schema prefix of its own and drops only
- * the schemas that prefix made.
+ * the schema that prefix made and the build its rebuild swapped in.
  */
 import type { HubStoreContext } from '@open-tomato/rafa-hub-port';
 
@@ -34,21 +34,26 @@ describe('connectPostgresHub, before it connects', () => {
 const url = process.env['POSTGRES_URL']?.trim() ?? '';
 
 describe.skipIf(url === '')('connectPostgresHub, live on POSTGRES_URL', () => {
-  it('opens a store and an index with no capability, both refusing a request once the store is closed', async () => {
+  it('opens a store and an index that rebuilds with no capability, both refusing a request once the store is closed', async () => {
     const schemaPrefix = `test_connector_${crypto
       .randomUUID()
       .replaceAll('-', '')
       .slice(0, 6)}`;
     const schema = projectSchemaName(schemaPrefix, DEFAULT_PROJECT_ID);
     const admin = new SQL(url);
+    let build: string | undefined;
     try {
       const { store, index } = await connectPostgresHub(CONTEXT, { urlVariable: 'POSTGRES_URL', schemaPrefix });
 
       expect((await store.status()).devices).toEqual([]);
       expect(index.capabilities()).toEqual({ fts: false, vector: false, graph: false });
-      await expect(index.search({ mode: 'fts', query: 'x' })).rejects.toThrow('holds no index yet');
-      await expect(index.rebuild({ project: DEFAULT_PROJECT_ID })).rejects.toThrow('holds no index yet');
-      await expect(index.links({ kind: 'commit', id: 'x' })).rejects.toThrow('holds no index yet');
+      await expect(index.search({ mode: 'fts', query: 'x' })).rejects.toThrow('serves no search or links yet');
+      await expect(index.links({ kind: 'commit', id: 'x' })).rejects.toThrow('serves no search or links yet');
+      const rebuilt = await index.rebuild({ project: DEFAULT_PROJECT_ID });
+      const [pointer] = await admin.unsafe<{ build_schema: string }[]>(`SELECT build_schema FROM "${schema}".hub_index_serving`);
+      build = pointer?.build_schema;
+      expect([rebuilt.project, rebuilt.rows, rebuilt.vector, rebuilt.why]).toEqual([DEFAULT_PROJECT_ID, 0, false, 'no embedder configured']);
+      expect(build).toStartWith('index_default_');
 
       await store.close();
 
@@ -58,6 +63,7 @@ describe.skipIf(url === '')('connectPostgresHub, live on POSTGRES_URL', () => {
       await expect(index.links({ kind: 'commit', id: 'x' })).rejects.toThrow('closed');
     } finally {
       await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      if (build !== undefined) await admin.unsafe(`DROP SCHEMA IF EXISTS "${build}" CASCADE`);
       await admin.close();
     }
   });

@@ -59,6 +59,7 @@ export const DRIZZLE_WIRE_MIGRATIONS: readonly DrizzleWireCoverage[] = [
     ],
   },
   { tag: '0001_hub_devices', wire: [] },
+  { tag: '0002_hub_index_serving', wire: [] },
 ];
 
 /** A journal entry, as the migrator reads it: its tag and the `when` Drizzle logs it under. */
