@@ -1,0 +1,19 @@
+# The build context of packages/rafa-hub/Dockerfile, which copies the
+# repository root whole: leave out what the host installed or built, the
+# git history, the loop's own state and any local secrets, so the image's
+# `bun install --frozen-lockfile` links the workspace from the lockfile alone.
+**/node_modules
+**/dist
+**/out
+**/.tsbuild
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+.git
+.rafa
+.ralph
+.tmp
+.claude/settings.local.json
+**/.env
+**/.env.*
+progress.txt

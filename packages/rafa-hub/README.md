@@ -18,6 +18,10 @@ Build the container from the repository root:
 docker build -f packages/rafa-hub/Dockerfile -t rafa-hub .
 ```
 
+The build copies the whole workspace, except what the root `.dockerignore`
+leaves out, and installs it from `bun.lock` before it bundles the hub, since the
+hub imports its sibling workspace packages and `drizzle-orm`.
+
 Run it with a volume on `/data` holding the config file:
 
 ```shell
