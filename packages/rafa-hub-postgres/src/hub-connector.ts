@@ -13,10 +13,10 @@
  * and answers `vector: false` with the why `no embedder configured`.
  * `search` reads the project's serving build (`index-search.ts`) under
  * that same answer: an `fts` search answers, and a `vector` or `hybrid`
- * one is refused naming `fts` and the why. `links` is refused, saying
- * the connector serves no links yet, and every capability answers
- * `false`, as the store's `contract()` does, until they are measured at
- * open. Once the store is closed, which closes the client both halves
+ * one is refused naming `fts` and the why. `links` walks the serving
+ * build's copy of `ref_links` (`index-links.ts`). Every capability
+ * answers `false`, as the store's `contract()` does, until they are
+ * measured at open. Once the store is closed, which closes the client both halves
  * share, each refuses naming the close.
  *
  * The leak rule holds here: what {@link connectPostgresHub} takes and
@@ -25,7 +25,15 @@
 import type { ProjectSchema } from './hub-projects.js';
 import type { HubDatabase } from './hub-tables.js';
 import type { SearchVectorState } from './index-search.js';
-import type { HubConnector, HubIndex, HubIndexCapabilities, HubStoreContext, IndexRebuildRequest, IndexSearchRequest } from '@open-tomato/rafa-hub-port';
+import type {
+  HubConnector,
+  HubIndex,
+  HubIndexCapabilities,
+  HubStoreContext,
+  IndexLinksRequest,
+  IndexRebuildRequest,
+  IndexSearchRequest,
+} from '@open-tomato/rafa-hub-port';
 
 import { NO_EMBEDDER } from '@open-tomato/rafa-index';
 import { drizzle } from 'drizzle-orm/bun-sql';
@@ -33,6 +41,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { openPostgresConnection } from './connection.js';
 import { openPostgresHubStoreParts } from './hub-store.js';
 import { rebuildProjectIndex } from './index-build.js';
+import { walkProjectLinks } from './index-links.js';
 import { searchProjectIndex } from './index-search.js';
 
 /** What the connector is opened with, beside the port's context. */
@@ -64,12 +73,9 @@ interface IndexHalf {
   readonly isClosed: () => boolean;
 }
 
-/** The index of the connector: a rebuild that swaps a build in, a search of the serving build, and a refused walk. */
+/** The index of the connector: a rebuild that swaps a build in, and a search and a walk of the serving build. */
 function partialIndex(half: IndexHalf): HubIndex {
   const { db, isClosed, now, placeOf } = half;
-  const refuse = (): Promise<never> => Promise.reject(isClosed()
-    ? closedIndex()
-    : new Error('hub postgres: the connector serves no links yet'));
   return Object.freeze({
     rebuild: async (request: IndexRebuildRequest) => {
       if (isClosed()) throw closedIndex();
@@ -81,7 +87,11 @@ function partialIndex(half: IndexHalf): HubIndex {
       const place = await placeOf(request.project);
       return searchProjectIndex({ db, place, request, vector: VECTOR_OFF });
     },
-    links: refuse,
+    links: async (request: IndexLinksRequest) => {
+      if (isClosed()) throw closedIndex();
+      const place = await placeOf(request.project);
+      return walkProjectLinks({ db, place, request });
+    },
     capabilities: () => NO_INDEX,
   });
 }

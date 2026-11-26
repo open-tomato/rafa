@@ -1,8 +1,8 @@
 /**
  * The connector `HUB_CONNECTORS` names `postgres`: it opens the store on
  * the URL the named environment variable holds, beside an index that
- * rebuilds, searches its serving build by full text alone, answers every
- * capability `false` and refuses a walk until it lands. Without a database, the cases hold the refusals
+ * rebuilds, searches its serving build by full text alone, walks its
+ * links, and answers every capability `false`. Without a database, the cases hold the refusals
  * made before anything connects; where `POSTGRES_URL` is set, the live
  * case opens both halves under a schema prefix of its own and drops only
  * the schema that prefix made and the build its rebuild swapped in.
@@ -34,7 +34,7 @@ describe('connectPostgresHub, before it connects', () => {
 const url = process.env['POSTGRES_URL']?.trim() ?? '';
 
 describe.skipIf(url === '')('connectPostgresHub, live on POSTGRES_URL', () => {
-  it('opens a store and an index that rebuilds and searches with no capability, both refusing a request once the store is closed', async () => {
+  it('opens a store and an index that rebuilds, searches and walks with no capability, both refusing a request once the store is closed', async () => {
     const schemaPrefix = `test_connector_${crypto
       .randomUUID()
       .replaceAll('-', '')
@@ -48,9 +48,10 @@ describe.skipIf(url === '')('connectPostgresHub, live on POSTGRES_URL', () => {
       expect((await store.status()).devices).toEqual([]);
       expect(index.capabilities()).toEqual({ fts: false, vector: false, graph: false });
       await expect(index.search({ mode: 'fts', query: 'x' })).rejects.toThrow('has no index built yet; rebuild the index');
-      await expect(index.links({ kind: 'commit', id: 'x' })).rejects.toThrow('serves no links yet');
+      await expect(index.links({ kind: 'commit', id: 'x' })).rejects.toThrow('has no index built yet; rebuild the index');
       const rebuilt = await index.rebuild({ project: DEFAULT_PROJECT_ID });
       expect((await index.search({ mode: 'fts', query: 'x' })).hits).toEqual([]);
+      expect(await index.links({ kind: 'commit', id: 'x' })).toEqual({ graph: false, links: [] });
       await expect(index.search({ mode: 'hybrid', query: 'x' })).rejects.toThrow('(no embedder configured); search with mode \'fts\'');
       const [pointer] = await admin.unsafe<{ build_schema: string }[]>(`SELECT build_schema FROM "${schema}".hub_index_serving`);
       build = pointer?.build_schema;

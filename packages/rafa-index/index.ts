@@ -8,7 +8,7 @@
  * imports stays a subpath (`@open-tomato/rafa-index/<file>`).
  */
 
-export { holdsRefLinks, links } from './src/links.js';
+export { DEFAULT_DEPTH, holdsRefLinks, IndexLinksRefusal, links, MAX_DEPTH, REF_LINK_COLUMNS } from './src/links.js';
 
 export type { LoaderState, PrepareOptions, VectorAnswer } from './src/loader.js';
 export { loadVector, openDatabase, prepareSqlite } from './src/loader.js';
