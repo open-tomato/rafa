@@ -5923,6 +5923,7 @@
         "packages/rafa-hub/src/two-devices.integration.test.ts",
         "packages/rafa-hub/src/two-projects.integration.test.ts",
         "packages/rafa-hub-port/index.test.ts",
+        "packages/rafa-hub-postgres/index.test.ts",
         "packages/rafa-index/src/fusion.test.ts",
         "packages/rafa-index/src/imports.test.ts",
         "packages/rafa-index/src/index.integration.test.ts",

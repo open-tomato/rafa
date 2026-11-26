@@ -36,10 +36,11 @@ export const SOURCE_ROOTS: readonly string[] = Object.freeze([
   'packages/rafa-effort/src',
 ]);
 
-/** The four workspace members kept out of {@link SOURCE_ROOTS}, by repo-relative directory, with why. */
+/** The five workspace members kept out of {@link SOURCE_ROOTS}, by repo-relative directory, with why. */
 export const MEMBERS_LEFT_OUT: Readonly<Record<string, string>> = Object.freeze({
   'packages/rafa-hub': 'the hub server, a bin of its own, never in the CLI',
   'packages/rafa-hub-port': 'the hub\'s store port, types its connectors implement, not shipped in the CLI',
+  'packages/rafa-hub-postgres': 'the hub\'s postgres connector, loaded by the hub alone, not shipped in the CLI',
   'packages/rafa-index': 'the hub\'s search index, imported by the hub alone, not shipped in the CLI',
   'packages/rafa-sync-service': 'the service sync strategy, loaded by the hub\'s users, not shipped in the CLI',
 });

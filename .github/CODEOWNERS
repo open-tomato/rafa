@@ -6,6 +6,7 @@
 /packages/rafa-effort/ @open-tomato/maintainers
 /packages/rafa-hub/ @open-tomato/maintainers
 /packages/rafa-hub-port/ @open-tomato/maintainers
+/packages/rafa-hub-postgres/ @open-tomato/maintainers
 /packages/rafa-index/ @open-tomato/maintainers
 /packages/rafa-inventory/ @open-tomato/maintainers
 /packages/rafa-pr/ @open-tomato/maintainers

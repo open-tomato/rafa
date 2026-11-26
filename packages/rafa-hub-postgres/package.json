@@ -1,0 +1,32 @@
+{
+  "name": "@open-tomato/rafa-hub-postgres",
+  "version": "0.0.0",
+  "description": "The hub's postgres connector: the hub's store and index over Postgres, on Drizzle over the Bun.sql driver.",
+  "private": true,
+  "license": "Apache-2.0",
+  "openTomato": {
+    "team": "@open-tomato/maintainers"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "bun test",
+    "check-types": "tsc --build",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@open-tomato/rafa-core": "workspace:*",
+    "@open-tomato/rafa-hub-port": "workspace:*",
+    "@open-tomato/rafa-index": "workspace:*",
+    "drizzle-orm": "0.45.4"
+  },
+  "devDependencies": {
+    "@open-tomato/eslint-config": "^0.2.0",
+    "drizzle-kit": "0.31.11",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  }
+}

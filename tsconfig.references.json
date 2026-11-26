@@ -9,6 +9,7 @@
     { "path": "./packages/rafa-effort" },
     { "path": "./packages/rafa-hub" },
     { "path": "./packages/rafa-hub-port" },
+    { "path": "./packages/rafa-hub-postgres" },
     { "path": "./packages/rafa-index" },
     { "path": "./packages/rafa-inventory" },
     { "path": "./packages/rafa-pr" },
