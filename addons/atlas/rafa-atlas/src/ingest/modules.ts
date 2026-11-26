@@ -11,13 +11,27 @@
  * 2. **Files.** Each module's folder is walked whole, passing over the
  *    folders of {@link SKIPPED_FOLDERS} (`node_modules`, `dist`,
  *    `.tsbuild`) and the folder of any other module nested in it, which
- *    counts on its own row. A file counts when its name ends in one of
- *    {@link SOURCE_EXTENSIONS}; a symbolic link is not followed. A file
- *    named `*.test.*` or `*.spec.*` is a test file: `test_files` and
- *    `test_loc` count those, `files` and `loc` the other source files, so
- *    the two sum to the module's whole. LOC is the lines holding anything
- *    but white space.
- * 3. **Imports.** Each source file, tests included, is read for the
+ *    counts on its own row; a symbolic link is not followed. Each file
+ *    counts in one kind only, the first {@link lineKindOf} finds, by the
+ *    rules of the 2026-11-02 count in `demo/src/data/composition.ts`, a
+ *    folder named below the module folder and never the module folder
+ *    itself:
+ *    - `fixtures` (`fixtures_loc`): a file under a `fixtures/`,
+ *      `__snapshots__/` or `stubs/` folder, or named `*.snap`,
+ *      `*.fixture.*` or `*.stub.*`; a snapshot or fixture is no test;
+ *    - `docs` (`docs_loc`): a markdown file, or any file under a `docs/`
+ *      folder;
+ *    - `test` (`test_files`, `test_loc`): a script file named `*.test.*`
+ *      or `*.spec.*`, or one under a `tests/` or `__tests__/` folder;
+ *    - `config` (`config_loc`): json, yaml, toml, ini, `.mjs` and `.cjs`
+ *      files, a `*.config.*` script, and the named files of
+ *      {@link CONFIG_FILE_NAMES} (`Dockerfile`, `.gitignore`, ...);
+ *    - `source` (`files`, `loc`): the other files ending in one of
+ *      {@link SOURCE_EXTENSIONS} (scripts, `.css`, `.html`).
+ *    A file none of these takes (`.txt`, `.xml`, `.jsonl`, images) counts
+ *    in no kind. LOC is the lines holding anything but white space.
+ * 3. **Imports.** Each script file of the walk ({@link SCRIPT_EXTENSIONS}),
+ *    whatever kind it counts in, is read for the
  *    `@open-tomato/<pkg>` specifiers its `from`, `import`, `import(` and
  *    `require(` clauses name, by regex ({@link IMPORT_SPECIFIER}): a
  *    subpath counts as its package. `imports_json` is the packages named,
@@ -54,8 +68,40 @@ export const MODULES_SOURCE = 'local.modules';
 /** The folders a module's walk passes over. */
 export const SKIPPED_FOLDERS: ReadonlySet<string> = new Set(['node_modules', 'dist', '.tsbuild']);
 
-/** The file endings a source file carries. */
-export const SOURCE_EXTENSIONS: readonly string[] = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
+/** The file endings a script file carries: read for imports, whatever kind it counts in. */
+export const SCRIPT_EXTENSIONS: readonly string[] = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
+
+/** The file endings a source file carries, once the kinds before it have passed it over. */
+export const SOURCE_EXTENSIONS: readonly string[] = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.css', '.html'];
+
+/** The file endings a config file carries. */
+export const CONFIG_EXTENSIONS: readonly string[] = ['.json', '.jsonc', '.json5', '.yaml', '.yml', '.toml', '.ini', '.mjs', '.cjs'];
+
+/** The file names that count as config whatever their ending. */
+export const CONFIG_FILE_NAMES: ReadonlySet<string> = new Set([
+  'Dockerfile', '.dockerignore', '.editorconfig', '.gitattributes', '.gitignore', '.npmignore', '.npmrc', '.nvmrc',
+]);
+
+/** The file endings a docs file carries. */
+export const DOCS_EXTENSIONS: readonly string[] = ['.md', '.mdx'];
+
+/** The folders whose files count as fixtures. */
+const FIXTURE_FOLDERS: ReadonlySet<string> = new Set(['fixtures', '__snapshots__', 'stubs']);
+
+/** The folders whose files count as docs. */
+const DOCS_FOLDERS: ReadonlySet<string> = new Set(['docs']);
+
+/** The folders whose script files count as tests. */
+const TEST_FOLDERS: ReadonlySet<string> = new Set(['tests', '__tests__']);
+
+/** The five kinds a counted file's lines fall in: see the module note. */
+export type LineKind = 'source' | 'test' | 'docs' | 'config' | 'fixtures';
+
+/** A fixture file's name: a snapshot, `<name>.fixture.<ext>` or `<name>.stub.<ext>`. */
+const FIXTURE_FILE = /(?:\.snap|\.(?:fixture|stub)\.[^/]+)$/;
+
+/** A config script's name: `<name>.config.<ext>`. */
+const CONFIG_SCRIPT = /\.config\.[cm]?[jt]sx?$/;
 
 /** The cut table under the project root. */
 export const CUT_TABLE_FILE: string = join('docs', 'survey', 'cut-table.json');
@@ -74,6 +120,9 @@ export interface ModuleTree {
   readonly loc: number;
   readonly testFiles: number;
   readonly testLoc: number;
+  readonly docsLoc: number;
+  readonly configLoc: number;
+  readonly fixturesLoc: number;
   /** The `@open-tomato/<pkg>` packages its files name, each once, sorted, its own left out. */
   readonly imports: readonly string[];
 }
@@ -141,9 +190,29 @@ function packageNameOf(folder: string): string | null {
   }
 }
 
-/** True when `name` ends in a source file ending. */
-function isSourceFile(name: string): boolean {
-  return SOURCE_EXTENSIONS.some((extension) => name.endsWith(extension));
+/** True when `name` ends in one of `extensions`. */
+function endsInOneOf(name: string, extensions: readonly string[]): boolean {
+  return extensions.some((extension) => name.endsWith(extension));
+}
+
+/**
+ * The kind `file`'s lines count in, or null for a file no kind takes; see
+ * the module note. `file` is relative to its module folder, so a folder
+ * the module itself is named after is never read as one of the kinds'.
+ */
+export function lineKindOf(file: string): LineKind | null {
+  const segments = file.split('/');
+  const name = segments.at(-1) ?? '';
+  const folders = new Set(segments.slice(0, -1));
+  const under = (kinds: ReadonlySet<string>): boolean => [...kinds].some((folder) => folders.has(folder));
+  const script = endsInOneOf(name, SCRIPT_EXTENSIONS);
+  if (under(FIXTURE_FOLDERS) || FIXTURE_FILE.test(name)) return 'fixtures';
+  if (under(DOCS_FOLDERS) || endsInOneOf(name, DOCS_EXTENSIONS)) return 'docs';
+  if (script && (TEST_FILE.test(name) || under(TEST_FOLDERS))) return 'test';
+  if (CONFIG_FILE_NAMES.has(name) || endsInOneOf(name, CONFIG_EXTENSIONS) || CONFIG_SCRIPT.test(name)) return 'config';
+  return endsInOneOf(name, SOURCE_EXTENSIONS)
+    ? 'source'
+    : null;
 }
 
 /** The entries of `folder`; none when it cannot be listed. */
@@ -155,19 +224,38 @@ function entriesOf(folder: string): readonly Dirent[] {
   }
 }
 
-/** The source files under `relative` (a folder under `root`), as relative paths; `nested` folders are passed over. */
-function sourceFilesUnder(root: string, relative: string, nested: ReadonlySet<string>): readonly string[] {
+/** The files under `relative` (a folder under `root`), as relative paths; `nested` folders are passed over. */
+function filesUnder(root: string, relative: string, nested: ReadonlySet<string>): readonly string[] {
   return entriesOf(join(root, relative)).flatMap((entry) => {
     const path = `${relative}/${entry.name}`;
     if (entry.isDirectory()) {
       return SKIPPED_FOLDERS.has(entry.name) || nested.has(path)
         ? []
-        : sourceFilesUnder(root, path, nested);
+        : filesUnder(root, path, nested);
     }
-    return entry.isFile() && isSourceFile(entry.name)
+    return entry.isFile()
       ? [path]
       : [];
   });
+}
+
+/** The line totals of one module, by the columns they fill. */
+type Totals = Pick<ModuleTree, 'files' | 'loc' | 'testFiles' | 'testLoc' | 'docsLoc' | 'configLoc' | 'fixturesLoc'>;
+
+/** `totals` with one file of `kind` and `loc` lines added. */
+function addFile(totals: Totals, kind: LineKind, loc: number): Totals {
+  switch (kind) {
+    case 'source':
+      return { ...totals, files: totals.files + 1, loc: totals.loc + loc };
+    case 'test':
+      return { ...totals, testFiles: totals.testFiles + 1, testLoc: totals.testLoc + loc };
+    case 'docs':
+      return { ...totals, docsLoc: totals.docsLoc + loc };
+    case 'config':
+      return { ...totals, configLoc: totals.configLoc + loc };
+    case 'fixtures':
+      return { ...totals, fixturesLoc: totals.fixturesLoc + loc };
+  }
 }
 
 /** Read one module's tree; see the module note. */
@@ -175,18 +263,14 @@ export function readModuleTree(root: string, path: string, modules: readonly str
   const nested = new Set(modules.filter((other) => other !== path && other.startsWith(`${path}/`)));
   const ownPackage = packageNameOf(join(root, path));
   const imports = new Set<string>();
-  const totals = { files: 0, loc: 0, testFiles: 0, testLoc: 0 };
-  for (const file of sourceFilesUnder(root, path, nested)) {
+  let totals: Totals = { files: 0, loc: 0, testFiles: 0, testLoc: 0, docsLoc: 0, configLoc: 0, fixturesLoc: 0 };
+  for (const file of filesUnder(root, path, nested)) {
+    const kind = lineKindOf(file.slice(path.length + 1));
+    const script = endsInOneOf(file, SCRIPT_EXTENSIONS);
+    if (kind === null && !script) continue;
     const text = readFileSync(join(root, file), 'utf8');
-    const loc = locOf(text);
-    if (TEST_FILE.test(file)) {
-      totals.testFiles += 1;
-      totals.testLoc += loc;
-    } else {
-      totals.files += 1;
-      totals.loc += loc;
-    }
-    for (const name of importedPackagesOf(text)) if (name !== ownPackage) imports.add(name);
+    if (kind !== null) totals = addFile(totals, kind, locOf(text));
+    if (script) for (const name of importedPackagesOf(text)) if (name !== ownPackage) imports.add(name);
   }
   return { path, package: ownPackage, ...totals, imports: [...imports].sort() };
 }
@@ -246,7 +330,8 @@ export function upwardEdgesOf(table: CutTableRead, path: string): number | null 
 
 /** The `module_facts` columns written, in the order {@link moduleRows} binds them. */
 const MODULE_COLUMNS: readonly string[] = [
-  'path', 'package', 'files', 'loc', 'test_files', 'test_loc', 'fan_in', 'fan_out', 'imports_json', 'upward_edges',
+  'path', 'package', 'files', 'loc', 'test_files', 'test_loc', 'docs_loc', 'config_loc', 'fixtures_loc',
+  'fan_in', 'fan_out', 'imports_json', 'upward_edges',
 ];
 
 /** Each module's row, in {@link MODULE_COLUMNS} order. */
@@ -262,7 +347,7 @@ export function moduleRows(trees: readonly ModuleTree[], table: CutTableRead): (
     const fanIn = trees.filter((other) => targets.get(other.path)?.has(tree.path) === true).length;
     return [
       tree.path, tree.package, tree.files, tree.loc, tree.testFiles, tree.testLoc,
-      fanIn, targets.get(tree.path)?.size ?? 0, JSON.stringify(tree.imports), upwardEdgesOf(table, tree.path),
+      tree.docsLoc, tree.configLoc, tree.fixturesLoc, fanIn, targets.get(tree.path)?.size ?? 0, JSON.stringify(tree.imports), upwardEdgesOf(table, tree.path),
     ];
   });
 }
