@@ -1,7 +1,8 @@
 /**
  * The connector's capabilities, measured at open. Without a database,
  * {@link measureCapabilities} is held to each capability's two answers
- * from the readings the open hands it (`projection` has one, `false`).
+ * from the readings the open hands it (`projection` has one, `false`),
+ * `vector` also to what holds the embedder's vectors back.
  * Where `POSTGRES_URL` is set, each case opens the connector under a
  * schema prefix no other case or run holds and reads its answers: `graph`
  * before and after a `ref_links` table is planted in the project's
@@ -76,6 +77,21 @@ describe('measureCapabilities', () => {
 
     expect(measured.capabilities.vector).toBe(false);
     expect(measured.vector).toEqual({ vector: false, why: NO_PGVECTOR });
+  });
+
+  it('answers vector false while something holds the embedder\'s vectors back, naming it, and true once nothing does', () => {
+    const held = measureCapabilities({ extensions: BOTH, embedder: true, refLinks: false, vectorHeld: 're-embedding' });
+    const released = measureCapabilities({ extensions: BOTH, embedder: true, refLinks: false, vectorHeld: null });
+
+    expect(held.vector).toEqual({ vector: false, why: 're-embedding' });
+    expect([held.capabilities.vector, released.capabilities.vector]).toEqual([false, true]);
+  });
+
+  it('answers the missing extension and the missing embedder ahead of what holds the vectors back', () => {
+    const noExtension = measureCapabilities({ extensions: ['pg_search'], embedder: true, refLinks: false, vectorHeld: 're-embedding' });
+    const noEmbedder = measureCapabilities({ extensions: BOTH, embedder: false, refLinks: false, vectorHeld: 're-embedding' });
+
+    expect([noExtension.vector.why, noEmbedder.vector.why]).toEqual([NO_PGVECTOR, NO_EMBEDDER]);
   });
 
   it('answers the index\'s three alone, frozen, so projection is never the index\'s', () => {

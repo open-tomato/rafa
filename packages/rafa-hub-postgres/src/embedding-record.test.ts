@@ -7,7 +7,9 @@
  * holds what a rebuild does with the record in the project's store
  * metadata: the first vector build records it, a build under the same
  * record goes on, and one under another model, another dimension or
- * another precision is refused naming both records with nothing changed.
+ * another precision is refused naming both records with nothing changed,
+ * and a connector opened under another record than the stored one writes
+ * it only through its re-embed (`reembed-job.test.ts` holds the job).
  * Each case drops only the project schemas its prefix made and the build
  * schemas its rebuilds named.
  */
@@ -297,7 +299,7 @@ describe.skipIf(url === '')('the embedding record, live on POSTGRES_URL', () => 
     expect((await storedOf(fullSchema))?.['precision']).toBe('full');
   });
 
-  it('records the connector\'s record at its open build, and refuses another one\'s rebuild of the same project', async () => {
+  it('records the connector\'s record at its open build, and writes another one\'s only through its re-embed of the same project', async () => {
     const prefix = freshPrefix();
     const schema = projectSchemaName(prefix, DEFAULT_PROJECT_ID);
     projectSchemas.push(schema);
@@ -309,12 +311,15 @@ describe.skipIf(url === '')('the embedding record, live on POSTGRES_URL', () => 
     const full: EmbeddingRecord = { ...RECORD, precision: 'full' };
     const second = await connectPostgresHub(CONTEXT, { urlVariable: 'POSTGRES_URL', env, schemaPrefix: prefix, embedder: recordingEmbedder(), embeddingRecord: full });
     try {
-      const refused = second.index.rebuild({ project: DEFAULT_PROJECT_ID });
+      const openedVector = second.index.capabilities().vector;
+      const rebuilt = await second.index.rebuild({ project: DEFAULT_PROJECT_ID });
+      const reembedded = await pointerOf(schema);
+      builds.push(reembedded ?? '');
 
-      await expect(refused).rejects.toThrow(`(${describeEmbeddingRecord(full)}) is refused`);
-      expect(await storedOf(schema)).toEqual({ ...RECORD });
-      expect(await vectorTypeOf(serving ?? '')).toBe('halfvec(3)');
-      expect(await pointerOf(schema)).toBe(serving);
+      expect([openedVector, rebuilt.vector, second.index.capabilities().vector]).toEqual([false, true, true]);
+      expect(await storedOf(schema)).toEqual({ ...full });
+      expect(reembedded).not.toBe(serving);
+      expect(await vectorTypeOf(reembedded ?? '')).toBe('vector(3)');
     } finally {
       await second.store.close();
     }

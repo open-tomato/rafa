@@ -45,6 +45,13 @@
  * build under another is refused naming both records, with nothing
  * changed. A build with no embedder leaves the stored record as it is.
  *
+ * A re-embed's build (`reembed-job.ts`, `replaceRecord`) claims nothing
+ * at the start: it is made under the configured record while another is
+ * stored, and writes the configured one over it once the build is filled
+ * and indexed, just before the swap, in the same transaction, so the
+ * record and the serving build's vectors change in one commit and a
+ * failed build leaves both as they were.
+ *
  * ## The serving build and the swap
  *
  * The project's schema holds the pointer, `hub_index_serving`
@@ -109,7 +116,14 @@ import { randomUUID } from 'node:crypto';
 import { IndexRebuildRefusal, NO_EMBEDDER } from '@open-tomato/rafa-index';
 import { eq, sql } from 'drizzle-orm';
 
-import { checkEmbeddingRecord, claimEmbeddingRecord, EMBEDDING_PRECISIONS, VECTOR_COLUMNS, vectorColumnOf } from './embedding-record.js';
+import {
+  checkEmbeddingRecord,
+  claimEmbeddingRecord,
+  EMBEDDING_PRECISIONS,
+  replaceEmbeddingRecord,
+  VECTOR_COLUMNS,
+  vectorColumnOf,
+} from './embedding-record.js';
 import { inProjectSchema } from './hub-tables.js';
 import { SCHEMA_NAME } from './migrator.js';
 import { hubIndexServing, WIRE_TABLES } from './schema.js';
@@ -178,6 +192,10 @@ export interface IndexBuildOptions {
   readonly embedder?: IndexEmbedder;
   /** The embedding record the embedder's vectors are made under, its precision choosing the column; required with an embedder, read only with one. */
   readonly record?: EmbeddingRecord;
+  /** Writes `record` over the stored one as the build swaps in, in place of the claim; a re-embed's build. Read only with an embedder. */
+  readonly replaceRecord?: boolean;
+  /** Why vector search is off, which a build with no embedder answers and a `vector` rebuild is refused naming; `NO_EMBEDDER` when left out. */
+  readonly vectorOff?: string;
   /** The test hooks. */
   readonly hooks?: IndexBuildHooks;
 }
@@ -254,7 +272,7 @@ function vectorPlan(options: IndexBuildOptions): VectorPlan | null {
   const { embedder, request } = options;
   if (embedder === undefined) {
     if (request.scope === 'vector') {
-      throw new IndexRebuildRefusal(`a vector rebuild needs vector search, which is off (${NO_EMBEDDER}); rebuild with scope 'fts'`);
+      throw new IndexRebuildRefusal(`a vector rebuild needs vector search, which is off (${options.vectorOff ?? NO_EMBEDDER}); rebuild with scope 'fts'`);
     }
     return null;
   }
@@ -409,7 +427,8 @@ async function buildAndSwap(tx: HubTransaction, options: IndexBuildOptions, buil
   await tx.execute(sql`LOCK TABLE ${hubIndexServing} IN SHARE ROW EXCLUSIVE MODE`);
   const stamp = rebuildStamp(now);
   const at = now().toISOString();
-  if (plan !== null) await claimEmbeddingRecord(tx, place.id, plan.record);
+  const replaces = plan !== null && options.replaceRecord === true;
+  if (plan !== null && !replaces) await claimEmbeddingRecord(tx, place.id, plan.record);
   const copied = await copiedOf(tx, place.schema);
   const vectorSchema = plan === null
     ? null
@@ -436,6 +455,7 @@ async function buildAndSwap(tx: HubTransaction, options: IndexBuildOptions, buil
   await writeMeta(tx, build, request, stamp, at, plan);
   tables.push(Object.freeze({ table: BUILD_META_TABLE, rows: 1 }));
   await hooks.beforeSwap?.(build);
+  if (plan !== null && replaces) await replaceEmbeddingRecord(tx, plan.record);
   await swapTo(tx, build, stamp, at);
   return Object.freeze({
     project: request.project,
@@ -445,7 +465,7 @@ async function buildAndSwap(tx: HubTransaction, options: IndexBuildOptions, buil
     tables: Object.freeze(tables),
     vector: plan !== null,
     why: plan === null
-      ? NO_EMBEDDER
+      ? options.vectorOff ?? NO_EMBEDDER
       : null,
   });
 }

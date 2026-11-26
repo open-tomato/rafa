@@ -10,8 +10,13 @@
  *     `ref_links` table at open, `false` otherwise. A table planted after
  *     the open is read by the next one.
  *   - `vector` is `true` only when `pgvector` (`vector` in `pg_extension`)
- *     is loaded and an embedder was given. Off, the why is
- *     {@link NO_PGVECTOR} when the extension is missing, else `NO_EMBEDDER`.
+ *     is loaded, an embedder was given and nothing holds its vectors
+ *     back. Off, the why is {@link NO_PGVECTOR} when the extension is
+ *     missing, `NO_EMBEDDER` when no embedder was given, else what holds
+ *     them back: a stored embedding record other than the configured one
+ *     while the re-embed runs, or that re-embed's failure
+ *     (`reembed-job.ts`). The re-embed's swap measures them again with
+ *     nothing held, and `vector` turns `true`.
  *   - `projection` is `false`: projecting rows for a device behind the
  *     hub is another member's, so the connector's `contract()` answers it
  *     `false` beside the index's three.
@@ -44,6 +49,8 @@ export interface CapabilityReadings {
   readonly embedder: boolean;
   /** Whether the first served project's schema holds `ref_links`. */
   readonly refLinks: boolean;
+  /** Why the embedder's vectors cannot serve yet, `null` or left out when nothing holds them back. */
+  readonly vectorHeld?: string | null;
 }
 
 /** The index's capabilities and the vector answer its search and rebuild work under. */
@@ -58,6 +65,7 @@ export interface MeasuredIndex {
 function vectorOf(readings: CapabilityReadings): SearchVectorState {
   if (!readings.extensions.includes(VECTOR_EXTENSION)) return Object.freeze({ vector: false, why: NO_PGVECTOR });
   if (!readings.embedder) return Object.freeze({ vector: false, why: NO_EMBEDDER });
+  if (readings.vectorHeld !== undefined && readings.vectorHeld !== null) return Object.freeze({ vector: false, why: readings.vectorHeld });
   return Object.freeze({ vector: true, why: null });
 }
 

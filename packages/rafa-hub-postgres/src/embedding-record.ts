@@ -33,10 +33,18 @@
  * is touched. A rebuild with no embedder writes no vector, reads no
  * record and leaves the stored one as it is.
  *
+ * ## Another record
+ *
+ * A hub opened under another record than the one stored re-embeds the
+ * project (`reembed-job.ts`): its build is made under the configured
+ * record and, in the transaction that swaps it in, writes it over the
+ * stored one with {@link replaceEmbeddingRecord}, so the record and the
+ * vectors the serving build holds change in one commit.
+ *
  * The rebuild's `SHARE ROW EXCLUSIVE` lock on the serving pointer makes
- * two rebuilds of one project run one after the other, and the rebuild
- * is the only writer of the record, so the read and the write of the
- * claim need no lock of their own.
+ * two rebuilds of one project run one after the other, and a rebuild,
+ * the re-embed's included, is the only writer of the record, so the read
+ * and the write of the claim need no lock of their own.
  *
  * Nothing here is exported from the package's entry but the record's
  * type: the claim takes a Drizzle transaction, which the leak rule keeps
@@ -195,4 +203,15 @@ export async function claimEmbeddingRecord(tx: HubTransaction, project: string, 
   }
   if (!sameEmbeddingRecord(stored, given)) throw new EmbeddingRecordMismatch(project, stored, given);
   return false;
+}
+
+/**
+ * Writes `given` over the record the project's metadata holds, which a
+ * re-embed's build does as it swaps in vectors made under `given`;
+ * answers the record it replaced, `null` when none was stored.
+ */
+export async function replaceEmbeddingRecord(tx: HubTransaction, given: EmbeddingRecord): Promise<EmbeddingRecord | null> {
+  const stored = await readEmbeddingRecord(tx);
+  await writeEmbeddingRecord(tx, given);
+  return stored;
 }
