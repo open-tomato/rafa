@@ -69,10 +69,9 @@ and stamped with its watermark; no cache stamps both sources missing),
 its upward edges from `docs/survey/cut-table.json`, NULL with no table),
 `github.ts` (pull requests and issue times through `gh`, under `--github`
 only), `attribute.ts` (the module column), and `snapshot.ts` (the
-`vacuumInto` copy). `src/sources.ts` holds the twelve source descriptors the
-registry serves, `local.tasks` to `local.prs`, one per bucket except
-`change_facts`, which the build stamps as `local.changes` with no descriptor
-yet. `src/build/` is the one-pass builder: `index.ts` writes the replica,
+`vacuumInto` copy). `src/sources.ts` holds the thirteen source descriptors
+the registry serves, `local.tasks` to `local.prs`, one per bucket.
+`src/build/` is the one-pass builder: `index.ts` writes the replica,
 `derive.ts` the work type, the rollups and each module's counts, and
 `daily.ts` the daily rollup. `src/metrics/` is the catalogue per lens,
 `src/registry.ts` the registry the handler serves, and `src/commands/` the
