@@ -7,7 +7,14 @@
  * through {@link INDEX_SETUPS}, keyed by the same names, beside the probe
  * the suite reads the store's and the index's identities with and the
  * planter of its `ref_links`; a connector added without one fails the
- * guard case here.
+ * guard case here, unless it is named as having no index half yet.
+ *
+ * `postgres` runs behind the `POSTGRES_URL` gate
+ * (`testdata/postgres-gate.ts`): closed, a skipped case names the gate;
+ * open, the row suite runs over the connector with each case's stores in
+ * schemas of their own, beside a gate case that fails when the connection
+ * is refused. Both answers of the gate are held by `bun test` spawned on
+ * `testdata/postgres-gate.fixture.ts`.
  *
  * The row suite also runs against the in-memory stand-in
  * (`testdata/memory-store.ts`), which is no connector, then against the
@@ -46,6 +53,14 @@ import { plantSqliteRefLinks, SQLITE_INDEX_PROBE } from './sqlite-index-probe.js
 import { connectSqliteHub } from './sqlite.js';
 import { openMemoryHubStore } from './testdata/memory-store.js';
 import { openNoProjectionHubStore } from './testdata/no-projection-store.js';
+import {
+  describePostgresGate,
+  isolatedPostgresStore,
+  POSTGRES_GATE_CASE,
+  POSTGRES_GATE_SUITE,
+  POSTGRES_SKIP_LINE,
+  postgresGate,
+} from './testdata/postgres-gate.js';
 
 /**
  * How the index suite opens one connector of {@link HUB_CONNECTORS},
@@ -77,13 +92,31 @@ const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
   },
 });
 
+/** The connectors whose index half is not built, so the index suite does not run over them. */
+const NO_INDEX_YET: readonly string[] = Object.freeze(['postgres']);
+
 describe('the connectors both suites run over', () => {
-  it('holds an index setup for every connector by name, and none other', () => {
-    expect(Object.keys(INDEX_SETUPS).sort()).toEqual(Object.keys(HUB_CONNECTORS).sort());
+  it('holds an index setup for every connector with an index by name, and none other', () => {
+    const indexed = Object.keys(HUB_CONNECTORS).filter((name) => !NO_INDEX_YET.includes(name));
+
+    expect(Object.keys(INDEX_SETUPS).sort()).toEqual(indexed.sort());
+  });
+
+  it('names only connectors it knows as having no index yet', () => {
+    expect(NO_INDEX_YET.filter((name) => !Object.hasOwn(HUB_CONNECTORS, name))).toEqual([]);
   });
 });
 
+const POSTGRES = postgresGate(process.env);
+describePostgresGate(POSTGRES);
+
 for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
+  // The registry's own entry stores in the default schemas of a real hub,
+  // so postgres runs the same connector under schemas of each case's own.
+  if (name === 'postgres') {
+    if (POSTGRES.open) hubStoreContract('postgres', isolatedPostgresStore(POSTGRES.url));
+    continue;
+  }
   hubStoreContract(name, async (context) => (await connector(context)).store);
   const setup = INDEX_SETUPS[name];
   if (setup !== undefined) {
@@ -177,7 +210,7 @@ function titleOf(line: string, prefix: string): string | null {
 }
 
 /** Spawns `bun test` on `fixture` with `env` set, answering the exit code and the lines the child printed. */
-async function spawnFixture(fixture: string, env: Readonly<Record<string, string>>): Promise<{ readonly exitCode: number; readonly lines: readonly string[] }> {
+async function spawnFixture(fixture: string, env: Readonly<Record<string, string | undefined>>): Promise<{ readonly exitCode: number; readonly lines: readonly string[] }> {
   const child = Bun.spawn([process.execPath, 'test', fixture], {
     cwd: PACKAGE_DIR,
     env: { ...process.env, ...env },
@@ -309,4 +342,45 @@ describe('the index contract suite against a broken connector', () => {
       expect(cases.filter((title) => !run.failed.includes(title))).toEqual([]);
     }, INDEX_FIXTURE_CASE_TIMEOUT_MS);
   }
+});
+
+/** The fixture a postgres gate run spawns `bun test` on. */
+const GATE_FIXTURE = join(import.meta.dir, 'testdata', 'postgres-gate.fixture.ts');
+
+/** A URL whose port refuses every connection. */
+const REFUSED_URL = 'postgres://hub:gate-password@127.0.0.1:1/hub';
+
+/** The variables under which bun prints no line for a skipped case, left out of a gate run. */
+const QUIET_VARIABLES = Object.freeze({ AGENT: undefined, CLAUDECODE: undefined, REPL_ID: undefined });
+
+/** Runs the gate fixture with `POSTGRES_URL` set to `url`, empty closing the gate. */
+function runGate(url: string): ReturnType<typeof spawnFixture> {
+  return spawnFixture(GATE_FIXTURE, { ...QUIET_VARIABLES, POSTGRES_URL: url });
+}
+
+describe('the postgres gate, spawned', () => {
+  it('prints a skip line naming the gate, and fails nothing, when it is closed', async () => {
+    const { exitCode, lines } = await runGate('');
+
+    expect(exitCode).toBe(0);
+    expect(lines.filter((line) => line.startsWith('(skip) '))).toEqual([`(skip) ${POSTGRES_GATE_SUITE} > ${POSTGRES_SKIP_LINE}`]);
+    expect(POSTGRES_SKIP_LINE).toContain('POSTGRES_URL');
+  });
+
+  it('fails the gate case when it is open and the connection is refused, repeating no password', async () => {
+    const { exitCode, lines } = await runGate(REFUSED_URL);
+    const failed = lines.flatMap((line) => titleOf(line, FAIL_MARK) ?? []);
+
+    expect(exitCode).toBe(1);
+    expect(failed).toEqual([`${POSTGRES_GATE_SUITE} > ${POSTGRES_GATE_CASE}`]);
+    expect(lines.join('\n')).toContain('POSTGRES_URL is set and the connection failed');
+    expect(lines.join('\n')).not.toContain('gate-password');
+  });
+
+  it('repeats no password of a URL that cannot be parsed', async () => {
+    const { exitCode, lines } = await runGate('postgres://hub:gate-password@[unparsed');
+
+    expect(exitCode).toBe(1);
+    expect(lines.join('\n')).not.toContain('gate-password');
+  });
 });

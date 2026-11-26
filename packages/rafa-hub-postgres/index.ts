@@ -7,7 +7,11 @@
  * The leak rule holds every export here: no Drizzle type, query builder,
  * SQL fragment, transaction handle or `Bun.sql` type is exported, so what
  * the hub reads of this package is the port's `HubStore` and `HubIndex`
- * and plain values. Today the entry exports the layout of the package's
- * Drizzle files alone.
+ * and plain values. The entry exports the connector,
+ * `connectPostgresHub` with its options, and the layout of the package's
+ * Drizzle files.
  */
+export type { PostgresHubOptions } from './src/hub-connector.js';
+
+export { connectPostgresHub } from './src/hub-connector.js';
 export { MIGRATIONS_FOLDER, SCHEMA_FILE } from './src/layout.js';

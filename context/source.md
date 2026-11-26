@@ -1250,9 +1250,10 @@ names come from, and the facade entry is no node.
   `packages/rafa-index`, whose `index.ts` sits beside `src/`),
   `outDir: ".tsbuild"` and `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages
   never share one (TS6377). It leaves its test files out, and its `references`
-  name what it imports: core and `packages/rafa-index` none, `packages/rafa-hub`
-  and `packages/rafa-hub-postgres` `../rafa`, `../rafa-hub-port` and
-  `../rafa-index`, `packages/rafa-hub-port` `../rafa`, and every other member
+  name what it imports: core and `packages/rafa-index` none,
+  `packages/rafa-hub-postgres` `../rafa`, `../rafa-hub-port` and
+  `../rafa-index`, `packages/rafa-hub` those three and
+  `../rafa-hub-postgres`, `packages/rafa-hub-port` `../rafa`, and every other member
   `../rafa` and the feature packages it imports. `tsc --build` builds a reference first, reads core through `paths`
   from that reference's declarations, and is a no-op on a second run.
   `.tsbuild/` is gitignored at every depth. Each of the six code packages'
