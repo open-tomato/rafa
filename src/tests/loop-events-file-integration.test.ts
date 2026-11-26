@@ -5,7 +5,8 @@
  *
  *   - A run that blocks its one task leaves
  *     `.rafa/runs/<id>.events.ndjson` holding one parsable line per
- *     emitted event, though text prints none of them.
+ *     emitted event, though text prints none of them, and ending on the
+ *     held stop's `halt`.
  *   - A run that ends on a throw, here a refused `effort.sync`, writes a
  *     last `error` line.
  *   - `readSessions`, `loop list` and `loop status` still read the
@@ -105,7 +106,7 @@ describe('the events file of a loop start run under RAFA_OUTPUT=text', () => {
     expectExit(run, 0, scratch);
 
     const { id, lines } = eventLines(scratch);
-    expect(lines.map((line) => line.name)).toEqual(['task-start', 'task-blocked']);
+    expect(lines.map((line) => line.name)).toEqual(['task-start', 'task-blocked', 'halt']);
     for (const line of lines) {
       expect(typeof line.summary).toBe('string');
       expect(Number.isNaN(Date.parse(line.ts))).toBe(false);
