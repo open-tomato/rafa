@@ -1,8 +1,9 @@
 /**
  * Tests for `ddl.ts`: the whitelist holds the seven PoC buckets and the six
  * of the git, GitHub, board and module sources and nothing else, refuses
- * every name that is not one of its own keys, and each statement creates
- * the table it is keyed by.
+ * every name that is not one of its own keys, each statement creates the
+ * table it is keyed by, and a fresh build holds the version 5 columns of
+ * `module_facts` and `issue_facts`.
  */
 import { Database } from 'bun:sqlite';
 import { describe, expect, it } from 'bun:test';
@@ -26,6 +27,28 @@ function columnsOf(table: string): string[] {
       .query<{ readonly name: string }, [string]>('SELECT name FROM pragma_table_info(?) ORDER BY cid')
       .all(table)
       .map((row) => row.name);
+  } finally {
+    database.close();
+  }
+}
+
+/** One column of `table` as `pragma_table_info` answers it. */
+interface ColumnInfo {
+  readonly name: string;
+  readonly type: string;
+  readonly notnull: number;
+  readonly dflt_value: string | null;
+}
+
+/** The type, NOT NULL flag and default of each column of `table` named in `names`, in that order. */
+function columnInfoOf(table: string, names: readonly string[]): ColumnInfo[] {
+  const database = new Database(':memory:');
+  try {
+    for (const statement of replicaDdl()) database.run(statement);
+    const rows = database
+      .query<ColumnInfo, [string]>('SELECT name, type, "notnull", dflt_value FROM pragma_table_info(?)')
+      .all(table);
+    return names.map((name) => rows.find((row) => row.name === name) ?? { name, type: '', notnull: -1, dflt_value: null });
   } finally {
     database.close();
   }
@@ -78,6 +101,42 @@ describe('REPLICA_TABLES', () => {
 
   it('gives issue_facts the module and priority columns of D15', () => {
     expect(columnsOf('issue_facts')).toEqual(expect.arrayContaining(['module', 'priority', 'stage', 'plan_stub']));
+  });
+
+  it('gives module_facts the three line kinds, zero by default, and a nullable layer and rank', () => {
+    expect(columnInfoOf('module_facts', ['docs_loc', 'config_loc', 'fixtures_loc', 'layer', 'layer_rank'])).toEqual([
+      { name: 'docs_loc', type: 'INTEGER', notnull: 1, dflt_value: '0' },
+      { name: 'config_loc', type: 'INTEGER', notnull: 1, dflt_value: '0' },
+      { name: 'fixtures_loc', type: 'INTEGER', notnull: 1, dflt_value: '0' },
+      { name: 'layer', type: 'TEXT', notnull: 0, dflt_value: null },
+      { name: 'layer_rank', type: 'INTEGER', notnull: 0, dflt_value: null },
+    ]);
+  });
+
+  it('stores zero lines of each new kind and a NULL layer for a module row that names neither', () => {
+    const database = new Database(':memory:');
+    for (const statement of replicaDdl()) database.run(statement);
+    database.run('INSERT INTO module_facts (path, package) VALUES (?, ?)', ['src', 'fixture']);
+    const row = database
+      .query<Record<string, unknown>, []>(
+        'SELECT docs_loc, config_loc, fixtures_loc, layer, layer_rank FROM module_facts',
+      )
+      .get();
+    database.close();
+
+    expect(row).toEqual({ docs_loc: 0, config_loc: 0, fixtures_loc: 0, layer: null, layer_rank: null });
+  });
+
+  it('gives issue_facts a nullable issue_type text column', () => {
+    expect(columnInfoOf('issue_facts', ['issue_type'])).toEqual([
+      { name: 'issue_type', type: 'TEXT', notnull: 0, dflt_value: null },
+    ]);
+  });
+
+  it('control: reads a column the DDL does not hold as missing', () => {
+    expect(columnInfoOf('module_facts', ['source_loc'])).toEqual([
+      { name: 'source_loc', type: '', notnull: -1, dflt_value: null },
+    ]);
   });
 
   it('keys stretch_marks by number and part, with its lane, end time and pull request', () => {

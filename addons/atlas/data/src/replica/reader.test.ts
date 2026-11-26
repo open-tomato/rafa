@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { ReplicaUnavailable } from '../contract/errors.js';
 import { ATLAS_CONTRACT_VERSION } from '../contract/version.js';
 
-import { META_KEYS } from './ddl.js';
+import { META_KEYS, REPLICA_VERSION } from './ddl.js';
 import { openReplica } from './reader.js';
 import { writeReplica } from './writer.js';
 
@@ -201,6 +201,23 @@ describe('openReplica, refused as ReplicaUnavailable', () => {
     });
 
     expect(() => openReplica(replicaPath)).toThrow('tables of version 0');
+  });
+
+  it('refuses a replica stamped with version 4, the tables before module line kinds and layers', async () => {
+    await writeReplica({ replicaPath, projectLabel: 'fixture' }, (build) => {
+      build.database.run('UPDATE atlas_meta SET value = ? WHERE key = ?', ['4', META_KEYS.replicaVersion]);
+    });
+
+    expect(REPLICA_VERSION).toBe('5');
+    expect(() => openReplica(replicaPath)).toThrow('has tables of version 4, this reader 5; rebuild it');
+  });
+
+  it('control: opens a replica stamped with version 5', async () => {
+    await buildWithSessions(['s1']);
+    const reader = openReplica(replicaPath);
+
+    expect(reader.current().meta.replicaVersion).toBe('5');
+    reader.close();
   });
 
   it('refuses a replica missing a meta stamp', async () => {

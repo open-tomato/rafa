@@ -17,7 +17,7 @@
  */
 
 /** The DDL version stamped as `replica_version`; a reader opens only its own. */
-export const REPLICA_VERSION: string = '4';
+export const REPLICA_VERSION: string = '5';
 
 /** One row per stamp: the keys of `META_KEYS`. */
 const ATLAS_META_DDL = 'CREATE TABLE atlas_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)';
@@ -131,13 +131,14 @@ const PR_FACTS_DDL = `CREATE TABLE pr_facts (
 
 /**
  * One row per issue. `module` and `priority` are the `module:<x>` and
- * `priority:<x>` labels (D15).
+ * `priority:<x>` labels (D15); `issue_type` is the value of the issue's
+ * first `type:<x>` label, NULL when it has none.
  */
 const ISSUE_FACTS_DDL = `CREATE TABLE issue_facts (
   number INTEGER PRIMARY KEY, title TEXT, state TEXT, state_reason TEXT, labels_json TEXT,
   is_bug INTEGER NOT NULL, is_epic INTEGER NOT NULL, epic_slug TEXT, parent_number INTEGER,
   created_at TEXT, closed_at TEXT, stage TEXT, stage_basis TEXT, horizon TEXT, plan_stub TEXT,
-  module TEXT, priority TEXT)`;
+  module TEXT, priority TEXT, issue_type TEXT)`;
 
 /**
  * The issue count per board stage, one row per day and stage. The only
@@ -148,9 +149,17 @@ const BOARD_SNAPSHOT_DDL = `CREATE TABLE board_snapshot (
   taken_at TEXT NOT NULL, day TEXT NOT NULL, stage TEXT NOT NULL, count INTEGER NOT NULL,
   PRIMARY KEY (day, stage))`;
 
-/** One row per module of the project's tree. */
+/**
+ * One row per module of the project's tree. Each file's lines count in one
+ * kind only: `loc` (source), `test_loc`, `docs_loc`, `config_loc` or
+ * `fixtures_loc`. `layer` and `layer_rank` are the module's layer in the
+ * `atlas.layers` setting and its place in that list, both NULL for a module
+ * no layer lists.
+ */
 const MODULE_FACTS_DDL = `CREATE TABLE module_facts (
   path TEXT PRIMARY KEY, package TEXT, files INTEGER, loc INTEGER, test_files INTEGER, test_loc INTEGER,
+  docs_loc INTEGER NOT NULL DEFAULT 0, config_loc INTEGER NOT NULL DEFAULT 0,
+  fixtures_loc INTEGER NOT NULL DEFAULT 0, layer TEXT, layer_rank INTEGER,
   fan_in INTEGER, fan_out INTEGER, imports_json TEXT, upward_edges INTEGER,
   bugs INTEGER, findings INTEGER, changes INTEGER)`;
 
