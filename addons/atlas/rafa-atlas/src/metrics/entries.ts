@@ -23,7 +23,7 @@
  * only states and labels, which the board cache holds. The four `gh`
  * entries with a metric (22, 29 and 33, and 20's lead time, which waits)
  * are drawn by a metric that answers rows only after a `--github` build.
- * The bug backlog metrics and the task pile ({@link UNNUMBERED_METRIC_IDS})
+ * The bug backlog metrics, the task pile and the work done ({@link UNNUMBERED_METRIC_IDS})
  * came after the B4 table and have no row in it.
  */
 import type { Feasibility, Lens } from '@open-tomato/atlas-data/contract';
@@ -96,13 +96,15 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
 
 /**
  * The served metrics no B4 row names: the task pile (spec C3), the open
- * typed issues by type and open time, which needs the GitHub times; then
+ * typed issues by type and open time, which needs the GitHub times; the
+ * work done (spec C4), the changelog entries per level and raw area; then
  * the bug backlog metrics, added from the burndown session after the
  * table was written. Outcome by loop start and the drop rate are offline;
  * open bugs per day and bugs per stretch need the GitHub times.
  */
 export const UNNUMBERED_METRIC_IDS: readonly string[] = [
   'pm.task-pile',
+  'dev.work-done',
   'qa.bug-outcome-by-loop-start',
   'qa.drop-rate',
   'qa.open-bugs-per-day',

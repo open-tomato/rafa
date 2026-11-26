@@ -19,13 +19,18 @@
  * `--github` build, and the engine computes no duration, so the metric
  * answers each merged pull request's two times and the card buckets the
  * span.
+ *
+ * `dev.work-done` (spec C4, no B4 row) counts the changelog entries of
+ * `local.changes` over the window per `level` and `area` as stored: the
+ * engine groups by the raw column, so a NULL area and each spelling of
+ * one area answer apart, and the card tidies, merges and folds them.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
 import { PLANS_SOURCE } from '../build/derive.js';
 import { ISSUES_SOURCE } from '../ingest/board.js';
 import { TASKS_SOURCE } from '../ingest/effort.js';
-import { CI_SOURCE } from '../ingest/facts.js';
+import { CHANGES_SOURCE, CI_SOURCE } from '../ingest/facts.js';
 import { COMMITS_SOURCE } from '../ingest/git.js';
 import { PRS_SOURCE } from '../ingest/github.js';
 
@@ -183,8 +188,26 @@ export const PR_CYCLE_TIME: MetricDefinition = {
   feasibility: 'gh',
 };
 
+/** The changelog entries over the window, per level and raw area: the card tidies the areas. */
+export const WORK_DONE: MetricDefinition = {
+  id: 'dev.work-done',
+  title: 'Work done',
+  lenses: ['developer'],
+  description: 'The changelog entries the tasks reported over the window, counted per level and per area as the task wrote it; an entry with no area counts under a NULL area.',
+  sourceId: CHANGES_SOURCE,
+  params: {
+    groupBy: ['level', 'area'],
+    measures: [{ field: 'id', agg: 'count', as: 'entries' }],
+    orderBy: [{ key: 'level', dir: 'asc' }, { key: 'area', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'entries',
+  chart: 'donut',
+  feasibility: 'direct',
+};
+
 /** The developer lens's PoC metrics, in the order section G lists them. */
 export const DEVELOPER_POC_METRICS: readonly MetricDefinition[] = [TASKS_DONE_PER_WEEK, TASK_CYCLE, RED_CI_SHARE, PLANS_COMPLETED_PER_WEEK];
 
-/** The developer lens's metrics: the PoC cut, then those over the git, board and GitHub sources. */
-export const DEVELOPER_METRICS: readonly MetricDefinition[] = [...DEVELOPER_POC_METRICS, DEPLOYS_PER_WEEK, WIP, PR_CYCLE_TIME];
+/** The developer lens's metrics: the PoC cut, then those over the git, board and GitHub sources, then the work done. */
+export const DEVELOPER_METRICS: readonly MetricDefinition[] = [...DEVELOPER_POC_METRICS, DEPLOYS_PER_WEEK, WIP, PR_CYCLE_TIME, WORK_DONE];

@@ -16,7 +16,10 @@
  * issue and the `cli-gap` bug left out and the bug with no module in,
  * the same params without the type, epic and cli-gap filters as the
  * control; built without, it answers no row, the params without the
- * GitHub filter as the control. `catalogue-sources.test.ts` runs the
+ * GitHub filter as the control. Then the work done over the replica with
+ * three planted changes (two spellings of the tests area and one with no
+ * area): it answers each level and area as stored, the NULL area and both
+ * spellings apart, a count of all entries as the control. `catalogue-sources.test.ts` runs the
  * phase 4 metrics over a replica of every source. Controls show each check can fail: the
  * schema refuses a definition with an extra key, the engine refuses a
  * measure on a field the descriptor lacks, and the formula refuses a
@@ -76,7 +79,7 @@ const POC_IDS = [
 const PHASE_FOUR_IDS = {
   pm: ['pm.milestone-completion', 'pm.minutes-per-agent', 'pm.out-of-scope-per-week', 'pm.task-pile'],
   architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations'],
-  developer: ['dev.deploys-per-week', 'dev.wip', 'dev.pr-cycle-time'],
+  developer: ['dev.deploys-per-week', 'dev.wip', 'dev.pr-cycle-time', 'dev.work-done'],
   qa: [
     'qa.defect-density',
     'qa.bug-outcome-by-loop-start',
@@ -128,6 +131,30 @@ const PLANTED_OUT_OF_SCOPE = [
   { id: 'planted-cli-gap', scope: 'bug', module: 'cli-gap', day: '2026-11-04' },
   { id: 'planted-null-scope', scope: null, module: null, day: '2026-10-28' },
 ] as const;
+
+/**
+ * The changes planted in the built replica beside the fixture's two
+ * (`patch` `board`, `minor` with no area): two spellings of the tests
+ * area and one more `minor` entry with no area.
+ */
+const PLANTED_CHANGES = [
+  { id: 'planted-tests', level: 'patch', area: 'tests', day: '2026-11-04' },
+  { id: 'planted-testing', level: 'patch', area: 'Testing', day: '2026-11-04' },
+  { id: 'planted-no-area', level: 'minor', area: null, day: '2026-11-04' },
+] as const;
+
+/** Plant {@link PLANTED_CHANGES} as rows of `change_facts` in the replica under `root`. */
+function plantChanges(root: string): void {
+  const database = new Database(replicaPathOf(root));
+  try {
+    const insert = database.prepare<unknown, [string, string, string | null, string]>(
+      'INSERT INTO change_facts (id, level, area, day) VALUES (?, ?, ?, ?)',
+    );
+    for (const row of PLANTED_CHANGES) insert.run(row.id, row.level, row.area, row.day);
+  } finally {
+    database.close();
+  }
+}
 
 /** Plant {@link PLANTED_OUT_OF_SCOPE} as out-of-scope rows of `bug_facts` in the replica under `root`. */
 function plantOutOfScope(root: string): void {
@@ -182,6 +209,7 @@ beforeAll(async () => {
   }, { now: () => new Date('2026-11-03T11:00:00.000Z') });
   await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
   plantOutOfScope(root);
+  plantChanges(root);
   registry = await openAtlasRegistry({ projectRoot: root, sourceOptions: { now: () => BUILT_AT } });
   const offline = writePileRoot('pile-offline');
   const github = writePileRoot('pile-github');
@@ -254,10 +282,10 @@ describe('METRIC_CATALOGUE', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five then four on PM, four then three, four then three, four then seven', () => {
+  it('gives each lens the metrics of its rows: five then four on PM, four then three, four then four, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 7, 7, 11]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 7, 8, 11]);
   });
 
   it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
@@ -496,5 +524,28 @@ describe('the task pile over the board fixture', () => {
 
     expect(rows.map((row) => [row.issue_type, row.created_at])).toEqual([['bug', null], ['chore', null], ['spec', null]]);
     expect(rows.map((row) => row.issues)).toEqual([2, 1, 1]);
+  });
+});
+
+describe('the work done over the fixture replica', () => {
+  it('counts the entries per level and area as stored, the NULL area and both spellings of tests apart', async () => {
+    const rows = recordsOf(await answerOf('dev.work-done'));
+
+    expect(rows).toEqual([
+      { level: 'minor', area: null, entries: 2 },
+      { level: 'patch', area: 'Testing', entries: 1 },
+      { level: 'patch', area: 'board', entries: 1 },
+      { level: 'patch', area: 'tests', entries: 1 },
+    ]);
+  });
+
+  it('control: the same params with no group key count all five entries in one row', async () => {
+    if (registry === null) throw new Error('no registry');
+    const changes = registry.sources.get('local.changes');
+    if (changes === undefined) throw new Error('no local.changes');
+    const metric = metricOf('dev.work-done');
+    const rows = recordsOf(await changes.query({ measures: metric.params.measures, window: WINDOW }));
+
+    expect(rows).toEqual([{ entries: 5 }]);
   });
 });
