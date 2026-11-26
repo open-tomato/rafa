@@ -47,6 +47,10 @@
  *
  * ## The payload cap
  *
+ * `dangerous.hub.maxPayloadRows` reaches the connector's context, so
+ * the store's contract answers it, `/v1/status` with it, and the push
+ * and pull routes hold every payload to it (`server-effort.ts`).
+ *
  * Once it listens, a hub whose `dangerous.hub.maxPayloadRows` is
  * `unlimited` or above its default (`config-dangerous.ts`) logs one
  * `config.dangerous` warning naming the key and its value: a push or
@@ -389,11 +393,11 @@ function servedProjects(config: HubConfig): readonly HubServedProject[] {
   return config.projects.map(({ id, name }) => Object.freeze({ id, name }));
 }
 
-/** Opens the `sqlite` connector over `config`'s projects, their stores and indexes, and its library. */
+/** Opens the `sqlite` connector over `config`'s projects, their stores and indexes, its library and its payload cap. */
 function connectHub(config: HubConfig): Promise<HubConnected> {
-  const { storePath, sqliteLibrary, repository, projects } = config;
+  const { storePath, sqliteLibrary, repository, projects, maxPayloadRows } = config;
   return connectSqliteHub(
-    { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config) },
+    { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config), maxPayloadRows },
     {
       fileName: basename(storePath),
       storeFiles: projects.map(({ id, storePath: file }) => ({ id, storePath: file })),

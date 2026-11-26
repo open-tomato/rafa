@@ -269,6 +269,26 @@ describe('runHub', () => {
     expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
     expect(String(logged[0]?.['problems'])).toContain('dangerous.hub.maxPayloadRows is 0');
   });
+
+  it('answers dangerous.hub.maxPayloadRows as maxPayloadRows on GET /v1/status: 50000 left out, the cap written, null for unlimited', async () => {
+    mkdirStore();
+    const { log } = collecting();
+    const auth = '  auth:\n    adapter: api-key\n    apiKeys:\n      - RAFA_HUB_BIN_KEY\n';
+
+    for (const [written, answered] of [[undefined, 50_000], ['7', 7], ['unlimited', null]] as const) {
+      const cap = written === undefined
+        ? ''
+        : `dangerous:\n  hub:\n    maxPayloadRows: ${written}\n`;
+      const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort(), auth + cap), RAFA_HUB_BIN_KEY: API_KEY }, { log, hostname: '127.0.0.1' });
+      if (server === null) throw new Error('the hub refused its config');
+      const status = await fetch(`${server.url}${HUB_ROUTES.status}`, { headers: { authorization: `Bearer ${API_KEY}` } });
+      const body = await status.json() as { readonly data?: Record<string, unknown> };
+      await server.stop();
+
+      expect(status.status).toBe(200);
+      expect(body.data?.['maxPayloadRows']).toBe(answered);
+    }
+  });
 });
 
 /** `hub.auth` under `api-key`, naming `RAFA_HUB_BIN_KEY`, plus `login` lines indented under it. */

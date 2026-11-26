@@ -13,7 +13,8 @@
  *   - `GET /v1/status` (`status.read`): the hub's version, the migration
  *     ids its store holds, its rows per table and each device's last push,
  *     with the store's wire contract beside them: `contractVersion`,
- *     `migrations` (the same ids) and `capabilities`. The rows, devices
+ *     `migrations` (the same ids), `capabilities` and `maxPayloadRows`,
+ *     the payload cap (`null` for none). The rows, devices
  *     and migrations are the first served project's, and `projects`
  *     names every project the store serves, each by `id` and `name` in
  *     the order listed, as the store's `status()` answers them; a store
@@ -21,7 +22,8 @@
  *   - `POST /v1/effort/push?device=<origin>&project=<id>&contractVersion=<n>`
  *     (`effort.push`): the body is a wire payload as core's
  *     `encodeWirePayload` writes it, checked by core's
- *     `decodeWirePayload`; answers what the push received and added.
+ *     `decodeWirePayload`; answers what the push received and added. A
+ *     payload carrying more rows than the cap is refused.
  *   - `GET /v1/effort/pull?device=<origin>&project=<id>&since=<cursor>&contractVersion=<n>&migrations=<ids>`
  *     (`effort.pull`): the rows other origins created past `since`, a
  *     wire cursor as JSON text and read from the start when left out, as
@@ -29,6 +31,13 @@
  *     comma-separated: a pull naming them is answered projected to that
  *     schema when the store holds an id they leave out, and whole when
  *     they name every id it holds; left out, the pull is answered whole.
+ *     Under a cap the answer is one page of at most the cap rows, its
+ *     cursor past the last row answered.
+ *
+ * The two effort routes are served by `server-effort.ts`, whose module
+ * note gives the cap: the store's `contract().maxPayloadRows`, as
+ * `dangerous.hub.maxPayloadRows` set it, so the status answer and the
+ * routes read one number.
  *
  * `device` is the calling store's origin, its rows' `origin_store`.
  * `project` is the project the rows are for, its root commit sha as 40
@@ -85,6 +94,9 @@
  *     naming a contract version the hub does not speak, its error naming
  *     both versions; refused once the query is read, before the body is
  *     decoded or the store is called;
+ *   - `413` for a push carrying more rows than the cap, its error naming
+ *     the rows, the cap and `dangerous.hub.maxPayloadRows`, refused once
+ *     the body is decoded, before the store is called;
  *   - `409` with `missing`, the migrations the device lacks, for a pull
  *     whose `migrations` leave out an id the store holds when the store's
  *     `capabilities.projection` is `false`, refused before the store is
@@ -151,16 +163,17 @@
  * the error's message and its milliseconds.
  */
 import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusalReason } from './identity/port.js';
+import type { EffortRouteContext, EffortServed } from './server-effort.js';
 import type { HubKeyRoutes } from './server-keys.js';
 import type { HubLoginRoutes } from './server-login.js';
-import type { HubIndex, HubPullRequest, HubServedProject, HubStore } from './store/port.js';
-import type { WireCursor } from '@open-tomato/rafa/store';
+import type { HubIndex, HubServedProject, HubStore } from './store/port.js';
 
-import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
+import { WireFormatError } from '@open-tomato/rafa/store';
 
+import { ProjectionUnsupported, PULL_QUERY, PUSH_QUERY, servePull, servePush } from './server-effort.js';
 import { isKeyPath } from './server-keys.js';
 import { isLoginPath } from './server-login.js';
-import { checkContractVersion, checkQuery, ContractUnsupported, readDevice, readProject, RequestRefused } from './server-query.js';
+import { checkQuery, ContractUnsupported, RequestRefused } from './server-query.js';
 import { HubProjectNotServed, HubUpgradeRequired, servesOneProject } from './store/sqlite.js';
 
 /** The path each route answers on. */
@@ -190,9 +203,6 @@ export const INTERNAL_ERROR = 'The hub failed to serve this request; the hub\'s 
 
 /** The `code` a `409` carries for a contract version the hub does not speak. */
 export const CONTRACT_UNSUPPORTED = 'contract-unsupported';
-
-/** One migration id in `migrations`: 1 to 200 printable ASCII characters but the comma that separates them. */
-const MIGRATION_ID = /^[!-+\--~]{1,200}$/;
 
 /** The status each identity refusal is answered with. */
 const REFUSAL_STATUS: Readonly<Record<IdentityRefusalReason, number>> = Object.freeze({
@@ -281,18 +291,6 @@ export interface HubServer {
   readonly stop: () => Promise<void>;
 }
 
-/** A pull the store cannot project, naming the migrations the device lacks: `409` with `missing`. */
-class ProjectionUnsupported extends Error {
-  override readonly name = 'ProjectionUnsupported';
-  /** The ids the store holds that the pulling device lacks, in the store's order. */
-  readonly missing: readonly string[];
-
-  constructor(missing: readonly string[]) {
-    super(`The pulling store lacks migration ${missing.join(', ')}, and this hub's store cannot project a pull to its schema. Nothing was sent. Next step: rafa self-update, then rafa effort sync.`);
-    this.missing = Object.freeze([...missing]);
-  }
-}
-
 /** A request's answer, with what its log line adds. */
 interface Served {
   readonly response: Response;
@@ -303,16 +301,9 @@ interface Served {
   readonly fields?: Readonly<Record<string, unknown>>;
 }
 
-/** What a route's handler is handed once the caller is served and the store is open. */
-interface RouteContext {
-  readonly url: URL;
-  readonly request: Request;
-  readonly store: HubStore;
+/** What a route's handler is handed once the caller is served and the store is open: an effort route's context, with the hub's version. */
+interface RouteContext extends EffortRouteContext {
   readonly version: string;
-  /** The projects the hub lists, or null on a single-project hub, which serves every project a request names. */
-  readonly listed: readonly HubServedProject[] | null;
-  /** Starts a rebuild of the index of the project a push named, or queues one; a no-op when the hub rebuilds nothing after a push. Never throws. */
-  readonly rebuild: (project: string | undefined) => void;
 }
 
 /** A route behind the identity port. */
@@ -388,69 +379,9 @@ function refusalResponse(refusal: IdentityRefusal): Response {
   return failure(status, refusal.message, headers);
 }
 
-/** The cursor `since` spells, `{}` when left out, checked by core's wire codec. */
-function readCursor(url: URL): WireCursor {
-  const since = url.searchParams.get('since');
-  if (since === null) return {};
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(since);
-  } catch {
-    throw new RequestRefused(400, 'since is not JSON; expected a cursor such as {"commits":12}.');
-  }
-  const probe = { format: WIRE_FORMAT, version: WIRE_VERSION, migrations: [], tables: {}, cursor: parsed };
-  return decodeWirePayload(JSON.stringify(probe)).cursor;
-}
-
-/**
- * The migration ids `migrations` names, comma-separated, or undefined
- * when left out; refused when an id is empty, is not printable ASCII or
- * is named twice.
- */
-function readMigrations(url: URL): readonly string[] | undefined {
-  const spelt = url.searchParams.get('migrations');
-  if (spelt === null) return undefined;
-
-  const ids = spelt.split(',');
-  const malformed = ids.find((id) => !MIGRATION_ID.test(id));
-  if (malformed !== undefined) {
-    throw new RequestRefused(400, `migrations names ${JSON.stringify(malformed)}; expected migration ids separated by commas, each 1 to 200 printable ASCII characters.`);
-  }
-  const twice = ids.find((id, index) => ids.indexOf(id) !== index);
-  if (twice !== undefined) throw new RequestRefused(400, `migrations names ${twice} more than once.`);
-  return ids;
-}
-
-/**
- * The pull `store` is handed for a device naming `migrations`: refused
- * with {@link ProjectionUnsupported} when the device lacks an id the
- * store holds and the store cannot project, and naming no `migrations`
- * when the store cannot project and the device lacks none, since such a
- * store is never handed them.
- */
-function pullRequestOf(store: HubStore, request: HubPullRequest, migrations: readonly string[] | undefined): HubPullRequest {
-  const { capabilities, migrations: held } = store.contract();
-  if (migrations === undefined || capabilities.projection) {
-    return migrations === undefined
-      ? request
-      : { ...request, migrations };
-  }
-  const missing = held.filter((id) => !migrations.includes(id));
-  if (missing.length > 0) throw new ProjectionUnsupported(missing);
-  return request;
-}
-
-/** The log field naming `project`, none when the request named none. */
-function projectField(project: string | undefined): Readonly<Record<string, string>> {
-  return project === undefined
-    ? {}
-    : { project };
-}
-
-/** The rows across every table of `tables`. */
-function rowCount(tables: Readonly<Record<string, readonly unknown[]>>): number {
-  return Object.values(tables).reduce((total, rows) => total + rows.length, 0);
+/** An effort route's answer: its data in a success envelope, with its log fields. */
+function servedOf({ data, fields }: EffortServed): Omit<Served, 'caller'> {
+  return { response: success(data), fields };
 }
 
 /** Every route behind the identity port, by path. */
@@ -464,29 +395,14 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
   [HUB_ROUTES.push]: {
     method: 'POST',
     action: 'effort.push',
-    query: ['device', 'project', 'contractVersion'],
-    handle: async ({ url, request, store, listed, rebuild }) => {
-      checkContractVersion(url);
-      const device = readDevice(url);
-      const project = readProject(url, listed);
-      const payload = decodeWirePayload(await request.text());
-      const pushed = await store.push({ device, project, payload });
-      if (pushed.added > 0) rebuild(project);
-      return { response: success(pushed), fields: { device, ...projectField(project), received: pushed.received, added: pushed.added } };
-    },
+    query: PUSH_QUERY,
+    handle: async (context) => servedOf(await servePush(context)),
   },
   [HUB_ROUTES.pull]: {
     method: 'GET',
     action: 'effort.pull',
-    query: ['device', 'project', 'since', 'contractVersion', 'migrations'],
-    handle: async ({ url, store, listed }) => {
-      checkContractVersion(url);
-      const device = readDevice(url);
-      const project = readProject(url, listed);
-      const since = readCursor(url);
-      const pulled = await store.pull(pullRequestOf(store, { device, project, since }, readMigrations(url)));
-      return { response: success(pulled), fields: { device, ...projectField(project), rows: rowCount(pulled.tables) } };
-    },
+    query: PULL_QUERY,
+    handle: async (context) => servedOf(await servePull(context)),
   },
 });
 
