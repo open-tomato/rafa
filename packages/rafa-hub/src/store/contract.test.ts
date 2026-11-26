@@ -4,8 +4,10 @@
  * the index suite twice per connector: once as configured and once with
  * the extension held off, so the vector cases run under both answers.
  * A connector's setup (the embedder, the extension held off) reaches it
- * through {@link INDEX_SETUPS}, keyed by the same names; a connector
- * added without one fails the guard case here.
+ * through {@link INDEX_SETUPS}, keyed by the same names, beside the probe
+ * the suite reads the store's and the index's identities with and the
+ * planter of its `ref_links`; a connector added without one fails the
+ * guard case here.
  *
  * The row suite also runs against the in-memory stand-in
  * (`testdata/memory-store.ts`), which is no connector, then against the
@@ -29,7 +31,7 @@
  * no load. Each is held to fail its named case, in the run as configured
  * or in the run with the extension off, and the `none` run is held to pass.
  */
-import type { HubIndexConnector, HubIndexFiles } from './index-contract.js';
+import type { HubIndexConnector, HubIndexLinkPlanter, HubIndexProbe } from './index-contract.js';
 import type { HubServedProject, HubStore } from './port.js';
 
 import { join } from 'node:path';
@@ -37,25 +39,30 @@ import { join } from 'node:path';
 import { createLoaderState } from '@open-tomato/rafa-index/loader';
 import { describe, expect, it } from 'bun:test';
 
-import { DEFAULT_STORE_FILE } from '../config.js';
-
 import { HUB_CONNECTORS } from './connectors.js';
 import { builders, hubStoreContract, readTemplate } from './contract.js';
 import { hubIndexContract, INDEX_CONTRACT_EMBEDDER } from './index-contract.js';
-import { connectSqliteHub, indexFileName } from './sqlite.js';
+import { plantSqliteRefLinks, SQLITE_INDEX_PROBE } from './sqlite-index-probe.js';
+import { connectSqliteHub } from './sqlite.js';
 import { openMemoryHubStore } from './testdata/memory-store.js';
 import { openNoProjectionHubStore } from './testdata/no-projection-store.js';
 
-/** How the index suite opens one connector of {@link HUB_CONNECTORS}, and the files it reads. */
+/**
+ * How the index suite opens one connector of {@link HUB_CONNECTORS},
+ * reads its store's and index's identities, and plants its `ref_links`.
+ */
 interface IndexSetup {
   readonly connect: HubIndexConnector;
-  readonly files: HubIndexFiles;
+  readonly probe: HubIndexProbe;
+  readonly plantLinks: HubIndexLinkPlanter;
 }
 
 /**
  * The index suite's setup per connector name. `sqlite` holds the
  * extension off the way macOS does with no library named, on a loader
- * state of its own so the process's stays unmarked.
+ * state of its own so the process's stays unmarked, and is probed by
+ * its store file's sha256 and its index file's inode
+ * (`sqlite-index-probe.ts`).
  */
 const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
   sqlite: {
@@ -65,7 +72,8 @@ const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
         ? { library: null, platform: 'darwin', state: createLoaderState() }
         : { state: createLoaderState() },
     }),
-    files: { index: indexFileName(DEFAULT_STORE_FILE), store: DEFAULT_STORE_FILE },
+    plantLinks: plantSqliteRefLinks,
+    probe: SQLITE_INDEX_PROBE,
   },
 });
 
@@ -79,7 +87,7 @@ for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
   hubStoreContract(name, async (context) => (await connector(context)).store);
   const setup = INDEX_SETUPS[name];
   if (setup !== undefined) {
-    const options = { embedder: INDEX_CONTRACT_EMBEDDER, files: setup.files };
+    const options = { embedder: INDEX_CONTRACT_EMBEDDER, plantLinks: setup.plantLinks, probe: setup.probe };
     hubIndexContract(name, setup.connect, options);
     hubIndexContract(`${name}, extension off`, setup.connect, { ...options, holdExtensionOff: true });
   }
@@ -273,8 +281,8 @@ const INDEX_FIXTURE_CASE_TIMEOUT_MS = 60_000;
 /** Each index fault, and the cases named for the rule it breaks. */
 const INDEX_FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
   ['index-in-store', [
-    'a rebuild beside a push > leaves the store file\'s sha256 as the push left it, and swaps a new index file in',
-    'a rebuild beside a push > leaves the store file\'s sha256 unchanged by a rebuild run alone',
+    'a rebuild beside a push > leaves the store\'s identity as the push left it, and swaps a new index in',
+    'a rebuild beside a push > leaves the store\'s identity unchanged by a rebuild run alone',
   ]],
   ['answers-bodies', [
     'what a search answers > holds only a table, an origin pair and a score per hit, in frozen records, for fts',

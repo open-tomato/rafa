@@ -10,7 +10,10 @@
  * Each fault wraps the working connector rather than forking it, so the
  * one rule it breaks is the only difference. The suite is registered
  * twice, as `contract.test.ts` registers it for a real connector: once
- * as configured and once with the extension held off.
+ * as configured and once with the extension held off, with the probe
+ * `contract.test.ts` hands `sqlite` (`sqlite-index-probe.ts`), so
+ * `index-in-store`'s write to the store file shows in the store's
+ * identity.
  */
 import type { HubIndexConnector } from '../index-contract.js';
 import type { HubConnector, HubIndex, IndexSearchRequest, IndexSearchResult } from '../port.js';
@@ -22,7 +25,8 @@ import { Database } from 'bun:sqlite';
 
 import { DEFAULT_STORE_FILE } from '../../config.js';
 import { hubIndexContract, INDEX_CONTRACT_EMBEDDER } from '../index-contract.js';
-import { connectSqliteHub, indexFileName } from '../sqlite.js';
+import { plantSqliteRefLinks, SQLITE_INDEX_PROBE } from '../sqlite-index-probe.js';
+import { connectSqliteHub } from '../sqlite.js';
 
 /** The environment variable naming the fault to plant. */
 export const FAULT_ENV = 'RAFA_HUB_INDEX_FAULT';
@@ -98,8 +102,7 @@ if (plant === undefined) throw new Error(`${FAULT_ENV} is ${JSON.stringify(fault
 /** Whether the fault opens the connector with no load, whatever the run asks. */
 const NEVER_LOADS = fault === 'vector-without-load';
 
-const files = { index: indexFileName(DEFAULT_STORE_FILE), store: DEFAULT_STORE_FILE };
-const options = { embedder: INDEX_CONTRACT_EMBEDDER, files };
+const options = { embedder: INDEX_CONTRACT_EMBEDDER, plantLinks: plantSqliteRefLinks, probe: SQLITE_INDEX_PROBE };
 
 /** The `sqlite` connector with the fault planted, as `contract.test.ts` opens the real one. */
 const connect: HubIndexConnector = async (context, setup) => {

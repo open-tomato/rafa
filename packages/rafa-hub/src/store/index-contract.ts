@@ -8,9 +8,10 @@
  * ```ts
  * import { hubIndexContract, INDEX_CONTRACT_EMBEDDER } from './index-contract.js';
  *
- * // `connectSomeHub` stands for any connector, taking the setup the suite hands it.
- * hubIndexContract('some', connectSomeHub, { embedder: INDEX_CONTRACT_EMBEDDER, files });
- * hubIndexContract('some, extension off', connectSomeHub, { embedder: INDEX_CONTRACT_EMBEDDER, files, holdExtensionOff: true });
+ * // `connectSomeHub`, `someProbe` and `plantSomeLinks` stand for any connector's own.
+ * const options = { embedder: INDEX_CONTRACT_EMBEDDER, plantLinks: plantSomeLinks, probe: someProbe };
+ * hubIndexContract('some', connectSomeHub, options);
+ * hubIndexContract('some, extension off', connectSomeHub, { ...options, holdExtensionOff: true });
  * ```
  *
  * ## What it covers
@@ -26,9 +27,10 @@
  *     and that `fts` still answers. One runner, called twice, covers both.
  *   - **`links`** over a `ref_links` table planted in the store, and over
  *     a store holding none.
- *   - **A rebuild beside a push**: the store file's sha256 is the one the
- *     push left, whatever the rebuild did, and the index file is a new
- *     one, since a rebuild builds a file beside the index and swaps it in.
+ *   - **A rebuild beside a push**: the store's identity is the one the
+ *     push left, whatever the rebuild did, and the index's identity is a
+ *     new one, since a rebuild builds its index beside the serving one and
+ *     swaps it in.
  *   - **A second push** keeps the index attached and answering.
  *   - **What a search answers**: a table, an origin pair and a score per
  *     hit, in frozen records, and no row body.
@@ -40,9 +42,17 @@
  * name, the embedder to embed with and whether the vector extension is
  * to be held off. A connector that cannot be told is handed the setup
  * and ignores it, so only the run that holds nothing off can pass it.
- * The options also name the store file and the index file in the
- * directory ({@link HubIndexFiles}), which the file cases hash and
- * `stat`, and in whose store file the `ref_links` table is planted.
+ *
+ * The suite reads no file: what it holds of a connector's storage it
+ * reads through the options' {@link HubIndexProbe}, called with the
+ * case's context. `storeIdentity()` answers one string for the rows the
+ * store holds and `indexIdentity()` one for the index serving them, so
+ * a rebuild is held to leave the first as it was and to change the
+ * second. The SQLite connector's probe (`sqlite-index-probe.ts`) hashes
+ * its store file and reads its index file's inode; a connector with no
+ * files answers its own measure of the same two things. The options'
+ * {@link HubIndexLinkPlanter} plants the `ref_links` rows the `links`
+ * cases walk, between two opens of the connector.
  *
  * ## The pushes it makes
  *
@@ -58,21 +68,22 @@
  *
  * A fresh directory under the temporary directory and a clock per case,
  * the connector's store closed and the directory removed after it,
- * whatever the case did.
+ * whatever the case did. The helpers that read nothing of a connector's
+ * storage live in `index-contract-helpers.ts`.
  */
 import type { WireTemplate } from './contract.js';
-import type { HubConnector, HubIndex, HubStore, HubStoreContext, IndexSearchHit } from './port.js';
+import type { HubConnector, HubIndex, HubStore, HubStoreContext } from './port.js';
 import type { WireRow, WirePayload } from '@open-tomato/rafa/store';
 import type { IndexEmbedder } from '@open-tomato/rafa-index';
 
-import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Database } from 'bun:sqlite';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { builders, readTemplate } from './contract.js';
+import { frozenWithKeys, holdsOnlyReferences, keyOf, keysOf, refusal, withText } from './index-contract-helpers.js';
 
 /** The two devices a case pushes as, each named by its store origin. */
 const A = 'aaaaaaaa-0000-4000-8000-00000000000a';
@@ -93,11 +104,6 @@ const PARSER = 'parser';
 const CACHE = 'cache';
 const ABSENT = 'zzzabsent';
 
-/** The keys a hit, its origin and a search answer hold, and nothing else. */
-const HIT_KEYS: readonly string[] = ['origin', 'score', 'table'];
-const ORIGIN_KEYS: readonly string[] = ['originSeq', 'originStore'];
-const RESULT_KEYS: readonly string[] = ['hits'];
-
 /**
  * The fixture embedder the suite's options are given: the count of `a`
  * and of `b` in a text, then a constant one, so no vector is zero and no
@@ -112,20 +118,35 @@ export const INDEX_CONTRACT_EMBEDDER: IndexEmbedder = {
   ]))),
 };
 
-/** The names of the two files a connector keeps in a case's directory. */
-export interface HubIndexFiles {
-  /** The store file's name, whose bytes a rebuild must leave as they were. */
-  readonly store: string;
-  /** The index file's name, which a rebuild replaces with a new file. */
-  readonly index: string;
+/**
+ * How the suite reads a connector's storage, called with the case's
+ * context after the connector opened over it. Each answer is an opaque
+ * string the suite only compares with an earlier one.
+ */
+export interface HubIndexProbe {
+  /** The identity of the rows the store holds, which a rebuild must leave as it was. */
+  readonly storeIdentity: (context: HubStoreContext) => Promise<string>;
+  /** The identity of the index serving, which a rebuild replaces with a new one. */
+  readonly indexIdentity: (context: HubStoreContext) => Promise<string>;
 }
+
+/** One `ref_links` row the `links` cases plant: from kind and id, then ref kind and text. */
+export type HubIndexLink = readonly [fromKind: string, fromId: string, refKind: string, refText: string];
+
+/**
+ * Plants `links` in the store the case's context names, its connector
+ * closed, so the next open finds a `ref_links` table holding them.
+ */
+export type HubIndexLinkPlanter = (context: HubStoreContext, links: readonly HubIndexLink[]) => Promise<void>;
 
 /** What a run is configured with. */
 export interface HubIndexContractOptions {
   /** The embedder vector search embeds with; {@link INDEX_CONTRACT_EMBEDDER} is the fixture. */
   readonly embedder: IndexEmbedder;
-  /** The files the connector keeps in the case's directory. */
-  readonly files: HubIndexFiles;
+  /** How the suite reads the store's and the index's identities. */
+  readonly probe: HubIndexProbe;
+  /** How the suite plants the `ref_links` rows the `links` cases walk. */
+  readonly plantLinks: HubIndexLinkPlanter;
   /** Whether the vector extension is held off, so `vector` is `false` though an embedder is given. */
   readonly holdExtensionOff?: boolean;
 }
@@ -147,84 +168,13 @@ interface Connected {
   readonly index: HubIndex;
 }
 
-/** `row` with `text` added to its `row_json` under `key`, its other keys kept. */
-function withText(row: WireRow, key: string, text: string): WireRow {
-  const rowJson = row['row_json'];
-  const parsed = typeof rowJson === 'string'
-    ? JSON.parse(rowJson) as Record<string, unknown>
-    : {};
-  return { ...row, row_json: JSON.stringify({ ...parsed, [key]: text }) };
-}
-
-/** A hit's key as one string: `table:store/seq`. */
-function keyOf(hit: IndexSearchHit): string {
-  return `${hit.table}:${hit.origin.originStore}/${String(hit.origin.originSeq)}`;
-}
-
-/** The keys of `hits`, sorted. */
-function keysOf(hits: readonly IndexSearchHit[]): string[] {
-  return hits.map(keyOf).sort();
-}
-
-/** A file's device and inode, as one string. */
-function inodeOf(path: string): string {
-  const stats = statSync(path);
-  return `${String(stats.dev)}:${String(stats.ino)}`;
-}
-
-/** The sha256 of a file's bytes. */
-function sha256Of(path: string): string {
-  return new Bun.CryptoHasher('sha256')
-    .update(readFileSync(path))
-    .digest('hex');
-}
-
-/** What a rejected call rejected with, as a message. */
-async function refusal(work: Promise<unknown>): Promise<string> {
-  const error = await work.then(() => null, (thrown: unknown) => thrown);
-  if (!(error instanceof Error)) throw new Error('hub index contract: the call did not reject');
-  return error.message;
-}
-
-/** Plants a `ref_links` table in the store file, holding the links given: from kind and id, then ref kind and text. */
-function plantRefLinks(path: string, links: readonly (readonly [string, string, string, string])[]): void {
-  const database = new Database(path);
-  try {
-    database.run('CREATE TABLE IF NOT EXISTS ref_links (from_kind TEXT NOT NULL, from_id TEXT NOT NULL, role TEXT NOT NULL, ref_kind TEXT NOT NULL, ref_text TEXT NOT NULL)');
-    for (const [fromKind, fromId, refKind, refText] of links) {
-      database.run('INSERT INTO ref_links VALUES (?, ?, \'mentions\', ?, ?)', [fromKind, fromId, refKind, refText]);
-    }
-  } finally {
-    database.close();
-  }
-}
-
-/** Whether `value` is a plain record whose own keys are exactly `keys`, frozen. */
-function frozenWithKeys(value: object, keys: readonly string[]): boolean {
-  return Object.isFrozen(value) && Object.keys(value).sort()
-    .join() === [...keys].sort().join();
-}
-
-/** Whether a search answer holds nothing but frozen (table, origin pair, score) records. */
-function holdsOnlyReferences(answer: { readonly hits: readonly IndexSearchHit[] }): boolean {
-  return frozenWithKeys(answer, RESULT_KEYS)
-    && Object.isFrozen(answer.hits)
-    && answer.hits.every((hit) => frozenWithKeys(hit, HIT_KEYS)
-      && frozenWithKeys(hit.origin, ORIGIN_KEYS)
-      && typeof hit.table === 'string'
-      && typeof hit.origin.originStore === 'string'
-      && Number.isInteger(hit.origin.originSeq)
-      && typeof hit.score === 'number'
-      && Number.isFinite(hit.score));
-}
-
 /**
  * Registers the contract's cases for one connector, under a `describe`
  * naming it. Call it from a test file, once per connector and once more
  * with `holdExtensionOff` for the vector answer that is `false`.
  */
 export function hubIndexContract(name: string, connector: HubIndexConnector, options: HubIndexContractOptions): void {
-  const { embedder, files } = options;
+  const { embedder, plantLinks, probe } = options;
   const holdExtensionOff = options.holdExtensionOff === true;
   const setup: HubIndexSetup = { embedder, holdExtensionOff };
 
@@ -236,8 +186,10 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
       if (template === undefined) throw new Error('hub index contract: the template was not read');
       return template;
     });
-    const storePath = (): string => join(directory, files.store);
-    const indexPath = (): string => join(directory, files.index);
+    /** The context the case's connector is opened over and its probe reads. */
+    const context = (): HubStoreContext => ({ directory, now: () => new Date(T0) });
+    const storeIdentity = (): Promise<string> => probe.storeIdentity(context());
+    const indexIdentity = (): Promise<string> => probe.indexIdentity(context());
 
     /** The rows a push carries: two commits and a session, each holding a word a search looks for. */
     const rows = (origin: string, first: number): Readonly<Record<string, readonly WireRow[]>> => ({
@@ -256,7 +208,7 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
 
     /** Opens the connector over the case's directory, its store closed after the case. */
     const connect = async (): Promise<Connected> => {
-      const hub = await connector({ directory, now: () => new Date(T0) }, setup);
+      const hub = await connector(context(), setup);
       opened.push(hub.store);
       return hub;
     };
@@ -269,12 +221,12 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
       return hub;
     };
 
-    /** Opens the connector once, closes it, plants links in the store file, and opens it again. */
-    const connectWithLinks = async (links: readonly (readonly [string, string, string, string])[]): Promise<Connected> => {
+    /** Opens the connector once, closes it, plants links in its store, and opens it again. */
+    const connectWithLinks = async (links: readonly HubIndexLink[]): Promise<Connected> => {
       const first = await connect();
       await first.store.close();
       opened = [];
-      plantRefLinks(storePath(), links);
+      await plantLinks(context(), links);
       return connect();
     };
 
@@ -462,7 +414,7 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
         it('rebuilds with no vector row, answering why, and refuses a vector-scoped rebuild naming fts', async () => {
           const { index, store } = await connect();
           await store.push({ device: A, payload: pushOf(A) });
-          const before = inodeOf(indexPath());
+          const before = await indexIdentity();
 
           const rebuilt = await index.rebuild({ project: PROJECT });
           const refused = await refusal(index.rebuild({ project: PROJECT, scope: 'vector' }));
@@ -470,7 +422,7 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
           expect([rebuilt.rows, rebuilt.vectors, rebuilt.vector]).toEqual([3, 0, false]);
           expect(rebuilt.why).not.toBeNull();
           expect(refused).toContain('fts');
-          expect(inodeOf(indexPath())).not.toBe(before);
+          expect(await indexIdentity()).not.toBe(before);
         });
       });
     } else {
@@ -528,7 +480,7 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
     }
 
     describe('links', () => {
-      const LINKS: readonly (readonly [string, string, string, string])[] = [
+      const LINKS: readonly HubIndexLink[] = [
         ['commit', 'abc123', 'issue', '#1'],
         ['issue', '#1', 'pr', '#2'],
         ['pr', '#2', 'issue', '#3'],
@@ -593,31 +545,31 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
     });
 
     describe('a rebuild beside a push', () => {
-      it('leaves the store file\'s sha256 as the push left it, and swaps a new index file in', async () => {
+      it('leaves the store\'s identity as the push left it, and swaps a new index in', async () => {
         const { index, store } = await connectWithRows();
-        const indexBefore = inodeOf(indexPath());
+        const indexBefore = await indexIdentity();
 
         const pushing = store.push({ device: B, payload: pushOf(B) });
         const rebuilding = index.rebuild({ project: PROJECT });
         const pushed = await pushing;
-        const storeAfterPush = sha256Of(storePath());
+        const storeAfterPush = await storeIdentity();
         const rebuilt = await rebuilding;
 
         expect(pushed.added).toBe(3);
         expect(rebuilt.project).toBe(PROJECT);
-        expect(sha256Of(storePath())).toBe(storeAfterPush);
-        expect(inodeOf(indexPath())).not.toBe(indexBefore);
+        expect(await storeIdentity()).toBe(storeAfterPush);
+        expect(await indexIdentity()).not.toBe(indexBefore);
       });
 
-      it('leaves the store file\'s sha256 unchanged by a rebuild run alone', async () => {
+      it('leaves the store\'s identity unchanged by a rebuild run alone', async () => {
         const { index } = await connectWithRows();
-        const storeBefore = sha256Of(storePath());
-        const indexBefore = inodeOf(indexPath());
+        const storeBefore = await storeIdentity();
+        const indexBefore = await indexIdentity();
 
         await index.rebuild({ project: PROJECT });
 
-        expect(sha256Of(storePath())).toBe(storeBefore);
-        expect(inodeOf(indexPath())).not.toBe(indexBefore);
+        expect(await storeIdentity()).toBe(storeBefore);
+        expect(await indexIdentity()).not.toBe(indexBefore);
       });
 
       it('holds the rows of both once a rebuild is run after them', async () => {
