@@ -38,6 +38,9 @@ function withKey(rowJson: WireRow[string], key: string, value: unknown): WireRow
  * Each fault, as a change to the working stand-in. `recomputes-gap` is
  * no fault: it rewrites only the gap core's merge recomputes, as the
  * SQLite adapter's merge does, which the suite exempts, so it passes.
+ * `ignores-limit` answers every row past the cursor whatever `limit` a
+ * pull names; `skips-past-page` cuts the page but answers the cursor of
+ * a pull naming none, so the rows the page left out are never answered.
  */
 const FAULTS: Readonly<Record<string, (store: HubStore) => HubStore>> = {
   'none': (store) => store,
@@ -69,6 +72,11 @@ const FAULTS: Readonly<Record<string, (store: HubStore) => HubStore>> = {
   'forgets-last-push': (store) => ({ ...store, status: async (request) => ({ ...await store.status(request), devices: [] }) }),
   'shares-projects': (store) => store,
   'miscounts': (store) => ({ ...store, status: async (request) => ({ ...await store.status(request), rows: {} }) }),
+  'ignores-limit': (store) => ({ ...store, pull: (request) => store.pull({ ...request, limit: undefined }) }),
+  'skips-past-page': (store) => ({
+    ...store,
+    pull: async (request) => ({ ...await store.pull(request), cursor: (await store.pull({ ...request, limit: undefined })).cursor }),
+  }),
 };
 
 /**

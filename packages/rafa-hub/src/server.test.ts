@@ -387,6 +387,7 @@ describe('GET /v1/status', () => {
         contractVersion: WIRE_CONTRACT_VERSION,
         migrations: ['0001-base'],
         capabilities: { fts: false, vector: false, graph: false, projection: false },
+        maxPayloadRows: null,
         rows: { commits: 3 },
         devices: [{ device: A, lastPushAt: T0 }, { device: B, lastPushAt: T0 }],
       },

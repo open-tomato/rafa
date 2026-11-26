@@ -233,6 +233,11 @@ const FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
     'projects > leaves the other project\'s row counts and devices unchanged by a push to one',
   ]],
   ['edits-rows', ['pull > carries every column as pushed but the recomputed gap, with seq the hub\'s own in rising order past the cursor']],
+  ['ignores-limit', [
+    'a paged pull > answers at most the limit\'s rows across every table, the caller\'s own counting none',
+    'a paged pull > reaches every row once over pages pulled with the cursor each answered, each page but the last full',
+  ]],
+  ['skips-past-page', ['a paged pull > reaches every row once over pages pulled with the cursor each answered, each page but the last full']],
 ];
 
 describe('the contract suite against a broken stand-in', () => {

@@ -66,6 +66,12 @@
  *     caller relayed it.
  *   - **The answered cursor is a snapshot.** Pulling again with it
  *     answers only rows pushed since.
+ *   - **A pull naming a `limit` answers a page.** At most that many
+ *     rows across every table, the caller's own counting none, and a
+ *     cursor past the rows it answered and no further, so pulling again
+ *     with it answers the rows the page left out, each row once. A page
+ *     answering fewer rows than its limit answered every row there was;
+ *     a full one may have more behind it.
  *   - **A pull is projected only to a caller behind the store.** A pull
  *     naming the caller's `migrations` while the store holds an id they
  *     leave out is answered at the caller's schema: the held ids it
@@ -160,6 +166,12 @@ export interface HubPullRequest {
    * left out. See the module note on projection.
    */
   readonly migrations?: readonly string[];
+  /**
+   * The most rows the pull answers across every table, a whole number
+   * above zero, asking for one page; every row past the cursor when left
+   * out. See the module note on pages.
+   */
+  readonly limit?: number;
 }
 
 /** One status reading: which project's rows, devices and migrations it answers. */
@@ -270,13 +282,22 @@ export interface HubContract {
   readonly migrations: readonly string[];
   /** Which capabilities the store has. */
   readonly capabilities: HubCapabilities;
+  /**
+   * The most rows one push or one pull page may carry, a whole number
+   * above zero, or `null` for no cap: the
+   * {@link HubStoreContext.maxPayloadRows} the store was opened with.
+   * A device splits its push under it and pulls pages of it; additive
+   * inside contract 1, so a reader of a hub that answers none reads no
+   * cap.
+   */
+  readonly maxPayloadRows: number | null;
 }
 
 /** The hub's store: where every device's pushed rows are kept and pulled from. */
 export interface HubStore {
   /** Takes a device's rows; see the module note on idempotence. */
   readonly push: (request: HubPushRequest) => Promise<HubPushResult>;
-  /** The rows other origins created past `since`, projected to `migrations` when it is given, with the cursor to pass next. */
+  /** The rows other origins created past `since`, at most `limit` of them when it is given, projected to `migrations` when it is given, with the cursor to pass next. */
   readonly pull: (request: HubPullRequest) => Promise<WirePayload>;
   /**
    * One project's row counts, schema and every device's last push, with
@@ -433,6 +454,13 @@ export interface HubStoreContext {
    * project, as a hub with `hub.projects` left out does.
    */
   readonly projects?: readonly HubServedProject[];
+  /**
+   * The cap {@link HubContract.maxPayloadRows} answers, as the hub's
+   * config sets it: a whole number above zero, or `null` for no cap.
+   * Left out, the store answers `null`; the default cap is the config's,
+   * never a connector's.
+   */
+  readonly maxPayloadRows?: number | null;
 }
 
 /** Makes one adapter's store over a context. */
