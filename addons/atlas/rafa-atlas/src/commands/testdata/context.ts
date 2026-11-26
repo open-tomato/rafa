@@ -1,8 +1,9 @@
 /**
  * A `RafaContext` for the command tests: the lines each level printed,
  * the payload handed to `output.result`, and an abort controller for the
- * command's signal. `project` is null, as `module exec` hands a module
- * command, so the root comes from `ATLAS_PROJECT_ROOT` in `env`.
+ * command's signal. `project` is null, as for a command run outside the
+ * dispatcher (`../placement.test.ts` runs them through it), so the
+ * root comes from `ATLAS_PROJECT_ROOT` in `env`.
  * `moduleConfig` is the raw `atlas` section the runtime would hand the
  * command, `undefined` unless the options set one. Named without `.test`
  * so bun never runs it alone.

@@ -3,11 +3,18 @@
  * read the `--github` switch into the build's options, and refuse the way
  * a module must.
  *
- * `module exec` resolves no project, so the root is `ATLAS_PROJECT_ROOT`
- * when it is set, the context's project when the dispatcher handed one,
- * and the working directory otherwise. A worktree holds no effort store,
- * so a run from one names the main checkout through `ATLAS_PROJECT_ROOT`;
- * `RAFA_EFFORT_DIR` still wins for the store itself, as the build reads it.
+ * `build` and `serve` declare `needsProject: true`, so the dispatcher
+ * places them in the project holding the working directory, refuses a
+ * run outside any as `no_project` before the command starts, and hands
+ * them the project's `atlas` section as `moduleConfig`. `describe` opens
+ * no replica and keeps `needsProject: false`, so it answers outside a
+ * project too. The data root is `ATLAS_PROJECT_ROOT` when it is set, the
+ * context's project when the dispatcher handed one, and the working
+ * directory otherwise. A worktree holds no effort store, so a run from
+ * one names the main checkout through `ATLAS_PROJECT_ROOT`, which moves
+ * only where the data is read: the layers still come from the project
+ * the command was placed in. `RAFA_EFFORT_DIR` still wins for the store
+ * itself, as the build reads it.
  *
  * A module cannot throw core's `CommandExit` reliably, since the repo's
  * source can be a second copy of core beside the runtime that loaded it,

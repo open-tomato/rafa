@@ -225,7 +225,10 @@
  * Nothing is loaded, and `moduleConfig` is `undefined`, for a core
  * command, a module declaring no key, and a module's command declaring
  * `needsProject: false`, which runs with no project to read a config
- * of. A key no config layer sets is `undefined` too.
+ * of. A key no config layer sets is `undefined` too. So a module command
+ * that reads its key leaves `needsProject` unset or `true`, as
+ * `rafa-atlas`'s `build` and `serve` do, while its `describe`, which
+ * opens no replica, declares `false` and runs outside a project too.
  *
  * ## The command hook
  *

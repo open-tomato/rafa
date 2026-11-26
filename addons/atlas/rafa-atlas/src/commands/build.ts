@@ -57,7 +57,7 @@ export const buildCommand: RafaCommand = {
   subject: SUBJECT,
   action: 'build',
   summary: 'build the Atlas replica from a copy of the effort store',
-  description: 'Copies the effort store with vacuumInto, reads the copy, the plan folder and the root\'s git history, and writes the replica at <root>/.rafa/atlas/atlas.sqlite in one rename. Prints the rows of each bucket and every source read in part. Calls no gh unless --github is given; with it, a failed GitHub read warns and the rest is built. The root is ATLAS_PROJECT_ROOT, or the working directory; RAFA_EFFORT_DIR names the store and wins. Exits 1 with an error line when there is no store.',
+  description: 'Copies the effort store with vacuumInto, reads the copy, the plan folder and the root\'s git history, and writes the replica at <root>/.rafa/atlas/atlas.sqlite in one rename. Prints the rows of each bucket and every source read in part. Calls no gh unless --github is given; with it, a failed GitHub read warns and the rest is built. Runs in the project of the working directory, whose atlas section names the layers, and refuses outside one. The root is ATLAS_PROJECT_ROOT, or that project; RAFA_EFFORT_DIR names the store and wins. Exits 1 with an error line when there is no store.',
   args: [],
   flags: [GITHUB_FLAG],
   examples: [
@@ -66,7 +66,7 @@ export const buildCommand: RafaCommand = {
     { cmd: execLine('build', '--github'), note: 'also reads the pull requests and issue times from GitHub' },
   ],
   outputs: ['text', 'json'],
-  needsProject: false,
+  needsProject: true,
   run: (context) => refusing(context, async () => {
     const summary = await runBuild(context);
     if (context.outputMode === 'json') context.output.result(summary);
