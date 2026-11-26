@@ -291,6 +291,29 @@ export interface HubContract {
    * cap.
    */
   readonly maxPayloadRows: number | null;
+  /**
+   * The embedding record the store's vectors are served under, the three
+   * fields a client matches its own vectors against, or `null` while
+   * `capabilities.vector` is `false`. Additive inside contract 1: a
+   * store that answers none, as one with no index behind it, is read as
+   * `null`, and `/v1/status` answers each of the three as `null` then.
+   */
+  readonly embedding?: HubEmbedding | null;
+}
+
+/**
+ * The embedding record as `/v1/status` answers it: the model a hub
+ * embeds text with, the hash of its weights and the dimension of its
+ * vectors. The record's precision stays on the hub, since it changes how
+ * the hub stores a vector, not the space a client's vector lives in.
+ */
+export interface HubEmbedding {
+  /** The model's name: `hub.index.embedding.model`. */
+  readonly model: string;
+  /** The hash of the model's weights, from the install record. */
+  readonly hash: string;
+  /** How many numbers each vector holds. */
+  readonly dimension: number;
 }
 
 /** The hub's store: where every device's pushed rows are kept and pulled from. */

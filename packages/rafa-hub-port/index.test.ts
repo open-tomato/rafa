@@ -136,9 +136,9 @@ describe('the package entry', () => {
     expect(exported.filter((name) => !declaredNames(PORT).includes(name))).toEqual([]);
   });
 
-  it('leaves out the three names no importer takes', () => {
+  it('leaves out the four names no importer takes', () => {
     const left = declaredNames(PORT).filter((name) => !reExportedNames(ENTRY).includes(name));
-    expect(left).toEqual(['IndexLink', 'IndexOriginPair', 'IndexTableRows']);
+    expect(left).toEqual(['HubEmbedding', 'IndexLink', 'IndexOriginPair', 'IndexTableRows']);
   });
 
   it('exports exactly the names the importers under packages/ take', () => {

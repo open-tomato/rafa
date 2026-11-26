@@ -357,6 +357,7 @@ describe.skipIf(url === '')('the re-embed job, live on POSTGRES_URL', () => {
       try {
         expect([index.capabilities().vector, store.contract().capabilities.vector]).toEqual([false, false]);
         await expect(index.search({ mode: 'vector', query: QUERY })).rejects.toThrow(`(${why}); search with mode 'fts'`);
+        expect(store.contract().embedding).toBeNull();
 
         await within('the job\'s first embed', embedder.entered);
         entered = load.mark();
@@ -389,6 +390,7 @@ describe.skipIf(url === '')('the re-embed job, live on POSTGRES_URL', () => {
       expect(readsOf(after)).toEqual(['new']);
       expect([index.capabilities().vector, store.contract().capabilities.vector]).toEqual([true, true]);
       expect(await storedRecord()).toEqual(NEXT);
+      expect(store.contract().embedding).toEqual({ model: NEXT.model, hash: NEXT.hash, dimension: NEXT.dimension });
       const swappedIn = await servingBuild();
       expect(swappedIn).not.toBe(seededBuild);
       expect(await buildMeta(swappedIn ?? '')).toEqual({ dimension: NEXT.dimension, precision: NEXT.precision });

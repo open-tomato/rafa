@@ -53,7 +53,9 @@
  * rows' text while the serving build answers `fts`, then swaps it in and
  * writes the configured record in one commit, and the connector measures
  * its capabilities again with nothing held back, so `capabilities()`,
- * `contract()` and `search` answer `vector` `true`. A failed job leaves
+ * `contract()` and `search` answer `vector` `true`. `contract().embedding`
+ * answers the configured record's `model`, `hash` and `dimension` while
+ * `vector` is `true`, and `null` while it is `false`. A failed job leaves
  * `vector` `false`, its why naming the failure. `onReembed` is handed the
  * job's outcome once the capabilities read it; a throw from it is left
  * unhandled. A `rebuild` asked while the job runs waits for it to settle.
@@ -188,6 +190,13 @@ function remeasured(readings: CapabilityReadings, outcome: ReembedOutcome): Meas
   return null;
 }
 
+/** The record's three fields `/v1/status` answers while `vector` is `true`, else `null`. */
+function servedEmbedding(vector: boolean, record: EmbeddingRecord | undefined): HubContract['embedding'] {
+  if (!vector || record === undefined) return null;
+  const { model, hash, dimension } = record;
+  return Object.freeze({ model, hash, dimension });
+}
+
 /** The stored record the open re-embeds over: one other than the configured, read only while vectors could serve. */
 async function recordToReplace(db: HubDatabase, place: ProjectSchema, measured: MeasuredIndex, record: EmbeddingRecord | undefined): Promise<EmbeddingRecord | null> {
   return measured.vector.vector && record !== undefined
@@ -243,7 +252,8 @@ export async function connectPostgresHub(
       ...store,
       contract: (): HubContract => {
         const contract = store.contract();
-        return Object.freeze({ ...contract, capabilities: Object.freeze({ ...measured.capabilities, projection: false }) });
+        const capabilities = Object.freeze({ ...measured.capabilities, projection: false });
+        return Object.freeze({ ...contract, capabilities, embedding: servedEmbedding(capabilities.vector, record) });
       },
       close: async () => {
         closed = true;

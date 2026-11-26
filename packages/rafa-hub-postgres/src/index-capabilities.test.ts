@@ -199,6 +199,7 @@ describe.skipIf(url === '')('the connector\'s capabilities, live on POSTGRES_URL
 
     expect(index.capabilities().vector).toBe(false);
     expect(embedded).toBe(false);
+    expect(store.contract().embedding).toBeNull();
     await expect(index.search({ mode: 'vector', query: 'parser' })).rejects.toThrow(`(${NO_EMBEDDER}); search with mode 'fts'`);
   });
 
@@ -213,6 +214,7 @@ describe.skipIf(url === '')('the connector\'s capabilities, live on POSTGRES_URL
     expect(index.capabilities().vector).toBe(true);
     expect(store.contract().capabilities.vector).toBe(true);
     expect(embedded).toBe(true);
+    expect(store.contract().embedding).toEqual({ model: RECORD.model, hash: RECORD.hash, dimension: RECORD.dimension });
     expect(hits.map((hit) => hit.origin)).toEqual([{ originStore: A, originSeq: 1 }]);
   });
 

@@ -14,7 +14,9 @@
  *     ids its store holds, its rows per table and each device's last push,
  *     with the store's wire contract beside them: `contractVersion`,
  *     `migrations` (the same ids), `capabilities` and `maxPayloadRows`,
- *     the payload cap (`null` for none). The rows, devices
+ *     the payload cap (`null` for none), and `embedding`, the serving
+ *     connector's embedding record as `model`, `hash` and `dimension`,
+ *     each `null` while `vector` is off. The rows, devices
  *     and migrations are the first served project's, and `projects`
  *     names every project the store serves, each by `id` and `name` in
  *     the order listed, as the store's `status()` answers them; a store
@@ -166,7 +168,7 @@ import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusa
 import type { EffortRouteContext, EffortServed } from './server-effort.js';
 import type { HubKeyRoutes } from './server-keys.js';
 import type { HubLoginRoutes } from './server-login.js';
-import type { HubIndex, HubServedProject, HubStore } from './store/port.js';
+import type { HubContract, HubIndex, HubServedProject, HubStore } from './store/port.js';
 
 import { WireFormatError } from '@open-tomato/rafa/store';
 
@@ -384,13 +386,22 @@ function servedOf({ data, fields }: EffortServed): Omit<Served, 'caller'> {
   return { response: success(data), fields };
 }
 
+/** The embedding `/v1/status` answers while vectors are off: each field `null`. */
+const NO_EMBEDDING = Object.freeze({ model: null, hash: null, dimension: null });
+
+/** The contract as `/v1/status` answers it: its `embedding` the record's three fields, each `null` when the store answers none. */
+function statusContract(contract: HubContract): Readonly<Record<string, unknown>> {
+  const { embedding, ...rest } = contract;
+  return { ...rest, embedding: embedding ?? NO_EMBEDDING };
+}
+
 /** Every route behind the identity port, by path. */
 const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
   [HUB_ROUTES.status]: {
     method: 'GET',
     action: 'status.read',
     query: [],
-    handle: async ({ store, version }) => ({ response: success({ version, ...await store.status(), ...store.contract() }) }),
+    handle: async ({ store, version }) => ({ response: success({ version, ...await store.status(), ...statusContract(store.contract()) }) }),
   },
   [HUB_ROUTES.push]: {
     method: 'POST',

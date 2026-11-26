@@ -4,9 +4,9 @@
  * behind them (`src/port.ts` holds the port and its rules).
  *
  * The entry exports the names a file outside this package imports,
- * twenty-two of the port's twenty-five; `IndexOriginPair`,
- * `IndexTableRows` and `IndexLink` stay reachable only as the field
- * types of the names exported here. A name a new importer needs is
+ * twenty-two of the port's twenty-six; `IndexOriginPair`,
+ * `IndexTableRows`, `IndexLink` and `HubEmbedding` stay reachable only
+ * as the field types of the names exported here. A name a new importer needs is
  * added to this list, and `index.test.ts` holds the list.
  */
 export type {
