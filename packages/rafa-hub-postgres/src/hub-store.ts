@@ -44,7 +44,8 @@
  * the context's `maxPayloadRows` as given (`null` when it gives none;
  * the store enforces no cap), and every capability `false`: this store
  * has no index of its own and cannot project, so the hub's route
- * refuses a device behind it.
+ * refuses a device behind it. The connector (`hub-connector.ts`) answers
+ * the capabilities its index measured at open in their place.
  *
  * ## Closing
  *

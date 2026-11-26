@@ -1,8 +1,10 @@
 /**
  * The connector `HUB_CONNECTORS` names `postgres`: it opens the store on
  * the URL the named environment variable holds, beside an index that
- * rebuilds, searches its serving build by full text alone, walks its
- * links, and answers every capability `false`. Without a database, the cases hold the refusals
+ * rebuilds, searches its serving build by full text alone with no
+ * embedder given, walks its links, and answers the capabilities it
+ * measured at open (`index-capabilities.test.ts` holds each one's two
+ * answers). Without a database, the cases hold the refusals
  * made before anything connects; where `POSTGRES_URL` is set, the live
  * case opens both halves under a schema prefix of its own and drops only
  * the schema that prefix made and the build its rebuild swapped in.
@@ -34,7 +36,7 @@ describe('connectPostgresHub, before it connects', () => {
 const url = process.env['POSTGRES_URL']?.trim() ?? '';
 
 describe.skipIf(url === '')('connectPostgresHub, live on POSTGRES_URL', () => {
-  it('opens a store and an index that rebuilds, searches and walks with no capability, both refusing a request once the store is closed', async () => {
+  it('opens a store and an index that rebuilds, searches and walks under fts alone, both refusing a request once the store is closed', async () => {
     const schemaPrefix = `test_connector_${crypto
       .randomUUID()
       .replaceAll('-', '')
@@ -46,7 +48,8 @@ describe.skipIf(url === '')('connectPostgresHub, live on POSTGRES_URL', () => {
       const { store, index } = await connectPostgresHub(CONTEXT, { urlVariable: 'POSTGRES_URL', schemaPrefix });
 
       expect((await store.status()).devices).toEqual([]);
-      expect(index.capabilities()).toEqual({ fts: false, vector: false, graph: false });
+      expect(index.capabilities()).toEqual({ fts: true, vector: false, graph: false });
+      expect(store.contract().capabilities).toEqual({ fts: true, vector: false, graph: false, projection: false });
       await expect(index.search({ mode: 'fts', query: 'x' })).rejects.toThrow('has no index built yet; rebuild the index');
       await expect(index.links({ kind: 'commit', id: 'x' })).rejects.toThrow('has no index built yet; rebuild the index');
       const rebuilt = await index.rebuild({ project: DEFAULT_PROJECT_ID });

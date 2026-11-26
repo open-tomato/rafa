@@ -1,6 +1,6 @@
 /**
  * The package's entry and its `drizzle-kit` config: the entry exports
- * the connector's function and plain strings alone, no Drizzle or
+ * the connector's and the probe's functions and plain strings alone, no Drizzle or
  * `Bun.sql` value, as the leak rule asks, and the config points
  * `drizzle-kit` at the layout the entry names, on Postgres, with no
  * database or URL in it.
@@ -12,15 +12,16 @@ import config from './drizzle.config.js';
 import * as entry from './index.js';
 
 describe('the package entry', () => {
-  it('exports the connector and the layout of the Drizzle files, and nothing else', () => {
-    expect(Object.keys(entry).sort()).toEqual(['MIGRATIONS_FOLDER', 'SCHEMA_FILE', 'connectPostgresHub']);
+  it('exports the connector, the index probe and the layout of the Drizzle files, and nothing else', () => {
+    expect(Object.keys(entry).sort()).toEqual(['MIGRATIONS_FOLDER', 'SCHEMA_FILE', 'connectPostgresHub', 'postgresIndexProbe']);
   });
 
-  it('exports plain strings beside the connector\'s function, no Drizzle value', () => {
-    const values = Object.entries(entry).filter(([name]) => name !== 'connectPostgresHub');
+  it('exports plain strings beside the connector\'s and the probe\'s functions, no Drizzle value', () => {
+    const functions = ['connectPostgresHub', 'postgresIndexProbe'];
+    const values = Object.entries(entry).filter(([name]) => !functions.includes(name));
 
     expect(values.filter(([, value]) => typeof value !== 'string')).toEqual([]);
-    expect(typeof entry.connectPostgresHub).toBe('function');
+    expect([typeof entry.connectPostgresHub, typeof entry.postgresIndexProbe]).toEqual(['function', 'function']);
   });
 });
 
