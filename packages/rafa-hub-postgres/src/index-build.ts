@@ -26,13 +26,24 @@
  *     `seq`, its key field, and the body;
  *   - with an embedder, {@link EMBEDDING_COLUMN} on each copy, one vector
  *     per row embedded from its body, and its HNSW index (`pgvector`),
- *     `<table>_hnsw`, by cosine distance: `halfvec` under precision `half`,
- *     `vector` under `full`;
+ *     `<table>_hnsw`, by cosine distance, the column chosen from the
+ *     embedding record's precision (`embedding-record.ts`): `halfvec`
+ *     under `half`, `vector` under `full`;
  *   - a copy of `ref_links` when the project's schema holds one, which
  *     `links` walks, with no index;
  *   - {@link BUILD_META_TABLE}, one row: the project the request named, the
  *     stamp, when it was built, and the dimension and precision of its
  *     vectors (both null with no embedder).
+ *
+ * ## The embedding record
+ *
+ * An embedder comes with the embedding record its vectors are made under
+ * (`model`, `hash`, `dimension`, `precision`). Once the rebuild holds its
+ * lock, and before it makes the build's schema, it claims the record in
+ * the project's store metadata (`claimEmbeddingRecord`): the first
+ * vector build writes it, a build under the same record goes on, and a
+ * build under another is refused naming both records, with nothing
+ * changed. A build with no embedder leaves the stored record as it is.
  *
  * ## The serving build and the swap
  *
@@ -74,15 +85,20 @@
  * Refused with `rafa-index`'s `IndexRebuildRefusal` before anything is
  * touched: a `vector`-scoped rebuild with no embedder, naming `fts`, and
  * an embedder dimension the HNSW index cannot take
- * ({@link HNSW_MAX_DIMENSION}). Refused inside the build, so nothing
- * changes: an embedder answering another count of vectors than bodies, or
- * a vector of another length than its dimension, and a row table holding
- * a column named as the build's own.
+ * ({@link HNSW_MAX_DIMENSION}). Refused with a `TypeError` before
+ * anything is touched: an embedder with no embedding record, or with one
+ * whose dimension is not its own. Refused inside the build, so nothing
+ * changes: a record other than the one the store metadata holds
+ * (`EmbeddingRecordMismatch`, an `IndexRebuildRefusal`), an embedder
+ * answering another count of vectors than bodies, or a vector of another
+ * length than its dimension, and a row table holding a column named as
+ * the build's own.
  *
  * Nothing here is exported from the package's entry: it takes the
  * `Bun.sql` client and the Drizzle database, which the leak rule keeps
  * inside the connector.
  */
+import type { EmbeddingPrecision, EmbeddingRecord } from './embedding-record.js';
 import type { ProjectSchema } from './hub-projects.js';
 import type { HubDatabase, HubTransaction } from './hub-tables.js';
 import type { IndexRebuildRequest, IndexRebuildResult } from '@open-tomato/rafa-hub-port';
@@ -93,15 +109,13 @@ import { randomUUID } from 'node:crypto';
 import { IndexRebuildRefusal, NO_EMBEDDER } from '@open-tomato/rafa-index';
 import { eq, sql } from 'drizzle-orm';
 
+import { checkEmbeddingRecord, claimEmbeddingRecord, EMBEDDING_PRECISIONS, VECTOR_COLUMNS, vectorColumnOf } from './embedding-record.js';
 import { inProjectSchema } from './hub-tables.js';
 import { SCHEMA_NAME } from './migrator.js';
 import { hubIndexServing, WIRE_TABLES } from './schema.js';
 
-/** How a build stores its vectors: `halfvec` (2-byte floats) under `half`, `vector` under `full`. */
-export type EmbeddingPrecision = 'half' | 'full';
-
-/** Every {@link EmbeddingPrecision}. */
-export const EMBEDDING_PRECISIONS: readonly EmbeddingPrecision[] = Object.freeze(['half', 'full']);
+export type { EmbeddingPrecision } from './embedding-record.js';
+export { EMBEDDING_PRECISIONS } from './embedding-record.js';
 
 /** The opening of every build schema's name. */
 export const BUILD_SCHEMA_PREFIX = 'index_';
@@ -126,12 +140,6 @@ export const EMBED_BATCH = 64;
 
 /** The most dimensions pgvector's HNSW index takes on a column of each precision. */
 export const HNSW_MAX_DIMENSION: Readonly<Record<EmbeddingPrecision, number>> = Object.freeze({ half: 4000, full: 2000 });
-
-/** The column type and HNSW operator class of each precision, for a dimension already checked. */
-const VECTOR_TYPES: Readonly<Record<EmbeddingPrecision, { readonly type: string; readonly ops: string }>> = Object.freeze({
-  half: { type: 'halfvec', ops: 'halfvec_cosine_ops' },
-  full: { type: 'vector', ops: 'vector_cosine_ops' },
-});
 
 /** pgvector's name in `pg_extension`. */
 const VECTOR_EXTENSION = 'vector';
@@ -168,8 +176,8 @@ export interface IndexBuildOptions {
   readonly now: () => Date;
   /** The embedder; without one the build holds no vector and no HNSW index. */
   readonly embedder?: IndexEmbedder;
-  /** How the vectors are stored; `half` when left out. */
-  readonly precision?: EmbeddingPrecision;
+  /** The embedding record the embedder's vectors are made under, its precision choosing the column; required with an embedder, read only with one. */
+  readonly record?: EmbeddingRecord;
   /** The test hooks. */
   readonly hooks?: IndexBuildHooks;
 }
@@ -208,7 +216,7 @@ interface Copied {
 /** The vector half a build makes, or none. */
 interface VectorPlan {
   readonly embedder: IndexEmbedder;
-  readonly precision: EmbeddingPrecision;
+  readonly record: EmbeddingRecord;
 }
 
 /** A name quoted as an SQL identifier. */
@@ -243,22 +251,22 @@ function rebuildStamp(now: () => Date): string {
 
 /** The vector half the request asks for, refused before anything is touched; see the module note. */
 function vectorPlan(options: IndexBuildOptions): VectorPlan | null {
-  const { embedder, precision = 'half', request } = options;
-  if (!EMBEDDING_PRECISIONS.includes(precision)) {
-    throw new TypeError(`hub postgres: the precision ${String(precision)} is neither half nor full`);
-  }
+  const { embedder, request } = options;
   if (embedder === undefined) {
     if (request.scope === 'vector') {
       throw new IndexRebuildRefusal(`a vector rebuild needs vector search, which is off (${NO_EMBEDDER}); rebuild with scope 'fts'`);
     }
     return null;
   }
-  const cap = HNSW_MAX_DIMENSION[precision];
   const { dimension } = embedder;
-  if (!Number.isInteger(dimension) || dimension < 1 || dimension > cap) {
-    throw new IndexRebuildRefusal(`the embedder's dimension ${String(dimension)} is no whole number from 1 to ${String(cap)}, the most an HNSW index on ${VECTOR_TYPES[precision].type} takes`);
+  const precision = options.record?.precision;
+  if (precision !== undefined && EMBEDDING_PRECISIONS.includes(precision)) {
+    const cap = HNSW_MAX_DIMENSION[precision];
+    if (!Number.isInteger(dimension) || dimension < 1 || dimension > cap) {
+      throw new IndexRebuildRefusal(`the embedder's dimension ${String(dimension)} is no whole number from 1 to ${String(cap)}, the most an HNSW index on ${VECTOR_COLUMNS[precision].type} takes`);
+    }
   }
-  return { embedder, precision };
+  return { embedder, record: checkEmbeddingRecord(options.record, embedder) };
 }
 
 /** The row tables `schema` holds with the origin pair, in `WIRE_TABLES` order, and whether it holds `ref_links`. */
@@ -329,8 +337,8 @@ async function vectorSchemaOf(tx: HubTransaction): Promise<string> {
 
 /** Embeds every body of one copied table, {@link EMBED_BATCH} at a time, and makes its HNSW index. */
 async function embedTable(tx: HubTransaction, build: string, table: string, plan: VectorPlan, vectorSchema: string): Promise<void> {
-  const { embedder, precision } = plan;
-  const { type, ops } = VECTOR_TYPES[precision];
+  const { embedder, record } = plan;
+  const { type, ops } = vectorColumnOf(record);
   const target = `${quoted(build)}.${quoted(table)}`;
   const column = `${quoted(vectorSchema)}.${type}(${String(embedder.dimension)})`;
   await tx.execute(sql.raw(`ALTER TABLE ${target} ADD COLUMN ${quoted(EMBEDDING_COLUMN)} ${column}`));
@@ -358,7 +366,7 @@ async function writeMeta(tx: HubTransaction, build: string, request: IndexRebuil
     precision text
   )`));
   await tx.execute(sql`INSERT INTO ${sql.raw(target)} (id, project, stamp, built_at, dimension, precision)
-    VALUES (1, ${request.project}, ${stamp}, ${at}, ${plan?.embedder.dimension ?? null}, ${plan?.precision ?? null})`);
+    VALUES (1, ${request.project}, ${stamp}, ${at}, ${plan?.record.dimension ?? null}, ${plan?.record.precision ?? null})`);
 }
 
 /** Repoints the project at `build` with the pointer locked against readers and drops the build it served before. */
@@ -401,6 +409,7 @@ async function buildAndSwap(tx: HubTransaction, options: IndexBuildOptions, buil
   await tx.execute(sql`LOCK TABLE ${hubIndexServing} IN SHARE ROW EXCLUSIVE MODE`);
   const stamp = rebuildStamp(now);
   const at = now().toISOString();
+  if (plan !== null) await claimEmbeddingRecord(tx, place.id, plan.record);
   const copied = await copiedOf(tx, place.schema);
   const vectorSchema = plan === null
     ? null

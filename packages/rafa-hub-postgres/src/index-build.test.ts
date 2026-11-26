@@ -10,6 +10,7 @@
  * its rebuilds named. Without a database, the refusals made before
  * anything connects run over a stand-in database.
  */
+import type { EmbeddingPrecision, EmbeddingRecord } from './embedding-record.js';
 import type { PostgresHubStoreParts } from './hub-store.js';
 import type { HubDatabase } from './hub-tables.js';
 import type { IndexBuildOptions } from './index-build.js';
@@ -80,6 +81,16 @@ function recordingEmbedder(dimension = 3): IndexEmbedder & { readonly texts: str
   };
 }
 
+/** The embedding record `embedder`'s vectors are made under, at `precision`. */
+function recordOf(embedder: IndexEmbedder, precision: EmbeddingPrecision = 'half'): EmbeddingRecord {
+  return { model: 'fixture-lengths', hash: 'fixture', dimension: embedder.dimension, precision };
+}
+
+/** The options of a build embedding with `embedder` at `precision`. */
+function embedding(embedder: IndexEmbedder, precision: EmbeddingPrecision = 'half'): Pick<IndexBuildOptions, 'embedder' | 'record'> {
+  return { embedder, record: recordOf(embedder, precision) };
+}
+
 /** A context over the clock reading {@link T0}, with `extra` in it. */
 function contextOf(extra: Partial<HubStoreContext> = {}): HubStoreContext {
   return { directory: '/nonexistent', now: () => new Date(T0), ...extra };
@@ -123,9 +134,9 @@ describe('rebuildProjectIndex, before it connects', () => {
   });
 
   it('refuses a dimension the HNSW index of its precision cannot take, before it opens a transaction', async () => {
-    const half = standIn({ embedder: recordingEmbedder(HNSW_MAX_DIMENSION.half + 1) });
-    const full = standIn({ embedder: recordingEmbedder(HNSW_MAX_DIMENSION.full + 1), precision: 'full' });
-    const none = standIn({ embedder: recordingEmbedder(0) });
+    const half = standIn(embedding(recordingEmbedder(HNSW_MAX_DIMENSION.half + 1)));
+    const full = standIn(embedding(recordingEmbedder(HNSW_MAX_DIMENSION.full + 1), 'full'));
+    const none = standIn(embedding(recordingEmbedder(0)));
 
     await expect(rebuildProjectIndex(half.options)).rejects.toThrow('from 1 to 4000, the most an HNSW index on halfvec takes');
     await expect(rebuildProjectIndex(full.options)).rejects.toThrow('from 1 to 2000, the most an HNSW index on vector takes');
@@ -134,7 +145,7 @@ describe('rebuildProjectIndex, before it connects', () => {
   });
 
   it('opens a transaction for a dimension within the cap, as the control', async () => {
-    const { options, opened } = standIn({ embedder: recordingEmbedder(HNSW_MAX_DIMENSION.full), precision: 'full' });
+    const { options, opened } = standIn(embedding(recordingEmbedder(HNSW_MAX_DIMENSION.full), 'full'));
 
     await expect(rebuildProjectIndex(options)).rejects.toThrow('the stand-in opens no transaction');
     expect(opened()).toBe(1);
@@ -269,7 +280,7 @@ describe.skipIf(url === '')('rebuildProjectIndex, live on POSTGRES_URL', () => {
       const schema = projectSchemas[0] ?? '';
       await store.push({ device: A, payload: payloadOf({ commits: [commit(A, 1), commit(A, 2)], sessions: [session(A, 3)] }) });
 
-      const { schema: build, result } = await rebuild(undefined, { embedder: recordingEmbedder() });
+      const { schema: build, result } = await rebuild(undefined, embedding(recordingEmbedder()));
 
       expect(await searchIndexesOn(schema)).toEqual([]);
       const expected = Object.keys(WIRE_TABLES)
@@ -294,10 +305,14 @@ describe.skipIf(url === '')('rebuildProjectIndex, live on POSTGRES_URL', () => {
       await store.push({ device: A, payload: payloadOf({ commits: [commit(A, 1)], sessions: [session(A, 3)] }) });
       const embedder = recordingEmbedder();
 
-      const half = await rebuild(undefined, { embedder });
+      const half = await rebuild(undefined, embedding(embedder));
       const [halfType] = await admin.unsafe<{ type: string }[]>(`SELECT format_type(atttypid, atttypmod) AS type FROM pg_attribute
         WHERE attrelid = to_regclass($1) AND attname = '${EMBEDDING_COLUMN}'`, [`"${half.schema}".commits`]);
-      const full = await rebuild(undefined, { embedder, precision: 'full' });
+      // A project holds one embedding record, so the full build is another project's.
+      await parts?.store.close();
+      const other = await open();
+      await other.store.push({ device: A, payload: payloadOf({ commits: [commit(A, 1)], sessions: [session(A, 3)] }) });
+      const full = await rebuild(undefined, embedding(embedder, 'full'));
       const [fullType] = await admin.unsafe<{ type: string }[]>(`SELECT format_type(atttypid, atttypmod) AS type FROM pg_attribute
         WHERE attrelid = to_regclass($1) AND attname = '${EMBEDDING_COLUMN}'`, [`"${full.schema}".commits`]);
 
@@ -348,7 +363,7 @@ describe.skipIf(url === '')('rebuildProjectIndex, live on POSTGRES_URL', () => {
       await store.push({ device: A, payload: payloadOf({ commits: [commit(A, 1), commit(A, 2)] }) });
       const short: IndexEmbedder = { dimension: 3, embed: async () => [Float32Array.of(1, 2, 3)] };
 
-      await expect(rebuild(undefined, { embedder: short })).rejects.toThrow('the embedder answered 1 vectors for 2 texts');
+      await expect(rebuild(undefined, embedding(short))).rejects.toThrow('the embedder answered 1 vectors for 2 texts');
       expect(await pointerOf(schema)).toBeNull();
     });
 

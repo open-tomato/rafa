@@ -46,8 +46,10 @@
  * {@link hubStoreMeta}, one row: the project the schema holds, the wire
  * contract version its tables mirror, and the embedding record (`model`,
  * `hash`, `dimension`, `precision`) the index's vectors were built under,
- * all four set or none. It is the hub's, never a device's `store_meta`,
- * which is local to its machine and never crosses the wire.
+ * all four set or none: the first rebuild that embeds writes it, and a
+ * vector write under another record is refused (`embedding-record.ts`).
+ * It is the hub's, never a device's `store_meta`, which is local to its
+ * machine and never crosses the wire.
  *
  * ## The devices
  *

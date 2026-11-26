@@ -236,9 +236,12 @@ describe.skipIf(url === '')('searchProjectIndex, live on POSTGRES_URL', () => {
   }
 
   /** Rebuilds the project, recording the build it made for the drop. */
-  async function rebuild(embedder?: IndexEmbedder, precision?: 'half' | 'full'): Promise<void> {
+  async function rebuild(embedder?: IndexEmbedder, precision: 'half' | 'full' = 'half'): Promise<void> {
     const place = await (parts as PostgresHubStoreParts).placeOf(undefined);
-    const built = await rebuildProjectIndex({ db, place, request: { project: place.id }, now: () => new Date(T0), embedder, precision });
+    const record = embedder === undefined
+      ? undefined
+      : { model: 'fixture-words', hash: 'fixture', dimension: embedder.dimension, precision };
+    const built = await rebuildProjectIndex({ db, place, request: { project: place.id }, now: () => new Date(T0), embedder, record });
     builds.push(built.schema);
   }
 
@@ -322,8 +325,9 @@ describe.skipIf(url === '')('searchProjectIndex, live on POSTGRES_URL', () => {
       const half = await openBuilt('half');
       const halfHits = await search({ mode: 'vector', query: 'parser' }, half);
       const rewrite = await search({ mode: 'vector', query: 'rewrite' }, half);
-      const full = wordEmbedder();
-      await rebuild(full, 'full');
+      // A project holds one embedding record, so the full build is another project's.
+      await parts?.store.close();
+      const full = await openBuilt('full');
       const fullHits = await search({ mode: 'vector', query: 'parser' }, full);
 
       expect(halfHits.map(keyOf)).toEqual([A2, A1, A4, A3]);

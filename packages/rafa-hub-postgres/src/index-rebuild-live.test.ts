@@ -45,6 +45,7 @@
  * holds, and drops only the project schema that prefix made and the build
  * it serves.
  */
+import type { EmbeddingRecord } from './embedding-record.js';
 import type { IndexBuildHooks } from './index-build.js';
 import type { WirePayload, WireRow } from '@open-tomato/rafa/store';
 import type { HubIndex, HubStoreContext, IndexSearchHit } from '@open-tomato/rafa-hub-port';
@@ -91,6 +92,9 @@ const EMBEDDER: IndexEmbedder = Object.freeze({
   dimension: 3,
   embed: async (texts: readonly string[]) => texts.map((text) => Float32Array.from({ length: 3 }, (_, at) => 1 + ((text.length + at) % 5))),
 });
+
+/** The embedding record {@link EMBEDDER}'s vectors are made under. */
+const RECORD: EmbeddingRecord = Object.freeze({ model: 'fixture-lengths', hash: 'fixture', dimension: 3, precision: 'half' });
 
 /** A commit row of origin A's `originSeq`. */
 function commit(originSeq: number): WireRow {
@@ -271,7 +275,7 @@ describe.skipIf(url === '')('searches during an index rebuild, live on POSTGRES_
     const schema = projectSchemaName(schemaPrefix, DEFAULT_PROJECT_ID);
     const admin = new SQL(url);
     try {
-      const { store, index } = await connectPostgresHub(CONTEXT, { urlVariable: 'POSTGRES_URL', schemaPrefix, embedder: EMBEDDER });
+      const { store, index } = await connectPostgresHub(CONTEXT, { urlVariable: 'POSTGRES_URL', schemaPrefix, embedder: EMBEDDER, embeddingRecord: RECORD });
       try {
         await store.push({ device: A, payload: SERVING_ROWS });
         await index.rebuild({ project: DEFAULT_PROJECT_ID });
@@ -331,7 +335,7 @@ describe.skipIf(url === '')('searches during an index rebuild, live on POSTGRES_
     const { store, placeOf } = await openPostgresHubStoreParts(CONTEXT, { client, schemaPrefix });
     try {
       const place = await placeOf(undefined);
-      await rebuildProjectIndex({ db: drizzle({ client }), place, request: { project: place.id }, now: CONTEXT.now, embedder: EMBEDDER, hooks });
+      await rebuildProjectIndex({ db: drizzle({ client }), place, request: { project: place.id }, now: CONTEXT.now, embedder: EMBEDDER, record: RECORD, hooks });
     } finally {
       await store.close();
     }

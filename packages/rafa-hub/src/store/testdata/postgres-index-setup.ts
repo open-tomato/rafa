@@ -10,10 +10,13 @@
  * calls {@link PostgresIndexSetup.dropMade} after each case.
  *
  * The suite's `holdExtensionOff` maps to no embedder given, which the
- * connector measures as `vector: false`.
+ * connector measures as `vector: false`. The suite's embedder is handed
+ * with {@link indexContractEmbeddingRecord}, the embedding record the
+ * connector takes beside an embedder, its dimension the embedder's.
  */
 import type { HubIndexConnector, HubIndexLink, HubIndexLinkPlanter, HubIndexProbe, HubIndexSetup } from '../index-contract.js';
 import type { HubStoreContext } from '../port.js';
+import type { EmbeddingRecord } from '@open-tomato/rafa-hub-postgres';
 
 import { connectPostgresHub, postgresIndexProbe } from '@open-tomato/rafa-hub-postgres';
 import { SQL } from 'bun';
@@ -22,6 +25,11 @@ import { dropSchemas, POSTGRES_GATE } from './postgres-gate.js';
 
 /** The project id a context listing no projects is served as. */
 const PROJECT_ID = 'default';
+
+/** The embedding record the suite's embedder is handed with, at the dimension of the embedder a case gives. */
+function indexContractEmbeddingRecord(dimension: number): EmbeddingRecord {
+  return { model: 'index-contract-fixture', hash: 'fixture', dimension, precision: 'half' };
+}
 
 /** The hex digits of a case's prefix taken from its directory's sha256. */
 const PREFIX_DIGITS = 8;
@@ -59,9 +67,9 @@ export function postgresIndexSetup(url: string): PostgresIndexSetup {
       urlVariable: POSTGRES_GATE,
       env: { [POSTGRES_GATE]: url },
       schemaPrefix,
-      embedder: setup === undefined || setup.holdExtensionOff
-        ? undefined
-        : setup.embedder,
+      ...setup === undefined || setup.holdExtensionOff
+        ? {}
+        : { embedder: setup.embedder, embeddingRecord: indexContractEmbeddingRecord(setup.embedder.dimension) },
     });
   };
 

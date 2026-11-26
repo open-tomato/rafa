@@ -5925,6 +5925,7 @@
         "packages/rafa-hub-port/index.test.ts",
         "packages/rafa-hub-postgres/index.test.ts",
         "packages/rafa-hub-postgres/src/connection.test.ts",
+        "packages/rafa-hub-postgres/src/embedding-record.test.ts",
         "packages/rafa-hub-postgres/src/hub-connector.test.ts",
         "packages/rafa-hub-postgres/src/hub-merge.test.ts",
         "packages/rafa-hub-postgres/src/hub-projects.test.ts",

@@ -10,6 +10,7 @@
  * only the project schemas that prefix made and the build schemas its
  * rebuilds named.
  */
+import type { EmbeddingRecord } from './embedding-record.js';
 import type { WirePayload } from '@open-tomato/rafa/store';
 import type { HubIndex, HubStore } from '@open-tomato/rafa-hub-port';
 import type { IndexEmbedder } from '@open-tomato/rafa-index';
@@ -37,6 +38,9 @@ const EMBEDDER: IndexEmbedder = {
   dimension: 2,
   embed: async (texts) => texts.map((text) => new Float32Array([1 + (4 * text.split(/[^a-z]+/).filter((word) => word === 'parser').length), 1])),
 };
+
+/** The embedding record {@link EMBEDDER}'s vectors are made under. */
+const RECORD: EmbeddingRecord = { model: 'fixture-parser', hash: 'fixture', dimension: 2, precision: 'half' };
 
 describe('measureCapabilities', () => {
   it('answers fts true with pg_search loaded, and false without it', () => {
@@ -113,7 +117,7 @@ describe.skipIf(url === '')('the connector\'s capabilities, live on POSTGRES_URL
       { directory: '/nonexistent', now: () => new Date(T0) },
       { urlVariable: 'POSTGRES_URL', env: { POSTGRES_URL: url }, schemaPrefix: prefix, ...embedder === undefined
         ? {}
-        : { embedder } },
+        : { embedder, embeddingRecord: RECORD } },
     );
     opened.push(hub.store);
     await recordBuild(projectSchemaName(prefix, DEFAULT_PROJECT_ID));

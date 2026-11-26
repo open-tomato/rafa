@@ -8,10 +8,12 @@
  * SQL fragment, transaction handle or `Bun.sql` type is exported, so what
  * the hub reads of this package is the port's `HubStore` and `HubIndex`
  * and plain values. The entry exports the connector,
- * `connectPostgresHub` with its options, the index contract suite's
- * probe, `postgresIndexProbe`, which reads over a URL and answers plain
+ * `connectPostgresHub` with its options and the type of the embedding
+ * record they take, the index contract suite's probe,
+ * `postgresIndexProbe`, which reads over a URL and answers plain
  * strings, and the layout of the package's Drizzle files.
  */
+export type { EmbeddingPrecision, EmbeddingRecord } from './src/embedding-record.js';
 export type { PostgresHubOptions } from './src/hub-connector.js';
 export type { PostgresIndexProbe, PostgresIndexProbeOptions } from './src/index-probe.js';
 
