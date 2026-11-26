@@ -29,7 +29,10 @@
  * demo's balance catalogue, naming only served weekly metrics. Each has a
  * control. Then the composition over two planted module folders, one no
  * layer lists, answering NULL in both layer columns, a window refused as
- * the control. `catalogue-sources.test.ts` runs the
+ * the control. Then the import flow over the same two folders, each
+ * import list answered as the text stored (an unsorted array, and an
+ * empty one), the sorted form differing from the stored one and a window
+ * refused as the controls. `catalogue-sources.test.ts` runs the
  * phase 4 metrics over a replica of every source. Controls show each check can fail: the
  * schema refuses a definition with an extra key, the engine refuses a
  * measure on a field the descriptor lacks, and the formula refuses a
@@ -89,7 +92,7 @@ const POC_IDS = [
 /** The metrics past the PoC cut of each lens, phase 4's and later, in the order each lens lists them after its PoC cut. */
 const PHASE_FOUR_IDS = {
   pm: ['pm.milestone-completion', 'pm.minutes-per-agent', 'pm.out-of-scope-per-week', 'pm.task-pile'],
-  architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations', 'arch.composition'],
+  architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations', 'arch.composition', 'arch.import-flow'],
   developer: [
     'dev.deploys-per-week',
     'dev.wip',
@@ -189,15 +192,26 @@ const PLANTED_MODULES = [
   { path: 'scripts', package: null, layer: null, layer_rank: null, loc: 80, test_loc: 0, docs_loc: 0, config_loc: 5, fixtures_loc: 0 },
 ] as const;
 
-/** Plant {@link PLANTED_MODULES} as rows of `module_facts` in the replica under `root`. */
+/**
+ * The import list stored for each folder of {@link PLANTED_MODULES}, by
+ * path, as the module ingest writes it: the core folder's two packages out
+ * of name order, the scripts folder's none.
+ */
+const PLANTED_IMPORTS: Readonly<Record<string, string>> = {
+  'packages/core': '["@open-tomato/rafa-core","@open-tomato/atlas-data"]',
+  scripts: '[]',
+};
+
+/** Plant {@link PLANTED_MODULES} as rows of `module_facts` in the replica under `root`, each with its {@link PLANTED_IMPORTS} list. */
 function plantModules(root: string): void {
   const database = new Database(replicaPathOf(root));
   try {
-    const insert = database.prepare<unknown, [string, string | null, string | null, number | null, number, number, number, number, number]>(
-      'INSERT INTO module_facts (path, package, layer, layer_rank, loc, test_loc, docs_loc, config_loc, fixtures_loc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    const insert = database.prepare<unknown, [string, string | null, string | null, number | null, number, number, number, number, number, string | null]>(
+      'INSERT INTO module_facts (path, package, layer, layer_rank, loc, test_loc, docs_loc, config_loc, fixtures_loc, imports_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
     for (const row of PLANTED_MODULES) {
-      insert.run(row.path, row.package, row.layer, row.layer_rank, row.loc, row.test_loc, row.docs_loc, row.config_loc, row.fixtures_loc);
+      const imports = PLANTED_IMPORTS[row.path] ?? null;
+      insert.run(row.path, row.package, row.layer, row.layer_rank, row.loc, row.test_loc, row.docs_loc, row.config_loc, row.fixtures_loc, imports);
     }
   } finally {
     database.close();
@@ -312,6 +326,14 @@ async function answerOf(id: string, window: QueryParams['window'] = WINDOW): Pro
   return applyFormula(await source.query({ ...metric.params, window }), metric.formula);
 }
 
+/** `params` asked of the source `id` names in the built replica, with no window. */
+async function unwindowedQuery(id: string, params: QueryParams): Promise<QueryResult> {
+  if (registry === null) throw new Error('no registry');
+  const source = registry.sources.get(id);
+  if (source === undefined) throw new Error(`no source ${id}`);
+  return source.query(params);
+}
+
 /** `params` asked of the source `id` names in the built replica, over the last 28 days. */
 async function sourceQuery(id: string, params: QueryParams): Promise<QueryResult> {
   if (registry === null) throw new Error('no registry');
@@ -339,10 +361,10 @@ describe('METRIC_CATALOGUE', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five then four on PM, four then four, four then eight, four then seven', () => {
+  it('gives each lens the metrics of its rows: five then four on PM, four then five, four then eight, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 8, 12, 11]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 9, 12, 11]);
   });
 
   it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
@@ -620,6 +642,36 @@ describe('the composition over the fixture replica', () => {
 
   it('control: a window on the module source is refused', async () => {
     await expect(answerOf('arch.composition')).rejects.toThrow(InvalidParams);
+  });
+});
+
+describe('the import flow over the fixture replica', () => {
+  it('answers each module folder\'s path, package, layer and rank, and its import list as the text stored', async () => {
+    const metric = metricOf('arch.import-flow');
+    const rows = recordsOf(applyFormula(await unwindowedQuery(metric.sourceId, metric.params), metric.formula));
+
+    expect(rows).toEqual(PLANTED_MODULES.map((row) => ({
+      path: row.path,
+      package: row.package,
+      layer: row.layer,
+      layer_rank: row.layer_rank,
+      imports_json: PLANTED_IMPORTS[row.path] ?? null,
+    })));
+  });
+
+  it('control: the stored core list is out of name order, so a read that sorted it would not match the text stored', () => {
+    const stored = PLANTED_IMPORTS['packages/core'] ?? '';
+    const parsed: unknown = JSON.parse(stored);
+    const sorted = Array.isArray(parsed)
+      ? JSON.stringify([...parsed.map(String)].sort())
+      : '';
+
+    expect(sorted).not.toBe('');
+    expect(sorted).not.toBe(stored);
+  });
+
+  it('control: a window on the module source is refused', async () => {
+    await expect(answerOf('arch.import-flow')).rejects.toThrow(InvalidParams);
   });
 });
 
