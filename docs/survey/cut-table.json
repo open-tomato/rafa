@@ -5789,7 +5789,7 @@
       "edges": [],
       "fileCounts": {
         "source": 32,
-        "test": 19,
+        "test": 20,
         "testSupport": 0
       },
       "files": [
@@ -5838,6 +5838,7 @@
         "packages/rafa-effort/src/effort/skill-signals.ts",
         "packages/rafa-effort/src/effort/skill-use.test.ts",
         "packages/rafa-effort/src/effort/skill-use.ts",
+        "packages/rafa-effort/src/effort/sync/contact-pages.test.ts",
         "packages/rafa-effort/src/effort/sync/contact.ts",
         "packages/rafa-effort/src/effort/sync/doctor-reading.ts",
         "packages/rafa-effort/src/effort/sync/file.ts",
@@ -5846,7 +5847,7 @@
         "packages/rafa-effort/src/effort/trend-stats.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-effort/": 51
+        "packages/rafa-effort/": 52
       },
       "folders": [
         "packages/rafa-effort/"

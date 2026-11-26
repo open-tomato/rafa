@@ -7,7 +7,7 @@
  * caller uses, and its module note is the authority for what each means.
  */
 import type { HubFacts, HubLineFacts, HubRefusal, HubSyncStatus } from './contact-readings.js';
-import type { SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
+import type { Sync, SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
 
 import { WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
 import { SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/migrations';
@@ -59,6 +59,37 @@ export function countOf(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
     ? value
     : null;
+}
+
+/** The selected `Sync`'s method `name`, read by shape and called with the strategy as `this`, or null when it has none. */
+export function memberOf(sync: Sync, name: 'hubStatus' | 'pendingPush'): (() => Promise<unknown>) | null {
+  const member = (sync as unknown as Readonly<Record<string, unknown>>)[name];
+  if (typeof member !== 'function') return null;
+  const ask = member as (this: Sync) => unknown;
+  return () => Promise.resolve(ask.call(sync));
+}
+
+/**
+ * The most rows the hub takes in one push payload and answers in one
+ * pull page, read by shape off a `hubStatus()` answer's
+ * `maxPayloadRows`: a whole number above zero, or null, no cap, for an
+ * answer naming none or anything else. See `contact.ts`'s module note,
+ * `The payload cap`.
+ */
+export function capOf(answer: unknown): number | null {
+  const { maxPayloadRows } = typeof answer === 'object' && answer !== null
+    ? answer as { readonly maxPayloadRows?: unknown }
+    : {};
+  const cap = countOf(maxPayloadRows);
+  return cap === 0
+    ? null
+    : cap;
+}
+
+/** The rows a `pulled` answer's page carried, read by shape off its `rows`; null for an answer counting none. */
+export function pageRowsOf(result: SyncPullResult): number | null {
+  if (result.status !== 'pulled') return null;
+  return countOf((result as { readonly rows?: unknown }).rows);
 }
 
 /** The migration ids a `hubStatus()` answer names, or null when it names no list of ids. */
