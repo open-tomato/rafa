@@ -49,6 +49,13 @@
  * all four set or none. It is the hub's, never a device's `store_meta`,
  * which is local to its machine and never crosses the wire.
  *
+ * ## The devices
+ *
+ * {@link hubDevices}, one row per device that has pushed to the project:
+ * its store origin and when its latest push was taken. The hub's own, as
+ * the metadata is, and no wire table, so the Drizzle migration that adds
+ * it covers no wire id in `wire-migrations.ts`.
+ *
  * ## One schema per project
  *
  * The tables are declared with no Postgres schema, so the SQL
@@ -354,6 +361,31 @@ export const hubStoreMeta: HubStoreMetaTable = pgTable(
     )`),
   ],
 );
+
+/** The devices table's columns, as `pgTable` takes them. */
+type HubDevicesColumns = {
+  readonly device: IsPrimaryKey<NotNull<MetaText<'device'>>>;
+  readonly lastPushAt: NotNull<MetaText<'last_push_at'>>;
+};
+
+/** The devices table's type, its columns by name. */
+export type HubDevicesTable = PgTableWithColumns<{
+  name: 'hub_devices';
+  schema: undefined;
+  columns: BuildColumns<'hub_devices', HubDevicesColumns, 'pg'>;
+  dialect: 'pg';
+}>;
+
+/**
+ * Each device's last push to the project, by the device's store origin:
+ * the hub's own, as the metadata is, never a wire table. A push stamps
+ * it, one that adds nothing included; `status()` answers it in `device`
+ * order.
+ */
+export const hubDevices: HubDevicesTable = pgTable('hub_devices', {
+  device: text('device').primaryKey(),
+  lastPushAt: text('last_push_at').notNull(),
+});
 
 /** Every row table, by the wire table name it mirrors. */
 export const WIRE_TABLES: Readonly<Record<string, WireTable>> = {

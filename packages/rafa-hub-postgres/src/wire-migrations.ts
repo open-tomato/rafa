@@ -58,4 +58,47 @@ export const DRIZZLE_WIRE_MIGRATIONS: readonly DrizzleWireCoverage[] = [
       'held-rows',
     ],
   },
+  { tag: '0001_hub_devices', wire: [] },
 ];
+
+/** A journal entry, as the migrator reads it: its tag and the `when` Drizzle logs it under. */
+export interface JournalEntry {
+  /** The Drizzle journal's tag for the migration. */
+  readonly tag: string;
+  /** The journal's `when`, the value Drizzle logs as `created_at`. */
+  readonly when: number;
+}
+
+/** A row of a schema's Drizzle log, by the `when` it was logged under. */
+export interface LoggedMigration {
+  /** The journal `when` Drizzle logged as `created_at`. */
+  readonly createdAt: number;
+}
+
+/**
+ * The wire migration ids a project's schema mirrors: for each Drizzle
+ * migration its log holds, in journal order, the wire ids `coverage`
+ * maps it to. Refuses a logged migration no journal entry holds, and an
+ * applied tag `coverage` does not map, naming each, so a schema never
+ * claims an id nothing says it mirrors.
+ */
+export function wireMigrationIds(
+  journal: readonly JournalEntry[],
+  logged: readonly LoggedMigration[],
+  coverage: readonly DrizzleWireCoverage[] = DRIZZLE_WIRE_MIGRATIONS,
+): string[] {
+  const applied = new Set(logged.map(({ createdAt }) => createdAt));
+  const stray = [...applied].filter((when) => !journal.some((entry) => entry.when === when));
+  if (stray.length > 0) {
+    throw new Error(`hub postgres: the schema's log holds a migration logged at ${stray.join(', ')}, which no journal entry holds`);
+  }
+  return journal
+    .filter(({ when }) => applied.has(when))
+    .flatMap(({ tag }) => {
+      const covered = coverage.find((entry) => entry.tag === tag);
+      if (covered === undefined) {
+        throw new Error(`hub postgres: the Drizzle migration ${tag} is applied but wire-migrations.ts maps it to no wire ids`);
+      }
+      return covered.wire;
+    });
+}

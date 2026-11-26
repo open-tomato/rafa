@@ -51,7 +51,7 @@ export const MIGRATIONS_TABLE = '__drizzle_migrations';
 export const SHIPPED_MIGRATIONS_FOLDER: string = join(fileURLToPath(new URL('..', import.meta.url)), MIGRATIONS_FOLDER);
 
 /** A Postgres schema name the migrator takes: lower case, unquoted-safe, within the 63-byte limit. */
-const SCHEMA_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
+export const SCHEMA_NAME: RegExp = /^[a-z_][a-z0-9_]{0,62}$/;
 
 /** One shipped migration and the sha256 of its file, as Drizzle logs it. */
 export interface ShippedMigrationHash {
@@ -68,6 +68,7 @@ export interface ShippedMigrationHash {
  */
 export const SHIPPED_MIGRATION_HASHES: readonly ShippedMigrationHash[] = [
   { tag: '0000_wire_contract_1', hash: '05825fa6a7974728683e1f51e402be2c82f6f7e2caf1eaac0797d452c1388f19' },
+  { tag: '0001_hub_devices', hash: 'ff4f0da769f1f2dba0987d45bd02a78be86c59b0bb5f83b24c1452381bce84b0' },
 ];
 
 /** A migration of a folder: its journal tag, its journal `when` and its file's hash. */
@@ -200,7 +201,7 @@ export async function migrateProjectSchema(client: SQL, schema: string, options:
 }
 
 /** A schema's Drizzle log, oldest first; empty when the schema has none yet. */
-async function appliedMigrations(client: SQL, schema: string): Promise<AppliedMigration[]> {
+export async function appliedMigrations(client: SQL, schema: string): Promise<AppliedMigration[]> {
   const table = `"${schema}"."${MIGRATIONS_TABLE}"`;
   const [found] = await client.unsafe<{ present: boolean }[]>('SELECT to_regclass($1) IS NOT NULL AS present', [table]);
   if (found?.present !== true) return [];

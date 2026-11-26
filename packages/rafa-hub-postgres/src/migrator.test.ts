@@ -151,7 +151,7 @@ describe.skipIf(url === undefined || url === '')('migrateProjectSchema, live on 
     const schema = freshSchema();
     await migrateProjectSchema(client, schema);
     expect(await tablesOf(schema)).toEqual(
-      [...Object.keys(WIRE_TABLES), 'hub_store_meta', MIGRATIONS_TABLE].sort(),
+      [...Object.keys(WIRE_TABLES), 'hub_devices', 'hub_store_meta', MIGRATIONS_TABLE].sort(),
     );
   });
 
