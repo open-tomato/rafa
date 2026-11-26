@@ -17,7 +17,8 @@
  *   - {@link HubClient.status}: `GET /v1/status`; answers the hub's
  *     version, migrations, rows per table and each device's last push,
  *     with the wire contract it speaks, `contractVersion` and
- *     `capabilities`, and the projects it serves, `projects`.
+ *     `capabilities`, the projects it serves, `projects`, and its
+ *     payload cap, `maxPayloadRows` (`null` when it names none).
  *
  * ## The contract version
  *
@@ -191,6 +192,11 @@ export interface HubStatusAnswer {
   readonly projects: readonly HubProjectAnswer[];
   /** Whether the hub named `projects`; push and pull send `project` only when it did. */
   readonly projectsNamed: boolean;
+  /**
+   * The most rows the hub takes in one push payload and answers in one pull
+   * page; `null` when it names none or answers `null` (no cap).
+   */
+  readonly maxPayloadRows: number | null;
 }
 
 /** What a client is made with. */
@@ -364,6 +370,16 @@ function readProjects(data: Record<string, unknown>): Pick<HubStatusAnswer, 'pro
   return { projects: Object.freeze(projects), projectsNamed };
 }
 
+/** The cap a status answer's `data` names: a whole number above zero, or `null` when absent or `null`. */
+function readCap(data: Record<string, unknown>): Pick<HubStatusAnswer, 'maxPayloadRows'> {
+  const cap = data.maxPayloadRows;
+  if (cap === undefined || cap === null) return { maxPayloadRows: null };
+  if (!isCount(cap) || cap === 0) {
+    throw new HubAnswerMalformed('the hub\'s answer to status holds a maxPayloadRows that is not a whole number above zero');
+  }
+  return { maxPayloadRows: cap };
+}
+
 /** `data` as a status answer, or a {@link HubAnswerMalformed}. */
 function readStatusAnswer(data: unknown): HubStatusAnswer {
   const valid = isRecord(data)
@@ -375,7 +391,7 @@ function readStatusAnswer(data: unknown): HubStatusAnswer {
     throw new HubAnswerMalformed('the hub\'s answer to status holds no version, migrations, rows and devices');
   }
   const { version, migrations, rows, devices } = data as unknown as HubStatusAnswer;
-  return Object.freeze({ version, migrations, rows, devices, ...readContract(data), ...readProjects(data) });
+  return Object.freeze({ version, migrations, rows, devices, ...readContract(data), ...readProjects(data), ...readCap(data) });
 }
 
 /**
