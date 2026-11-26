@@ -17,7 +17,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { openSqliteStore, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { exportWirePayload, openSqliteStore, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
@@ -334,6 +334,99 @@ describe('push', () => {
   });
 });
 
+describe('the push\'s dry run and pendingPush', () => {
+  it('count the rows past the push cursor, sending no push and leaving the state file as it was, where the push after sends them', async () => {
+    const over = hub();
+    const a = device(2);
+    const service = serviceOf(a, over);
+    await service.push({ to: null });
+    a.store.append('commits', [commitRow(), commitRow(), commitRow()]);
+    const before = readFileSync(statePathOf(a), 'utf8');
+
+    expect(await service.push({ to: null, dryRun: true })).toEqual({ status: 'pushed', path: null, dryRun: true, rows: 3 });
+    expect(await service.pendingPush()).toBe(3);
+    expect(over.requests.map(({ rows }) => rows)).toEqual([2]);
+    expect(readFileSync(statePathOf(a), 'utf8')).toBe(before);
+
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(over.requests.map(({ rows }) => rows)).toEqual([2, 3]);
+    expect(readFileSync(statePathOf(a), 'utf8')).not.toBe(before);
+    expect(await service.pendingPush()).toBe(0);
+    expect(await service.push({ to: null, dryRun: true })).toEqual({ status: 'pushed', path: null, dryRun: true, rows: 0 });
+  });
+
+  it('write no state file for a store never pushed, where its first push writes one', async () => {
+    const over = hub();
+    const a = device(2);
+    const service = serviceOf(a, over);
+    expect(await service.pendingPush()).toBe(2);
+    expect(await service.push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 2 });
+    expect(existsSync(statePathOf(a))).toBe(false);
+    expect(over.requests).toEqual([]);
+    expect(await service.push({ to: null, dryRun: false })).toEqual({ status: 'pushed', path: null });
+    expect(existsSync(statePathOf(a))).toBe(true);
+    expect(over.requests.map(({ rows }) => rows)).toEqual([2]);
+  });
+
+  it('read the hub\'s status on a dry run alone, the route a push adds never called', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION);
+    const a = device(1);
+    expect(await serviceThrough(a, over).push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 1 });
+    expect(over.paths()).toEqual(['/v1/status']);
+    expect(await serviceThrough(a, over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(over.paths()).toEqual(['/v1/status', '/v1/status', '/v1/effort/push']);
+  });
+
+  it('refuse a hub speaking another contract on a dry run, as a push does, where pendingPush contacts no hub', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION + 1);
+    const a = device(1);
+    const service = serviceThrough(a, over);
+    expect(await rejectionOf(service.push({ to: null, dryRun: true }))).toBeInstanceOf(HubContractMismatch);
+    expect(over.paths()).toEqual(['/v1/status']);
+    expect(await serviceThrough(a, over).pendingPush()).toBe(1);
+    expect(over.paths()).toEqual(['/v1/status']);
+  });
+
+  it('count with pendingPush and no token stored, where the push from the same strategy is refused for the token', async () => {
+    const over = hub();
+    const service = serviceOf(device(2), over, { readSecret: async () => null });
+    expect(await service.pendingPush()).toBe(2);
+    expect(over.statusReads()).toBe(0);
+    expect((await rejectionOf(service.push({ to: null, dryRun: true }))).name).toBe('HubTokenError');
+    expect(over.requests).toEqual([]);
+  });
+
+  it('cannot see the hub\'s 409 on a dry run, which only a sent push is answered with', async () => {
+    const over = hub();
+    const a = device(1);
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: upgrade the hub', missing: [FUTURE_MIGRATION] }, { status: 409 }));
+    expect(await serviceOf(a, over).push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 1 });
+    expect(over.requests).toEqual([]);
+    expect(await rejectionOf(serviceOf(a, over).push({ to: null }))).toBeInstanceOf(HubUpgradeRequired);
+    expect(over.requests).toHaveLength(1);
+  });
+
+  it('answer nothing-to-sync and 0 with no contact when the store is not there yet', async () => {
+    const over = hub();
+    const root = freshRoot();
+    expect(await serviceOf(root, over).push({ to: null, dryRun: true })).toEqual({ status: 'nothing-to-sync' });
+    expect(await serviceOf(root, over).pendingPush()).toBe(0);
+    expect(over.statusReads()).toBe(0);
+    expect(over.requests).toEqual([]);
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
+  });
+
+  it('refuse an NDJSON project and a store with no origin as a push does, where a minted SQLite store counts', async () => {
+    const over = hub();
+    const a = device(1);
+    expect(await rejectionOf(serviceOf(a, over, { backend: 'ndjson' }).pendingPush())).toBeInstanceOf(ServiceSyncRefusal);
+    expect(await rejectionOf(serviceOf(a, over, { backend: 'ndjson' }).push({ to: null, dryRun: true }))).toBeInstanceOf(ServiceSyncRefusal);
+    expect(await rejectionOf(serviceOf(device(1, false), over).pendingPush())).toBeInstanceOf(ServiceSyncRefusal);
+    expect(await serviceOf(a, over).pendingPush()).toBe(1);
+    expect(over.statusReads()).toBe(0);
+  });
+});
+
 describe('pull', () => {
   it('merges the rows another device pushed through mergeStore, keeping the hub\'s cursor and no backup', async () => {
     const over = hub();
@@ -394,7 +487,7 @@ describe('pull', () => {
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
     expect(refused.message).toBe(
       `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged.`
-        + ' Next step: rafa self-update, then sync again',
+        + ' Next step: rafa self-update, then rafa effort sync',
     );
     expect((refused as RafaUpdateRequired).nextStep).toBe(SELF_UPDATE);
     expect((refused as RafaUpdateRequired).missing).toEqual([FUTURE_MIGRATION]);
@@ -438,7 +531,7 @@ describe('pull', () => {
     const refused = await rejectionOf(serviceOf(device(1), over).pull({ from: null, dryRun: false }));
     expect(refused.message).toBe(
       `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
-        + ' nothing was merged. Next step: rafa self-update, then sync again',
+        + ' nothing was merged. Next step: rafa self-update, then rafa effort sync',
     );
   });
 });
@@ -544,7 +637,7 @@ describe('the projected pull, under effort.syncSkew: pull-projected', () => {
     const refused = await rejectionOf(projectingOf(b, over).pull({ from: null, dryRun: false }));
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
     expect(refused.message).toBe(
-      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged. Next step: rafa self-update, then sync again`,
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged. Next step: rafa self-update, then rafa effort sync`,
     );
     expect(existsSync(statePathOf(b))).toBe(false);
     over.setFault(() => Response.json({ success: false, error: 'rafa-hub: cannot project' }, { status: 409 }));
@@ -774,7 +867,7 @@ describe('when the hub cannot be reached or refuses', () => {
     expect(refused).toBeInstanceOf(HubUpgradeRequired);
     expect(refused.message).toBe(
       `effort sync: the hub is behind this rafa (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
-        + ' nothing was sent. Next step: upgrade the hub, then sync again',
+        + ' nothing was sent. Next step: upgrade the hub, then rafa effort sync',
     );
     expect((refused as HubUpgradeRequired).missing).toEqual([FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION]);
     expect((refused as HubUpgradeRequired).nextStep).toBe(UPGRADE_HUB);
@@ -985,3 +1078,87 @@ describe('the project', () => {
     expect(over.projectQueries).toEqual(['some-project']);
   });
 });
+
+describe('hubStatus', () => {
+  const served = [{ id: 'some-project', name: 'some/project' }, { id: 'other-project', name: 'other/project' }];
+
+  it('answers the contract, the project and its name and the hub\'s migrations, reading /v1/status once across hubStatus, push and pull', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = device(1);
+    await serviceOf(a, over).push({ to: null });
+    const held = stateOf(a);
+    expect(Object.keys(held.stores)).toHaveLength(1);
+    const before = over.statusReads();
+    const named = { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'other-project' };
+    const service = serviceOf(device(1), over, { hub: named });
+    const answer = await service.hubStatus();
+    expect(answer).toEqual({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      projectId: 'other-project',
+      projectName: 'other/project',
+      migrations: exportWirePayload({ path: a.path }).migrations,
+    });
+    expect(answer.migrations.length).toBeGreaterThan(0);
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect((await service.pull({ from: null, dryRun: false })).status).toBe('pulled');
+    expect(await service.hubStatus()).toEqual(answer);
+    expect(over.statusReads() - before).toBe(1);
+    expect(over.requests.map(({ path }) => path)).toEqual(['/v1/effort/push', '/v1/effort/push', '/v1/effort/pull']);
+  });
+
+  it('reads /v1/status again for a second strategy, so the count of one could have read two', async () => {
+    const over = hub();
+    const a = device(1);
+    await serviceOf(a, over).hubStatus();
+    await serviceOf(a, over).hubStatus();
+    expect(over.statusReads()).toBe(2);
+  });
+
+  it('names the repository\'s root commit, with no name from a hub naming no projects', async () => {
+    const over = hub();
+    const a = device(1);
+    expect(await serviceOf(a, over).hubStatus()).toEqual({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      projectId: rootCommitOf(a.root),
+      projectName: null,
+      migrations: [],
+    });
+  });
+
+  it('answers a hub speaking another contract without refusing it, where push still refuses it', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION + 1);
+    const a = device(1);
+    const service = serviceThrough(a, over);
+    expect(await service.hubStatus()).toMatchObject({ contractVersion: WIRE_CONTRACT_VERSION + 1, projectName: null, migrations: [] });
+    expect(await rejectionOf(service.push({ to: null }))).toBeInstanceOf(HubContractMismatch);
+    expect(over.paths()).toEqual(['/v1/status']);
+  });
+
+  it('answers with no store there yet', async () => {
+    const over = hub();
+    const root = freshRoot();
+    expect(await serviceOf(root, over).hubStatus()).toMatchObject({ contractVersion: WIRE_CONTRACT_VERSION, projectId: rootCommitOf(root) });
+    expect(existsSync(openSqliteStore(root).path('commits'))).toBe(false);
+  });
+
+  it('refuses in a repository with no commit and no hub.project, reading no status, where hub.project lets it answer', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = uncommittedDevice();
+    expect(await rejectionOf(serviceOf(a, over).hubStatus())).toBeInstanceOf(ServiceSyncRefusal);
+    expect(over.statusReads()).toBe(0);
+    const named = serviceOf(a, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'some-project' } });
+    expect(await named.hubStatus()).toMatchObject({ projectId: 'some-project', projectName: 'some/project' });
+    expect(over.statusReads()).toBe(1);
+  });
+
+  it('passes an unreachable hub through as HubUnreachable', async () => {
+    const over = hub();
+    const a = device(1);
+    const service = serviceOf(a, over);
+    await over.stop();
+    expect((await rejectionOf(service.hubStatus())).name).toBe('HubUnreachable');
+  });
+});
+

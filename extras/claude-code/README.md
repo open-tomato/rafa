@@ -7,7 +7,7 @@ Code 2.1.283.
 
 ## What it puts in a project
 
-`rafa-hookify/install.ts` copies three files and adds two entries. Each
+`rafa-hookify/install.ts` copies four files and adds three entries. Each
 row is one of them.
 
 | Installed at | From | What it does |
@@ -15,7 +15,9 @@ row is one of them.
 | `.claude/skills/rafa-tooling/SKILL.md` | `files/rafa-tooling-skill.md` | The rules: the `gh`-to-rafa mappings, who runs which command, flag syntax, 🪙 commands, logins, checkouts, `pr merge` checks, the tomato header |
 | `.claude/skills/rafa-tooling/help-tree.ts` | `files/help-tree.ts` | The whole command tree in one page: `rafa describe \| bun .claude/skills/rafa-tooling/help-tree.ts` |
 | `.claude/hooks/rafa-tooling-hook.ts` | `files/rafa-tooling-hook.ts` | The PreToolUse hook below |
+| `.claude/hooks/rafa-session-hook.ts` | `files/rafa-session-hook.ts` | A SessionStart hook that runs `rafa effort sync --output=json` and prints its lines when a hub was contacted |
 | `.claude/settings.json` | | A `PreToolUse` entry with matcher `Bash` that runs the hook; the rest of the file is kept |
+| `.claude/settings.json` | | A `SessionStart` entry that runs the session hook with a 120-second timeout; the rest of the file is kept |
 | `AGENTS.md`, else `CLAUDE.md` | | One line pointing at the skill, appended at the end |
 
 ## Install
@@ -74,8 +76,48 @@ closed state, since `rafa pr list` shows open pull requests only, and
 naming another repository with `-R`/`--repo` passes too, since rafa reads
 only the project's own: the hook reads that from `git remote get-url
 origin`, and when it cannot, any named repository counts as another one.
-To turn the hook off in a project, remove its entry from
+To turn the tooling hook off in a project, remove its entry from
 `.claude/settings.json`.
+
+## The session hook
+
+The SessionStart hook runs `rafa effort sync --output=json` in the
+project when a Claude Code session opens, with `rafa` taken from `PATH`.
+Its output reaches the session as context, so the session starts knowing
+what the sync did.
+
+When a hub was contacted, the hook prints the lines the run wrote, one
+per line. A repo woken after weeks prints:
+
+```text
+hub: reachable, contract 1, project rafa; pulled 312 rows
+```
+
+The line ends `; <m> rows held back` when the pull held rows back. One
+release behind its hub, the hook prints a line saying this rafa is
+behind, and naming `rafa self-update, then rafa effort sync` as the
+next step. When the hub is down, it prints one offline line, naming the
+hub's URL and the reason, and the session starts as usual; the rows sync
+on the next contact.
+
+With no hub (`effort.sync` is `local` or `file`), the hook prints
+nothing. It also prints nothing outside a rafa project, under a rafa
+with no `effort sync` action, or when `rafa` is not on `PATH`. It exits
+0 whatever `rafa` answers, so a session always starts.
+
+To check before a sync writes anything, run these in the project's
+checkout:
+
+- `rafa effort sync --status` asks the hub and moves nothing.
+- `rafa effort sync --dry-run` shows what a sync would push, pull and
+  record as conflicts, and writes neither the store nor the state file.
+
+To remove the session hook, delete its `SessionStart` entry from
+`.claude/settings.json`, the one whose command names
+`rafa-session-hook.ts`, and delete `.claude/hooks/rafa-session-hook.ts`.
+The rest of the file stays. Run `/rafa-hookify` or the installer again
+and both come back, since they install every row, so remove them after
+the last run.
 
 ## What the pack cannot reach
 

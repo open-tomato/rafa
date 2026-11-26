@@ -609,6 +609,11 @@
     },
     {
       "kind": "test",
+      "path": "src/commands/effort/sync.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/commands/index.roster.sweep.test.ts",
       "upwardEdgesIn": 0
     },
@@ -3704,6 +3709,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/sync-contact-service-integration.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/sync-local-default-spawned.test.ts",
       "upwardEdgesIn": 0
     },
@@ -6117,6 +6127,7 @@
         "src/commands/effort/report.ts",
         "src/commands/effort/schema.test.ts",
         "src/commands/effort/schema.ts",
+        "src/commands/effort/sync.test.ts",
         "src/commands/index.roster.sweep.test.ts",
         "src/commands/index.test.ts",
         "src/commands/index.ts",
@@ -6751,6 +6762,7 @@
         "src/tests/switch-drift-spawned.test.ts",
         "src/tests/switch-next-plan-cli.test.ts",
         "src/tests/sync-contact-spawned.test.ts",
+        "src/tests/sync-contact-service-integration.test.ts",
         "src/tests/sync-local-default-spawned.test.ts",
         "src/tests/sync-module-missing-spawned.test.ts",
         "src/tests/sync-service-package-integration.test.ts",

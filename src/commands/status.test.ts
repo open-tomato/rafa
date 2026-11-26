@@ -20,20 +20,35 @@
  *   every section read, which also exits 0 and writes no `warn` line:
  *   so the six `warn` lines are the sections', and a section not read
  *   is proved not to be a failure.
+ * - The hub line cases run the real contact over the real `service`
+ *   strategy against the stand-in hub, handed in through the `pull`
+ *   seam; the offline and missing-token lines sit beside the reachable
+ *   hub's line, and `effort.sync: local` runs the default seam, which
+ *   contacts nothing.
  * - The positional word exits 2 with the reader never called, beside
  *   the same line without the word, which reads.
  */
 import type { StatusCommandSeams } from './status.js';
+import type { StandInHub } from '../../packages/rafa-sync-service/src/testdata/stand-in-hub.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
-import type { PullBeforeReadInput } from '@open-tomato/rafa-effort/effort/sync/contact';
+import type { Sync } from '@open-tomato/rafa/ports';
+import type { HubStatusReading, PullBeforeReadInput } from '@open-tomato/rafa-effort/effort/sync/contact';
+
+import '../config-registry.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/adapters';
+import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
+import { createHubContact } from '@open-tomato/rafa-effort/effort/sync/contact';
+
+import { createServiceSync } from '../../packages/rafa-sync-service/src/sync.js';
+import { startStandInHub } from '../../packages/rafa-sync-service/src/testdata/stand-in-hub.js';
 import { renderStatus, statusData } from '../status/render.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
@@ -283,5 +298,119 @@ describe('the status declaration', () => {
     expect(statusCommand.args).toEqual([]);
     expect(statusCommand.flags).toEqual([]);
     expect(statusCommand.outputs).toEqual(['text', 'json']);
+  });
+});
+
+const TOKEN_SECRET = 'hub-token';
+
+let hubs: StandInHub[] = [];
+
+afterEach(async () => {
+  await Promise.all(hubs.map((started) => started.stop()));
+  hubs = [];
+});
+
+/** A stand-in hub, stopped after the case. */
+function hub(): StandInHub {
+  const started = startStandInHub();
+  hubs = [...hubs, started];
+  return started;
+}
+
+/**
+ * A `pull` seam over the real contact and the real `service` strategy for
+ * `over`, naming `project`; `token` is what its secret reader answers.
+ */
+function serviceSeam(over: StandInHub, project: string, token: string | null): (input: PullBeforeReadInput) => Promise<HubStatusReading | null> {
+  return async (input) => {
+    const create = ({ repoRoot }: { readonly repoRoot: string }): Sync => createServiceSync({
+      repoRoot,
+      backend: 'sqlite',
+      hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: 2000, project },
+      readSecret: () => Promise.resolve(token),
+    });
+    const adapters = createAdapterRegistry([{ port: 'sync', kind: 'service', portVersion: PORT_VERSIONS.sync, create }]);
+    const text = `effort:\n  sync: service\nhub:\n  url: ${over.url}\n`;
+    const resolved = resolveConfig({ cli: {}, file: parseConfigText(text, join(input.roots.root, '.rafa', 'config.yaml')), user: null });
+    return createHubContact(
+      { root: input.roots.root, home: input.roots.home, resolved, warn: input.warn },
+      { modules: { adapters, manifest: { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS } } },
+    ).status();
+  };
+}
+
+/** Dispatches `rafa status` with `pull` as its pull seam and a read seam answering ALL_READ. */
+async function statusWith(pull: StatusCommandSeams['pull']): Promise<CapturedRun> {
+  const seams: StatusCommandSeams = { read: () => Promise.resolve(ALL_READ), pull };
+  return dispatchInProject(['status'], [], [createStatusCommand(seams)], plant());
+}
+
+/** The lines a captured run wrote about the hub: the hub line and every contact line. */
+function hubLines(outcome: CapturedRun): readonly string[] {
+  return lines(outcome.stdout + outcome.stderr).filter((line) => line.includes('hub') && !line.includes('Board:'));
+}
+
+describe('the hub line of rafa status', () => {
+  it('prints the hub line after the pull seam and before the sections, exiting 0', async () => {
+    const over = hub();
+    over.setProjects([{ id: 'alpha', name: 'Alpha' }]);
+
+    const outcome = await statusWith(serviceSeam(over, 'alpha', 'ghp_token'));
+
+    expect(outcome.exitCode).toBe(0);
+    const all = lines(outcome.stdout);
+    expect(all[0]).toMatch(/^hub: reachable, contract \d+, project Alpha; pulled 0 rows$/u);
+    expect(all.slice(1)).toEqual([...written(ALL_READ)]);
+  });
+
+  it('prints one offline line, no hub line and the sections, exiting 0, beside the reachable hub', async () => {
+    const over = hub();
+    await over.stop();
+
+    const outcome = await statusWith(serviceSeam(over, 'alpha', 'ghp_token'));
+
+    expect(outcome.exitCode).toBe(0);
+    const about = hubLines(outcome);
+    expect(about).toHaveLength(1);
+    expect(about[0]).toContain('is unreachable');
+    expect(outcome.stdout).not.toContain('hub: reachable');
+    expect(lines(outcome.stdout + outcome.stderr)).toHaveLength(1 + written(ALL_READ).length);
+  });
+
+  it('prints one line for a missing token, no hub line, exiting 0', async () => {
+    const over = hub();
+
+    const outcome = await statusWith(serviceSeam(over, 'alpha', null));
+
+    expect(outcome.exitCode).toBe(0);
+    const about = hubLines(outcome);
+    expect(about).toHaveLength(1);
+    expect(about[0]).toContain('failed');
+    expect(about[0]).toContain(TOKEN_SECRET);
+    expect(outcome.stdout).not.toContain('hub: reachable');
+    expect(over.requests).toEqual([]);
+  });
+
+  it('names this port\'s project when the hub serves two', async () => {
+    const over = hub();
+    over.setProjects([{ id: 'alpha', name: 'Alpha' }, { id: 'beta', name: 'Beta' }]);
+
+    const outcome = await statusWith(serviceSeam(over, 'beta', 'ghp_token'));
+
+    expect(outcome.exitCode).toBe(0);
+    expect(hubLines(outcome)).toEqual([expect.stringContaining('project Beta;')]);
+    expect(outcome.stdout).not.toContain('Alpha');
+    expect(over.projectQueries.every((query) => query === 'beta')).toBe(true);
+  });
+
+  it('prints no hub line under effort.sync: local, which contacts nothing, the default seam', async () => {
+    const project = plant('effort:\n  sync: local\n');
+    const seams: StatusCommandSeams = { read: () => Promise.resolve(ALL_READ) };
+
+    const outcome = await dispatchInProject(['status'], [], [createStatusCommand(seams)], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect([...lines(outcome.stdout + outcome.stderr)]).toEqual([...written(ALL_READ)]);
+    expect([...hubLines(outcome)]).toEqual([]);
   });
 });

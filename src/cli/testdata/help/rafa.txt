@@ -43,10 +43,10 @@ Subjects:
              mark one ready, unblock it and check its references
   pr         the pull request of a branch: one line, in full or in the browser;
              open, list, wait on, merge and triage them 🪙
-  effort     collect session and commit rows; report per plan; read and repair
-             the store: its schema, a copy for testing, migrations, and fixes;
-             merge or import another device's store; move an NDJSON store to
-             SQLite
+  effort     collect session and commit rows; report per plan; sync with the
+             hub; read and repair the store: its schema, a copy for testing,
+             migrations, and fixes; merge or import another device's store; move
+             an NDJSON store to SQLite
   module     list the configured modules; run an action a module provides
   agent      copy an agent definition into the project; list what a session sees
              🪙

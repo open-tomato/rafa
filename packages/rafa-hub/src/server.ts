@@ -288,7 +288,7 @@ class ProjectionUnsupported extends Error {
   readonly missing: readonly string[];
 
   constructor(missing: readonly string[]) {
-    super(`The pulling store lacks migration ${missing.join(', ')}, and this hub's store cannot project a pull to its schema. Nothing was sent. Next step: rafa self-update, then sync again.`);
+    super(`The pulling store lacks migration ${missing.join(', ')}, and this hub's store cannot project a pull to its schema. Nothing was sent. Next step: rafa self-update, then rafa effort sync.`);
     this.missing = Object.freeze([...missing]);
   }
 }

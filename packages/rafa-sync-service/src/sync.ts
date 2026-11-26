@@ -28,16 +28,35 @@
  *
  * Exports the rows past the push cursor with core's `exportWirePayload`
  * and sends them to the hub under the store's origin. Once the hub has
- * taken them, the push cursor becomes the export's. Every push reaches
- * the hub, one with no rows included, so the hub records the device's
- * last push and refuses a store newer than it at once. It answers
- * `pushed` with no path: the rows were delivered. A hub whose store
- * lacks a migration this one applied refuses the push with a `409`
- * naming the ids in `missing`, written as {@link HubUpgradeRequired}:
+ * taken them, the push cursor becomes the export's. Every push but a
+ * dry run reaches the hub, one with no rows included, so the hub
+ * records the device's last push and refuses a store newer than it at
+ * once. It answers `pushed` with no path: the rows were delivered. A
+ * hub whose store lacks a migration this one applied refuses the push
+ * with a `409` naming the ids in `missing`, written as
+ * {@link HubUpgradeRequired}:
  * `effort sync: the hub is behind this rafa (migration <ids>); nothing
- * was sent. Next step: upgrade the hub, then sync again`. A `409` naming
+ * was sent. Next step: upgrade the hub, then rafa effort sync`. A `409` naming
  * no `missing`, from an older hub, passes on as `HubRefused` with its
  * message as it stands. Neither moves the push cursor.
+ *
+ * ## The push's dry run and the rows waiting
+ *
+ * A push asked with `dryRun: true` ({@link ServicePushRequest}) does
+ * everything a push does up to the send: it refuses what a push refuses,
+ * reads the hub's status and refuses another contract version, and
+ * exports the rows past the push cursor. Then it sends nothing and
+ * leaves the state file as it was, answering `pushed` with `dryRun:
+ * true` and `rows`, the rows the export holds, which a push would send
+ * ({@link ServicePushResult}). It cannot see the hub's `409`, which
+ * only a sent push is answered with. A store not there yet answers
+ * `nothing-to-sync` with no contact, as a push does.
+ *
+ * {@link ServiceSync.pendingPush} counts the same rows with no contact
+ * at all: no token, no status read and no project. It refuses an
+ * NDJSON project and a store with no origin as a push does, since the
+ * push cursor is kept under the store's origin, and answers 0 for a
+ * store not there yet. Neither writes the state file.
  *
  * ## Pull
  *
@@ -45,7 +64,7 @@
  * A payload naming a migration this rafa does not know is refused with
  * {@link RafaUpdateRequired}, `effort sync: this rafa is behind the hub
  * (migration <ids>); nothing was merged. Next step: rafa self-update,
- * then sync again`, whether or not it holds rows: its rows could not be
+ * then rafa effort sync`, whether or not it holds rows: its rows could not be
  * read here. Then:
  *
  *   - A payload holding no row is not merged, since a merge rewrites the
@@ -162,6 +181,20 @@
  * yet answers `nothing-to-sync` with no contact, the status read
  * included.
  *
+ * ## The hub's status
+ *
+ * {@link ServiceSync.hubStatus} answers the hub's contract version, the
+ * project push and pull name with the name the hub gives it, and the
+ * migrations the hub holds, all read off the hub client's kept status
+ * answer: a strategy that answers `hubStatus()` and then pushes and
+ * pulls reads `/v1/status` once. It reads no store and needs none, and
+ * it refuses no contract version: a hub speaking another one is
+ * answered as it is, for the caller to show, and push and pull still
+ * refuse it. Its errors are push's and pull's: the project's refusal
+ * in a repository with no commit and no `hub.project`, the token
+ * reader's, and the status read's, so an unreachable hub is
+ * unreachable here too.
+ *
  * ## After a merge
  *
  * A merged store keeps its origin: core carries the `store_meta` row
@@ -261,7 +294,7 @@ export class RafaUpdateRequired extends Error {
   constructor(missing: readonly string[]) {
     super(
       `effort sync: this rafa is behind the hub (migration ${idsOf(missing)}); nothing was merged.`
-        + ` Next step: ${SELF_UPDATE}, then sync again`,
+        + ` Next step: ${SELF_UPDATE}, then rafa effort sync`,
     );
     this.missing = Object.freeze([...missing]);
   }
@@ -278,7 +311,7 @@ export class HubUpgradeRequired extends Error {
   constructor(missing: readonly string[]) {
     super(
       `effort sync: the hub is behind this rafa (migration ${idsOf(missing)}); nothing was sent.`
-        + ` Next step: ${UPGRADE_HUB}, then sync again`,
+        + ` Next step: ${UPGRADE_HUB}, then rafa effort sync`,
     );
     this.missing = Object.freeze([...missing]);
   }
@@ -374,10 +407,43 @@ export type ServicePullResult =
     readonly notice: string;
   });
 
-/** The `service` strategy: a `Sync` whose pull answers {@link ServicePullResult}. */
+/** What {@link ServiceSync.hubStatus} answers, read off the kept status answer; see the module note. */
+export interface ServiceHubStatus {
+  /** The wire contract version the hub speaks, which may not be this rafa's. */
+  readonly contractVersion: number;
+  /** The project push and pull name: `hub.project`, or else the repository's root commit. */
+  readonly projectId: string;
+  /** The hub's name for that project; null when its status names none. */
+  readonly projectName: string | null;
+  /** The migration ids the hub holds, in the order it names them. */
+  readonly migrations: readonly string[];
+}
+
+/** What a push is asked: core's `SyncPushRequest`, with the dry run. */
+export interface ServicePushRequest extends SyncPushRequest {
+  /** Counts the rows the push would send, sending nothing and moving no cursor; see the module note. */
+  readonly dryRun?: boolean;
+}
+
+/** A push's answer: core's `SyncPushResult`, a dry run's also carrying the rows it would have sent. */
+export type ServicePushResult =
+  | SyncPushResult
+  | (Extract<SyncPushResult, { readonly status: 'pushed' }> & {
+    /** Always true: nothing was sent. */
+    readonly dryRun: true;
+    /** The rows past the push cursor, across tables, which a push would send. */
+    readonly rows: number;
+  });
+
+/** The `service` strategy: a `Sync` with the push's dry run, the rows waiting and the hub's status. */
 export interface ServiceSync extends Sync {
   readonly kind: 'service';
+  push: (request: ServicePushRequest) => Promise<ServicePushResult>;
   pull: (request: SyncPullRequest) => Promise<ServicePullResult>;
+  /** The rows past the push cursor, counted with no contact; see the module note. */
+  pendingPush: () => Promise<number>;
+  /** The hub's status, from the same kept answer push and pull read; see the module note. */
+  hubStatus: () => Promise<ServiceHubStatus>;
 }
 
 /** The hub a strategy reaches, as `selectSync` hands it: `AdapterContext.hub`. */
@@ -568,15 +634,29 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
       : undefined;
   };
 
-  const push = async ({ to }: SyncPushRequest): Promise<SyncPushResult> => {
+  /** The rows of the store under `origin` past its push cursor; reads only. */
+  const pastPushCursor = (origin: string): WirePayload => exportWirePayload({
+    path: storePath,
+    cursor: readSyncCursors(statePath, origin, hub.url).push,
+  });
+
+  const push = async ({ to, dryRun = false }: ServicePushRequest): Promise<ServicePushResult> => {
     refusePath('to', to);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
     const reached = await agreedClient();
-    const payload = exportWirePayload({ path: storePath, cursor: readSyncCursors(statePath, origin, hub.url).push });
+    const payload = pastPushCursor(origin);
+    if (dryRun) return Object.freeze({ status: 'pushed', path: null, dryRun: true, rows: rowsIn(payload) });
     await pushOrRefuse(reached, origin, payload);
     writeSyncCursor(statePath, origin, hub.url, 'push', payload.cursor);
     return PUSHED;
+  };
+
+  const pendingPush = async (): Promise<number> => {
+    const origin = originOf();
+    return origin === undefined
+      ? 0
+      : rowsIn(pastPushCursor(origin));
   };
 
   const pull = async (request: SyncPullRequest): Promise<ServicePullResult> => {
@@ -616,7 +696,14 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
       : { status: 'pulled', merge, notice: refilledLine(merge.rowsRefilled, refill.since) });
   };
 
-  return Object.freeze({ kind: 'service', push, pull });
+  const hubStatus = async (): Promise<ServiceHubStatus> => {
+    const reached = await hubClient();
+    const { contractVersion, migrations } = await reached.status();
+    const projectId = project ?? resolveProject(options.repoRoot, hub.project);
+    return Object.freeze({ contractVersion, projectId, projectName: await reached.projectName(), migrations });
+  };
+
+  return Object.freeze({ kind: 'service', push, pull, pendingPush, hubStatus });
 }
 
 /**

@@ -347,7 +347,21 @@ under `packages/`.
 **The `service` strategy makes one contact per command through
 `createHubContact` (`packages/rafa-effort/src/effort/sync/contact.ts`), which
 never throws and never sets the exit code.** A contact runs `pushThenPull()`
-(push then pull) or `pull()` alone. `local` and `file` are never contacted:
+(push then pull), `pull()` alone, `status()`, or `sync({ stop })`. `status()`
+is a pull alone, then the hub line's facts from the strategy's `hubStatus()`,
+read by shape off the status answer the pull kept, which `hubLine` formats as
+`hub: reachable, contract <n>, project <name>; pulled <n> rows` (`; <m> rows
+held back` when rows were). `sync()` reads the hub's status, checks it for
+skew (the contract version, then the hub's migrations against core's
+catalogue; a hub ahead is let through under `effort.syncSkew:
+pull-projected`), pushes, then pulls. `stop: 'status'` ends it after the
+check with the rows waiting to push (`pendingPush()`, read by shape), and
+`stop: 'dry-run'` pushes and pulls with `dryRun`, asking the dry-run push
+only of a strategy carrying `pendingPush`. A run stops at the first refusal,
+whose `refusal` names its cause, `skew`, `contract`, `project` (the hub's
+`project <id> is not served here`) or `token` (`HubTokenError`), and its one
+line, written once per contact in the hub line's place.
+`local` and `file` are never contacted:
 nothing is loaded, selected or written. The `service` adapter is selected once
 per contact by `selectSync` through the registry `loadModules` answers, and a
 selection that fails (e.g., `SyncModuleMissing`) is written once through
@@ -356,10 +370,19 @@ contact and pushes then pulls after storing rows and writing its summary;
 `rafa loop start` makes one contact for the run and pushes then pulls at
 the end of each task, whatever its outcome, its pulls naming the run's
 session id as `SyncPullRequest.sessionId` so the merge's live-loop guard
-passes the run's own record; `rafa status`, `rafa next`
-(including `--dry-run`), and `rafa effort report` pull alone before they
-read, through `pullBeforeRead` (`packages/rafa-effort/src/effort/collect.ts`,
-`src/start.ts`, querying in the effort module). **The offline rule:** a push or
+passes the run's own record; `rafa next` (including `--dry-run`) and
+`rafa effort report` pull alone before they read, through `pullBeforeRead`
+(`packages/rafa-effort/src/effort/sync/contact.ts`, called from
+`src/commands/next.ts` and `packages/rafa-effort/src/effort/report.ts`),
+and `rafa status` pulls alone through a contact's `status()` kind, then
+prints the hub line, `hub: reachable, contract <n>, project <name>; pulled
+<n> rows`, ending `; <m> rows held back` when the
+pull held rows back, or nothing when the pull did not answer and its own
+line stands in its place (`src/commands/status.ts`); and `rafa effort sync`
+runs a contact's `sync({ stop })` kind, `--status` and `--dry-run` its two
+stop points, and exits 1 for a refusal or a step that failed and 0 otherwise,
+an unreachable hub and `local` or `file` included
+(`src/commands/effort/sync.ts`). **The offline rule:** a push or
 pull that rejects with an error whose `name` is `HubUnreachable` (network error,
 timeout, or hub unreachable) writes exactly one line per contact, `effort
 sync: the hub at <url> is unreachable (<first line of why>); this command
@@ -512,9 +535,9 @@ once per contact, under the offline rule above, and `<ids>` is the ids the
 
 | Case | `refuse` (default) | `pull-projected` |
 | --- | --- | --- |
-| This rafa is behind the hub, and the hub's store can project | `effort sync: this rafa is behind the hub (migration <ids>); nothing was merged. Next step: rafa self-update, then sync again` | `effort sync: pulled <n> rows projected to this rafa's schema; <m> columns wait for rafa self-update`; `heldBack` is kept |
+| This rafa is behind the hub, and the hub's store can project | `effort sync: this rafa is behind the hub (migration <ids>); nothing was merged. Next step: rafa self-update, then rafa effort sync` | `effort sync: pulled <n> rows projected to this rafa's schema; <m> columns wait for rafa self-update`; `heldBack` is kept |
 | This rafa is behind the hub, and the hub cannot project (its status says so, or its store answers `409` naming `missing`) | The line above | The line above: a device that sends no migrations gets whole rows, which name ids it lacks |
-| The hub is behind this rafa (the push is refused `409` naming `missing`) | `effort sync: the hub is behind this rafa (migration <ids>); nothing was sent. Next step: upgrade the hub, then sync again` | The same line |
+| The hub is behind this rafa (the push is refused `409` naming `missing`) | `effort sync: the hub is behind this rafa (migration <ids>); nothing was sent. Next step: upgrade the hub, then rafa effort sync` | The same line |
 | A refill: every id `held_rows` lists is known to this build, and `heldBack` is set | `effort sync: refilled <n> rows held back since <date>`; `heldBack` is cleared | The same line |
 | A refill that still lacks an id `held_rows` lists | The first row's line | Projected again: the `pulled <n> rows projected` line, with `heldBack` kept |
 

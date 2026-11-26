@@ -14,7 +14,7 @@ import type { WirePayload } from '@open-tomato/rafa/store';
 import { WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { createHubClient, HUB_UNREACHABLE, HubAnswerMalformed, HubRefused, HubUnreachable, UNNAMED_CONTRACT_VERSION } from './client.js';
+import { createHubClient, HUB_UNREACHABLE, HubAnswerMalformed, HubRefused, HubUnreachable, projectNameOf, UNNAMED_CONTRACT_VERSION } from './client.js';
 
 const TOKEN = 'ghp_client_test_token';
 
@@ -474,6 +474,68 @@ describe('the project', () => {
     const error = await rejectionOf(clientOf(hub.url, { project: PROJECT }).push('dev-a', PAYLOAD));
     expect(error).toBeInstanceOf(HubAnswerMalformed);
     expect(pastStatus(hub)).toEqual([]);
+  });
+});
+
+describe('the project name', () => {
+  /** The status reads `hub` saw. */
+  function statusReads(hub: StandIn): Seen[] {
+    return hub.seen.filter(({ path }) => path === '/v1/status');
+  }
+
+  it('answers the name of the client\'s project among the two a hub serves', async () => {
+    const hub = standIn(() => success(PROJECTS_STATUS));
+    expect(await clientOf(hub.url, { project: PROJECT }).projectName()).toBe('octo/one');
+    expect(await clientOf(hub.url, { project: 'b'.repeat(40) }).projectName()).toBe('octo/two');
+  });
+
+  it('answers null for a project the hub does not serve, where a served one is named', async () => {
+    const hub = standIn(() => success(PROJECTS_STATUS));
+    expect(await clientOf(hub.url, { project: 'c'.repeat(40) }).projectName()).toBeNull();
+    expect(await clientOf(hub.url, { project: PROJECT }).projectName()).toBe('octo/one');
+  });
+
+  it('answers null from a hub naming no projects and from a client made with none', async () => {
+    const none = standIn(() => success(CONTRACT_STATUS));
+    const serving = standIn(() => success(PROJECTS_STATUS));
+    expect(await clientOf(none.url, { project: PROJECT }).projectName()).toBeNull();
+    expect(await clientOf(serving.url).projectName()).toBeNull();
+  });
+
+  it('reads the kept status answer: one status request across status, projectName, push and pull', async () => {
+    const hub = standIn(behind((request) => (request.method === 'POST'
+      ? success({ received: 1, added: 1, at: '2026-10-01T00:00:00.000Z' })
+      : success(PAYLOAD)), PROJECTS_STATUS));
+    const client = clientOf(hub.url, { project: PROJECT });
+    expect(await client.projectName()).toBe('octo/one');
+    await client.push('dev-a', PAYLOAD);
+    await client.pull('dev-a', {});
+    await client.status();
+    expect(await client.projectName()).toBe('octo/one');
+    expect(statusReads(hub)).toHaveLength(1);
+    expect(pastStatus(hub)).toHaveLength(2);
+  });
+
+  it('reads the status again after a failed read, as status does', async () => {
+    let reads = 0;
+    const hub = standIn(() => (++reads === 1
+      ? failure(500, 'down')
+      : success(PROJECTS_STATUS)));
+    const client = clientOf(hub.url, { project: PROJECT });
+    expect(await rejectionOf(client.projectName())).toBeInstanceOf(HubUnreachable);
+    expect(await client.projectName()).toBe('octo/one');
+    expect(statusReads(hub)).toHaveLength(2);
+  });
+});
+
+describe('projectNameOf', () => {
+  const answer = { ...CONTRACT_STATUS_READ, projects: PROJECTS, projectsNamed: true };
+
+  it('picks the entry whose id is the project, and null for an unknown or absent one', () => {
+    expect(projectNameOf(answer, 'b'.repeat(40))).toBe('octo/two');
+    expect(projectNameOf(answer, 'c'.repeat(40))).toBeNull();
+    expect(projectNameOf(answer, undefined)).toBeNull();
+    expect(projectNameOf(CONTRACT_STATUS_READ, PROJECT)).toBeNull();
   });
 });
 
