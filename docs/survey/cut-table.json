@@ -5933,6 +5933,7 @@
         "packages/rafa-hub-postgres/src/index-capabilities.test.ts",
         "packages/rafa-hub-postgres/src/index-links.test.ts",
         "packages/rafa-hub-postgres/src/index-probe.test.ts",
+        "packages/rafa-hub-postgres/src/index-rebuild-live.test.ts",
         "packages/rafa-hub-postgres/src/index-search.test.ts",
         "packages/rafa-hub-postgres/src/migrator.test.ts",
         "packages/rafa-hub-postgres/src/schema.test.ts",

@@ -40,27 +40,34 @@
  * (`schema.ts`): one row naming the serving build, none before the first
  * rebuild. The rebuild runs in one repeatable-read transaction, so every
  * row table is copied at one point of its history: it makes the build's
- * schema, copies, embeds and indexes, then locks the pointer row `FOR
- * UPDATE`, repoints it at the new build and drops the old build's schema.
+ * schema, copies, embeds and indexes, then locks the pointer table `IN
+ * EXCLUSIVE MODE`, repoints it at the new build and drops the old build's
+ * schema.
  * Nothing of the build is seen before that transaction commits, so no
  * query reads its tables while their indexes are built, and a rebuild
  * that fails anywhere, or whose process dies, leaves the serving build
  * and the pointer as they were and no schema of its own behind.
  *
  * A reader reads the pointer with {@link servingBuild}, which locks the
- * row `FOR SHARE`, and queries the build in the same transaction. The
- * swap's `FOR UPDATE` waits for every reader holding the old pointer, and
- * a reader arriving during the swap waits for its commit and reads the
- * new pointer, so the old build is never dropped under a reader. The
- * transaction must be read-write: Postgres refuses `FOR SHARE` in a
- * read-only one.
+ * row `FOR SHARE`, and so the table `IN ROW SHARE MODE`, and queries the
+ * build in the same transaction. The swap's `EXCLUSIVE` lock waits for
+ * every reader holding the old pointer, and a reader arriving once it
+ * waits queues behind it, then reads the pointer the swap committed, so
+ * the old build is never dropped under a reader. The transaction must be
+ * read-write: Postgres refuses `FOR SHARE` in a read-only one.
+ *
+ * The swap takes a table lock because a row lock does not queue: a
+ * reader's `FOR SHARE` joins the others holding the row ahead of a
+ * waiting `FOR UPDATE`, so readers that keep overlapping hold a swap off
+ * for as long as they do (measured, `index-rebuild-live.test.ts`).
  *
  * Two rebuilds of one project, from this hub or another on the same
  * database, run one after the other: each opens its transaction with
  * `LOCK TABLE hub_index_serving IN SHARE ROW EXCLUSIVE MODE`, which
- * conflicts with itself and not with a reader's `FOR SHARE`. A `LOCK`
- * takes no snapshot, so the later rebuild's snapshot is taken once the
- * earlier one has committed, and it reads the earlier one's swap.
+ * conflicts with itself and not with a reader's `FOR SHARE`, so readers
+ * go on while the build is made. A `LOCK` takes no snapshot, so the later
+ * rebuild's snapshot is taken once the earlier one has committed, and it
+ * reads the earlier one's swap.
  *
  * ## Refusals
  *
@@ -145,7 +152,7 @@ export interface ServingBuild {
 
 /** A test's hook inside the rebuild's transaction. */
 export interface IndexBuildHooks {
-  /** Runs once the build is filled and indexed, before the pointer is locked; a throw rolls the whole build back. */
+  /** Runs once the build is filled and indexed, before the pointer is locked against readers; a throw rolls the whole build back. */
   readonly beforeSwap?: (schema: string) => void | Promise<void>;
 }
 
@@ -354,13 +361,14 @@ async function writeMeta(tx: HubTransaction, build: string, request: IndexRebuil
     VALUES (1, ${request.project}, ${stamp}, ${at}, ${plan?.embedder.dimension ?? null}, ${plan?.precision ?? null})`);
 }
 
-/** Repoints the project at `build` under the pointer's row lock and drops the build it served before. */
+/** Repoints the project at `build` with the pointer locked against readers and drops the build it served before. */
 async function swapTo(tx: HubTransaction, build: string, stamp: string, at: string): Promise<void> {
+  // A table lock, since later readers queue behind it; see the module note.
+  await tx.execute(sql`LOCK TABLE ${hubIndexServing} IN EXCLUSIVE MODE`);
   const [old] = await tx
     .select({ schema: hubIndexServing.buildSchema })
     .from(hubIndexServing)
-    .where(eq(hubIndexServing.id, 1))
-    .for('update');
+    .where(eq(hubIndexServing.id, 1));
   await tx
     .insert(hubIndexServing)
     .values({ id: 1, buildSchema: build, stamp, builtAt: at })
