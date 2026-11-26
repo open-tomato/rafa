@@ -5858,7 +5858,7 @@
       "fileCounts": {
         "source": 11,
         "test": 40,
-        "testSupport": 8
+        "testSupport": 9
       },
       "files": [
         "packages/rafa-hub/src/bin.test.ts",
@@ -5887,6 +5887,7 @@
         "packages/rafa-hub/src/identity/testdata/stand-in-github.ts",
         "packages/rafa-hub/src/login/basic.test.ts",
         "packages/rafa-hub/src/login/oauth.test.ts",
+        "packages/rafa-hub/src/login/testdata/stand-in-oauth.ts",
         "packages/rafa-hub/src/server-keys.test.ts",
         "packages/rafa-hub/src/server-login.test.ts",
         "packages/rafa-hub/src/server-query.ts",
@@ -5922,7 +5923,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 50,
+        "packages/rafa-hub/": 51,
         "packages/rafa-index/": 9
       },
       "folders": [
