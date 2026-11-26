@@ -234,8 +234,10 @@ and passed.
    it). Before those refusals, a branch held by a loop worktree one directory
    below `loop.worktreeDir` is freed when that worktree is clean and no live
    loop session holds it: `CLOSEOUT-<stub>.md` and `PLAN_TRACKER-<stub>.md` are
-   copied into the main checkout's `plan.dir` (a later-modified file there is
-   kept), `git worktree remove` runs, and one line says so. A dirty one, one a
+   copied into the main checkout's `plan.dir`, and the run's notes file
+   `.rafa/notes/<stub>.md`, when the worktree has one, into its `.rafa/notes/`
+   (a later-modified file there is kept), `git worktree remove` runs, and one
+   line says so. A dirty one, one a
    live loop holds, one whose session records cannot be read, and one git will
    not remove are refused naming the path, before anything is merged
    (`packages/rafa-pr/src/commands/pr/merge-loop-worktree.ts`). Any other holder
