@@ -100,6 +100,7 @@ describe('defaults', () => {
       rebuildAfterPush: true,
       embeddingModel: null,
       embeddingPrecision: 'half',
+      maxPayloadRows: 50_000,
     });
   });
 
@@ -116,7 +117,7 @@ describe('defaults', () => {
       '  embedding:',
       '    model: nomic-embed-text-v1.5',
       '    precision: full',
-    ), PATH);
+    ).concat('\ndangerous:\n  hub:\n    maxPayloadRows: 1000'), PATH);
 
     expect(config).toEqual({
       repository: 'open-tomato/rafa',
@@ -133,6 +134,7 @@ describe('defaults', () => {
       rebuildAfterPush: false,
       embeddingModel: 'nomic-embed-text-v1.5',
       embeddingPrecision: 'full',
+      maxPayloadRows: 1000,
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -517,6 +519,7 @@ describe('readHubConfig', () => {
       rebuildAfterPush: true,
       embeddingModel: null,
       embeddingPrecision: 'half',
+      maxPayloadRows: 50_000,
     });
   });
 

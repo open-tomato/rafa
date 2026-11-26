@@ -45,6 +45,14 @@
  * says), it logs one `login.insecure` warning once it listens: the
  * login's password crosses the network in clear unless TLS fronts it.
  *
+ * ## The payload cap
+ *
+ * Once it listens, a hub whose `dangerous.hub.maxPayloadRows` is
+ * `unlimited` or above its default (`config-dangerous.ts`) logs one
+ * `config.dangerous` warning naming the key and its value: a push or
+ * pull page that large holds the hub's memory and its request for its
+ * whole length. The default and any smaller cap log nothing.
+ *
  * A config the reader refuses is logged as one `config.refused` line
  * holding every problem, and the command exits 1 without listening; so
  * is an `api-key` hub whose named variable is unset or empty, the line
@@ -98,6 +106,7 @@ import { basename, dirname } from 'node:path';
 import packageJson from '../package.json';
 
 import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
+import { DEFAULT_MAX_PAYLOAD_ROWS, isDangerousPayloadCap, MAX_PAYLOAD_ROWS_KEY } from './config-dangerous.js';
 import { HubConfigError, readHubConfig } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
 import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
@@ -262,6 +271,26 @@ function warnInsecureLogin(login: HubLogin | undefined, hostname: string, log: H
 }
 
 /**
+ * Logs one `config.dangerous` warning when `maxPayloadRows` (null for
+ * `unlimited`) is no cap or one above {@link DEFAULT_MAX_PAYLOAD_ROWS},
+ * and nothing otherwise.
+ */
+function warnDangerousPayloadCap(maxPayloadRows: number | null, log: HubLog): void {
+  if (!isDangerousPayloadCap(maxPayloadRows)) return;
+
+  const value = maxPayloadRows === null
+    ? 'unlimited'
+    : String(maxPayloadRows);
+  log({
+    level: 'warn',
+    event: 'config.dangerous',
+    key: MAX_PAYLOAD_ROWS_KEY,
+    value,
+    message: `${MAX_PAYLOAD_ROWS_KEY} is ${value}, above the default ${String(DEFAULT_MAX_PAYLOAD_ROWS)}, so one push or pull page may hold the hub's memory and its request for as long as it runs`,
+  });
+}
+
+/**
  * Reads the config `env` names and starts the hub over it, answering
  * the running server, or null when the config was refused, which is
  * logged. Under `api-key` it opens the key and login stores in the keys
@@ -316,6 +345,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     throw error;
   }
   warnInsecureLogin(keyLogin?.login, hostname, log);
+  warnDangerousPayloadCap(config.maxPayloadRows, log);
   return opened.length === 0
     ? server
     : closingOnStop(server, closeOpened);

@@ -1,5 +1,5 @@
 /**
- * The hub's config reader: the fourteen server keys `rafa-hub` reads from
+ * The hub's config reader: the fifteen server keys `rafa-hub` reads from
  * the YAML file the {@link HUB_CONFIG_ENV} environment variable names,
  * each with its default and its reader, resolved into one frozen
  * {@link HubConfig} or refused with every problem at once as a
@@ -25,8 +25,11 @@
  * (whose TSDoc holds their readings): `hub.store.engine` (default
  * `sqlite`), `hub.store.postgres.urlVariable` (default `POSTGRES_URL`
  * under `postgres`), `hub.index.embedding.model` (no default; vectors
- * off) and `hub.index.embedding.precision` (default `half`). The
- * client's keys (`hub.url`, `hub.tokenSecret`, `hub.timeout`) are
+ * off) and `hub.index.embedding.precision` (default `half`), and one
+ * outside `hub`, read by `config-dangerous.ts` (whose TSDoc holds its
+ * readings): `dangerous.hub.maxPayloadRows` (default `50000`,
+ * `unlimited` for no cap), the most rows one push or pull page holds.
+ * The client's keys (`hub.url`, `hub.tokenSecret`, `hub.timeout`) are
  * core's, read by `packages/rafa/src/config-schema-hub.ts` from a
  * project's `.rafa/config.yaml`; this file is the server's own and
  * never a project's.
@@ -89,12 +92,14 @@
  *     unknown key there is a misspelling (`cachefor`) that would
  *     otherwise leave a default in force without a word.
  */
+import type { HubDangerousConfig } from './config-dangerous.js';
 import type { HubLoginConfig } from './config-login.js';
 import type { HubIndexConfig, HubStoreConfig } from './config-store.js';
 
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 
+import { readDangerousConfig } from './config-dangerous.js';
 import { readLoginConfig } from './config-login.js';
 import { readIndexConfig, readStoreConfig } from './config-store.js';
 
@@ -213,9 +218,10 @@ export interface HubProject {
 
 /**
  * The hub's settings, resolved: the keys of `hub.store` and `hub.index`,
- * read by `config-store.ts`, beside the ones below.
+ * read by `config-store.ts`, and of `dangerous`, read by
+ * `config-dangerous.ts`, beside the ones below.
  */
-export interface HubConfig extends HubStoreConfig, HubIndexConfig {
+export interface HubConfig extends HubStoreConfig, HubIndexConfig, HubDangerousConfig {
   /**
    * The repository whose permission decides who may sync. `hub.repository`,
    * or the first listed project's when `hub.projects` is set.
@@ -546,9 +552,10 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     throw new HubConfigError([`${path}: not valid YAML: ${reason}`]);
   }
 
-  const hub = isMapping(document)
-    ? document['hub']
-    : undefined;
+  const sections: Readonly<Record<string, unknown>> = isMapping(document)
+    ? document
+    : {};
+  const hub = sections['hub'];
   if (!isMapping(hub)) {
     throw new HubConfigError([`${path}: hub is ${describeValue(hub)}, expected a mapping holding hub.repository`]);
   }
@@ -556,6 +563,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
   const auth = section(path, 'auth', hub['auth'], AUTH_KEYS);
   const store = readStoreConfig(path, hub['store']);
   const index = readIndexConfig(path, hub['index']);
+  const dangerous = readDangerousConfig(path, sections['dangerous']);
   const projects = readProjects(path, hub['projects']);
   const repository = projects === undefined
     ? readRepository(path, hub['repository'])
@@ -582,6 +590,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     ...login.problems,
     ...store.problems,
     ...index.problems,
+    ...dangerous.problems,
   ];
   if (problems.length > 0) throw new HubConfigError(problems);
 
@@ -598,6 +607,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     login: login.value as HubLoginConfig | null,
     ...(store.value as HubStoreConfig),
     ...(index.value as HubIndexConfig),
+    ...(dangerous.value as HubDangerousConfig),
   });
 }
 

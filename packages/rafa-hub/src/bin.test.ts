@@ -226,6 +226,49 @@ describe('runHub', () => {
     expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(503);
     expect(logged.some((entry) => entry.event === 'store.unavailable')).toBe(true);
   });
+
+  /** The `config.dangerous` lines a hub started with `dangerous.hub.maxPayloadRows` written as `cap` logs; left out under undefined. */
+  async function dangerousLines(cap: string | undefined): Promise<HubLogEntry[]> {
+    const { log, logged } = collecting();
+    const extra = cap === undefined
+      ? ''
+      : `dangerous:\n  hub:\n    maxPayloadRows: ${cap}\n`;
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort(), extra) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its config: ${JSON.stringify(logged)}`);
+    await server.stop();
+    return logged.filter((entry) => entry.event === 'config.dangerous');
+  }
+
+  it('logs one config.dangerous warning at start for dangerous.hub.maxPayloadRows unlimited or above 50000', async () => {
+    mkdirStore();
+
+    for (const [cap, value] of [['unlimited', 'unlimited'], ['50001', '50001']] as const) {
+      const lines = await dangerousLines(cap);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({ level: 'warn', key: 'dangerous.hub.maxPayloadRows', value });
+      expect(String(lines[0]?.['message'])).toStartWith(`dangerous.hub.maxPayloadRows is ${value}, above the default 50000`);
+    }
+  });
+
+  it('logs no config.dangerous line for the default, left out or written, or a cap below it', async () => {
+    mkdirStore();
+
+    for (const cap of [undefined, '50000', '100']) {
+      expect(await dangerousLines(cap)).toEqual([]);
+    }
+  });
+
+  it('answers null with a config.refused line naming dangerous.hub.maxPayloadRows when it is 0', async () => {
+    const { log, logged } = collecting();
+    const config = writeConfig(await freePort(), 'dangerous:\n  hub:\n    maxPayloadRows: 0\n');
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: config }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain('dangerous.hub.maxPayloadRows is 0');
+  });
 });
 
 /** `hub.auth` under `api-key`, naming `RAFA_HUB_BIN_KEY`, plus `login` lines indented under it. */
