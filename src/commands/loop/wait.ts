@@ -28,7 +28,12 @@
  *   1. The events file (`loop/events-file.ts`), read from the byte
  *      offset the last read stopped at, starting from 0, so events the
  *      run wrote before the wait began count too. The first event asked
- *      for, in file order, answers.
+ *      for, in file order, answers, and the wait ends on it, so a run is
+ *      answered once: a task held for leaving neither a report nor a
+ *      commit writes its `task-blocked` and then a `halt` naming the
+ *      hold and the task (`emitStopEvents` in `rafa-run`), which the
+ *      default set answers on the `halt`, exit 11, and `--until=blocked`
+ *      on the `task-blocked`, exit 13.
  *   2. The record, read again with the state it reads as, and its pid
  *      probed. A run that has ended answers `exit` when asked for; the
  *      events file is read once more first, so a `pr` line written just

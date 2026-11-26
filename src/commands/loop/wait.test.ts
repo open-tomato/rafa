@@ -38,6 +38,7 @@ import {
   SESSION_ID,
   sessionRecord,
 } from '../../tests/loop-session-fixtures.js';
+import { readLoopEnding } from '../stretch/item-merge.js';
 
 import { createLoopWaitCommand, WAIT_POLL_MS } from './wait.js';
 
@@ -57,6 +58,15 @@ const MS_PER_MINUTE = 60_000;
 /** The usage line a line refusal names. */
 const USAGE = 'Usage: rafa loop wait [-s|--session-id=<id>] [--until=<reasons>] [--timeout=<minutes>]';
 
+/** The line a task held on both absences is printed under, which its run's closing `halt` opens with. */
+const HELD_TEXT = 'Task held: its session left neither a report nor a commit';
+
+/** The reason a held task's `task-blocked` gives: the first of its two holds. */
+const NO_REPORT_HOLD = 'no report: the session wrote no rafa:report block the loop could read';
+
+/** What `rafa stretch item` printed for a run whose events held no ending (#1544). */
+const NO_ENDING = 'it wrote no pr, no-pr, halt or error event';
+
 /** One event of each kind the reasons match, as the loop emits it. */
 const EVENTS: Readonly<Record<string, LoopEvent>> = {
   'pr': { kind: 'pr', number: 41 },
@@ -65,6 +75,8 @@ const EVENTS: Readonly<Record<string, LoopEvent>> = {
   'error': { kind: 'error', message: 'boom\nat line 2' },
   'task-blocked': { kind: 'task-blocked', position: { index: 2, total: 4 }, reason: 'budget spent' },
   'task-start': { kind: 'task-start', position: { index: 2, total: 4 }, text: 'Second task' },
+  'held task-blocked': { kind: 'task-blocked', position: { index: 2, total: 4 }, reason: NO_REPORT_HOLD },
+  'held halt': { kind: 'halt', reason: `${HELD_TEXT}: Second task` },
 };
 
 /** The line the events file holds for `event`, newline included. */
@@ -476,6 +488,50 @@ describe('rafa loop wait --output=json', () => {
       type: 'result',
       ok: false,
       error: { code: 'command_exit', message: `rafa· exit             session ${SESSION_ID} stopped, pid ${PID} not alive` },
+    });
+  });
+});
+
+describe('rafa loop wait, a held stop (#1544)', () => {
+  it('reads a run whose events end on the held task-blocked as no ending, the control the case below reverses', async () => {
+    const { project } = projectWith(['task-start', 'held task-blocked']);
+
+    const run = await wait(project, [], clocked({ isAlive: () => false }).seams);
+
+    expect(run.stdout).toBe(`rafa· exit             session ${SESSION_ID} stopped, pid ${PID} not alive\n`);
+    expect(run.exitCode).toBe(exitOf('exit'));
+    expect(readLoopEnding(project.root, SESSION_ID)).toMatchObject({ kind: 'none', reason: expect.stringContaining(NO_ENDING) });
+  });
+
+  it('answers task-start, the held task-blocked and its halt on the halt: the held reason once, and the halt\'s exit code', async () => {
+    const { project } = projectWith(['task-start', 'held task-blocked', 'held halt']);
+
+    const run = await wait(project, [], clocked({ isAlive: () => false }).seams);
+
+    expect(run.stdout).toBe(`rafa· halt             ${HELD_TEXT}: Second task\n`);
+    expect(run.stdout.split(HELD_TEXT)).toHaveLength(2);
+    expect([run.exitCode, run.stderr]).toEqual([exitOf('halt'), '']);
+    const ending = readLoopEnding(project.root, SESSION_ID);
+    expect(ending).toEqual({ kind: 'halt', reason: `${HELD_TEXT}: Second task` });
+    expect(JSON.stringify(ending)).not.toContain(NO_ENDING);
+  });
+
+  it('gives the json result once for the same file, its one wait event and its terminal error naming the held line', async () => {
+    const { project } = projectWith(['task-start', 'held task-blocked', 'held halt']);
+
+    const run = await wait(project, ['--output=json'], clocked({ isAlive: () => false }).seams);
+    const events = eventsOf(run.stdout);
+
+    expect(run.exitCode).toBe(exitOf('halt'));
+    expect(events.filter((event) => event.type === 'event')).toHaveLength(1);
+    expect(events.find((event) => event.type === 'event')).toMatchObject({
+      name: 'wait',
+      data: { reason: 'halt', exitCode: exitOf('halt'), event: { name: 'halt', data: { reason: `${HELD_TEXT}: Second task` } } },
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: 'result',
+      ok: false,
+      error: { code: 'command_exit', message: `rafa· halt             ${HELD_TEXT}: Second task` },
     });
   });
 });

@@ -42,6 +42,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { readSessions } from '@open-tomato/rafa/core/loop';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
+import { SHARED_CHECKOUT_NOTE } from '@open-tomato/rafa-run/start/run-setup';
 
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { hostToolDirs } from '../tests/stand-in-gh.js';
@@ -389,6 +390,11 @@ describe('a run whose wrap-up never opens a pull request and whose branch can be
     expect(promptOf(scratch, 3)).toContain('wrap-up: nothing opened');
     expect(said).toContain('running retry wrap-up session 1 of 1');
     expect(said).toContain('the loop opens it itself');
+    // Run in the checkout it was started from, it says once, before the
+    // first task, that edits made there go into task commits.
+    const note = SHARED_CHECKOUT_NOTE.trim();
+    expect(said.split(note)).toHaveLength(2);
+    expect(said.indexOf(note)).toBeLessThan(said.indexOf('📋 Creating new plan tracker'));
 
     // The runner pushed the branch, then created the pull request carrying the issue it closes.
     expect(originBranches(scratch)).toContain(BRANCH);

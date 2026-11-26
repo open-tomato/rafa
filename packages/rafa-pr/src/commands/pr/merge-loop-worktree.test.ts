@@ -2,7 +2,7 @@
  * `freeLoopHolder` and its two halves over a scripted git and a real
  * scratch directory: git's answers are scripted, as every module of
  * the merge reaches git through the runner it is handed, while the two
- * plan files are written, dated and copied on disk, so the
+ * plan files and the notes file are written, dated and copied on disk, so the
  * modification-time rule is read from the file system itself.
  */
 import type { LoopWorktreeReading, LoopWorktreeSeams } from './merge-loop-worktree.js';
@@ -338,6 +338,110 @@ describe('freeLoopWorktree copies the plan files, then removes the worktree', ()
     expect(outcome.message).toContain(`${closeout} could not be copied into ${join(main, PLAN_DIR)}: EACCES: permission denied`);
     expect(outcome.message).toContain('the worktree was left in place');
     expect(log.filter((line) => line.startsWith('git worktree remove'))).toEqual([]);
+  });
+});
+
+describe('freeLoopWorktree copies the run\'s notes file beside the plan files', () => {
+  const NOTES_DIR = join('.rafa', 'notes');
+  const notes = `${STUB}.md`;
+
+  it('copies two files and keeps the status line as it was when the worktree has no notes file', () => {
+    const { main, holder } = freshRepo();
+    plant(join(holder, PLAN_DIR, closeout), 'closeout from the loop\n', NEW);
+    plant(join(holder, PLAN_DIR, tracker), 'tracker from the loop\n', NEW);
+    const { seams, log } = scripted();
+
+    const outcome = freeLoopWorktree(seams, reading(main, holder), { path: holder, stub: STUB });
+
+    expect(outcome.ok).toBe(true);
+    expect(existsSync(join(main, NOTES_DIR))).toBe(false);
+    expect(log.filter((line) => line.startsWith('copy'))).toHaveLength(2);
+    if (!outcome.ok) return;
+    expect(outcome.files.map((file) => file.name)).toEqual([closeout, tracker]);
+    expect(outcome.line).toBe(
+      `Freed the ended loop worktree ${holder} holding ${BRANCH}: ${closeout} copied and ${tracker} copied`
+        + ` into ${join(main, PLAN_DIR)}, then the worktree removed.`,
+    );
+  });
+
+  it('copies a notes file only the worktree holds into the main checkout, making its directory, before the remove', () => {
+    const { main, holder } = freshRepo();
+    plant(join(holder, PLAN_DIR, tracker), 'tracker from the loop\n', NEW);
+    plant(join(holder, NOTES_DIR, notes), 'captures from the run\n', NEW);
+    const { seams, log } = scripted();
+
+    const outcome = freeLoopWorktree(seams, reading(main, holder), { path: holder, stub: STUB });
+
+    expect(outcome.ok).toBe(true);
+    expect(readFileSync(join(main, NOTES_DIR, notes), 'utf8')).toBe('captures from the run\n');
+    expect(log.slice(-2)).toEqual([
+      `copy ${join(holder, NOTES_DIR, notes)} -> ${join(main, NOTES_DIR, notes)}`,
+      `git worktree remove ${holder}`,
+    ]);
+    if (!outcome.ok) return;
+    expect(outcome.line).toBe(
+      `Freed the ended loop worktree ${holder} holding ${BRANCH}: ${closeout} absent and ${tracker} copied`
+        + ` into ${join(main, PLAN_DIR)}, and ${notes} copied into ${join(main, NOTES_DIR)}, then the worktree removed.`,
+    );
+  });
+
+  it('keeps a notes file both sides hold when the main checkout\'s is newer, as it keeps a plan file', () => {
+    const { main, holder } = freshRepo();
+    plant(join(holder, PLAN_DIR, tracker), 'tracker from the loop\n', OLD);
+    plant(join(main, PLAN_DIR, tracker), 'tracker edited in main\n', NEW);
+    plant(join(holder, NOTES_DIR, notes), 'notes from the loop\n', OLD);
+    plant(join(main, NOTES_DIR, notes), 'notes edited in main\n', NEW);
+    const { seams } = scripted();
+
+    const outcome = freeLoopWorktree(seams, reading(main, holder), { path: holder, stub: STUB });
+
+    expect(outcome.ok).toBe(true);
+    expect(readFileSync(join(main, PLAN_DIR, tracker), 'utf8')).toBe('tracker edited in main\n');
+    expect(readFileSync(join(main, NOTES_DIR, notes), 'utf8')).toBe('notes edited in main\n');
+    if (!outcome.ok) return;
+    expect(outcome.files.map((file) => file.outcome)).toEqual(['absent', 'kept', 'kept']);
+    expect(outcome.line).toContain(`${notes} kept (the main checkout's is newer) into ${join(main, NOTES_DIR)}`);
+  });
+
+  it('overwrites an older notes file both sides hold, as it overwrites a plan file, the control for the case above', () => {
+    const { main, holder } = freshRepo();
+    plant(join(holder, PLAN_DIR, tracker), 'tracker from the loop\n', NEW);
+    plant(join(main, PLAN_DIR, tracker), 'stale tracker in main\n', OLD);
+    plant(join(holder, NOTES_DIR, notes), 'notes from the loop\n', NEW);
+    plant(join(main, NOTES_DIR, notes), 'stale notes in main\n', OLD);
+    const { seams } = scripted();
+
+    const outcome = freeLoopWorktree(seams, reading(main, holder), { path: holder, stub: STUB });
+
+    expect(outcome.ok).toBe(true);
+    expect(readFileSync(join(main, PLAN_DIR, tracker), 'utf8')).toBe('tracker from the loop\n');
+    expect(readFileSync(join(main, NOTES_DIR, notes), 'utf8')).toBe('notes from the loop\n');
+    if (!outcome.ok) return;
+    expect(outcome.files.map((file) => file.outcome)).toEqual(['absent', 'copied', 'copied']);
+  });
+
+  it('leaves the worktree in place when the notes copy fails, naming the plan files it copied', () => {
+    const { main, holder } = freshRepo();
+    plant(join(holder, PLAN_DIR, closeout), 'closeout from the loop\n', NEW);
+    plant(join(holder, PLAN_DIR, tracker), 'tracker from the loop\n', NEW);
+    plant(join(holder, NOTES_DIR, notes), 'notes from the loop\n', NEW);
+    const { seams, log } = scripted();
+    const failing: LoopWorktreeSeams = {
+      ...seams,
+      copyFile: (from, to) => {
+        if (to.endsWith(join(NOTES_DIR, notes))) throw new Error('EACCES: permission denied');
+        seams.copyFile(from, to);
+      },
+    };
+
+    const outcome = freeLoopWorktree(failing, reading(main, holder), { path: holder, stub: STUB });
+
+    expect(outcome.ok).toBe(false);
+    expect(log.filter((line) => line.startsWith('git worktree remove'))).toEqual([]);
+    expect(readFileSync(join(main, PLAN_DIR, tracker), 'utf8')).toBe('tracker from the loop\n');
+    if (outcome.ok) return;
+    expect(outcome.message).toContain(`${notes} could not be copied into ${join(main, NOTES_DIR)}: EACCES: permission denied`);
+    expect(outcome.message).toContain(`${closeout} copied and ${tracker} copied into ${join(main, PLAN_DIR)}; the worktree was left in place`);
   });
 });
 

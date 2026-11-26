@@ -158,6 +158,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '@open-tomato/rafa/core/output';
 import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { SHARED_CHECKOUT_NOTE } from '@open-tomato/rafa-run/start/run-setup';
 import { preserveProgress } from '@open-tomato/rafa-run/start/wrap-up';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
@@ -479,6 +480,9 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
   return [
     ['warn', `\n⚠️  Branch \`${STUB}\` carries no \`<type>/\` prefix.`],
     ['warn', '   The run proceeds; the convention is `feat/<plan-stub>`.'],
+    // No `--as-worktree`, so the run says it commits in this checkout,
+    // past the guard (`start/run-setup.ts`).
+    ['info', SHARED_CHECKOUT_NOTE],
     // The risk total, ahead of the notices (`start/risk-total.ts`): the
     // spawned run's env is PATH and HOME alone and the scratch has no
     // `origin`, so the four notes are the account readings, measured.

@@ -41,6 +41,9 @@
  * settings off, or the flag absent with the settings on), so the
  * refusal is shown to be keyed on both.
  *
+ * `noteSharedCheckout` reads the words alone: an `--as-worktree` line
+ * writes nothing, a line without the flag writes the one info line once.
+ *
  * `--retry` is the one flag `readRunArgs` refuses: each refused value is
  * read off the `CommandExit` it throws, beside the accepted counts 1 and
  * 3 as its controls, so a reader refusing every value fails here.
@@ -65,10 +68,12 @@ import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
 import { DEFAULT_CI_ATTEMPTS } from './pr-lifecycle.js';
 import {
   guardRunBranch,
+  noteSharedCheckout,
   readRunArgs,
   refuseWorktreeBesideCreateBranch,
   refuseWorktreeWhileTracking,
   resolveRunBranch,
+  SHARED_CHECKOUT_NOTE,
 } from './run-setup.js';
 import { NOTHING_DISPATCHED } from './session.js';
 
@@ -522,6 +527,46 @@ describe('guardRunBranch', () => {
     warnings = [];
     expect(refusalOf(null, 'probe', [])).toBeNull();
     expect(warnings).toEqual([]);
+  });
+});
+
+describe('noteSharedCheckout', () => {
+  /** Every line it wrote, at any level, with its level. */
+  let lines: string[] = [];
+
+  beforeEach(() => {
+    lines = [];
+    const at = (level: string) => (message: string): void => {
+      lines.push(`${level}:${message}`);
+    };
+    setActiveOutput(sinkOutput({ info: at('info'), warn: at('warn'), error: at('error'), debug: at('debug') }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('writes nothing for an --as-worktree run, whatever else its line carries', () => {
+    for (const args of [['--as-worktree'], ['--plan=x.md', '--as-worktree', '--any-branch']]) {
+      noteSharedCheckout(args);
+    }
+
+    expect(lines).toEqual([]);
+  });
+
+  it('writes the one line once, at info, for a run in its own checkout', () => {
+    noteSharedCheckout(['--plan=x.md', '--create-branch']);
+
+    expect(lines).toEqual([`info:${SHARED_CHECKOUT_NOTE}`]);
+    expect(SHARED_CHECKOUT_NOTE).toContain('edits made here during the run go into its task commits');
+    expect(SHARED_CHECKOUT_NOTE).toContain('--as-worktree keeps them apart');
+    expect(SHARED_CHECKOUT_NOTE.trim()).not.toContain('\n');
+  });
+
+  it('writes it for a bare line too, so the flag and not --create-branch is what it keys on', () => {
+    noteSharedCheckout([]);
+
+    expect(lines).toEqual([`info:${SHARED_CHECKOUT_NOTE}`]);
   });
 });
 

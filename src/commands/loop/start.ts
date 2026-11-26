@@ -20,7 +20,11 @@
  * because the two are the pair an operator on the base chooses between —
  * leave the base, or stay on it deliberately — and `--any-branch`
  * outranks it there. With no branch checked out `--any-branch` waives
- * nothing, and the run is refused without the other.
+ * nothing, and the run is refused without the other. Its description
+ * names what staying in this checkout costs: a task's commit stages the
+ * whole tree, so edits made here during the run go into task commits,
+ * and every run without `--as-worktree` prints one line saying so before
+ * its first task (`noteSharedCheckout`, `start/run-setup.ts`, #1607).
  *
  * `--as-worktree` is declared beside them for the same reason: it is
  * the third answer to that question, the plan's branch in a worktree
@@ -225,7 +229,9 @@ const DECLARATION: CommandDeclaration = {
         + ' latest `origin/<base>` and runs the plan there without asking, or switches to that branch'
         + ' when it already exists. On a detached `HEAD` the base is `pr.base`, else the branch'
         + ' `origin/HEAD` names. Refuses rather than move when a tracked file is modified, the fetch'
-        + ' fails or, on `main` or `master`, the base has diverged from its remote.',
+        + ' fails or, on `main` or `master`, the base has diverged from its remote. The run then works'
+        + ' in this checkout, so edits made here while it runs go into its task commits; `--as-worktree`'
+        + ' keeps them apart.',
       type: 'boolean',
     },
     {

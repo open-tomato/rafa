@@ -12,7 +12,7 @@
  * the plan files the loop wrote inside it, since `.rafa/` is ignored
  * and `git worktree remove` takes ignored files with it. This module
  * does that removal for the one case where it is safe, and copies the
- * two plan files out first.
+ * two plan files and the run's notes file out first.
  *
  * ## Which holder is a loop worktree
  *
@@ -56,15 +56,22 @@
  * {@link freeLoopWorktree} copies `CLOSEOUT-<stub>.md` and
  * `PLAN_TRACKER-<stub>.md` from the holder's `plan.dir` into the main
  * checkout's, both read from {@link LoopWorktreeReading.planDir} as
- * configured, and only then runs `git worktree remove <path>` in the
- * main checkout. Each file has one outcome:
+ * configured, then the run's notes file, `.rafa/notes/<stub>.md` (see
+ * {@link NOTES_DIR}), from the holder into the main checkout's
+ * `.rafa/notes/`, and only then runs `git worktree remove <path>` in the
+ * main checkout. The notes file holds the task captures, local-only
+ * readings among them that CI does not repeat, and `.rafa/` being
+ * ignored, the remove would delete it with the worktree. Each file has
+ * one outcome, the notes file by the same rule as the plan files:
  *
  *   - `copied`, the main checkout's file replaced or made;
  *   - `kept`, when the main checkout's file has a LATER modification
  *     time than the holder's: an edit made in the main checkout after
  *     the loop ended is not overwritten. An equal time copies;
  *   - `absent`, when the holder has no such file, which a loop that
- *     never reached its close-out leaves;
+ *     never reached its close-out leaves. An absent notes file is left
+ *     out of {@link FreeOutcome}'s files and the status line altogether,
+ *     so a worktree without one frees as it did before notes were copied;
  *   - `in-place`, when an absolute `plan.dir` makes source and
  *     destination one file.
  *
@@ -78,7 +85,7 @@
  * delete it`.
  *
  * A copy that fails refuses before the remove, leaving the worktree in
- * place. A remove git refuses is a refusal too, quoting git and naming
+ * place, and the refusal names the copies made before it. A remove git refuses is a refusal too, quoting git and naming
  * the copies that were made, and the caller merges nothing after
  * either. Nothing here passes `--force`.
  */
@@ -98,6 +105,13 @@ import { createGitRunner, gitSaid, worktreesHolding } from '../../pr/index.js';
 
 /** How every refusal here opens, as `packages/rafa-pr/src/pr/merge.ts`'s refusals open. */
 const REFUSAL_PREFIX = 'rafa pr merge refuses';
+
+/**
+ * Where a run's notes file sits, `<NOTES_DIR>/<stub>.md`, read from the
+ * holder and from the main checkout alike: a fixed path under the
+ * checkout, not a configured one like `plan.dir`.
+ */
+export const NOTES_DIR = '.rafa/notes';
 
 /** The indent a refusal's listed lines carry. */
 const INDENT = '   ';
@@ -154,11 +168,13 @@ export type LoopHolderAnswer =
 /** What became of one plan file; see the module note. */
 export type PlanFileOutcome = 'copied' | 'kept' | 'absent' | 'in-place';
 
-/** One plan file and what became of it. */
+/** One plan file, or the notes file, and what became of it. */
 export interface PlanFileCopy {
   readonly name: string;
   readonly from: string;
   readonly to: string;
+  /** The main checkout's directory it is copied into, `plan.dir` or {@link NOTES_DIR}. */
+  readonly into: string;
   readonly outcome: PlanFileOutcome;
 }
 
@@ -214,35 +230,43 @@ export function readLoopHolder(seams: LoopWorktreeSeams, reading: LoopWorktreeRe
   };
 }
 
-/** Copies the two plan files into the main checkout, then removes the worktree; see the module note. */
+/**
+ * Copies `CLOSEOUT-<stub>.md` and `PLAN_TRACKER-<stub>.md` into the main
+ * checkout's `plan.dir`, then the run's notes file `<stub>.md` into its
+ * {@link NOTES_DIR} when the holder has one, each through the same
+ * overwrite rule, and only then removes the worktree; see the module
+ * note. The status line names every file and where it went, with no
+ * notes clause when the holder has no notes file. A copy that fails
+ * answers a refusal before the remove, naming the copies already made.
+ */
 export function freeLoopWorktree(seams: LoopWorktreeSeams, reading: LoopWorktreeReading, holder: LoopHolder): FreeOutcome {
   const into = resolve(reading.mainCheckout, reading.planDir);
   const files: PlanFileCopy[] = [];
-  for (const name of planFileNames(holder.stub)) {
-    const from = resolve(holder.path, reading.planDir, name);
-    const to = join(into, name);
+  for (const source of copySources(reading, holder)) {
+    const to = join(source.into, source.name);
     try {
-      files.push({ name, from, to, outcome: copyPlanFile(seams, from, to) });
+      const outcome = copyPlanFile(seams, source.from, to);
+      if (outcome !== 'absent' || !source.optional) files.push({ name: source.name, from: source.from, to, into: source.into, outcome });
     } catch (error) {
       return {
         ok: false,
         message: [
-          `${REFUSAL_PREFIX}: ${name} could not be copied into ${into}: ${messageOf(error)}`,
-          `${INDENT}${filesClause(files) ?? 'nothing was copied'}; the worktree was left in place, and nothing was merged.`,
+          `${REFUSAL_PREFIX}: ${source.name} could not be copied into ${source.into}: ${messageOf(error)}`,
+          `${INDENT}${copiesClause(files) ?? 'nothing was copied'}; the worktree was left in place, and nothing was merged.`,
         ].join('\n'),
       };
     }
   }
 
   const removed = seams.git(['worktree', 'remove', holder.path]);
-  const copies = filesClause(files);
+  const copies = copiesClause(files);
   if (!removed.ok) {
     return {
       ok: false,
       message: [
         `${REFUSAL_PREFIX}: the loop worktree ${holder.path} holding ${reading.branch} could not be removed, so nothing was merged.`,
         ...quotedLines(gitSaid(removed)),
-        `${INDENT}${copies ?? 'no plan file was there to copy'} into ${into}.`,
+        `${INDENT}${copies ?? `no plan file was there to copy into ${into}`}.`,
         `Run git worktree remove ${shellQuote(holder.path)} yourself, then rafa pr merge again.`,
       ].join('\n'),
     };
@@ -251,7 +275,7 @@ export function freeLoopWorktree(seams: LoopWorktreeSeams, reading: LoopWorktree
     ok: true,
     files,
     line: `Freed the ended loop worktree ${holder.path} holding ${reading.branch}: `
-      + `${copies ?? 'no plan file to copy'} into ${into}, then the worktree removed.`,
+      + `${copies ?? `no plan file to copy into ${into}`}, then the worktree removed.`,
   };
 }
 
@@ -317,6 +341,29 @@ export function planFileNames(stub: string): readonly string[] {
   return [`CLOSEOUT-${stub}.md`, `PLAN_TRACKER-${stub}.md`];
 }
 
+/** One file {@link freeLoopWorktree} copies; an optional one is left unnamed when the holder has none. */
+interface CopySource {
+  readonly name: string;
+  readonly from: string;
+  readonly into: string;
+  readonly optional: boolean;
+}
+
+/** The two plan files into `plan.dir`, then the notes file into {@link NOTES_DIR}, in copy order. */
+function copySources(reading: LoopWorktreeReading, holder: LoopHolder): readonly CopySource[] {
+  const planInto = resolve(reading.mainCheckout, reading.planDir);
+  const notes = `${holder.stub}.md`;
+  return [
+    ...planFileNames(holder.stub).map((name) => ({
+      name,
+      from: resolve(holder.path, reading.planDir, name),
+      into: planInto,
+      optional: false,
+    })),
+    { name: notes, from: resolve(holder.path, NOTES_DIR, notes), into: resolve(reading.mainCheckout, NOTES_DIR), optional: true },
+  ];
+}
+
 /** The holder's stub when it sits one directory below `loop.worktreeDir`, else null. */
 function loopStubOf(seams: LoopWorktreeSeams, reading: LoopHolderPlace, path: string): string | null {
   const dir = worktreeDirAt(reading.mainCheckout, reading.worktreeDir);
@@ -354,7 +401,7 @@ function dirtyReasons(git: GitRunner): string[] {
     : [parts.join(', ')];
 }
 
-/** Copies one plan file unless the rule in the module note keeps it. May throw. */
+/** Copies one plan file, or the notes file, unless the rule in the module note keeps it. May throw. */
 function copyPlanFile(seams: LoopWorktreeSeams, from: string, to: string): PlanFileOutcome {
   if (from === to) return 'in-place';
   const source = seams.modifiedAt(from);
@@ -365,10 +412,22 @@ function copyPlanFile(seams: LoopWorktreeSeams, from: string, to: string): PlanF
   return 'copied';
 }
 
-/** `CLOSEOUT-x.md copied and PLAN_TRACKER-x.md kept (...)`, or null when there are no files yet. */
-function filesClause(files: readonly PlanFileCopy[]): string | null {
-  if (files.length === 0) return null;
-  return files.map((file) => `${file.name} ${outcomeWords(file.outcome)}`).join(' and ');
+/**
+ * `CLOSEOUT-x.md copied and PLAN_TRACKER-x.md kept (...) into <plan.dir>`,
+ * then `, and x.md copied into <notes dir>` for the notes file, one
+ * clause per destination directory in copy order; null when there are
+ * no files yet.
+ */
+function copiesClause(files: readonly PlanFileCopy[]): string | null {
+  const groups: { readonly into: string; readonly names: string[] }[] = [];
+  for (const file of files) {
+    const words = `${file.name} ${outcomeWords(file.outcome)}`;
+    const last = groups.at(-1);
+    if (last?.into === file.into) last.names.push(words);
+    else groups.push({ into: file.into, names: [words] });
+  }
+  if (groups.length === 0) return null;
+  return groups.map((group) => `${group.names.join(' and ')} into ${group.into}`).join(', and ');
 }
 
 function outcomeWords(outcome: PlanFileOutcome): string {

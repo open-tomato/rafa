@@ -659,7 +659,10 @@ New; it replaces no earlier text. What a row or an action added to
   started, and halts with the work kept if either changes externally; the guard
   fires on every loop, with or without `--as-worktree`, and never interferes
   with the loop's own commits. Without `--as-worktree` the checkout is the
-  project root itself, and you run the loop where you already are.
+  project root itself, and you run the loop where you already are; since a
+  task's commit stages the whole tree, a file you edit there during the run
+  goes into the next task's commit, which the run says in one line before its
+  first task (`noteSharedCheckout`, `start/run-setup.ts`).
 - **`start/worktree.ts` adds the worktree on the branch's route**: `create`
   fetches `origin/<base>` (a failed fetch refuses the run, so a stale base is
   never cut from) and adds `feat/<stub>` on a new branch with `--no-track`;

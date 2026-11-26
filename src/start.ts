@@ -392,6 +392,7 @@ import {
   createStartTriage,
   dispatchTask,
   emitLoopEvent,
+  emitStopEvents,
   finishCleanExit,
   guardCheckout,
   guardRunBranch,
@@ -404,6 +405,7 @@ import {
   isBudgetExit,
   loadRunConfig,
   markBudgetExit,
+  noteSharedCheckout,
   openCheckoutExpectation,
   openRunSession,
   readAlwaysRunFiles,
@@ -525,6 +527,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     branchTemplate: runConfig.config.namingBranch,
   });
   guardRunBranch(planStub, branch, args, runConfig.config.namingBranch);
+  // Past the guard, ahead of every session: without `--as-worktree` the run
+  // is in the checkout it was started from, and one line says that edits
+  // made there go into task commits (`start/run-setup.ts`, #1607).
+  noteSharedCheckout(args);
   // What the loop guard holds the checkout to: its branch at the HEAD it
   // starts from, moved on by each task commit (`start/checkout-watch.ts`).
   let expected = openCheckoutExpectation({ projectRoot: repoRoot, checkout, branch });
@@ -888,8 +894,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (finished.outcome !== 'done') {
         const held = { kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' } as const;
         if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit', retryTask)) continue;
-        if (await decisions.atStop({ kind: 'clean-exit', taskInfo, retryTask, finished, stopEvent: held })) continue;
-        emitLoopEvent(held);
+        const stop = { kind: 'clean-exit', taskInfo, retryTask, finished, stopEvent: held } as const;
+        if (await decisions.atStop(stop)) continue;
+        emitStopEvents(stop);
         return;
       }
       decisions.taskDone(taskInfo);
