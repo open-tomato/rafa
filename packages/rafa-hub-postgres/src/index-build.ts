@@ -205,7 +205,7 @@ interface VectorPlan {
 }
 
 /** A name quoted as an SQL identifier. */
-function quoted(name: string): string {
+export function quoted(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }
 
