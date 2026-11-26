@@ -17,6 +17,14 @@
  * `--github` (D9) is the one switch that lets a build call `gh`: bare, or
  * `--github=true`, it is on; left out, `--no-github` or `--github=false`,
  * it is off, and any other value refuses naming the flag.
+ *
+ * The layers come from `context.moduleConfig`: the raw `atlas` section of
+ * the project's config, the key the manifest declares under
+ * `provides.config`, which the runtime hands the command unread. It is
+ * read through `readAtlasLayers` (`../layers.ts`), so a section that does
+ * not parse throws `AtlasConfigError`, which `refusing` prints as one
+ * error line per problem before the build starts; an unset section is
+ * no layers, and every `module_facts.layer` reads NULL.
  */
 import type { BuildOptions } from '../build/index.js';
 import type { GhRunner } from '@open-tomato/rafa-board';
@@ -25,6 +33,7 @@ import type { RafaContext, RafaFlagSpec } from '@open-tomato/rafa-core/core/comm
 import { resolve } from 'node:path';
 
 import { AtlasConfigError } from '../config.js';
+import { readAtlasLayers } from '../layers.js';
 
 /** The subject every Atlas command is grouped under. */
 export const SUBJECT = 'atlas';
@@ -61,12 +70,17 @@ export function githubFlagOf(context: RafaContext): boolean {
   throw new Error(`--${GITHUB_FLAG.name} is ${JSON.stringify(value)}, expected no value, true or false`);
 }
 
-/** The build options of the context: its root, its environment and `--github`; `gh`, when given, stands in for `gh`. */
+/**
+ * The build options of the context: its root, its environment, `--github`
+ * and the layers of its `atlas` section; `gh`, when given, stands in for
+ * `gh`. Throws `AtlasConfigError` for a section that does not parse.
+ */
 export function buildOptionsOf(context: RafaContext, gh?: GhRunner): BuildOptions {
   return {
     projectRoot: projectRootOf(context),
     env: context.env,
     github: githubFlagOf(context),
+    layers: readAtlasLayers(context.moduleConfig),
     ...(gh === undefined
       ? {}
       : { gh }),

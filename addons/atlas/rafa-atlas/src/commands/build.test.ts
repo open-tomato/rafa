@@ -9,20 +9,27 @@
  * (`../ingest/testdata/github.fixture.ts`): without the flag the stub,
  * which throws, is never called; with it, a stub answering `ok: false`
  * gives one warning naming its stderr and a build that still succeeds.
+ * The layer cases hand the context an `atlas` section as
+ * `moduleConfig`, over a root holding two module folders: two layers
+ * stamp the folder each lists and leave the other NULL, and a section
+ * that does not parse refuses the build with one error line per problem
+ * and no replica written.
  */
 import type { BuildSummary } from '../build/index.js';
 
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { openReplica } from '@open-tomato/atlas-data/replica';
+import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { replicaPathOf } from '../build/index.js';
 import { PRS_SOURCE } from '../ingest/github.js';
 import { writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
 import { failingGh, FIXTURE_GH_STDERR, fixtureGh, throwingGh } from '../ingest/testdata/github.fixture.js';
+import { ATLAS_SECTION } from '../layers.js';
 
 import { buildCommand, partialLines, runBuild } from './build.js';
 import { testContext } from './testdata/context.js';
@@ -159,6 +166,94 @@ describe('the build command\'s --github flag', () => {
     await expect(buildCommand.run(context)).rejects.toThrow('--github is "maybe"');
     expect(printed.error).toEqual([expect.stringContaining('--github is "maybe", expected no value, true or false')]);
     expect(existsSync(replicaPathOf(root))).toBe(false);
+  });
+});
+
+/** Two module folders: a package and a root folder with no package. */
+const MODULE_TREE: Readonly<Record<string, string>> = {
+  'packages/core/package.json': JSON.stringify({ name: '@open-tomato/fixture-core' }),
+  'packages/core/src/index.ts': 'export const core = 1;\n',
+  'src/commands/index.ts': 'export const commands = 1;\n',
+};
+
+/** A root holding the fixture store and {@link MODULE_TREE}. */
+function moduleRoot(name: string): string {
+  const root = join(scope, name);
+  writeFixtureStore(root);
+  for (const [path, text] of Object.entries(MODULE_TREE)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  return root;
+}
+
+/** Each `module_facts` row's path, layer and rank, by path. */
+function layerRows(root: string): readonly (readonly unknown[])[] {
+  const database = new Database(replicaPathOf(root), { readonly: true });
+  try {
+    return database.query<{ path: string; layer: string | null; layer_rank: number | null }, []>(
+      'SELECT path, layer, layer_rank FROM module_facts ORDER BY path',
+    ).all()
+      .map((row) => [row.path, row.layer, row.layer_rank]);
+  } finally {
+    database.close();
+  }
+}
+
+describe('the build command reading the atlas section', () => {
+  it('stamps the layers of the section the context hands it, and NULL for a folder no layer lists', async () => {
+    const root = moduleRoot('layers');
+    const moduleConfig = {
+      layers: [
+        { name: 'platform', modules: ['@open-tomato/elsewhere'] },
+        { name: 'core', modules: ['@open-tomato/fixture-core'] },
+      ],
+    };
+    const { context, printed } = testContext({ env: { ATLAS_PROJECT_ROOT: root }, moduleConfig });
+
+    await buildCommand.run(context);
+
+    expect(printed.error).toEqual([]);
+    expect(layerRows(root)).toEqual([
+      ['packages/core', 'core', 1],
+      ['src/commands', null, null],
+    ]);
+  });
+
+  it('refuses a section that does not parse with one error line per problem, writing no replica', async () => {
+    const root = moduleRoot('bad-section');
+    const moduleConfig = {
+      layers: [
+        { name: 'core', modules: ['@open-tomato/fixture-core'] },
+        { name: ' ', modules: ['@open-tomato/fixture-core'] },
+      ],
+      colours: true,
+    };
+    const { context, printed } = testContext({ env: { ATLAS_PROJECT_ROOT: root }, moduleConfig });
+
+    const refusal = await buildCommand.run(context).then(() => null, (error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(Error);
+    expect((refusal as Error).message).toBe(`atlas: ${ATLAS_SECTION} holds 2 problems`);
+    expect(printed.error).toEqual([
+      `${ATLAS_SECTION}: colours is not a key Atlas reads; it reads layers`,
+      `${ATLAS_SECTION}: layers[1].name is " ", expected a layer name holding something`,
+    ]);
+    expect(printed.info).toEqual([]);
+    expect(existsSync(replicaPathOf(root))).toBe(false);
+  });
+
+  it('control: with no section the same root builds, every folder NULL', async () => {
+    const root = moduleRoot('no-section');
+    const { context, printed } = testContext({ env: { ATLAS_PROJECT_ROOT: root } });
+
+    await buildCommand.run(context);
+
+    expect(printed.error).toEqual([]);
+    expect(layerRows(root)).toEqual([
+      ['packages/core', null, null],
+      ['src/commands', null, null],
+    ]);
   });
 });
 

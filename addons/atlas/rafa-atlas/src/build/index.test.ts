@@ -7,16 +7,22 @@
  * case reads the project's history; a root holding no repository stamps
  * both git sources missing and the build goes on. The board cases plant
  * the board ingest's fixture cache in the root; a root holding none stamps
- * both board sources missing and the build goes on.
+ * both board sources missing and the build goes on. The layer cases plant
+ * three module folders, two with a package and one without, and build
+ * with two layers: the folder each lists, by package or by folder, is
+ * stamped with its layer and rank, and the third reads NULL, as every
+ * folder does in the control build handed no layers.
  */
 import type { GitRunner } from '../ingest/git.js';
+import type { AtlasLayer } from '../layers.js';
 
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { openReplica } from '@open-tomato/atlas-data/replica';
 import { openSqliteStore } from '@open-tomato/rafa-core/store/sqlite';
+import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { BOARD_SOURCE, ISSUES_SOURCE } from '../ingest/board.js';
@@ -146,5 +152,70 @@ describe('buildAtlas over the buckets built so far', () => {
 
     await expect(buildAtlas({ projectRoot: root, env: {} })).rejects.toThrow('no effort store');
     expect(existsSync(replicaPathOf(root))).toBe(false);
+  });
+});
+
+/** Three module folders: two packages and a root folder with no package. */
+const MODULE_TREE: Readonly<Record<string, string>> = {
+  'packages/core/package.json': JSON.stringify({ name: '@open-tomato/fixture-core' }),
+  'packages/core/src/index.ts': 'export const core = 1;\n',
+  'packages/extra/package.json': JSON.stringify({ name: '@open-tomato/fixture-extra' }),
+  'packages/extra/src/index.ts': 'export const extra = 1;\n',
+  'src/commands/index.ts': 'export const commands = 1;\n',
+};
+
+/** The two layers the case builds with: one listing a package, one a folder. */
+const TWO_LAYERS: readonly AtlasLayer[] = [
+  { name: 'core', modules: ['@open-tomato/fixture-core'] },
+  { name: 'app', modules: ['src/commands'] },
+];
+
+/** A root holding the fixture store and {@link MODULE_TREE}. */
+function moduleRoot(name: string): string {
+  const root = join(scope, name);
+  writeFixtureStore(root);
+  for (const [path, text] of Object.entries(MODULE_TREE)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  return root;
+}
+
+/** Each `module_facts` row's path, layer and rank, by path. */
+function layerRows(replicaPath: string): readonly (readonly unknown[])[] {
+  const database = new Database(replicaPath, { readonly: true });
+  try {
+    return database.query<{ path: string; layer: string | null; layer_rank: number | null }, []>(
+      'SELECT path, layer, layer_rank FROM module_facts ORDER BY path',
+    ).all()
+      .map((row) => [row.path, row.layer, row.layer_rank]);
+  } finally {
+    database.close();
+  }
+}
+
+describe('buildAtlas stamping each module\'s layer', () => {
+  it('stamps the layer and rank of each folder two layers list, by package and by folder, and NULL for the unlisted one', async () => {
+    const root = moduleRoot('layers');
+
+    const summary = await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT, layers: TWO_LAYERS });
+
+    expect(layerRows(summary.replicaPath)).toEqual([
+      ['packages/core', 'core', 0],
+      ['packages/extra', null, null],
+      ['src/commands', 'app', 1],
+    ]);
+  });
+
+  it('control: the same tree built with no layers reads NULL in every folder', async () => {
+    const root = moduleRoot('no-layers');
+
+    const summary = await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT });
+
+    expect(layerRows(summary.replicaPath)).toEqual([
+      ['packages/core', null, null],
+      ['packages/extra', null, null],
+      ['src/commands', null, null],
+    ]);
   });
 });

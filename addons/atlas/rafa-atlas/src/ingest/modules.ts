@@ -47,18 +47,27 @@
  *    inside it nor one around it) reads NULL, as every module does when
  *    the file is absent, does not parse, or holds no `packages` list;
  *    the stamp is then partial and says so.
- * 5. **Counts.** `bugs`, `findings` and `changes` are left NULL here;
+ * 5. **Layers.** `layer` and `layer_rank` are the place `layerOf`
+ *    (`../layers.ts`) gives the module among the options' `layers`, the
+ *    `atlas.layers` section of the project's config: the first layer
+ *    listing its package or its folder, by name and by its place in the
+ *    list from 0. A module no layer lists, and every module of a build
+ *    handed no layers, reads NULL in both.
+ * 6. **Counts.** `bugs`, `findings` and `changes` are left NULL here;
  *    `derive.ts` counts them by module from the effort buckets.
  *
  * The stamp's `as_of` and `read_at` are the build clock: the tree is read
  * as it stands. A tree with no module folder writes no row and is stamped
  * partial, naming the globs.
  */
+import type { AtlasLayer } from '../layers.js';
 import type { ReplicaBuild, SourceStamp } from '@open-tomato/atlas-data/replica';
 import type { Dirent } from 'node:fs';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { layerOf } from '../layers.js';
 
 import { DEFAULT_MODULE_GLOBS, discoverModules } from './attribute.js';
 
@@ -152,6 +161,8 @@ export interface ModuleIngestOptions {
   readonly root: string;
   /** The globs the modules are found by; defaults to {@link DEFAULT_MODULE_GLOBS}. */
   readonly globs?: readonly string[];
+  /** The layers each module is placed in (`atlas.layers`); none when left out, so every `layer` reads NULL. */
+  readonly layers?: readonly AtlasLayer[];
   /** The build clock: the stamp's `as_of` and `read_at`; defaults to the system clock. */
   readonly now?: () => Date;
 }
@@ -331,11 +342,11 @@ export function upwardEdgesOf(table: CutTableRead, path: string): number | null 
 /** The `module_facts` columns written, in the order {@link moduleRows} binds them. */
 const MODULE_COLUMNS: readonly string[] = [
   'path', 'package', 'files', 'loc', 'test_files', 'test_loc', 'docs_loc', 'config_loc', 'fixtures_loc',
-  'fan_in', 'fan_out', 'imports_json', 'upward_edges',
+  'fan_in', 'fan_out', 'imports_json', 'upward_edges', 'layer', 'layer_rank',
 ];
 
-/** Each module's row, in {@link MODULE_COLUMNS} order. */
-export function moduleRows(trees: readonly ModuleTree[], table: CutTableRead): (string | number | null)[][] {
+/** Each module's row, in {@link MODULE_COLUMNS} order, placed among `layers` (none by default, every place NULL). */
+export function moduleRows(trees: readonly ModuleTree[], table: CutTableRead, layers: readonly AtlasLayer[] = []): (string | number | null)[][] {
   const byPackage = new Map(trees
     .filter((tree): tree is ModuleTree & { readonly package: string } => tree.package !== null)
     .map((tree) => [tree.package, tree.path]));
@@ -345,9 +356,11 @@ export function moduleRows(trees: readonly ModuleTree[], table: CutTableRead): (
   const targets = new Map(trees.map((tree) => [tree.path, targetsOf(tree)]));
   return trees.map((tree) => {
     const fanIn = trees.filter((other) => targets.get(other.path)?.has(tree.path) === true).length;
+    const place = layerOf(layers, tree.path, tree.package);
     return [
       tree.path, tree.package, tree.files, tree.loc, tree.testFiles, tree.testLoc,
       tree.docsLoc, tree.configLoc, tree.fixturesLoc, fanIn, targets.get(tree.path)?.size ?? 0, JSON.stringify(tree.imports), upwardEdgesOf(table, tree.path),
+      place?.layer ?? null, place?.rank ?? null,
     ];
   });
 }
@@ -384,7 +397,7 @@ export function ingestModules(build: ReplicaBuild, options: ModuleIngestOptions)
   const insert = build.database.prepare<unknown, (string | number | null)[]>(
     `INSERT INTO module_facts (${MODULE_COLUMNS.join(', ')}) VALUES (${MODULE_COLUMNS.map(() => '?').join(', ')})`,
   );
-  const rows = moduleRows(trees, table);
+  const rows = moduleRows(trees, table, options.layers);
   build.database.transaction(() => {
     for (const row of rows) insert.run(...row);
   })();
