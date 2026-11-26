@@ -1098,6 +1098,7 @@ describe('hubStatus', () => {
       projectId: 'other-project',
       projectName: 'other/project',
       migrations: exportWirePayload({ path: a.path }).migrations,
+      maxPayloadRows: null,
     });
     expect(answer.migrations.length).toBeGreaterThan(0);
     expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
@@ -1123,6 +1124,7 @@ describe('hubStatus', () => {
       projectId: rootCommitOf(a.root),
       projectName: null,
       migrations: [],
+      maxPayloadRows: null,
     });
   });
 
@@ -1162,3 +1164,64 @@ describe('hubStatus', () => {
   });
 });
 
+describe('a bounded push and a pull\'s page', () => {
+  it('answers the hub\'s maxPayloadRows on hubStatus, null from a hub naming none', async () => {
+    const over = hub();
+    const a = device(1);
+    expect((await serviceOf(a, over).hubStatus()).maxPayloadRows).toBeNull();
+    over.setMaxPayloadRows(2);
+    expect((await serviceOf(a, over).hubStatus()).maxPayloadRows).toBe(2);
+  });
+
+  it('sends at most limit rows a push, moving the push cursor past them, where a whole push to the capped hub is refused', async () => {
+    const over = hub();
+    over.setMaxPayloadRows(2);
+    const a = device(3);
+    const service = serviceOf(a, over);
+    expect((await rejectionOf(service.push({ to: null }))).name).toBe('HubRefused');
+    expect(await service.pendingPush()).toBe(3);
+    expect(await service.push({ to: null, limit: 2 })).toEqual({ status: 'pushed', path: null });
+    expect(stateOf(a).stores[originOf(a)]?.push.commits).toBe(2);
+    expect(await service.pendingPush()).toBe(1);
+    await service.push({ to: null, limit: 2 });
+    expect(await service.pendingPush()).toBe(0);
+    expect(over.requests.map(({ rows }) => rows)).toEqual([3, 2, 1]);
+    expect(over.held('commits').map((row) => `${String(row['origin_store'])}:${String(row['origin_seq'])}`)).toEqual(commitPairs(a));
+  });
+
+  it('sends every row when the limit reaches them, and counts the cut on a dry run', async () => {
+    const over = hub();
+    const a = device(3);
+    const service = serviceOf(a, over);
+    expect(await service.push({ to: null, dryRun: true, limit: 2 })).toMatchObject({ dryRun: true, rows: 2 });
+    expect(await service.push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 3 });
+    await service.push({ to: null, limit: 3 });
+    expect(over.requests.map(({ rows }) => rows)).toEqual([3]);
+    expect(await service.pendingPush()).toBe(0);
+  });
+
+  it.each([0, -1, 1.5])('refuses a push limit of %p before any contact', async (limit) => {
+    const over = hub();
+    const a = device(1);
+    expect(await rejectionOf(serviceOf(a, over).push({ to: null, limit }))).toBeInstanceOf(TypeError);
+    expect(over.requests).toEqual([]);
+    expect(over.statusReads()).toBe(0);
+  });
+
+  it('answers each pulled page\'s rows, so a page reaching the cap is pulled again until every row is merged', async () => {
+    const over = hub();
+    over.setMaxPayloadRows(2);
+    const a = device(3);
+    const pusher = serviceOf(a, over);
+    await pusher.push({ to: null, limit: 2 });
+    await pusher.push({ to: null, limit: 2 });
+    const b = device(1);
+    const puller = serviceOf(b, over);
+    const first = await puller.pull({ from: null, dryRun: false });
+    expect(first).toMatchObject({ status: 'pulled', rows: 2, merge: { rowsAdded: 2 } });
+    const second = await puller.pull({ from: null, dryRun: false });
+    expect(second).toMatchObject({ status: 'pulled', rows: 1, merge: { rowsAdded: 1 } });
+    expect(await puller.pull({ from: null, dryRun: false })).toEqual({ status: 'nothing-to-sync' });
+    expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
+  });
+});

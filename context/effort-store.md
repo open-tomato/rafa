@@ -409,7 +409,11 @@ into payloads under it, asking `push({ to: null, limit })` of a strategy
 carrying `pendingPush()` until no rows wait; it repeats a pull while the
 page's answer says (`rows`) it came back full. A hub naming no cap, a
 strategy with no `pendingPush()` and a dry run push and pull once
-(`packages/rafa-effort/src/effort/sync/contact-pages.ts`).
+(`packages/rafa-effort/src/effort/sync/contact-pages.ts`). The `service`
+strategy answers `maxPayloadRows` on `hubStatus()`, sends at most `limit`
+rows a push past its push cursor, and answers `rows` on every `pulled`
+page (`packages/rafa-sync-service/src/sync.ts`, `A bounded push and a
+pull's page`).
 `pullBeforeRead` reads the config without writing its warnings and contacts
 nothing when the config is refused, leaving the refusal to the command.
 
