@@ -287,7 +287,7 @@ with three gates. **Triggers:** pull requests into `main`, `integration`
 or `stretch/**`, and pushes to `stretch/**`. **Gates** (each step runs
 unless the job was cancelled): ring 0's job `verify` runs `bun test`,
 `bunx eslint .`, and
-`bun run check-types`, the root config and the ten composite members,
+`bun run check-types`, the root config and the eleven composite members,
 which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
 (`turbo run lint check-types test --affected`), `bunx tsc --build
 tsconfig.references.json` and `bun scripts/workspace/graph-check.ts`.

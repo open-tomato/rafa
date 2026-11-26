@@ -5862,7 +5862,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 40,
+        "test": 41,
         "testSupport": 9
       },
       "files": [
@@ -5917,6 +5917,7 @@
         "packages/rafa-hub/src/testdata/test-secrets.ts",
         "packages/rafa-hub/src/two-devices.integration.test.ts",
         "packages/rafa-hub/src/two-projects.integration.test.ts",
+        "packages/rafa-hub-port/index.test.ts",
         "packages/rafa-index/src/fusion.test.ts",
         "packages/rafa-index/src/imports.test.ts",
         "packages/rafa-index/src/index.integration.test.ts",
@@ -5929,10 +5930,12 @@
       ],
       "filesByFolder": {
         "packages/rafa-hub/": 51,
+        "packages/rafa-hub-port/": 1,
         "packages/rafa-index/": 9
       },
       "folders": [
         "packages/rafa-hub/",
+        "packages/rafa-hub-port/",
         "packages/rafa-index/"
       ],
       "name": "rafa-hub",

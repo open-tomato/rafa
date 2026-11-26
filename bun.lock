@@ -187,7 +187,20 @@
       },
       "dependencies": {
         "@open-tomato/rafa-core": "workspace:*",
+        "@open-tomato/rafa-hub-port": "workspace:*",
         "@open-tomato/rafa-index": "workspace:*",
+      },
+      "devDependencies": {
+        "@open-tomato/eslint-config": "^0.2.0",
+        "eslint": "^9.39.4",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/rafa-hub-port": {
+      "name": "@open-tomato/rafa-hub-port",
+      "version": "0.0.0",
+      "dependencies": {
+        "@open-tomato/rafa-core": "workspace:*",
       },
       "devDependencies": {
         "@open-tomato/eslint-config": "^0.2.0",
@@ -448,6 +461,8 @@
     "@open-tomato/rafa-effort": ["@open-tomato/rafa-effort@workspace:packages/rafa-effort"],
 
     "@open-tomato/rafa-hub": ["@open-tomato/rafa-hub@workspace:packages/rafa-hub"],
+
+    "@open-tomato/rafa-hub-port": ["@open-tomato/rafa-hub-port@workspace:packages/rafa-hub-port"],
 
     "@open-tomato/rafa-index": ["@open-tomato/rafa-index@workspace:packages/rafa-index"],
 
