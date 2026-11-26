@@ -6,7 +6,10 @@
  * window (a source with no time axis refusing one), and a formula that
  * reads the columns those params answer; then every PoC metric over a
  * replica built from the fixture store, with rows behind each and the
- * readings the fixture fixes. `catalogue-sources.test.ts` runs the phase 4 metrics
+ * readings the fixture fixes, and the out-of-scope entries per week over
+ * the replica with three planted rows: a machine-scoped one and a
+ * `cli-gap` one left out, a NULL-scope one counted, the same params
+ * without the two filters as the control. `catalogue-sources.test.ts` runs the phase 4 metrics
  * over a replica of every source. Controls show each check can fail: the
  * schema refuses a definition with an extra key, the engine refuses a
  * measure on a field the descriptor lacks, and the formula refuses a
@@ -22,14 +25,16 @@ import { join } from 'node:path';
 import { applyFormula, InvalidParams, MetricDefinitionSchema } from '@open-tomato/atlas-data/contract';
 import { runQuery } from '@open-tomato/atlas-data/query';
 import { writeBugRoutes } from '@open-tomato/rafa-core/store/bug-routes';
+import { Database } from 'bun:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { buildAtlas } from '../build/index.js';
+import { buildAtlas, replicaPathOf } from '../build/index.js';
 import { FIXTURE_PLAN, FIXTURE_TASK_LINE, TASK_SESSIONS, writeFactsFixture, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
 import { openAtlasRegistry, type AtlasRegistry } from '../registry.js';
 import { SOURCE_SPECS } from '../sources.js';
 
 import { METRIC_CATALOGUE } from './catalogue.js';
+import { NOT_MACHINE_OR_CLI_GAP } from './pm.js';
 import { BOARD_BUGS, NOT_CLI_GAP } from './qa.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-catalogue-')));
@@ -60,7 +65,7 @@ const POC_IDS = [
 
 /** The metrics past the PoC cut of each lens, phase 4's and later, in the order each lens lists them after its PoC cut. */
 const PHASE_FOUR_IDS = {
-  pm: ['pm.milestone-completion', 'pm.minutes-per-agent'],
+  pm: ['pm.milestone-completion', 'pm.minutes-per-agent', 'pm.out-of-scope-per-week'],
   architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations'],
   developer: ['dev.deploys-per-week', 'dev.wip', 'dev.pr-cycle-time'],
   qa: [
@@ -103,6 +108,31 @@ const GITHUB_IDS = ['dev.pr-cycle-time', 'qa.defect-age', 'qa.resolution-time', 
 /** The routed bug the test plants beside the fixture's: the one own-fallout row. */
 const FALLOUT_BUG = 'the replica drops a routed bug';
 
+/**
+ * The out-of-scope rows planted in the built replica: one scoped to this
+ * machine and one with module `cli-gap` in ISO week 45, which the
+ * fixture's three out-of-scope bugs fill, and one with a NULL scope and
+ * module in week 44, alone there. The engine keys a week by its Monday.
+ */
+const PLANTED_OUT_OF_SCOPE = [
+  { id: 'planted-machine', scope: 'machine', module: null, day: '2026-11-04' },
+  { id: 'planted-cli-gap', scope: 'bug', module: 'cli-gap', day: '2026-11-04' },
+  { id: 'planted-null-scope', scope: null, module: null, day: '2026-10-28' },
+] as const;
+
+/** Plant {@link PLANTED_OUT_OF_SCOPE} as out-of-scope rows of `bug_facts` in the replica under `root`. */
+function plantOutOfScope(root: string): void {
+  const database = new Database(replicaPathOf(root));
+  try {
+    const insert = database.prepare<unknown, [string, string | null, string | null, string]>(
+      'INSERT INTO bug_facts (id, source, scope, module, day) VALUES (?, \'out_of_scope\', ?, ?, ?)',
+    );
+    for (const row of PLANTED_OUT_OF_SCOPE) insert.run(row.id, row.scope, row.module, row.day);
+  } finally {
+    database.close();
+  }
+}
+
 beforeAll(async () => {
   const root = join(scope, 'built');
   writeFixtureStore(root);
@@ -112,6 +142,7 @@ beforeAll(async () => {
     routes: [{ what: FALLOUT_BUG, said: 'own-fallout', kind: 'own-fallout', route: 'repair', entryIndex: 2 }],
   }, { now: () => new Date('2026-11-03T11:00:00.000Z') });
   await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
+  plantOutOfScope(root);
   registry = await openAtlasRegistry({ projectRoot: root, sourceOptions: { now: () => BUILT_AT } });
 });
 
@@ -169,10 +200,10 @@ describe('METRIC_CATALOGUE', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five then two on PM, four then three, four then three, four then seven', () => {
+  it('gives each lens the metrics of its rows: five then three on PM, four then three, four then three, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([7, 7, 7, 11]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([8, 7, 7, 11]);
   });
 
   it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
@@ -201,8 +232,13 @@ describe('METRIC_CATALOGUE', () => {
     const bugMetrics = METRIC_CATALOGUE.filter((metric) => metric.sourceId === 'local.bugs');
     const boardBugMetrics = METRIC_CATALOGUE.filter((metric) => metric.params.filters?.some((filter) => filter.field === 'is_bug') === true);
 
-    expect(bugMetrics.map((metric) => metric.id)).toEqual(['qa.bugs-by-kind', 'qa.regressions', 'qa.filed-share']);
-    expect(bugMetrics.every((metric) => NOT_CLI_GAP.every((filter) => metric.params.filters?.includes(filter) === true))).toBe(true);
+    const routedMetrics = bugMetrics.filter((metric) => metric.params.filters?.some((filter) => filter.field === 'source' && filter.value === 'routed') === true);
+    const outOfScopeMetrics = bugMetrics.filter((metric) => !routedMetrics.includes(metric));
+
+    expect(bugMetrics.map((metric) => metric.id)).toEqual(['pm.out-of-scope-per-week', 'qa.bugs-by-kind', 'qa.regressions', 'qa.filed-share']);
+    expect(routedMetrics.every((metric) => NOT_CLI_GAP.every((filter) => metric.params.filters?.includes(filter) === true))).toBe(true);
+    expect(outOfScopeMetrics.map((metric) => metric.id)).toEqual(['pm.out-of-scope-per-week']);
+    expect(outOfScopeMetrics.every((metric) => NOT_MACHINE_OR_CLI_GAP.every((filter) => metric.params.filters?.includes(filter) === true))).toBe(true);
     expect(boardBugMetrics.map((metric) => metric.id)).toEqual(PHASE_FOUR_IDS.qa.slice(1));
     expect(boardBugMetrics.every((metric) => BOARD_BUGS.every((filter) => metric.params.filters?.includes(filter) === true))).toBe(true);
   });
@@ -333,5 +369,25 @@ describe('the minutes per agent over the fixture replica', () => {
 
     expect(rows).toEqual([{ agent: 'implementer', minutes: 75, sessions: 2 }]);
     expect(cycle.reduce((sum, row) => sum + Number(row.minutes), 0)).toBe(75);
+  });
+});
+
+describe('the out-of-scope entries per week over the fixture replica', () => {
+  it('counts every out-of-scope row per ISO week, the machine and cli-gap rows left out and the NULL-scope row in', async () => {
+    const rows = recordsOf(await answerOf('pm.out-of-scope-per-week'));
+
+    expect(rows).toEqual([{ week: '2026-10-26', entries: 1 }, { week: '2026-11-02', entries: 3 }]);
+  });
+
+  it('control: the same params without the machine and cli-gap filters count both planted rows in week 45', async () => {
+    if (registry === null) throw new Error('no registry');
+    const bugs = registry.sources.get('local.bugs');
+    if (bugs === undefined) throw new Error('no local.bugs');
+    const metric = metricOf('pm.out-of-scope-per-week');
+    const filters = (metric.params.filters ?? []).filter((filter) => !NOT_MACHINE_OR_CLI_GAP.includes(filter));
+    const rows = recordsOf(await bugs.query({ ...metric.params, filters, window: WINDOW }));
+
+    expect(filters).toEqual([{ field: 'source', op: 'eq', value: 'out_of_scope' }]);
+    expect(rows).toEqual([{ week: '2026-10-26', entries: 1 }, { week: '2026-11-02', entries: 5 }]);
   });
 });

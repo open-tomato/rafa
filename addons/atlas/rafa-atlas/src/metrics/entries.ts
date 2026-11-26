@@ -13,9 +13,11 @@
  * served metric can be a nearer reading than its entry's: entry 24, the
  * change failure rate, is drawn by `dev.red-ci-share`, the red share of
  * CI readings, and entry 28, defect leakage, by `qa.filed-share`, the
- * share of routed bugs per route. Entry 8 reads a blocker as active by
- * its task's outcome, `blocked`: the store keeps no open or closed state
- * of a blocker.
+ * share of routed bugs per route, and entry 7, scope creep, by
+ * `pm.out-of-scope-per-week`, every out-of-scope entry per week (spec
+ * C1), with no ratio over planned tasks. Entry 8 reads a blocker as
+ * active by its task's outcome, `blocked`: the store keeps no open or
+ * closed state of a blocker.
  *
  * Entries 1 and 25 are offline (D17): milestone completion and WIP read
  * only states and labels, which the board cache holds. The four `gh`
@@ -61,7 +63,7 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
   entry(4, 'pm', 'On-time delivery', 'collect', 'needs a due date on plans; no proxy', 'KPI empty'),
   entry(5, 'pm', 'Budget burn', 'direct', 'tokens_total cumulative vs budget.tokensPerWeek (daily_rollup)', 'KPI + goal, line + baseline', ['pm.budget-burn', 'pm.tokens-per-day']),
   entry(6, 'pm', 'Actual vs planned', 'direct', 'tasks_planned vs task_sessions per plan', 'grouped bar', ['pm.planned-vs-sessions']),
-  entry(7, 'pm', 'Scope creep', 'proxy', 'bug_routes follow-up + filed per tasks_planned', 'stacked column'),
+  entry(7, 'pm', 'Scope creep', 'proxy', 'bug_routes follow-up + filed per tasks_planned', 'stacked column', ['pm.out-of-scope-per-week']),
   entry(8, 'pm', 'Active blockers and risks', 'direct', 'finding_facts source=blocker, outcome blocked; issue_facts stage Blocked', 'row list, risk heatmap', ['pm.active-blockers']),
   entry(9, 'pm', 'Defect / rework rate', 'direct', 'repeat_sessions + ci_repair_sessions / task_sessions', 'KPI + trend'),
   entry(10, 'pm', 'Resource utilization', 'proxy', 'task session minutes per agent; no wall-clock capacity is recorded', 'horizontal bar', ['pm.minutes-per-agent']),

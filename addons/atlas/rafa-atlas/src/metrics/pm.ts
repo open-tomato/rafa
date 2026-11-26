@@ -23,14 +23,25 @@
  * per agent over the window: a proxy for resource utilization, as the
  * store records no wall-clock capacity to divide by. A task session
  * naming no agent counts under a NULL agent, which the card names.
+ *
+ * `pm.out-of-scope-per-week` (entry 7, spec C1) counts every out-of-scope
+ * entry a task reported per ISO week: the `local.bugs` rows with
+ * `source` `out_of_scope`, leaving out `scope` `machine` and `module`
+ * `cli-gap` as every bug count does ({@link NOT_MACHINE_OR_CLI_GAP}).
+ * The engine reads `ne` as true for a NULL, so a row stored before the
+ * store recorded a scope, or naming no module, stays in. It measures
+ * what the tile names, so it is `direct` and carries no proxy note,
+ * though entry 7's own basis is a ratio over planned tasks.
  */
-import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
+import type { Filter, MetricDefinition } from '@open-tomato/atlas-data/contract';
 
 import { DAILY_SOURCE } from '../build/daily.js';
 import { PLANS_SOURCE } from '../build/derive.js';
 import { ISSUES_SOURCE } from '../ingest/board.js';
 import { TASKS_SOURCE } from '../ingest/effort.js';
-import { FINDINGS_SOURCE } from '../ingest/facts.js';
+import { BUGS_SOURCE, FINDINGS_SOURCE } from '../ingest/facts.js';
+
+import { CLI_GAP_OUT } from './qa.js';
 
 /** How many blockers the active-blockers list answers, the newest first. */
 const ACTIVE_BLOCKERS_LIMIT = 50;
@@ -179,8 +190,33 @@ export const MINUTES_PER_AGENT: MetricDefinition = {
   proxyNote: 'Task session minutes per agent stand in for utilization: the store records no capacity to divide them by.',
 };
 
+/** Leaves out the bugs of this machine and the gaps in rafa's own CLI; `ne` keeps a NULL scope or module in. */
+export const NOT_MACHINE_OR_CLI_GAP: readonly Filter[] = [
+  { field: 'scope', op: 'ne', value: 'machine' },
+  CLI_GAP_OUT,
+];
+
+/** Every out-of-scope entry a task reported, counted per ISO week. */
+export const OUT_OF_SCOPE_PER_WEEK: MetricDefinition = {
+  id: 'pm.out-of-scope-per-week',
+  title: 'Out-of-scope entries per week',
+  lenses: ['pm'],
+  description: 'The out-of-scope entries the tasks reported, counted per ISO week; machine-scoped entries and cli-gap bugs left out, an entry with no scope or module kept.',
+  sourceId: BUGS_SOURCE,
+  params: {
+    grain: 'week',
+    filters: [{ field: 'source', op: 'eq', value: 'out_of_scope' }, ...NOT_MACHINE_OR_CLI_GAP],
+    measures: [{ field: 'id', agg: 'count', as: 'entries' }],
+    orderBy: [{ key: 'week', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'entries',
+  chart: 'kpi',
+  feasibility: 'direct',
+};
+
 /** The project management lens's PoC metrics, in the order section G lists them. */
 export const PM_POC_METRICS: readonly MetricDefinition[] = [BUDGET_BURN, TOKENS_PER_DAY, PLAN_COMPLETION, PLANNED_VS_SESSIONS, ACTIVE_BLOCKERS];
 
-/** The project management lens's metrics: the PoC cut, the one over the board source, then the minutes per agent. */
-export const PM_METRICS: readonly MetricDefinition[] = [...PM_POC_METRICS, MILESTONE_COMPLETION, MINUTES_PER_AGENT];
+/** The project management lens's metrics: the PoC cut, the one over the board source, the minutes per agent, then the out-of-scope entries per week. */
+export const PM_METRICS: readonly MetricDefinition[] = [...PM_POC_METRICS, MILESTONE_COMPLETION, MINUTES_PER_AGENT, OUT_OF_SCOPE_PER_WEEK];
