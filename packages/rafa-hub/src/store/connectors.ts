@@ -6,8 +6,8 @@
  * Here that is `sqlite`, {@link connectSqliteHub} with its defaults, and
  * `postgres`, `connectPostgresHub` of `@open-tomato/rafa-hub-postgres`
  * reading its URL from `hub.store.postgres.urlVariable`'s default,
- * `POSTGRES_URL`; its index half is not built yet. The in-memory stand-in in `contract.test.ts` is no connector: it has no
- * index and keeps its own run of the row suite.
+ * `POSTGRES_URL`. The in-memory stand-in in `contract.test.ts` is no
+ * connector: it has no index and keeps its own run of the row suite.
  */
 import type { HubConnector } from './port.js';
 

@@ -13,9 +13,9 @@
  *     one write to the project's schema it is meant to make.
  *   - {@link servingBuildIdentity}, the index's identity: the serving
  *     build's schema, then each of its tables with its relfilenode and its
- *     indexes' names and relfilenodes, in name order; `none` before the
- *     first rebuild. A rebuild swaps in a new schema of new tables, so it
- *     changes; a search leaves it.
+ *     indexes' names and relfilenodes, in name order; `none` for a
+ *     project no build serves yet. A rebuild swaps in a new schema of
+ *     new tables, so it changes; a search leaves it.
  *
  * {@link postgresIndexProbe} wraps the two over a URL, opening a client of
  * its own for each reading and closing it after, and is what the package's
@@ -32,7 +32,7 @@ import { SCHEMA_NAME } from './migrator.js';
 /** The pointer table, the one table of the project's schema the store identity leaves out. */
 const POINTER_TABLE = 'hub_index_serving';
 
-/** The index identity before the project's first rebuild. */
+/** The index identity of a project no build serves yet. */
 export const NO_SERVING_BUILD = 'none';
 
 /** What {@link postgresIndexProbe} reads over. */

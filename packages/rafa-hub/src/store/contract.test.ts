@@ -11,10 +11,11 @@
  *
  * `postgres` runs behind the `POSTGRES_URL` gate
  * (`testdata/postgres-gate.ts`): closed, a skipped case names the gate;
- * open, the row suite runs over the connector with each case's stores in
+ * open, both suites run over the connector with each case's stores in
  * schemas of their own, beside a gate case that fails when the connection
- * is refused. Both answers of the gate are held by `bun test` spawned on
- * `testdata/postgres-gate.fixture.ts`.
+ * is refused. Its index setup (`testdata/postgres-index-setup.ts`) holds
+ * the extension off by giving no embedder. Both answers of the gate are
+ * held by `bun test` spawned on `testdata/postgres-gate.fixture.ts`.
  *
  * The row suite also runs against the in-memory stand-in
  * (`testdata/memory-store.ts`), which is no connector, then against the
@@ -44,7 +45,7 @@ import type { HubServedProject, HubStore } from './port.js';
 import { join } from 'node:path';
 
 import { createLoaderState } from '@open-tomato/rafa-index/loader';
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { HUB_CONNECTORS } from './connectors.js';
 import { builders, hubStoreContract, readTemplate } from './contract.js';
@@ -61,6 +62,7 @@ import {
   POSTGRES_SKIP_LINE,
   postgresGate,
 } from './testdata/postgres-gate.js';
+import { postgresIndexSetup } from './testdata/postgres-index-setup.js';
 
 /**
  * How the index suite opens one connector of {@link HUB_CONNECTORS},
@@ -72,12 +74,20 @@ interface IndexSetup {
   readonly plantLinks: HubIndexLinkPlanter;
 }
 
+const POSTGRES = postgresGate(process.env);
+
+/** The `postgres` index setup; its URL is empty, and nothing of it is called, while the gate is closed. */
+const POSTGRES_INDEX = postgresIndexSetup(POSTGRES.open
+  ? POSTGRES.url
+  : '');
+
 /**
  * The index suite's setup per connector name. `sqlite` holds the
  * extension off the way macOS does with no library named, on a loader
  * state of its own so the process's stays unmarked, and is probed by
  * its store file's sha256 and its index file's inode
- * (`sqlite-index-probe.ts`).
+ * (`sqlite-index-probe.ts`). `postgres` is the setup of
+ * `testdata/postgres-index-setup.ts`.
  */
 const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
   sqlite: {
@@ -90,10 +100,11 @@ const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
     plantLinks: plantSqliteRefLinks,
     probe: SQLITE_INDEX_PROBE,
   },
+  postgres: POSTGRES_INDEX,
 });
 
 /** The connectors whose index half is not built, so the index suite does not run over them. */
-const NO_INDEX_YET: readonly string[] = Object.freeze(['postgres']);
+const NO_INDEX_YET: readonly string[] = Object.freeze([]);
 
 describe('the connectors both suites run over', () => {
   it('holds an index setup for every connector with an index by name, and none other', () => {
@@ -107,17 +118,19 @@ describe('the connectors both suites run over', () => {
   });
 });
 
-const POSTGRES = postgresGate(process.env);
 describePostgresGate(POSTGRES);
+// Runs after the suite's own hook has closed the case's stores. Dropped case by
+// case, the schemas never pile up in the catalogue the later cases read.
+afterEach(() => POSTGRES_INDEX.dropMade());
 
 for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
   // The registry's own entry stores in the default schemas of a real hub,
   // so postgres runs the same connector under schemas of each case's own.
-  if (name === 'postgres') {
-    if (POSTGRES.open) hubStoreContract('postgres', isolatedPostgresStore(POSTGRES.url));
-    continue;
-  }
-  hubStoreContract(name, async (context) => (await connector(context)).store);
+  const isPostgres = name === 'postgres';
+  if (isPostgres && !POSTGRES.open) continue;
+  hubStoreContract(name, isPostgres && POSTGRES.open
+    ? isolatedPostgresStore(POSTGRES.url)
+    : async (context) => (await connector(context)).store);
   const setup = INDEX_SETUPS[name];
   if (setup !== undefined) {
     const options = { embedder: INDEX_CONTRACT_EMBEDDER, plantLinks: setup.plantLinks, probe: setup.probe };

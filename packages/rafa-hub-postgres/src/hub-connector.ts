@@ -13,6 +13,12 @@
  * loaded and an embedder given, and `projection` `false`. The store's
  * `contract()` answers the same three beside `projection`.
  *
+ * When the first served project has no serving build at open, the open
+ * builds one from its rows with one rebuild, as the `sqlite` connector
+ * builds a missing index file, so a search or a walk answers from the
+ * start. A build already serving is left as it is. Another project's first
+ * build is its first `rebuild`.
+ *
  * `rebuild` builds the project's index as a build schema of its own and
  * swaps it in (`index-build.ts`), embedding with the embedder only while
  * `vector` is `true`, so a build without one holds full text alone and
@@ -45,7 +51,8 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { openPostgresConnection } from './connection.js';
 import { openPostgresHubStoreParts } from './hub-store.js';
-import { rebuildProjectIndex } from './index-build.js';
+import { inProjectSchema } from './hub-tables.js';
+import { rebuildProjectIndex, servingBuild } from './index-build.js';
 import { holdsRefLinksTable, measureCapabilities } from './index-capabilities.js';
 import { walkProjectLinks } from './index-links.js';
 import { searchProjectIndex } from './index-search.js';
@@ -77,6 +84,16 @@ interface IndexHalf {
   readonly isClosed: () => boolean;
 }
 
+/** Builds and swaps in the index of the project at `place` when none is serving it. */
+async function buildMissingIndex(half: IndexHalf, place: ProjectSchema): Promise<void> {
+  const { db, measured, now } = half;
+  if (await inProjectSchema(db, place.schema, servingBuild) !== null) return;
+  const embedder = measured.vector.vector
+    ? half.embedder
+    : undefined;
+  await rebuildProjectIndex({ db, place, request: { project: place.id }, now, embedder });
+}
+
 /** The index of the connector: a rebuild that swaps a build in, and a search and a walk of the serving build. */
 function connectorIndex(half: IndexHalf): HubIndex {
   const { db, isClosed, measured, now, placeOf } = half;
@@ -106,8 +123,9 @@ function connectorIndex(half: IndexHalf): HubIndex {
 /**
  * Opens the `postgres` connector's store and index over `context`,
  * measuring the index's capabilities once the first project's schema is
- * ready. Rejects, with nothing left open, when the variable, the
- * database's extensions or the first project's schema is refused.
+ * ready, then building that project's index when none serves it. Rejects,
+ * with nothing left open, when the variable, the database's extensions,
+ * the first project's schema or that first build is refused.
  */
 export async function connectPostgresHub(
   context: HubStoreContext,
@@ -116,16 +134,20 @@ export async function connectPostgresHub(
   const { urlVariable, env, schemaPrefix, embedder } = options;
   const { client, extensions } = await openPostgresConnection({ urlVariable, env });
   const { store, placeOf } = await openPostgresHubStoreParts(context, { client, schemaPrefix });
-  let measured: MeasuredIndex;
+  const db = drizzle({ client });
+  let closed = false;
+  let half: IndexHalf;
   try {
     const first = await placeOf(undefined);
     const refLinks = await holdsRefLinksTable(client, first.schema);
-    measured = measureCapabilities({ extensions, embedder: embedder !== undefined, refLinks });
+    const measured = measureCapabilities({ extensions, embedder: embedder !== undefined, refLinks });
+    half = { db, placeOf, now: context.now, measured, embedder, isClosed: () => closed };
+    await buildMissingIndex(half, first);
   } catch (error) {
     await store.close();
     throw error;
   }
-  let closed = false;
+  const { measured } = half;
   return {
     store: {
       ...store,
@@ -138,6 +160,6 @@ export async function connectPostgresHub(
         await store.close();
       },
     },
-    index: connectorIndex({ db: drizzle({ client }), placeOf, now: context.now, measured, embedder, isClosed: () => closed }),
+    index: connectorIndex(half),
   };
 }

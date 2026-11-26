@@ -4,11 +4,12 @@
  * `POSTGRES_URL` is set, each case opens the connector under a schema
  * prefix no other case or run holds and reads the two identities through
  * {@link postgresIndexProbe}: the store's held across a rebuild and a
- * search, the index's `none` before the first rebuild and new after each.
+ * search, the index's new after each rebuild, and `none` once no build
+ * serves.
  * Each reading that must stay is paired with a control that moves it: a
  * push, and an index put on a row table, change the store's identity. It
  * drops only the project schemas that prefix made and the build schemas
- * its rebuilds named.
+ * their opens and rebuilds named.
  */
 import type { WirePayload } from '@open-tomato/rafa/store';
 import type { HubIndex, HubStore, HubStoreContext } from '@open-tomato/rafa-hub-port';
@@ -71,14 +72,20 @@ describe.skipIf(url === '')('postgresIndexProbe, live on POSTGRES_URL', () => {
       .slice(0, 8)}`;
     schema = projectSchemaName(prefix, DEFAULT_PROJECT_ID);
     hub = await connectPostgresHub(CONTEXT, { urlVariable: 'POSTGRES_URL', env: { POSTGRES_URL: url }, schemaPrefix: prefix });
+    await recordBuild();
     return hub;
+  }
+
+  /** Records the build the pointer names for the drop. */
+  async function recordBuild(): Promise<void> {
+    const [pointer] = await admin.unsafe<{ build_schema: string }[]>(`SELECT build_schema FROM "${schema}".hub_index_serving`);
+    if (pointer !== undefined) builds.push(pointer.build_schema);
   }
 
   /** Rebuilds the project, recording the build it swapped in for the drop. */
   async function rebuild(index: HubIndex): Promise<void> {
     await index.rebuild({ project: DEFAULT_PROJECT_ID });
-    const [pointer] = await admin.unsafe<{ build_schema: string }[]>(`SELECT build_schema FROM "${schema}".hub_index_serving`);
-    if (pointer !== undefined) builds.push(pointer.build_schema);
+    await recordBuild();
   }
 
   beforeAll(() => {
@@ -128,8 +135,9 @@ describe.skipIf(url === '')('postgresIndexProbe, live on POSTGRES_URL', () => {
   });
 
   describe('the index identity', () => {
-    it('answers none before the first rebuild', async () => {
+    it('answers none for a project no build serves', async () => {
       await open();
+      await admin.unsafe(`DELETE FROM "${schema}".hub_index_serving`);
 
       expect(await probe.indexIdentity(CONTEXT)).toBe(NO_SERVING_BUILD);
     });
@@ -141,7 +149,7 @@ describe.skipIf(url === '')('postgresIndexProbe, live on POSTGRES_URL', () => {
 
       const lines = (await probe.indexIdentity(CONTEXT)).split('\n');
 
-      expect(lines[0]).toBe(builds[0]);
+      expect(lines[0]).toBe(builds.at(-1));
       expect(lines.find((line) => line.startsWith('commits@'))).toMatch(/^commits@\d+\[commits_bm25=\d+\]$/);
       expect(lines.find((line) => line.startsWith('index_meta@'))).toMatch(/^index_meta@\d+\[index_meta_pkey=\d+\]$/);
     });
@@ -159,7 +167,7 @@ describe.skipIf(url === '')('postgresIndexProbe, live on POSTGRES_URL', () => {
 
       expect(searched).toBe(first);
       expect(second).not.toBe(first);
-      expect(second.split('\n')[0]).toBe(builds[1]);
+      expect(second.split('\n')[0]).toBe(builds.at(-1));
     });
   });
 });

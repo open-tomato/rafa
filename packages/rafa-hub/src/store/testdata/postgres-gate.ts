@@ -9,8 +9,8 @@
  * that has gone away never reads as a pass.
  *
  * Every store opened here takes a schema prefix no other case or run
- * holds, and its `close()` drops the schemas that prefix made and no
- * other.
+ * holds, and its `close()` drops the schemas that prefix made, with the
+ * index build each one serves, and no other.
  */
 import type { HubStoreContext, HubStoreFactory } from '../port.js';
 
@@ -47,15 +47,31 @@ export function postgresGate(env: Readonly<Record<string, string | undefined>>):
     : { open: true, url };
 }
 
-/** Drops every schema named `<prefix>_…`, the ones a store under `prefix` made. */
-async function dropSchemas(url: string, prefix: string): Promise<void> {
+/** The index build the project schema `name` serves, `null` for none or a schema with no pointer. */
+async function servingBuildOf(admin: SQL, name: string): Promise<string | null> {
+  const [pointer] = await admin.unsafe<{ found: string | null }[]>('SELECT to_regclass($1)::text AS found', [`"${name}".hub_index_serving`]);
+  if (!pointer?.found) return null;
+  const [serving] = await admin.unsafe<{ build_schema: string }[]>(`SELECT build_schema FROM "${name}".hub_index_serving`);
+  return serving?.build_schema ?? null;
+}
+
+/**
+ * Drops every schema named `<prefix>_…`, the ones a store under `prefix`
+ * made, and first the build each serves, which is named `index_…` and so
+ * is found only through its project schema's pointer.
+ */
+export async function dropSchemas(url: string, prefix: string): Promise<void> {
   const admin = new SQL(url);
   try {
     const made = await admin.unsafe<{ schema_name: string }[]>(
       'SELECT schema_name FROM information_schema.schemata WHERE starts_with(schema_name, $1)',
       [`${prefix}_`],
     );
-    for (const { schema_name: name } of made) await admin.unsafe(`DROP SCHEMA "${name}" CASCADE`);
+    for (const { schema_name: name } of made) {
+      const build = await servingBuildOf(admin, name);
+      if (build !== null) await admin.unsafe(`DROP SCHEMA IF EXISTS "${build}" CASCADE`);
+      await admin.unsafe(`DROP SCHEMA "${name}" CASCADE`);
+    }
   } finally {
     await admin.close();
   }

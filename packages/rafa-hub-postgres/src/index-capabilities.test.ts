@@ -101,6 +101,12 @@ describe.skipIf(url === '')('the connector\'s capabilities, live on POSTGRES_URL
     return { prefix, schema };
   }
 
+  /** Records for the drop the build the pointer of `schema` names. */
+  async function recordBuild(schema: string): Promise<void> {
+    const [pointer] = await admin.unsafe<{ build_schema: string }[]>(`SELECT build_schema FROM "${schema}".hub_index_serving`);
+    if (pointer !== undefined) builds.push(pointer.build_schema);
+  }
+
   /** Opens the connector under `prefix`, its store closed after the case. */
   async function open(prefix: string, embedder?: IndexEmbedder): Promise<{ readonly store: HubStore; readonly index: HubIndex }> {
     const hub = await connectPostgresHub(
@@ -110,14 +116,14 @@ describe.skipIf(url === '')('the connector\'s capabilities, live on POSTGRES_URL
         : { embedder } },
     );
     opened.push(hub.store);
+    await recordBuild(projectSchemaName(prefix, DEFAULT_PROJECT_ID));
     return hub;
   }
 
   /** Rebuilds the project, recording the build it swapped in for the drop. */
   async function rebuild(index: HubIndex, schema: string): Promise<boolean> {
     const result = await index.rebuild({ project: DEFAULT_PROJECT_ID });
-    const [pointer] = await admin.unsafe<{ build_schema: string }[]>(`SELECT build_schema FROM "${schema}".hub_index_serving`);
-    if (pointer !== undefined) builds.push(pointer.build_schema);
+    await recordBuild(schema);
     return result.vector;
   }
 
