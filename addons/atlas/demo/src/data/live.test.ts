@@ -125,10 +125,13 @@ describe('liveResultOf over a stub client: the requests', () => {
       { id: 'qa.open-bugs-per-day', window: undefined },
       { id: 'pm.minutes-per-agent', window: { last: '28d' } },
       { id: 'qa.defect-density', window: undefined },
+      { id: 'pm.out-of-scope-per-week', window: { last: '28d' } },
+      { id: 'pm.task-pile', window: undefined },
+      { id: 'dev.work-done', window: { last: '28d' } },
       { id: 'pm.tokens-per-day', window: previous },
       { id: 'arch.debt-ratio', window: previous },
     ]);
-    expect([...WINDOWED_SOURCE_METRICS].sort()).toEqual(['deploysPerWeek', 'minutesPerAgent', 'resolutionTime']);
+    expect([...WINDOWED_SOURCE_METRICS].sort()).toEqual(['deploysPerWeek', 'minutesPerAgent', 'resolutionTime', 'scopeCreep', 'workDone']);
   });
 
   it('reads the plans\' first sessions once, over the series window, for the outcome card', async () => {
@@ -338,9 +341,10 @@ describe('liveResultOf over a stub client: each field filled', () => {
 });
 
 describe('liveResultOf over a stub client: the phase-4 fields', () => {
-  it('wires the four fields phase 4 names, WIP, the two bug backlog fields, the minutes per agent and the defect density, each from its own metric', () => {
+  it('wires the four fields phase 4 names, WIP, the two bug backlog fields, the minutes per agent, the defect density and the three cards\' fields, each from its own metric', () => {
     expect(SOURCE_WIRED_FIELDS).toEqual([
       'deploysPerWeek', 'modules', 'workspace', 'wip', 'resolutionByPriority', 'bugOutcomeByLoopStart', 'openBugsPerDay', 'minutesPerAgent', 'defectDensity',
+      'scopeCreepPerWeek', 'scopeCreepAverage', 'taskPileTree', 'workDoneTree',
     ]);
     expect(Object.keys(SOURCE_METRIC_FIELDS)).toEqual(Object.keys(SOURCE_METRICS));
     for (const field of SOURCE_WIRED_FIELDS) expect({ field, wired: WIRED_FIELDS.includes(field) }).toEqual({ field, wired: true });
@@ -443,6 +447,15 @@ describe('liveResultOf over a stub client: the phase-4 fields', () => {
     expect(defectDensityOf(resultOf(['path', 'bugs', 'loc'], [['src/gone', 7, 0]]))).toBe(0);
   });
 
+  it('fills the out-of-scope tile, the task pile and work done through live-cards.ts\'s mappers', async () => {
+    const { result } = await liveResult();
+
+    expect(result.mock.scopeCreepPerWeek).toEqual([0, 6, 0, 4]);
+    expect(result.mock.scopeCreepAverage).toBe(2.5);
+    expect(result.mock.taskPileTree.map((branch) => branch.id)).toEqual(['bug', 'chore', 'spec']);
+    expect(result.mock.workDoneTree.map((branch) => branch.id)).toEqual(['features', 'fixes', 'chores']);
+  });
+
   it('gives each phase-4 field its metric and row count, a proxy\'s note on the module fields', async () => {
     const { result } = await liveResult();
 
@@ -465,20 +478,26 @@ describe('liveResultOf over a stub client: a replica with no GitHub data', () =>
     expect(GITHUB_BUILD_LINE).toBe('rafa module exec @open-tomato/rafa-atlas build --github');
     expect(result.notWired.has('resolutionByPriority')).toBe(true);
     expect(result.notWired.has('openBugsPerDay')).toBe(true);
-    expect([...result.notWiredDetail.entries()]).toEqual([['resolutionByPriority', GITHUB_NOT_READ], ['openBugsPerDay', GITHUB_NOT_READ]]);
-    expect(result.notWired.size).toBe(NOT_WIRED.size + 2);
+    expect(result.notWired.has('taskPileTree')).toBe(true);
+    expect([...result.notWiredDetail.entries()]).toEqual([
+      ['resolutionByPriority', GITHUB_NOT_READ],
+      ['openBugsPerDay', GITHUB_NOT_READ],
+      ['taskPileTree', GITHUB_NOT_READ],
+    ]);
+    expect(result.notWired.size).toBe(NOT_WIRED.size + 3);
   });
 
   it('control: keeps the offline phase-4 fields wired, and with GitHub data marks neither GitHub field', async () => {
     const offline = await liveResultOf(stubLiveClient({ github: false }).client, 'past-month');
     const { result } = await liveResult();
 
-    for (const field of ['deploysPerWeek', 'modules', 'workspace', 'wip', 'bugOutcomeByLoopStart'] as const) {
+    for (const field of ['deploysPerWeek', 'modules', 'workspace', 'wip', 'bugOutcomeByLoopStart', 'scopeCreepPerWeek', 'workDoneTree'] as const) {
       expect({ field, marked: offline.notWired.has(field) }).toEqual({ field, marked: false });
     }
     expect(offline.mock.bugOutcomeByLoopStart).toHaveLength(2);
     expect(result.notWired.has('resolutionByPriority')).toBe(false);
     expect(result.notWired.has('openBugsPerDay')).toBe(false);
+    expect(result.notWired.has('taskPileTree')).toBe(false);
   });
 });
 
@@ -512,10 +531,9 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
 
     expect(result.notWired).toBe(NOT_WIRED);
     for (const field of WIRED_FIELDS) expect(result.notWired.has(field)).toBe(false);
-    expect([...result.notWired].sort()).toEqual(['balance', 'scopeCreepPerWeek', 'taskPileTree', 'workDoneTree']);
+    expect([...result.notWired].sort()).toEqual(['balance']);
     expect(result.notWired.size + WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
     expect(result.notWiredDetail.size).toBe(0);
-    expect(result.mock.scopeCreepPerWeek).toEqual([]);
     expect(result.balance).toEqual([]);
     expect(result.workspace.composition).toEqual([]);
     expect(result.workspace.sankeyNodes).toEqual([]);

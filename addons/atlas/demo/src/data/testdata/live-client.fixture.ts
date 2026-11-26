@@ -5,7 +5,7 @@
  * `live-sources.ts`, in the columns the engine answers it with, and
  * records every call; `query` answers the plans' first sessions
  * (`STUB_PLANS`) and records every query; `listMetrics` answers
- * `STUB_DEFINITIONS`, whose proxies carry a stub note, whose two GitHub
+ * `STUB_DEFINITIONS`, whose proxies carry a stub note, whose three GitHub
  * metrics are `gh` and whose WIP metric has the goal `STUB_WIP_LIMIT`;
  * each other route refuses. Asked with `{ github: false }`, the GitHub
  * metrics answer no row, as after a build run without `--github`. The
@@ -172,6 +172,27 @@ export const STUB_DEFECT_DENSITY: QueryResult = resultOf(['path', 'bugs', 'loc',
   ['packages/stub-b', 1, 2_000, 0.0005],
 ], { from: null, to: null });
 
+/** Out-of-scope entries in the window's second and fourth weeks. */
+export const STUB_SCOPE_CREEP: QueryResult = resultOf(['week', 'entries'], [['2026-11-02', 6], ['2026-11-16', 4]]);
+
+/** Open typed issues, by type and open time, aged to the stub's build time (`meta.asOf`, 2026-11-22 09:00): 2, 53, 14 and 1 days. */
+export const STUB_TASK_PILE: QueryResult = resultOf(['issue_type', 'created_at', 'issues'], [
+  ['bug', '2026-11-20T09:00:00.000Z', 1],
+  ['bug', '2026-09-30T09:00:00.000Z', 2],
+  ['spec', '2026-11-08T09:00:00.000Z', 1],
+  ['chore', '2026-11-21T09:00:00.000Z', 1],
+], { from: null, to: null });
+
+/** Changelog entries by level and raw area: two spellings of docs, a spaced area, and a fix with no area. */
+export const STUB_WORK_DONE: QueryResult = resultOf(['level', 'area', 'entries'], [
+  ['major', 'Documentation', 1],
+  ['minor', 'docs', 2],
+  ['minor', 'tests', 4],
+  ['patch', ' Loop ', 3],
+  ['patch', null, 2],
+  ['none', 'board', 1],
+]);
+
 /** The answer of each metric of `live-sources.ts`. */
 export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = {
   deploysPerWeek: STUB_DEPLOYS,
@@ -183,10 +204,13 @@ export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = 
   openBugsPerDay: STUB_OPEN_BUGS,
   minutesPerAgent: STUB_MINUTES_PER_AGENT,
   defectDensity: STUB_DEFECT_DENSITY,
+  scopeCreep: STUB_SCOPE_CREEP,
+  taskPile: STUB_TASK_PILE,
+  workDone: STUB_WORK_DONE,
 };
 
 /** The metrics the stub lists as GitHub-only, as the catalogue does. */
-export const STUB_GITHUB: readonly string[] = [SOURCE_METRICS.resolutionTime, SOURCE_METRICS.openBugsPerDay];
+export const STUB_GITHUB: readonly string[] = [SOURCE_METRICS.resolutionTime, SOURCE_METRICS.openBugsPerDay, SOURCE_METRICS.taskPile];
 
 /** The answer of each metric run over the window before the range's. */
 const STUB_PREVIOUS: Readonly<Partial<Record<LiveMetric, QueryResult>>> = { tokensPerDay: STUB_PREVIOUS_TOKENS, debtRatio: STUB_PREVIOUS_DEBT };

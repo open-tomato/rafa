@@ -31,9 +31,12 @@
  * fill `deploysPerWeek`, `modules`, `workspace` (its members and edges),
  * `wip`, `resolutionByPriority`, `bugOutcomeByLoopStart`,
  * `openBugsPerDay` and `defectDensity`, and `pm.minutes-per-agent` fills
- * `minutesPerAgent`. The task cycle's points also fill
- * `taskMinutesBins`, binned on the page (`taskMinutesBinsOf`). Their requests and mappers live in `live-sources.ts`,
- * and the cell readers both files share in `live-read.ts`. A GitHub-only
+ * `minutesPerAgent`. The metrics of three remaining cards fill
+ * `scopeCreepPerWeek` with `scopeCreepAverage` (C1), `taskPileTree` (C3)
+ * and `workDoneTree` (C4). The task cycle's points also fill
+ * `taskMinutesBins`, binned on the page (`taskMinutesBinsOf`). Their requests live in `live-sources.ts`,
+ * their mappers there and, for the three cards, in `live-cards.ts`,
+ * and the cell readers the files share in `live-read.ts`. A GitHub-only
  * metric that answers no row adds its fields to `notWired` for that
  * result, with the `--github` build line in `notWiredDetail`.
  */
@@ -203,6 +206,7 @@ function emptyMock(): MockData {
     activeBlockers: [],
     minutesPerAgent: [],
     scopeCreepPerWeek: [],
+    scopeCreepAverage: 0,
     minutesByChangeKind: [],
     minutesByChangeKindPrevious: [],
     debtRatio: 0,
