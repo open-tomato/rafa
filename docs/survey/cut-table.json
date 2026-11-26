@@ -5896,6 +5896,7 @@
         "packages/rafa-hub/src/login/basic.test.ts",
         "packages/rafa-hub/src/login/oauth.test.ts",
         "packages/rafa-hub/src/login/testdata/stand-in-oauth.ts",
+        "packages/rafa-hub/src/payload-cap.integration.test.ts",
         "packages/rafa-hub/src/server-effort.test.ts",
         "packages/rafa-hub/src/server-keys.test.ts",
         "packages/rafa-hub/src/server-login.test.ts",
