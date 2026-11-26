@@ -1,5 +1,5 @@
 /**
- * Tests for the hub's config reader (`config.ts`): the ten server keys,
+ * Tests for the hub's config reader (`config.ts`): its server keys,
  * their defaults, the refusal of `0`, negative and out-of-range values,
  * and the file `RAFA_HUB_CONFIG` names.
  *
@@ -38,12 +38,6 @@ const API_KEYS_EXPECTED = 'expected a non-empty list of environment variable nam
 
 /** What an entry of `hub.auth.apiKeys` says it expected. */
 const API_KEY_NAME_EXPECTED = 'expected an environment variable name of A-Z, 0-9 and _, not opening with a digit, such as RAFA_HUB_KEY; the value written is not repeated';
-
-/** What `hub.store.sqliteLibrary` says it expected. */
-const LIBRARY_EXPECTED = 'expected an absolute path to a vanilla libsqlite3, such as /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib';
-
-/** What `hub.index.rebuildAfterPush` says it expected. */
-const REBUILD_EXPECTED = 'expected true or false';
 
 /** What `hub.projects` says it expected. */
 const PROJECTS_EXPECTED = 'expected a non-empty list of projects, each a mapping holding id, name, repository and storePath';
@@ -90,7 +84,7 @@ function problemsOf(attempt: () => unknown): readonly string[] {
 }
 
 describe('defaults', () => {
-  it('fills port, storePath, cacheFor, sqliteLibrary and rebuildAfterPush when only hub.repository is written', () => {
+  it('fills port, storePath, cacheFor and the store and index keys when only hub.repository is written', () => {
     expect(parseHubConfig(hubYaml(), PATH)).toEqual({
       repository: 'open-tomato/rafa',
       port: 7373,
@@ -100,8 +94,12 @@ describe('defaults', () => {
       authAdapter: 'github',
       apiKeys: [],
       login: null,
+      storeEngine: 'sqlite',
+      postgresUrlVariable: null,
       sqliteLibrary: null,
       rebuildAfterPush: true,
+      embeddingModel: null,
+      embeddingPrecision: 'half',
     });
   });
 
@@ -115,6 +113,9 @@ describe('defaults', () => {
       '  sqliteLibrary: /opt/sqlite/libsqlite3.dylib',
       'index:',
       '  rebuildAfterPush: false',
+      '  embedding:',
+      '    model: nomic-embed-text-v1.5',
+      '    precision: full',
     ), PATH);
 
     expect(config).toEqual({
@@ -126,8 +127,12 @@ describe('defaults', () => {
       authAdapter: 'github',
       apiKeys: [],
       login: null,
+      storeEngine: 'sqlite',
+      postgresUrlVariable: null,
       sqliteLibrary: '/opt/sqlite/libsqlite3.dylib',
       rebuildAfterPush: false,
+      embeddingModel: 'nomic-embed-text-v1.5',
+      embeddingPrecision: 'full',
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -426,71 +431,11 @@ describe('hub.auth.adapter and hub.auth.apiKeys', () => {
   });
 });
 
-describe('hub.store.sqliteLibrary', () => {
-  it('refuses a relative path, a padded path and an empty string, naming an absolute one', () => {
-    const cases = ['lib/libsqlite3.dylib', './libsqlite3.dylib', '\' /opt/sqlite/libsqlite3.dylib\'', '\'\''];
-
-    expect(cases.map((raw) => problemsOf(() => parseHubConfig(hubYaml('store:', `  sqliteLibrary: ${raw}`), PATH)))).toEqual([
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is "lib/libsqlite3.dylib", ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is "./libsqlite3.dylib", ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is " /opt/sqlite/libsqlite3.dylib", ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is "", ${LIBRARY_EXPECTED}`],
-    ]);
-  });
-
-  it('refuses a number, a boolean, null and a list without coercing', () => {
-    const cases = ['42', 'true', 'null', '[/opt/sqlite/libsqlite3.dylib]'];
-
-    expect(cases.map((raw) => problemsOf(() => parseHubConfig(hubYaml('store:', `  sqliteLibrary: ${raw}`), PATH)))).toEqual([
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is 42, ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is true, ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is null, ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is /opt/sqlite/libsqlite3.dylib, ${LIBRARY_EXPECTED}`],
-    ]);
-  });
-
-  it('keeps an absolute path as written, and is null when left out or the section is empty', () => {
-    const read = (...lines: string[]) => parseHubConfig(hubYaml(...lines), PATH).sqliteLibrary;
-
-    expect([
-      read('store:', '  sqliteLibrary: /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib'),
-      read('store:', '  sqliteLibrary: /usr/lib/../lib/libsqlite3.so'),
-      read(),
-      read('store: {}'),
-    ]).toEqual(['/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib', '/usr/lib/../lib/libsqlite3.so', null, null]);
-  });
-});
-
-describe('hub.index.rebuildAfterPush', () => {
-  it('refuses a quoted boolean, a number, null and yes without coercing', () => {
-    const cases = ['\'false\'', '0', '1', 'null', 'yes'];
-
-    expect(cases.map((raw) => problemsOf(() => parseHubConfig(hubYaml('index:', `  rebuildAfterPush: ${raw}`), PATH)))).toEqual([
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is "false", ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is 0, ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is 1, ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is null, ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is "yes", ${REBUILD_EXPECTED}`],
-    ]);
-  });
-
-  it('reads true and false as written, and true when left out', () => {
-    const read = (...lines: string[]) => parseHubConfig(hubYaml(...lines), PATH).rebuildAfterPush;
-
-    expect([
-      read('index:', '  rebuildAfterPush: false'),
-      read('index:', '  rebuildAfterPush: true'),
-      read(),
-      read('index: {}'),
-    ]).toEqual([false, true, true, true]);
-  });
-});
-
 describe('the document', () => {
   it('refuses unknown keys under hub.store and hub.index, beside a known-key control', () => {
     expect(problemsOf(() => parseHubConfig(hubYaml('store:', '  sqlitelibrary: /opt/libsqlite3.dylib', 'index:', '  rebuild: false'), PATH))).toEqual([
-      '/srv/hub/hub.yaml: hub.store.sqlitelibrary is not a key the hub reads; expected one of hub.store.sqliteLibrary',
-      '/srv/hub/hub.yaml: hub.index.rebuild is not a key the hub reads; expected one of hub.index.rebuildAfterPush',
+      '/srv/hub/hub.yaml: hub.store.sqlitelibrary is not a key the hub reads; expected one of hub.store.engine, hub.store.sqliteLibrary, hub.store.postgres',
+      '/srv/hub/hub.yaml: hub.index.rebuild is not a key the hub reads; expected one of hub.index.rebuildAfterPush, hub.index.embedding',
     ]);
     expect(parseHubConfig(hubYaml('store:', '  sqliteLibrary: /opt/libsqlite3.dylib', 'index:', '  rebuildAfterPush: false'), PATH))
       .toMatchObject({ sqliteLibrary: '/opt/libsqlite3.dylib', rebuildAfterPush: false });
@@ -498,8 +443,8 @@ describe('the document', () => {
 
   it('refuses a store or index section that is not a mapping', () => {
     expect(problemsOf(() => parseHubConfig(hubYaml('store: /opt/libsqlite3.dylib', 'index: true'), PATH))).toEqual([
-      '/srv/hub/hub.yaml: hub.store is "/opt/libsqlite3.dylib", expected a mapping holding sqliteLibrary',
-      '/srv/hub/hub.yaml: hub.index is true, expected a mapping holding rebuildAfterPush',
+      '/srv/hub/hub.yaml: hub.store is "/opt/libsqlite3.dylib", expected a mapping holding engine, sqliteLibrary, postgres',
+      '/srv/hub/hub.yaml: hub.index is true, expected a mapping holding rebuildAfterPush, embedding',
     ]);
   });
 
@@ -566,8 +511,12 @@ describe('readHubConfig', () => {
       authAdapter: 'github',
       apiKeys: [],
       login: null,
+      storeEngine: 'sqlite',
+      postgresUrlVariable: null,
       sqliteLibrary: null,
       rebuildAfterPush: true,
+      embeddingModel: null,
+      embeddingPrecision: 'half',
     });
   });
 

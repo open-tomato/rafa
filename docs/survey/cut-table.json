@@ -5862,7 +5862,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 41,
+        "test": 42,
         "testSupport": 9
       },
       "files": [
@@ -5870,6 +5870,7 @@
         "packages/rafa-hub/src/bin.ts",
         "packages/rafa-hub/src/cli-keys.test.ts",
         "packages/rafa-hub/src/config-login.test.ts",
+        "packages/rafa-hub/src/config-store.test.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
         "packages/rafa-hub/src/contract-skew.integration.test.ts",
@@ -5929,7 +5930,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 51,
+        "packages/rafa-hub/": 52,
         "packages/rafa-hub-port/": 1,
         "packages/rafa-index/": 9
       },
