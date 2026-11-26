@@ -17,12 +17,15 @@
  *     `AbortSignal.timeout` fires. Only this path proves the abort
  *     itself, which a stopped hub's instant refusal never reaches.
  *
- * `hub.timeout` is set to `1s`, the shortest `config-schema-hub.ts`
- * accepts, so the silent path's wait is short and the timing bound below
- * is cheap to prove: `src/tests/sync-contact-spawned.test.ts` covers the
- * one-line and local-store rules already, over a stand-in `service`
- * module that never makes a real connection, so it proves nothing about
- * either real wait.
+ * `hub.timeout` takes two values. Every run that must reach the hub (the
+ * priming collects, the baselines and the runs after it returns) takes
+ * {@link BASELINE_HUB_TIMEOUT}, so a slow runner's push is not read as an
+ * unreachable hub. Every run that must not takes {@link HUB_TIMEOUT},
+ * `1s`, the shortest `config-schema-hub.ts` accepts, so the silent path's
+ * wait is short and the timing bound below is cheap to prove:
+ * `src/tests/sync-contact-spawned.test.ts` covers the one-line and
+ * local-store rules already, over a stand-in `service` module that never
+ * makes a real connection, so it proves nothing about either real wait.
  *
  * Four devices and a fifth that is never redirected or stopped at all:
  *
@@ -97,7 +100,7 @@ const VERSION = '0.0.0-hub-unreachable';
 const REPOSITORY = 'open-tomato/rafa';
 const WRITER = 'ghp_hub_unreachable_writer_00001';
 
-/** How long a spawned command may take before it is killed: well past one `hub.timeout`. */
+/** How long a spawned command may take before it is killed: past one `hub.timeout` of either length. */
 const RUN_TIMEOUT_MS = 15_000;
 
 /** How long the whole case, twenty-one spawned commands and one hub restart, may take. */
@@ -112,13 +115,32 @@ const SYNC_SERVICE_PACKAGE = fileURLToPath(new URL('../../rafa-sync-service', im
 /** The `name` the package's `package.json` carries, and `allowList:` must match. */
 const SYNC_SERVICE_NAME = '@open-tomato/rafa-sync-service';
 
-/** `hub.timeout`, kept at the shortest value the config schema accepts. */
+/**
+ * `hub.timeout` for every run that must reach the hub. Those runs assert
+ * no `effort sync:` line, which claims the hub answered; a loaded CI
+ * runner took 1,763 ms over one push, so the claim needs a timeout well
+ * past that.
+ */
+const BASELINE_HUB_TIMEOUT = '10s';
+
+/** `hub.timeout` for the unreachable runs, kept at the shortest value the config schema accepts. */
 const HUB_TIMEOUT = '1s';
 
 /** The milliseconds {@link HUB_TIMEOUT} spells. */
 const HUB_TIMEOUT_MS = 1000;
 
-/** The slack the timing bound allows past one `hub.timeout`, in milliseconds: "plus one second". */
+/**
+ * The least slack the timing bound allows past the baseline and one
+ * {@link HUB_TIMEOUT}, in milliseconds. The slack is this or the
+ * command's own baseline, whichever is longer: a loaded runner slows a
+ * command in proportion to what it costs, and a fixed second was overshot
+ * on CI by runs that were only slow.
+ *
+ * A client that never aborts still fails the case. The silent listener
+ * answers no connection and never closes an idle one, so such a command
+ * waits until it is killed at {@link RUN_TIMEOUT_MS} and fails the exit-0
+ * assertion, however long the baseline was.
+ */
 const TIMING_SLACK_MS = 1000;
 
 /** The environment this process runs `git` fixture steps under: its own, with no `GIT_*` variable reaching it. */
@@ -246,8 +268,11 @@ interface Device {
 /** Whether a device needs `rafa next --dry-run` to run on it (`pr.provider: gh`, a roadmap and a stand-in `gh`) or stays plain (`pr.provider: none`). */
 type DeviceKind = 'plain' | 'next';
 
-/** The config text for `kind`, naming `hubUrl` and `secretName`. */
-function deviceConfig(kind: DeviceKind, hubUrl: string, secretName: string): string {
+/** The two `hub.timeout` values a device is configured with. */
+type DeviceHubTimeout = typeof BASELINE_HUB_TIMEOUT | typeof HUB_TIMEOUT;
+
+/** The config text for `kind`, naming `hubUrl`, `secretName` and `timeout`. */
+function deviceConfig(kind: DeviceKind, hubUrl: string, secretName: string, timeout: DeviceHubTimeout): string {
   const identity = kind === 'next'
     ? ['pr:', '  provider: gh', `  base: ${NEXT_BASE}`, 'roadmap:', `  issue: ${String(NEXT_ROADMAP_ISSUE)}`]
     : ['pr:', '  provider: none'];
@@ -258,7 +283,7 @@ function deviceConfig(kind: DeviceKind, hubUrl: string, secretName: string): str
     'hub:',
     `  url: ${hubUrl}`,
     `  tokenSecret: ${secretName}`,
-    `  timeout: ${HUB_TIMEOUT}`,
+    `  timeout: ${timeout}`,
     'modules:',
     `  - path: ${SYNC_SERVICE_PACKAGE}`,
     'allowList:',
@@ -267,15 +292,22 @@ function deviceConfig(kind: DeviceKind, hubUrl: string, secretName: string): str
   ].join('\n');
 }
 
-/** Rewrites `device`'s config to name `hubUrl`, as planting it does and as redirecting it later does too. */
-function writeDeviceConfig(device: Device, kind: DeviceKind, hubUrl: string, secretName: string): void {
-  writeFileSync(join(device.root, '.rafa', 'config.yaml'), deviceConfig(kind, hubUrl, secretName), 'utf8');
+/** Rewrites `device`'s config to name `hubUrl` and `timeout`, as planting it does and as taking it offline and back does too. */
+function writeDeviceConfig(
+  device: Device,
+  kind: DeviceKind,
+  hubUrl: string,
+  secretName: string,
+  timeout: DeviceHubTimeout,
+): void {
+  writeFileSync(join(device.root, '.rafa', 'config.yaml'), deviceConfig(kind, hubUrl, secretName, timeout), 'utf8');
 }
 
 /**
  * A fresh git repository under `scope` named `name`, with a git identity
  * of its own and one commit over a file no other device holds, then
- * `.rafa/config.yaml` naming `hubUrl` and `secretName`. A `next` device
+ * `.rafa/config.yaml` naming `hubUrl`, `secretName` and
+ * {@link BASELINE_HUB_TIMEOUT}. A `next` device
  * is checked out on {@link NEXT_BASE}, pushed to a bare `origin` beside
  * it so the branch scan's remote half never fails, with the stand-in
  * `gh` {@link writeStandInGh} writes on its own `bin/`.
@@ -303,7 +335,7 @@ function plantDevice(scope: string, name: string, kind: DeviceKind, hubUrl: stri
 
   mkdirSync(join(root, '.rafa'), { recursive: true });
   const device: Device = { name, root, home, bin, secretsFile: testSecretsFileIn(scope) };
-  writeDeviceConfig(device, kind, hubUrl, secretName);
+  writeDeviceConfig(device, kind, hubUrl, secretName, BASELINE_HUB_TIMEOUT);
   return device;
 }
 
@@ -403,8 +435,9 @@ interface DownRunExpectations {
  * Runs `words` on `device` while its hub cannot be reached, named by
  * `hubUrl`: asserts exit 0, exactly one hub-unreachable line naming
  * `hubUrl` and no other sync line, and a duration no more than one
- * `hub.timeout` and one second past `baselineMs`, the same command's
- * reading while the hub was reachable.
+ * {@link HUB_TIMEOUT} and the slack {@link TIMING_SLACK_MS} describes
+ * past `baselineMs`, the same command's reading while the hub was
+ * reachable.
  */
 async function unreachableRun(
   device: Device,
@@ -417,7 +450,7 @@ async function unreachableRun(
   expect(run.exitCode).toBe(0);
   expect(unreachableLineCount(run.output, hubUrl)).toBe(1);
   expect(syncLineCount(run.output)).toBe(1);
-  expect(run.ms).toBeLessThanOrEqual(baselineMs + HUB_TIMEOUT_MS + TIMING_SLACK_MS);
+  expect(run.ms).toBeLessThanOrEqual(baselineMs + HUB_TIMEOUT_MS + Math.max(TIMING_SLACK_MS, baselineMs));
   if (expectations.contains !== undefined) expect(run.output).toContain(expectations.contains);
   return run;
 }
@@ -433,6 +466,8 @@ function startSilentListener(): SilentListener {
   const server = Bun.serve({
     port: 0,
     hostname: '127.0.0.1',
+    // Never closes an idle connection: the default would end a never-aborting client's wait.
+    idleTimeout: 0,
     fetch: (): Promise<Response> => new Promise<Response>(() => {
       // Never settles: the caller's own `AbortSignal.timeout` is what ends the wait.
     }),
@@ -510,10 +545,13 @@ describe('every command survives the hub being unreachable', () => {
       const stopNextBaseline = await baselineRun(stopNext, NEXT_DRY_RUN);
       const silentNextBaseline = await baselineRun(silentNext, NEXT_DRY_RUN);
 
-      // Go offline: the two "silent" devices are redirected to a listener that never answers,
-      // and the shared hub is stopped — the two ways a hub goes unreachable; see the module note.
-      writeDeviceConfig(silentPlain, 'plain', silent.url, secretName);
-      writeDeviceConfig(silentNext, 'next', silent.url, secretName);
+      // Go offline: every measured device takes the short timeout, the two "silent" ones are
+      // redirected to a listener that never answers, and the shared hub is stopped — the two
+      // ways a hub goes unreachable; see the module note.
+      writeDeviceConfig(stopPlain, 'plain', hub.url, secretName, HUB_TIMEOUT);
+      writeDeviceConfig(stopNext, 'next', hub.url, secretName, HUB_TIMEOUT);
+      writeDeviceConfig(silentPlain, 'plain', silent.url, secretName, HUB_TIMEOUT);
+      writeDeviceConfig(silentNext, 'next', silent.url, secretName, HUB_TIMEOUT);
       await hub.stop();
 
       // The row stop-plain writes while its hub cannot be reached.
@@ -530,8 +568,10 @@ describe('every command survives the hub being unreachable', () => {
       await unreachableRun(stopNext, NEXT_DRY_RUN, hub.url, stopNextBaseline);
       await unreachableRun(silentNext, NEXT_DRY_RUN, silent.url, silentNextBaseline);
 
-      // The hub returns, on the same address every device still names.
+      // The hub returns, on the same address every device still names, and stop-plain, which
+      // must reach it again, takes the long timeout back.
       hub = startHub(hubPort, github.url, hubDir);
+      writeDeviceConfig(stopPlain, 'plain', hub.url, secretName, BASELINE_HUB_TIMEOUT);
 
       const reconnected = await runCommand(stopPlain, EFFORT_COLLECT);
       expect(reconnected.exitCode).toBe(0);
