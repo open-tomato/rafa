@@ -32,6 +32,20 @@
  * store recorded a scope, or naming no module, stays in. It measures
  * what the tile names, so it is `direct` and carries no proxy note,
  * though entry 7's own basis is a ratio over planned tasks.
+ *
+ * `pm.task-pile` (spec C3, no B4 row) answers the open issues of the
+ * board cache that carry a `type:` label, grouped by that type
+ * (`issue_type`, the first `type:` label) and by each issue's
+ * `created_at`, which the card buckets by age to the replica's build
+ * time. Epics and the roadmap issue hold other issues, so `type:epic`
+ * and `type:roadmap` are left out, and `is_epic` with them for an epic
+ * whose first type label is another. `module` `cli-gap` is left out
+ * ({@link CLI_GAP_OUT}) so the bug slice matches the open bug issues; the
+ * filters are a conjunction, so the cut reaches any issue so labelled,
+ * and `cli-gap` is a value only bugs carry. A NULL module stays in. The
+ * open time comes from GitHub only ({@link READ_FROM_GITHUB}), so it is
+ * `gh`: a replica built without `--github` answers no row. It reads the
+ * board as of its cache, so the card asks it with no window.
  */
 import type { Filter, MetricDefinition } from '@open-tomato/atlas-data/contract';
 
@@ -41,7 +55,7 @@ import { ISSUES_SOURCE } from '../ingest/board.js';
 import { TASKS_SOURCE } from '../ingest/effort.js';
 import { BUGS_SOURCE, FINDINGS_SOURCE } from '../ingest/facts.js';
 
-import { CLI_GAP_OUT } from './qa.js';
+import { CLI_GAP_OUT, READ_FROM_GITHUB } from './qa.js';
 
 /** How many blockers the active-blockers list answers, the newest first. */
 const ACTIVE_BLOCKERS_LIMIT = 50;
@@ -215,8 +229,37 @@ export const OUT_OF_SCOPE_PER_WEEK: MetricDefinition = {
   feasibility: 'direct',
 };
 
+/** The type labels that hold other issues, left out of the task pile. */
+const CONTAINER_TYPES: readonly string[] = ['epic', 'roadmap'];
+
+/** The open typed issues by type and open time: the card rings them by type, then by age. */
+export const TASK_PILE: MetricDefinition = {
+  id: 'pm.task-pile',
+  title: 'Task pile',
+  lenses: ['pm'],
+  description: 'The open issues with a type: label, epics and the roadmap issue left out and cli-gap bugs with them, counted per type and open time; the card buckets their age. Read from GitHub: only a build run with --github fills the open time.',
+  sourceId: ISSUES_SOURCE,
+  params: {
+    filters: [
+      { field: 'state', op: 'eq', value: 'OPEN' },
+      { field: 'issue_type', op: 'is_null', value: false },
+      { field: 'issue_type', op: 'nin', value: CONTAINER_TYPES },
+      { field: 'is_epic', op: 'ne', value: 1 },
+      CLI_GAP_OUT,
+      READ_FROM_GITHUB,
+    ],
+    groupBy: ['issue_type', 'created_at'],
+    measures: [{ field: 'number', agg: 'count', as: 'issues' }],
+    orderBy: [{ key: 'issue_type', dir: 'asc' }, { key: 'created_at', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'issues',
+  chart: 'donut',
+  feasibility: 'gh',
+};
+
 /** The project management lens's PoC metrics, in the order section G lists them. */
 export const PM_POC_METRICS: readonly MetricDefinition[] = [BUDGET_BURN, TOKENS_PER_DAY, PLAN_COMPLETION, PLANNED_VS_SESSIONS, ACTIVE_BLOCKERS];
 
-/** The project management lens's metrics: the PoC cut, the one over the board source, the minutes per agent, then the out-of-scope entries per week. */
-export const PM_METRICS: readonly MetricDefinition[] = [...PM_POC_METRICS, MILESTONE_COMPLETION, MINUTES_PER_AGENT, OUT_OF_SCOPE_PER_WEEK];
+/** The project management lens's metrics: the PoC cut, the one over the board source, the minutes per agent, the out-of-scope entries per week, then the task pile. */
+export const PM_METRICS: readonly MetricDefinition[] = [...PM_POC_METRICS, MILESTONE_COMPLETION, MINUTES_PER_AGENT, OUT_OF_SCOPE_PER_WEEK, TASK_PILE];

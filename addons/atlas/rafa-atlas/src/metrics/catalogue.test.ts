@@ -9,13 +9,20 @@
  * readings the fixture fixes, and the out-of-scope entries per week over
  * the replica with three planted rows: a machine-scoped one and a
  * `cli-gap` one left out, a NULL-scope one counted, the same params
- * without the two filters as the control. `catalogue-sources.test.ts` runs the phase 4 metrics
- * over a replica of every source. Controls show each check can fail: the
+ * without the two filters as the control. Then the task pile over two
+ * replicas of the board fixture with three more open issues (a roadmap
+ * issue, a `cli-gap` bug and a chore): built with `--github` it answers
+ * the open typed issues by type and open time, the epic, the roadmap
+ * issue and the `cli-gap` bug left out and the bug with no module in,
+ * the same params without the type, epic and cli-gap filters as the
+ * control; built without, it answers no row, the params without the
+ * GitHub filter as the control. `catalogue-sources.test.ts` runs the
+ * phase 4 metrics over a replica of every source. Controls show each check can fail: the
  * schema refuses a definition with an extra key, the engine refuses a
  * measure on a field the descriptor lacks, and the formula refuses a
  * column the result lacks.
  */
-import type { DataSourceDescriptor, MetricDefinition, QueryParams, QueryResult, Scalar } from '@open-tomato/atlas-data/contract';
+import type { DataSourceDescriptor, Filter, MetricDefinition, QueryParams, QueryResult, Scalar } from '@open-tomato/atlas-data/contract';
 import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -29,13 +36,15 @@ import { Database } from 'bun:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { buildAtlas, replicaPathOf } from '../build/index.js';
+import { boardCacheText, FIXTURE_ROWS, fixtureRow, writeBoardFixture } from '../ingest/testdata/board-cache.fixture.js';
 import { FIXTURE_PLAN, FIXTURE_TASK_LINE, TASK_SESSIONS, writeFactsFixture, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
+import { FIXTURE_ISSUE_DATES, FIXTURE_PRS, fixtureGh } from '../ingest/testdata/github.fixture.js';
 import { openAtlasRegistry, type AtlasRegistry } from '../registry.js';
 import { SOURCE_SPECS } from '../sources.js';
 
 import { METRIC_CATALOGUE } from './catalogue.js';
 import { NOT_MACHINE_OR_CLI_GAP } from './pm.js';
-import { BOARD_BUGS, NOT_CLI_GAP } from './qa.js';
+import { BOARD_BUGS, CLI_GAP_OUT, NOT_CLI_GAP, READ_FROM_GITHUB } from './qa.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-catalogue-')));
 const BUILT_AT = new Date('2026-11-05T12:00:00.000Z');
@@ -65,7 +74,7 @@ const POC_IDS = [
 
 /** The metrics past the PoC cut of each lens, phase 4's and later, in the order each lens lists them after its PoC cut. */
 const PHASE_FOUR_IDS = {
-  pm: ['pm.milestone-completion', 'pm.minutes-per-agent', 'pm.out-of-scope-per-week'],
+  pm: ['pm.milestone-completion', 'pm.minutes-per-agent', 'pm.out-of-scope-per-week', 'pm.task-pile'],
   architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations'],
   developer: ['dev.deploys-per-week', 'dev.wip', 'dev.pr-cycle-time'],
   qa: [
@@ -103,7 +112,7 @@ const PROXY_IDS = [
 ];
 
 /** The metrics that answer rows only after a build run with --github. */
-const GITHUB_IDS = ['dev.pr-cycle-time', 'qa.defect-age', 'qa.resolution-time', 'qa.open-bugs-per-day', 'qa.bugs-per-stretch'];
+const GITHUB_IDS = ['pm.task-pile', 'dev.pr-cycle-time', 'qa.defect-age', 'qa.resolution-time', 'qa.open-bugs-per-day', 'qa.bugs-per-stretch'];
 
 /** The routed bug the test plants beside the fixture's: the one own-fallout row. */
 const FALLOUT_BUG = 'the replica drops a routed bug';
@@ -133,6 +142,36 @@ function plantOutOfScope(root: string): void {
   }
 }
 
+/**
+ * The open issues the task pile's builds add to the board fixture's: the
+ * roadmap issue, a `cli-gap` bug and a chore. The fixture already holds an
+ * open epic (40), an open spec (42), an open bug with module `notes` (50),
+ * an open bug with no module (52) and an open issue with no type (53).
+ */
+const PILE_ROWS = [
+  fixtureRow(44, ['type:roadmap'], { title: 'Roadmap' }),
+  fixtureRow(57, ['type:bug', 'module:cli-gap']),
+  fixtureRow(58, ['type:chore']),
+];
+
+/** The open times `gh issue list` answers for {@link PILE_ROWS}. */
+const PILE_DATES = [
+  { number: 44, createdAt: '2026-09-01T09:00:00Z', closedAt: null },
+  { number: 57, createdAt: '2026-10-30T09:00:00Z', closedAt: null },
+  { number: 58, createdAt: '2026-11-03T09:00:00Z', closedAt: null },
+];
+
+/** The task pile's two replicas, built from the board fixture with {@link PILE_ROWS}, with and without the GitHub read. */
+const pileRegistries: { offline: AtlasRegistry | null; github: AtlasRegistry | null } = { offline: null, github: null };
+
+/** A root holding the effort fixture store and the board cache with {@link PILE_ROWS}. */
+function writePileRoot(name: string): string {
+  const root = join(scope, name);
+  writeFixtureStore(root);
+  writeBoardFixture(root, boardCacheText([...FIXTURE_ROWS, ...PILE_ROWS]));
+  return root;
+}
+
 beforeAll(async () => {
   const root = join(scope, 'built');
   writeFixtureStore(root);
@@ -144,10 +183,25 @@ beforeAll(async () => {
   await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
   plantOutOfScope(root);
   registry = await openAtlasRegistry({ projectRoot: root, sourceOptions: { now: () => BUILT_AT } });
+  const offline = writePileRoot('pile-offline');
+  const github = writePileRoot('pile-github');
+  await buildAtlas({ projectRoot: offline, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
+  await buildAtlas({
+    projectRoot: github,
+    env: {},
+    now: () => BUILT_AT,
+    projectLabel: 'fixture',
+    github: true,
+    gh: fixtureGh(FIXTURE_PRS, [...FIXTURE_ISSUE_DATES, ...PILE_DATES]).runner,
+  });
+  pileRegistries.offline = await openAtlasRegistry({ projectRoot: offline, sourceOptions: { now: () => BUILT_AT } });
+  pileRegistries.github = await openAtlasRegistry({ projectRoot: github, sourceOptions: { now: () => BUILT_AT } });
 });
 
 afterAll(() => {
   registry?.close();
+  pileRegistries.offline?.close();
+  pileRegistries.github?.close();
   rmSync(scope, { recursive: true, force: true });
 });
 
@@ -200,10 +254,10 @@ describe('METRIC_CATALOGUE', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five then three on PM, four then three, four then three, four then seven', () => {
+  it('gives each lens the metrics of its rows: five then four on PM, four then three, four then three, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([8, 7, 7, 11]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 7, 7, 11]);
   });
 
   it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
@@ -223,7 +277,7 @@ describe('METRIC_CATALOGUE', () => {
     expect(proxies.every((metric) => (metric.proxyFor ?? '') !== '' && (metric.proxyNote ?? '') !== '')).toBe(true);
   });
 
-  it('serves no metric that needs a collector, and labels gh the five that need the GitHub times', () => {
+  it('serves no metric that needs a collector, and labels gh the six that need the GitHub times', () => {
     expect(METRIC_CATALOGUE.filter((metric) => metric.feasibility === 'collect')).toEqual([]);
     expect(METRIC_CATALOGUE.filter((metric) => metric.feasibility === 'gh').map((metric) => metric.id)).toEqual(GITHUB_IDS);
   });
@@ -389,5 +443,58 @@ describe('the out-of-scope entries per week over the fixture replica', () => {
 
     expect(filters).toEqual([{ field: 'source', op: 'eq', value: 'out_of_scope' }]);
     expect(rows).toEqual([{ week: '2026-10-26', entries: 1 }, { week: '2026-11-02', entries: 5 }]);
+  });
+});
+
+/** `params` asked with no window of `local.issues` in the task pile replica `which` names. */
+async function pileQuery(which: keyof typeof pileRegistries, params: QueryParams): Promise<QueryResult> {
+  const issues = pileRegistries[which]?.sources.get('local.issues');
+  if (issues === undefined) throw new Error(`no local.issues in the ${which} replica`);
+  return issues.query(params);
+}
+
+describe('the task pile over the board fixture', () => {
+  it('answers the open typed issues by type and open time, the epic, the roadmap issue and the cli-gap bug left out, the bug with no module in', async () => {
+    const metric = metricOf('pm.task-pile');
+    const rows = recordsOf(applyFormula(await pileQuery('github', metric.params), metric.formula));
+
+    expect(rows).toEqual([
+      { issue_type: 'bug', created_at: '2026-10-21T09:00:00.000Z', issues: 1 },
+      { issue_type: 'bug', created_at: '2026-10-24T09:00:00.000Z', issues: 1 },
+      { issue_type: 'chore', created_at: '2026-11-03T09:00:00.000Z', issues: 1 },
+      { issue_type: 'spec', created_at: '2026-10-02T09:00:00.000Z', issues: 1 },
+    ]);
+  });
+
+  it('control: without the type, epic and cli-gap filters the epic, the roadmap issue, the cli-gap bug and the untyped issue answer too', async () => {
+    const metric = metricOf('pm.task-pile');
+    const kept = (filter: Filter): boolean => filter.field !== 'issue_type' && filter.field !== 'is_epic' && filter !== CLI_GAP_OUT;
+    const filters = (metric.params.filters ?? []).filter(kept);
+    const rows = recordsOf(await pileQuery('github', { ...metric.params, filters, groupBy: ['issue_type'], orderBy: [{ key: 'issue_type', dir: 'asc' }] }));
+
+    expect(filters).toEqual([{ field: 'state', op: 'eq', value: 'OPEN' }, READ_FROM_GITHUB]);
+    expect(rows).toEqual([
+      { issue_type: 'bug', issues: 3 },
+      { issue_type: 'chore', issues: 1 },
+      { issue_type: 'epic', issues: 1 },
+      { issue_type: 'roadmap', issues: 1 },
+      { issue_type: 'spec', issues: 1 },
+      { issue_type: null, issues: 1 },
+    ]);
+  });
+
+  it('answers no row from a replica built without --github, where no issue has an open time', async () => {
+    const metric = metricOf('pm.task-pile');
+
+    expect((await pileQuery('offline', metric.params)).rows).toEqual([]);
+  });
+
+  it('control: the offline replica holds the open typed issues, which the params without the GitHub filter answer', async () => {
+    const metric = metricOf('pm.task-pile');
+    const filters = (metric.params.filters ?? []).filter((filter) => filter !== READ_FROM_GITHUB);
+    const rows = recordsOf(await pileQuery('offline', { ...metric.params, filters }));
+
+    expect(rows.map((row) => [row.issue_type, row.created_at])).toEqual([['bug', null], ['chore', null], ['spec', null]]);
+    expect(rows.map((row) => row.issues)).toEqual([2, 1, 1]);
   });
 });

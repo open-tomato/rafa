@@ -15,7 +15,7 @@ The catalogue serves the phase 4 metrics over the git, board, module and
 GitHub sources: `dev.wip` counts the open issues in Claimed or In
 development by stage, never by label, with `wipLimit` as its goal; every bug
 metric leaves out `module` `cli-gap`, keeping a bug with no module; the
-five GitHub-only metrics (`feasibility` `gh`) answer rows only after a build
+six GitHub-only metrics (`feasibility` `gh`) answer rows only after a build
 run with `--github`. No build calls `gh` without `--github` (D9); a failed
 `gh` read under it stamps `local.prs` failed with `gh`'s stderr, warns once
 and builds the rest, exit 0 (D18). The bug outcome and the drop rate read

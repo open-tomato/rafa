@@ -10,12 +10,13 @@
  * each lens lists the phase 4 metrics over the git, board, module and
  * GitHub sources: 14 more, five of them GitHub-only (`feasibility` `gh`),
  * answering rows only after a build run with `--github`. Then the
- * metrics of the remaining cards: `pm.out-of-scope-per-week` (C1). A
+ * metrics of the remaining cards: `pm.out-of-scope-per-week` (C1) and
+ * `pm.task-pile` (C3), GitHub-only as well. A
  * metric over `local.modules`, which has no time axis, refuses a
  * window, and one over `local.issues` that reads the board as of now
  * asks with none. Every metric of spec section B4, served or not, is
- * listed with its feasibility in `entries.ts`, beside the four bug
- * backlog metrics no B4 row names.
+ * listed with its feasibility in `entries.ts`, beside the task pile and
+ * the four bug backlog metrics no B4 row names.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
