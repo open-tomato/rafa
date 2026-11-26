@@ -392,6 +392,7 @@ import {
   createStartTriage,
   dispatchTask,
   emitLoopEvent,
+  emitStopEvents,
   finishCleanExit,
   guardCheckout,
   guardRunBranch,
@@ -888,8 +889,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (finished.outcome !== 'done') {
         const held = { kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' } as const;
         if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit', retryTask)) continue;
-        if (await decisions.atStop({ kind: 'clean-exit', taskInfo, retryTask, finished, stopEvent: held })) continue;
-        emitLoopEvent(held);
+        const stop = { kind: 'clean-exit', taskInfo, retryTask, finished, stopEvent: held } as const;
+        if (await decisions.atStop(stop)) continue;
+        emitStopEvents(stop);
         return;
       }
       decisions.taskDone(taskInfo);

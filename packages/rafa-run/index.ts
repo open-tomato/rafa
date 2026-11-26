@@ -187,7 +187,7 @@ export {
 
 export { LoopEnd } from './src/start/continue-exits.js';
 
-export { createRunDecisions } from './src/start/continue-run.js';
+export { createRunDecisions, emitStopEvents } from './src/start/continue-run.js';
 
 export type { TaskLearning } from './src/start/dispatch.js';
 export {

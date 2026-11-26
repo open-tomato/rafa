@@ -127,6 +127,19 @@
  * (errors outside any test, no summary), end the run with
  * {@link DECISION_STOP_EXIT} and a `halt` naming the count.
  *
+ * ## The events of a stop no decision goes on from
+ *
+ * When {@link RunDecisions.atStop} answers false at a task's stop,
+ * `start()` emits that stop's events through {@link emitStopEvents}:
+ * the stop's own `task-blocked`, and for a clean exit held on nothing
+ * but its absences (`heldOnNothingLeftBehind`, no `--retry` granted)
+ * one `halt` after it, its reason the held line `start/commit.ts`
+ * prints, {@link TASK_HELD_NOTHING_LEFT} and the task's text. The run
+ * ends there with no wrap-up, so the `halt` is what `rafa loop wait`
+ * and `rafa stretch item` read it ended on. Every other stop, one its
+ * report holds or a session that exited nonzero, emits its
+ * `task-blocked` alone, as before.
+ *
  * Every line goes through the active output (`core/output/active.ts`).
  */
 import type { FinishedTask } from './commit.js';
@@ -147,9 +160,10 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { CommandExit } from '@open-tomato/rafa/core/command';
 import { activeOutput, activeOutputMode } from '@open-tomato/rafa/core/output';
+import { stripTaskDeclaration } from '@open-tomato/rafa/core/plan';
 import { findNextTask, listOpenTasks, writeTrackerBlocker } from '@open-tomato/rafa/utils/tracker';
 
-import { heldOnNothingLeftBehind } from './commit.js';
+import { heldOnNothingLeftBehind, TASK_HELD_NOTHING_LEFT } from './commit.js';
 import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';
 import { parseDecision } from './decision-parse.js';
 import { buildDecisionPrompt, resolveContinueCriteria } from './decision-prompt.js';
@@ -279,6 +293,27 @@ const NO_DECISIONS: RunDecisions = Object.freeze({
   atPlanEnd: () => [],
   gateForcedWrapUp: (gate: BeforeSessionAnswer) => gate,
 });
+
+/** A task's stop {@link emitStopEvents} ends the run on: a clean exit held, or a session that exited nonzero. */
+export type TaskStop = Extract<DecisionStop, { readonly kind: 'clean-exit' | 'session-exit' }>;
+
+/**
+ * The events `stop` ends the run with when no decision goes on, in the
+ * order they are emitted: its own event, then, for a clean exit held on
+ * nothing but its absences, a `halt` whose reason is
+ * {@link TASK_HELD_NOTHING_LEFT}, a colon and the task's text, its
+ * declaration taken off as the held line takes it. See the module note.
+ */
+export function stopEventsOf(stop: TaskStop): readonly LoopEvent[] {
+  if (stop.kind !== 'clean-exit' || !heldOnNothingLeftBehind(stop.finished)) return [stop.stopEvent];
+  const reason = `${TASK_HELD_NOTHING_LEFT}: ${stripTaskDeclaration(stop.taskInfo.task)}`;
+  return [stop.stopEvent, { kind: 'halt', reason }];
+}
+
+/** Emits {@link stopEventsOf}'s events for `stop`, in order. */
+export function emitStopEvents(stop: TaskStop): void {
+  for (const event of stopEventsOf(stop)) emitLoopEvent(event);
+}
 
 /** The subject of one decision: the task, why it stopped, and the event its stop emits. */
 interface DecisionSubject {

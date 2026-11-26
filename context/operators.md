@@ -285,7 +285,11 @@ a later task is done, neither the stopped one nor a repair;
 it ends nothing, so `rafa loop wait` and `rafa stretch item` read on past
 it. A stop it retries writes no `task-blocked` line: a task stop writes
 one only once no retry is granted, so a `task-blocked` line still means
-the run stopped.
+the run stopped. A task held because its session left neither a report nor
+a commit, with no retry granted, is followed by one `halt` line,
+`Task held: its session left neither a report nor a commit: <task>`
+(`emitStopEvents`, `packages/rafa-run/src/start/continue-run.ts`), so
+`rafa loop wait` and `rafa stretch item` name that hold as the run's end.
 
 The three `--continue` lines (`context/cli.md`) count tracker lines
 from 1, as the decision prompt does. A `decision` line names the

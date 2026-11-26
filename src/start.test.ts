@@ -517,8 +517,9 @@ describe('where start.ts retries a stop', () => {
     expect(START.match(/Run again to retry\./g)).toHaveLength(1);
     expect(START).toContain('        const held = { kind: \'task-blocked\', position, reason: finished.holds[0] ?? \'held by its report\' } as const;\n'
       + '        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\', retryTask)) continue;\n'
-      + '        if (await decisions.atStop({ kind: \'clean-exit\', taskInfo, retryTask, finished, stopEvent: held })) continue;\n'
-      + '        emitLoopEvent(held);\n        return;\n');
+      + '        const stop = { kind: \'clean-exit\', taskInfo, retryTask, finished, stopEvent: held } as const;\n'
+      + '        if (await decisions.atStop(stop)) continue;\n'
+      + '        emitStopEvents(stop);\n        return;\n');
     expect(START.match(/if \(!suiteSteps\.stoppedOnSignal\(\) && retries\.retry\('suite step red', (?:null|retryTask)\)\) continue;/g)).toHaveLength(2);
   });
 
@@ -571,7 +572,7 @@ describe('where start.ts hands a stop to a --continue decision', () => {
     expect(EVERY.filter((call) => call.name === 'atStop').map((call) => call.args[0])).toEqual([
       '{ kind: \'suite-red\' }',
       '{ kind: \'session-exit\', taskInfo, retryTask, exitCode, stopEvent: failed }',
-      '{ kind: \'clean-exit\', taskInfo, retryTask, finished, stopEvent: held }',
+      'stop',
       '{ kind: \'suite-red\' }',
     ]);
   });
@@ -589,7 +590,7 @@ describe('where start.ts hands a stop to a --continue decision', () => {
     expect(START).toContain('      if (await decisions.atFirstTask(taskInfo, trackerContent)) continue;\n');
     expect(START.indexOf('decisions.atFirstTask(')).toBeLessThan(START.indexOf('haltBeforeSession({ expected, trackerPath, taskInfo })'));
     expect(START.indexOf('decisions.atPlanEnd(')).toBeLessThan(START.indexOf('haltBeforeSession({ expected, trackerPath, taskInfo })'));
-    expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeGreaterThan(START.indexOf('emitLoopEvent(held);'));
+    expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeGreaterThan(START.indexOf('emitStopEvents(stop);'));
     expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeLessThan(START.indexOf('emitLoopEvent({ kind: \'task-done\''));
   });
 });
