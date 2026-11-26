@@ -24,6 +24,22 @@
  * `local.changes` over the window per `level` and `area` as stored: the
  * engine groups by the raw column, so a NULL area and each spelling of
  * one area answer apart, and the card tidies, merges and folds them.
+ *
+ * The balance radar (spec C5) reads weekly rows and computes each index
+ * itself, this week over the median of the 12 before, as the engine
+ * computes no median over buckets. Four metrics give it the weeks the
+ * catalogue lacked: `dev.changes-per-week`, the changelog entries per
+ * week, level and raw area; `dev.sessions-per-week`, the task sessions
+ * per week, work type and report status with their minutes;
+ * `dev.repeat-sessions-per-week`, the task sessions with an attempt past
+ * the first; and `dev.ci-verdicts-per-week` (entry 31), the green and red
+ * readings per week, since `dev.red-ci-share` answers one share over the
+ * window and no week. The sessions read `local.tasks`, not `local.daily`:
+ * `daily_rollup` holds the task and blocked counts but splits minutes by
+ * session kind, never by work type, and holds no repeat count, while the
+ * engine has no conditional measure, so the repeat sessions are a query of
+ * their own over the `attempt` filter. {@link BALANCE_INDEX_METRICS} lists
+ * which metrics each index reads.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
@@ -206,8 +222,140 @@ export const WORK_DONE: MetricDefinition = {
   feasibility: 'direct',
 };
 
+/** The changelog entries per week, level and raw area: the radar's features landed and docs kept current. */
+export const CHANGES_PER_WEEK: MetricDefinition = {
+  id: 'dev.changes-per-week',
+  title: 'Changes per week',
+  lenses: ['developer'],
+  description: 'The changelog entries the tasks reported, per ISO week, counted per level and per area as the task wrote it; an entry with no area counts under a NULL area.',
+  sourceId: CHANGES_SOURCE,
+  params: {
+    grain: 'week',
+    groupBy: ['level', 'area'],
+    measures: [{ field: 'id', agg: 'count', as: 'entries' }],
+    orderBy: [{ key: 'week', dir: 'asc' }, { key: 'level', dir: 'asc' }, { key: 'area', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'entries',
+  chart: 'stacked-bar',
+  feasibility: 'direct',
+};
+
+/** The task sessions per week, work type and status, with their minutes: the radar's blocked and refactor + chore. */
+export const SESSIONS_PER_WEEK: MetricDefinition = {
+  id: 'dev.sessions-per-week',
+  title: 'Task sessions per week',
+  lenses: ['developer'],
+  description: 'The task sessions per ISO week, counted per work type (feature, fix, chore) and report status (done, blocked), with the minutes they ran; a session with no work type or no report counts under a NULL.',
+  sourceId: TASKS_SOURCE,
+  params: {
+    grain: 'week',
+    filters: [{ field: 'kind', op: 'eq', value: 'task' }],
+    groupBy: ['work_type', 'status'],
+    measures: [
+      { field: 'session_id', agg: 'count', as: 'sessions' },
+      { field: 'minutes', agg: 'sum', as: 'minutes' },
+    ],
+    orderBy: [{ key: 'week', dir: 'asc' }, { key: 'work_type', dir: 'asc' }, { key: 'status', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'sessions',
+  chart: 'stacked-bar',
+  feasibility: 'proxy',
+  proxyFor: 'minutes by kind of work',
+  proxyNote: 'Work type is read from the change level each task reported (patch = fix, none = chore or docs, minor = feature): loop branches carry no type, so a refactor reads as the level it reported.',
+};
+
+/** The task sessions past their task line's first attempt, per week: the repeat half of the radar's blocked. */
+export const REPEAT_SESSIONS_PER_WEEK: MetricDefinition = {
+  id: 'dev.repeat-sessions-per-week',
+  title: 'Repeat sessions per week',
+  lenses: ['developer'],
+  description: 'The task sessions per ISO week that ran a task line again: an attempt past the first of their plan and task line.',
+  sourceId: TASKS_SOURCE,
+  params: {
+    grain: 'week',
+    filters: [
+      { field: 'kind', op: 'eq', value: 'task' },
+      { field: 'attempt', op: 'gt', value: 1 },
+    ],
+    measures: [{ field: 'session_id', agg: 'count', as: 'sessions' }],
+    orderBy: [{ key: 'week', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'sessions',
+  chart: 'line',
+  feasibility: 'direct',
+};
+
+/** The CI readings that ran a check, per week and verdict: the radar's red CI share, by week. */
+export const CI_VERDICTS_PER_WEEK: MetricDefinition = {
+  id: 'dev.ci-verdicts-per-week',
+  title: 'CI verdicts per week',
+  lenses: ['developer'],
+  description: 'The CI readings of plan heads that ran a check, per ISO week of the reading, counted green and red.',
+  sourceId: CI_SOURCE,
+  params: {
+    grain: 'week',
+    filters: [{ field: 'verdict', op: 'in', value: ['green', 'red'] }],
+    groupBy: ['verdict'],
+    measures: [{ field: 'head_sha', agg: 'count', as: 'readings' }],
+    orderBy: [{ key: 'week', dir: 'asc' }, { key: 'verdict', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'readings',
+  chart: 'stacked-bar',
+  feasibility: 'direct',
+};
+
+/**
+ * The metrics each index of the balance radar reads (spec C5), keyed by
+ * the index ids of `demo/src/data/balance.ts`, each answering weekly rows:
+ *
+ * - `feat-rate`: `dev.changes-per-week`, its `major` and `minor` entries
+ *   (feature, D4).
+ * - `plan-done`: `pm.plan-completion`, the plans started and completed
+ *   per week of their first session; `dev.plans-completed-per-week`
+ *   answers the completed half alone.
+ * - `releases`: `dev.deploys-per-week`.
+ * - `bug-intake`: `pm.out-of-scope-per-week` over the task sessions of
+ *   `dev.sessions-per-week`; the out-of-scope count is the bug count that
+ *   leaves out `scope` `machine` and `module` `cli-gap`.
+ * - `regressions`: `qa.regressions` over the week totals of
+ *   `qa.bugs-by-kind`, every bug route.
+ * - `red-ci`: `dev.ci-verdicts-per-week`, red over green and red.
+ * - `blocked`: the `blocked` sessions of `dev.sessions-per-week` and
+ *   `dev.repeat-sessions-per-week`, over the task sessions.
+ * - `refactor-share`: the `chore` minutes of `dev.sessions-per-week` over
+ *   all its minutes; D4 has no refactor type.
+ * - `docs-share`: the `docs` entries of `dev.changes-per-week`, after the
+ *   card's C4 tidying, over all its entries; the stale docs cleared wait
+ *   on a replica holding the store's `stale_docs`.
+ */
+export const BALANCE_INDEX_METRICS: Readonly<Record<string, readonly string[]>> = {
+  'feat-rate': ['dev.changes-per-week'],
+  'plan-done': ['pm.plan-completion'],
+  'releases': ['dev.deploys-per-week'],
+  'bug-intake': ['pm.out-of-scope-per-week', 'dev.sessions-per-week'],
+  'regressions': ['qa.regressions', 'qa.bugs-by-kind'],
+  'red-ci': ['dev.ci-verdicts-per-week'],
+  'blocked': ['dev.sessions-per-week', 'dev.repeat-sessions-per-week'],
+  'refactor-share': ['dev.sessions-per-week'],
+  'docs-share': ['dev.changes-per-week'],
+};
+
 /** The developer lens's PoC metrics, in the order section G lists them. */
 export const DEVELOPER_POC_METRICS: readonly MetricDefinition[] = [TASKS_DONE_PER_WEEK, TASK_CYCLE, RED_CI_SHARE, PLANS_COMPLETED_PER_WEEK];
 
-/** The developer lens's metrics: the PoC cut, then those over the git, board and GitHub sources, then the work done. */
-export const DEVELOPER_METRICS: readonly MetricDefinition[] = [...DEVELOPER_POC_METRICS, DEPLOYS_PER_WEEK, WIP, PR_CYCLE_TIME, WORK_DONE];
+/** The developer lens's metrics: the PoC cut, then those over the git, board and GitHub sources, then the work done and the radar's weeks. */
+export const DEVELOPER_METRICS: readonly MetricDefinition[] = [
+  ...DEVELOPER_POC_METRICS,
+  DEPLOYS_PER_WEEK,
+  WIP,
+  PR_CYCLE_TIME,
+  WORK_DONE,
+  CHANGES_PER_WEEK,
+  SESSIONS_PER_WEEK,
+  REPEAT_SESSIONS_PER_WEEK,
+  CI_VERDICTS_PER_WEEK,
+];

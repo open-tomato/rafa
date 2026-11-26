@@ -19,7 +19,15 @@
  * GitHub filter as the control. Then the work done over the replica with
  * three planted changes (two spellings of the tests area and one with no
  * area): it answers each level and area as stored, the NULL area and both
- * spellings apart, a count of all entries as the control. `catalogue-sources.test.ts` runs the
+ * spellings apart, a count of all entries as the control. Then the four
+ * weekly metrics of the balance radar over the same replica: the changes
+ * per week, level and area, over two weeks once a change planted before
+ * the 28-day window is asked for too; the task sessions per week, work
+ * type and status, which agree with `local.daily` on the counts it holds;
+ * the repeat sessions; the CI verdicts per week, which sum to the red CI
+ * share's readings; and the index map, keyed by the nine ids of the
+ * demo's balance catalogue, naming only served weekly metrics. Each has a
+ * control. `catalogue-sources.test.ts` runs the
  * phase 4 metrics over a replica of every source. Controls show each check can fail: the
  * schema refuses a definition with an extra key, the engine refuses a
  * measure on a field the descriptor lacks, and the formula refuses a
@@ -28,7 +36,7 @@
 import type { DataSourceDescriptor, Filter, MetricDefinition, QueryParams, QueryResult, Scalar } from '@open-tomato/atlas-data/contract';
 import type { TableSourceSpec } from '@open-tomato/atlas-data/source';
 
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -46,6 +54,7 @@ import { openAtlasRegistry, type AtlasRegistry } from '../registry.js';
 import { SOURCE_SPECS } from '../sources.js';
 
 import { METRIC_CATALOGUE } from './catalogue.js';
+import { BALANCE_INDEX_METRICS } from './developer.js';
 import { NOT_MACHINE_OR_CLI_GAP } from './pm.js';
 import { BOARD_BUGS, CLI_GAP_OUT, NOT_CLI_GAP, READ_FROM_GITHUB } from './qa.js';
 
@@ -79,7 +88,16 @@ const POC_IDS = [
 const PHASE_FOUR_IDS = {
   pm: ['pm.milestone-completion', 'pm.minutes-per-agent', 'pm.out-of-scope-per-week', 'pm.task-pile'],
   architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations'],
-  developer: ['dev.deploys-per-week', 'dev.wip', 'dev.pr-cycle-time', 'dev.work-done'],
+  developer: [
+    'dev.deploys-per-week',
+    'dev.wip',
+    'dev.pr-cycle-time',
+    'dev.work-done',
+    'dev.changes-per-week',
+    'dev.sessions-per-week',
+    'dev.repeat-sessions-per-week',
+    'dev.ci-verdicts-per-week',
+  ],
   qa: [
     'qa.defect-density',
     'qa.bug-outcome-by-loop-start',
@@ -111,6 +129,7 @@ const PROXY_IDS = [
   'arch.violations',
   'dev.tasks-done-per-week',
   'dev.plans-completed-per-week',
+  'dev.sessions-per-week',
   'qa.defect-density',
 ];
 
@@ -143,14 +162,20 @@ const PLANTED_CHANGES = [
   { id: 'planted-no-area', level: 'minor', area: null, day: '2026-11-04' },
 ] as const;
 
-/** Plant {@link PLANTED_CHANGES} as rows of `change_facts` in the replica under `root`. */
+/** A docs change planted in ISO week 40, before the 28-day window every other reading asks for. */
+const PLANTED_EARLIER_CHANGE = { id: 'planted-earlier-docs', level: 'none', area: 'docs', day: '2026-09-30' } as const;
+
+/** A window reaching back past {@link PLANTED_EARLIER_CHANGE}. */
+const WIDE_WINDOW = { last: '84d' } as const;
+
+/** Plant {@link PLANTED_CHANGES} and {@link PLANTED_EARLIER_CHANGE} as rows of `change_facts` in the replica under `root`. */
 function plantChanges(root: string): void {
   const database = new Database(replicaPathOf(root));
   try {
     const insert = database.prepare<unknown, [string, string, string | null, string]>(
       'INSERT INTO change_facts (id, level, area, day) VALUES (?, ?, ?, ?)',
     );
-    for (const row of PLANTED_CHANGES) insert.run(row.id, row.level, row.area, row.day);
+    for (const row of [...PLANTED_CHANGES, PLANTED_EARLIER_CHANGE]) insert.run(row.id, row.level, row.area, row.day);
   } finally {
     database.close();
   }
@@ -254,13 +279,21 @@ function runEmpty(spec: TableSourceSpec, params: QueryParams): QueryResult {
   return runQuery((selects) => selects.map(() => []), { table: spec.table, descriptor: descriptorOf(spec) }, params, { now: BUILT_AT });
 }
 
-/** The metric `id` asked of the built replica over the last 28 days, its formula applied. */
-async function answerOf(id: string): Promise<QueryResult> {
+/** The metric `id` asked of the built replica over `window`, the last 28 days unless named, its formula applied. */
+async function answerOf(id: string, window: QueryParams['window'] = WINDOW): Promise<QueryResult> {
   if (registry === null) throw new Error('no registry');
   const metric = metricOf(id);
   const source = registry.sources.get(metric.sourceId);
   if (source === undefined) throw new Error(`no source ${metric.sourceId}`);
-  return applyFormula(await source.query({ ...metric.params, window: WINDOW }), metric.formula);
+  return applyFormula(await source.query({ ...metric.params, window }), metric.formula);
+}
+
+/** `params` asked of the source `id` names in the built replica, over the last 28 days. */
+async function sourceQuery(id: string, params: QueryParams): Promise<QueryResult> {
+  if (registry === null) throw new Error('no registry');
+  const source = registry.sources.get(id);
+  if (source === undefined) throw new Error(`no source ${id}`);
+  return source.query({ ...params, window: WINDOW });
 }
 
 /** True for params that measure with no group key: the engine answers one total row, 0 over no rows. */
@@ -282,10 +315,10 @@ describe('METRIC_CATALOGUE', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five then four on PM, four then three, four then four, four then seven', () => {
+  it('gives each lens the metrics of its rows: five then four on PM, four then three, four then eight, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 7, 8, 11]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 7, 12, 11]);
   });
 
   it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
@@ -547,5 +580,130 @@ describe('the work done over the fixture replica', () => {
     const rows = recordsOf(await changes.query({ measures: metric.params.measures, window: WINDOW }));
 
     expect(rows).toEqual([{ entries: 5 }]);
+  });
+});
+
+describe('the changes per week over the fixture replica', () => {
+  it('counts the entries per ISO week, level and area as stored, the NULL area and both spellings of tests apart', async () => {
+    const rows = recordsOf(await answerOf('dev.changes-per-week'));
+
+    expect(rows).toEqual([
+      { week: '2026-11-02', level: 'minor', area: null, entries: 2 },
+      { week: '2026-11-02', level: 'patch', area: 'Testing', entries: 1 },
+      { week: '2026-11-02', level: 'patch', area: 'board', entries: 1 },
+      { week: '2026-11-02', level: 'patch', area: 'tests', entries: 1 },
+    ]);
+  });
+
+  it('answers the docs change planted in week 40 in a row of its own once the window reaches it', async () => {
+    const rows = recordsOf(await answerOf('dev.changes-per-week', WIDE_WINDOW));
+
+    expect(rows.map((row) => row.week)).toEqual(['2026-09-28', '2026-11-02', '2026-11-02', '2026-11-02', '2026-11-02']);
+    expect(rows[0]).toEqual({ week: '2026-09-28', level: 'none', area: 'docs', entries: 1 });
+  });
+
+  it('control: the same params with no grain answer the rows of dev.work-done', async () => {
+    const metric = metricOf('dev.changes-per-week');
+    const params: QueryParams = { ...metric.params, grain: 'all', orderBy: [{ key: 'level', dir: 'asc' }, { key: 'area', dir: 'asc' }] };
+    const rows = recordsOf(await sourceQuery(metric.sourceId, params));
+
+    expect(rows).toEqual(recordsOf(await answerOf('dev.work-done')));
+  });
+});
+
+describe('the task sessions per week over the fixture replica', () => {
+  it('counts the two task sessions of week 45 by work type and status, with their minutes', async () => {
+    const rows = recordsOf(await answerOf('dev.sessions-per-week'));
+
+    expect(rows).toEqual([
+      { week: '2026-11-02', work_type: 'feature', status: 'done', sessions: 1, minutes: 45 },
+      { week: '2026-11-02', work_type: 'fix', status: 'blocked', sessions: 1, minutes: 30 },
+    ]);
+  });
+
+  it('control: local.daily holds the same task sessions and blocked tasks, none in the week of the legacy session, and no repeat count', async () => {
+    const daily = recordsOf(await sourceQuery('local.daily', {
+      grain: 'week',
+      measures: [
+        { field: 'task_sessions', agg: 'sum', as: 'task_sessions' },
+        { field: 'tasks_blocked', agg: 'sum', as: 'tasks_blocked' },
+      ],
+    }));
+    const dailyFields = SOURCE_SPECS.find((spec) => spec.descriptor.id === 'local.daily')?.descriptor.fields.map((field) => field.key) ?? [];
+
+    expect(daily).toEqual([
+      { week: '2026-10-26', task_sessions: 0, tasks_blocked: 0 },
+      { week: '2026-11-02', task_sessions: 2, tasks_blocked: 1 },
+    ]);
+    expect(dailyFields.filter((key) => key.includes('repeat') || key.includes('work_type'))).toEqual([]);
+  });
+});
+
+describe('the repeat sessions per week over the fixture replica', () => {
+  it('counts the second session of the fixture task line, its attempt 2, as the one repeat of week 45', async () => {
+    const rows = recordsOf(await answerOf('dev.repeat-sessions-per-week'));
+
+    expect(rows).toEqual([{ week: '2026-11-02', sessions: 1 }]);
+  });
+
+  it('control: the same params without the attempt filter count both task sessions', async () => {
+    const metric = metricOf('dev.repeat-sessions-per-week');
+    const filters = (metric.params.filters ?? []).filter((filter) => filter.field !== 'attempt');
+    const rows = recordsOf(await sourceQuery(metric.sourceId, { ...metric.params, filters }));
+
+    expect(filters).toEqual([{ field: 'kind', op: 'eq', value: 'task' }]);
+    expect(rows).toEqual([{ week: '2026-11-02', sessions: 2 }]);
+  });
+});
+
+describe('the CI verdicts per week over the fixture replica', () => {
+  it('counts the readings of week 45 by verdict: two green, three red', async () => {
+    const rows = recordsOf(await answerOf('dev.ci-verdicts-per-week'));
+
+    expect(rows).toEqual([
+      { week: '2026-11-02', verdict: 'green', readings: 2 },
+      { week: '2026-11-02', verdict: 'red', readings: 3 },
+    ]);
+  });
+
+  it('control: the weekly readings sum per verdict to those of dev.red-ci-share, which answers no week', async () => {
+    const weekly = recordsOf(await answerOf('dev.ci-verdicts-per-week'));
+    const share = recordsOf(await answerOf('dev.red-ci-share'));
+    const sumOf = (verdict: string): number => weekly.filter((row) => row.verdict === verdict).reduce((sum, row) => sum + Number(row.readings), 0);
+
+    expect(share.map((row) => [row.verdict, row.readings])).toEqual([['green', sumOf('green')], ['red', sumOf('red')]]);
+    expect(share.every((row) => !('week' in row))).toBe(true);
+  });
+});
+
+/** The index ids of the `BALANCE_CATALOGUE` written in `text`, in its order: the entries with a pole, never the poles. */
+function balanceIndexIdsOf(text: string): string[] {
+  return [...text.matchAll(/\{ id: '([a-z-]+)', label: '[^']*', pole: /g)].map((match) => match[1] ?? '');
+}
+
+/** The demo's balance catalogue, read as text: the module set its index ids. */
+const BALANCE_TEXT = readFileSync(join(import.meta.dir, '../../../demo/src/data/balance.ts'), 'utf8');
+
+describe('the metrics each balance index reads', () => {
+  it('keys the map by the nine index ids of the demo\'s balance catalogue, in its order', () => {
+    expect(Object.keys(BALANCE_INDEX_METRICS)).toEqual(balanceIndexIdsOf(BALANCE_TEXT));
+    expect(Object.keys(BALANCE_INDEX_METRICS)).toHaveLength(9);
+  });
+
+  it('control: a catalogue text with an index renamed no longer matches the map\'s keys', () => {
+    const renamed = BALANCE_TEXT.replace('{ id: \'docs-share\'', '{ id: \'docs-kept\'');
+
+    expect(Object.keys(BALANCE_INDEX_METRICS)).not.toEqual(balanceIndexIdsOf(renamed));
+  });
+
+  it('names only metrics the catalogue serves, each asked at week grain', () => {
+    const named = [...new Set(Object.values(BALANCE_INDEX_METRICS).flat())];
+
+    expect(named.filter((id) => !ALL_IDS.includes(id))).toEqual([]);
+    expect(named.filter((id) => metricOf(id).params.grain !== 'week')).toEqual([]);
+  });
+
+  it('control: dev.red-ci-share, the one CI metric before this map, has no week grain and would be caught', () => {
+    expect(metricOf('dev.red-ci-share').params.grain).toBeUndefined();
   });
 });

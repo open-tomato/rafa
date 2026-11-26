@@ -15,16 +15,20 @@
  * CI readings, and entry 28, defect leakage, by `qa.filed-share`, the
  * share of routed bugs per route, and entry 7, scope creep, by
  * `pm.out-of-scope-per-week`, every out-of-scope entry per week (spec
- * C1), with no ratio over planned tasks. Entry 8 reads a blocker as
- * active by its task's outcome, `blocked`: the store keeps no open or
- * closed state of a blocker.
+ * C1), with no ratio over planned tasks. Entry 31, the test pass/fail
+ * trend, is drawn by `dev.ci-verdicts-per-week`, the CI verdicts the
+ * radar reads (spec C5), with no test-level reading. Entry 8 reads a
+ * blocker as active by its task's outcome, `blocked`: the store keeps no
+ * open or closed state of a blocker.
  *
  * Entries 1 and 25 are offline (D17): milestone completion and WIP read
  * only states and labels, which the board cache holds. The four `gh`
  * entries with a metric (22, 29 and 33, and 20's lead time, which waits)
  * are drawn by a metric that answers rows only after a `--github` build.
- * The bug backlog metrics, the task pile and the work done ({@link UNNUMBERED_METRIC_IDS})
- * came after the B4 table and have no row in it.
+ * The bug backlog metrics, the task pile, the work done and the radar's
+ * changes, sessions and repeat sessions per week
+ * ({@link UNNUMBERED_METRIC_IDS}) came after the B4 table and have no row
+ * in it.
  */
 import type { Feasibility, Lens } from '@open-tomato/atlas-data/contract';
 
@@ -87,7 +91,7 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
   entry(28, 'qa', 'Defect leakage', 'proxy', 'bug-labelled issues with no loop match / all bugs', '100% stacked bar', ['qa.filed-share']),
   entry(29, 'qa', 'Defect resolution time', 'gh', 'linked issue created_at to closed_at, by priority', 'box plot', ['qa.resolution-time']),
   entry(30, 'qa', 'Test coverage', 'collect', 'needs bun test --coverage lcov collection', 'radial gauge empty'),
-  entry(31, 'qa', 'Test pass/fail trend', 'proxy', 'CI verdicts per week, green vs red', 'stacked column'),
+  entry(31, 'qa', 'Test pass/fail trend', 'proxy', 'CI verdicts per week, green vs red', 'stacked column', ['dev.ci-verdicts-per-week']),
   entry(32, 'qa', 'Flaky tests', 'direct', 'ci_facts.flipped, failing names top 10', 'top-10 table', ['qa.flaky-checks']),
   entry(33, 'qa', 'Defect age', 'gh', 'open bug issues in buckets 0–7d, 8–30d, 30d+', 'ageing bar', ['qa.defect-age']),
   entry(34, 'qa', 'Regression defects', 'direct', 'bug_facts kind own-fallout per week', 'line', ['qa.regressions']),
@@ -97,7 +101,9 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
 /**
  * The served metrics no B4 row names: the task pile (spec C3), the open
  * typed issues by type and open time, which needs the GitHub times; the
- * work done (spec C4), the changelog entries per level and raw area; then
+ * work done (spec C4), the changelog entries per level and raw area; the
+ * three weekly metrics the balance radar reads (spec C5): changes, task
+ * sessions and repeat sessions per week; then
  * the bug backlog metrics, added from the burndown session after the
  * table was written. Outcome by loop start and the drop rate are offline;
  * open bugs per day and bugs per stretch need the GitHub times.
@@ -105,6 +111,9 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
 export const UNNUMBERED_METRIC_IDS: readonly string[] = [
   'pm.task-pile',
   'dev.work-done',
+  'dev.changes-per-week',
+  'dev.sessions-per-week',
+  'dev.repeat-sessions-per-week',
   'qa.bug-outcome-by-loop-start',
   'qa.drop-rate',
   'qa.open-bugs-per-day',

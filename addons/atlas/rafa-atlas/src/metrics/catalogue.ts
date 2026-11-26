@@ -11,12 +11,15 @@
  * GitHub sources: 14 more, five of them GitHub-only (`feasibility` `gh`),
  * answering rows only after a build run with `--github`. Then the
  * metrics of the remaining cards: `pm.out-of-scope-per-week` (C1) and
- * `pm.task-pile` (C3), GitHub-only as well, and `dev.work-done` (C4). A
+ * `pm.task-pile` (C3), GitHub-only as well, `dev.work-done` (C4), and
+ * the four weekly metrics the balance radar reads (C5): changes, task
+ * sessions, repeat sessions and CI verdicts per week. A
  * metric over `local.modules`, which has no time axis, refuses a
  * window, and one over `local.issues` that reads the board as of now
  * asks with none. Every metric of spec section B4, served or not, is
  * listed with its feasibility in `entries.ts`, beside the task pile, the
- * work done and the four bug backlog metrics no B4 row names.
+ * work done, the radar's changes, sessions and repeat sessions, and the
+ * four bug backlog metrics no B4 row names.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
