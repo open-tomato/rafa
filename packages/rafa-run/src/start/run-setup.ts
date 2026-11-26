@@ -63,6 +63,11 @@
  * plan's `feat/<stub>`, one in a worktree of its own and the other by
  * switching the main checkout, so a line naming both asks for two
  * contradictory things and is refused before anything is read.
+ *
+ * {@link noteSharedCheckout} runs after the guard: a run without
+ * `--as-worktree` is in the checkout it was started from, and one info
+ * line says that edits made there during the run go into task commits
+ * and that the flag keeps them apart (#1607).
  */
 import type { BranchSeams } from './branch.js';
 import type { ContinueArgs } from './continue-args.js';
@@ -408,6 +413,31 @@ export function guardRunBranch(
     const convention = branchNameFor('<plan-stub>', branchTemplate);
     activeOutput().warn(`   The run proceeds; the convention is \`${convention}\`.`);
   }
+}
+
+/**
+ * The line a run without `--as-worktree` prints before its first task,
+ * the run being in the checkout it was started from (#1607).
+ */
+export const SHARED_CHECKOUT_NOTE: string = '\nℹ️  This run commits in this checkout: edits made here during the run go'
+  + ` into its task commits. ${AS_WORKTREE_FLAG} keeps them apart.`;
+
+/**
+ * Prints {@link SHARED_CHECKOUT_NOTE} once through the active output
+ * when the words carry no `--as-worktree`, and nothing under it.
+ *
+ * A task's commit stages the whole tree (`git add -A`, since a session
+ * creates files as well as editing them), so a file the person edits in
+ * the run's checkout while it runs goes into the next task's commit.
+ * Without the flag the run's checkout is the one it was started from
+ * (`start/run-checkout.ts`), so the line says so and names the flag that
+ * runs in a worktree of its own instead. `start()` calls it once, right
+ * after {@link guardRunBranch} lets the run through and before the
+ * session record and every session, so a refused run prints only why.
+ */
+export function noteSharedCheckout(args: readonly string[]): void {
+  if (args.includes(AS_WORKTREE_FLAG)) return;
+  activeOutput().info(SHARED_CHECKOUT_NOTE);
 }
 
 /** The flag that finishes the run at the push instead of waiting for CI. */

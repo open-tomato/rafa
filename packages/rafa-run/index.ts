@@ -243,6 +243,7 @@ export {
 
 export {
   guardRunBranch,
+  noteSharedCheckout,
   readRunArgs,
   refuseWorktreeBesideCreateBranch,
   refuseWorktreeWhileTracking,

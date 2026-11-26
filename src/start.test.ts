@@ -287,6 +287,18 @@ describe('the two directories start.ts points each call at', () => {
     expect(firstArgument('finishCleanExit')).toContain('repoRoot: checkout,');
   });
 
+  it('notes the shared checkout once, past the guard and before the session record and the first task', () => {
+    // Which runs print the line, and which print none, is
+    // `start/run-setup.test.ts`'s; here it is the place of the one call.
+    const notes = EVERY.filter((call) => call.name === 'noteSharedCheckout');
+    const at = START.indexOf('noteSharedCheckout(args);');
+
+    expect(notes.map((call) => call.args)).toEqual([['args']]);
+    expect(at).toBeGreaterThan(START.indexOf('guardRunBranch(planStub, branch, args'));
+    expect(at).toBeLessThan(START.indexOf('const session = openRunSession('));
+    expect(at).toBeLessThan(START.indexOf('dispatchTask('));
+  });
+
   it('serves every session from the project root while spawning it in the checkout', () => {
     // The served directory is `.rafa/runs/<id>/served/` under this root
     // (`start/serving.ts`), so a worktree run's sessions are served the
