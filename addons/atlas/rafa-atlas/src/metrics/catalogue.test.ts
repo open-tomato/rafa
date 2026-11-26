@@ -27,7 +27,9 @@
  * the repeat sessions; the CI verdicts per week, which sum to the red CI
  * share's readings; and the index map, keyed by the nine ids of the
  * demo's balance catalogue, naming only served weekly metrics. Each has a
- * control. `catalogue-sources.test.ts` runs the
+ * control. Then the composition over two planted module folders, one no
+ * layer lists, answering NULL in both layer columns, a window refused as
+ * the control. `catalogue-sources.test.ts` runs the
  * phase 4 metrics over a replica of every source. Controls show each check can fail: the
  * schema refuses a definition with an extra key, the engine refuses a
  * measure on a field the descriptor lacks, and the formula refuses a
@@ -87,7 +89,7 @@ const POC_IDS = [
 /** The metrics past the PoC cut of each lens, phase 4's and later, in the order each lens lists them after its PoC cut. */
 const PHASE_FOUR_IDS = {
   pm: ['pm.milestone-completion', 'pm.minutes-per-agent', 'pm.out-of-scope-per-week', 'pm.task-pile'],
-  architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations'],
+  architect: ['arch.loc-per-module', 'arch.coupling', 'arch.violations', 'arch.composition'],
   developer: [
     'dev.deploys-per-week',
     'dev.wip',
@@ -181,6 +183,27 @@ function plantChanges(root: string): void {
   }
 }
 
+/** The module folders planted in the built replica: one in the second layer, one no layer lists. */
+const PLANTED_MODULES = [
+  { path: 'packages/core', package: '@open-tomato/core', layer: 'core', layer_rank: 1, loc: 500, test_loc: 300, docs_loc: 40, config_loc: 20, fixtures_loc: 10 },
+  { path: 'scripts', package: null, layer: null, layer_rank: null, loc: 80, test_loc: 0, docs_loc: 0, config_loc: 5, fixtures_loc: 0 },
+] as const;
+
+/** Plant {@link PLANTED_MODULES} as rows of `module_facts` in the replica under `root`. */
+function plantModules(root: string): void {
+  const database = new Database(replicaPathOf(root));
+  try {
+    const insert = database.prepare<unknown, [string, string | null, string | null, number | null, number, number, number, number, number]>(
+      'INSERT INTO module_facts (path, package, layer, layer_rank, loc, test_loc, docs_loc, config_loc, fixtures_loc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    );
+    for (const row of PLANTED_MODULES) {
+      insert.run(row.path, row.package, row.layer, row.layer_rank, row.loc, row.test_loc, row.docs_loc, row.config_loc, row.fixtures_loc);
+    }
+  } finally {
+    database.close();
+  }
+}
+
 /** Plant {@link PLANTED_OUT_OF_SCOPE} as out-of-scope rows of `bug_facts` in the replica under `root`. */
 function plantOutOfScope(root: string): void {
   const database = new Database(replicaPathOf(root));
@@ -235,6 +258,7 @@ beforeAll(async () => {
   await buildAtlas({ projectRoot: root, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
   plantOutOfScope(root);
   plantChanges(root);
+  plantModules(root);
   registry = await openAtlasRegistry({ projectRoot: root, sourceOptions: { now: () => BUILT_AT } });
   const offline = writePileRoot('pile-offline');
   const github = writePileRoot('pile-github');
@@ -315,10 +339,10 @@ describe('METRIC_CATALOGUE', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives each lens the metrics of its rows: five then four on PM, four then three, four then eight, four then seven', () => {
+  it('gives each lens the metrics of its rows: five then four on PM, four then four, four then eight, four then seven', () => {
     const count = (lens: MetricDefinition['lenses'][number]): number => METRIC_CATALOGUE.filter((metric) => metric.lenses.includes(lens)).length;
 
-    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 7, 12, 11]);
+    expect([count('pm'), count('architect'), count('developer'), count('qa')]).toEqual([9, 8, 12, 11]);
   });
 
   it.each(ALL_IDS)('%s passes the MetricDefinition schema', (id) => {
@@ -580,6 +604,22 @@ describe('the work done over the fixture replica', () => {
     const rows = recordsOf(await changes.query({ measures: metric.params.measures, window: WINDOW }));
 
     expect(rows).toEqual([{ entries: 5 }]);
+  });
+});
+
+describe('the composition over the fixture replica', () => {
+  it('answers each module folder\'s package, layer and five line counts, the unassigned folder NULL in both layer columns', async () => {
+    if (registry === null) throw new Error('no registry');
+    const metric = metricOf('arch.composition');
+    const modules = registry.sources.get(metric.sourceId);
+    if (modules === undefined) throw new Error('no local.modules');
+    const rows = recordsOf(applyFormula(await modules.query(metric.params), metric.formula));
+
+    expect(rows).toEqual(PLANTED_MODULES.map((row) => ({ ...row })));
+  });
+
+  it('control: a window on the module source is refused', async () => {
+    await expect(answerOf('arch.composition')).rejects.toThrow(InvalidParams);
   });
 });
 

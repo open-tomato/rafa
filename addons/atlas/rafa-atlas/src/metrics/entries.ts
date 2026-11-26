@@ -103,7 +103,8 @@ export const CATALOGUE_ENTRIES: readonly CatalogueEntry[] = [
  * typed issues by type and open time, which needs the GitHub times; the
  * work done (spec C4), the changelog entries per level and raw area; the
  * three weekly metrics the balance radar reads (spec C5): changes, task
- * sessions and repeat sessions per week; then
+ * sessions and repeat sessions per week; the composition (spec C6 and
+ * C7), each module folder's layer and five line counts; then
  * the bug backlog metrics, added from the burndown session after the
  * table was written. Outcome by loop start and the drop rate are offline;
  * open bugs per day and bugs per stretch need the GitHub times.
@@ -114,6 +115,7 @@ export const UNNUMBERED_METRIC_IDS: readonly string[] = [
   'dev.changes-per-week',
   'dev.sessions-per-week',
   'dev.repeat-sessions-per-week',
+  'arch.composition',
   'qa.bug-outcome-by-loop-start',
   'qa.drop-rate',
   'qa.open-bugs-per-day',
