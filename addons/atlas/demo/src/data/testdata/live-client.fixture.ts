@@ -4,7 +4,9 @@
  * results below, one per PoC metric and one per metric of
  * `live-sources.ts`, in the columns the engine answers it with, and
  * records every call; `query` answers the plans' first sessions
- * (`STUB_PLANS`) and records every query; `listMetrics` answers
+ * (`STUB_PLANS`) and the balance metrics' day rows
+ * (`STUB_BALANCE_ANSWERS`, from the sources `describeMetric` names for
+ * them) and records every query; `listMetrics` answers
  * `STUB_DEFINITIONS`, whose proxies carry a stub note, whose three GitHub
  * metrics are `gh` and whose WIP metric has the goal `STUB_WIP_LIMIT`;
  * each other route refuses. Asked with `{ github: false }`, the GitHub
@@ -16,11 +18,16 @@
 import type { MetricDefinition, QueryParams, QueryResult, Scalar, Window } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 
+import { BALANCE_METRICS, type BalanceMetric } from '../live-balance.js';
+import { DAY_MS } from '../live-read.js';
 import { PLANS_SOURCE_ID, SOURCE_METRICS, type SourceMetric } from '../live-sources.js';
 import { LIVE_METRICS, type LiveMetric } from '../live.js';
 
 /** The window the stub says it ran: 28 days ending 2026-11-23. */
 export const STUB_WINDOW: { readonly from: string; readonly to: string } = { from: '2026-10-26T00:00:00.000Z', to: '2026-11-23T00:00:00.000Z' };
+
+/** The stub's build time, every answer's `meta.asOf`: Sunday 2026-11-22, 09:00 UTC. */
+export const STUB_BUILT_AT = '2026-11-22T09:00:00.000Z';
 
 /** A result of string columns, `rows` and the window it ran over. */
 export function resultOf(
@@ -31,7 +38,7 @@ export function resultOf(
   return {
     columns: columns.map((key) => ({ key, label: key, type: 'string' })),
     rows,
-    meta: { asOf: '2026-11-22T09:00:00.000Z', partial: false, partialReasons: [], rowCount: rows.length, truncated: false, window },
+    meta: { asOf: STUB_BUILT_AT, partial: false, partialReasons: [], rowCount: rows.length, truncated: false, window },
   };
 }
 
@@ -244,6 +251,61 @@ export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = 
   importFlow: STUB_IMPORT_FLOW,
 };
 
+/** The `YYYY-MM-DD` `back` days before the stub's build day. */
+function stubDayBack(back: number): string {
+  return new Date(Date.parse(STUB_BUILT_AT.slice(0, 10)) - back * DAY_MS).toISOString()
+    .slice(0, 10);
+}
+
+/** The weeks behind a balance index's baseline. */
+const BALANCE_BASELINE_WEEKS = 12;
+
+/**
+ * The day-grain answer of each metric the balance indices read: one
+ * release tag in each of the 12 baseline weeks and two in the 7 days to
+ * the build, so releases read 2.00×, and no row for every other metric,
+ * so each other index reads "none in 12 weeks".
+ */
+export const STUB_BALANCE_ANSWERS: Readonly<Record<BalanceMetric, QueryResult>> = {
+  changes: resultOf(['day', 'level', 'area', 'entries'], []),
+  planCompletion: resultOf(['day', 'started', 'completed'], []),
+  deploys: resultOf(['day', 'deploys'], [
+    ...Array.from({ length: BALANCE_BASELINE_WEEKS }, (_, week) => [stubDayBack((week + 1) * 7), 1]),
+    [stubDayBack(3), 1],
+    [stubDayBack(0), 1],
+  ]),
+  outOfScope: resultOf(['day', 'entries'], []),
+  sessions: resultOf(['day', 'work_type', 'status', 'sessions', 'minutes'], []),
+  repeats: resultOf(['day', 'sessions'], []),
+  regressions: resultOf(['day', 'bugs'], []),
+  bugsByKind: resultOf(['day', 'kind', 'bugs'], []),
+  ciVerdicts: resultOf(['day', 'verdict', 'readings'], []),
+};
+
+/** The source id the stub's definition of a balance metric names, its answer's key in `query`. */
+function balanceSourceOf(metricId: string): string {
+  return `stub.balance.${metricId}`;
+}
+
+/** The balance answer of each stub source id. */
+const BALANCE_ANSWER_OF: ReadonlyMap<string, QueryResult> = new Map((Object.keys(BALANCE_METRICS) as BalanceMetric[]).map((key) => [balanceSourceOf(BALANCE_METRICS[key]), STUB_BALANCE_ANSWERS[key]]));
+
+/** The stub's definition of a balance metric, as `describeMetric` answers it; refused for another id. */
+function balanceDefinitionOf(id: string): Promise<MetricDefinition> {
+  if (!Object.values(BALANCE_METRICS).includes(id)) return Promise.reject(new Error(`no stub definition for ${id}`));
+  return Promise.resolve({
+    id,
+    title: id,
+    lenses: ['developer'],
+    description: `stub definition of ${id}`,
+    sourceId: balanceSourceOf(id),
+    params: {},
+    formula: { kind: 'none' },
+    chart: 'line',
+    feasibility: 'direct',
+  });
+}
+
 /** The metrics the stub lists as GitHub-only, as the catalogue does. */
 export const STUB_GITHUB: readonly string[] = [SOURCE_METRICS.resolutionTime, SOURCE_METRICS.openBugsPerDay, SOURCE_METRICS.taskPile];
 
@@ -326,8 +388,10 @@ export interface StubOptions {
 
 /**
  * A client whose `runMetric` answers the results above and records each
- * call, and whose `query` answers `STUB_PLANS` for `local.plans` and
- * records each query; every other route refuses.
+ * call, whose `query` answers `STUB_PLANS` for `local.plans` and
+ * `STUB_BALANCE_ANSWERS` for the balance metrics' stub sources and
+ * records each query, and whose `describeMetric` answers the balance
+ * metrics; every other route refuses.
  */
 export function stubLiveClient({ github = true }: StubOptions = {}): StubLiveClient {
   const calls: StubCall[] = [];
@@ -340,12 +404,14 @@ export function stubLiveClient({ github = true }: StubOptions = {}): StubLiveCli
     describeSource: unused,
     query: (id, params) => {
       queries.push({ id, params });
-      return id === PLANS_SOURCE_ID
-        ? Promise.resolve(STUB_PLANS)
-        : Promise.reject(new Error(`no stub answer for a query of ${id}`));
+      if (id === PLANS_SOURCE_ID) return Promise.resolve(STUB_PLANS);
+      const balance = BALANCE_ANSWER_OF.get(id);
+      return balance === undefined
+        ? Promise.reject(new Error(`no stub answer for a query of ${id}`))
+        : Promise.resolve(balance);
     },
     listMetrics: () => Promise.resolve(STUB_DEFINITIONS),
-    describeMetric: unused,
+    describeMetric: balanceDefinitionOf,
     runMetric: (id, window) => {
       calls.push({ id, window });
       const source = SOURCE_ANSWER_OF.get(id);

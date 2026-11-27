@@ -99,6 +99,16 @@ empty state, a dash and "needs a collector: needs a due date on plans"
 (`LensStat`'s `collect`), distinct from "not wired yet"; the mock page
 keeps its sample.
 
+On the Development lens, work done reads `workDoneTree`, the change
+entries by work type and tidied area, and its live subtitle says it reads
+the range in place of the mock's 12 weeks. The balance radar reads the
+result's `balance`, the nine indices of `live-balance.ts`, asked over the
+fixed 91 days ending with the replica's build time whatever the range;
+an index with no event in its 12 baseline weeks reads "none in 12 weeks"
+after its axis label and in the source table, and draws at 0. An answer
+naming no build time leaves `balance` marked not wired. The mock page
+keeps the catalogue's values and subtitles.
+
 Every card and tile a live metric feeds names its `reads`. On the live
 page a wired card's note is `liveNoteOf`'s (`src/lenses/spec.ts`): the
 proxy note, when the metric is a proxy, and the row count behind it, so

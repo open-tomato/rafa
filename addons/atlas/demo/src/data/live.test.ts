@@ -5,7 +5,8 @@
  * (`live-sources.ts`) mapped into its field, a GitHub-only metric with no
  * row marked not wired with the `--github` build line, each field's meta
  * (its row count, and a proxy's `ProxyNote`), the weeks the weekly
- * fields span, every other field marked not wired, an API that is not there failing with the start line, and
+ * fields span, the balance's nine indices asked over the fixed window
+ * ending with the build, an API that is not there failing with the start line, and
  * `?source=` reading as the mock unless it names `live`. The stub client
  * (`testdata/live-client.fixture.ts`) records every call. The page drawn
  * over each source is `App.test.tsx`'s, since this file imports no TSX.
@@ -24,6 +25,8 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { readPageSource } from '../url.js';
 
+import { BALANCE_CATALOGUE } from './balance.js';
+import { BALANCE_METRICS, hasNoBaseline } from './live-balance.js';
 import {
   defectDensityOf,
   GITHUB_BUILD_LINE,
@@ -52,7 +55,7 @@ import {
   failingClient,
   resultOf,
   STUB_ANSWERS,
-  STUB_PLANS,
+  STUB_BUILT_AT,
   STUB_PROXIES,
   STUB_SOURCE_ANSWERS,
   STUB_WINDOW,
@@ -80,14 +83,15 @@ function columnsOnly(answer: QueryResult): QueryResult {
 
 /** A client answering every metric and the plans query with its stub columns and no row: the control the filled fields are held against. */
 function emptyClient(): AtlasClient {
+  const { client } = stubLiveClient();
   return {
-    ...stubLiveClient().client,
+    ...client,
     runMetric: (id) => {
       const answer = ANSWER_OF.get(id);
       if (answer === undefined) return Promise.reject(new Error(`no stub answer for ${id}`));
       return Promise.resolve(columnsOnly(answer));
     },
-    query: () => Promise.resolve(columnsOnly(STUB_PLANS)),
+    query: async (id, params) => columnsOnly(await client.query(id, params)),
   };
 }
 
@@ -140,7 +144,16 @@ describe('liveResultOf over a stub client: the requests', () => {
     const { client, queries } = stubLiveClient();
     await liveResultOf(client, 'last-year');
 
-    expect(queries).toEqual([{ id: PLANS_SOURCE_ID, params: { window: { last: '52w' }, fields: ['plan_stub', 'first_at'], limit: 5_000 } }]);
+    expect(queries.filter((query) => query.id === PLANS_SOURCE_ID)).toEqual([{ id: PLANS_SOURCE_ID, params: { window: { last: '52w' }, fields: ['plan_stub', 'first_at'], limit: 5_000 } }]);
+  });
+
+  it('asks the balance metrics over the 91 days ending with the build\'s day, whatever the range', async () => {
+    const { client, queries } = stubLiveClient();
+    await liveResultOf(client, 'now');
+    const balance = queries.filter((query) => query.id !== PLANS_SOURCE_ID);
+
+    expect(balance).toHaveLength(Object.keys(BALANCE_METRICS).length);
+    for (const { params } of balance) expect(params.window).toEqual({ to: STUB_BUILT_AT.slice(0, 10), last: '91d' });
   });
 
   it('asks the two one-number tiles over the KPI window, every other metric over the series window', async () => {
@@ -169,10 +182,11 @@ describe('liveResultOf over a stub client: each field filled', () => {
     const mockFields = WIRED_FIELDS.filter((field): field is keyof MockData => field in result.mock);
     const mockNames: readonly string[] = mockFields;
 
-    expect(mockNames).toEqual(WIRED_FIELDS.filter((field) => field !== 'workspace'));
+    expect(mockNames).toEqual(WIRED_FIELDS.filter((field) => field !== 'workspace' && field !== 'balance'));
     for (const field of mockFields) {
       expect({ field, value: result.mock[field] }).not.toEqual({ field, value: empty.mock[field] });
     }
+    expect(result.balance).not.toEqual(empty.balance);
     expect(result.workspace.members).not.toEqual(empty.workspace.members);
     expect(result.workspace.edges).not.toEqual(empty.workspace.edges);
   });
@@ -530,7 +544,7 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
   it('gives every wired field its metric and its answer\'s row count, the previous-window fields the earlier answer\'s', async () => {
     const { result } = await liveResult();
 
-    expect([...result.fieldMeta.keys()].sort()).toEqual([...WIRED_FIELDS].sort());
+    expect([...result.fieldMeta.keys()].sort()).toEqual(WIRED_FIELDS.filter((field) => field !== 'balance').sort());
     for (const key of Object.keys(LIVE_METRICS) as LiveMetric[]) {
       const own = METRIC_FIELDS[key][0] ?? 'balance';
       expect({ key, rowCount: result.fieldMeta.get(own)?.rowCount }).toEqual({ key, rowCount: STUB_ANSWERS[key].meta.rowCount });
@@ -551,15 +565,42 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
     expect(result.fieldMeta.get('tokensPerDay')).toEqual({ metricId: 'pm.tokens-per-day', rowCount: 2 });
   });
 
-  it('marks every other field not wired, the balance and the workspace included, and leaves them empty', async () => {
+  it('marks no field not wired, the balance and the workspace included', async () => {
     const { result } = await liveResult();
 
     expect(result.notWired).toBe(NOT_WIRED);
     for (const field of WIRED_FIELDS) expect(result.notWired.has(field)).toBe(false);
-    expect([...result.notWired].sort()).toEqual(['balance']);
-    expect(result.notWired.size + WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
+    expect([...result.notWired]).toEqual([]);
+    expect(WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
     expect(result.notWiredDetail.size).toBe(0);
+  });
+
+  it('fills the balance with the nine live indices, an index with no event in 12 weeks read as none', async () => {
+    const { result } = await liveResult();
+    const releases = result.balance.find((index) => index.id === 'releases');
+    const regressions = result.balance.find((index) => index.id === 'regressions');
+
+    expect(result.balance.map((index) => index.id)).toEqual(BALANCE_CATALOGUE.map((index) => index.id));
+    expect(releases?.value).toBe(2);
+    expect(regressions === undefined
+      ? false
+      : hasNoBaseline(regressions)).toBe(true);
+    expect(result.fieldMeta.has('balance')).toBe(false);
+  });
+
+  it('control: an answer naming no build time leaves the balance empty and marked not wired', async () => {
+    const { client } = stubLiveClient();
+    const noBuild: AtlasClient = {
+      ...client,
+      runMetric: async (id, window, signal) => {
+        const answer = await client.runMetric(id, window, signal);
+        return { ...answer, meta: { ...answer.meta, asOf: null } };
+      },
+    };
+    const result = await liveResultOf(noBuild, 'past-month');
+
     expect(result.balance).toEqual([]);
+    expect(result.notWired.has('balance')).toBe(true);
   });
 
   it('names the series window\'s weeks, one per entry of the weekly fields that hold no dates', async () => {

@@ -35,7 +35,12 @@
  * `scopeCreepPerWeek` with `scopeCreepAverage` (C1), `taskPileTree` (C3)
  * and `workDoneTree` (C4), and those of the architect cards the rest of
  * `workspace`: the composition, the rose and the Sankey with its layers
- * (C6 to C8, `live-architecture.ts`). The task cycle's points also fill
+ * (C6 to C8, `live-architecture.ts`). The balance radar's nine indices
+ * (C5, `live-balance.ts`) are asked once the PoC answers name the
+ * replica's build time, over the fixed 91 days ending with it whatever
+ * the range; an answer naming no build time leaves `balance` empty and
+ * marked, and `balance` has no `FieldMeta`, since nine metrics fill it.
+ * The task cycle's points also fill
  * `taskMinutesBins`, binned on the page (`taskMinutesBinsOf`). Their requests live in `live-sources.ts`,
  * their mappers there and, for the three cards, in `live-cards.ts`,
  * and the cell readers the files share in `live-read.ts`. A GitHub-only
@@ -52,6 +57,7 @@ import type { ChartTone, HistogramBin, LineSeries, ScatterPoint, TimePoint } fro
 import { AtlasRequestError, AtlasResponseInvalid, AtlasTransportError } from '@open-tomato/atlas-transport/client';
 
 import { architectureOf } from './live-architecture.js';
+import { balanceIndicesOf } from './live-balance.js';
 import {
   boundsOf,
   columnOf,
@@ -164,7 +170,7 @@ export const METRIC_FIELDS: Readonly<Record<LiveMetric, readonly LensField[]>> =
 const METRIC_KEYS = Object.keys(LIVE_METRICS) as LiveMetric[];
 
 /** The fields a live metric fills, the PoC metrics' then `live-sources.ts`'s; every other field is not wired yet. */
-export const WIRED_FIELDS: readonly LensField[] = [...METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key]), ...SOURCE_WIRED_FIELDS];
+export const WIRED_FIELDS: readonly LensField[] = [...METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key]), ...SOURCE_WIRED_FIELDS, 'balance'];
 
 /** The metrics that are one number on a tile, run over the range's KPI window. */
 export const KPI_METRICS: ReadonlySet<LiveMetric> = new Set<LiveMetric>(['redCiShare', 'activeBlockers']);
@@ -609,11 +615,16 @@ function fieldMetaOf(answers: Answers, previous: Partial<Answers>, sources: Sour
   return new Map([...poc, ...past].filter(([field], index, all) => all.findIndex(([seen]) => seen === field) === index));
 }
 
-/** The fields marked not wired for one result: `NOT_WIRED` itself, or with the GitHub fields that answered no row. */
+/** The fields marked not wired for one result: `NOT_WIRED` itself, or with the fields that could not be read (`pending`). */
 function notWiredOf(pending: readonly LensField[]): ReadonlySet<LensField> {
   return pending.length === 0
     ? NOT_WIRED
     : new Set([...NOT_WIRED, ...pending]);
+}
+
+/** The replica's build time, as the first answer naming one says it; null when none does. */
+function builtAtOf(answers: Answers): string | null {
+  return METRIC_KEYS.map((key) => answers[key].meta.asOf).find((asOf) => asOf !== null) ?? null;
 }
 
 /** The wired fields of the mock shape, each filled from its metric's answer. */
@@ -667,9 +678,13 @@ export async function liveResultOf(client: AtlasClient, range: TimeRange, signal
     sourceAnswersOf(client, RANGE_WINDOW[range].series, signal),
     client.listMetrics(undefined, signal),
   ]);
-  const [tokens, debt] = await Promise.all([
+  const builtAt = builtAtOf(answers);
+  const [tokens, debt, balance] = await Promise.all([
     previousOf(client, 'tokensPerDay', answers.tokensPerDay, signal),
     previousOf(client, 'debtRatio', answers.debtRatio, signal),
+    builtAt === null
+      ? null
+      : balanceIndicesOf(client, builtAt, signal),
   ]);
   const previous: Partial<Answers> = {
     ...(tokens === null
@@ -683,12 +698,14 @@ export async function liveResultOf(client: AtlasClient, range: TimeRange, signal
   return {
     range,
     source: 'live',
-    notWired: notWiredOf(pending),
+    notWired: notWiredOf(balance === null
+      ? [...pending, 'balance']
+      : pending),
     notWiredDetail: new Map(pending.map((field) => [field, GITHUB_NOT_READ])),
     fieldMeta: fieldMetaOf(answers, previous, sources, proxyNotesOf(definitions)),
     weeks: seriesWeeksOf(answers.bugsByKind, 'week'),
     mock: mockOf(answers, previous, sources, definitions),
-    balance: [],
+    balance: balance ?? [],
     workspace: {
       ...EMPTY_WORKSPACE,
       ...moduleGraphOf(sources.metrics.coupling),

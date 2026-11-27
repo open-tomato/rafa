@@ -7,13 +7,15 @@
  * behind them, while the others say "Not wired yet"; the two bug backlog
  * cards draw on both sources, and over a replica with no GitHub data the
  * GitHub-only cards name the `--github` build; the on-time tile draws the
- * `collect` empty state on the live page and its sample on the mock. happy-dom has no canvas, so the page draws with a stub engine
+ * `collect` empty state on the live page and its sample on the mock; work
+ * done and the balance radar draw from the live answers, an index with no
+ * event in 12 weeks reading "none in 12 weeks" on its axis. happy-dom has no canvas, so the page draws with a stub engine
  * whose primitives render a labelled element; the engine is the charts
  * package's to test. The source answers with no delay.
  */
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
-import type { ChartPrimitives } from '@open-tomato/charts';
+import type { ChartPrimitives, RadarAxis } from '@open-tomato/charts';
 import type { ReactElement } from 'react';
 
 import { formatPercent } from '@open-tomato/charts';
@@ -22,6 +24,8 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { createElement } from 'react';
 
 import { App } from './App.js';
+import { BALANCE_CATALOGUE } from './data/balance.js';
+import { NONE_IN_12_WEEKS } from './data/live-balance.js';
 import { scopeCreepOf } from './data/live-cards.js';
 import { GITHUB_BUILD_LINE, GITHUB_NOT_READ } from './data/live-sources.js';
 import { createLiveLensSource, LIVE_METRICS } from './data/live.js';
@@ -56,9 +60,27 @@ const LENS_CARDS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
+/** The balance card's title, and its subtitle on each page. */
+const BALANCE_TITLE = 'Balance: shipping, failing, foundation';
+const BALANCE_MOCK_SUBTITLE = 'each index divided by its twelve-week median, so the ring at 1 is as usual';
+const BALANCE_LIVE_SUBTITLE = 'the 7 days to the replica\'s build over the median of the 12 weeks before, their mean when it is 0; the ring at 1 is as usual';
+
+/** Work done's subtitle on each page: the mock's names its 12 weeks in the title, the live one reads the range. */
+const WORK_DONE_MOCK_SUBTITLE = 'kind on the inner ring, the module it landed in on the outer ring';
+const WORK_DONE_LIVE_SUBTITLE = 'the change entries by work type on the inner ring, the area each landed in on the outer ring, over the range';
+
 /** A primitive that draws nothing: an image role named by the chart's label. */
 function StubChart({ ariaLabel }: { readonly ariaLabel: string }): ReactElement {
   return <div role="img" aria-label={ariaLabel} />;
+}
+
+/** The radar's stub: the image, with each axis label as text, so a test reads what an axis says. */
+function StubRadar({ ariaLabel, axes }: { readonly ariaLabel: string; readonly axes: readonly RadarAxis[] }): ReactElement {
+  return (
+    <div role="img" aria-label={ariaLabel}>
+      {axes.map((axis) => <span key={axis.id}>{axis.label}</span>)}
+    </div>
+  );
 }
 
 const STUB_ENGINE: ChartPrimitives = {
@@ -79,7 +101,7 @@ const STUB_ENGINE: ChartPrimitives = {
   Sankey: StubChart,
   Nightingale: StubChart,
   Sunburst: StubChart,
-  Radar: StubChart,
+  Radar: StubRadar,
 };
 
 /** The page over the stub engine and the given source. */
@@ -328,7 +350,7 @@ describe('App, by page source', () => {
     expect(screen.getByRole('img', { name: 'Task cycle minutes per task with a seven-day moving median' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Red CI share against the ten percent threshold' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Distribution of task minutes' })).toBeDefined();
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
+    expect(screen.queryByText('Not wired yet')).toBeNull();
     expect(within(screen.getByRole('region', { name: 'Plans completed per week' })).getByText('3')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Releases this week' })).getByText('1')).toBeDefined();
     expect(within(screen.getByRole('region', { name: 'Work in progress' })).getByText('3')).toBeDefined();
@@ -394,11 +416,61 @@ describe('App, by page source', () => {
 
   it('control: a card no live metric feeds keeps the general not-wired line, not the --github one', async () => {
     renderApp(createLiveLensSource(stubLiveClient({ github: false }).client));
-    fireEvent.click(screen.getByRole('tab', { name: 'Development' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Architecture' }));
     await settle();
 
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(2);
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(3);
     expect(screen.queryByText(GITHUB_NOT_READ)).toBeNull();
-    expect(within(screen.getByRole('region', { name: 'Work done, 12 weeks' })).getByText(/^No live metric feeds this card yet/u)).toBeDefined();
+    expect(within(screen.getByRole('region', { name: 'Package size' })).getByText(/^No live metric feeds this card yet/u)).toBeDefined();
+  });
+
+  it('over the live source, draws work done from the change entries, its subtitle naming the range for the mock\'s 12 weeks', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'Development' }));
+    await settle();
+    const card = screen.getByRole('region', { name: 'Work done, 12 weeks' });
+
+    expect(within(card).getByRole('img', { name: 'Work done by kind and module as a sunburst' })).toBeDefined();
+    expect(within(card).getByText(WORK_DONE_LIVE_SUBTITLE)).toBeDefined();
+    expect(within(card).queryByText(WORK_DONE_MOCK_SUBTITLE)).toBeNull();
+    expect(within(card).queryByText('Not wired yet')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Work done, 12 weeks' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Source' }));
+    expect(screen.getByRole('cell', { name: 'loop' })).toBeDefined();
+    expect(screen.getAllByRole('cell', { name: 'docs' })).toHaveLength(1);
+  });
+
+  it('over the live source, draws the balance radar from the live indices, an index with no event reading none in 12 weeks', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'Development' }));
+    await settle();
+    const card = screen.getByRole('region', { name: BALANCE_TITLE });
+    const radar = within(card).getByRole('img', { name: /^Balance radar: 8 indices/u });
+
+    expect(within(radar).getByText('releases')).toBeDefined();
+    expect(within(radar).getByText(`regression share: ${NONE_IN_12_WEEKS}`)).toBeDefined();
+    expect(within(card).getByText(BALANCE_LIVE_SUBTITLE)).toBeDefined();
+    expect(within(card).queryByText('Not wired yet')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: `Options for ${BALANCE_TITLE}` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Source' }));
+    expect(screen.getByRole('cell', { name: '2.00×' })).toBeDefined();
+    expect(screen.getAllByRole('cell', { name: NONE_IN_12_WEEKS })).toHaveLength(BALANCE_CATALOGUE.length - 1);
+  });
+
+  it('control: the mock page keeps work done\'s mock subtitle and the balance radar\'s catalogue values, no axis reading none', async () => {
+    renderApp();
+    fireEvent.click(screen.getByRole('tab', { name: 'Development' }));
+    await settle();
+    const work = screen.getByRole('region', { name: 'Work done, 12 weeks' });
+    const balance = screen.getByRole('region', { name: BALANCE_TITLE });
+
+    expect(within(work).getByText(WORK_DONE_MOCK_SUBTITLE)).toBeDefined();
+    expect(within(work).queryByText(WORK_DONE_LIVE_SUBTITLE)).toBeNull();
+    expect(within(balance).getByText(BALANCE_MOCK_SUBTITLE)).toBeDefined();
+    expect(within(balance).queryByText(new RegExp(NONE_IN_12_WEEKS, 'u'))).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: `Options for ${BALANCE_TITLE}` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Source' }));
+    const releases = lensResultOf('past-month').balance.find((index) => index.id === 'releases');
+    expect(screen.getByRole('cell', { name: `${releases?.value.toFixed(2)}×` })).toBeDefined();
   });
 });

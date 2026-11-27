@@ -102,6 +102,8 @@ export function DeveloperLens(): ReactElement {
           <BalanceCard />
           <LensCard
             config={WORK_DONE}
+            reads={['workDoneTree']}
+            liveSubtitle="the change entries by work type on the inner ring, the area each landed in on the outer ring, over the range"
             select={(result: LensResult) => result.mock.workDoneTree}
             legend={WORK_LEGEND}
             table={(tree) => ({ columns: ['Kind', 'Module', 'Items'], rows: tree.flatMap((kind) => kind.children.map((child) => [kind.label, child.label, child.value])) })}

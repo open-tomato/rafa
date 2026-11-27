@@ -289,3 +289,20 @@ export function liveBalanceOf(answers: BalanceAnswers, builtAt: string): LiveBal
     return indexOf(index, weekly(answers, buildDay));
   });
 }
+
+/** The nine indices with their live values, asked of `client` over the 91 days ending with the day of `builtAt`. */
+export async function balanceIndicesOf(client: AtlasClient, builtAt: string, signal?: AbortSignal): Promise<LiveBalanceIndex[]> {
+  return liveBalanceOf(await balanceAnswersOf(client, builtAt, signal), builtAt);
+}
+
+/** True for an index whose baseline found no event in its 12 weeks; a mock index, which has no baseline, never is. */
+export function hasNoBaseline(index: BalanceIndex): boolean {
+  return 'baseline' in index && (index as LiveBalanceIndex).baseline.rule === 'none';
+}
+
+/** `index` as its radar axis reads it: its label, with `NONE_IN_12_WEEKS` after it when `hasNoBaseline` says so. */
+export function axisIndexOf(index: BalanceIndex): BalanceIndex {
+  return hasNoBaseline(index)
+    ? { ...index, label: `${index.label}: ${NONE_IN_12_WEEKS}` }
+    : index;
+}
