@@ -1,8 +1,9 @@
 /**
  * Tests for the readers of `hub.store` and `hub.index`
  * (`config-store.ts`): each key's default, each value refused,
- * `hub.store.postgres` refused under `engine: sqlite`, and the readings
- * reaching `parseHubConfig`.
+ * `hub.store.postgres` refused under `engine: sqlite`, the SQLite library
+ * chosen between the install record and `hub.store.sqliteLibrary`, and
+ * the readings reaching `parseHubConfig`.
  *
  * Each refusal sits beside an accepting control of the same key, so a
  * reader that refused everything, or a check that never fired, fails
@@ -10,11 +11,11 @@
  * the module's own constants. A section is handed in as the YAML a
  * config file would hold under `hub.store` or `hub.index`.
  */
-import type { HubIndexConfig, HubStoreConfig, SectionReading } from './config-store.js';
+import type { HubIndexConfig, HubStoreConfig, SectionReading, SqliteLibraryChoice } from './config-store.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { readIndexConfig, readStoreConfig } from './config-store.js';
+import { chooseSqliteLibrary, readIndexConfig, readStoreConfig } from './config-store.js';
 import { parseHubConfig } from './config.js';
 
 /** The config file's path, as a refusal names it. */
@@ -181,6 +182,51 @@ describe('hub.store.sqliteLibrary', () => {
       store('sqliteLibrary: /usr/lib/../lib/libsqlite3.so').value?.sqliteLibrary,
       store('engine: postgres', 'sqliteLibrary: /usr/lib/libsqlite3.so').value?.sqliteLibrary,
     ]).toEqual(['/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib', '/usr/lib/../lib/libsqlite3.so', '/usr/lib/libsqlite3.so']);
+  });
+});
+
+/** The install record's path, as a warning and a refusal name it. */
+const RECORD = '/srv/hub/rafa-hub.install.json';
+
+/** A library the record or the file names. */
+const HOMEBREW = '/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib';
+
+/** The library {@link chooseSqliteLibrary} picks from the record's `record` and the file's `file`. */
+function choose(record: string | null, file: string | null): SectionReading<SqliteLibraryChoice> {
+  return chooseSqliteLibrary({ path: RECORD, library: record }, { path: PATH, library: file });
+}
+
+/** The warning `hub.store.sqliteLibrary` gives when it names `library`. */
+function keyWarning(library: string): string {
+  return `/srv/hub/hub.yaml: hub.store.sqliteLibrary is read for this release only; run rafa-hub install --sqlite-library=${library} to record it in /srv/hub/rafa-hub.install.json, then remove the key`;
+}
+
+describe('chooseSqliteLibrary', () => {
+  it('loads the record\'s library, or none, with no warning, when the file names none', () => {
+    expect([choose(HOMEBREW, null), choose(null, null)]).toEqual([
+      { value: { library: HOMEBREW, warning: null }, problems: [] },
+      { value: { library: null, warning: null }, problems: [] },
+    ]);
+    expect(Object.isFrozen(choose(HOMEBREW, null).value)).toBe(true);
+  });
+
+  it('loads the file\'s library with one warning naming rafa-hub install when the record names none', () => {
+    expect(choose(null, HOMEBREW)).toEqual({ value: { library: HOMEBREW, warning: keyWarning(HOMEBREW) }, problems: [] });
+  });
+
+  it('loads the record\'s library, still warning, when both name one library, written alike or by two spellings of one path', () => {
+    expect([choose(HOMEBREW, HOMEBREW), choose('/usr/lib/libsqlite3.so', '/usr/lib/../lib/libsqlite3.so')]).toEqual([
+      { value: { library: HOMEBREW, warning: keyWarning(HOMEBREW) }, problems: [] },
+      { value: { library: '/usr/lib/libsqlite3.so', warning: keyWarning('/usr/lib/../lib/libsqlite3.so') }, problems: [] },
+    ]);
+  });
+
+  it('refuses two different libraries with one problem naming both files, both libraries and rafa-hub install', () => {
+    expect(choose('/usr/lib/libsqlite3.so', HOMEBREW)).toEqual({
+      problems: [
+        '/srv/hub/hub.yaml: hub.store.sqliteLibrary is "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib" and the install record /srv/hub/rafa-hub.install.json names "/usr/lib/libsqlite3.so"; expected one library: remove hub.store.sqliteLibrary, or run rafa-hub install --sqlite-library=/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib to record it instead',
+      ],
+    });
   });
 });
 

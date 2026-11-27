@@ -6,14 +6,16 @@
  * `stretch/**` runs them too, so an item's red shows before its merge into
  * the stretch branch, not after it on the push.
  *
- * The workflow holds three jobs under the same triggers, permissions and
+ * The workflow holds four jobs under the same triggers, permissions and
  * timeout: `verify` (ring 0) runs the whole suite, lint and types,
  * and runs the `paradedb` service, pinned by digest, behind `POSTGRES_URL`;
  * `affected` (ring 1) runs `turbo` over the packages a change reaches,
  * the type references and the workspace graph check, against the base
  * `TURBO_SCM_BASE` names, and `atlas` runs each publishable Atlas
  * library's own gates from its folder, one matrix leg per package, since
- * the root `bun test` skips them.
+ * the root `bun test` skips them. `hub-image` builds and starts the hub's
+ * image when a pull request changes a path the image is built from;
+ * `packages/rafa-hub/src/image.test.ts` holds that job's path list.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -154,8 +156,8 @@ describe('the verify workflow', () => {
     expect(branchesOf(WORKFLOW, 'push')).toEqual(['stretch/**']);
   });
 
-  it('holds three jobs, verify, affected and atlas', () => {
-    expect(Object.keys(WORKFLOW.jobs)).toEqual(['verify', 'affected', 'atlas']);
+  it('holds four jobs, verify, affected, atlas and hub-image', () => {
+    expect(Object.keys(WORKFLOW.jobs)).toEqual(['verify', 'affected', 'atlas', 'hub-image']);
   });
 
   it('reads contents and nothing more', () => {

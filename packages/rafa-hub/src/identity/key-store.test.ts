@@ -1,6 +1,8 @@
 /**
  * The hub key store (`key-store.ts`): minting and digesting a key, the
- * keys file's name beside a project's files, and the SQLite adapter's
+ * keys file's name in `dataDir` and beside a project's files, the old
+ * place a keys file is opened at for one release, under fixture
+ * directories of the case's own, and the SQLite adapter's
  * calls, create answering the plain key once, the name rules, pause,
  * delete keeping the row, last use, a reopen, and a read of every
  * column of every row and every byte of the file finding no plain key,
@@ -12,7 +14,7 @@
 import type { HubKey, HubKeyStore } from './key-store.js';
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -29,7 +31,9 @@ import {
   keyDigest,
   keysFileName,
   mintKey,
+  oldKeysFileName,
   openSqliteKeyStore,
+  resolveKeysFile,
 } from './key-store.js';
 
 /** A minted key: the prefix, then 32 bytes as 43 base64url characters. */
@@ -113,16 +117,95 @@ describe('keyDigest', () => {
 });
 
 describe('keysFileName', () => {
-  it('names rafa-hub.keys.sqlite in the store path\'s directory', () => {
-    expect(keysFileName('/srv/hub/rafa-hub.sqlite')).toBe(`/srv/hub/${KEYS_FILE}`);
-    expect(keysFileName('/srv/hub/projects/alpha.sqlite')).toBe(`/srv/hub/projects/${KEYS_FILE}`);
-    expect(keysFileName('rafa-hub.sqlite')).toBe(KEYS_FILE);
+  it('names rafa-hub.keys.sqlite in the data directory', () => {
+    expect(keysFileName('/data')).toBe(`/data/${KEYS_FILE}`);
+    expect(keysFileName('/srv/hub/')).toBe(`/srv/hub/${KEYS_FILE}`);
+    expect(keysFileName('.')).toBe(KEYS_FILE);
   });
 
-  it('is none of the project\'s store, devices or index files', () => {
+  it('is none of the project\'s store, devices or index files, the store in the data directory', () => {
     const store = '/srv/hub/rafa-hub.sqlite';
     const files = [store, devicesFileName(store), indexFileName(store)];
-    expect(files).not.toContain(keysFileName(store));
+    expect(files).not.toContain(keysFileName('/srv/hub'));
+  });
+});
+
+describe('oldKeysFileName', () => {
+  it('names rafa-hub.keys.sqlite in the store path\'s directory', () => {
+    expect(oldKeysFileName('/srv/hub/rafa-hub.sqlite')).toBe(`/srv/hub/${KEYS_FILE}`);
+    expect(oldKeysFileName('/srv/hub/projects/alpha.sqlite')).toBe(`/srv/hub/projects/${KEYS_FILE}`);
+    expect(oldKeysFileName('rafa-hub.sqlite')).toBe(KEYS_FILE);
+  });
+});
+
+describe('resolveKeysFile', () => {
+  let root = '';
+  let dataDir = '';
+  let storePath = '';
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'rafa-hub-keys-place-'));
+    dataDir = join(root, 'data');
+    storePath = join(root, 'store', 'rafa-hub.sqlite');
+    mkdirSync(dataDir);
+    mkdirSync(join(root, 'store'));
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  /** Writes a fixture keys file at `path`; its bytes are never opened. */
+  function fixture(path: string): void {
+    writeFileSync(path, 'fixture keys file');
+  }
+
+  it('answers the file in dataDir, no warning, when neither place holds one', () => {
+    expect(resolveKeysFile(dataDir, storePath)).toEqual({ path: join(dataDir, KEYS_FILE), warning: null });
+  });
+
+  it('answers the file in dataDir, no warning, when dataDir holds one', () => {
+    fixture(join(dataDir, KEYS_FILE));
+
+    expect(resolveKeysFile(dataDir, storePath)).toEqual({ path: join(dataDir, KEYS_FILE), warning: null });
+  });
+
+  it('answers the file in dataDir, no warning, when both places hold one', () => {
+    fixture(join(dataDir, KEYS_FILE));
+    fixture(join(root, 'store', KEYS_FILE));
+
+    expect(resolveKeysFile(dataDir, storePath)).toEqual({ path: join(dataDir, KEYS_FILE), warning: null });
+  });
+
+  it('answers the file beside hub.storePath, with one warning naming the new place, when it is found there alone', () => {
+    const old = join(root, 'store', KEYS_FILE);
+    fixture(old);
+
+    const place = resolveKeysFile(dataDir, storePath);
+
+    expect(place.path).toBe(old);
+    expect(place.warning).toBe(`${old}: the keys file is found beside hub.storePath alone, so it is opened there for this release; its place is now ${join(dataDir, KEYS_FILE)}, in the install record's dataDir: move it there before the next release`);
+  });
+
+  it('gives no warning when the old place is dataDir itself, as in the image', () => {
+    fixture(join(dataDir, KEYS_FILE));
+
+    expect(resolveKeysFile(dataDir, join(dataDir, 'rafa-hub.sqlite'))).toEqual({ path: join(dataDir, KEYS_FILE), warning: null });
+    expect(resolveKeysFile(`${dataDir}/`, join(dataDir, '.', 'rafa-hub.sqlite')).warning).toBeNull();
+  });
+
+  it('asks the exists it is handed, never the disk, when one is handed', () => {
+    const asked: string[] = [];
+    const exists = (path: string): boolean => {
+      asked.push(path);
+      return path === oldKeysFileName('/elsewhere/rafa-hub.sqlite');
+    };
+
+    const place = resolveKeysFile('/nowhere', '/elsewhere/rafa-hub.sqlite', exists);
+
+    expect(place.path).toBe(`/elsewhere/${KEYS_FILE}`);
+    expect(place.warning).toContain(`/nowhere/${KEYS_FILE}`);
+    expect(asked).toContain(`/nowhere/${KEYS_FILE}`);
   });
 });
 
@@ -270,7 +353,7 @@ describe('openSqliteKeyStore over a file', () => {
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), 'rafa-hub-key-store-'));
-    path = keysFileName(join(directory, 'rafa-hub.sqlite'));
+    path = keysFileName(directory);
   });
 
   afterEach(() => {

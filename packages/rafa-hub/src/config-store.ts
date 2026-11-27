@@ -11,7 +11,11 @@
  *   - `engine` is `sqlite` (the default, a `bun:sqlite` file per
  *     project) or `postgres` (an organisation's hub), and nothing else.
  *   - `sqliteLibrary` is the absolute path of a vanilla `libsqlite3`
- *     that turns the index's vector half on for a macOS hub (#1428).
+ *     that turns the index's vector half on for a macOS hub (#1428). It
+ *     is read for one release only: the install record's
+ *     `sqliteLibrary`, which `rafa-hub install --sqlite-library` writes,
+ *     takes its place (spec #1614), and {@link chooseSqliteLibrary}
+ *     picks the one to load.
  *   - `postgres` holds `urlVariable`, the name of the environment
  *     variable holding the connection URL, `POSTGRES_URL` (the first one
  *     `Bun.sql` reads) when left out. The URL itself never sits in the
@@ -48,6 +52,17 @@
  *     from another directory would be a silent wrong load. Left out, it
  *     is null, and the connector answers `vector: false` where the
  *     engine needs it. It is read under either engine.
+ *   - {@link chooseSqliteLibrary} reads the record's library and the
+ *     file's side by side. The file's alone loads, with one warning line
+ *     naming `rafa-hub install`; the two naming the same library load it,
+ *     with the same warning, since the key still goes; two different
+ *     libraries refuse the start, one problem naming both. Two paths are
+ *     the same library when they resolve to one path, so
+ *     `/usr/lib/../lib/libsqlite3.so` is `/usr/lib/libsqlite3.so`; links
+ *     are not followed, since the start reads no file to compare them.
+ *     The engine does not change the rule: under `postgres`, which opens
+ *     no SQLite store, two different libraries are still refused, so the
+ *     refusal does not wait for an engine change to surface.
  *   - `hub.index.embedding.model` is non-empty text with no white space
  *     at either end, kept as written; left out, it is null and vectors
  *     stay off. `hub.index.embedding.precision` is read whether or not a
@@ -60,9 +75,11 @@
  *     under `hub`.
  *
  * `config.ts` imports this module, so this one takes nothing from it,
- * and its few helpers are its own, as `config-login.ts`'s are.
+ * and its few helpers are its own, as `config-login.ts`'s are. Nor does
+ * it take anything from `install-record.ts`, which imports `config.ts`:
+ * the record's library and path are handed in.
  */
-import { isAbsolute } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 
 /** The engine the hub keeps its rows and index in: `hub.store.engine`. */
 export type HubStoreEngine = 'sqlite' | 'postgres';
@@ -276,6 +293,54 @@ export function readStoreConfig(path: string, raw: unknown): SectionReading<HubS
     }),
     problems: [],
   };
+}
+
+/** One side of {@link chooseSqliteLibrary}: the file a library was read from, and the library, or null. */
+export interface SqliteLibrarySource {
+  /** The file read: the install record's path, or the config file's. */
+  readonly path: string;
+  /** The absolute path of the library it names, or null when it names none. */
+  readonly library: string | null;
+}
+
+/** The library the hub loads, and the warning `hub.store.sqliteLibrary` gives. */
+export interface SqliteLibraryChoice {
+  /** The absolute path of the SQLite library to load, or null for Bun's own. */
+  readonly library: string | null;
+  /**
+   * One warning line when the config file names `hub.store.sqliteLibrary`,
+   * read for this release only, for the caller to log; null otherwise.
+   */
+  readonly warning: string | null;
+}
+
+/** The command a `hub.store.sqliteLibrary` warning or refusal names, for `library`. */
+function installLibraryCommand(library: string): string {
+  return `rafa-hub install --sqlite-library=${library}`;
+}
+
+/**
+ * The SQLite library the hub loads, from the install record's
+ * `sqliteLibrary` (`record`) and the config file's
+ * `hub.store.sqliteLibrary` (`file`), as the module note reads them:
+ * the record's when the file names none; the file's, with one warning
+ * line naming `rafa-hub install`, when the record names none; the
+ * record's, with the same warning, when both name one library; and a
+ * refusal naming both when they differ.
+ */
+export function chooseSqliteLibrary(record: SqliteLibrarySource, file: SqliteLibrarySource): SectionReading<SqliteLibraryChoice> {
+  if (file.library === null) return { value: Object.freeze({ library: record.library, warning: null }), problems: [] };
+
+  if (record.library !== null && resolve(record.library) !== resolve(file.library)) {
+    return {
+      problems: [
+        `${file.path}: hub.store.sqliteLibrary is ${JSON.stringify(file.library)} and the install record ${record.path} names ${JSON.stringify(record.library)}; expected one library: remove hub.store.sqliteLibrary, or run ${installLibraryCommand(file.library)} to record it instead`,
+      ],
+    };
+  }
+
+  const warning = `${file.path}: hub.store.sqliteLibrary is read for this release only; run ${installLibraryCommand(file.library)} to record it in ${record.path}, then remove the key`;
+  return { value: Object.freeze({ library: record.library ?? file.library, warning }), problems: [] };
 }
 
 /** Reads `hub.index.rebuildAfterPush`, {@link DEFAULT_REBUILD_AFTER_PUSH} when left out. */

@@ -121,7 +121,13 @@
  * The store is opened by `openConnected` when it is given, a connector
  * opening the store and its index (`store/port.ts`, `HubConnector`)
  * together, and by `openStore` otherwise, which opens a store with no
- * index behind it. One of the two must be given.
+ * index behind it. One of the two must be given. Once the store opens
+ * the server logs one `store.opened` line at `info`, holding `sqliteVec`
+ * when the connector answered one ({@link HubConnected.sqliteVec}, the
+ * `sqlite` connector's): whether `sqlite-vec` loaded and the loader's
+ * `why` when it did not. A store opened by `openStore`, or under
+ * `postgres`, logs the line without it. An open that fails logs one
+ * `store.unavailable` line at `error` with its message.
  *
  * ## The index
  *
@@ -169,6 +175,7 @@ import type { EffortRouteContext, EffortServed } from './server-effort.js';
 import type { HubKeyRoutes } from './server-keys.js';
 import type { HubLoginRoutes } from './server-login.js';
 import type { HubContract, HubIndex, HubServedProject, HubStore } from './store/port.js';
+import type { SqliteVecAnswer } from './store/sqlite.js';
 
 import { WireFormatError } from '@open-tomato/rafa/store';
 
@@ -281,6 +288,8 @@ export interface HubServerOptions {
 export interface HubConnected {
   readonly store: HubStore;
   readonly index: HubIndex;
+  /** The `sqlite` connector's answer for `sqlite-vec`, logged on `store.opened`; left out by every other connector. */
+  readonly sqliteVec?: SqliteVecAnswer;
 }
 
 /** A running hub. */
@@ -475,7 +484,7 @@ function rebuildsOf(index: HubIndex, log: HubLog): Rebuilds {
 /** What {@link holdStore} opens with. */
 interface Opening {
   /** Opens the store, with its index when the hub was given a connector. */
-  readonly open: () => Promise<{ readonly store: HubStore; readonly index: HubIndex | null }>;
+  readonly open: () => Promise<{ readonly store: HubStore; readonly index: HubIndex | null; readonly sqliteVec?: SqliteVecAnswer }>;
   /** The project a rebuild after a push naming `project` records, or null when a push starts none. */
   readonly rebuildFor: ((project: string | undefined) => string) | null;
 }
@@ -488,7 +497,7 @@ function holdStore(opening: Opening, log: HubLog): StoreHolder {
 
   const attempt = async (): Promise<Held | null> => {
     try {
-      const { store, index } = await opening.open();
+      const { store, index, sqliteVec } = await opening.open();
       const { rebuildFor } = opening;
       if (index !== null && rebuildFor !== null) rebuilds = rebuildsOf(index, log);
       held = {
@@ -497,7 +506,9 @@ function holdStore(opening: Opening, log: HubLog): StoreHolder {
           if (rebuildFor !== null) rebuilds.request(rebuildFor(project));
         },
       };
-      log({ level: 'info', event: 'store.opened' });
+      log({ level: 'info', event: 'store.opened', ...sqliteVec === undefined
+        ? {}
+        : { sqliteVec } });
       return held;
     } catch (error) {
       log({ level: 'error', event: 'store.unavailable', error: messageOf(error) });

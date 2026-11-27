@@ -33,14 +33,14 @@
 import type { HubLogEntry, HubServer } from './server.js';
 import type { WirePayload } from '@open-tomato/rafa/store';
 
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { encodeWirePayload, exportWirePayload, openSqliteStore, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { runHub } from './bin.js';
+import { HUB_VERSION, runHub } from './bin.js';
 import { lineAnswers, runKeys, runLogin } from './cli-keys.js';
 import { HUB_CONFIG_ENV } from './config.js';
 import { LOGIN_PASSWORD_VARIABLE, LOGIN_USER_VARIABLE } from './identity/login-store.js';
@@ -83,9 +83,14 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-/** Writes the scratch hub config under `api-key` with its store under the case's root; answers its path. */
+/**
+ * Writes the scratch hub config under `api-key` with its store under the
+ * case's root, making the store's directory, which the keys file in
+ * `dataDir` no longer makes; answers its path.
+ */
 function writeConfig(port: number): string {
   const path = join(root, 'hub.yaml');
+  mkdirSync(join(root, 'store'), { recursive: true });
   writeFileSync(path, [
     'hub:',
     `  repository: ${REPOSITORY}`,
@@ -207,7 +212,7 @@ describe('the hub login and keys, wired whole under hub.auth.adapter api-key', (
     // 1. The login, from two lines of standard input.
     const login = printing();
     commands.push(login);
-    const loggedIn = await runLogin(hubEnv, { ...login.options, answers: lineAnswers(() => Promise.resolve(`${LOGIN_USER}\n${LOGIN_PASSWORD}\n`)) });
+    const loggedIn = await runLogin(hubEnv, HUB_VERSION, { ...login.options, answers: lineAnswers(() => Promise.resolve(`${LOGIN_USER}\n${LOGIN_PASSWORD}\n`)) });
     expect(loggedIn).toBe(0);
     expect(login.out).toHaveLength(1);
     expect(login.out[0]).toContain(`the login is set for ${LOGIN_USER}`);

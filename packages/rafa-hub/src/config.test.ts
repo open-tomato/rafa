@@ -458,6 +458,18 @@ describe('the document', () => {
     ]);
   });
 
+  it('refuses an install key at the top level and under hub, naming rafa-hub install, beside a control without one', () => {
+    const problem = (key: string) => `/srv/hub/hub.yaml: ${key} is not a key of the hub's config; expected the install's values in the install record, written by rafa-hub install`;
+    expect(parseHubConfig(hubYaml('port: 7373').concat('\ndangerous:\n  hub:\n    maxPayloadRows: 1000'), PATH).port).toBe(7373);
+    expect(problemsOf(() => parseHubConfig(hubYaml().concat('\ninstall:\n  dataDir: /data'), PATH))).toEqual([problem('install')]);
+    expect(problemsOf(() => parseHubConfig(hubYaml('install:', '  dataDir: /data'), PATH))).toEqual([problem('hub.install')]);
+    expect(problemsOf(() => parseHubConfig(hubYaml('install: ~', 'prot: 7373').concat('\ninstall: {}'), PATH))).toEqual([
+      problem('install'),
+      problem('hub.install'),
+      '/srv/hub/hub.yaml: hub.prot is not a key the hub reads; expected one of hub.repository, hub.port, hub.storePath, hub.projects, hub.auth, hub.store, hub.index',
+    ]);
+  });
+
   it('refuses an auth section that is not a mapping', () => {
     expect(problemsOf(() => parseHubConfig(hubYaml('auth: 10m'), PATH))).toEqual([
       '/srv/hub/hub.yaml: hub.auth is "10m", expected a mapping holding adapter, apiKeys, cacheFor, login',

@@ -5,7 +5,9 @@
  * case's temporary directory, and {@link runKeys} against the real key
  * routes (`openKeyRoutes`) behind the real basic login, both over the
  * keys file the case's config names, reached through a `fetch` that
- * hands each request to the routes in process.
+ * hands each request to the routes in process. The login's keys file is
+ * placed by the install record beside the config file, a fixture the
+ * case writes, or by its defaults when the case writes none.
  *
  * Every case's answers are scripted: no case reads this process's
  * standard input, and no case reaches a network.
@@ -22,6 +24,7 @@ import { PassThrough } from 'node:stream';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { HUB_VERSION } from './bin.js';
 import {
   HUB_URL_VARIABLE,
   isLoginCommand,
@@ -36,6 +39,7 @@ import {
 import { HUB_CONFIG_ENV } from './config.js';
 import { keyDigest, keysFileName, openSqliteKeyStore } from './identity/key-store.js';
 import { LOGIN_PASSWORD_VARIABLE, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
+import { INSTALL_RECORD_FILE } from './install-record.js';
 import { openBasicLogin } from './login/basic.js';
 import { openOAuthLogin } from './login/oauth.js';
 import { openKeyRoutes } from './server-keys.js';
@@ -78,9 +82,43 @@ function configEnv(auth = `    adapter: api-key\n    apiKeys: [${BOOT_VARIABLE}]
   return { [HUB_CONFIG_ENV]: path };
 }
 
-/** The keys file the case's config names. */
+/** The keys file the case's config names with no install record: in the config file's directory, the default `dataDir`. */
 function keysFile(): string {
-  return keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+  return keysFileName(root);
+}
+
+/** The keys file's old place, beside the case's `hub.storePath`. */
+function oldKeysFile(): string {
+  return join(root, 'store', 'rafa-hub.keys.sqlite');
+}
+
+/** Writes an install record beside the case's config file, `fields` over a valid one this hub wrote. */
+function writeRecord(fields: Readonly<Record<string, unknown>> = {}): string {
+  const path = join(root, INSTALL_RECORD_FILE);
+  const record = { installVersion: 1, hub: HUB_VERSION, bun: Bun.version, dataDir: root, sqliteLibrary: null, models: [], ...fields };
+  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+  return path;
+}
+
+/** Sets a fixture login `user` in the keys file at `path`, creating its directory. */
+async function seedLogin(path: string, user: string): Promise<void> {
+  mkdirSync(join(path, '..'), { recursive: true });
+  const store = openSqliteLoginStore({ path });
+  try {
+    await store.setLogin(user, 'seeded password');
+  } finally {
+    store.close();
+  }
+}
+
+/** Whether the keys file at `path` holds a login for `user` with {@link PASSWORD}. */
+async function holdsLogin(path: string, user: string): Promise<boolean> {
+  const store = openSqliteLoginStore({ path });
+  try {
+    return await store.verifyLogin(user, PASSWORD);
+  } finally {
+    store.close();
+  }
 }
 
 /** Answers scripted as `answers`, at a terminal or not, counting each question asked. */
@@ -205,10 +243,10 @@ describe('runLogin', () => {
     return openSqliteLoginStore({ path: keysFile() });
   }
 
-  it('sets the login from two lines of input in the keys file beside hub.storePath, creating its directory', async () => {
+  it('sets the login from two lines of input in the keys file in the config file\'s directory when there is no install record', async () => {
     const answers = scripted([USER, PASSWORD]);
 
-    const code = await runLogin(configEnv(), { ...lines, answers, now: () => FIXED_NOW });
+    const code = await runLogin(configEnv(), HUB_VERSION, { ...lines, answers, now: () => FIXED_NOW });
 
     expect(code).toBe(0);
     expect(answers.asked).toEqual(['user: ', 'password: ']);
@@ -220,16 +258,70 @@ describe('runLogin', () => {
     } finally {
       store.close();
     }
+    expect(existsSync(oldKeysFile())).toBe(false);
     expect(printed()).not.toContain(PASSWORD);
+  });
+
+  it('sets the login in the keys file in the install record\'s dataDir, creating its directory', async () => {
+    const env = configEnv();
+    const dataDir = join(root, 'data', 'hub');
+    writeRecord({ dataDir });
+
+    const code = await runLogin(env, HUB_VERSION, { ...lines, answers: scripted([USER, PASSWORD]) });
+
+    expect(code).toBe(0);
+    expect(err).toEqual([]);
+    expect(out).toEqual([`rafa-hub login: the login is set for ${USER}, in ${keysFileName(dataDir)}`]);
+    expect(await holdsLogin(keysFileName(dataDir), USER)).toBe(true);
+    expect(existsSync(keysFile())).toBe(false);
+  });
+
+  it('sets the login in a keys file found beside hub.storePath alone, with one warning line naming the new place', async () => {
+    const env = configEnv();
+    await seedLogin(oldKeysFile(), 'seeded');
+
+    const code = await runLogin(env, HUB_VERSION, { ...lines, answers: scripted([USER, PASSWORD]) });
+
+    expect(code).toBe(0);
+    expect(err).toEqual([`rafa-hub login: ${oldKeysFile()}: the keys file is found beside hub.storePath alone, so it is opened there for this release; its place is now ${keysFile()}, in the install record's dataDir: move it there before the next release`]);
+    expect(out).toEqual([`rafa-hub login: the login is now ${USER}, replacing the one set before, in ${oldKeysFile()}`]);
+    expect(await holdsLogin(oldKeysFile(), USER)).toBe(true);
+    expect(existsSync(keysFile())).toBe(false);
+  });
+
+  it('sets the login in dataDir, with no warning, when both places hold a keys file', async () => {
+    const env = configEnv();
+    await seedLogin(oldKeysFile(), 'seeded');
+    await seedLogin(keysFile(), 'seeded');
+
+    const code = await runLogin(env, HUB_VERSION, { ...lines, answers: scripted([USER, PASSWORD]) });
+
+    expect(code).toBe(0);
+    expect(err).toEqual([]);
+    expect(await holdsLogin(keysFile(), USER)).toBe(true);
+    expect(await holdsLogin(oldKeysFile(), USER)).toBe(false);
+  });
+
+  it('refuses an install record another hub version wrote before asking anything, in one line naming run rafa-hub install', async () => {
+    const env = configEnv();
+    const path = writeRecord({ hub: '0.0.0-other' });
+    const answers = scripted([USER, PASSWORD]);
+
+    const code = await runLogin(env, HUB_VERSION, { ...lines, answers });
+
+    expect(code).toBe(1);
+    expect(answers.asked).toEqual([]);
+    expect(err).toEqual([`rafa-hub login: the install record was refused: ${path}: written by hub 0.0.0-other, and this hub is ${HUB_VERSION}; run rafa-hub install`]);
+    expect(existsSync(keysFile())).toBe(false);
   });
 
   it('asks the password twice at a terminal, and says it replaced a login set before', async () => {
     const env = configEnv();
-    expect(await runLogin(env, { ...lines, answers: scripted([USER, 'first password']) })).toBe(0);
+    expect(await runLogin(env, HUB_VERSION, { ...lines, answers: scripted([USER, 'first password']) })).toBe(0);
     out = [];
     const answers = scripted(['grace', PASSWORD, PASSWORD], true);
 
-    const code = await runLogin(env, { ...lines, answers });
+    const code = await runLogin(env, HUB_VERSION, { ...lines, answers });
 
     expect(code).toBe(0);
     expect(answers.asked).toEqual(['user: ', 'password: ', 'password again: ']);
@@ -244,7 +336,7 @@ describe('runLogin', () => {
   });
 
   it('sets nothing when the two passwords typed at a terminal differ, opening no keys file', async () => {
-    const code = await runLogin(configEnv(), { ...lines, answers: scripted([USER, PASSWORD, 'another password'], true) });
+    const code = await runLogin(configEnv(), HUB_VERSION, { ...lines, answers: scripted([USER, PASSWORD, 'another password'], true) });
 
     expect(code).toBe(1);
     expect(err).toEqual(['rafa-hub login: the two passwords differ; nothing was set']);
@@ -257,7 +349,7 @@ describe('runLogin', () => {
     ['the user name holds a colon', ['ada:lovelace', PASSWORD], 'a login\'s user name holds no ":", which Authorization: Basic could not carry; nothing was set'],
     ['the password is empty', [USER, ''], 'a login\'s password is not empty; nothing was set'],
   ] as const)('exits 1 with one line when %s', async (_why, typed, line) => {
-    const code = await runLogin(configEnv(), { ...lines, answers: scripted(typed) });
+    const code = await runLogin(configEnv(), HUB_VERSION, { ...lines, answers: scripted(typed) });
 
     expect(code).toBe(1);
     expect(out).toEqual([]);
@@ -274,7 +366,7 @@ describe('runLogin', () => {
   ] as const)('refuses a hub under %s before asking anything', async (_why, auth, line) => {
     const answers = scripted([USER, PASSWORD]);
 
-    const code = await runLogin(configEnv(auth), { ...lines, answers });
+    const code = await runLogin(configEnv(auth), HUB_VERSION, { ...lines, answers });
 
     expect(code).toBe(1);
     expect(answers.asked).toEqual([]);
@@ -285,7 +377,7 @@ describe('runLogin', () => {
   it('refuses a config the reader refuses, in one line naming its problem', async () => {
     const answers = scripted([USER, PASSWORD]);
 
-    const code = await runLogin({ [HUB_CONFIG_ENV]: join(root, 'absent.yaml') }, { ...lines, answers });
+    const code = await runLogin({ [HUB_CONFIG_ENV]: join(root, 'absent.yaml') }, HUB_VERSION, { ...lines, answers });
 
     expect(code).toBe(1);
     expect(answers.asked).toEqual([]);
@@ -294,7 +386,7 @@ describe('runLogin', () => {
     expect(err[0]).toContain('could not be read');
   });
 
-  it('writes the keys file beside the first listed project\'s store under hub.projects', async () => {
+  it('writes the keys file in dataDir under hub.projects, beside neither listed project\'s store', async () => {
     const path = join(root, 'hub.yaml');
     writeFileSync(path, [
       'hub:',
@@ -313,11 +405,48 @@ describe('runLogin', () => {
       '',
     ].join('\n'));
 
-    const code = await runLogin({ [HUB_CONFIG_ENV]: path }, { ...lines, answers: scripted([USER, PASSWORD]) });
+    const code = await runLogin({ [HUB_CONFIG_ENV]: path }, HUB_VERSION, { ...lines, answers: scripted([USER, PASSWORD]) });
 
     expect(code).toBe(0);
-    expect(existsSync(join(root, 'first', 'rafa-hub.keys.sqlite'))).toBe(true);
+    expect(existsSync(keysFile())).toBe(true);
+    expect(existsSync(join(root, 'first', 'rafa-hub.keys.sqlite'))).toBe(false);
     expect(existsSync(join(root, 'second', 'rafa-hub.keys.sqlite'))).toBe(false);
+  });
+
+  it('opens the old place beside the first listed project\'s store alone under hub.projects, never the second\'s', async () => {
+    const path = join(root, 'hub.yaml');
+    writeFileSync(path, [
+      'hub:',
+      '  projects:',
+      `    - id: ${PROJECT_ID}`,
+      '      name: first',
+      '      repository: open-tomato/first',
+      '      storePath: first/rafa-hub.sqlite',
+      `    - id: ${'d'.repeat(40)}`,
+      '      name: second',
+      '      repository: open-tomato/second',
+      '      storePath: second/rafa-hub.sqlite',
+      '  auth:',
+      '    adapter: api-key',
+      `    apiKeys: [${BOOT_VARIABLE}]`,
+      '',
+    ].join('\n'));
+    const first = join(root, 'first', 'rafa-hub.keys.sqlite');
+    const second = join(root, 'second', 'rafa-hub.keys.sqlite');
+    await seedLogin(second, 'seeded');
+
+    expect(await runLogin({ [HUB_CONFIG_ENV]: path }, HUB_VERSION, { ...lines, answers: scripted([USER, PASSWORD]) })).toBe(0);
+    expect(err).toEqual([]);
+    expect(await holdsLogin(keysFile(), USER)).toBe(true);
+
+    rmSync(keysFile());
+    err = [];
+    await seedLogin(first, 'seeded');
+    expect(await runLogin({ [HUB_CONFIG_ENV]: path }, HUB_VERSION, { ...lines, answers: scripted([USER, PASSWORD]) })).toBe(0);
+    expect(err).toHaveLength(1);
+    expect(err[0]).toStartWith(`rafa-hub login: ${first}: the keys file is found beside hub.storePath alone`);
+    expect(await holdsLogin(first, USER)).toBe(true);
+    expect(await holdsLogin(second, USER)).toBe(false);
   });
 });
 
