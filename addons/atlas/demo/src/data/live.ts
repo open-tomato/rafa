@@ -33,7 +33,9 @@
  * `openBugsPerDay` and `defectDensity`, and `pm.minutes-per-agent` fills
  * `minutesPerAgent`. The metrics of three remaining cards fill
  * `scopeCreepPerWeek` with `scopeCreepAverage` (C1), `taskPileTree` (C3)
- * and `workDoneTree` (C4). The task cycle's points also fill
+ * and `workDoneTree` (C4), and those of the architect cards the rest of
+ * `workspace`: the composition, the rose and the Sankey with its layers
+ * (C6 to C8, `live-architecture.ts`). The task cycle's points also fill
  * `taskMinutesBins`, binned on the page (`taskMinutesBinsOf`). Their requests live in `live-sources.ts`,
  * their mappers there and, for the three cards, in `live-cards.ts`,
  * and the cell readers the files share in `live-read.ts`. A GitHub-only
@@ -49,6 +51,7 @@ import type { ChartTone, HistogramBin, LineSeries, ScatterPoint, TimePoint } fro
 
 import { AtlasRequestError, AtlasResponseInvalid, AtlasTransportError } from '@open-tomato/atlas-transport/client';
 
+import { architectureOf } from './live-architecture.js';
 import {
   boundsOf,
   columnOf,
@@ -234,7 +237,7 @@ function emptyMock(): MockData {
   };
 }
 
-/** The workspace with nothing in it: the live one lays the module graph's members and edges over it. */
+/** The workspace with nothing in it: the live one lays the module graph and the architect cards' fields over it. */
 const EMPTY_WORKSPACE: MeasuredWorkspace = {
   composition: [],
   sizeRose: [],
@@ -243,6 +246,8 @@ const EMPTY_WORKSPACE: MeasuredWorkspace = {
   edges: [],
   sankeyNodes: [],
   sankeyLinks: [],
+  layerOrder: [],
+  layerTones: {},
 };
 
 /** Every field of a result set, mock series first. */
@@ -595,13 +600,13 @@ function metaOf(field: LensField, metricId: string, answer: QueryResult | undefi
     : { metricId, rowCount, proxyNote }];
 }
 
-/** The meta of every wired field, the PoC metrics' then `live-sources.ts`'s. */
+/** The meta of every wired field, the PoC metrics' then `live-sources.ts`'s; a field two metrics fill keeps the first one's. */
 function fieldMetaOf(answers: Answers, previous: Partial<Answers>, sources: SourceAnswers, notes: ReadonlyMap<string, string>): ReadonlyMap<LensField, FieldMeta> {
   const poc = METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key].map((field) => metaOf(field, LIVE_METRICS[key], PREVIOUS_FIELDS[field] === undefined
     ? answers[key]
     : previous[key], notes)));
   const past = SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key].map((field) => metaOf(field, SOURCE_METRICS[key], sources.metrics[key], notes)));
-  return new Map([...poc, ...past]);
+  return new Map([...poc, ...past].filter(([field], index, all) => all.findIndex(([seen]) => seen === field) === index));
 }
 
 /** The fields marked not wired for one result: `NOT_WIRED` itself, or with the GitHub fields that answered no row. */
@@ -684,7 +689,11 @@ export async function liveResultOf(client: AtlasClient, range: TimeRange, signal
     weeks: seriesWeeksOf(answers.bugsByKind, 'week'),
     mock: mockOf(answers, previous, sources, definitions),
     balance: [],
-    workspace: { ...EMPTY_WORKSPACE, ...moduleGraphOf(sources.metrics.coupling) },
+    workspace: {
+      ...EMPTY_WORKSPACE,
+      ...moduleGraphOf(sources.metrics.coupling),
+      ...architectureOf(sources.metrics.composition, sources.metrics.importFlow),
+    },
   };
 }
 

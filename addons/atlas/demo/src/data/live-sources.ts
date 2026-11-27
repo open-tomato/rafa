@@ -12,9 +12,12 @@
  *   folder, grouped by the folder it sits in; `arch.coupling` fills the
  *   members and edges of `workspace`, one node per module and one edge per
  *   `@open-tomato` import of another module's package, dependency to
- *   dependent as `graph.ts` draws them. The rest of `workspace` (the
- *   package composition, the rose, the Sankey) holds nothing: no live
- *   metric measures it, and its cards read no field.
+ *   dependent as `graph.ts` draws them. `arch.composition` fills the
+ *   package composition, the rose and the sunburst of `workspace`, and
+ *   `arch.import-flow` its Sankey, its layer columns and their tones;
+ *   their mappers live in `live-architecture.ts`. All three fill the one
+ *   `workspace` field, listed once in `SOURCE_WIRED_FIELDS`, and its meta
+ *   is `arch.coupling`'s, the first of them.
  * - `dev.wip` fills `wip`, its count against the metric's `goal`, which
  *   `withAtlasTargets` lays over it from `wipLimit` (null with none).
  * - `qa.bug-outcome-by-loop-start` fills `bugOutcomeByLoopStart`: each
@@ -43,7 +46,7 @@
  *
  * Every metric but deploys, resolution, the minutes per agent, the
  * out-of-scope entries and work done is asked with no window:
- * `local.modules` has no time axis, WIP, the outcome and the task pile
+ * `local.modules` (coupling, composition, the import flow) has no time axis, WIP, the outcome and the task pile
  * read the board as of its cache (`local.issues` bounds a window by
  * `created_at`, NULL offline), and the bugs open on a day include those
  * opened before it.
@@ -84,7 +87,9 @@ export type SourceMetric =
   | 'defectDensity'
   | 'scopeCreep'
   | 'taskPile'
-  | 'workDone';
+  | 'workDone'
+  | 'composition'
+  | 'importFlow';
 
 /** The catalogue id of each metric this module runs. */
 export const SOURCE_METRICS: Readonly<Record<SourceMetric, string>> = {
@@ -100,6 +105,8 @@ export const SOURCE_METRICS: Readonly<Record<SourceMetric, string>> = {
   scopeCreep: 'pm.out-of-scope-per-week',
   taskPile: 'pm.task-pile',
   workDone: 'dev.work-done',
+  composition: 'arch.composition',
+  importFlow: 'arch.import-flow',
 };
 
 /** The field each metric fills. */
@@ -116,13 +123,15 @@ export const SOURCE_METRIC_FIELDS: Readonly<Record<SourceMetric, readonly LensFi
   scopeCreep: ['scopeCreepPerWeek', 'scopeCreepAverage'],
   taskPile: ['taskPileTree'],
   workDone: ['workDoneTree'],
+  composition: ['workspace'],
+  importFlow: ['workspace'],
 };
 
 /** The metrics run in `SOURCE_METRICS` order. */
 export const SOURCE_METRIC_KEYS: readonly SourceMetric[] = Object.keys(SOURCE_METRICS) as SourceMetric[];
 
-/** The fields a metric of this module fills. */
-export const SOURCE_WIRED_FIELDS: readonly LensField[] = SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key]);
+/** The fields a metric of this module fills, each once: three metrics fill `workspace`. */
+export const SOURCE_WIRED_FIELDS: readonly LensField[] = [...new Set(SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key]))];
 
 /** The metrics asked over the range's series window; every other one is asked with none (see the module note). */
 export const WINDOWED_SOURCE_METRICS: ReadonlySet<SourceMetric> = new Set<SourceMetric>([

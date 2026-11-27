@@ -45,7 +45,7 @@ animation, for captures). No capture sets `source=live`.
 | Folder | Holds |
 |---|---|
 | `src/App.tsx` | the shell: lens tabs, the `RangeSelector`, the theme button, over one `DashboardData` |
-| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one, with the phase-4 metrics' mappers in `live-sources.ts` and the cell readers both share in `live-read.ts` |
+| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one, with the phase-4 metrics' mappers in `live-sources.ts`, the architect cards' in `live-architecture.ts`, and the cell readers both share in `live-read.ts` |
 | `src/lenses/` | one file per lens and the `balance/` card; every card is a `LensCard` (a `DashboardCard` with the fields it `reads`) with a `CardSpec` and a `select` |
 | `src/templates/` | `LensGrid`: the tile row and the card grid |
 
@@ -78,8 +78,12 @@ edges of `workspace`, the network graph), WIP against the project's
 (`bugOutcomeByLoopStart`, each bug a loop filed counted on the day its
 plan's first session started) and open bugs per day (`openBugsPerDay`),
 with the resolution time by priority (`resolutionByPriority`). The
-package composition, the rose and the import flow stay the mock page's
-(`composition.ts`, `graph.ts`). The open bugs and the resolution time
+rest of `workspace` comes from `arch.composition` and `arch.import-flow`
+(`live-architecture.ts`): the package composition, the rose (folders of
+1,000 lines or more), the sunburst, and the import flow with its layer
+columns (`layerOrder`, `unassigned` last) and their tones (`layerTones`),
+each upward import marked `upward`. Their three cards name no `reads`
+yet, so the live page still shows them "Not wired yet". The open bugs and the resolution time
 are GitHub-only: when their metric answers no row, the replica was built
 without `--github`, and the card shows "Not wired yet" with the build
 line `rafa module exec @open-tomato/rafa-atlas build --github` (the

@@ -4,7 +4,9 @@
  * source (.ts/.tsx/.js/.css/.html), tests (*.test.ts and tests/ folders),
  * docs (markdown and docs/), config (json, toml, yaml, mjs and the rest) and
  * fixtures (fixtures/, snapshots, stubs). `deps` counts external runtime
- * dependencies declared by the package itself (most are hoisted to the root).
+ * dependencies declared by the package itself (most are hoisted to the root);
+ * a live row (`live-architecture.ts`) holds null, as the module scan counts
+ * none.
  */
 import type { ChartTone, RoseSlice, SunburstNode } from '@open-tomato/charts';
 
@@ -17,7 +19,7 @@ export interface PackageComposition {
   docs: number;
   config: number;
   fixtures: number;
-  deps: number;
+  deps: number | null;
 }
 
 export const PACKAGE_COMPOSITION: PackageComposition[] = [

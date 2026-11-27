@@ -33,6 +33,9 @@ const P90_AVERAGE = 58;
 /** How many rows the import-flow and module-import source tables show. */
 const SANKEY_TABLE_LIMIT = 16;
 
+/** The external deps cell of a live composition row: the module scan counts none. */
+const NOT_COUNTED = 'not counted';
+
 const GRAPH_SOURCE = 'The workspace members and their dependencies, read from each package.json on 2026-11-02 (src/data/graph.ts).';
 
 function gradeOf(debtRatio: number): string {
@@ -397,7 +400,7 @@ export function ArchitectLens(): ReactElement {
             select={(result: LensResult) => result.workspace}
             info={COMPOSITION_INFO}
             legend={COMPONENT_LEGEND}
-            table={(workspace) => ({ columns: ['Package', 'Source', 'Tests', 'Docs', 'Config', 'Fixtures', 'External deps'], rows: workspace.composition.map((pkg) => [pkg.id.replace(/^rafa-/, ''), formatCompact(pkg.source), formatCompact(pkg.tests), formatCompact(pkg.docs), formatCompact(pkg.config), formatCompact(pkg.fixtures), pkg.deps]) })}
+            table={(workspace) => ({ columns: ['Package', 'Source', 'Tests', 'Docs', 'Config', 'Fixtures', 'External deps'], rows: workspace.composition.map((pkg) => [pkg.id.replace(/^rafa-/, ''), formatCompact(pkg.source), formatCompact(pkg.tests), formatCompact(pkg.docs), formatCompact(pkg.config), formatCompact(pkg.fixtures), pkg.deps ?? NOT_COUNTED]) })}
           >
             {({ data: workspace, animate, height }) => (
               <Sunburst ariaLabel="Package composition as a sunburst: packages on the inner ring, their parts on the outer ring" nodes={workspace.compositionSunburst} groupTones={COMPOSITION_TONES} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(320, height)} />

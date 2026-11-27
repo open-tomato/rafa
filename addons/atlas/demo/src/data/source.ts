@@ -6,19 +6,22 @@
  * the same in every range.
  */
 import type { PageSource } from '../url.js';
+import type { FlowLink } from './graph.js';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
-import type { GraphLink, GraphNode, RoseSlice, SunburstNode } from '@open-tomato/charts';
+import type { ChartTone, GraphLink, GraphNode, RoseSlice, SunburstNode } from '@open-tomato/charts';
 
 import { BALANCE_CATALOGUE, type BalanceIndex } from './balance.js';
 import { COMPOSITION_SUNBURST, PACKAGE_COMPOSITION, SIZE_ROSE, type PackageComposition } from './composition.js';
-import { SANKEY_LINKS, SANKEY_NODES, WORKSPACE_LINKS, WORKSPACE_NODES } from './graph.js';
+import { LAYER_ORDER, LAYER_TONES, SANKEY_LINKS, SANKEY_NODES, WORKSPACE_LINKS, WORKSPACE_NODES } from './graph.js';
 import { buildMock, MOCK_SEEDS, WEEK_DATES, type MockData, type MockSeeds } from './mock.js';
 import { between, seeded } from './random.js';
 
 /**
  * The workspace: package composition and the import graph. The mock's is
  * measured on 2026-11-02 (`composition.ts`, `graph.ts`); the live one holds
- * only `members` and `edges`, the module graph `arch.coupling` answers.
+ * the module graph `arch.coupling` answers in `members` and `edges`, and
+ * the composition, the rose, the Sankey and the layers `arch.composition`
+ * and `arch.import-flow` answer (`live-architecture.ts`).
  */
 export interface MeasuredWorkspace {
   readonly composition: readonly PackageComposition[];
@@ -27,7 +30,11 @@ export interface MeasuredWorkspace {
   readonly members: readonly GraphNode[];
   readonly edges: readonly GraphLink[];
   readonly sankeyNodes: readonly GraphNode[];
-  readonly sankeyLinks: readonly GraphLink[];
+  readonly sankeyLinks: readonly FlowLink[];
+  /** The Sankey's columns, left to right: the layers in rank order. */
+  readonly layerOrder: readonly string[];
+  /** The tone of each layer of `layerOrder`, the key every slice's and node's group names. */
+  readonly layerTones: Readonly<Record<string, ChartTone>>;
 }
 
 /** One field of a result set a card reads: a mock series, the balance indices or the measured workspace. */
@@ -110,6 +117,8 @@ const WORKSPACE: MeasuredWorkspace = {
   edges: WORKSPACE_LINKS,
   sankeyNodes: SANKEY_NODES,
   sankeyLinks: SANKEY_LINKS,
+  layerOrder: LAYER_ORDER,
+  layerTones: LAYER_TONES,
 };
 
 /** The seeds one range draws with. */

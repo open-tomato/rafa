@@ -13,7 +13,7 @@
 import type { SourceMetric } from './live-sources.js';
 import type { LiveMetric } from './live.js';
 import type { MockData } from './mock.js';
-import type { LensResult } from './source.js';
+import type { LensField, LensResult } from './source.js';
 import type { StubCall } from './testdata/live-client.fixture.js';
 import type { QueryResult } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
@@ -128,6 +128,8 @@ describe('liveResultOf over a stub client: the requests', () => {
       { id: 'pm.out-of-scope-per-week', window: { last: '28d' } },
       { id: 'pm.task-pile', window: undefined },
       { id: 'dev.work-done', window: { last: '28d' } },
+      { id: 'arch.composition', window: undefined },
+      { id: 'arch.import-flow', window: undefined },
       { id: 'pm.tokens-per-day', window: previous },
       { id: 'arch.debt-ratio', window: previous },
     ]);
@@ -458,15 +460,38 @@ describe('liveResultOf over a stub client: the phase-4 fields', () => {
 
   it('gives each phase-4 field its metric and row count, a proxy\'s note on the module fields', async () => {
     const { result } = await liveResult();
+    const firstOf = (field: LensField): SourceMetric | undefined => (Object.keys(SOURCE_METRICS) as SourceMetric[])
+      .find((key) => SOURCE_METRIC_FIELDS[key].includes(field));
 
-    for (const key of Object.keys(SOURCE_METRICS) as SourceMetric[]) {
-      for (const field of SOURCE_METRIC_FIELDS[key]) {
-        expect({ field, metricId: result.fieldMeta.get(field)?.metricId, rowCount: result.fieldMeta.get(field)?.rowCount })
-          .toEqual({ field, metricId: SOURCE_METRICS[key], rowCount: STUB_SOURCE_ANSWERS[key].meta.rowCount });
-      }
+    for (const field of SOURCE_WIRED_FIELDS) {
+      const key = firstOf(field) ?? 'coupling';
+      expect({ field, metricId: result.fieldMeta.get(field)?.metricId, rowCount: result.fieldMeta.get(field)?.rowCount })
+        .toEqual({ field, metricId: SOURCE_METRICS[key], rowCount: STUB_SOURCE_ANSWERS[key].meta.rowCount });
     }
     expect(result.fieldMeta.get('modules')?.proxyNote).toBe(stubNoteOf('arch.loc-per-module'));
     expect(result.fieldMeta.get('wip')?.proxyNote).toBeUndefined();
+  });
+
+  it('keeps arch.coupling\'s meta on the workspace, which the composition and the import flow fill too', async () => {
+    const { result } = await liveResult();
+
+    expect(SOURCE_METRIC_FIELDS.composition).toEqual(['workspace']);
+    expect(SOURCE_METRIC_FIELDS.importFlow).toEqual(['workspace']);
+    expect(SOURCE_WIRED_FIELDS.filter((field) => field === 'workspace')).toHaveLength(1);
+    expect(result.fieldMeta.get('workspace')).toEqual({ metricId: 'arch.coupling', rowCount: 3, proxyNote: stubNoteOf('arch.coupling') });
+  });
+
+  it('lays the architect cards\' fields into the workspace: the rose, the sunburst, the Sankey and its layers', async () => {
+    const { result } = await liveResult();
+
+    expect(result.workspace.sizeRose.map((slice) => slice.id)).toEqual(['packages/stub-core', 'packages/stub-loose']);
+    expect(result.workspace.compositionSunburst.map((node) => node.id)).toEqual(['packages/stub-core', 'packages/stub-loose', 'addons/stub-addon', 'packages/stub-lint']);
+    expect(result.workspace.composition.map((row) => row.id)).toEqual(['packages/stub-core', 'packages/stub-loose', 'addons/stub-addon', 'packages/stub-lint']);
+    expect(result.workspace.layerOrder).toEqual(['core', 'addon', 'unassigned']);
+    expect(Object.keys(result.workspace.layerTones)).toEqual(['config', 'core', 'addon', 'unassigned']);
+    expect(result.workspace.sankeyLinks.filter((link) => link.upward === true)).toEqual([
+      { source: '@open-tomato/stub-addon', target: '@open-tomato/stub-low', value: 1, upward: true },
+    ]);
   });
 });
 
@@ -535,8 +560,6 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
     expect(result.notWired.size + WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
     expect(result.notWiredDetail.size).toBe(0);
     expect(result.balance).toEqual([]);
-    expect(result.workspace.composition).toEqual([]);
-    expect(result.workspace.sankeyNodes).toEqual([]);
   });
 
   it('names the series window\'s weeks, one per entry of the weekly fields that hold no dates', async () => {

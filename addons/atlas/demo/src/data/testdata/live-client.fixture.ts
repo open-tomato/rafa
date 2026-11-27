@@ -193,6 +193,39 @@ export const STUB_WORK_DONE: QueryResult = resultOf(['level', 'area', 'entries']
   ['none', 'board', 1],
 ]);
 
+/**
+ * The five kinds of lines per module folder, in the layers config (rank 0),
+ * core (1) and addon (2): the core folder over 1,000 lines with no fixture
+ * line, the addon one under 1,000, a folder no layer lists, and one with
+ * no line at all.
+ */
+export const STUB_COMPOSITION: QueryResult = resultOf(
+  ['path', 'package', 'layer', 'layer_rank', 'loc', 'test_loc', 'docs_loc', 'config_loc', 'fixtures_loc'],
+  [
+    ['addons/stub-addon', '@open-tomato/stub-addon', 'addon', 2, 300, 200, 0, 40, 10],
+    ['packages/stub-core', '@open-tomato/stub-core', 'core', 1, 1_200, 600, 50, 100, 0],
+    ['packages/stub-empty', null, 'core', 1, 0, 0, 0, 0, 0],
+    ['packages/stub-loose', null, null, null, 900, 300, 0, 0, 0],
+    ['packages/stub-lint', '@open-tomato/eslint-config', 'config', 0, 0, 20, 0, 400, 0],
+  ],
+  { from: null, to: null },
+);
+
+/**
+ * Each module folder's layer and imports, in the layers of
+ * `STUB_COMPOSITION`: the addon imports the core one, a core folder
+ * imports the addon (an upward import), the folder no layer lists imports
+ * the core one, and the lint config package, which every folder imports,
+ * draws nothing.
+ */
+export const STUB_IMPORT_FLOW: QueryResult = resultOf(['path', 'package', 'layer', 'layer_rank', 'imports_json'], [
+  ['addons/stub-addon', '@open-tomato/stub-addon', 'addon', 2, '["@open-tomato/stub-core","@open-tomato/eslint-config"]'],
+  ['packages/stub-core', '@open-tomato/stub-core', 'core', 1, '["@open-tomato/eslint-config"]'],
+  ['packages/stub-low', '@open-tomato/stub-low', 'core', 1, '["@open-tomato/stub-addon"]'],
+  ['packages/stub-loose', null, null, null, '["@open-tomato/stub-core","@open-tomato/stub-outside"]'],
+  ['packages/stub-lint', '@open-tomato/eslint-config', 'config', 0, '[]'],
+], { from: null, to: null });
+
 /** The answer of each metric of `live-sources.ts`. */
 export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = {
   deploysPerWeek: STUB_DEPLOYS,
@@ -207,6 +240,8 @@ export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = 
   scopeCreep: STUB_SCOPE_CREEP,
   taskPile: STUB_TASK_PILE,
   workDone: STUB_WORK_DONE,
+  composition: STUB_COMPOSITION,
+  importFlow: STUB_IMPORT_FLOW,
 };
 
 /** The metrics the stub lists as GitHub-only, as the catalogue does. */
