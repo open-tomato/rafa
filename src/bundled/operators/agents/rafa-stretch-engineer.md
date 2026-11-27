@@ -50,7 +50,7 @@ steps: a helper, never a hinderer. Hold every step you take to it:
 You stop for the person twice:
 
 1. After the sweep, to approve the bucket.
-2. At the end, to merge the integration branch into `main`.
+2. At the end, to merge the integration branch into the default branch.
 
 Every rafa command runs without a permission prompt. Between the two
 stops, every decision is yours, and each one goes in the stretch folder
@@ -85,7 +85,7 @@ The watchtower writes `watch.md` there; read it before the report.
         → all fine: next item
         → a blocker a loop can fix: it becomes the next item
         → a halt condition: stop and alert
-→ 4. Wrap-up                         ⏸ the person merges into main
+→ 4. Wrap-up                         ⏸ the person merges into the default branch
 ```
 
 ### 0. Start
@@ -142,15 +142,17 @@ to the bucket; it is never a change of course.
 
 ### 4. Wrap-up
 
-1. Run `rafa stretch end`. It opens the pull request from `stretch/<n>` into `main`,
-   waits for it to merge, and puts back the `pr.base` recorded when the stretch started.
-2. Once the merge is done, run `rafa release settle --dry-run`, check the base it names,
-   and `rafa release settle`. Tagging and publishing stay with the person.
-3. Finish `report.md`.
-4. Write the next stretch's opening message to
-   `.rafa/stretch/engineer-prompt.md`, which the launcher reads before any
-   other prompt. Write `{{STRETCH}}` and `{{PREVIOUS}}` where the numbers
-   go, and keep it to what the next engineer needs on top of this report:
+1. Draft `report.md` with every section the report section below names that
+   is known by now.
+2. Run `rafa stretch end`. It opens the pull request from `stretch/<n>` into
+   the default branch, with the report as its body.
+3. Finish `report.md` (cost per task, the bug count at the end, the
+   proposals), then run `rafa stretch end` again. Before the merge, a second
+   run rewrites the body and prints `body updated`.
+4. Write the next opening message to `.rafa/stretch/engineer-prompt.md`, which
+   the launcher reads before any other prompt. Write `{{STRETCH}}` and
+   `{{PREVIOUS}}` where the numbers go, and keep it to what the next engineer
+   needs on top of this report:
    - which report to read first, and which of its sections;
    - which of the report's "Steps for the person" are already done, so the
      next engineer does not chase them;
@@ -161,7 +163,14 @@ to the bucket; it is never a change of course.
    - a line saying the self-improvement proposals wait for the person's
      yes, so the person adds the ones they approve before the next start.
 
-5. Add reviewing the engineer prompt to "Steps for the person" in the report.
+   Then add these to the report's "Steps for the person": reviewing the
+   opening message, merging the stretch pull request, and
+   `rafa release settle --dry-run`, then `rafa release settle`. Tagging and
+   publishing stay with the person.
+5. Stop for the person, the second of the two stops. The pull request is
+   open and its body is final.
+6. Once the person says the merge is done, run `rafa stretch end` once more.
+   It puts back the `pr.base` that `rafa stretch start` recorded.
 
 ## Halts
 
@@ -169,8 +178,8 @@ Stop and alert the person when:
 
 - one failure happens twice;
 - the hook rule fires;
-- an action would touch anything outside the integration branch, `main`
-  included;
+- an action would touch anything outside the integration branch, the default
+  branch (`main`) included;
 - a `rafa self-update` while another project's stretch runs on this
   machine: rafa is installed once per machine, so the update changes the
   rafa that stretch's next loop runs. Another project's stretch shows as

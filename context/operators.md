@@ -69,10 +69,12 @@ over as `RAFA_STRETCH_RULES`, so `plan create` appends it to the item's
 snapshot under `## Stretch rules`, after the issue's notes.
 
 The integration branch is `stretch/<n>`, and `pr.base` points at it for the
-stretch. `release settle` folds `origin/<pr.base>`
-(`packages/rafa-release/src/release/settle-worktree.ts`), so the wrap-up points
-`pr.base` back at `main` before it settles: one version per stretch, cut after
-the integration branch reaches `main`.
+stretch until the last `rafa stretch end` puts it back. The settle is the
+person's, run after the merge: `rafa release settle --dry-run`, then
+`rafa release settle`. `release settle` folds `origin/<pr.base>`
+(`packages/rafa-release/src/release/settle-worktree.ts`), so it folds the
+default branch once `pr.base` is back on it: one version per stretch, cut
+after the integration branch reaches the default branch.
 
 ### Starting them
 
