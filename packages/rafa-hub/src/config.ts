@@ -97,7 +97,15 @@
  *     data directory, SQLite library and models) live in the install
  *     record that command writes, read before this file, and the two
  *     key sets never overlap. Under `hub` it is refused once, by that
- *     problem, and not again as an unknown key.
+ *     problem, and not again as an unknown key; at the top level
+ *     `config-top-level.ts` refuses it, with the same sentence.
+ *   - The top level holds only `hub` and `dangerous`, and `dangerous`
+ *     only `hub`, and a function value is refused at any depth: both
+ *     rules are `config-top-level.ts`'s (whose TSDoc holds their
+ *     readings), run by {@link readHubDocument} on every document before
+ *     the keys above are read, so a `.yaml` file and a `.ts` module are
+ *     judged alike. Their problems come first, then the readers' in the
+ *     order above.
  */
 import type { HubDangerousConfig } from './config-dangerous.js';
 import type { HubLoginConfig } from './config-login.js';
@@ -109,6 +117,7 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { readDangerousConfig } from './config-dangerous.js';
 import { readLoginConfig } from './config-login.js';
 import { readIndexConfig, readStoreConfig } from './config-store.js';
+import { INSTALL_KEY, installRefusal, readFunctionValues, readTopLevel } from './config-top-level.js';
 
 /** The environment variable naming the hub's config file. */
 export const HUB_CONFIG_ENV = 'RAFA_HUB_CONFIG';
@@ -523,21 +532,16 @@ function readApiKeys(path: string, adapter: HubAuthAdapter | undefined, raw: unk
     : { value: Object.freeze([...raw] as string[]), problems: [] };
 }
 
-/** The key an install record holds, refused in the operator's config file at the top level and under `hub`. */
-const INSTALL_KEY = 'install';
-
 /**
- * One problem for each `install` key written at the top level of the
- * file or under `hub`: the install's values live in the install record
- * `rafa-hub install` writes, so the two key sets never overlap.
+ * The problem of an `install` key written under `hub`: the install's
+ * values live in the install record `rafa-hub install` writes, so the
+ * two key sets never overlap. `config-top-level.ts` refuses the one at
+ * the top level with the same sentence.
  */
-function installKeys(path: string, sections: Readonly<Record<string, unknown>>, hub: Readonly<Record<string, unknown>>): string[] {
-  return [
-    { key: INSTALL_KEY, holder: sections },
-    { key: `hub.${INSTALL_KEY}`, holder: hub },
-  ]
-    .filter(({ holder }) => Object.hasOwn(holder, INSTALL_KEY))
-    .map(({ key }) => `${path}: ${key} is not a key of the hub's config; expected the install's values in the install record, written by rafa-hub install`);
+function installKeys(path: string, hub: Readonly<Record<string, unknown>>): string[] {
+  return Object.hasOwn(hub, INSTALL_KEY)
+    ? [installRefusal(path, `hub.${INSTALL_KEY}`)]
+    : [];
 }
 
 /** `hub` without its `install` key, which {@link installKeys} refuses on its own. */
@@ -566,9 +570,8 @@ function section(path: string, name: string, raw: unknown, known: readonly strin
 
 /**
  * The {@link HubConfig} the YAML `text` read from `path` names, frozen,
- * or a {@link HubConfigError} holding every problem found. `path` opens
- * each refusal and is the directory a relative `hub.storePath` is
- * resolved against, so it should be absolute.
+ * or a {@link HubConfigError} holding every problem found, as
+ * {@link readHubDocument} reads the document the text parses to.
  */
 export function parseHubConfig(text: string, path: string): HubConfig {
   let document: unknown;
@@ -580,14 +583,30 @@ export function parseHubConfig(text: string, path: string): HubConfig {
       : String(error);
     throw new HubConfigError([`${path}: not valid YAML: ${reason}`]);
   }
+  return readHubDocument(document, path);
+}
 
-  const sections: Readonly<Record<string, unknown>> = isMapping(document)
-    ? document
-    : {};
+/**
+ * The {@link HubConfig} the parsed `document` read from `path` names,
+ * frozen, or a {@link HubConfigError} holding every problem found: a
+ * parsed YAML file or a loaded `.ts` module's default export. The top
+ * level and every function value are judged first, by
+ * `config-top-level.ts`; a reader's problem at a key holding a function
+ * gives way to the function's own. `path` opens each refusal and is the
+ * directory a relative `hub.storePath` is resolved against, so it
+ * should be absolute.
+ */
+export function readHubDocument(document: unknown, path: string): HubConfig {
+  const topLevel = readTopLevel(path, document);
+  const functions = readFunctionValues(path, topLevel.sections);
+  const shadowed = (problem: string): boolean => functions.keys.some((key) => problem.startsWith(`${path}: ${key} `));
+  const refuse = (problems: readonly string[]): never => {
+    throw new HubConfigError([...topLevel.problems, ...functions.problems, ...problems.filter((problem) => !shadowed(problem))]);
+  };
+
+  const sections = functions.document as Readonly<Record<string, unknown>>;
   const hub = sections['hub'];
-  if (!isMapping(hub)) {
-    throw new HubConfigError([`${path}: hub is ${describeValue(hub)}, expected a mapping holding hub.repository`]);
-  }
+  if (!isMapping(hub)) return refuse([`${path}: hub is ${describeValue(hub)}, expected a mapping holding hub.repository`]);
 
   const auth = section(path, 'auth', hub['auth'], AUTH_KEYS);
   const store = readStoreConfig(path, hub['store']);
@@ -607,7 +626,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
   const cacheFor = readCacheFor(path, auth.value?.['cacheFor']);
 
   const problems = [
-    ...installKeys(path, sections, hub),
+    ...installKeys(path, hub),
     ...unknownKeys(path, 'hub', withoutInstall(hub), HUB_KEYS),
     ...repository.problems,
     ...port.problems,
@@ -622,7 +641,7 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     ...index.problems,
     ...dangerous.problems,
   ];
-  if (problems.length > 0) throw new HubConfigError(problems);
+  if (problems.length > 0 || topLevel.problems.length > 0 || functions.problems.length > 0) refuse(problems);
 
   const served = projects?.value ?? defaultProject(repository.value as string, storePath.value as string);
   const [first] = served as readonly [HubProject, ...HubProject[]];

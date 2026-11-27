@@ -5888,7 +5888,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 50,
+        "test": 51,
         "testSupport": 9
       },
       "files": [
@@ -5899,6 +5899,7 @@
         "packages/rafa-hub/src/config-dangerous.test.ts",
         "packages/rafa-hub/src/config-login.test.ts",
         "packages/rafa-hub/src/config-store.test.ts",
+        "packages/rafa-hub/src/config-top-level.test.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
         "packages/rafa-hub/src/contract-skew.integration.test.ts",
