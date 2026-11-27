@@ -5661,8 +5661,8 @@
         }
       ],
       "fileCounts": {
-        "source": 56,
-        "test": 50,
+        "source": 57,
+        "test": 51,
         "testSupport": 0
       },
       "files": [
@@ -5723,6 +5723,8 @@
         "packages/rafa-release/src/release/level.ts",
         "packages/rafa-release/src/release/package-base-version.test.ts",
         "packages/rafa-release/src/release/package-base-version.ts",
+        "packages/rafa-release/src/release/package-fragments.test.ts",
+        "packages/rafa-release/src/release/package-fragments.ts",
         "packages/rafa-release/src/release/prepare.test.ts",
         "packages/rafa-release/src/release/prepare.ts",
         "packages/rafa-release/src/release/receipt.test.ts",
@@ -5774,7 +5776,7 @@
         "src/release/fold-spawned.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-release/": 92,
+        "packages/rafa-release/": 94,
         "src/commands/release/": 3,
         "src/release/": 1
       },
