@@ -309,8 +309,8 @@ finding the ticked pre-wrap-up repair on the tracker, writes its blocker
 on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
-`.github/workflows/verify.yml` runs two jobs under two triggers, each
-with three gates. **Triggers:** pull requests into `main`, `integration`
+`.github/workflows/verify.yml` runs four jobs under two triggers; each
+ring runs three gates. **Triggers:** pull requests into `main`, `integration`
 or `stretch/**`, and pushes to `stretch/**`. **Gates** (each step runs
 unless the job was cancelled): ring 0's job `verify` runs `bun test`,
 `bunx eslint .`, and
@@ -332,11 +332,20 @@ root `AGENTS.md`, which is capped at 80 lines, so a session that runs turbo
 reads `git status` afterwards and finds no such block. Measured on turbo
 2.11.8: a dry run under `CLAUDECODE` and `AI_AGENT` left `git status` empty
 and `AGENTS.md` at 80 lines. `src/tests/turbo-config.sweep.test.ts` holds the
-key. **Two cases for
+key. The job `atlas` runs each publishable Atlas library's gates from its
+folder. The job `hub-image` builds `packages/rafa-hub/Dockerfile` with the
+Bun of `packageManager`, starts an `api-key` hub over a named volume, and
+checks `/health` answers 200 within the image's start period, the
+`store.opened` line's `sqliteVec.loaded`, the keys file and the install
+record's `dataDir` and `bun`. On a pull request its first step lists the
+changed files, and the rest run only when one lies under its `HUB_PATHS`,
+which `packages/rafa-hub/src/image.test.ts` holds to the hub's workspace
+closure; on a push every step runs. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
-`integration` reports the `verify` and `affected` checks (merge with
-`rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports
-the same two and the `fragment` check (merge with `rafa pr merge <n>`, which
+`integration` reports the `verify`, `affected` and `hub-image` checks
+(merge with `rafa pr wait <n>` then `rafa pr merge <n>`); a pull request
+into `stretch/**` reports the same three and the `fragment` check (merge
+with `rafa pr merge <n>`, which
 `rafa stretch item --wait` runs once they pass; `--skip-checks` is refused
 there). So an item's red shows on its pull request, before the merge into
 the stretch branch, and each item merge waits for one hosted run. One more

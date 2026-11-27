@@ -146,3 +146,163 @@ jobs:
       - name: Stories
         if: ${{ !cancelled() }}
         run: bun run check:stories
+
+  hub-image:
+    # The hub's image, built and started as an operator would: a plain
+    # `docker build` of packages/rafa-hub/Dockerfile, no new action.
+    # GitHub's `paths:` filter is workflow-wide, so the first step lists
+    # the pull request's changed files and every later step runs only when
+    # one lies under HUB_PATHS: the files the image is built from and every
+    # folder of the hub's workspace closure, core by the folders the hub's
+    # imports reach. `packages/rafa-hub/src/image.test.ts` holds the list to
+    # that closure. On a push to `stretch/**` every step runs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUB_IMAGE: rafa-hub-ci
+      HUB_CONTAINER: rafa-hub-ci
+      HUB_VOLUME: rafa-hub-ci-data
+      HUB_PORT: '7373'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Changed paths
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          HUB_PATHS: |
+            .dockerignore
+            .github/workflows/verify.yml
+            bun.lock
+            package.json
+            tsconfig.packages.json
+            packages/rafa-hub/
+            packages/rafa-hub-port/
+            packages/rafa-hub-postgres/
+            packages/rafa-index/
+            packages/rafa/package.json
+            packages/rafa/src/core/
+            packages/rafa/src/effort/session-log-path.ts
+            packages/rafa/src/effort/store/
+            packages/rafa/src/schema/
+            packages/rafa/src/utils/
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "A $EVENT event: the image is built unfiltered."
+            echo 'hub=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A path ending in / names its folder, any other path one file.
+          matches() {
+            local path
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              if [ "$1" = "$path" ] || { [ "${path%/}" != "$path" ] && [ "${1#"$path"}" != "$1" ]; }; then
+                return 0
+              fi
+            done <<< "$HUB_PATHS"
+            return 1
+          }
+          hub=false
+          while IFS= read -r file; do
+            if [ -n "$file" ] && matches "$file"; then
+              echo "Reaches the image: $file"
+              hub=true
+            fi
+          done < <(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD")
+          if [ "$hub" = false ]; then
+            echo 'No changed file reaches the image: the later steps are skipped.'
+          fi
+          echo "hub=$hub" >> "$GITHUB_OUTPUT"
+
+      - name: Bun version
+        id: bun
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          manager=$(jq -r '.packageManager // empty' package.json)
+          case "$manager" in
+            bun@*) ;;
+            *) echo "package.json names packageManager '$manager', not bun@<version>"; exit 1 ;;
+          esac
+          echo "version=${manager#bun@}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        if: steps.paths.outputs.hub == 'true'
+        env:
+          BUN_VERSION: ${{ steps.bun.outputs.version }}
+        run: docker build -f packages/rafa-hub/Dockerfile --build-arg BUN_VERSION="$BUN_VERSION" -t "$HUB_IMAGE" .
+
+      - name: Config
+        # The volume is new, so its first mount copies the image's /data,
+        # owned by `bun`, and the config is written as that user.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          printf '%s\n' \
+            'hub:' \
+            '  repository: open-tomato/rafa' \
+            '  auth:' \
+            '    adapter: api-key' \
+            '    apiKeys: [RAFA_HUB_KEY]' \
+            | docker run --rm -i -v "$HUB_VOLUME:/data" "$HUB_IMAGE" sh -c 'cat > /data/rafa-hub.yaml'
+
+      - name: Start
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          RAFA_HUB_KEY=$(openssl rand -hex 32)
+          export RAFA_HUB_KEY
+          docker run -d --name "$HUB_CONTAINER" -p "127.0.0.1:$HUB_PORT:7373" -e RAFA_HUB_KEY -v "$HUB_VOLUME:/data" "$HUB_IMAGE"
+
+      - name: Health
+        # The image's HEALTHCHECK start period, read from the image, bounds
+        # the wait for /health to answer 200.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          period=$(docker image inspect -f '{{json .Config.Healthcheck.StartPeriod}}' "$HUB_IMAGE")
+          deadline=$(( $(date +%s) + period / 1000000000 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$HUB_PORT/health" || true)
+            if [ "$status" = 200 ]; then
+              echo "/health answered 200."
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "/health did not answer 200 within the $(( period / 1000000000 ))s start period (last: ${status:-none})."
+          exit 1
+
+      - name: Start line
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          line=$(docker logs "$HUB_CONTAINER" 2>/dev/null | jq -c -n -R '[inputs | fromjson? | select(.event == "store.opened")] | .[0] // empty')
+          echo "${line:-no store.opened line}"
+          [ -n "$line" ] || exit 1
+          if [ "$(jq -r '.sqliteVec.loaded' <<< "$line")" != true ]; then
+            echo "sqlite-vec did not load: $(jq -r '.sqliteVec.why' <<< "$line")"
+            exit 1
+          fi
+
+      - name: Keys file
+        if: steps.paths.outputs.hub == 'true'
+        run: docker exec "$HUB_CONTAINER" test -f /data/rafa-hub.keys.sqlite
+
+      - name: Install record
+        if: steps.paths.outputs.hub == 'true'
+        env:
+          BUN_VERSION: ${{ steps.bun.outputs.version }}
+        run: |
+          record=$(docker exec "$HUB_CONTAINER" cat /data/rafa-hub.install.json)
+          echo "$record"
+          jq -e --arg bun "$BUN_VERSION" '.dataDir == "/data" and .bun == $bun' <<< "$record" > /dev/null
+
+      - name: Logs
+        if: ${{ !cancelled() && steps.paths.outputs.hub == 'true' }}
+        run: docker logs "$HUB_CONTAINER" || true
+
+      - name: Clean up
+        if: ${{ always() && steps.paths.outputs.hub == 'true' }}
+        run: |
+          docker rm -f "$HUB_CONTAINER" || true
+          docker volume rm "$HUB_VOLUME" || true
