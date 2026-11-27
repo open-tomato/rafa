@@ -12,8 +12,8 @@
  *
  * ## What this file imports
  *
- * Types from `@open-tomato/rafa/core/command`, and the subject and the
- * type and priority lists from `declarations-shared.ts`, never from
+ * Types from `@open-tomato/rafa/core/command`, and the subject, the
+ * type, record type and priority lists from `declarations-shared.ts`, never from
  * `declarations.ts`, which re-exports this file: importing back would
  * close a cycle. No module under `src/` is reached either way, which
  * `declarations.test.ts` reads off this file's source.
@@ -25,7 +25,7 @@
  */
 import type { CommandDeclaration } from '@open-tomato/rafa/core/command';
 
-import { ISSUE_PRIORITY_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS, issueUpstreamFlagSpec } from './declarations-shared.js';
+import { ISSUE_PRIORITY_WORDS, ISSUE_RECORD_TYPES, ISSUE_SUBJECT, ISSUE_TYPE_WORDS, issueUpstreamFlagSpec } from './declarations-shared.js';
 
 /** The module an issue filed with no `--module` belongs to: a copy of `TRIAGE_MODULE`; see the module note. */
 export const ISSUE_TRIAGE_MODULE = 'unassigned';
@@ -41,9 +41,9 @@ export const ISSUE_CREATE_DECLARATION: CommandDeclaration = Object.freeze<Comman
   summary: 'create an issue on the tracker from a title and a body, a bug from its fields',
   description: 'Files one issue on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
     + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
-    + ' `--title` is required for every type but `bug`. The issue is of type `code` and module `unassigned` unless'
+    + ' `--title` is required for every type but `bug` and `debt`. The issue is of type `code` and module `unassigned` unless'
     + ' `--type` and `--module` say otherwise, and with no `--priority` the tracker marks it needs-triage. A'
-    + ' `--type=bug` line is filed from its fields: `--module`, `--action`, `--summary`, `--cause` and'
+    + ' `--type=bug` or `--type=debt` line is filed as a bug record from its fields: `--module`, `--action`, `--summary`, `--cause` and'
     + ' `--reproduce`, each also read from a section of the body, with rafa filling the versions and the place,'
     + ' rendering the title through `issues.titles.bug` and refusing a record missing a field, naming each. The body is'
     + ' `--body`, or what the file `--body-file` names holds, standard input for `-`. A spec whose body'
@@ -57,7 +57,7 @@ export const ISSUE_CREATE_DECLARATION: CommandDeclaration = Object.freeze<Comman
   flags: [
     {
       name: 'title',
-      description: 'The title of the issue. Required for every type but bug, whose title is rendered from its fields.',
+      description: 'The title of the issue. Required for every type but bug and debt, whose title is rendered from its fields.',
       type: 'string',
     },
     {
@@ -72,7 +72,9 @@ export const ISSUE_CREATE_DECLARATION: CommandDeclaration = Object.freeze<Comman
     },
     {
       name: 'type',
-      description: `What the issue is for: one of ${ISSUE_TYPE_WORDS.join(', ')}.`,
+      description: `What the issue is for: one of ${ISSUE_TYPE_WORDS.join(', ')}. ${ISSUE_RECORD_TYPES.join(' and ')} are`
+        + ' bug records, filed from their fields: bug when the gap makes something break, debt when it only leaves a step'
+        + ' done by hand.',
       type: 'string',
       default: DEFAULT_ISSUE_TYPE,
     },
@@ -138,7 +140,7 @@ export const ISSUE_CREATE_DECLARATION: CommandDeclaration = Object.freeze<Comman
       description: 'Print the title and the body the line would file, resolve no tracker and file nothing.',
       type: 'boolean',
     },
-    issueUpstreamFlagSpec('File the issue, a bug only (--type=bug), its private names hidden,'),
+    issueUpstreamFlagSpec('File the issue, a bug record only (--type=bug or --type=debt), its private names hidden,'),
   ],
   examples: [
     {

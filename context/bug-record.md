@@ -342,9 +342,10 @@ third line, and nothing is sent. The key's repository is not checked
 against GitHub here: a name that does not exist fails at the filing
 step, with `gh`'s own error.
 
-Only a bug is filed upstream. `issue create --upstream=rafa` refuses any
-other `--type` (`--type=code is not filed upstream: only a bug is`), and
-reads the bug line as any bug line is read, so an incomplete record is
+Only a bug record, `--type=bug` or `--type=debt`, is filed upstream.
+`issue create --upstream=rafa` refuses any other `--type` (`--type=code
+is not filed upstream: only a bug record is`), and reads the record line
+as any record line is read, so an incomplete record is
 refused before the gate. `issue comment` and `issue list` take any issue
 number and are not limited to bugs.
 

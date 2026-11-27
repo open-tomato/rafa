@@ -2116,14 +2116,15 @@ New; it replaces no earlier text. What a row or an action added to
   `github`'s `find` refuses every `--state`. `show` reads one issue;
   `create` files a draft with default type `code` (changed by `--type`),
   module `unassigned` and no priority unless a flag names one. A
-  `--type=bug` line is filed as a bug record (`issue/create-bug.ts`,
-  `context/bug-record.md`): its fields come from the bug flags and the
-  body's sections, its title is rendered through `issues.titles.bug`, and
-  a record missing a field is refused before the chain is resolved, so
-  `--title` is required for every type but `bug`. `--dry-run` prints the
-  draft of any type and resolves no tracker. `create --upstream=rafa`
-  takes a bug alone, passes the gate of `issue/upstream.ts` once the bug
-  line is read, hides a private board's names (`issue/upstream-text.ts`)
+  `--type=bug` or `--type=debt` line, a type of `ISSUE_RECORD_TYPES`
+  (`issue/declarations-shared.ts`), is filed as a bug record
+  (`issue/create-bug.ts`, `context/bug-record.md`): its fields come from
+  the bug flags and the body's sections, its title is rendered through
+  `issues.titles.bug`, and a record missing a field is refused before the
+  chain is resolved, so `--title` is required for every type but `bug`
+  and `debt`. `--dry-run` prints the draft of any type and resolves no
+  tracker. `create --upstream=rafa` takes a bug record alone, passes the
+  gate of `issue/upstream.ts` once the record line is read, hides a private board's names (`issue/upstream-text.ts`)
   and files on the `github` tracker made over `upstreamGhRunner`, with
   no chain resolved and no project placement; under `--dry-run` it prints
   that body and its `Upstream:` target. `list --type=bug` prints

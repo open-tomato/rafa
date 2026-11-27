@@ -1,7 +1,7 @@
 /**
  * What more than one `issue` declarations file spells: the subject the
- * nine commands sit under, and the state, type and priority lists their
- * help names.
+ * nine commands sit under, the state, type and priority lists their help
+ * names, and the record types `issue create` files from their fields.
  *
  * ## Why this file sits apart
  *
@@ -47,7 +47,7 @@ export const ISSUE_STATE_WORDS: readonly string[] = Object.freeze([
   'cancelled',
 ]);
 
-/** Every issue type, `epic` and `spec` last: a copy of `ISSUE_TYPES`; see the module note. */
+/** Every issue type, `epic`, `spec` and `debt` last: a copy of `ISSUE_TYPES`; see the module note. */
 export const ISSUE_TYPE_WORDS: readonly string[] = Object.freeze([
   'code',
   'bug',
@@ -57,7 +57,17 @@ export const ISSUE_TYPE_WORDS: readonly string[] = Object.freeze([
   'package-api',
   'epic',
   'spec',
+  'debt',
 ]);
+
+/**
+ * The types filed as a bug record, from the record's fields, its title
+ * rendered through `issues.titles.bug`: a `bug`, which makes something
+ * break, and a `debt`, a gap that only leaves a step to be done by hand.
+ * `issue create` reads it for its record flags, its title, its
+ * `--upstream` check and its record read.
+ */
+export const ISSUE_RECORD_TYPES: readonly string[] = Object.freeze(['bug', 'debt']);
 
 /** Every priority, most urgent first: a copy of `ISSUE_PRIORITIES`; see the module note. */
 export const ISSUE_PRIORITY_WORDS: readonly string[] = Object.freeze([
