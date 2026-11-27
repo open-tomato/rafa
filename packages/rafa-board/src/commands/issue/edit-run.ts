@@ -11,12 +11,13 @@
  * number, and an append (`--append-file=<file>` or `--append=<text>`,
  * with a required `--reason`, `--while-in-development` allowed), a
  * replace (`--replace-file=<file>`, `--title` allowed beside it), a title
- * change (`--title` alone) or a priority (`--priority=<priority>`,
- * `--title` allowed beside it), which `./edit-priority.ts` reads, plans
- * and words: its request is of kind `title`, so gate 4 weighs it as a
- * title change, and its write answers `replaced`. `--reason` and
- * `--while-in-development` go with an append only, and flags that do not
- * combine and a blank value are refused. A file is read as `issue create
+ * change (`--title` alone), a priority (`--priority=<priority>`) or a
+ * type (`--type=bug|debt`), each with `--title` allowed beside it, which
+ * `./edit-priority.ts` and `./edit-type.ts` read, plan and word: their
+ * request is of kind `title`, so gate 4 weighs it as a title change, and
+ * its write answers `replaced`. `--reason` and `--while-in-development`
+ * go with an append only, and flags that do not combine and a blank value
+ * are refused. A file is read as `issue create
  * --body-file` reads one, `-` for standard input, and refused when
  * unreadable or blank. Each refusal exits 1 naming {@link EDIT_USAGE}.
  *
@@ -50,7 +51,7 @@
  * After the gates pass, an append whose dated block (same day, reason and
  * text) is already the body's last part answers `already` and writes
  * nothing (`carriesUpdateBlock`, `packages/rafa-board/src/board/issue-edit-body.ts`), as does
- * a priority the issue holds alone. Both are weighed after the gates, so
+ * a priority or a type the issue holds alone. Both are weighed after the gates, so
  * a line run again on an issue since closed or claimed is told so.
  *
  * `--dry-run` weighs every gate and writes nothing: the report holds the
@@ -64,8 +65,8 @@
  * normalise both. The re-read must hold what was written
  * ({@link writeHeld}): for an append the body read before byte for byte,
  * then the separator and the block and nothing else; for a replace the
- * new body; for a title or a priority the old body; and the new title and
- * the new priority where one was written. Anything else is `conflict`,
+ * new body; for a title, a priority or a type the old body; and the new
+ * title, priority and type where one was written. Anything else is `conflict`,
  * exit code 1, its message naming the bodies {@link saveConflictBodies}
  * saved: `.rafa/scratch/rafa-<n>-edit-before-<stamp>.md` and
  * `rafa-<n>-edit-after-<stamp>.md`.
@@ -77,7 +78,7 @@
  *
  * ## Outcomes
  *
- * {@link EditOutcome}: `appended`, `replaced` (body, title or priority),
+ * {@link EditOutcome}: `appended`, `replaced` (body, title, priority or type),
  * `already` and `stale-copy` exit 0, `conflict` exits 1
  * ({@link editExitCode}). `stale-copy`, an append on a planned issue or
  * on a claimed one under `--while-in-development`, names `rafa plan
@@ -89,7 +90,7 @@ import type { EditKind, EditStateInput, EditStateReading } from '../../board/iss
 import type { BoardTrust, EditorLogin, EditorRefusal, TrustReading } from '../../board/trust.js';
 import type { RafaContext } from '@open-tomato/rafa/core/command';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
-import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, IssueType, Tracker } from '@open-tomato/rafa/ports';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -128,6 +129,7 @@ import {
 } from '../../board/trust.js';
 
 import { planPriorityEdit, priorityMessage, readPriorityFlag } from './edit-priority.js';
+import { planTypeEdit, readTypeFlag, typeMessage } from './edit-type.js';
 import {
   issueName,
   issueProject,
@@ -141,7 +143,8 @@ import {
 
 /** The usage line a line refusal names. */
 export const EDIT_USAGE: string = 'rafa issue edit <n> (--append-file=<file> | --append=<text>) --reason=<text>'
-  + ' [--while-in-development] | ((--replace-file=<file> | --priority=<priority>) [--title=<text>] | --title=<text>) [--dry-run]';
+  + ' [--while-in-development] | ((--replace-file=<file> | --priority=<priority> | --type=<bug|debt>) [--title=<text>]'
+  + ' | --title=<text>) [--dry-run]';
 
 /** The exit code every gate refusal ends with: `TRUST_REFUSAL_EXIT`, `LEAK_REFUSAL_EXIT` and `BOARD_REFUSAL_EXIT` are all 2. */
 export const EDIT_REFUSAL_EXIT: number = TRUST_REFUSAL_EXIT;
@@ -195,6 +198,8 @@ export interface EditRequest {
   readonly title: string | null;
   /** The new priority, when the line names one: the request is then of kind `title`, its title null or new. */
   readonly priority?: IssuePriority;
+  /** The new type, when the line names one: the request is then of kind `title`, as for a priority. */
+  readonly type?: IssueType;
   readonly whileInDevelopment: boolean;
   readonly dryRun: boolean;
 }
@@ -322,6 +327,7 @@ function readEditFlags(flags: LineFlags) {
     replaceFile: readNonBlankFlag(flags, FLAG.replaceFile, EDIT_USAGE),
     title: readNonBlankFlag(flags, FLAG.title, EDIT_USAGE),
     priority: readPriorityFlag(flags, EDIT_USAGE),
+    type: readTypeFlag(flags, EDIT_USAGE),
     whileInDevelopment: readSwitch(flags, FLAG.whileInDevelopment),
     dryRun: readSwitch(flags, FLAG.dryRun),
   };
@@ -344,7 +350,8 @@ function appendLine(issue: number, read: EditFlags): EditLine {
 
 /** A line of `kind` with no reason and no opening of a claim. */
 function lineOf(issue: number, read: EditFlags, kind: EditKind, source: EditTextSource | null): EditLine {
-  return { issue, kind, source, reason: null, title: read.title ?? null, priority: read.priority, whileInDevelopment: false, dryRun: read.dryRun };
+  const { priority, type, dryRun } = read;
+  return { issue, kind, source, reason: null, title: read.title ?? null, priority, type, whileInDevelopment: false, dryRun };
 }
 
 /**
@@ -365,7 +372,7 @@ export function readEditLine(args: readonly string[], flags: LineFlags): EditLin
   if (appending) return appendLine(issue, read);
 
   if (read.reason !== undefined) {
-    throw lineRefusal(`--${FLAG.reason} goes with an append only: a replace, a title change and a priority take none`, EDIT_USAGE);
+    throw lineRefusal(`--${FLAG.reason} goes with an append only: a replace, a title change, a priority and a type take none`, EDIT_USAGE);
   }
   if (read.whileInDevelopment) {
     throw lineRefusal(
@@ -376,9 +383,9 @@ export function readEditLine(args: readonly string[], flags: LineFlags): EditLin
   if (read.replaceFile !== undefined) {
     return lineOf(issue, read, 'replace', { from: 'file', flag: FLAG.replaceFile, path: read.replaceFile });
   }
-  if (read.title !== undefined || read.priority !== undefined) return lineOf(issue, read, 'title', null);
+  if (read.title !== undefined || read.priority !== undefined || read.type !== undefined) return lineOf(issue, read, 'title', null);
   throw lineRefusal(
-    `Name the edit: --${FLAG.appendFile}, --${FLAG.append}, --${FLAG.replaceFile}, --${FLAG.title} or --priority`,
+    `Name the edit: --${FLAG.appendFile}, --${FLAG.append}, --${FLAG.replaceFile}, --${FLAG.title}, --priority or --type`,
     EDIT_USAGE,
   );
 }
@@ -469,6 +476,7 @@ interface PlannedEdit {
 /** The edit `request` makes over `found`, read at `now`. */
 function planEdit(request: EditRequest, found: EditableIssue, now: Date): PlannedEdit {
   if (request.priority !== undefined) return planPriorityEdit({ priority: request.priority, title: request.title }, found);
+  if (request.type !== undefined) return planTypeEdit({ type: request.type, title: request.title }, found);
   const titled = request.title === null
     ? {}
     : { title: request.title };
@@ -611,6 +619,7 @@ export function writeHeld(
   const { change } = planned;
   if (change.title !== undefined && reread.title !== change.title) return false;
   if (change.priority !== undefined && reread.priority !== change.priority) return false;
+  if (change.type !== undefined && reread.type !== change.type) return false;
   const before = found.body.replace(/\r\n/gu, '\n');
   const after = reread.body.replace(/\r\n/gu, '\n');
   if (planned.block !== null) return originalPartHolds(before, after, normalised(planned.block));
@@ -657,6 +666,7 @@ function heldOutcome(request: EditRequest, state: EditStateReading): EditOutcome
 /** The sentence a held or would-be `outcome` is printed as. */
 function outcomeMessage(request: EditRequest, outcome: EditOutcome, branch: string | null, name: string): string {
   if (request.priority !== undefined) return priorityMessage({ priority: request.priority, title: request.title }, outcome === 'already', name);
+  if (request.type !== undefined) return typeMessage({ type: request.type, title: request.title }, outcome === 'already', name);
   switch (outcome) {
     case 'appended':
       return `Appended an update to ${name}; the original part is unchanged.`;
