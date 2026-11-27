@@ -227,6 +227,20 @@ its change reaches:
   file under `src/`, `scripts/` and `packages/`, and it fails on any `from` path
   of a move list under `scripts/codemod/moves/` that a scanned file still names,
   once that entry's `to` exists: a list written ahead of its run counts nothing.
+
+  The task step also joins the facade tests a task's added deep imports reach.
+  An added line in a script file that imports `@open-tomato/<pkg>/<path>` from
+  outside `packages/<pkg>/` reaches `packages/<pkg>/index.test.ts`, when the
+  checkout holds one; the step runs each such test once beside the always-run
+  files, and prints `🧩 Facade check added` for it. The facade test holds the
+  package's `index.ts` to the names the rest of the tree takes from it, and no
+  other part of the task step reads it: `--changed` follows the import graph
+  from the changed files, not from the facade test, and the default glob takes
+  no `index.test.ts`. The join runs wherever the always-run files run in the
+  task step, so an `affected` step takes it in its second run, and a `full`
+  step runs the facade tests already and reads no diff. The stage step and the
+  pre-wrap-up step do not join them. A removed deep import adds nothing, and a
+  diff git does not answer warns and adds none.
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a

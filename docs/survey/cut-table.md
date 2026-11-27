@@ -1,6 +1,6 @@
 # Cut table
 
-Read from `docs/survey/import-graph.json`: 2198 files, 2170 of them in 12 packages (764 left to place) and 28 in 3 unassigned folders. The package rows below sum to 2243 files, 73 more than that reading, because rows were added by hand after the graph was read. Of the 4868 edges between two files neither of which is a test, value and type alike, 51 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
+Read from `docs/survey/import-graph.json`: 2198 files, 2170 of them in 12 packages (764 left to place) and 28 in 3 unassigned folders. The package rows below sum to 2245 files, 75 more than that reading, because rows were added by hand after the graph was read. Of the 4868 edges between two files neither of which is a test, value and type alike, 51 point upward, 0 of them cleared by #118, and 75 have an end in an unassigned folder and no rank.
 
 The counts rank options. They do not certify a cut: `tsc --build` with project references is that gate (#807).
 

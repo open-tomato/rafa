@@ -304,7 +304,8 @@ runner runs the suite after the task commits when the task declares
 - `tests.alwaysRun` (glob list; defaults to `src/**/*.sweep.test.ts`) —
   content sweeps that always run alongside scoped tests in every task's
   gates, since they read files at run time and `bun test --changed=<base>`
-  follows only the import graph
+  follows only the import graph. The task step adds the facade test of each
+  package a task's added deep import reaches (`context/verification.md`)
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and
