@@ -13,6 +13,12 @@
  * nothing and prints nothing where the release does not run, read off
  * the log of every git command the run sent.
  *
+ * The `release.packageFragments` cases refuse first, a package fragment
+ * the branch added and one it inherited from the base; then the same
+ * tree under `allow` is read against a run of the same repository with
+ * the key unset, so "unchanged" is two runs compared, and a root-only
+ * tree under `refuse` merges as it did before the key.
+ *
  * `merge.test.ts` is past 800 lines, so these cases live here, beside
  * the module they cover.
  */
@@ -107,9 +113,12 @@ function changelog(...sections: readonly (readonly [string, string])[]): string 
     .join('\n');
 }
 
-/** A fragment's text. */
-function fragment(plan: string, level: string, note: string): string {
-  return ['---', `plan: ${plan}`, `title: ${plan} title`, `level: ${level}`, '---', '', note, ''].join('\n');
+/** A fragment's text, with a `package:` line when `packageName` is given. */
+function fragment(plan: string, level: string, note: string, packageName?: string): string {
+  const packageLine = packageName === undefined
+    ? []
+    : [`package: ${packageName}`];
+  return ['---', `plan: ${plan}`, `title: ${plan} title`, `level: ${level}`, ...packageLine, '---', '', note, ''].join('\n');
 }
 
 /** A repository this case owns. */
@@ -138,6 +147,8 @@ function commitAndPush(repo: GuardRepo, branch: string, files: Readonly<Record<s
 interface WorldOptions {
   /** The files the head branch commits. */
   readonly branch: Readonly<Record<string, string>>;
+  /** Files the base's first commit carries beside the manifest, so the branch inherits them. */
+  readonly baseBefore?: Readonly<Record<string, string>>;
   /** Files committed on the base after the branch forked, if any. */
   readonly baseAfter?: Readonly<Record<string, string>>;
   /** The config, {@link GH_CONFIG} and more. */
@@ -161,7 +172,11 @@ function plantWorld(options: WorldOptions): GuardRepo {
   must(root, repo.home, 'init', '-q', '--bare', `--initial-branch=${BASE}`, bare);
   must(root, repo.home, 'init', '-q', `--initial-branch=${BASE}`, repo.work);
   must(repo.work, repo.home, 'remote', 'add', 'origin', bare);
-  const first: Record<string, string> = { '.gitignore': '.rafa/\n', 'package.json': manifest('0.24.0') };
+  const first: Record<string, string> = {
+    '.gitignore': '.rafa/\n',
+    'package.json': manifest('0.24.0'),
+    ...options.baseBefore,
+  };
   const withChangelog = options.changelog === false
     ? first
     : { ...first, 'CHANGELOG.md': changelog(['0.24.0', '- loop: the first note']) };
@@ -501,6 +516,76 @@ describe('settle\'s release pull request against an ordinary stamping branch (#8
     expect(lines).toContain(`  Release guard: stale — ${RELEASE_PR_BRANCH} stamps 0.25.0, which origin/${BASE} has passed at 0.26.0`);
     expect(lines.at(-1)?.trim()).toBe(FIX_LINE);
     expect(run.sent).not.toContain(MERGE_SENT);
+  });
+});
+
+describe('a head holding package fragments, under release.packageFragments', () => {
+  /** A config refusing package fragments, beside the provider. */
+  const REFUSE_PACKAGES = `release:\n  packageFragments: refuse\n${GH_CONFIG}`;
+
+  /** A branch that changes source and adds a fragment releasing `@scope/x`. */
+  const PACKAGE_BRANCH = {
+    'src/a.ts': 'export const a = 1;\n',
+    '.changes/rafa-2.md': fragment('rafa-2', 'minor', '- x: a package thing', '@scope/x'),
+  };
+
+  /** The line the refusal names `path` releasing `@scope/x` with, indented under its head. */
+  const refusedLine = (path: string): string => `  ${path} names package @scope/x, and release.packageFragments`
+    + ' is refuse: this project takes no package fragments';
+
+  /** The refusal's head over `count` fragments. */
+  const refusalHead = (count: string): string => `❌ rafa pr merge refuses #${NUMBER}: its head holds ${count} naming a package,`
+    + ' and release.packageFragments is refuse.';
+
+  it('refuses a package fragment the branch added under refuse, naming the file and the key, asking and merging nothing', async () => {
+    const repo = plantWorld({ branch: PACKAGE_BRANCH, config: REFUSE_PACKAGES });
+
+    const run = await ran(repo, ['--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect((run.refusal ?? '').split('\n')).toEqual([refusalHead('1 fragment'), refusedLine('.changes/rafa-2.md')]);
+    expect(run.asked).toEqual([]);
+    expect(run.sent).not.toContain(MERGE_SENT);
+  });
+
+  it('refuses a package fragment the branch inherited from its base, beside the root fragment it added', async () => {
+    const repo = plantWorld({
+      baseBefore: { '.changes/rafa-0.md': fragment('rafa-0', 'patch', '- x: an older thing', '@scope/x') },
+      branch: { ...CLEAN_BRANCH, '.changes/rafa-3.md': fragment('rafa-3', 'patch', '- loop: a root thing') },
+      config: REFUSE_PACKAGES,
+    });
+
+    const run = await ran(repo, ['--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect((run.refusal ?? '').split('\n')).toEqual([refusalHead('1 fragment'), refusedLine('.changes/rafa-0.md')]);
+    expect(run.sent).not.toContain(MERGE_SENT);
+  });
+
+  it('reads the same tree under allow as with the key unset, and merges', async () => {
+    // Two worlds, since the merge's clean-up deletes the head branch it read.
+    const allowRepo = plantWorld({ branch: PACKAGE_BRANCH, config: `release:\n  packageFragments: allow\n${GH_CONFIG}` });
+    const unsetRepo = plantWorld({ branch: PACKAGE_BRANCH });
+
+    const allowed = await ran(allowRepo, ['--yes']);
+    const unset = await ran(unsetRepo, ['--yes']);
+
+    expect([allowed.exitCode, allowed.refusal]).toEqual([0, null]);
+    expect(allowed.sent).toContain(MERGE_SENT);
+    expect({ printed: allowed.printed, warned: allowed.warned, guard: allowed.guard })
+      .toEqual({ printed: unset.printed, warned: unset.warned, guard: unset.guard });
+    expect(allowed.guard?.answer).toBe('clean');
+  });
+
+  it('merges a tree of root fragments alone under refuse, reading clean', async () => {
+    const repo = plantWorld({ branch: CLEAN_BRANCH, config: REFUSE_PACKAGES });
+
+    const run = await ran(repo, ['--yes']);
+
+    expect([run.exitCode, run.refusal, run.warned]).toEqual([0, null, []]);
+    expect(run.printed).toContain(`Release guard: clean — ${BRANCH} carries .changes/rafa-1.md`);
+    expect(run.sent).toContain(MERGE_SENT);
+    expect(run.guard).toMatchObject({ answer: 'clean', reaction: 'print' });
   });
 });
 

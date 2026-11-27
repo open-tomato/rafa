@@ -30,6 +30,15 @@
  *     in `./declarations.ts`, `packages/rafa/src/core/config/dangerous.ts`),
  *     so this step prints no line of its own for it.
  *
+ * Ahead of every reaction, under `release.packageFragments: refuse`, a
+ * head whose `release.fragments` holds any fragment with a `package:`
+ * line, added on the branch or inherited from the base, is refused with
+ * exit 1 before anything is asked, the head naming the count and the
+ * key and one line under it per file, naming its path and its package
+ * (`readHeadPackageFragments`, `packages/rafa-release/src/release/guard-merge.ts`,
+ * which asks the reading `rafa release fragment` asks). Under `allow` the
+ * step reads and prints what it did before the key.
+ *
  * Every refusal names the answer and the setting first and the guard's
  * lines after, so a `stale` or `collision` refusal still ENDS with
  * `rafa pr triage <n> --resolve`, the line the reader acts on.
@@ -57,6 +66,7 @@ import {
   guardLines,
   guardReaction,
   localPlanNotes,
+  readHeadPackageFragments,
   readMergeGuard,
   releaseDeliveryLine,
   releaseDeliveryOf,
@@ -123,6 +133,14 @@ function refusalHead(number: number, answer: GuardAnswer | 'unread'): string {
     : `rafa pr merge refuses #${number}: its release guard reads ${answer}, and pr.versionCollision is refuse.`;
 }
 
+/** Why the guard refuses a head holding `count` package fragments, naming the key. */
+function packageFragmentsHead(number: number, count: number): string {
+  const fragments = count === 1
+    ? '1 fragment'
+    : `${count} fragments`;
+  return `rafa pr merge refuses #${number}: its head holds ${fragments} naming a package, and release.packageFragments is refuse.`;
+}
+
 /** Asks the guard's question; true for a yes. See the module note. */
 async function askGuard(step: MergeGuardStep, answer: GuardAnswer | 'unread', lines: readonly string[]): Promise<boolean> {
   const { number } = step.detail;
@@ -170,6 +188,10 @@ export async function guardBeforeMerge(step: MergeGuardStep): Promise<MergeGuard
     now: step.now,
     readNotes: localPlanNotes(root),
   });
+  const refused = readHeadPackageFragments({ git: step.git, settings, head: step.detail.headRefName });
+  if (refused.length > 0) {
+    throw guardRefusal(packageFragmentsHead(step.detail.number, refused.length), refused.map(({ sentence }) => sentence));
+  }
   const delivery = releaseDeliveryOf(reading);
   if (delivery !== null) {
     const lines = [releaseDeliveryLine(delivery)];

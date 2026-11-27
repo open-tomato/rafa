@@ -69,6 +69,21 @@
  * the root is the project root; a probe that cannot answer at all is
  * refused.
  *
+ * ## Package fragments
+ *
+ * Under `release.packageFragments: refuse` a line naming `--package` is
+ * refused before the workspace is read or anything is written, and a
+ * line naming none is written as under `allow`. The answer is the
+ * shared reading's (`packageFragmentRefusal`,
+ * `packages/rafa-release/src/release/package-fragments.ts`), the one the
+ * merge guard asks too, and the sentence names where the key is set: the
+ * file that answered it (`ResolvedConfig.provenance`), with the template
+ * when one did, or the layer when no file did.
+ *
+ * ```text
+ * ❌ release.packageFragments is refuse (/repo/.rafa/config.yaml): this project takes no package fragments; drop --package
+ * ```
+ *
  * ## Refusals, output and json
  *
  * Every refusal exits 1 before anything is written. A run that wrote
@@ -81,16 +96,20 @@
  * same way, the fragment and the warnings.
  */
 import type { RafaCommand, RafaContext } from '@open-tomato/rafa/core/command';
+import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 import type { PlanReleaseLevel } from '@open-tomato/rafa/core/plan';
 import type { GitToplevelProbe } from '@open-tomato/rafa/project/roots';
+import type { ProjectFound } from '@open-tomato/rafa/project/scope';
 import type { Fragment } from '@open-tomato/rafa/release/fragment';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { expectNoArgument, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
+import { expectNoArgument, requireProject } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
+import { ConfigError } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { messageOf } from '@open-tomato/rafa/core/config/sections';
 import { createGitRunner, gitSaid } from '@open-tomato/rafa/core/git';
 import { PLAN_RELEASE_LEVELS } from '@open-tomato/rafa/core/plan';
@@ -98,6 +117,7 @@ import { gitToplevel } from '@open-tomato/rafa/project/roots';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '@open-tomato/rafa/release/fragment';
 
 import { readFragmentTree } from '../../release/fragment-tree.js';
+import { packageFragmentRefusal } from '../../release/package-fragments.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { packageNamed, readWorkspacePackages } from '../../release/workspace-packages.js';
 
@@ -279,6 +299,34 @@ function checkPackage(root: string, name: string | null): void {
   if (member.isPrivate) throw refusal(`${name} (${member.dir}) is private, so it never releases and settle would refuse its fragment`);
 }
 
+/** The config that resolves for `project`, refusing one `loadConfig` refuses, with every problem. */
+async function fragmentConfig(project: ProjectFound, warn: (message: string) => void): Promise<ResolvedConfig> {
+  try {
+    return await loadConfig({ root: project.root, home: project.home }, {}, warn);
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    throw new CommandExit(1, [
+      `❌ ${COMMAND_NAME}: the config cannot be used:`,
+      ...error.problems.map((problem) => `   ${problem}`),
+    ].join('\n'));
+  }
+}
+
+/** Where `release.packageFragments` is set: the file that answered it, its template, or the layer; see the module note. */
+function packageFragmentsWhere(resolved: ResolvedConfig): string {
+  const origin = resolved.provenance.releasePackageFragments;
+  if (origin === null) return resolved.sources.releasePackageFragments;
+  return origin.template === undefined
+    ? origin.file
+    : `${origin.file}, template ${origin.template}`;
+}
+
+/** Refuses `--package` under `release.packageFragments: refuse`, through the shared reading; see the module note. */
+function checkPackageFragments(resolved: ResolvedConfig, name: string | null): void {
+  const sentence = packageFragmentRefusal(resolved.config.releasePackageFragments, name, packageFragmentsWhere(resolved));
+  if (sentence !== null) throw refusal(sentence);
+}
+
 /**
  * The root the fragment is written under: the git worktree of the
  * directory the command runs in, or `projectRoot` outside any
@@ -334,13 +382,15 @@ function writeNew(path: string, resolved: string, text: string): void {
   }
 }
 
-/** One whole run: the line, the config, the base's names, the checks, then the one write. */
+/** One whole run: the line, the config, the package-fragment check, the base's names, the checks, then the one write. */
 export async function runFragment(context: RafaContext, seams: FragmentSeams = {}): Promise<ReleaseFragmentResult> {
   const request = readFragmentRequest(context);
   const project = requireProject(context, COMMAND_NAME);
-  const config = await resolveProjectConfig(project, COMMAND_NAME, (message) => {
+  const loaded = await fragmentConfig(project, (message) => {
     context.output.warn(message);
   });
+  const { config } = loaded;
+  checkPackageFragments(loaded, request.package);
   const root = fragmentRoot(project.root, seams);
   checkPackage(root, request.package);
 

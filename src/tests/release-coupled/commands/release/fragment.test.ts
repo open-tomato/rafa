@@ -23,6 +23,10 @@
  *   - a package the workspace holds and publishes is written, beside
  *     the refused private and unknown ones, so the check is known to
  *     pass a good name;
+ *   - the `refuse` case is paired with the same line under `allow` and
+ *     with the key unset, both written, and with a root fragment under
+ *     `refuse`, written, so the refusal is known to come from the key
+ *     meeting `--package` and not from either alone;
  *   - the worktree case asserts the caller's `.changes/` stays empty, and
  *     a run from a subdirectory of the caller, whose toplevel is the
  *     project root, still prints the path relative, so the absolute
@@ -418,6 +422,63 @@ describe('the root rafa release fragment writes under', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain(`the git worktree of ${w.project.root} could not be read, so no fragment was written: git could not run`);
     expect(changesOf(w.project)).toEqual([]);
+  });
+});
+
+describe('rafa release fragment under release.packageFragments', () => {
+  /** The world's config with `packageFragments` set to `mode`; returns the config file's path. */
+  function setPackageFragments(w: World, mode: string): string {
+    return plantProjectConfig(w.project.root, `release:\n  versionFile: package.json\n  packageFragments: ${mode}\n`);
+  }
+
+  const packageLine = ['--plan=rafa-12', '--level=patch', '--title=Plugin hooks', '--note=hooks: run first', '--package=@scope/plugin'];
+
+  it('refuses --package under refuse with exit 1, naming the file it is set in, writing nothing', async () => {
+    const w = world();
+    const file = setPackageFragments(w, 'refuse');
+
+    const run = await ran(w.project, packageLine);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`release.packageFragments is refuse (${file}): this project takes no package fragments; drop --package`);
+    expect(run.stderr).toContain(`Usage: ${RELEASE_FRAGMENT_USAGE}`);
+    expect(changesOf(w.project)).toEqual([]);
+  });
+
+  it('writes the package fragment under allow', async () => {
+    const w = world();
+    setPackageFragments(w, 'allow');
+
+    const run = await ran(w.project, packageLine);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toBe('.changes/rafa-12.md\n');
+    expect(parseFragment(textAt(w.project, '.changes/rafa-12.md'))).toEqual({
+      ok: true,
+      fragment: { plan: 'rafa-12', title: 'Plugin hooks', level: 'patch', package: '@scope/plugin', notes: ['- hooks: run first'] },
+    });
+  });
+
+  it('writes the package fragment with the key unset', async () => {
+    const w = world();
+
+    const run = await ran(w.project, packageLine);
+
+    expect(run.exitCode).toBe(0);
+    expect(changesOf(w.project)).toEqual(['rafa-12.md']);
+  });
+
+  it('still writes a root fragment under refuse', async () => {
+    const w = world();
+    setPackageFragments(w, 'refuse');
+
+    const run = await ran(w.project, ['--plan=dependabot-8', '--level=patch', '--title=Bump bun', '--note=deps: bump bun']);
+
+    expect(run.exitCode).toBe(0);
+    expect(parseFragment(textAt(w.project, '.changes/dependabot-8.md'))).toEqual({
+      ok: true,
+      fragment: { plan: 'dependabot-8', title: 'Bump bun', level: 'patch', package: null, notes: ['- deps: bump bun'] },
+    });
   });
 });
 

@@ -33,7 +33,9 @@
  * from source `default`, and `hints` after `collaborate` at the end of
  * the known keys in all three fixtures, and moved nothing else; the core
  * key `effort.syncSkew` added one `load-config.json` entry, its `refuse`
- * default from source `default`, and moved nothing else.
+ * default from source `default`, and moved nothing else; the `release`
+ * key `release.packageFragments` added one `load-config.json` entry, its
+ * `allow` default from source `default`, and moved nothing else.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

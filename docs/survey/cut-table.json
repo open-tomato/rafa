@@ -3354,6 +3354,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/release-package-fragments-integration.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/release-publish-workflow.test.ts",
       "upwardEdgesIn": 0
     },
@@ -5661,8 +5666,8 @@
         }
       ],
       "fileCounts": {
-        "source": 56,
-        "test": 50,
+        "source": 57,
+        "test": 51,
         "testSupport": 0
       },
       "files": [
@@ -5723,6 +5728,8 @@
         "packages/rafa-release/src/release/level.ts",
         "packages/rafa-release/src/release/package-base-version.test.ts",
         "packages/rafa-release/src/release/package-base-version.ts",
+        "packages/rafa-release/src/release/package-fragments.test.ts",
+        "packages/rafa-release/src/release/package-fragments.ts",
         "packages/rafa-release/src/release/prepare.test.ts",
         "packages/rafa-release/src/release/prepare.ts",
         "packages/rafa-release/src/release/receipt.test.ts",
@@ -5774,7 +5781,7 @@
         "src/release/fold-spawned.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-release/": 92,
+        "packages/rafa-release/": 94,
         "src/commands/release/": 3,
         "src/release/": 1
       },
@@ -6025,7 +6032,7 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 613,
+        "test": 614,
         "testSupport": 22
       },
       "files": [
@@ -6744,6 +6751,7 @@
         "src/tests/release-delivery-spawned-cli.test.ts",
         "src/tests/release-fragment-ci-config-spawned.test.ts",
         "src/tests/release-mechanics.test.ts",
+        "src/tests/release-package-fragments-integration.test.ts",
         "src/tests/release-publish-workflow.test.ts",
         "src/tests/release-settle-doctor-button-merge-spawned-cli.test.ts",
         "src/tests/release-settle-parallel-branches-spawned-cli.test.ts",

@@ -165,20 +165,24 @@ fragments after a `git fetch` to pick the right name).
 
 `rafa release fragment --plan=<id> --level=<level> --title=<text>
 [--note=<area>: <summary>]... [--package=<name>]` writes one fragment for a
-branch with no wrap-up to write it, such as a bot's pull request, and prints
-its path as the last line. `--plan` must match the plan id pattern, `--level`
-is one of `patch`, `minor`, `major` and `none`, and `--package` must name a
-public member of the checkout's workspace. A shipping level given no `--note`
-takes the title as its one note, with a warning. The name is `<plan>.md`, or
-`-2`, `-3` and on when that name already waits on `origin/<pr.base>`. A file
-already at the path, in the working tree or in `HEAD`, is refused, so a second
-run never duplicates the first. The fragment is written under the git worktree
-of the directory the command runs in (`git rev-parse --show-toplevel`), not
-under the project root a linked worktree with no `.rafa/` resolves to, while
+branch with no wrap-up to write it, such as a bot's pull request, and prints its
+path as the last line. `--plan` must match the plan id pattern, `--level` is one
+of `patch`, `minor`, `major` and `none`, and `--package` must name a public
+member of the checkout's workspace. Under `release.packageFragments: refuse`,
+`--package` is refused before anything is written, naming the key and where it
+is set, and a run without it writes as before. `rafa pr merge` refuses the
+same fragments at its guard, a head whose tree holds one naming a package, see
+"Guards: the preflight check". A shipping level given no `--note` takes the
+title as its one note, with a warning. The name is `<plan>.md`, or `-2`, `-3`
+and on when that name already waits on `origin/<pr.base>`. A file already at the
+path, in the working tree or in `HEAD`, is refused, so a second run never
+duplicates the first. The fragment is written under the git worktree of the
+directory the command runs in (`git rev-parse --show-toplevel`), not under the
+project root a linked worktree with no `.rafa/` resolves to, while
 `release.fragments` and `pr.base` are still read from the project's config.
-Outside any repository it falls back to the project root. The printed path
-(and the json `path`) is relative when that worktree root is the project root,
-and absolute when it is not.
+Outside any repository it falls back to the project root. The printed path (and
+the json `path`) is relative when that worktree root is the project root, and
+absolute when it is not.
 
 The bot fragment workflow, `release-bot-fragment.yml`, writes that fragment for
 a Dependabot pull request. It runs on `pull_request_target` for
@@ -551,6 +555,15 @@ and merges whatever `pr.versionCollision` says; `rafa pr triage` gives it no
 released or collides with reads as any branch does, fix included, and an
 ordinary branch stamping a version still reads `stale`.
 
+Under `release.packageFragments: refuse`, `rafa pr merge` refuses with exit 1,
+ahead of every answer above and before anything is asked, a head whose
+`release.fragments` holds any fragment with a `package:` line, whether the
+branch added it or inherited it from the base: the head's tree is read at
+`origin/<head>` through `readFragmentTree`, and the refusal names the key and,
+one line each, every such file with its package (`readHeadPackageFragments`,
+`packages/rafa-release/src/release/guard-merge.ts`). Under `allow` the guard
+reads as it did before the key.
+
 ### The stale-docs chore
 
 The documentation lines a doc task could not settle go to one `chore` issue per
@@ -652,7 +665,7 @@ the exit code.
 
 ### Config keys
 
-Nine keys control the release flow, all under the `release` section except two:
+Ten keys control the release flow, all under the `release` section except two:
 
 **`release.fragments`** — Path to the fragments directory (default `.changes/`).
 Tracked, not gitignored. Fragment filenames are `<plan id>.md`, or `-2`, `-3`
@@ -710,6 +723,14 @@ that releases rafa keeps its lock moving with each release. A project that uses
 rafa leaves it off. The refusals and the dry run's line are under "The lock" in
 "Settle and its deliveries". Read by `rafa release settle` and its dry run.
 
+**`release.packageFragments`** — Whether a fragment may name a package: `allow`
+(default, a `package:` line is written as before the key) or `refuse` (the
+repository releases no package yet, so a fragment naming one is refused). Read
+through core's `oneOf`, so any other value is refused naming both. Declared in
+`packages/rafa/src/config-schema-release.ts`. Read by `rafa release fragment`
+and by the release guard `rafa pr merge` runs, both through the shared reading
+`packages/rafa-release/src/release/package-fragments.ts`.
+
 **`pr.versionCollision`** — Reaction to `missing` and `stale` preflight
 findings: `report` (default, warn and proceed), `ask` (ask the user), `refuse`
 (error and stop). `collision` always refuses, requiring
@@ -720,7 +741,7 @@ to override a `collision` finding and allow a merge. Use only when you have
 merged a branch already stamped with the same version and need to unblock
 another.
 
-Beside the nine, one key under `hints` sets how the steps print:
+Beside the ten, one key under `hints` sets how the steps print:
 **`hints.skills`** — Boolean (default `false`, read through `flag`). `true`
 adds the skill line to each step that has a case, as "Placed steps and the
 skill line" describes. Read by `rafa release tag`, `rafa release settle` and
@@ -731,6 +752,7 @@ All keys are optional. An absent `release.fragments` defaults to `.changes/`, an
 absent `release.strategy` defaults to `semver-by-level`, an absent
 `release.settle` defaults to `push`, an absent `release.tag` defaults to
 `manual`, an absent `release.publishCommand` defaults to `npm publish`, an
-absent `release.publish` defaults to `manual`, and an absent `release.moveLock`
-defaults to `false`. They're set by `rafa init` and
+absent `release.publish` defaults to `manual`, an absent `release.moveLock`
+defaults to `false`, and an absent `release.packageFragments` defaults to
+`allow`. They're set by `rafa init` and
 read by `loadConfig`.
