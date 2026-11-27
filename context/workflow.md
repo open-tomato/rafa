@@ -798,7 +798,8 @@ corrects the report, and closes the issue. This establishes a clear pipeline
 from tooling promise (the hook's denial) to tooling completion (the rafa
 command) to closure (the verification sweep). A gap is tech debt, not a bug:
 a bug count reads `--type=bug`, so a gap report shows there only when it
-breaks something, and no count filters `module:cli-gap` out.
+breaks something. The Atlas QA bug metrics also leave every `module:cli-gap`
+row out (`NOT_CLI_GAP`, `addons/atlas/rafa-atlas/src/metrics/qa.ts`).
 
 A stale line found during other work is corrected in that work, in the same
 commit, and is not filed as a bug.
