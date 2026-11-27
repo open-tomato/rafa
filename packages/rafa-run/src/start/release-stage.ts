@@ -286,8 +286,14 @@ export interface ReleaseFinish extends ReleaseBodyRecord {
   readonly levelReport: string | null;
 }
 
-/** The plan title heading: one `#`, a space, and the title after it. */
-const PLAN_HEADING = /^# +(.+)$/;
+/**
+ * The plan title heading: one `#`, a space, and the title after it,
+ * which holds no line terminator. The title opens past the whole space
+ * run, so the run and the title never share a character to try again
+ * (CodeQL `js/polynomial-redos`); a heading of spaces alone captures
+ * nothing, which the caller reads as no title.
+ */
+const PLAN_HEADING = /^# +([^ \n\r\u2028\u2029].*)?$/;
 
 /** The label a plan title opens with, which the heading already implies. */
 const PLAN_LABEL = /^plan\s*[:—–-]\s*/i;

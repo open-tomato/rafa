@@ -106,6 +106,16 @@ import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
 /** The label every pure case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
 
+/**
+ * The spec's one-second bound on a crafted file: the old tab-indent
+ * pattern, its leading run and its tab able to share a line of tabs,
+ * took about 2.3 s on {@link CRAFTED_TABS} tabs and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Tabs on the crafted line, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_TABS = 50_000;
+
 /** The label a user scope file parses under. No file is read at it. */
 const USER_PATH = '/home/someone/.rafa/config.yaml';
 
@@ -886,6 +896,21 @@ describe('parseConfigText', () => {
 
     expect(file.values.inject).toBe('full');
     expect(file.extras).toEqual([{ key: 'note', value: 'a\tb' }]);
+  });
+
+  it('reads a line of tabs alone as a blank line, within REDOS_BOUND_MS', () => {
+    const text = '\t'.repeat(CRAFTED_TABS + 1);
+
+    const started = performance.now();
+    const document = parseConfigDocument(text, PATH);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(document).toBeNull();
+    // Control: content after the same run is still refused as tab-indented.
+    expect(refusal(() => parseConfigDocument(`${text}x`, PATH)).problems).toEqual([
+      `${PATH}: line 1 is indented with a tab; YAML indents with spaces only`,
+    ]);
   });
 
   it('characterizes yes as a string and TRUE as the boolean, so yes is refused', () => {

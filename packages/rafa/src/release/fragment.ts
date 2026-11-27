@@ -332,11 +332,22 @@ export function allocateFragmentName(plan: string, taken: Iterable<string>): str
 }
 
 /**
+ * `text` without its trailing slashes, found by a scan back from the end:
+ * linear in the length, where the regex `/\/+$/` was tried from every slash
+ * of an inner run and took quadratic time on one (CodeQL js/polynomial-redos).
+ */
+function withoutTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charAt(end - 1) === '/') end -= 1;
+  return text.slice(0, end);
+}
+
+/**
  * `directory` as a path prefix from the root: `./.changes/` and
  * `.changes` both answer `.changes/`, and the root itself answers ''.
  */
 export function directoryPrefix(directory: string): string {
-  const normal = posix.normalize(directory.replace(/\\/g, '/')).replace(/\/+$/, '');
+  const normal = withoutTrailingSlashes(posix.normalize(directory.replace(/\\/g, '/')));
   return normal === '.' || normal === ''
     ? ''
     : `${normal}/`;

@@ -188,8 +188,8 @@ export const SCRIPT_EXTENSIONS: readonly string[] = [
 /** A fenced block's opening or closing line. */
 const FENCE_LINE = /^ {0,3}(?:```|~~~)/;
 
-/** An ATX heading: up to three spaces, one to six hashes, then text. */
-const HEADING_LINE = /^ {0,3}(#{1,6})\s+(.*)$/;
+/** An ATX heading: up to three spaces, one to six hashes, then text opening past the whole space run. */
+const HEADING_LINE = /^ {0,3}(#{1,6})\s+(\S.*)?$/;
 
 /** A numbered list item at list level: `1.` or `1)`, then content. */
 const NUMBERED_ITEM = /^ {0,3}\d+[.)]\s+\S/;
@@ -364,11 +364,11 @@ export function bodySections(body: string): readonly BodySection[] {
     if (match === null) return;
 
     const [, hashes = '', title = ''] = match;
-    headings.push({
-      level: hashes.length,
-      title: title.replace(/\s+#+\s*$/, '').trim(),
-      index,
-    });
+    const text = title.trimEnd();
+    let start = text.length;
+    while (start > 0 && text.charAt(start - 1) === '#') start -= 1;
+    if (!/\s/.test(text.charAt(start - 1))) start = text.length;
+    headings.push({ level: hashes.length, title: text.slice(0, start).trim(), index });
   });
 
   return headings.map((heading, position) => {
@@ -709,9 +709,9 @@ export function inferDomain(name: string, body: string): InstinctDomain {
  * shape, so this is a net under a name that is not.
  */
 export function slugifyId(value: string): string {
-  return value.toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return value.toLowerCase().split(/[^a-z0-9]+/)
+    .filter((part) => part !== '')
+    .join('-');
 }
 
 /**

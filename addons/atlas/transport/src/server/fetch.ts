@@ -69,12 +69,23 @@ function entriesOf(
   return Object.fromEntries(entries);
 }
 
+/**
+ * `text` without its trailing slashes, found by a scan back from the end:
+ * linear in the length, where the regex `/\/+$/` was tried from every slash
+ * of an inner run and took quadratic time on one (CodeQL js/polynomial-redos).
+ */
+function withoutTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '/') end -= 1;
+  return text.slice(0, end);
+}
+
 /** Wraps `handler` as a fetch handler mounted at `options.basePath`. */
 export function toFetchHandler(
   handler: AtlasHandler,
   options: FetchAdapterOptions = {},
 ): (request: Request) => Promise<Response> {
-  const base = (options.basePath ?? '').replace(/\/+$/, '');
+  const base = withoutTrailingSlashes(options.basePath ?? '');
   const maxBody = options.maxBodyBytes ?? DEFAULT_MAX_BODY;
   return async (request) => {
     const url = new URL(request.url);

@@ -329,6 +329,20 @@ describe('an undeclared bare @open-tomato import', () => {
     ]);
   });
 
+  test('a paths target with two * fills both with the specifier\'s match (CodeQL alert 37)', () => {
+    const root = plantWith({
+      'tsconfig.packages.json': {
+        compilerOptions: { paths: { '@open-tomato/rafa/*': ['./packages/core/src/*'], '@open-tomato/pair/*': ['./packages/*-*'] } },
+      },
+      'packages/svc-svc/package.json': { name: '@open-tomato/rafa-pair', private: true, scripts: { lint: 'eslint .', test: 'bun test' } },
+      'packages/config/pair.mjs': 'export * from \'@open-tomato/pair/svc\';\n',
+    });
+
+    expect(reasonsOf(checkGraph(root), 'packages/config')).toEqual([
+      'imports @open-tomato/rafa-pair, which no dependency field declares: pair.mjs (@open-tomato/pair/svc)',
+    ]);
+  });
+
   test('a dynamic import and a require are read too', () => {
     const root = plantWith({
       'packages/config/lazy.js': 'await import(\'@open-tomato/rafa-hub\');\nrequire(\'@open-tomato/rafa-cli\');\n',
