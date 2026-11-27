@@ -84,8 +84,11 @@ const FAIL_TIMING = /^\[\d+(?:\.\d+)?m?s\]$/;
 /** A line break, which a case name never holds: what a regex's `.` does not match. */
 const LINE_BREAK = /[\n\r\u2028\u2029]/;
 
-/** A `file > case` line: a test file's path, ` > `, then the case name. */
-const FILE_CASE_LINE = new RegExp(`^\\s*(${TEST_FILE})\\s+>\\s+(.+?)\\s*$`);
+/**
+ * A `file > case` line's head: a test file's path, whitespace, then `>`.
+ * The case name after it is read by {@link fileCaseLineOf}.
+ */
+const FILE_CASE_HEAD = new RegExp(`^\\s*(${TEST_FILE})\\s+>`);
 
 /** Bun's file header: a test file's path alone on its line, then `:`. */
 const FILE_HEADER = new RegExp(`^\\s*(${TEST_FILE}):\\s*$`);
@@ -156,8 +159,17 @@ function failedCaseNameOf(line: string): string | null {
   const mark = FAIL_MARK.exec(line);
   if (mark === null) return null;
   const rest = line.slice(mark[0].length);
+  return shortestNameIn(rest, failTailOf(rest));
+}
+
+/**
+ * The shortest case name in `rest`, the text after a case line's marker,
+ * whose end `tail` gives, or null: read from the end of the whitespace
+ * `rest` opens with, then from one character earlier each time no name
+ * fits, so a character or more of whitespace always stays before it.
+ */
+function shortestNameIn(rest: string, tail: FailTail): string | null {
   const lead = rest.length - rest.trimStart().length;
-  const tail = failTailOf(rest);
   const breakAfterLead = rest.slice(lead).search(LINE_BREAK);
   let lineBreak = breakAfterLead === -1
     ? rest.length
@@ -177,14 +189,33 @@ interface CaseLine {
   readonly file: string | null;
 }
 
+/**
+ * The file and case name on the `file > case` line `line`, or null when it
+ * is none: the name is the shortest one, of a character or more and
+ * holding no line break, that leaves whitespace only after it, read as
+ * {@link shortestNameIn} reads a `(fail)` line's with no timing. That is
+ * what `/^\s*(TEST_FILE)\s+>\s+(.+?)\s*$/` read, here in linear time,
+ * where the name and the whitespace runs around it could share one long
+ * run and took quadratic time on it.
+ */
+function fileCaseLineOf(line: string): { readonly file: string; readonly name: string } | null {
+  const head = FILE_CASE_HEAD.exec(line);
+  if (head === null) return null;
+  const rest = line.slice(head[0].length);
+  const name = shortestNameIn(rest, { content: rest.trimEnd().length, timing: null });
+  return name === null
+    ? null
+    : { file: head[1]!, name };
+}
+
 /** The case line `line` is, at `index`, or null. */
 function caseLineOf(line: string, index: number): CaseLine | null {
   const failName = failedCaseNameOf(line);
   if (failName !== null) return { index, name: failName, file: null };
-  const fileCase = FILE_CASE_LINE.exec(line);
+  const fileCase = fileCaseLineOf(line);
   return fileCase === null
     ? null
-    : { index, name: fileCase[2]!, file: fileCase[1]! };
+    : { index, ...fileCase };
 }
 
 /** The lines of `text`. */

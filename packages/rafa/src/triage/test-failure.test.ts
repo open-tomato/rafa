@@ -28,6 +28,15 @@ const CRAFTED_SPACES = 50_000;
  */
 const CRAFTED_FAIL_LINE = `(fail)${' '.repeat(CRAFTED_SPACES)}x\ry`;
 
+/**
+ * The crafted `file > case` line: a test file, ` > `, a name, a long
+ * space run, then a carriage return, which no case name may hold, so the
+ * line is no case and the old `FILE_CASE_LINE` pattern, its lazy name and
+ * trailing whitespace run able to share the run, rescanned it once per
+ * character before saying so: this file's timing case took 6,216 ms on it.
+ */
+const CRAFTED_FILE_CASE_LINE = `src/a.test.ts > a${' '.repeat(CRAFTED_SPACES)}b\rc`;
+
 const BUN_CAPTURE = [
   'bun test v1.4.2 (744846f84)',
   '',
@@ -109,6 +118,32 @@ describe('testFailureOf', () => {
     expect(withFolder?.file).toBe('src/a/b.test.ts');
     expect(bare?.file).toBe('b.test.ts');
     expect(bare?.name).toBe(withFolder?.name);
+  });
+
+  it('reads each file > case line\'s name as the shortest one its whitespace leaves, and none holding a line break', () => {
+    const lines = [
+      '  src/a.test.ts\t>  \t b c  ',
+      'src/a.test.ts >    ',
+      'src/a.test.ts > a\u2028',
+      'src/a.test.ts >  \u2028x',
+      'src/a.test.ts > a > b [1ms]',
+    ];
+    const names = lines.map((artifact) => testFailureOf({ what: 'red', artifact })?.name);
+    const broken = ['src/a.test.ts > a\rb', 'src/a.test.ts >a', 'src/a.test.ts> a', 'src/a.test.ts > \u2028'];
+
+    expect(names).toEqual(['b c', ' ', 'a', 'x', 'a > b [1ms]']);
+    expect(broken.map((artifact) => testFailureOf({ what: 'red', artifact }))).toEqual([null, null, null, null]);
+  });
+
+  it('reads no case off a file > case line with a long space run before a line break, and the next line\'s case, within REDOS_BOUND_MS', () => {
+    const bug = { what: 'a test fails', artifact: `src/a.test.ts:\n${CRAFTED_FILE_CASE_LINE}\n(fail) a > b [1ms]` };
+
+    const started = performance.now();
+    const failure = testFailureOf(bug);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(failure).toEqual({ file: 'src/a.test.ts', name: 'a > b', evidence: CRAFTED_FILE_CASE_LINE });
   });
 
   it('reads the last test file above the case line when no file header is above it', () => {
