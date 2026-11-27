@@ -170,7 +170,7 @@ path as the last line. `--plan` must match the plan id pattern, `--level` is one
 of `patch`, `minor`, `major` and `none`, and `--package` must name a public
 member of the checkout's workspace. Under `release.packageFragments: refuse`,
 `--package` is refused before anything is written, naming the key and where it
-is set, and a line without it is written as before. `rafa pr merge` refuses the
+is set, and a run without it writes as before. `rafa pr merge` refuses the
 same fragments at its guard, a head whose tree holds one naming a package, see
 "Guards: the preflight check". A shipping level given no `--note` takes the
 title as its one note, with a warning. The name is `<plan>.md`, or `-2`, `-3`
@@ -560,9 +560,9 @@ ahead of every answer above and before anything is asked, a head whose
 `release.fragments` holds any fragment with a `package:` line, whether the
 branch added it or inherited it from the base: the head's tree is read at
 `origin/<head>` through `readFragmentTree`, and the refusal names the key and,
-one line each, every such file with its package
-(`readHeadPackageFragments`, `packages/rafa-release/src/release/guard-merge.ts`).
-Under `allow` the guard reads as it did before the key.
+one line each, every such file with its package (`readHeadPackageFragments`,
+`packages/rafa-release/src/release/guard-merge.ts`). Under `allow` the guard
+reads as it did before the key.
 
 ### The stale-docs chore
 

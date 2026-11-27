@@ -262,8 +262,8 @@ a tagged version, default `manual`), `release.publishCommand` (the publish line
 folder, default `npm publish`), `release.moveLock` (`true` has settle write
 `rafa.lock` in its release commit, default `false`), `release.packageFragments`
 (`allow` or `refuse`, whether a fragment may name a package, default `allow`),
-and `pr.versionCollision`
-(what happens when a merge would collide, default `report`). Read
+and `pr.versionCollision` (what happens when a merge would collide, default
+`report`). Read
 `context/release.md` for the full design, `docs/ci-release-settle.md` for
 automating settle in CI, and `rafa release settle --help` for the settle
 command.
