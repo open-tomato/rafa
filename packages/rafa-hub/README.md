@@ -158,6 +158,64 @@ rows. `true`, the default, rebuilds it after each such push; `false` leaves
 rebuilds to `rafa-hub index rebuild`, run by the operator. Only the two booleans
 are read: `'false'` and `0` are refused.
 
+### `hub.store.engine`
+
+The engine the hub keeps its rows and index in. `sqlite`, the default, keeps one
+`bun:sqlite` file per project, as [The index](#the-index) describes. `postgres`
+keeps them in a Postgres database, for an organisation's hub; see
+[The Postgres engine](#the-postgres-engine). Any other value is refused. Every
+device keeps `bun:sqlite` whatever the hub runs on: the hub promises the wire
+contract, not an engine.
+
+### `hub.store.postgres.urlVariable`
+
+Under `engine: postgres`, the name of the environment variable holding the
+Postgres connection URL. It defaults to `POSTGRES_URL`, the variable `Bun.sql`
+reads first. The URL comes from that variable alone, never from the config file:
+there is no `hub.store.postgres.url` key. The name matches
+`^[A-Z_][A-Z0-9_]*$`, and a refusal never repeats what was written, in case a
+URL with a password was pasted in place of the name. An unset or empty variable,
+white space alone counting as empty, refuses the start. The message names the
+variable, never its value:
+
+```text
+hub postgres: the environment variable POSTGRES_URL is unset; set it to the Postgres URL the hub stores in
+```
+
+`hub.store.postgres` written under `engine: sqlite`, the default included, is
+refused, since nothing would read it.
+
+### `hub.index.embedding.model` and `hub.index.embedding.precision`
+
+`hub.index.embedding.model` names the model the hub embeds text with: non-empty
+text with no white space at either end, such as `nomic-embed-text-v1.5`. Left
+out, it is null. `hub.index.embedding.precision` is how a vector is stored:
+`half`, the default, with 2-byte floats, or `full`. Any other value, such as
+`16`, is refused, whether or not a model is named. There is no
+`hub.index.embedding.dimension` key: the model's dimension is a fact of the
+install, not a setting.
+
+This release hands no embedder to either engine, so `vector` is `false` on every
+hub whatever model is named. The two keys are read and checked now. What a
+search falls back to is in [The index](#the-index).
+
+### `dangerous.hub.maxPayloadRows`
+
+This key sits in a `dangerous` section beside `hub`, not under it. It is the
+most rows one push may carry and one pull page may answer. It defaults to
+`50000`, and `unlimited` lifts it. A whole number from 1 up is read; `0` and
+`-1` are refused. The hub answers the cap as `maxPayloadRows` in its contract
+and on `/v1/status`. The device's contact splits every push under it by cursor,
+so a big push goes through in payloads and no flag is needed. There is no
+`--batch` option.
+
+A client that ignores the field and sends a payload over the cap is refused,
+with a message naming `dangerous.hub.maxPayloadRows` and nothing taken. A value
+above the default, or `unlimited`, makes the hub log one `config.dangerous`
+warning when it starts listening, naming the key and its value. The section is
+named `dangerous` because one request can hold the hub's memory for as long as
+it runs.
+
 ### Example configuration
 
 The lightest configuration names only the repository:
@@ -234,6 +292,9 @@ The hub listens on every interface, so under the default `basic` login it logs
 
 ## The index
 
+This section describes the `sqlite` engine, the default. Under `postgres` the
+index lives in the database; see [The Postgres engine](#the-postgres-engine).
+
 The hub keeps its index in `<store>.index.sqlite`, a file beside the store. For
 the default store, `rafa-hub.sqlite` beside the config, that is
 `rafa-hub.index.sqlite`. The devices table sits beside the store as well, in
@@ -278,6 +339,37 @@ The reason reads `no embedder configured` once the sqlite-vec extension loads.
 When it does not, the loader's own reason is printed: on macOS without
 `hub.store.sqliteLibrary`, it reads `no SQLite library is named, and macOS's own
 SQLite loads no extension`.
+
+## The Postgres engine
+
+Under `hub.store.engine: postgres`, the hub's rows and index live in Postgres,
+through the `@open-tomato/rafa-hub-postgres` connector. The connector opens at
+start, before the hub listens, and a connector that does not open stops the
+start. The URL comes from the variable `hub.store.postgres.urlVariable` names;
+see the key above.
+
+The database must have two extensions loaded:
+
+- `pg_search`, ParadeDB's BM25 index, which answers `fts`.
+- `pgvector`, listed in `pg_extension` as `vector`, which answers `vector` once
+  an embedder is given. This release gives none, so `vector` stays `false`.
+
+The open reads `pg_extension` and refuses when either is missing, naming each
+one it lacks. The message reads:
+
+```text
+hub postgres: the database lacks the extension pg_search; install pg_search on it (CREATE EXTENSION) before the hub starts on postgres
+```
+
+Install the extensions on the database; the hub does not create them.
+
+`fts` and `graph` answer from the database when their parts are there: `graph`
+is `true` once the store holds `ref_links`. Full text and the graph serve with
+`vector` `false`, which is a working hub, not a degraded one.
+
+**Licence review is open.** `pg_search` is licensed under AGPL-3.0. Anyone who
+ships or hosts this connector for others should have that licence reviewed
+before they do. That review has not been done.
 
 ## Who may sync
 
