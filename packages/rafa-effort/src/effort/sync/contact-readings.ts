@@ -127,10 +127,17 @@ export interface HubSyncContacted {
    * was asked.
    */
   readonly pending: HubContactStep<number | null> | null;
-  /** Step 3, the push; `skipped` under `dry-run` for a strategy with no dry run. */
+  /** The push, step 3 under `effort.syncMerge: merge` and step 4 under `ff-only`; `skipped` under `dry-run` for a strategy with no dry run. */
   readonly push: HubContactStep<SyncPushResult> | null;
-  /** Step 4, the pull and its merge. */
+  /** The pull and its merge, step 4 under `effort.syncMerge: merge` and step 3 under `ff-only`. */
   readonly pull: HubContactStep<SyncPullResult> | null;
+  /**
+   * The conflicted rows the push left out, the ones `merge_conflicts`
+   * names, or under `dry-run` would have: 0 for a push that left none
+   * out, as every push under `merge` does, and null when no push
+   * answered. Never the `heldBack` rows a projected pull held back.
+   */
+  readonly conflicted: number | null;
   /** Step 5, the hub line's facts, or `skipped` when the pull did not answer or was not run. */
   readonly hub: HubContactStep<HubSyncLineFacts>;
 }

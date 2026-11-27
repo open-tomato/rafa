@@ -563,7 +563,7 @@ describe('a contact\'s sync() under the hub\'s cap', () => {
 
     await contacting(strategy).contact.sync();
 
-    expect(strategy.calls).toEqual(['hubStatus', 'push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+    expect(strategy.calls).toEqual(['hubStatus', 'pull {"from":null,"dryRun":false}', 'push {"to":null,"leaveOutConflicted":true}']);
   });
 
   it('sends one dry-run push under the cap, splitting nothing', async () => {
@@ -571,6 +571,6 @@ describe('a contact\'s sync() under the hub\'s cap', () => {
 
     await contacting(strategy).contact.sync({ stop: 'dry-run' });
 
-    expect(strategy.calls).toEqual(['hubStatus', 'push {"to":null,"dryRun":true}', 'pull {"from":null,"dryRun":true}']);
+    expect(strategy.calls).toEqual(['hubStatus', 'pull {"from":null,"dryRun":true}', 'push {"to":null,"dryRun":true,"leaveOutConflicted":true}']);
   });
 });

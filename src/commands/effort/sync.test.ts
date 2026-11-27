@@ -96,6 +96,7 @@ const AT: Omit<HubSyncContacted, 'status' | 'stop'> = {
   pending: null,
   push: null,
   pull: null,
+  conflicted: null,
   hub: { outcome: 'skipped' },
 };
 
@@ -480,13 +481,13 @@ function realContact(sync: Sync): (input: SyncContactInput) => Promise<HubSyncRe
 }
 
 describe('rafa effort sync over the real contact and a stub service strategy', () => {
-  it('pushes, pulls and prints the hub line naming this port\'s project', async () => {
+  it('pulls, pushes and prints the hub line naming this port\'s project, under effort.syncMerge: ff-only, the default', async () => {
     const calls: Call[] = [];
 
     const outcome = await dispatchInProject(['effort', 'sync'], [EFFORT_SUBJECT], [createSyncCommand({ contact: realContact(stubService(calls)) })], plant());
 
     expect(outcome.exitCode).toBe(0);
-    expect(calls).toEqual(['hubStatus', 'push', 'pull']);
+    expect(calls).toEqual(['hubStatus', 'pull', 'push']);
     expect(lines(outcome.stdout)).toEqual([
       hubLine({ contractVersion: WIRE_CONTRACT_VERSION, projectId: 'p-2', projectName: 'Beta', pulled: 9, heldBack: 0 }),
     ]);
@@ -502,13 +503,13 @@ describe('rafa effort sync over the real contact and a stub service strategy', (
     expect(lines(outcome.stdout)).toEqual([`hub: reachable, contract ${String(WIRE_CONTRACT_VERSION)}, project Beta; 6 rows waiting to push`]);
   });
 
-  it('pushes and pulls as dry runs under --dry-run, printing the counts', async () => {
+  it('pulls and pushes as dry runs under --dry-run, printing the counts', async () => {
     const calls: Call[] = [];
 
     const outcome = await dispatchInProject(['effort', 'sync', '--dry-run'], [EFFORT_SUBJECT], [createSyncCommand({ contact: realContact(stubService(calls)) })], plant());
 
     expect(outcome.exitCode).toBe(0);
-    expect(calls).toEqual(['hubStatus', 'push --dry-run', 'pull --dry-run']);
+    expect(calls).toEqual(['hubStatus', 'pull --dry-run', 'push --dry-run']);
     expect(lines(outcome.stdout)).toEqual([
       `hub: reachable, contract ${String(WIRE_CONTRACT_VERSION)}, project Beta; dry run: 6 rows to push, 9 rows to pull, 1 rows in conflict;`
       + ' nothing was written',
@@ -696,7 +697,7 @@ describe('rafa effort sync --status over a fake hub', () => {
     const whole = await syncAt(at, over.url);
 
     expect(whole.exitCode).toBe(0);
-    expect(over.requests.slice(requestsBefore).map(({ method, path }) => `${method} ${path}`)).toEqual(['POST /v1/effort/push', 'GET /v1/effort/pull']);
+    expect(over.requests.slice(requestsBefore).map(({ method, path }) => `${method} ${path}`)).toEqual(['GET /v1/effort/pull', 'POST /v1/effort/push']);
     expect(filesIn(at.storeDir)).not.toEqual(filesBefore);
   });
 

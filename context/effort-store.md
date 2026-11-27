@@ -357,10 +357,17 @@ read by shape off the status answer the pull kept, which `hubLine` formats as
 held back` when rows were). `sync()` reads the hub's status, checks it for
 skew (the contract version, then the hub's migrations against core's
 catalogue; a hub ahead is let through under `effort.syncSkew:
-pull-projected`), pushes, then pulls. `stop: 'status'` ends it after the
+pull-projected`), then pushes and pulls in the order `effort.syncMerge`
+names, as `pushThenPull()` does: under `ff-only` it pulls, then pushes
+leaving out the rows `merge_conflicts` names, a pull that did not answer
+ending the run before the push; under `merge` it pushes, then pulls. The
+rows the push left out are the reading's `conflicted` (0 under `merge`),
+and `sync()` writes no held line of its own. `stop: 'status'` ends it after the
 check with the rows waiting to push (`pendingPush()`, read by shape), and
-`stop: 'dry-run'` pushes and pulls with `dryRun`, asking the dry-run push
-only of a strategy carrying `pendingPush`. A run stops at the first refusal,
+`stop: 'dry-run'` pulls and pushes in the same order with `dryRun`, asking
+the dry-run push only of a strategy carrying `pendingPush`, and under
+`ff-only` counting the conflicted rows past the push cursor without
+writing. A run stops at the first refusal,
 whose `refusal` names its cause, `skew`, `contract`, `project` (the hub's
 `project <id> is not served here`) or `token` (`HubTokenError`), and its one
 line, written once per contact in the hub line's place.
