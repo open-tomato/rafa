@@ -17,7 +17,9 @@
  *   `arch.import-flow` its Sankey, its layer columns and their tones;
  *   their mappers live in `live-architecture.ts`. All three fill the one
  *   `workspace` field, listed once in `SOURCE_WIRED_FIELDS`, and its meta
- *   is `arch.coupling`'s, the first of them.
+ *   is `arch.coupling`'s, the first of them; the rose, the sunburst and
+ *   the Sankey each keep their own metric's meta in `workspaceMeta`
+ *   (`WORKSPACE_CARD_METRICS`), which their live notes read.
  * - `dev.wip` fills `wip`, its count against the metric's `goal`, which
  *   `withAtlasTargets` lays over it from `wipLimit` (null with none).
  * - `qa.bug-outcome-by-loop-start` fills `bugOutcomeByLoopStart`: each
@@ -52,7 +54,7 @@
  * opened before it.
  */
 import type { BugOutcomeDay, MockData, OpenBugsDay, Wip } from './mock.js';
-import type { LensField } from './source.js';
+import type { FieldMeta, LensField, WorkspaceCard } from './source.js';
 import type { MetricDefinition, QueryResult, Scalar, Window } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { BoxGroup, GraphLink, GraphNode, TreemapNode } from '@open-tomato/charts';
@@ -132,6 +134,30 @@ export const SOURCE_METRIC_KEYS: readonly SourceMetric[] = Object.keys(SOURCE_ME
 
 /** The fields a metric of this module fills, each once: three metrics fill `workspace`. */
 export const SOURCE_WIRED_FIELDS: readonly LensField[] = [...new Set(SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key]))];
+
+/** The metric each workspace card with one of its own reads: the rose and the sunburst `arch.composition`, the Sankey `arch.import-flow`. */
+export const WORKSPACE_CARD_METRICS: Readonly<Record<WorkspaceCard, SourceMetric>> = {
+  sizeRose: 'composition',
+  composition: 'composition',
+  importFlow: 'importFlow',
+};
+
+/** A field's or a card's meta: its metric, the row count of the answer that filled it and, for a proxy, the metric's note. */
+export function metaOf(metricId: string, answer: QueryResult | undefined, notes: ReadonlyMap<string, string>): FieldMeta {
+  const rowCount = answer?.meta.rowCount ?? 0;
+  const proxyNote = notes.get(metricId);
+  return proxyNote === undefined
+    ? { metricId, rowCount }
+    : { metricId, rowCount, proxyNote };
+}
+
+/** The meta of each workspace card with a metric of its own, from that metric's answer. */
+export function workspaceMetaOf(sources: SourceAnswers, notes: ReadonlyMap<string, string>): ReadonlyMap<WorkspaceCard, FieldMeta> {
+  return new Map((Object.keys(WORKSPACE_CARD_METRICS) as WorkspaceCard[]).map((card) => {
+    const key = WORKSPACE_CARD_METRICS[card];
+    return [card, metaOf(SOURCE_METRICS[key], sources.metrics[key], notes)] as const;
+  }));
+}
 
 /** The metrics asked over the range's series window; every other one is asked with none (see the module note). */
 export const WINDOWED_SOURCE_METRICS: ReadonlySet<SourceMetric> = new Set<SourceMetric>([

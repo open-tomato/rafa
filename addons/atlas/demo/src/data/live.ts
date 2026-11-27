@@ -40,6 +40,8 @@
  * replica's build time, over the fixed 91 days ending with it whatever
  * the range; an answer naming no build time leaves `balance` empty and
  * marked, and `balance` has no `FieldMeta`, since nine metrics fill it.
+ * `workspace` keeps `arch.coupling`'s meta, and the rose, the sunburst
+ * and the Sankey their own metric's in `workspaceMeta`.
  * The task cycle's points also fill
  * `taskMinutesBins`, binned on the page (`taskMinutesBinsOf`). Their requests live in `live-sources.ts`,
  * their mappers there and, for the three cards, in `live-cards.ts`,
@@ -75,6 +77,7 @@ import {
 import {
   GITHUB_NOT_READ,
   githubPendingOf,
+  metaOf,
   moduleGraphOf,
   SOURCE_METRIC_FIELDS,
   SOURCE_METRIC_KEYS,
@@ -82,6 +85,7 @@ import {
   SOURCE_WIRED_FIELDS,
   sourceAnswersOf,
   sourceFieldsOf,
+  workspaceMetaOf,
   type SourceAnswers,
 } from './live-sources.js';
 import { BRANCH_TYPES, TASK_MINUTE_EDGES } from './mock.js';
@@ -597,21 +601,12 @@ function proxyNotesOf(definitions: readonly MetricDefinition[]): ReadonlyMap<str
     : [])));
 }
 
-/** One field's meta: its metric, the row count of the answer that filled it and the metric's proxy note. */
-function metaOf(field: LensField, metricId: string, answer: QueryResult | undefined, notes: ReadonlyMap<string, string>): readonly [LensField, FieldMeta] {
-  const rowCount = answer?.meta.rowCount ?? 0;
-  const proxyNote = notes.get(metricId);
-  return [field, proxyNote === undefined
-    ? { metricId, rowCount }
-    : { metricId, rowCount, proxyNote }];
-}
-
 /** The meta of every wired field, the PoC metrics' then `live-sources.ts`'s; a field two metrics fill keeps the first one's. */
 function fieldMetaOf(answers: Answers, previous: Partial<Answers>, sources: SourceAnswers, notes: ReadonlyMap<string, string>): ReadonlyMap<LensField, FieldMeta> {
-  const poc = METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key].map((field) => metaOf(field, LIVE_METRICS[key], PREVIOUS_FIELDS[field] === undefined
+  const poc = METRIC_KEYS.flatMap((key) => METRIC_FIELDS[key].map((field) => [field, metaOf(LIVE_METRICS[key], PREVIOUS_FIELDS[field] === undefined
     ? answers[key]
-    : previous[key], notes)));
-  const past = SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key].map((field) => metaOf(field, SOURCE_METRICS[key], sources.metrics[key], notes)));
+    : previous[key], notes)] as const));
+  const past = SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key].map((field) => [field, metaOf(SOURCE_METRICS[key], sources.metrics[key], notes)] as const));
   return new Map([...poc, ...past].filter(([field], index, all) => all.findIndex(([seen]) => seen === field) === index));
 }
 
@@ -695,6 +690,7 @@ export async function liveResultOf(client: AtlasClient, range: TimeRange, signal
       : { debtRatio: debt }),
   };
   const pending = githubPendingOf(sources, definitions);
+  const notes = proxyNotesOf(definitions);
   return {
     range,
     source: 'live',
@@ -702,7 +698,8 @@ export async function liveResultOf(client: AtlasClient, range: TimeRange, signal
       ? [...pending, 'balance']
       : pending),
     notWiredDetail: new Map(pending.map((field) => [field, GITHUB_NOT_READ])),
-    fieldMeta: fieldMetaOf(answers, previous, sources, proxyNotesOf(definitions)),
+    fieldMeta: fieldMetaOf(answers, previous, sources, notes),
+    workspaceMeta: workspaceMetaOf(sources, notes),
     weeks: seriesWeeksOf(answers.bugsByKind, 'week'),
     mock: mockOf(answers, previous, sources, definitions),
     balance: balance ?? [],

@@ -124,7 +124,10 @@ draws no "Not wired yet".
 Every card and tile a live metric feeds names its `reads`. On the live
 page a wired card's note is `liveNoteOf`'s (`src/lenses/spec.ts`): the
 proxy note, when the metric is a proxy, and the row count behind it, so
-a thin reading says how little stands behind it. The weekly cards whose
+a thin reading says how little stands behind it. The rose and the
+sunburst name `arch.composition` and the import flow `arch.import-flow`
+(`metaCard`, read from the result's `workspaceMeta`), while `workspace`
+itself keeps `arch.coupling`'s. The weekly cards whose
 field holds no dates (bugs by kind, routes, preflight halts) label their
 weeks from the result's `weeks`, the series window's Mondays, and the
 stacked ones draw the kinds the answer names (`src/lenses/kinds.ts`).

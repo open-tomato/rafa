@@ -50,6 +50,13 @@ export interface FieldMeta {
   readonly proxyNote?: string;
 }
 
+/**
+ * The cards that read `workspace` but whose rows come from a metric of
+ * their own, not from `arch.coupling`'s, whose meta the field keeps: the
+ * package size rose, the composition sunburst and the import flow.
+ */
+export type WorkspaceCard = 'sizeRose' | 'composition' | 'importFlow';
+
 /** No field marked: what the mock source answers, every field drawn. */
 const NONE_MARKED: ReadonlySet<LensField> = new Set<LensField>();
 
@@ -58,6 +65,9 @@ const NO_DETAIL: ReadonlyMap<LensField, string> = new Map<LensField, string>();
 
 /** No field filled by a metric: the mock's meta. */
 const NO_META: ReadonlyMap<LensField, FieldMeta> = new Map<LensField, FieldMeta>();
+
+/** No workspace card filled by a metric of its own: the mock's. */
+const NO_WORKSPACE_META: ReadonlyMap<WorkspaceCard, FieldMeta> = new Map<WorkspaceCard, FieldMeta>();
 
 /** What the page source answers for one range: every card's data. */
 export interface LensResult {
@@ -80,6 +90,12 @@ export interface LensResult {
    * and, for a proxy, its `ProxyNote`. The mock fills none.
    */
   readonly fieldMeta: ReadonlyMap<LensField, FieldMeta>;
+  /**
+   * Per workspace card with a metric of its own: that metric's meta, which
+   * the card's live note reads in place of `workspace`'s (`arch.coupling`).
+   * The mock fills none.
+   */
+  readonly workspaceMeta: ReadonlyMap<WorkspaceCard, FieldMeta>;
   /**
    * The Monday (UTC) of each week a weekly field without its own dates
    * holds one entry for (bugs by kind, routes, preflight halts), oldest
@@ -139,7 +155,7 @@ function balanceOf(range: TimeRange): readonly BalanceIndex[] {
 
 /** The result set for one range, computed at once. */
 export function lensResultOf(range: TimeRange): LensResult {
-  return { range, source: 'mock', notWired: NONE_MARKED, notWiredDetail: NO_DETAIL, fieldMeta: NO_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
+  return { range, source: 'mock', notWired: NONE_MARKED, notWiredDetail: NO_DETAIL, fieldMeta: NO_META, workspaceMeta: NO_WORKSPACE_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
 }
 
 /** A page source over the mock that answers after `delayMs`. */

@@ -14,7 +14,7 @@
 import type { SourceMetric } from './live-sources.js';
 import type { LiveMetric } from './live.js';
 import type { MockData } from './mock.js';
-import type { LensField, LensResult } from './source.js';
+import type { LensField, LensResult, WorkspaceCard } from './source.js';
 import type { StubCall } from './testdata/live-client.fixture.js';
 import type { QueryResult } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
@@ -37,6 +37,7 @@ import {
   SOURCE_METRICS,
   SOURCE_WIRED_FIELDS,
   WINDOWED_SOURCE_METRICS,
+  WORKSPACE_CARD_METRICS,
 } from './live-sources.js';
 import {
   createLiveLensSource,
@@ -51,6 +52,7 @@ import {
   WIRED_FIELDS,
 } from './live.js';
 import { TASK_MINUTE_EDGES } from './mock.js';
+import { lensResultOf } from './source.js';
 import {
   failingClient,
   resultOf,
@@ -493,6 +495,27 @@ describe('liveResultOf over a stub client: the phase-4 fields', () => {
     expect(SOURCE_METRIC_FIELDS.importFlow).toEqual(['workspace']);
     expect(SOURCE_WIRED_FIELDS.filter((field) => field === 'workspace')).toHaveLength(1);
     expect(result.fieldMeta.get('workspace')).toEqual({ metricId: 'arch.coupling', rowCount: 3, proxyNote: stubNoteOf('arch.coupling') });
+  });
+
+  it('keeps a meta per workspace card of its own metric: arch.composition for the rose and the sunburst, arch.import-flow for the Sankey', async () => {
+    const { result } = await liveResult();
+    const cards = Object.keys(WORKSPACE_CARD_METRICS) as WorkspaceCard[];
+
+    expect(cards).toEqual(['sizeRose', 'composition', 'importFlow']);
+    for (const card of cards) {
+      const key = WORKSPACE_CARD_METRICS[card];
+      expect({ card, ...result.workspaceMeta.get(card) }).toEqual({ card, metricId: SOURCE_METRICS[key], rowCount: STUB_SOURCE_ANSWERS[key].meta.rowCount });
+    }
+    expect(result.workspaceMeta.get('sizeRose')?.metricId).toBe('arch.composition');
+    expect(result.workspaceMeta.get('composition')?.metricId).toBe('arch.composition');
+    expect(result.workspaceMeta.get('importFlow')?.metricId).toBe('arch.import-flow');
+    expect(result.workspaceMeta.get('sizeRose')?.rowCount).toBeGreaterThan(0);
+    expect(result.workspaceMeta.get('importFlow')?.rowCount).toBeGreaterThan(0);
+    expect(result.fieldMeta.get('workspace')?.metricId).toBe('arch.coupling');
+  });
+
+  it('control: the mock result keeps no workspace card meta', () => {
+    expect(lensResultOf('past-month').workspaceMeta.size).toBe(0);
   });
 
   it('lays the architect cards\' fields into the workspace: the rose, the sunburst, the Sankey and its layers', async () => {

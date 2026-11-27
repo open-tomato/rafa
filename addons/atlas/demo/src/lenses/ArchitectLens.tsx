@@ -435,6 +435,7 @@ export function ArchitectLens(): ReactElement {
           <LensCard
             config={ROSE}
             reads={['workspace']}
+            metaCard="sizeRose"
             liveSubtitle={ROSE_LIVE_SUBTITLE}
             select={(result: LensResult) => result.workspace.sizeRose}
             info={ROSE_INFO}
@@ -452,6 +453,7 @@ export function ArchitectLens(): ReactElement {
           <LensCard
             config={COMPOSITION}
             reads={['workspace']}
+            metaCard="composition"
             liveSubtitle={COMPOSITION_LIVE_SUBTITLE}
             select={(result: LensResult) => result.workspace}
             info={COMPOSITION_INFO}
@@ -469,6 +471,7 @@ export function ArchitectLens(): ReactElement {
           <LensCard
             config={FLOW}
             reads={['workspace']}
+            metaCard="importFlow"
             liveSubtitle={data === undefined
               ? undefined
               : flowLiveSubtitleOf(data.workspace.sankeyLinks)}

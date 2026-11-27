@@ -5,7 +5,7 @@
  * tile draws on the live page (`isWired`), and the note a wired card
  * shows there (`liveNoteOf`).
  */
-import type { LensField, LensResult } from '../data/source.js';
+import type { FieldMeta, LensField, LensResult, WorkspaceCard } from '../data/source.js';
 import type { CardSpec } from '@open-tomato/atlas-ui';
 import type { ChartHeight } from '@open-tomato/charts';
 
@@ -59,16 +59,23 @@ export function plotHeight(base: number, height: ChartHeight): ChartHeight {
  * The note a wired card shows on the live page: per metric behind
  * `reads`, its proxy note when it is a proxy, then the answer's row
  * count, so a thin reading (three red runs in 303) says how little stands
- * behind it. Undefined over the mock, or when no field read has a meta.
+ * behind it. A workspace card naming its `card` reads that card's own
+ * meta (`workspaceMeta`) in place of the fields'. Undefined over the
+ * mock, or when no field read has a meta.
  */
-export function liveNoteOf(result: LensResult, reads: readonly LensField[]): string | undefined {
+export function liveNoteOf(result: LensResult, reads: readonly LensField[], card?: WorkspaceCard): string | undefined {
   if (result.source === 'mock') return undefined;
-  const metas = reads.flatMap((field) => {
-    const meta = result.fieldMeta.get(field);
-    return meta === undefined
-      ? []
-      : [meta];
-  });
+  const own = card === undefined
+    ? undefined
+    : result.workspaceMeta.get(card);
+  const metas: readonly FieldMeta[] = own === undefined
+    ? reads.flatMap((field) => {
+      const meta = result.fieldMeta.get(field);
+      return meta === undefined
+        ? []
+        : [meta];
+    })
+    : [own];
   const metrics = [...new Set(metas.map((meta) => meta.metricId))];
   if (metrics.length === 0) return undefined;
   return metrics.map((metricId) => {

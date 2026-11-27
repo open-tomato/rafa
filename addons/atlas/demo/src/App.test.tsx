@@ -35,7 +35,7 @@ import { GITHUB_BUILD_LINE, GITHUB_NOT_READ } from './data/live-sources.js';
 import { createLiveLensSource, LIVE_METRICS } from './data/live.js';
 import { ON_TIME_SHARE, PILE_KINDS, SCOPE_CREEP_AVERAGE } from './data/mock.js';
 import { createLensSource, lensResultOf, type LensResult } from './data/source.js';
-import { noRowsOf, STUB_SCOPE_CREEP, stubLiveClient } from './data/testdata/live-client.fixture.js';
+import { noRowsOf, STUB_SCOPE_CREEP, STUB_SOURCE_ANSWERS, stubLiveClient } from './data/testdata/live-client.fixture.js';
 import { NO_FLAKY_TITLE } from './lenses/QaLens.js';
 
 /** The card titles each lens shows, by the tab that opens it. */
@@ -515,6 +515,37 @@ describe('App, by page source', () => {
       for (const name of ['@open-tomato/stub-addon', '@open-tomato/stub-low', UPWARD]) expect(within(first).getByRole('cell', { name })).toBeDefined();
     }
     expect(screen.getAllByRole('cell', { name: UPWARD })).toHaveLength(1);
+  });
+
+  it('over the live source, notes each architect card\'s own metric: arch.composition on the rose and the sunburst, arch.import-flow on the Sankey', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'Architecture' }));
+    await settle();
+    const compositionRows = STUB_SOURCE_ANSWERS.composition.meta.rowCount;
+    const flowRows = STUB_SOURCE_ANSWERS.importFlow.meta.rowCount;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Package size' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Info' }));
+    expect(screen.getByText(`${compositionRows} rows behind it (arch.composition).`)).toBeDefined();
+    expect(screen.queryByText(/\(arch\.coupling\)\.$/u)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Options for What each package is made of' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Info' }));
+    expect(screen.getAllByText(`${compositionRows} rows behind it (arch.composition).`).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Import flow by layer' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Info' }));
+    expect(screen.getByText(`${flowRows} rows behind it (arch.import-flow).`)).toBeDefined();
+  });
+
+  it('control: the workspace keeps arch.coupling\'s note, on the module imports card and behind the Workspace members tile', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    fireEvent.click(screen.getByRole('tab', { name: 'Architecture' }));
+    await settle();
+
+    expect(within(screen.getByRole('region', { name: 'Workspace members' })).getByText('3')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Module imports' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Info' }));
+    expect(screen.getByText(/3 rows behind it \(arch\.coupling\)\.$/u)).toBeDefined();
+    expect(screen.queryByText(/\(arch\.composition\)\.$/u)).toBeNull();
   });
 
   it('control: the mock page keeps the three architect cards\' subtitles, legends and two-column flow table', async () => {
