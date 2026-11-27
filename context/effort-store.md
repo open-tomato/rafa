@@ -362,7 +362,9 @@ names, as `pushThenPull()` does: under `ff-only` it pulls, then pushes
 leaving out the rows `merge_conflicts` names, a pull that did not answer
 ending the run before the push; under `merge` it pushes, then pulls. The
 rows the push left out are the reading's `conflicted` (0 under `merge`),
-and `sync()` writes no held line of its own. `stop: 'status'` ends it after the
+and `sync()` writes no held line of its own. A row is left out, and counted,
+once: by the push whose cut reaches it, whose cursor then passes it, so a
+later push neither sends it nor names it in a held line. `stop: 'status'` ends it after the
 check with the rows waiting to push (`pendingPush()`, read by shape), and
 `stop: 'dry-run'` pulls and pushes in the same order with `dryRun`, asking
 the dry-run push only of a strategy carrying `pendingPush`, and under

@@ -26,8 +26,11 @@
  *     ({@link conflictedOf}), summed over a push split under the cap,
  *     and when there are any one line is written through `warn`, once
  *     for the run: `effort sync: <n> rows held: they differ from the
- *     hub's copy (merge_conflicts); the rest was pushed`. These are no
- *     `held_rows`: those are the rows a projected pull held back.
+ *     hub's copy (merge_conflicts); the rest was pushed`. The line counts
+ *     only the rows this push's cut reached: a row left out once is behind
+ *     the cursor, so a later push neither sends it nor names it again.
+ *     These are no `held_rows`: those are the rows a projected pull held
+ *     back.
  *   - **`push-then-pull`** pushes first, asking nothing more, then pulls;
  *     nothing is left out of its push.
  *

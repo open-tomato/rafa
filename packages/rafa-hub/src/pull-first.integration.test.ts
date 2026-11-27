@@ -30,7 +30,9 @@
  *     `merge_conflicts` records it.
  *   - **`ff-only`**: B's pull records the conflict, its push sends every
  *     other row, the hub keeps device A's `tracker_ref` and lacks B's
- *     row, B's store keeps it, and B's output holds the held line.
+ *     row, B's store keeps it, and B's output holds the held line. A
+ *     second `effort collect` neither sends the row nor prints the line:
+ *     the line is written once, by the push whose cut reaches the row.
  *   - **A file merge**: a conflict `rafa effort merge` records on B, from
  *     a store file the hub never saw, is held on B's next `effort
  *     collect`.
@@ -566,9 +568,12 @@ describe('a device pulls before it pushes, and holds the rows in conflict', () =
     expect(others.map((row) => row.split(' ')[0])).toEqual(expect.arrayContaining(['commits', 'findings']));
     expect(ownRows(hub.storePath, bOrigin)).toEqual(others);
 
-    // The push cursor moved past the held row, so the next contact does not send it.
+    // The push cursor moved past the held row, so the next contact does not send it, and
+    // prints no held line: the line is written once, by the push whose cut reaches the row.
+    // The first run's line above is the control that `syncLines` reads it.
     const again = await runCommand(b, EFFORT_COLLECT);
     expect(again.exitCode).toBe(0);
+    expect(syncLines(again.output)).toEqual([]);
     expect(ownRows(hub.storePath, bOrigin)).toEqual(others);
     expect(referenceOn(hub.storePath, SHARED_FINDING)).toEqual(REF_A);
     expect(conflictsOn(hub.storePath)).toEqual([]);
