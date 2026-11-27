@@ -234,6 +234,19 @@ its change reaches:
   switches that retake off and nothing else; read "A newly red file is
   run alone once" below
 
+**The Bun transpiler-cache line.** Bun caches the transpiled output of a source
+file at 51,200 bytes or more under `$HOME/.bun/install/cache/@t@/`, and a file
+under the line leaves no `.bun` there. One such file on the `rafa --help` load
+path turns the `runRafa` case of `src/tests/cli-capture.test.ts` red, with a
+message about `.bun` under `HOME` and nothing about size. That case spawns the
+CLI and imports no source, so `--changed` never selects it. The guard
+`src/tests/bun-cache-line.sweep.test.ts` reads the tracked `.ts` sources, not
+tests, declarations or installed and built trees, and fails naming each file at
+or over the line with its size. The `src/**/*.sweep.test.ts` glob above runs it
+in every step. When it fires, move one cohesive part of the named file into a
+module beside it and import that back; exported names keep their paths, or
+their importers move in the same commit.
+
 **The coupling reading is a survey reading, not a gate.**
 `bun scripts/survey/coupling.ts --max=20` reads `docs/survey/import-graph.json`,
 `docs/survey/cut-table.json` and the tracked files that import the feature
