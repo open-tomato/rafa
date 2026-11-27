@@ -346,10 +346,36 @@ function locateRepaired(model: PlanModel, named: string, position: number | unde
     : severalTasksWithText(holders.length, place, REPAIRED_TEXT);
 }
 
+/** True when `character` is a space, a tab or a newline: what a blank line holds. */
+function isBlank(character: string): boolean {
+  return character === ' ' || character === '\t' || character === '\n';
+}
+
+/**
+ * `text` less its leading lines of spaces and tabs, each with its
+ * newline, and its trailing ones from the newline that opens them, as
+ * `/^(?:[ \t]*\n)+/` and `/(?:\n[ \t]*)+$/` trimmed it. A scan from
+ * each end does it in linear time, where the second regex was tried from
+ * every newline of a long blank run (CodeQL js/polynomial-redos). `text`
+ * holds a character that is not blank.
+ */
+function withoutOuterBlankLines(text: string): string {
+  let start = 0;
+  for (let at = 0; at < text.length && isBlank(text.charAt(at)); at += 1) {
+    if (text.charAt(at) === '\n') start = at + 1;
+  }
+  let content = text.length;
+  while (content > start && isBlank(text.charAt(content - 1))) content -= 1;
+  const end = text.indexOf('\n', content);
+  return text.slice(start, end === -1
+    ? text.length
+    : end);
+}
+
 /** A context body less its outer blank lines, or null when it says nothing. */
 function contextBody(body: string | null): string | null {
   if (body === null || body.trim().length === 0) return null;
-  return body.replace(/^(?:[ \t]*\n)+/, '').replace(/(?:\n[ \t]*)+$/, '');
+  return withoutOuterBlankLines(body);
 }
 
 /** A heading and its present parts, a blank line between each. */

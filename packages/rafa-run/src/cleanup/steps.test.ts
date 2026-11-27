@@ -40,6 +40,16 @@ import {
 
 const NOW = new Date('2026-09-24T12:00:00Z');
 
+/**
+ * The spec's one-second bound on reading a crafted argv word: the old
+ * force pattern took about 2 s on {@link CRAFTED_RUN} characters and
+ * grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Characters in a crafted word's repeated run, the 50,000 of the plan's slow shape. */
+const CRAFTED_RUN = 50_000;
+
 function localBranch(name: string): LocalBranch {
   return { name, upstream: `origin/${name}`, gone: false, ahead: 0, lastCommit: NOW };
 }
@@ -417,10 +427,23 @@ describe('forcedFlagRefusal', () => {
     ['-f'],
     ['-ff'],
     ['-df'],
+    ['-fd'],
+    ['-xfy'],
   ])('refuses %s', (flag) => {
     expect(forcedFlagRefusal(['git', 'branch', flag, 'x'])).toBe(
       `rafa cleanup refuses a forced removal: \`${flag}\`. Nothing was run.`,
     );
+  });
+
+  it('lets a short flag word through when a hyphen follows its long f run, within REDOS_BOUND_MS', () => {
+    const word = `-f${'f'.repeat(CRAFTED_RUN)}-`;
+
+    const started = performance.now();
+    const refusal = forcedFlagRefusal(['git', 'branch', word, 'x']);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(refusal).toBeNull();
   });
 
   it('names every forcing word', () => {
@@ -436,6 +459,8 @@ describe('forcedFlagRefusal', () => {
     [['git', 'push', 'origin', '--delete', 'old-fix']],
     [['git', 'push', 'origin', '--delete', 'fix/force-f']],
     [['git', 'push', 'origin', '--delete', '+plus']],
+    [['git', 'branch', '-d-f', 'x']],
+    [['git', 'branch', '--forced', 'x']],
   ])('lets %p through', (argv) => {
     expect(forcedFlagRefusal(argv)).toBeNull();
   });

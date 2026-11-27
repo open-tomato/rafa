@@ -18,6 +18,16 @@ import { stubRegistry, TASKS_RESULT } from './testdata/registry.fixture.js';
 
 const ORIGIN = 'http://atlas.test';
 
+/**
+ * The spec's one-second bound on a crafted mount: the old trailing-slash
+ * trim took about 2.2 s on the 50,000-character shape below, and grows with
+ * its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Slashes in the crafted mount's run, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_SLASHES = 50_000;
+
 const ANSWER: AtlasResponse = {
   status: 201,
   headers: { 'content-type': 'application/json; charset=utf-8', 'x-answered': 'yes' },
@@ -205,5 +215,20 @@ describe('toFetchHandler, the answer it writes', () => {
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('POST');
+  });
+});
+
+describe('toFetchHandler, a crafted mount', () => {
+  it('trims no slash off a mount whose slash run is not at its end, within REDOS_BOUND_MS', async () => {
+    const basePath = `${'/'.repeat(CRAFTED_SLASHES)}x`;
+    const { handler, seen } = recorder();
+
+    const started = performance.now();
+    const fetchHandler = toFetchHandler(handler, { basePath });
+    const elapsed = performance.now() - started;
+    await fetchHandler(new Request(`${ORIGIN}${basePath}/sources`));
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(seen.map((request) => request.path)).toEqual(['/sources']);
   });
 });

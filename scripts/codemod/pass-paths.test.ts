@@ -102,6 +102,16 @@ describe('builtPaths', () => {
 
     expect(read('src/x.test.ts', text)).toEqual([]);
   });
+
+  it('reads a backslash in a constant\'s name as itself, never as a regex escape (CodeQL alert 34)', () => {
+    const imported: ReadonlyMap<string, BuiltPath> = new Map([['A\\B', { anchor: 'src/lib.ts', path: 'lib' }]]);
+    const text = lines(
+      'const a = join(AB, \'x.ts\');',
+      'const b = join(A\\B, \'y.ts\');',
+    );
+
+    expect(read('src/x.ts', text, { imported, isSpecifier: () => false })).toEqual([[2, ['lib/y.ts']]]);
+  });
 });
 
 describe('namedImports', () => {

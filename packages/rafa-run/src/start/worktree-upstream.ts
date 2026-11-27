@@ -125,11 +125,28 @@ export type Sleep = (ms: number) => void;
 /** The indent a quoted git line carries, as `./worktree.ts` indents its own. */
 const INDENT = '   ';
 
+/** What git's lock line says before the path of the config file; see the module note. */
+const CONFIG_LOCK_OPENING = 'could not lock config file ';
+
+/** What git's lock line ends with, after the path of the config file. */
+const CONFIG_LOCK_CLOSING = ': File exists';
+
+/** The line terminators a regular expression's `$` and `.` stop at. */
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/;
+
 /**
- * git's line for a config file whose lock another writer holds, whatever
- * path it names the file by; see the module note.
+ * Whether `line` is git's line for a config file whose lock another
+ * writer holds, whatever path it names the file by: the opening, at
+ * least one character of path, and the closing at the line's end.
+ * Read with `indexOf` and `endsWith` rather than a pattern, since an
+ * unanchored `.+` before the closing tried again from every opening
+ * the text repeats (CodeQL `js/polynomial-redos`).
  */
-const CONFIG_LOCK_HELD = /could not lock config file .+: File exists$/m;
+function isConfigLockLine(line: string): boolean {
+  if (!line.endsWith(CONFIG_LOCK_CLOSING)) return false;
+  const opening = line.indexOf(CONFIG_LOCK_OPENING);
+  return opening !== -1 && opening + CONFIG_LOCK_OPENING.length < line.length - CONFIG_LOCK_CLOSING.length;
+}
 
 /**
  * The upstream line for `branch`, `git` included and frozen: `git branch
@@ -147,7 +164,7 @@ export function upstreamArgv(branch: string): readonly string[] {
  * command that succeeded; see the module note.
  */
 export function isConfigLockRefusal(result: GitResult): boolean {
-  return !result.ok && CONFIG_LOCK_HELD.test(result.stderr);
+  return !result.ok && result.stderr.split(LINE_TERMINATOR).some((line) => isConfigLockLine(line));
 }
 
 /**

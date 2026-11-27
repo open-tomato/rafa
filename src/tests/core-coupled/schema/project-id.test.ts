@@ -49,6 +49,24 @@ import {
 } from '@open-tomato/rafa/schema/project-id';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 
+/**
+ * The spec's one-second bound on a crafted remote: the old credential
+ * strip took about 3.7 s on {@link CRAFTED_SCHEMES} schemes and the old
+ * trailing-slash trim about 2.2 s on {@link CRAFTED_SLASHES} slashes,
+ * each tried from every start of its run and growing with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/**
+ * `://` repeats in the crafted remote, 100,002 characters: at the plan's
+ * 50,000 the old strip took about 0.9 s, under the bound, so the shape
+ * is doubled for the case to fail on it.
+ */
+const CRAFTED_SCHEMES = 33_334;
+
+/** Slashes in the crafted remote's run, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_SLASHES = 50_000;
+
 /** A remote, what the shell normalises it to, and the id it hashes to. */
 const REMOTES: readonly (readonly [string, string, string])[] = [
   ['git@github.com:open-tomato/rafa.git', 'github.com/open-tomato/rafa', 'a8785cdba525'],
@@ -116,6 +134,47 @@ describe('the project id', () => {
     expect(projectId('/anywhere', { readRemote: () => 'git@github.com:open-tomato/rafa.git' }))
       .toBe('a8785cdba525');
     expect(projectId('/anywhere', { readRemote: () => null })).toBeNull();
+  });
+});
+
+describe('the credential strip and the slash trim', () => {
+  test('strips the credentials after the first scheme that has some, up to the first @, once', () => {
+    expect(normalizeRemote('https://user:pw@Host.com/O/R.git')).toBe('host.com/o/r');
+    expect(normalizeRemote('ssh://a@b://c@d/r')).toBe('b://c@d/r');
+    expect(normalizeRemote('x://@y://u@h/r')).toBe('@y://h/r');
+    expect(normalizeRemote('http://h/a@b')).toBe('b');
+  });
+
+  test('strips nothing where no scheme holds credentials', () => {
+    expect(normalizeRemote('https://@host.com/r')).toBe('@host.com/r');
+    expect(normalizeRemote('a@b')).toBe('a@b');
+  });
+
+  test('drops every trailing slash and keeps an inner run', () => {
+    expect(normalizeRemote('https://host.com/r//')).toBe('host.com/r');
+    expect(normalizeRemote('a/////x')).toBe('a/////x');
+  });
+
+  test('strips no credentials from a long run of schemes holding no @, within REDOS_BOUND_MS', () => {
+    const url = '://'.repeat(CRAFTED_SCHEMES);
+
+    const started = performance.now();
+    const normalized = normalizeRemote(url);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(normalized).toBe(`${'://'.repeat(CRAFTED_SCHEMES - 1)}:`);
+  });
+
+  test('trims no slash off a remote whose slash run is not at its end, within REDOS_BOUND_MS', () => {
+    const url = `a${'/'.repeat(CRAFTED_SLASHES)}x`;
+
+    const started = performance.now();
+    const normalized = normalizeRemote(url);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(normalized).toBe(url);
   });
 });
 

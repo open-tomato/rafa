@@ -328,13 +328,14 @@ export function renderConceptsJson(map: ConceptMap): string {
 }
 
 /**
- * Escapes a pipe so a value stays in its markdown table cell.
+ * Escapes a backslash and a pipe so a value stays in its markdown table
+ * cell: a backslash escaped first, so one before a pipe cannot unescape it.
  *
  * @param text - A cell's text.
- * @returns The text with every `|` escaped.
+ * @returns The text with every `\\` and every `|` escaped.
  */
 function cell(text: string): string {
-  return text.replace(/\|/g, '\\|');
+  return text.replace(/[\\|]/g, '\\$&');
 }
 
 /**

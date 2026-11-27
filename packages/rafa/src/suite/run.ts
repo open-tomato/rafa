@@ -492,11 +492,21 @@ function unescapeXml(value: string): string {
   });
 }
 
+/**
+ * A run of name characters, then its `="value"` when one follows. Each
+ * match takes a whole run, so no start inside one is tried: the pattern
+ * `/([\w:-]+)="([^"]*)"/g` was tried from every character of a long run
+ * holding no `=` (CodeQL js/polynomial-redos), and a start inside a run
+ * ends where the run does, so it never matched where the run's own start
+ * did not.
+ */
+const NAME_AND_VALUE = /([\w:-]+)(?:="([^"]*)")?/g;
+
 /** The attributes of one tag, their values unescaped. */
 export function attributesOf(text: string): Readonly<Record<string, string>> {
   const found: Record<string, string> = {};
-  for (const match of text.matchAll(/([\w:-]+)="([^"]*)"/g)) {
-    found[match[1] ?? ''] = unescapeXml(match[2] ?? '');
+  for (const match of text.matchAll(NAME_AND_VALUE)) {
+    if (match[2] !== undefined) found[match[1] ?? ''] = unescapeXml(match[2]);
   }
   return found;
 }

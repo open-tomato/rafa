@@ -247,6 +247,22 @@ function applyTag(state: ParseState, closing: boolean, tag: string, attributes: 
 }
 
 /**
+ * The text with its CDATA and comment spans removed, again until none is
+ * left: one pass can join the two halves of a nested span into a new one.
+ *
+ * @param xml - A report's text.
+ * @returns The text with no `<![CDATA[…]]>` or `<!--…-->` span.
+ */
+function withoutIgnoredSpans(xml: string): string {
+  let text = xml;
+  for (let previous = ''; previous !== text;) {
+    previous = text;
+    text = text.replace(IGNORED_SPANS, '');
+  }
+  return text;
+}
+
+/**
  * Reads a `bun test --reporter=junit` report. Pure: the caller reads the
  * file.
  *
@@ -256,7 +272,7 @@ function applyTag(state: ParseState, closing: boolean, tag: string, attributes: 
  */
 export function parseJunit(xml: string): JunitRun {
   const state: ParseState = { cases: [], open: undefined, suites: [], wallMicros: undefined };
-  for (const match of xml.replace(IGNORED_SPANS, '').matchAll(TAG)) {
+  for (const match of withoutIgnoredSpans(xml).matchAll(TAG)) {
     applyTag(state, match[1] === '/', match[2] ?? '', attributesOf(match[3] ?? ''), match[4] === '/');
   }
   if (state.wallMicros === undefined) {

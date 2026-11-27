@@ -108,8 +108,8 @@ export interface FailedCase {
 /** A marker line ending a case: its kind and the text after it. */
 const MARKER_LINE = /^\((pass|fail|skip|todo)\) (.*)$/;
 
-/** The time Bun appends to a marker line, as ` [0.19ms]`. */
-const TRAILING_TIME = /\s+\[\d+(?:\.\d+)?m?s\]$/;
+/** The time Bun appends to a marker line, alone, as `[0.19ms]`. */
+const BRACKETED_TIME = /^\[\d+(?:\.\d+)?m?s\]$/;
 
 /** The line under a timed-out case's `(fail)` line, as `  ^ this test timed out after 50ms.`. */
 const TIMEOUT_NOTE = /^\s+\^ (\S.*)$/;
@@ -155,13 +155,30 @@ interface CaseWalk {
   readonly cases: readonly FailedCase[];
 }
 
+/**
+ * `label` less the time Bun appends and the whitespace before it, as
+ * `/\s+\[\d+(?:\.\d+)?m?s\]$/` took them off; unchanged when it ends in
+ * no time or no whitespace stands before it. The time holds no `[`, so it
+ * opens at the last one, and the read is linear, where that regex was
+ * tried from every character of a long whitespace run (CodeQL
+ * js/polynomial-redos).
+ */
+function withoutTrailingTime(label: string): string {
+  const open = label.lastIndexOf('[');
+  if (open === -1 || !BRACKETED_TIME.test(label.slice(open))) return label;
+  const name = label.slice(0, open).trimEnd();
+  return name.length === open
+    ? label
+    : name;
+}
+
 /** The failed case whose `(fail)` line is `lines[index]`, holding `label`, under `file`. */
 function failedCase(lines: readonly string[], walk: CaseWalk, index: number, label: string, file: string): FailedCase {
   const timeout = TIMEOUT_NOTE.exec(lines[index + 1] ?? '');
   const errorLines = timeout === null
     ? errorLinesOf(lines.slice(walk.start, index))
     : [keptLine(timeout[1] ?? '')];
-  return { file, name: label.replace(TRAILING_TIME, ''), label, errorLines };
+  return { file, name: withoutTrailingTime(label), label, errorLines };
 }
 
 /** Takes `lines[index]` into the walk: a header opens a file, a marker line ends a case. */

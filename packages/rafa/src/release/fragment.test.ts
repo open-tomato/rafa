@@ -65,6 +65,18 @@ const VALID_FRAGMENT: Fragment = {
 const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..');
 
 /**
+ * The spec's one-second bound on a crafted directory. The old
+ * trailing-slash trim took about 2.2 s on a run of
+ * {@link CRAFTED_SLASHES} slashes, but `directoryPrefix` normalises the
+ * path first, which collapses the run, so the case passed on the old
+ * trim too (about 0.2 ms): it guards the trim against a reordering.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Slashes in the crafted directory's run, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_SLASHES = 50_000;
+
+/**
  * `release.packageFragments` as this repository's `rafa.config.ts` sets
  * it: the last entry naming it answers, and the default when none does.
  */
@@ -294,6 +306,18 @@ describe('directoryPrefix', () => {
     expect(directoryPrefix('.changes')).toBe('.changes/');
     expect(directoryPrefix('./.changes/')).toBe('.changes/');
     expect(directoryPrefix('.')).toBe('');
+  });
+
+  test('answers a directory holding a long slash run, within REDOS_BOUND_MS', () => {
+    const inner = `a${'/'.repeat(CRAFTED_SLASHES)}x`;
+    const trailing = `a${'/'.repeat(CRAFTED_SLASHES)}`;
+
+    const started = performance.now();
+    const prefixes = [directoryPrefix(inner), directoryPrefix(trailing)];
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(prefixes).toEqual(['a/x/', 'a/']);
   });
 });
 

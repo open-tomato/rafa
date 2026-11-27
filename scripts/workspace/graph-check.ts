@@ -318,7 +318,7 @@ function namedPackage(specifier: string, aliases: readonly PathAlias[], members:
     : specifier === entry.prefix);
   const target = alias === undefined
     ? undefined
-    : alias.target.replace('*', specifier.slice(alias.prefix.length, specifier.length - alias.suffix.length));
+    : alias.target.replaceAll('*', specifier.slice(alias.prefix.length, specifier.length - alias.suffix.length));
   const owner = target === undefined
     ? undefined
     : members.find((member) => target === member.absolute || target.startsWith(`${member.absolute}/`));
