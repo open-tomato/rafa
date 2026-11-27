@@ -21,6 +21,12 @@
  * no file: the case reads the library the `sqlite` opener is handed, and
  * the opener it hands in opens the real connector without it.
  *
+ * The `store.opened` cases open the real `sqlite` connector over a
+ * stubbed macOS loader, on a loader state of the case's own, whose
+ * `setCustomSQLite` names the library or refuses it, and read the
+ * `sqliteVec` the line holds; under `postgres` the stand-in connector is
+ * the `sqlite` one, which answers a `sqliteVec` the line must not hold.
+ *
  * `rafa-hub index rebuild` runs over a store the `sqlite` connector made
  * under the case's root, seeded with one commit pushed from a real
  * export (`@open-tomato/rafa/store`), so the counts it prints are read
@@ -35,6 +41,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { encodeWirePayload, exportWirePayload, openSqliteStore, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { createLoaderState } from '@open-tomato/rafa-index/loader';
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
@@ -1229,5 +1236,63 @@ describe('runIndexRebuild and the SQLite library', () => {
     expect(err[0]).toStartWith('rafa-hub index rebuild: the config was refused: ');
     expect(err[0]).toContain('expected one library: remove hub.store.sqliteLibrary');
     expect(handed).toEqual([]);
+  });
+});
+
+/** The library the stubbed loader names; no file is there, since its `setCustomSQLite` never opens it. */
+const STUB_LIBRARY = '/nonexistent/rafa-1614/libsqlite3.dylib';
+
+/** A `sqlite` opener over the real connector, its loader a stubbed macOS one whose `setCustomSQLite` answers `named`. */
+function stubbedLoaderSqlite(named: boolean): SqliteHubOpener {
+  return (context, options) => connectSqliteHub(context, {
+    ...options,
+    loader: { library: STUB_LIBRARY, platform: 'darwin', setCustomSQLite: () => named, state: createLoaderState() },
+  });
+}
+
+describe('runHub and the store.opened line', () => {
+  /** Starts the hub over `env` and `options`, asks `/health` once, and answers the `store.opened` lines it logged. */
+  async function openedLines(env: Record<string, string>, options: Parameters<typeof runHub>[1]): Promise<HubLogEntry[]> {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const server = await runHub(env, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1', ...options });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(200);
+    return logged.filter((entry) => entry.event === 'store.opened');
+  }
+
+  it('holds the sqlite connector\'s sqliteVec, loaded with no why, when the stubbed loader names the library', async () => {
+    const lines = await openedLines({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { connectSqlite: stubbedLoaderSqlite(true) });
+
+    expect(lines).toEqual([{ level: 'info', event: 'store.opened', sqliteVec: { loaded: true, why: null } }]);
+  });
+
+  it('holds the sqlite connector\'s sqliteVec, not loaded with the loader\'s why, when the stubbed loader refuses the library', async () => {
+    const lines = await openedLines({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { connectSqlite: stubbedLoaderSqlite(false) });
+
+    expect(lines).toEqual([{
+      level: 'info',
+      event: 'store.opened',
+      sqliteVec: { loaded: false, why: `Database.setCustomSQLite(${STUB_LIBRARY}) loaded no library` },
+    }]);
+  });
+
+  it('holds no sqliteVec under hub.store.engine postgres, though the stand-in connector answers one', async () => {
+    const answered: unknown[] = [];
+    const env = { [HUB_CONFIG_ENV]: writeConfig(await freePort(), POSTGRES_STORE), [PG_URL_VARIABLE]: 'postgres://stand-in' };
+
+    const lines = await openedLines(env, {
+      connectPostgres: async (context) => {
+        const hub = await connectSqliteHub(context, { loader: { state: createLoaderState() } });
+        answered.push(hub.sqliteVec);
+        return hub;
+      },
+    });
+
+    expect(answered).toHaveLength(1);
+    expect(answered[0]).toBeDefined();
+    expect(lines).toEqual([{ level: 'info', event: 'store.opened' }]);
   });
 });

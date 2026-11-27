@@ -561,15 +561,18 @@ function servedProjects(config: HubConfig): readonly HubServedProject[] {
  * Opens the connector `hub.store.engine` names over `config`'s projects
  * and its payload cap: under `postgres` by `openers.connectPostgres`, its
  * URL read from `env` by the variable `hub.store.postgres.urlVariable`
- * names; under `sqlite` by `openers.connectSqlite`, each project's store
- * and index in its file, the loader handed
- * `sqliteLibrary`, the library {@link chooseSqliteLibrary} picked.
+ * names, and answers its store and index alone, so the `store.opened`
+ * line holds no `sqliteVec`; under `sqlite` by `openers.connectSqlite`,
+ * each project's store and index in its file, the loader handed
+ * `sqliteLibrary`, the library {@link chooseSqliteLibrary} picked, and
+ * answers the connector's `sqliteVec` with them.
  */
 function connectHub(config: HubConfig, sqliteLibrary: string | null, env: HubEnv, openers: HubOpeners): Promise<HubConnected> {
   const { storePath, repository, projects, maxPayloadRows } = config;
   const context: HubStoreContext = { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config), maxPayloadRows };
   if (config.storeEngine === 'postgres') {
-    return openers.connectPostgres(context, { urlVariable: config.postgresUrlVariable ?? DEFAULT_POSTGRES_URL_VARIABLE, env });
+    const opened = openers.connectPostgres(context, { urlVariable: config.postgresUrlVariable ?? DEFAULT_POSTGRES_URL_VARIABLE, env });
+    return opened.then(({ store, index }) => ({ store, index }));
   }
 
   return openers.connectSqlite(
