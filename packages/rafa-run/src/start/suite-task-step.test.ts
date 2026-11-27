@@ -129,14 +129,24 @@ function scriptedGit(answers: Readonly<Record<string, GitResult>>, calls: string
   };
 }
 
-/** The git answers of a checkout at {@link HEAD} whose diff from `from` is `paths`, tracking `tracked` when handed. */
-function gitAt(diffs: Readonly<Record<string, readonly string[]>>, calls: string[] = [], tracked?: readonly string[]): GitRunner {
+/** The words of the diff the facade reader (`facade-always-run.ts`) reads from `from`. */
+function unifiedDiffFrom(from: string): string {
+  return `diff --unified=0 --no-renames --no-color ${from} HEAD`;
+}
+
+/**
+ * The git answers of a checkout at {@link HEAD} whose diff from `from` is
+ * `paths`, tracking `tracked` when handed. Its unified diff from `from`
+ * is `unified[from]`, or empty, so it adds no facade test.
+ */
+function gitAt(diffs: Readonly<Record<string, readonly string[]>>, calls: string[] = [], tracked?: readonly string[], unified: Readonly<Record<string, string>> = {}): GitRunner {
   const answers: Record<string, GitResult> = {
     'rev-parse --verify HEAD^{commit}': { ok: true, stdout: `${HEAD}\n`, stderr: '' },
   };
   if (tracked !== undefined) answers['ls-files -z'] = { ok: true, stdout: tracked.map((path) => `${path}\0`).join(''), stderr: '' };
   for (const [from, paths] of Object.entries(diffs)) {
     answers[`diff --name-only -z --no-renames ${from} HEAD`] = { ok: true, stdout: paths.map((path) => `${path}\0`).join(''), stderr: '' };
+    answers[unifiedDiffFrom(from)] = { ok: true, stdout: unified[from] ?? '', stderr: '' };
   }
   return scriptedGit(answers, calls);
 }
@@ -604,6 +614,119 @@ describe('runTaskStep with tests.alwaysRun', () => {
     expect(second.seen.runs).toHaveLength(2);
     expect(stoppedSecond).toMatchObject({ red: false, interrupted: true, blocker: null });
     expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+});
+
+describe('runTaskStep joining the facade tests a new deep import reaches', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const glob = ['src/**/*.sweep.test.ts'];
+  const sweep = 'src/tests/leak.sweep.test.ts';
+  const facade = 'packages/rafa-board/index.test.ts';
+  const tracked = ['src/a.ts', 'src/a.test.ts', 'src/b/x.ts', 'src/b/b.test.ts', sweep];
+  const facadeRed: SuiteFailure = { file: facade, name: 'rafa-board facade > exports every name the tree takes' };
+  const addedLine = `🧩 Facade check added: ${facade} (a new deep import in src/a.ts)`;
+
+  /** A `--unified=0` diff of `src/a.ts` adding `line`. */
+  function diffAdding(line: string): string {
+    return ['diff --git a/src/a.ts b/src/a.ts', 'index 1111111..2222222 100644', '--- a/src/a.ts', '+++ b/src/a.ts', '@@ -1,0 +2 @@', `+${line}`, ''].join('\n');
+  }
+
+  const rootImport = diffAdding('import { boardOf } from \'@open-tomato/rafa-board\';');
+  const deepImport = diffAdding('import { createGhEditorLogin } from \'@open-tomato/rafa-board/board/trust\';');
+
+  /** The lines the join printed. */
+  function facadeLines(): readonly string[] {
+    return linesAt('info').filter((line) => line.startsWith('🧩'));
+  }
+
+  beforeEach(() => {
+    mkdirSync(join(dir, 'packages', 'rafa-board'), { recursive: true });
+    writeFileSync(join(dir, facade), '', 'utf8');
+  });
+
+  it('adds no path and prints no line for a diff whose only import of the package is its root', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result(), result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, calls, tracked, { [BASE]: rootImport }) });
+    const outcome = await runTaskStep(context, input);
+
+    expect(calls).toContain(unifiedDiffFrom(BASE));
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.runs[1]?.paths).toEqual([sweep]);
+    expect(facadeLines()).toEqual([]);
+    expect(linesAt('warn')).toEqual([]);
+    expect(outcome).toMatchObject({ red: false, blocker: null });
+  });
+
+  it('runs no second run for the same root import under [], so nothing was added to run', async () => {
+    const { context, seen } = contextWith([result()], { alwaysRun: [], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked, { [BASE]: rootImport }) });
+    await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(1);
+    expect(facadeLines()).toEqual([]);
+  });
+
+  it('prints the line and runs the facade test after the always-run files for a diff adding a deep import', async () => {
+    const { context, seen } = contextWith([result(), result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked, { [BASE]: deepImport }) });
+    const outcome = await runTaskStep(context, input);
+
+    expect(facadeLines()).toEqual([addedLine]);
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.runs[0]).toMatchObject({ changedSince: BASE });
+    expect(seen.runs[1]).toMatchObject({ paths: [sweep, facade], junitFile: alwaysRunJunitFileFor(dir, SESSION) });
+    expect(outcome).toMatchObject({ red: false, blocker: null });
+  });
+
+  it('runs the facade test as the second run under [], which ran none for the root import', async () => {
+    const { context, seen } = contextWith([result(), result()], { alwaysRun: [], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked, { [BASE]: deepImport }) });
+    await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.runs[1]?.paths).toEqual([facade]);
+    expect(facadeLines()).toEqual([addedLine]);
+  });
+
+  it('adds the facade test once, in the glob\'s sorted place, and prints no line when the always-run files already name it', async () => {
+    const { context, seen } = contextWith([result(), result()], {
+      alwaysRun: [...glob, 'packages/*/index.test.ts'],
+      git: gitAt({ [BASE]: ['src/a.ts'] }, [], [...tracked, facade], { [BASE]: deepImport }),
+    });
+    await runTaskStep(context, input);
+
+    expect(seen.runs[1]?.paths).toEqual([facade, sweep]);
+    expect(facadeLines()).toEqual([]);
+  });
+
+  it('settles the step red on a red facade result, naming the facade test in the blocker', async () => {
+    const { context, seen } = contextWith([result(), red([facadeRed])], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked, { [BASE]: deepImport }) });
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs[1]?.paths).toContain(facade);
+    expect(outcome.red).toBe(true);
+    expect(seen.steps[0]?.newFailures).toEqual([facadeRed]);
+    expect(outcome.blocker).toContain(`${facade} (1 test)`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.status).toBe('blocked');
+  });
+
+  it('puts the facade test in a module step\'s own path list, in one run', async () => {
+    const { context, seen } = contextWith([result()], {
+      alwaysRun: glob,
+      owns: ['src/b'],
+      git: gitAt({ [BASE]: ['src/b/x.ts'] }, [], tracked, { [BASE]: deepImport }),
+    });
+    await runTaskStep(context, { ...input, declared: 'module' });
+
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.paths).toEqual(['src/b/b.test.ts', sweep, facade]);
+  });
+
+  it('reads no unified diff for a full step, which runs every facade test already', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, calls, tracked, { [BASE]: deepImport }) });
+    await runTaskStep(context, { ...input, declared: 'full' });
+
+    expect(seen.runs).toHaveLength(1);
+    expect(calls).not.toContain(unifiedDiffFrom(BASE));
+    expect(facadeLines()).toEqual([]);
   });
 });
 
