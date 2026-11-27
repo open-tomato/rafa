@@ -57,8 +57,9 @@ import { createAdapterRegistry, PORT_VERSIONS } from '@open-tomato/rafa/core/ada
 import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 import { openSqliteStore, WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
 import { SQLITE_MIGRATIONS } from '@open-tomato/rafa/store/migrations';
-import { createHubContact, hubLine } from '@open-tomato/rafa-effort/effort/sync/contact';
+import { conflictedLine, createHubContact, hubLine } from '@open-tomato/rafa-effort/effort/sync/contact';
 
+import { SYNC_STATE_FILE_NAME } from '../../../packages/rafa-sync-service/src/state.js';
 import { createServiceSync } from '../../../packages/rafa-sync-service/src/sync.js';
 import { startStandInHub } from '../../../packages/rafa-sync-service/src/testdata/stand-in-hub.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
@@ -96,6 +97,7 @@ const AT: Omit<HubSyncContacted, 'status' | 'stop'> = {
   pending: null,
   push: null,
   pull: null,
+  conflicted: null,
   hub: { outcome: 'skipped' },
 };
 
@@ -188,6 +190,19 @@ describe('rafa effort sync, a whole sync', () => {
     ]);
   });
 
+  it('prints the held line, then the hub line, after a push that left one conflicted row out, beside a push leaving none', async () => {
+    const outcome = await run([], { ...synced(3), conflicted: 1 }, [PROJECTED]);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout)).toEqual([
+      `warn: ${PROJECTED}`,
+      `warn: ${conflictedLine(1)}`,
+      'hub: reachable, contract 1, project rafa; pulled 3 rows',
+    ]);
+    expect(conflictedLine(1)).toBe('effort sync: 1 rows held: they differ from the hub\'s copy (merge_conflicts); the rest was pushed');
+    expect(lines((await run([], { ...synced(3), conflicted: 0 })).stdout)).toEqual(['hub: reachable, contract 1, project rafa; pulled 3 rows']);
+  });
+
   it('prints the one offline line and no hub line for an unreachable hub, exiting 0', async () => {
     const reading: HubSyncReading = { ...AT, stop: null, status: { outcome: 'unreachable', problem: 'connect refused' } };
 
@@ -264,6 +279,17 @@ describe('rafa effort sync --dry-run', () => {
     expect(outcome.contacts.inputs.map((input) => input.stop)).toEqual(['dry-run']);
     expect(lines(outcome.stdout)).toEqual([
       'hub: reachable, contract 1, project rafa; dry run: 5 rows to push, 7 rows to pull, 2 rows in conflict; nothing was written',
+    ]);
+  });
+
+  it('adds the rows the push would hold after the conflicts, and writes no held line of its own', async () => {
+    const reading: HubSyncReading = { ...synced(7, 0, 2), stop: 'dry-run', pending: { outcome: 'done', result: 5 }, conflicted: 1 };
+
+    const outcome = await run(['--dry-run'], reading);
+
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([
+      'hub: reachable, contract 1, project rafa; dry run: 5 rows to push, 7 rows to pull, 2 rows in conflict; 1 rows would be held;'
+      + ' nothing was written',
     ]);
   });
 
@@ -480,13 +506,13 @@ function realContact(sync: Sync): (input: SyncContactInput) => Promise<HubSyncRe
 }
 
 describe('rafa effort sync over the real contact and a stub service strategy', () => {
-  it('pushes, pulls and prints the hub line naming this port\'s project', async () => {
+  it('pulls, pushes and prints the hub line naming this port\'s project, under effort.syncMerge: ff-only, the default', async () => {
     const calls: Call[] = [];
 
     const outcome = await dispatchInProject(['effort', 'sync'], [EFFORT_SUBJECT], [createSyncCommand({ contact: realContact(stubService(calls)) })], plant());
 
     expect(outcome.exitCode).toBe(0);
-    expect(calls).toEqual(['hubStatus', 'push', 'pull']);
+    expect(calls).toEqual(['hubStatus', 'pull', 'push']);
     expect(lines(outcome.stdout)).toEqual([
       hubLine({ contractVersion: WIRE_CONTRACT_VERSION, projectId: 'p-2', projectName: 'Beta', pulled: 9, heldBack: 0 }),
     ]);
@@ -502,13 +528,13 @@ describe('rafa effort sync over the real contact and a stub service strategy', (
     expect(lines(outcome.stdout)).toEqual([`hub: reachable, contract ${String(WIRE_CONTRACT_VERSION)}, project Beta; 6 rows waiting to push`]);
   });
 
-  it('pushes and pulls as dry runs under --dry-run, printing the counts', async () => {
+  it('pulls and pushes as dry runs under --dry-run, printing the counts', async () => {
     const calls: Call[] = [];
 
     const outcome = await dispatchInProject(['effort', 'sync', '--dry-run'], [EFFORT_SUBJECT], [createSyncCommand({ contact: realContact(stubService(calls)) })], plant());
 
     expect(outcome.exitCode).toBe(0);
-    expect(calls).toEqual(['hubStatus', 'push --dry-run', 'pull --dry-run']);
+    expect(calls).toEqual(['hubStatus', 'pull --dry-run', 'push --dry-run']);
     expect(lines(outcome.stdout)).toEqual([
       `hub: reachable, contract ${String(WIRE_CONTRACT_VERSION)}, project Beta; dry run: 6 rows to push, 9 rows to pull, 1 rows in conflict;`
       + ' nothing was written',
@@ -602,9 +628,15 @@ interface Device {
   readonly append: (rows: readonly CommitEffortRow[]) => void;
 }
 
-/** The project config naming the `service` strategy and the hub at `url`. */
-function serviceConfig(url: string): string {
-  return `effort:\n  sync: service\nhub:\n  url: ${url}\n`;
+/** The `effort.syncMerge` value a project config names; the default when left out. */
+type SyncMerge = 'ff-only' | 'merge';
+
+/** The project config naming the `service` strategy and the hub at `url`, with `syncMerge` when one is named. */
+function serviceConfig(url: string, syncMerge?: SyncMerge): string {
+  const merge = syncMerge === undefined
+    ? ''
+    : `  syncMerge: ${syncMerge}\n`;
+  return `effort:\n  sync: service\n${merge}hub:\n  url: ${url}\n`;
 }
 
 /** A device holding `rows` commits of its own, its config naming `url`. */
@@ -632,6 +664,7 @@ async function seed(at: Device, url: string): Promise<void> {
 interface ServiceOptions {
   readonly token?: string | null;
   readonly project?: string;
+  readonly syncMerge?: SyncMerge;
 }
 
 /** A contact seam over the real contact and the real `service` strategy for the hub at `url`. */
@@ -649,7 +682,7 @@ function serviceContact(url: string, options: ServiceOptions = {}): (input: Sync
       readSecret: () => Promise.resolve(token),
     });
     const adapters = createAdapterRegistry([{ port: 'sync', kind: 'service', portVersion: PORT_VERSIONS.sync, create }]);
-    const resolved = resolveConfig({ cli: {}, file: parseConfigText(serviceConfig(url), join(input.roots.root, '.rafa', 'config.yaml')), user: null });
+    const resolved = resolveConfig({ cli: {}, file: parseConfigText(serviceConfig(url, options.syncMerge), join(input.roots.root, '.rafa', 'config.yaml')), user: null });
     return createHubContact(
       { root: input.roots.root, home: input.roots.home, resolved, warn: input.warn },
       { modules: { adapters, manifest: { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS } } },
@@ -696,7 +729,7 @@ describe('rafa effort sync --status over a fake hub', () => {
     const whole = await syncAt(at, over.url);
 
     expect(whole.exitCode).toBe(0);
-    expect(over.requests.slice(requestsBefore).map(({ method, path }) => `${method} ${path}`)).toEqual(['POST /v1/effort/push', 'GET /v1/effort/pull']);
+    expect(over.requests.slice(requestsBefore).map(({ method, path }) => `${method} ${path}`)).toEqual(['GET /v1/effort/pull', 'POST /v1/effort/push']);
     expect(filesIn(at.storeDir)).not.toEqual(filesBefore);
   });
 
@@ -748,10 +781,75 @@ describe('rafa effort sync --dry-run over a fake hub', () => {
     const whole = await syncAt(at, over.url);
 
     expect(whole.exitCode).toBe(0);
-    expect(lines(whole.stdout)).toEqual([expect.stringMatching(/^hub: reachable, contract \d+, project \S+; pulled \d+ rows$/u)]);
+    // Its pull records the shared row's conflict, so its push, under ff-only, holds that row.
+    expect(lines(whole.stdout)).toEqual([
+      `warn: ${conflictedLine(1)}`,
+      expect.stringMatching(/^hub: reachable, contract \d+, project \S+; pulled \d+ rows$/u),
+    ]);
     expect(Object.keys(filesIn(at.storeDir)).length).toBeGreaterThanOrEqual(Object.keys(filesBefore).length);
     expect(filesIn(at.storeDir)).not.toEqual(filesBefore);
     expect(over.requests.map(({ method }) => method)).toContain('POST');
+  });
+});
+
+describe('rafa effort sync --dry-run over a fake hub, a conflict recorded', () => {
+  /**
+   * A device holding a commit of its own that a peer pushed to the hub
+   * at another time, pulled so its merge records the conflict, and never
+   * pushed: the row is past its push cursor and `merge_conflicts` names it.
+   */
+  async function recordedConflict(): Promise<{ readonly over: StandInHub; readonly at: Device }> {
+    const over = await seededHub();
+    await seed(deviceOf(over.url, [commitOf('shared', '2026-10-01T09:00:00.000Z')]), over.url);
+    const at = deviceOf(over.url, [commitOf('shared', '2026-10-01T10:00:00.000Z'), commitOf('own-1')]);
+    const pulled = await createServiceSync({
+      repoRoot: at.project.root,
+      backend: 'sqlite',
+      hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: 2000 },
+      readSecret: () => Promise.resolve(TOKEN),
+    }).pull({ from: null, dryRun: false });
+    expect(pulled).toMatchObject({ status: 'pulled', merge: { rowsInConflict: 1 } });
+    return { over, at };
+  }
+
+  it('reports 1 rows would be held under ff-only, leaving the store and sync-service.json byte-for-byte unchanged', async () => {
+    const { over, at } = await recordedConflict();
+    const filesBefore = filesIn(at.storeDir);
+    const requestsBefore = over.requests.length;
+
+    const outcome = await syncAt(at, over.url, ['--dry-run'], { syncMerge: 'ff-only' });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([
+      expect.stringMatching(/^hub: reachable, contract \d+, project \S+; dry run: \d+ rows to push, \d+ rows to pull, \d+ rows in conflict; 1 rows would be held; nothing was written$/u),
+    ]);
+    expect(Object.keys(filesBefore)).toContain(SYNC_STATE_FILE_NAME);
+    expect(filesIn(at.storeDir)).toEqual(filesBefore);
+    expect(over.requests.slice(requestsBefore).map(({ method }) => method)).toEqual(['GET']);
+
+    // The control: the whole sync on the same device holds the row, prints the held line and writes the store folder.
+    const whole = await syncAt(at, over.url, [], { syncMerge: 'ff-only' });
+
+    expect(whole.exitCode).toBe(0);
+    expect(lines(whole.stdout + whole.stderr)).toEqual([
+      `warn: ${conflictedLine(1)}`,
+      expect.stringMatching(/^hub: reachable, contract \d+, project \S+; pulled \d+ rows$/u),
+    ]);
+    expect(filesIn(at.storeDir)).not.toEqual(filesBefore);
+  });
+
+  it('prints no held count under merge for the same recorded conflict, writing nothing', async () => {
+    const { over, at } = await recordedConflict();
+    const filesBefore = filesIn(at.storeDir);
+
+    const outcome = await syncAt(at, over.url, ['--dry-run'], { syncMerge: 'merge' });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([
+      expect.stringMatching(/^hub: reachable, contract \d+, project \S+; dry run: \d+ rows to push, \d+ rows to pull, \d+ rows in conflict; nothing was written$/u),
+    ]);
+    expect(outcome.stdout).not.toContain('would be held');
+    expect(filesIn(at.storeDir)).toEqual(filesBefore);
   });
 });
 

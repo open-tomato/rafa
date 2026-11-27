@@ -7,11 +7,12 @@
  * the strategy keeps the cursors: each bounded push moves its push
  * cursor past the rows it sent, and each pull its pull cursor past the
  * page it merged. `contact.ts`'s module note, `The payload cap`, is the
- * authority for what each does.
+ * authority for what each does, and its `The order` for a push leaving
+ * out the conflicted rows.
  */
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '@open-tomato/rafa/ports';
 
-import { countOf, memberOf, pageRowsOf } from './contact-facts.js';
+import { conflictedOf, countOf, memberOf, pageRowsOf } from './contact-facts.js';
 
 /**
  * The hub's cap as a run has it: a number of rows, null for none, or
@@ -26,11 +27,19 @@ export interface BoundedPushRequest extends SyncPushRequest {
   readonly limit: number;
 }
 
+/** A push asked to leave out every row `merge_conflicts` names, as `contact.ts`'s `pull-then-push` asks it. */
+interface ConflictedPushRequest extends SyncPushRequest {
+  readonly leaveOutConflicted: true;
+}
+
 /** The pages one pull repeats at most before it stops, leaving the rest to the next contact. */
 export const MAX_PULL_PAGES = 1000;
 
 /** The push every contact asks for when it bounds nothing: the strategy reaches the hub itself. */
 const WHOLE_PUSH: SyncPushRequest = Object.freeze({ to: null });
+
+/** {@link WHOLE_PUSH} leaving out the conflicted rows. */
+const WHOLE_PUSH_LEAVING_OUT: ConflictedPushRequest = Object.freeze({ to: null, leaveOutConflicted: true });
 
 /** The merge counts {@link pagedPull} sums over a pull's pages. */
 const SUMMED = ['rowsAdded', 'rowsSkipped', 'rowsInConflict', 'rowsHeld', 'rowsRefilled', 'gapsRewritten'] as const;
@@ -45,28 +54,41 @@ async function capNow(cap: PayloadCap): Promise<number | null> {
     : cap;
 }
 
+/** `result` carrying `conflicted` as the rows left out across every payload of one push, or `result` itself when it already says so. */
+function withConflicted(result: SyncPushResult, conflicted: number): SyncPushResult {
+  return conflicted === conflictedOf(result)
+    ? result
+    : Object.freeze({ ...result, conflicted });
+}
+
 /**
  * Sends the rows waiting to push in payloads of at most the hub's cap:
  * one push as core's port asks it for a strategy with no
  * `pendingPush()`, nothing waiting or a hub naming no cap, and bounded
  * pushes otherwise, each followed by a count of the rows still waiting,
- * until none do. Answers the last push's answer. Rejects as the push or
- * the count rejects, and with a line saying so when a bounded push left
- * as many rows waiting as before it, so a strategy whose cursor did not
- * move is never asked again. See the module note.
+ * until none do. Under `leaveOutConflicted` every push asks
+ * `leaveOutConflicted: true`, and the answer's `conflicted` is summed
+ * over the payloads. Answers the last push's answer. Rejects as the
+ * push or the count rejects, and with a line saying so when a bounded
+ * push left as many rows waiting as before it, so a strategy whose
+ * cursor did not move is never asked again. See the module note.
  */
-export async function splitPush(sync: Sync, cap: PayloadCap): Promise<SyncPushResult> {
+export async function splitPush(sync: Sync, cap: PayloadCap, leaveOutConflicted = false): Promise<SyncPushResult> {
+  const whole = leaveOutConflicted
+    ? WHOLE_PUSH_LEAVING_OUT
+    : WHOLE_PUSH;
   const pending = memberOf(sync, 'pendingPush');
-  if (cap === null || pending === null) return sync.push(WHOLE_PUSH);
+  if (cap === null || pending === null) return sync.push(whole);
   let waiting = countOf(await pending());
-  if (waiting === null || waiting === 0) return sync.push(WHOLE_PUSH);
+  if (waiting === null || waiting === 0) return sync.push(whole);
   const limit = await capNow(cap);
-  if (limit === null) return sync.push(WHOLE_PUSH);
-  const bounded: BoundedPushRequest = Object.freeze({ to: null, limit });
+  if (limit === null) return sync.push(whole);
+  const bounded: BoundedPushRequest = Object.freeze({ ...whole, limit });
   let result = await sync.push(bounded);
+  let conflicted = conflictedOf(result);
   while (result.status === 'pushed') {
     const left = countOf(await pending());
-    if (left === null || left === 0) return result;
+    if (left === null || left === 0) return withConflicted(result, conflicted);
     if (left >= waiting) {
       throw new Error(
         `the strategy still counts ${String(left)} rows to push after a payload of at most ${String(limit)},`
@@ -75,8 +97,9 @@ export async function splitPush(sync: Sync, cap: PayloadCap): Promise<SyncPushRe
     }
     waiting = left;
     result = await sync.push(bounded);
+    conflicted += conflictedOf(result);
   }
-  return result;
+  return withConflicted(result, conflicted);
 }
 
 /** Whether `result`'s page came back full: it says how many rows it carried, and they reach the cap. */

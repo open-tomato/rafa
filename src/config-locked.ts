@@ -4,7 +4,8 @@
  * A locked setting is one whose value a team decides once, for every
  * device: how the effort store travels (`effort.sync`), what a sync
  * does when a device and its hub hold different migrations
- * (`effort.syncSkew`), which preflight items halt a run
+ * (`effort.syncSkew`), whether a sync pulls before it pushes and holds
+ * back the rows that differ from the hub's copy (`effort.syncMerge`), which preflight items halt a run
  * (`prerequisites.required`), when a planned issue's claim goes stale
  * (`claims.staleAfter`) and whether a claim may reach one issue ahead
  * (`claims.ahead`). This module
@@ -24,6 +25,7 @@ import type { ConfigSetting } from '@open-tomato/rafa/core/config';
 export const LOCKED_SETTINGS: readonly ConfigSetting[] = Object.freeze([
   'effortSync',
   'effortSyncSkew',
+  'effortSyncMerge',
   'prerequisitesRequired',
   'claimsStaleAfter',
   'claimsAhead',

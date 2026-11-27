@@ -83,18 +83,32 @@
  * rewrite is rolled back: the row here stays as it was and listed, and
  * the pair is compared as any other, a difference outside every edited
  * field recorded as a conflict.
+ *
+ * ## Reading the conflicted rows
+ *
+ * {@link readConflictedRows} answers, by a store file's path, which
+ * local rows `merge_conflicts` names: each `table_name` with the set of
+ * its `local_seq` values, whichever merge recorded them, a hub pull or
+ * `rafa effort merge`. A row named twice, under two fields or two
+ * merges, is one entry. These are the conflicted rows a pull-first sync
+ * leaves out of its push; they are not the rows `held_rows` lists, which
+ * a projected pull brought in truncated.
  */
 import type { TableUnion, UnionMatch } from './merge-union.js';
-import type { Database, SQLQueryBindings } from 'bun:sqlite';
+import type { SQLQueryBindings } from 'bun:sqlite';
 
-import { SQLiteError } from 'bun:sqlite';
+import { existsSync } from 'node:fs';
+
+import { Database, SQLiteError } from 'bun:sqlite';
 
 import { storedLogPathOf } from '../session-log-path.js';
 
+import { guardTestProcess } from './location.js';
 import { withoutGap } from './merge-commit-gaps.js';
 import { MERGE_RULES, RECOMPUTED, SET_ONCE } from './merge-rules.js';
 import { carriedColumns } from './merge-union.js';
 import { quoted } from './rebuild-aside.js';
+import { activeStoreSettings } from './settings.js';
 
 /** The merge these conflicts are recorded under. */
 export interface ConflictTrail {
@@ -402,4 +416,51 @@ export function takeHeldCopies(
   return local.transaction(() => unions.map((union) => cut.has(union.table)
     ? none(union.table)
     : takeTableCopies(local, other, union)))();
+}
+
+/** Each table name `merge_conflicts` names, with the `local_seq` values it names under it. */
+export type ConflictedRows = ReadonlyMap<string, ReadonlySet<number>>;
+
+/** The local table recording each conflict a merge did not settle. */
+const CONFLICTS_TABLE = 'merge_conflicts';
+
+const CONFLICTED_ROWS = 'SELECT DISTINCT table_name, local_seq FROM merge_conflicts ORDER BY table_name, local_seq';
+
+/**
+ * The conflicted rows of the store file at `path`, as the module note
+ * says: a map from each table name `merge_conflicts` names to the set of
+ * `local_seq` values it names under that table, tables in name order and
+ * each set in ascending order. Two conflicts on one row, two fields or
+ * two merges, give one entry.
+ *
+ * The store is opened read-only, after the test guard
+ * (`guardTestProcess`, `location.ts`), and closed before this returns,
+ * so nothing is written and no migration runs. A path with no file, and
+ * a schema before `merge_conflicts`, answer an empty map, as does a
+ * store with no conflict recorded.
+ *
+ * The map and each set are frozen with `Object.freeze` and typed
+ * read-only. `Object.freeze` stops a property write, not `Map.set` or
+ * `Set.add`, so it is the read-only types that keep a caller from
+ * changing the entries.
+ */
+export function readConflictedRows(path: string): ConflictedRows {
+  guardTestProcess(path);
+  if (!existsSync(path)) return Object.freeze(new Map());
+  const db = new Database(path, { readonly: true });
+  try {
+    db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);
+    const hasTable = db
+      .query<{ n: number }, [string]>('SELECT count(*) AS n FROM sqlite_master WHERE type = \'table\' AND name = ?')
+      .get(CONFLICTS_TABLE)?.n === 1;
+    if (!hasTable) return Object.freeze(new Map());
+    const rows = db.query<{ table_name: string; local_seq: number }, []>(CONFLICTED_ROWS).all();
+    const tables = [...new Set(rows.map(({ table_name: table }) => table))];
+    return Object.freeze(new Map(tables.map((table) => [
+      table,
+      Object.freeze(new Set(rows.filter(({ table_name: name }) => name === table).map(({ local_seq: seq }) => seq))),
+    ])));
+  } finally {
+    db.close();
+  }
 }

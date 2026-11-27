@@ -53,6 +53,14 @@
  * `limit` counts the cut. A `limit` that is not a whole number above
  * zero is refused with a `TypeError` before anything is read.
  *
+ * A push asked `leaveOutConflicted: true` (false when left out) passes
+ * that cut through `withoutConflicted` (`conflicted.ts`) with core's
+ * `readConflictedRows`, so no row `merge_conflicts` names is sent. It
+ * still writes the cut's cursor, past each row it left out, which is
+ * then never resent, and answers `conflicted`, the rows left out; its
+ * dry run counts them too, writing nothing. Under false no answer
+ * carries `conflicted`.
+ *
  * Every `pulled` answer carries `rows`, the rows the hub's page held
  * across its tables: the hub cuts every page at its cap, so a page
  * whose `rows` reaches the cap may have more behind it, and the contact
@@ -237,6 +245,7 @@
  * contact, never when it is made.
  */
 import type { HubClient, HubPullOptions } from './client.js';
+import type { WithoutConflicted } from './conflicted.js';
 import type { SecretReader } from './token.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '@open-tomato/rafa/ports';
 import type { MergeOptions, StoreBackend, StoreMergeResult, WireCursor, WirePayload, WireRow } from '@open-tomato/rafa/store';
@@ -249,6 +258,7 @@ import {
   materialiseWirePayload,
   mergeStore,
   openSqliteStore,
+  readConflictedRows,
   readHeldMigrations,
   readStoreOrigin,
   STORE_BACKENDS,
@@ -259,6 +269,7 @@ import {
 import { readProjectIdentity } from '@open-tomato/rafa/store/store-identity';
 
 import { createHubClient, HubRefused } from './client.js';
+import { withoutConflicted } from './conflicted.js';
 import { clearHeldBack, keepHeldBack, readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
 import { defaultSecretReader, readHubToken } from './token.js';
 
@@ -450,12 +461,18 @@ export interface ServicePushRequest extends SyncPushRequest {
   readonly dryRun?: boolean;
   /** The most rows the push sends past the push cursor, a whole number above zero; every row when left out. */
   readonly limit?: number;
+  /** Leaves out every row `merge_conflicts` names, false when left out; see the module note. */
+  readonly leaveOutConflicted?: boolean;
 }
+
+/** A push the hub took, with the rows it left out under `leaveOutConflicted` alone; see the module note. */
+export type ServicePushed = Extract<SyncPushResult, { readonly status: 'pushed' }> & { readonly conflicted?: number };
 
 /** A push's answer: core's `SyncPushResult`, a dry run's also carrying the rows it would have sent. */
 export type ServicePushResult =
   | SyncPushResult
-  | (Extract<SyncPushResult, { readonly status: 'pushed' }> & {
+  | ServicePushed
+  | (ServicePushed & {
     /** Always true: nothing was sent. */
     readonly dryRun: true;
     /** The rows past the push cursor, across tables, which a push would send. */
@@ -599,6 +616,13 @@ function cutPayload(payload: WirePayload, since: WireCursor, limit: number | und
   return Object.freeze({ ...payload, tables: Object.freeze(tables), cursor: Object.freeze(cursor) });
 }
 
+/** `payload` without the rows `merge_conflicts` names in the store at `path` when `leaveOut`; see the module note. */
+function leftOut(payload: WirePayload, path: string, leaveOut: boolean): WithoutConflicted {
+  return leaveOut
+    ? withoutConflicted(payload, readConflictedRows(path))
+    : { payload, dropped: 0 };
+}
+
 /** Refuses a payload naming a migration outside `known`. */
 function refuseUnknownMigrations(payload: WirePayload, known: readonly string[]): void {
   const missing = payload.migrations.filter((id) => !known.includes(id));
@@ -682,17 +706,20 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
     return cutPayload(exportWirePayload({ path: storePath, cursor: since }), since, limit);
   };
 
-  const push = async ({ to, dryRun = false, limit }: ServicePushRequest): Promise<ServicePushResult> => {
+  const push = async ({ to, dryRun = false, limit, leaveOutConflicted = false }: ServicePushRequest): Promise<ServicePushResult> => {
     refusePath('to', to);
     checkLimit(limit);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
     const reached = await agreedClient();
-    const payload = pastPushCursor(origin, limit);
-    if (dryRun) return Object.freeze({ status: 'pushed', path: null, dryRun: true, rows: rowsIn(payload) });
+    const { payload, dropped } = leftOut(pastPushCursor(origin, limit), storePath, leaveOutConflicted);
+    const counted = leaveOutConflicted
+      ? { conflicted: dropped }
+      : {};
+    if (dryRun) return Object.freeze({ status: 'pushed', path: null, dryRun: true, rows: rowsIn(payload), ...counted });
     await pushOrRefuse(reached, origin, payload);
     writeSyncCursor(statePath, origin, hub.url, 'push', payload.cursor);
-    return PUSHED;
+    return Object.freeze({ ...PUSHED, ...counted });
   };
 
   const pendingPush = async (): Promise<number> => {

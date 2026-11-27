@@ -52,6 +52,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {
+  attributesOf,
   CLAUDE_CODE_ENV,
   FORCE_COLOR_ENV,
   OUTPUT_TAIL_LINES,
@@ -71,6 +72,16 @@ import {
 } from './run.js';
 
 const TESTDATA = join(import.meta.dir, 'testdata');
+
+/**
+ * The spec's one-second bound on a crafted tag: the old attribute
+ * pattern, tried from every character of a long name run, took about
+ * 3.8 s on {@link CRAFTED_NAME_RUN} characters and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Characters in the crafted tag's name run, about the 50,000 of the plan's slow shape. */
+const CRAFTED_NAME_RUN = 50_000;
 
 /** The first line of the message Bun writes for a failing `toBe`. */
 const TO_BE = 'expect(received).toBe(expected)';
@@ -168,6 +179,31 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
+});
+
+describe('attributesOf', () => {
+  it('reads each name="value" pair, its value unescaped, the last of one name answering', () => {
+    expect(attributesOf(' a="1" b-c:d="x y" e="" f=g h="open')).toEqual({ a: '1', 'b-c:d': 'x y', e: '' });
+    expect(attributesOf(' name="a &amp; b" time="0.5"')).toEqual({ name: 'a & b', time: '0.5' });
+    expect(attributesOf('x="a"b="c"')).toEqual({ x: 'a', b: 'c' });
+    expect(attributesOf('a="1" a="2"')).toEqual({ a: '2' });
+    expect(attributesOf('--="z"')).toEqual({ '--': 'z' });
+  });
+
+  it('reads a quote opened before a name as the start of a value', () => {
+    expect(attributesOf('"q=" k="v"')).toEqual({ q: ' k=' });
+  });
+
+  it('reads the pair after a long name run holding no =, within REDOS_BOUND_MS', () => {
+    const text = `${'-'.repeat(CRAFTED_NAME_RUN)} a="1"`;
+
+    const started = performance.now();
+    const attributes = attributesOf(text);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(attributes).toEqual({ a: '1' });
+  });
 });
 
 describe('parseJunitFailures', () => {

@@ -106,6 +106,16 @@ import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
 /** The label every pure case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
 
+/**
+ * The spec's one-second bound on a crafted file: the old tab-indent
+ * pattern, its leading run and its tab able to share a line of tabs,
+ * took about 2.3 s on {@link CRAFTED_TABS} tabs and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Tabs on the crafted line, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_TABS = 50_000;
+
 /** The label a user scope file parses under. No file is read at it. */
 const USER_PATH = '/home/someone/.rafa/config.yaml';
 
@@ -127,6 +137,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'effortBusyTimeoutMs',
   'effortSync',
   'effortSyncSkew',
+  'effortSyncMerge',
   'hubUrl',
   'hubTokenSecret',
   'hubTimeout',
@@ -248,6 +259,7 @@ const DEFAULTS: RafaConfig = {
   effortBusyTimeoutMs: 5000,
   effortSync: 'local',
   effortSyncSkew: 'refuse',
+  effortSyncMerge: 'ff-only',
   hubUrl: null,
   hubTokenSecret: null,
   hubTimeout: '3s',
@@ -379,6 +391,7 @@ const FULL = [
   '  busyTimeoutMs: 250',
   '  sync: file',
   '  syncSkew: pull-projected',
+  '  syncMerge: merge',
   'hub:',
   '  url: https://hub.example.org',
   '  tokenSecret: rafa-hub-token',
@@ -561,6 +574,7 @@ const FULL_VALUES: RafaConfig = {
   effortBusyTimeoutMs: 250,
   effortSync: 'file',
   effortSyncSkew: 'pull-projected',
+  effortSyncMerge: 'merge',
   hubUrl: 'https://hub.example.org',
   hubTokenSecret: 'rafa-hub-token',
   hubTimeout: '10s',
@@ -888,6 +902,21 @@ describe('parseConfigText', () => {
     expect(file.extras).toEqual([{ key: 'note', value: 'a\tb' }]);
   });
 
+  it('reads a line of tabs alone as a blank line, within REDOS_BOUND_MS', () => {
+    const text = '\t'.repeat(CRAFTED_TABS + 1);
+
+    const started = performance.now();
+    const document = parseConfigDocument(text, PATH);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(document).toBeNull();
+    // Control: content after the same run is still refused as tab-indented.
+    expect(refusal(() => parseConfigDocument(`${text}x`, PATH)).problems).toEqual([
+      `${PATH}: line 1 is indented with a tab; YAML indents with spaces only`,
+    ]);
+  });
+
   it('characterizes yes as a string and TRUE as the boolean, so yes is refused', () => {
     expect(Bun.YAML.parse('a: yes')).toEqual({ a: 'yes' });
     expect(fileOf('tracking:\n  specs: TRUE\n').values.trackingSpecs).toBe(true);
@@ -946,6 +975,11 @@ describe('parseConfigText', () => {
         'effort.syncSkew', 'effort:\n  syncSkew: pull',
         'effort.syncSkew is "pull", expected one of: refuse, pull-projected',
         'effort:\n  syncSkew: pull-projected', 'effortSyncSkew', 'pull-projected',
+      ],
+      [
+        'effort.syncMerge', 'effort:\n  syncMerge: rebase',
+        'effort.syncMerge is "rebase", expected one of: ff-only, merge',
+        'effort:\n  syncMerge: merge', 'effortSyncMerge', 'merge',
       ],
       [
         'hub.url', 'hub:\n  url: hub.example.org',

@@ -17,7 +17,9 @@
  * page pulled again beside a page one row short pulled once, a dry run
  * never repeated and a hub naming no cap; and a strategy whose cursor
  * does not move stopped after one push beside one that ignores the
- * limit and sends everything.
+ * limit and sends everything. A push leaving out conflicted rows sums
+ * the count over its payloads beside the same split asked without it,
+ * which carries no such field and answers none.
  *
  * The file makes a registry of its own the active one for its contact
  * cases, holding core's `local` and `file` sync strategies, and puts back
@@ -39,7 +41,7 @@ import { parseConfigText, resolveConfig } from '@open-tomato/rafa/core/config';
 import { WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { capOf } from './contact-facts.js';
+import { capOf, conflictedOf } from './contact-facts.js';
 import { MAX_PULL_PAGES, pagedPull, splitPush } from './contact-pages.js';
 import { createHubContact, HUB_UNREACHABLE } from './contact.js';
 import { createFileSync } from './file.js';
@@ -75,8 +77,11 @@ const HOME = join(tempBase, 'home');
 /** The hub the service config names. */
 const HUB_URL = 'http://127.0.0.1:7373';
 
-/** A project naming `service` and the hub. */
+/** A project naming `service` and the hub, under the default `effort.syncMerge: ff-only`. */
 const SERVICE = `effort:\n  sync: service\nhub:\n  url: ${HUB_URL}\n`;
+
+/** The same project under `effort.syncMerge: merge`, whose `pushThenPull()` pushes first. */
+const SERVICE_MERGE = `effort:\n  sync: service\n  syncMerge: merge\nhub:\n  url: ${HUB_URL}\n`;
 
 /** The migration ids this file's contacts know, and its stand-in hub holds, so the skew check passes. */
 const KNOWN: readonly string[] = Object.freeze(['init']);
@@ -132,6 +137,8 @@ interface StandInOptions {
   readonly pageCountsNone?: boolean;
   /** Whether each page answers {@link PAGE_NOTICE}. */
   readonly notice?: boolean;
+  /** The conflicted rows the push at `index`, from 0, answers it left out when asked `leaveOutConflicted`; none when left out. */
+  readonly conflicted?: (index: number) => number;
 }
 
 /** The stand-in strategy, what it was asked and the payloads it sent. */
@@ -166,13 +173,16 @@ function standIn(options: StandInOptions): StandIn {
   const push = (request: SyncPushRequest): Promise<SyncPushResult> => {
     calls.push(`push ${JSON.stringify(request)}`);
     const waiting = options.rows - cursor;
-    const { limit } = request as { readonly limit?: number };
+    const { limit, leaveOutConflicted } = request as { readonly limit?: number; readonly leaveOutConflicted?: boolean };
     const sent = limit === undefined || options.honoursLimit === false
       ? waiting
       : Math.min(waiting, limit);
+    const conflicted = leaveOutConflicted === true
+      ? { conflicted: options.conflicted?.(payloads.length) ?? 0 }
+      : {};
     payloads.push(sent);
     if (options.movesCursor !== false) cursor += sent;
-    return Promise.resolve({ status: 'pushed', path: null });
+    return Promise.resolve({ status: 'pushed', path: null, ...conflicted } as SyncPushResult);
   };
   const pull = (request: SyncPullRequest): Promise<SyncPullResult> => {
     calls.push(`pull ${JSON.stringify(request)}`);
@@ -289,6 +299,38 @@ describe('splitPush', () => {
     expect(strategy.payloads).toEqual([CAP + 1]);
   });
 
+  it('asks every payload to leave out the conflicted rows and sums what they left out', async () => {
+    const strategy = standIn({ rows: (CAP * 2) + 1, conflicted: (index) => [1, 0, 2][index] ?? 0 });
+
+    const result = await splitPush(strategy.sync, CAP, true);
+
+    expect(strategy.payloads).toEqual([CAP, CAP, 1]);
+    expect(strategy.calls.filter((call) => call.startsWith('push '))).toEqual([
+      `push {"to":null,"leaveOutConflicted":true,"limit":${String(CAP)}}`,
+      `push {"to":null,"leaveOutConflicted":true,"limit":${String(CAP)}}`,
+      `push {"to":null,"leaveOutConflicted":true,"limit":${String(CAP)}}`,
+    ]);
+    expect(result as unknown).toEqual({ status: 'pushed', path: null, conflicted: 3 });
+  });
+
+  it('asks a whole push to leave them out too, answering its count as it stands', async () => {
+    const strategy = standIn({ rows: CAP + 1, conflicted: () => 1 });
+
+    const result = await splitPush(strategy.sync, null, true);
+
+    expect(strategy.calls).toEqual(['push {"to":null,"leaveOutConflicted":true}']);
+    expect(result as unknown).toEqual({ status: 'pushed', path: null, conflicted: 1 });
+  });
+
+  it('while the same split asked without it names no field and answers no count, the control', async () => {
+    const strategy = standIn({ rows: (CAP * 2) + 1, conflicted: () => 1 });
+
+    const result = await splitPush(strategy.sync, CAP);
+
+    expect(strategy.calls.filter((call) => call.includes('leaveOutConflicted'))).toEqual([]);
+    expect(result).toEqual({ status: 'pushed', path: null });
+  });
+
   it('rejects after one push, naming the rows still waiting, for a strategy whose cursor did not move', async () => {
     const strategy = standIn({ rows: CAP + 1, movesCursor: false });
 
@@ -376,6 +418,23 @@ describe('pagedPull', () => {
   });
 });
 
+describe('conflictedOf', () => {
+  it('reads a whole number of rows off the push answer\'s conflicted', () => {
+    expect(conflictedOf({ status: 'pushed', path: null, conflicted: 2 } as SyncPushResult)).toBe(2);
+    expect(conflictedOf({ status: 'pushed', path: null, conflicted: 0 } as SyncPushResult)).toBe(0);
+  });
+
+  it.each([
+    ['an answer naming none', { status: 'pushed', path: null }],
+    ['nothing to sync', { status: 'nothing-to-sync' }],
+    ['a negative count', { status: 'pushed', path: null, conflicted: -1 }],
+    ['a fractional count', { status: 'pushed', path: null, conflicted: 1.5 }],
+    ['a count spelled as text', { status: 'pushed', path: null, conflicted: '1' }],
+  ] as const)('reads %s as 0', (_case, answer) => {
+    expect(conflictedOf(answer as SyncPushResult)).toBe(0);
+  });
+});
+
 describe('capOf', () => {
   it('reads a whole number above zero as the cap', () => {
     expect(capOf({ maxPayloadRows: CAP })).toBe(CAP);
@@ -406,19 +465,38 @@ function selecting(strategy: StandIn): HubContactSeams {
   return { modules: { adapters, manifest: { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS } }, migrations: KNOWN };
 }
 
-/** A contact over the service config selecting `strategy`, its written lines captured. */
-function contacting(strategy: StandIn): { readonly lines: string[]; readonly contact: ReturnType<typeof createHubContact> } {
+/** A contact over the service config `text` selecting `strategy`, its written lines captured. */
+function contacting(strategy: StandIn, text = SERVICE): { readonly lines: string[]; readonly contact: ReturnType<typeof createHubContact> } {
   const lines: string[] = [];
   const warn = (line: string): void => {
     lines.push(line);
   };
-  return { lines, contact: createHubContact({ root: ROOT, home: HOME, resolved: resolving(SERVICE), warn }, selecting(strategy)) };
+  return { lines, contact: createHubContact({ root: ROOT, home: HOME, resolved: resolving(text), warn }, selecting(strategy)) };
 }
 
-describe('a contact\'s pushThenPull() under the hub\'s cap', () => {
+/** The held line for `count` conflicted rows, spelled out as the spec words it. */
+function heldLine(count: number): string {
+  return `effort sync: ${String(count)} rows held: they differ from the hub's copy (merge_conflicts); the rest was pushed`;
+}
+
+describe('a contact\'s pushThenPull() under ff-only and the hub\'s cap', () => {
+  it('pulls first, then splits the push leaving out the conflicted rows, and writes one held line for the summed count', async () => {
+    const strategy = standIn({ rows: CAP + 1, cap: CAP, conflicted: (index) => [1, 1][index] ?? 0 });
+    const { contact, lines } = contacting(strategy);
+
+    const reading = await contact.pushThenPull();
+
+    expect(strategy.calls[0]).toBe('pull {"from":null,"dryRun":false}');
+    expect(strategy.payloads).toEqual([CAP, 1]);
+    expect(reading).toMatchObject({ push: { outcome: 'done', result: { conflicted: 2 } }, pull: { outcome: 'done' } });
+    expect(lines).toEqual([heldLine(2)]);
+  });
+});
+
+describe('a contact\'s pushThenPull() under merge and the hub\'s cap', () => {
   it('lands the cap plus one in two payloads, reading the cap off one status read, and pulls each full page', async () => {
     const strategy = standIn({ rows: CAP + 1, cap: CAP, page: (index) => [CAP, 1][index] ?? 0 });
-    const { contact, lines } = contacting(strategy);
+    const { contact, lines } = contacting(strategy, SERVICE_MERGE);
 
     const reading = await contact.pushThenPull();
 
@@ -432,7 +510,7 @@ describe('a contact\'s pushThenPull() under the hub\'s cap', () => {
   it('lands exactly the cap in one payload', async () => {
     const strategy = standIn({ rows: CAP, cap: CAP });
 
-    await contacting(strategy).contact.pushThenPull();
+    await contacting(strategy, SERVICE_MERGE).contact.pushThenPull();
 
     expect(strategy.payloads).toEqual([CAP]);
   });
@@ -440,7 +518,7 @@ describe('a contact\'s pushThenPull() under the hub\'s cap', () => {
   it('lands the cap plus one in one unbounded payload when the hub answers no cap, the control', async () => {
     const strategy = standIn({ rows: CAP + 1, page: () => CAP });
 
-    await contacting(strategy).contact.pushThenPull();
+    await contacting(strategy, SERVICE_MERGE).contact.pushThenPull();
 
     expect(strategy.payloads).toEqual([CAP + 1]);
     expect(strategy.calls.filter((call) => call.startsWith('push '))).toEqual(['push {"to":null}']);
@@ -450,7 +528,7 @@ describe('a contact\'s pushThenPull() under the hub\'s cap', () => {
   it('asks no hub status when nothing waits to push and no page counts its rows', async () => {
     const strategy = standIn({ rows: 0, cap: CAP });
 
-    await contacting(strategy).contact.pushThenPull();
+    await contacting(strategy, SERVICE_MERGE).contact.pushThenPull();
 
     expect(strategy.calls).toEqual(['pendingPush', 'push {"to":null}', 'pull {"from":null,"dryRun":false}']);
   });
@@ -458,7 +536,7 @@ describe('a contact\'s pushThenPull() under the hub\'s cap', () => {
   it('writes a status read that found the hub unreachable as the push\'s one line, and skips the pull', async () => {
     const unreachable = Object.assign(new Error('connect ECONNREFUSED on status'), { name: HUB_UNREACHABLE });
     const strategy = standIn({ rows: CAP + 1, statusError: unreachable });
-    const { contact, lines } = contacting(strategy);
+    const { contact, lines } = contacting(strategy, SERVICE_MERGE);
 
     const reading = await contact.pushThenPull();
 
@@ -485,7 +563,7 @@ describe('a contact\'s sync() under the hub\'s cap', () => {
 
     await contacting(strategy).contact.sync();
 
-    expect(strategy.calls).toEqual(['hubStatus', 'push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+    expect(strategy.calls).toEqual(['hubStatus', 'pull {"from":null,"dryRun":false}', 'push {"to":null,"leaveOutConflicted":true}']);
   });
 
   it('sends one dry-run push under the cap, splitting nothing', async () => {
@@ -493,6 +571,6 @@ describe('a contact\'s sync() under the hub\'s cap', () => {
 
     await contacting(strategy).contact.sync({ stop: 'dry-run' });
 
-    expect(strategy.calls).toEqual(['hubStatus', 'push {"to":null,"dryRun":true}', 'pull {"from":null,"dryRun":true}']);
+    expect(strategy.calls).toEqual(['hubStatus', 'pull {"from":null,"dryRun":true}', 'push {"to":null,"dryRun":true,"leaveOutConflicted":true}']);
   });
 });

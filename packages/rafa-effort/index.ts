@@ -47,6 +47,7 @@ export type {
 
 export type { PullBeforeReadInput } from './src/effort/sync/contact.js';
 export {
+  conflictedLine,
   createHubContact,
   hubLine,
   pullBeforeRead,

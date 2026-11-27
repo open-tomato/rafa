@@ -177,8 +177,14 @@ import { heldReason as checkedOutReason } from '@open-tomato/rafa-pr';
 /** How many characters of a commit hash a withheld reason shows. */
 const SHORT_HASH_LENGTH = 7;
 
-/** The flag spellings that make a worktree removal, a branch delete or a push forced. */
-const FORCING_FLAG = /^(?:--force(?:[=-].*)?|-[^-]*f[^-]*)$/;
+/**
+ * The flag spellings that make a worktree removal, a branch delete or a
+ * push forced: `--force` and its `=` or `-` forms, or one short-flag
+ * word holding an `f`. The run before that `f` holds no `f`, so it ends
+ * at the first one and the two runs never share a character to try
+ * again (CodeQL `js/polynomial-redos`).
+ */
+const FORCING_FLAG = /^(?:--force(?:[=-].*)?|-[^-f]*f[^-]*)$/;
 
 /** The remote a `delete-remote-branch` step writes to: the one `./remote-only.ts` reads its rows off. */
 const REMOTE = 'origin';

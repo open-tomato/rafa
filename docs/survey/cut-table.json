@@ -5888,7 +5888,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 49,
+        "test": 50,
         "testSupport": 9
       },
       "files": [
@@ -5927,6 +5927,7 @@
         "packages/rafa-hub/src/login/testdata/stand-in-oauth.ts",
         "packages/rafa-hub/src/payload-cap.integration.test.ts",
         "packages/rafa-hub/src/postgres-two-devices.integration.test.ts",
+        "packages/rafa-hub/src/pull-first.integration.test.ts",
         "packages/rafa-hub/src/server-effort.test.ts",
         "packages/rafa-hub/src/server-keys.test.ts",
         "packages/rafa-hub/src/server-login.test.ts",
@@ -5982,7 +5983,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 59,
+        "packages/rafa-hub/": 60,
         "packages/rafa-hub-port/": 1,
         "packages/rafa-index/": 9
       },
@@ -6002,12 +6003,13 @@
       "edges": [],
       "fileCounts": {
         "source": 4,
-        "test": 6,
+        "test": 7,
         "testSupport": 2
       },
       "files": [
         "packages/rafa-sync-service/src/client.test.ts",
         "packages/rafa-sync-service/src/client.ts",
+        "packages/rafa-sync-service/src/conflicted.test.ts",
         "packages/rafa-sync-service/src/core-subpaths.test.ts",
         "packages/rafa-sync-service/src/no-sql.test.ts",
         "packages/rafa-sync-service/src/state.test.ts",
@@ -6020,7 +6022,7 @@
         "packages/rafa-sync-service/src/token.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-sync-service/": 12
+        "packages/rafa-sync-service/": 13
       },
       "folders": [
         "packages/rafa-sync-service/"

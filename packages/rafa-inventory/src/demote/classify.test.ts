@@ -91,6 +91,16 @@ const SOLUTION = 'Assert that the stub received the request before asserting on 
 /** The When to Use section of every fixture that has one. */
 const WHEN_TO_USE = 'Writing any test with an in-process HTTP stub. Also when reviewing one.';
 
+/**
+ * The spec's one-second bound on a crafted heading or name: the old
+ * heading and closing-hash patterns each took about 3 s on
+ * {@link CRAFTED_RUN} characters and grow with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Characters in a crafted line's repeated run, the 50,000 of the plan's slow shape. */
+const CRAFTED_RUN = 50_000;
+
 /** `data` with `changes` applied, an `undefined` change removing its key. */
 function withFields(
   data: Readonly<Record<string, unknown>>,
@@ -464,6 +474,48 @@ describe('bodySections', () => {
     expect(sections.map((section) => section.level)).toEqual([2, 3, 2]);
     expect(sections.map((section) => section.line)).toEqual([1, 5, 9]);
   });
+
+  test('reads which lines are headings, and drops a closing hash run only after whitespace', () => {
+    const titles = bodySections([
+      '# Closed ##',
+      '## C#',
+      '### Spaced   ###   ',
+      '#### ###',
+      '#NoSpace',
+      '####### Seven',
+      '    # Indented four',
+      '#\tTabbed',
+      '# a\u2028b',
+      '# a\rb',
+      '# Crlf\r',
+      '# ',
+      '# \u2028x',
+    ].join('\n')).map((section) => section.title);
+
+    expect(titles).toEqual(['Closed', 'C#', 'Spaced', '###', 'Tabbed', 'Crlf', '', 'x']);
+  });
+
+  test('reads no heading off a long space run before a line separator, within REDOS_BOUND_MS', () => {
+    const text = [`# ${' '.repeat(CRAFTED_RUN)}x \u2028`, '## Kept'].join('\n');
+
+    const started = performance.now();
+    const found = bodySections(text);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(found.map((section) => section.title)).toEqual(['Kept']);
+  });
+
+  test('keeps a long space run inside a title that holds no closing hashes, within REDOS_BOUND_MS', () => {
+    const spaced = `a${' '.repeat(CRAFTED_RUN)}b`;
+
+    const started = performance.now();
+    const found = bodySections([`# ${spaced}`, '## Closed ##'].join('\n'));
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(found.map((section) => section.title)).toEqual([spaced, 'Closed']);
+  });
 });
 
 describe('numberedRuns', () => {
@@ -733,6 +785,22 @@ describe('the converted id', () => {
 
     expect(slugifyId('Assert The Stub')).toBe('assert-the-stub');
     expect(convertToInstinct(source(file), options).instinct?.id).toBe('assert-the-stub');
+  });
+
+  test('joins the runs with one hyphen and leaves none at either end', () => {
+    expect(['--A__b--', ' x ', '-', '', 'a1--2b', 'Été!'].map(slugifyId))
+      .toEqual(['a-b', 'x', '', '', 'a1-2b', 't']);
+  });
+
+  test('slugifies a long hyphen run between two letters, within REDOS_BOUND_MS', () => {
+    const name = `a${'-'.repeat(CRAFTED_RUN)}b`;
+
+    const started = performance.now();
+    const id = slugifyId(name);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(id).toBe('a-b');
   });
 
   test('falls back to the directory name when the frontmatter names none', () => {

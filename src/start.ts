@@ -832,7 +832,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // dispatch row takes the resolver and what the prompt offered off
       // `dispatch` (`start/dispatch.ts`). Triage follows
       // the store and the mark, and stops nothing (`start/triage.ts`).
-      // Last, the rows are pushed, the other devices' pulled, then the bug-fix pairs.
+      // Last, the rows are pushed and the other devices' pulled, in the
+      // order `effort.syncMerge` names, then the bug-fix pairs.
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
         await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });

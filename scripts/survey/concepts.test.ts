@@ -153,6 +153,13 @@ describe('the concept map over a planted page and two files', () => {
     expect(none).toHaveLength(6);
   });
 
+  it('escapes a backslash before a pipe, so the pipe stays inside its cell (CodeQL alert 35)', () => {
+    const concept = { clusters: [], files: [], key: 'a b', name: 'a\\|b', origins: ['heading' as const], pages: ['context/x.md'], terms: ['a b'] };
+    const markdown = renderConceptsMarkdown({ concepts: [concept], pages: ['context/x.md'], read: [] }, []);
+
+    expect(markdown).toContain('| a\\\\\\|b | heading | `context/x.md` |');
+  });
+
   it('renders equal JSON for an equal map, every list sorted', () => {
     const json = renderConceptsJson(map);
     expect(renderConceptsJson(plantedMap())).toBe(json);

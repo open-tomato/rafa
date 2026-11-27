@@ -514,9 +514,11 @@ function sortKeys(document: Mapping, path: string): SortedKeys {
 
 /**
  * A line whose leading whitespace holds a tab and whose content after it
- * is neither empty nor a comment. Such a line is a tab-indented one.
+ * is neither empty nor a comment. Such a line is a tab-indented one. Its
+ * first tab follows spaces only, so no two runs share a character: a
+ * leading `[ \t]*` ahead of the tab made a line of tabs quadratic.
  */
-const TAB_INDENTED_LINE = /^[ \t]*\t[ \t]*[^\s#]/;
+const TAB_INDENTED_LINE = /^ *\t[ \t]*[^\s#]/;
 
 /**
  * One problem per line that indents its content with a tab, named by

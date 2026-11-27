@@ -17,7 +17,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { exportWirePayload, openSqliteStore, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { exportWirePayload, openSqliteStore, readConflictedRows, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
@@ -1223,5 +1223,112 @@ describe('a bounded push and a pull\'s page', () => {
     expect(second).toMatchObject({ status: 'pulled', rows: 1, merge: { rowsAdded: 1 } });
     expect(await puller.pull({ from: null, dryRun: false })).toEqual({ status: 'nothing-to-sync' });
     expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
+  });
+});
+
+describe('a push leaving out the conflicted rows', () => {
+  /** A commit row of the sha `seed` hashes to, at `timestamp`: two devices writing one seed at two times disagree on it. */
+  function sharedCommit(seed: string, timestamp: string): CommitEffortRow {
+    const sha = new Bun.CryptoHasher('sha1')
+      .update(`shared-${seed}`)
+      .digest('hex');
+    return { sha, timestamp } as CommitEffortRow;
+  }
+
+  /** A device whose conflicted row is in its store and named in its `merge_conflicts`. */
+  interface Conflicted {
+    readonly over: StandInHub;
+    readonly b: Device;
+    /** The origin pair of the conflicted row, as the stand-in holds rows. */
+    readonly pair: string;
+  }
+
+  /**
+   * A device holding one commit of its own and one a peer pushed to the
+   * same hub at another time, pulled so its merge records the conflict.
+   * Its push cursor is not written yet: it has pushed nothing.
+   */
+  async function conflictedDevice(): Promise<Conflicted> {
+    const over = hub();
+    const peer = device(0);
+    peer.store.append('commits', [sharedCommit('shared', '2026-10-01T09:00:00.000Z')]);
+    await serviceOf(peer, over).push({ to: null });
+    const b = device(1);
+    b.store.append('commits', [sharedCommit('shared', '2026-10-01T10:00:00.000Z')]);
+    expect(await serviceOf(b, over).pull({ from: null, dryRun: false })).toMatchObject({ status: 'pulled', merge: { rowsInConflict: 1 } });
+    const [row] = read<{ seq: number; pair: string }>(
+      b.path,
+      `SELECT seq, origin_store || ':' || origin_seq AS pair FROM commits WHERE sha = '${sharedCommit('shared', '').sha}'`,
+    );
+    if (row === undefined) throw new Error('the device holds no shared commit');
+    expect(readConflictedRows(b.path)).toEqual(new Map([['commits', new Set([row.seq])]]));
+    return { over, b, pair: row.pair };
+  }
+
+  /** The origin pairs the stand-in holds in `commits`. */
+  function heldPairs(over: StandInHub): string[] {
+    return over.held('commits').map((row) => `${String(row['origin_store'])}:${String(row['origin_seq'])}`);
+  }
+
+  /** The pushes `at`'s store sent to `over`. */
+  function pushesOf(over: StandInHub, at: Device): number[] {
+    return over.requests
+      .filter(({ path, device: named }) => path === '/v1/effort/push' && named === originOf(at))
+      .map(({ rows }) => rows);
+  }
+
+  it('sends the conflicted row when leaveOutConflicted is left out or false, answering no conflicted count', async () => {
+    const absent = await conflictedDevice();
+    expect(await serviceOf(absent.b, absent.over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(heldPairs(absent.over)).toContain(absent.pair);
+    expect(pushesOf(absent.over, absent.b)).toEqual([2]);
+
+    const off = await conflictedDevice();
+    expect(await serviceOf(off.b, off.over).push({ to: null, leaveOutConflicted: false })).toEqual({ status: 'pushed', path: null });
+    expect(heldPairs(off.over)).toContain(off.pair);
+    expect(pushesOf(off.over, off.b)).toEqual([2]);
+  });
+
+  it('counts the conflicted rows on a dry run, writing neither the cursor nor the state file, where the push after writes both', async () => {
+    const { over, b } = await conflictedDevice();
+    const service = serviceOf(b, over);
+    const before = readFileSync(statePathOf(b), 'utf8');
+    expect(await service.push({ to: null, dryRun: true })).toEqual({ status: 'pushed', path: null, dryRun: true, rows: 2 });
+    expect(await service.push({ to: null, dryRun: true, leaveOutConflicted: true }))
+      .toEqual({ status: 'pushed', path: null, dryRun: true, rows: 1, conflicted: 1 });
+    expect(readFileSync(statePathOf(b), 'utf8')).toBe(before);
+    expect(stateOf(b).stores[originOf(b)]?.push).toEqual({});
+    expect(pushesOf(over, b)).toEqual([]);
+
+    await service.push({ to: null, leaveOutConflicted: true });
+    expect(readFileSync(statePathOf(b), 'utf8')).not.toBe(before);
+    expect(pushesOf(over, b)).toEqual([1]);
+  });
+
+  it('leaves the row out under true: absent from the hub, still in the store, the cursor past it, and never sent after', async () => {
+    const { over, b, pair } = await conflictedDevice();
+    const service = serviceOf(b, over);
+    expect(await service.push({ to: null, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 1 });
+    expect(heldPairs(over)).not.toContain(pair);
+    expect(heldPairs(over)).toContain(`${originOf(b)}:1`);
+    expect(commitPairs(b)).toContain(pair);
+    const cursor = stateOf(b).stores[originOf(b)]?.push.commits;
+    expect(cursor).toBe(exportWirePayload({ path: b.path }).cursor['commits']);
+    expect(cursor).toBeGreaterThanOrEqual(Number(pair.split(':')[1]));
+
+    expect(await service.push({ to: null, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 0 });
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(pushesOf(over, b)).toEqual([1, 0, 0]);
+    expect(heldPairs(over)).not.toContain(pair);
+  });
+
+  it('counts a conflicted row once under a limit, in the push whose cut reaches it', async () => {
+    const { over, b, pair } = await conflictedDevice();
+    const service = serviceOf(b, over);
+    expect(await service.push({ to: null, limit: 1, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 0 });
+    expect(await service.push({ to: null, limit: 1, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 1 });
+    expect(await service.push({ to: null, limit: 1, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 0 });
+    expect(pushesOf(over, b)).toEqual([1, 0, 0]);
+    expect(heldPairs(over)).not.toContain(pair);
   });
 });

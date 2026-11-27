@@ -35,7 +35,9 @@
  * key `effort.syncSkew` added one `load-config.json` entry, its `refuse`
  * default from source `default`, and moved nothing else; the `release`
  * key `release.packageFragments` added one `load-config.json` entry, its
- * `allow` default from source `default`, and moved nothing else.
+ * `allow` default from source `default`, and moved nothing else; the core
+ * key `effort.syncMerge` added one `load-config.json` entry, its `ff-only`
+ * default from source `default`, and moved nothing else.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

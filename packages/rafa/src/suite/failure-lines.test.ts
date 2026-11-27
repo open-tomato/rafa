@@ -41,6 +41,16 @@ import {
 } from './failure-lines.js';
 import { parseJunitFailures } from './run.js';
 
+/**
+ * The spec's one-second bound on a crafted `(fail)` line: the old
+ * trailing-time pattern, tried from every space of a long run, took
+ * about 3 s on {@link CRAFTED_SPACES} spaces and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Spaces inside the crafted case name, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_SPACES = 50_000;
+
 /** A recorded fixture's text. */
 function fixture(file: string): string {
   return readFileSync(join(import.meta.dir, 'testdata', file), 'utf8');
@@ -180,6 +190,26 @@ describe('parseFailedCases over written stderr', () => {
     // Control: a frameless error there keeps its own line and not the annotation that repeats it.
     const frameless = ['::group::a.test.ts:', 'error: no frame', '::error title=error: no frame::', '(fail) bare [0.01ms]', '::endgroup::', ''].join('\n');
     expect(parseFailedCases(frameless, ['a.test.ts'])[0]?.errorLines).toEqual(['error: no frame']);
+  });
+
+  it('takes the trailing time and the whitespace before it off a name, and nothing else', () => {
+    const labels = ['a  [1.5s]', 'a\t[2ms]', ' [1ms]', 'a [1ms] [2ms]', 'a[1ms]', 'a [x]', '[1ms]', 'a [1.ms]', 'a [12m]', 'a [3ms]x'];
+    const stderr = ['a.test.ts:', ...labels.map((label) => `(fail) ${label}`), ''].join('\n');
+
+    expect(parseFailedCases(stderr, ['a.test.ts']).map((failed) => failed.name))
+      .toEqual(['a', 'a', '', 'a [1ms]', 'a[1ms]', 'a [x]', '[1ms]', 'a [1.ms]', 'a [12m]', 'a [3ms]x']);
+  });
+
+  it('keeps a long space run inside a case name, within REDOS_BOUND_MS', () => {
+    const label = `a${' '.repeat(CRAFTED_SPACES)}b`;
+    const stderr = ['x.test.ts:', `(fail) ${label}`, ''].join('\n');
+
+    const started = performance.now();
+    const cases = parseFailedCases(stderr, ['x.test.ts']);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(cases).toEqual([{ file: 'x.test.ts', name: label, label, errorLines: [] }]);
   });
 
   it('leaves out a failed case under no file it was handed', () => {
