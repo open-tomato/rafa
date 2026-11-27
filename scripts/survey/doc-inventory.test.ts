@@ -209,6 +209,15 @@ describe('the inventory over a planted cut', () => {
     expect(markdown.endsWith('- Hindsight\n')).toBe(true);
   });
 
+  it('escapes a backslash before a pipe, so the pipe stays inside its cell (CodeQL alert 36)', () => {
+    const readings = new Map<string, FileReading>([
+      [WRITE, { links: [{ file: READ, target: 'a\\|b', url: false }], note: undefined }],
+    ]);
+    const markdown = renderDocInventoryMarkdown(inventoryDocs({ clusterOf: CLUSTER_OF, concepts: [], readings }), [WRITE]);
+
+    expect(markdown).toContain('| `src/store/write.ts` | `c01-store` | `a\\\\\\|b` | 1 | `src/review/read.ts` | `c02-review` |');
+  });
+
   it('renders equal JSON for equal input, every list sorted', () => {
     const json = renderDocInventoryJson(inventory);
     expect(renderDocInventoryJson(inventoryDocs({ clusterOf: CLUSTER_OF, concepts: CONCEPTS, readings: plantedReadings() })))

@@ -119,8 +119,14 @@ export function metaPaths(file: string, line: string): readonly string[] {
 /** A binding that exports its name. */
 const EXPORTED = /^\s*export\s/;
 
+/**
+ * Escapes a name for a `RegExp` source, so it matches as written.
+ *
+ * @param name - A bound or imported name.
+ * @returns The name with every regex metacharacter escaped, `\\` and `$` included.
+ */
 function escapeName(name: string): string {
-  return name.replace(/\$/g, '\\$');
+  return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** The folder constants a line names, by the paths they hold. */
