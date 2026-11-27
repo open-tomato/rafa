@@ -6002,12 +6002,13 @@
       "edges": [],
       "fileCounts": {
         "source": 4,
-        "test": 6,
+        "test": 7,
         "testSupport": 2
       },
       "files": [
         "packages/rafa-sync-service/src/client.test.ts",
         "packages/rafa-sync-service/src/client.ts",
+        "packages/rafa-sync-service/src/conflicted.test.ts",
         "packages/rafa-sync-service/src/core-subpaths.test.ts",
         "packages/rafa-sync-service/src/no-sql.test.ts",
         "packages/rafa-sync-service/src/state.test.ts",
@@ -6020,7 +6021,7 @@
         "packages/rafa-sync-service/src/token.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-sync-service/": 12
+        "packages/rafa-sync-service/": 13
       },
       "folders": [
         "packages/rafa-sync-service/"
