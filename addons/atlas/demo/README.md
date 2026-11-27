@@ -82,8 +82,7 @@ rest of `workspace` comes from `arch.composition` and `arch.import-flow`
 (`live-architecture.ts`): the package composition, the rose (folders of
 1,000 lines or more), the sunburst, and the import flow with its layer
 columns (`layerOrder`, `unassigned` last) and their tones (`layerTones`),
-each upward import marked `upward`. Their three cards name no `reads`
-yet, so the live page still shows them "Not wired yet". The open bugs, the resolution time
+each upward import marked `upward`. The open bugs, the resolution time
 and the task pile are GitHub-only: when their metric answers no row, the replica was built
 without `--github`, and the card shows "Not wired yet" with the build
 line `rafa module exec @open-tomato/rafa-atlas build --github` (the
@@ -108,6 +107,19 @@ an index with no event in its 12 baseline weeks reads "none in 12 weeks"
 after its axis label and in the source table, and draws at 0. An answer
 naming no build time leaves `balance` marked not wired. The mock page
 keeps the catalogue's values and subtitles.
+
+On the Architecture lens, the package size rose reads `workspace.sizeRose`,
+the composition sunburst `workspace.composition` and
+`compositionSunburst`, and the import flow `workspace.sankeyNodes` and
+`sankeyLinks` in the columns of `layerOrder`. All three take their tones
+and their legend from `layerTones`, so a layer of `atlas.layers` the mock
+does not name shows with its own tone. The charts package's Sankey tones
+a ribbon by its source node and takes no tone per link, so an upward
+import is told apart in words: the live subtitle counts them, and the
+source table lists them first with `upward` in its Direction column.
+The mock page keeps its subtitles, legends and two-column flow table.
+With every card wired, a live page over a replica built with `--github`
+draws no "Not wired yet".
 
 Every card and tile a live metric feeds names its `reads`. On the live
 page a wired card's note is `liveNoteOf`'s (`src/lenses/spec.ts`): the
