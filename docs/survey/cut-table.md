@@ -16,7 +16,7 @@ An upward edge leaves a package for one further down this table. A file left to 
 | 4 | `rafa-inventory` | 105 | 56 | 49 | 0 | 0 | 0 | 0 |
 | 5 | `rafa-board` | 309 | 156 | 145 | 8 | 2 | 0 | 2 |
 | 6 | `rafa-pr` | 162 | 81 | 79 | 2 | 26 | 0 | 26 |
-| 7 | `rafa-run` | 232 | 107 | 125 | 0 | 22 | 0 | 22 |
+| 7 | `rafa-run` | 234 | 108 | 126 | 0 | 22 | 0 | 22 |
 | 8 | `rafa-release` | 106 | 56 | 50 | 0 | 1 | 0 | 1 |
 | 9 | `rafa-effort` | 58 | 36 | 22 | 0 | 0 | 0 | 0 |
 | 10 | `rafa-hub` | 65 | 11 | 45 | 9 | 0 | 0 | 0 |

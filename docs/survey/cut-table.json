@@ -5369,8 +5369,8 @@
         }
       ],
       "fileCounts": {
-        "source": 107,
-        "test": 125,
+        "source": 108,
+        "test": 126,
         "testSupport": 0
       },
       "files": [
@@ -5469,6 +5469,8 @@
         "packages/rafa-run/src/start/dispatch.ts",
         "packages/rafa-run/src/start/doc-task.test.ts",
         "packages/rafa-run/src/start/doc-task.ts",
+        "packages/rafa-run/src/start/facade-always-run.test.ts",
+        "packages/rafa-run/src/start/facade-always-run.ts",
         "packages/rafa-run/src/start/follow-ups.test.ts",
         "packages/rafa-run/src/start/follow-ups.ts",
         "packages/rafa-run/src/start/forced-draft.test.ts",
