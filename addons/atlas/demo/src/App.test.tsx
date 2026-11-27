@@ -6,7 +6,8 @@
  * client) the cards and tiles a metric feeds draw, with the row count
  * behind them, while the others say "Not wired yet"; the two bug backlog
  * cards draw on both sources, and over a replica with no GitHub data the
- * GitHub-only cards name the `--github` build. happy-dom has no canvas, so the page draws with a stub engine
+ * GitHub-only cards name the `--github` build; the on-time tile draws the
+ * `collect` empty state on the live page and its sample on the mock. happy-dom has no canvas, so the page draws with a stub engine
  * whose primitives render a labelled element; the engine is the charts
  * package's to test. The source answers with no delay.
  */
@@ -15,15 +16,18 @@ import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
 import type { ChartPrimitives } from '@open-tomato/charts';
 import type { ReactElement } from 'react';
 
+import { formatPercent } from '@open-tomato/charts';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createElement } from 'react';
 
 import { App } from './App.js';
+import { scopeCreepOf } from './data/live-cards.js';
 import { GITHUB_BUILD_LINE, GITHUB_NOT_READ } from './data/live-sources.js';
 import { createLiveLensSource, LIVE_METRICS } from './data/live.js';
+import { ON_TIME_SHARE, PILE_KINDS, SCOPE_CREEP_AVERAGE } from './data/mock.js';
 import { createLensSource, lensResultOf, type LensResult } from './data/source.js';
-import { noRowsOf, stubLiveClient } from './data/testdata/live-client.fixture.js';
+import { noRowsOf, STUB_SCOPE_CREEP, stubLiveClient } from './data/testdata/live-client.fixture.js';
 import { NO_FLAKY_TITLE } from './lenses/QaLens.js';
 
 /** The card titles each lens shows, by the tab that opens it. */
@@ -221,10 +225,69 @@ describe('App, by page source', () => {
     expect(screen.getByRole('img', { name: 'Planned tasks against task sessions, per plan' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Hours of task sessions per agent over the range' })).toBeDefined();
     expect(screen.getByText('task session minutes over the range; no limit is set')).toBeDefined();
-    expect(screen.getAllByText('Not wired yet')).toHaveLength(1);
+    expect(screen.queryByText('Not wired yet')).toBeNull();
+    expect(screen.queryByText('not wired yet')).toBeNull();
     expect(within(screen.getByRole('region', { name: 'Plans completed this week' })).queryByText('not wired yet')).toBeNull();
     expect(within(screen.getByRole('region', { name: 'Active blockers' })).getByText('1')).toBeDefined();
-    expect(within(screen.getByRole('region', { name: 'Plans landed on their CI-green week' })).getByText('not wired yet')).toBeDefined();
+  });
+
+  it('over the live source, draws the out-of-scope tile from the answer, against the window\'s weekly average', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    await settle();
+    const { lastWeek, average } = scopeCreepOf(STUB_SCOPE_CREEP);
+    const tile = screen.getByRole('region', { name: 'Out-of-scope entries this week' });
+
+    expect(average).not.toBe(SCOPE_CREEP_AVERAGE);
+    expect(within(tile).getByText(String(lastWeek))).toBeDefined();
+    expect(within(tile).getByText(`vs ${average} a week average`)).toBeDefined();
+    expect(within(tile).queryByText('not wired yet')).toBeNull();
+  });
+
+  it('over the live source, draws the on-time tile as the collect empty state, naming the due date on plans', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    await settle();
+    const tile = screen.getByRole('region', { name: 'Plans landed on their CI-green week' });
+
+    expect(within(tile).getByText('needs a collector: needs a due date on plans')).toBeDefined();
+    expect(within(tile).getByText('—')).toBeDefined();
+    expect(within(tile).queryByText(formatPercent(ON_TIME_SHARE))).toBeNull();
+    expect(within(tile).queryByText('not wired yet')).toBeNull();
+  });
+
+  it('over the live source, draws the task pile from the open issues, with the board\'s type labels in the legend', async () => {
+    renderApp(createLiveLensSource(stubLiveClient().client));
+    await settle();
+    const pile = screen.getByRole('region', { name: 'The task pile as drag' });
+
+    expect(within(pile).getByRole('img', { name: 'Pending work by kind and age as a sunburst' })).toBeDefined();
+    expect(within(pile).getByText('the open issues by type label, and how long each has waited since it was opened')).toBeDefined();
+    expect(within(pile).getByText('bug')).toBeDefined();
+    expect(within(pile).queryByText('open bugs')).toBeNull();
+  });
+
+  it('over a replica with no GitHub data, names the --github build on the task pile', async () => {
+    renderApp(createLiveLensSource(stubLiveClient({ github: false }).client));
+    await settle();
+    const pile = screen.getByRole('region', { name: 'The task pile as drag' });
+
+    expect(within(pile).queryByRole('img')).toBeNull();
+    expect(within(pile).getByText(GITHUB_NOT_READ)).toBeDefined();
+    expect(screen.getAllByText('Not wired yet')).toHaveLength(1);
+  });
+
+  it('control: the mock page keeps the out-of-scope average, the on-time sample and the pile\'s mock kinds', async () => {
+    renderApp();
+    await settle();
+    const scope = screen.getByRole('region', { name: 'Out-of-scope entries this week' });
+    const onTime = screen.getByRole('region', { name: 'Plans landed on their CI-green week' });
+    const pile = screen.getByRole('region', { name: 'The task pile as drag' });
+
+    expect(within(scope).getByText(`vs ${SCOPE_CREEP_AVERAGE} a week average`)).toBeDefined();
+    expect(within(onTime).getByText(formatPercent(ON_TIME_SHARE))).toBeDefined();
+    expect(within(onTime).getByText('proxy for on-time delivery: no due dates exist')).toBeDefined();
+    expect(within(onTime).queryByText(/needs a collector/u)).toBeNull();
+    expect(within(pile).getByText('what is pending by kind, and how long each item has waited')).toBeDefined();
+    for (const kind of PILE_KINDS) expect(within(pile).getByText(kind.label)).toBeDefined();
   });
 
   it('over the live source, notes the row count behind a wired card in place of the mock note', async () => {

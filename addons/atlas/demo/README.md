@@ -83,11 +83,21 @@ rest of `workspace` comes from `arch.composition` and `arch.import-flow`
 1,000 lines or more), the sunburst, and the import flow with its layer
 columns (`layerOrder`, `unassigned` last) and their tones (`layerTones`),
 each upward import marked `upward`. Their three cards name no `reads`
-yet, so the live page still shows them "Not wired yet". The open bugs and the resolution time
-are GitHub-only: when their metric answers no row, the replica was built
+yet, so the live page still shows them "Not wired yet". The open bugs, the resolution time
+and the task pile are GitHub-only: when their metric answers no row, the replica was built
 without `--github`, and the card shows "Not wired yet" with the build
 line `rafa module exec @open-tomato/rafa-atlas build --github` (the
 result's `notWiredDetail`).
+
+On the Project Management lens, the out-of-scope tile reads
+`scopeCreepPerWeek` and compares the last week against the window's
+weekly average (`scopeCreepAverage`); the task pile reads `taskPileTree`,
+the open issues by type label and age, its legend and tones taken from
+the branches the answer names. The on-time tile stands in for a
+catalogue entry marked `collect`: on the live page it draws the `collect`
+empty state, a dash and "needs a collector: needs a due date on plans"
+(`LensStat`'s `collect`), distinct from "not wired yet"; the mock page
+keeps its sample.
 
 Every card and tile a live metric feeds names its `reads`. On the live
 page a wired card's note is `liveNoteOf`'s (`src/lenses/spec.ts`): the

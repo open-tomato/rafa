@@ -23,6 +23,14 @@ export const LIVE_SOURCE = 'Live: the Atlas API under /api/atlas, over the repli
 /** What a card or a tile that no live metric feeds says on the live page. */
 export const NOT_WIRED_TITLE = 'Not wired yet';
 
+/**
+ * What a tile whose catalogue entry is `collect` says on the live page,
+ * before the collector it names: rafa collects nothing it could read, so
+ * no metric will feed it until the collector exists. Distinct from
+ * `NOT_WIRED_TITLE` (Q1 of the data-integration spec).
+ */
+export const NEEDS_COLLECTOR_TITLE = 'Needs a collector';
+
 /** A card's spec as a lens writes it: the primitive by name, the rest of the spec, the source optional. */
 export type LensCardSpec = Omit<CardSpec, 'chart' | 'source' | 'animate'> & {
   readonly primitive: string;

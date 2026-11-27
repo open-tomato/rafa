@@ -1,12 +1,13 @@
 import type { LensField, LensResult } from '../data/source.js';
 
-import { useDashboard, type LegendItem } from '@open-tomato/atlas-ui';
-import { formatCompact, formatDay, formatMinutes, formatPercent, useChartEngine, type LineSeries } from '@open-tomato/charts';
+import { useDashboard, type LegendItem, type StatDelta } from '@open-tomato/atlas-ui';
+import { formatCompact, formatDay, formatMinutes, formatPercent, useChartEngine, type ChartTone, type LineSeries } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
-import { PILE_KINDS, PILE_TONES, WEEKLY_TOKEN_BUDGET_TIGHT, WIP_LIMIT_MINUTES, ON_TIME_SHARE, type MockData } from '../data/mock.js';
+import { PILE_TONES, WEEKLY_TOKEN_BUDGET_TIGHT, WIP_LIMIT_MINUTES, ON_TIME_SHARE, type MockData, type TreeBranch } from '../data/mock.js';
 import { LensGrid } from '../templates/LensGrid.js';
 
+import { groupTonesOf } from './kinds.js';
 import { LensCard } from './LensCard.js';
 import { LensStat } from './LensStat.js';
 import { LoadingTiles } from './LoadingTiles.js';
@@ -15,9 +16,6 @@ import { cardSpec, plotHeight } from './spec.js';
 
 /** The four-week average completion share the hero tile compares against. */
 const COMPLETION_AVERAGE = 0.71;
-
-/** The page-wide scope-creep average the tile compares against. */
-const SCOPE_CREEP_AVERAGE = 18;
 
 /** Minutes in an hour, and the tenths the agent hours keep. */
 const MINUTES_PER_HOUR = 60;
@@ -62,6 +60,12 @@ const PILE = cardSpec({
   maximise: { size: 'large', legend: 'always' },
 });
 
+/** What the task pile says on the live page, where the inner ring is the board's type labels. */
+const PILE_LIVE_SUBTITLE = 'the open issues by type label, and how long each has waited since it was opened';
+
+/** What the on-time tile's catalogue entry (4, `collect`) says is missing. */
+const ON_TIME_COLLECTOR = 'needs a due date on plans';
+
 /** What the budget card says on the live page, where no weekly target is read yet. */
 const NO_TARGET = 'no target set';
 
@@ -97,7 +101,19 @@ const PLANNED_LEGEND: readonly LegendItem[] = [
   { id: 'sessions', label: 'Task sessions', tone: 'series-2' },
 ];
 
-const PILE_LEGEND: readonly LegendItem[] = PILE_KINDS.map(({ id, label, tone }) => ({ id, label, tone }));
+/**
+ * The task pile's tones: the mock's kinds in `PILE_TONES`, and on the live
+ * page each type label the board holds, toned in the order first named.
+ */
+function pileTonesOf(tree: readonly TreeBranch[]): Record<string, ChartTone> {
+  return groupTonesOf(tree, PILE_TONES);
+}
+
+/** The task pile's legend: one entry per inner ring branch, the mock's kinds or the live type labels. */
+function pileLegend(tree: readonly TreeBranch[]): LegendItem[] {
+  const tones = pileTonesOf(tree);
+  return tree.map(({ id, label }) => ({ id, label, tone: tones[id] ?? 'muted' }));
+}
 
 /** The two token series: this period and the one before. */
 function tokenSeries(mock: MockData): LineSeries[] {
@@ -126,6 +142,30 @@ const TOKEN_LEGEND: readonly LegendItem[] = [
   { id: 'current', label: 'This period', tone: 'series-1' },
   { id: 'previous', label: 'Previous 12 weeks', tone: 'series-2' },
 ];
+
+/** Which way the last week's out-of-scope count sits against the average: up, down, or flat when equal. */
+function directionOf(last: number, average: number): StatDelta['direction'] {
+  if (last === average) return 'flat';
+  return last > average
+    ? 'up'
+    : 'down';
+}
+
+/**
+ * The out-of-scope tile's delta: the mock's against its fixed average
+ * (always up, as before), the live page's against the window's weekly
+ * average (C1).
+ */
+function scopeCreepDelta(mock: MockData, onMock: boolean): StatDelta {
+  const last = mock.scopeCreepPerWeek.at(-1) ?? 0;
+  return {
+    text: `vs ${mock.scopeCreepAverage} a week average`,
+    direction: onMock
+      ? 'up'
+      : directionOf(last, mock.scopeCreepAverage),
+    upIsGood: false,
+  };
+}
 
 /** A week's completed plans over its started ones; 0 for a week that started none. */
 function completionOf(week: { readonly started: number; readonly completed: number }): number {
@@ -162,8 +202,14 @@ function ProjectTiles({ result }: { readonly result: LensResult }): ReactElement
           ? { text: '1 fewer than last week', direction: 'down', upIsGood: false }
           : undefined}
       />
-      <LensStat label="Out-of-scope entries this week" value={String(mock.scopeCreepPerWeek.at(-1) ?? 0)} trend={mock.scopeCreepPerWeek} delta={{ text: `vs ${SCOPE_CREEP_AVERAGE} a week average`, direction: 'up', upIsGood: false }} />
-      <LensStat label="Plans landed on their CI-green week" value={formatPercent(ON_TIME_SHARE)} note="proxy for on-time delivery: no due dates exist" />
+      <LensStat
+        label="Out-of-scope entries this week"
+        reads={['scopeCreepPerWeek', 'scopeCreepAverage']}
+        value={String(mock.scopeCreepPerWeek.at(-1) ?? 0)}
+        trend={mock.scopeCreepPerWeek}
+        delta={scopeCreepDelta(mock, onMock)}
+      />
+      <LensStat label="Plans landed on their CI-green week" value={formatPercent(ON_TIME_SHARE)} note="proxy for on-time delivery: no due dates exist" collect={ON_TIME_COLLECTOR} />
     </>
   );
 }
@@ -280,12 +326,14 @@ export function ProjectManagerLens(): ReactElement {
           </LensCard>
           <LensCard
             config={PILE}
+            reads={['taskPileTree']}
+            liveSubtitle={PILE_LIVE_SUBTITLE}
             select={(result: LensResult) => result.mock.taskPileTree}
-            legend={PILE_LEGEND}
+            legend={pileLegend}
             table={(tree) => ({ columns: ['Kind', 'Waiting', 'Items'], rows: tree.flatMap((kind) => kind.children.map((child) => [kind.label, child.label, child.value])) })}
           >
             {({ data: tree, animate, height }) => (
-              <Sunburst ariaLabel="Pending work by kind and age as a sunburst" nodes={tree} groupTones={PILE_TONES} unit="items" animate={animate} height={plotHeight(300, height)} />
+              <Sunburst ariaLabel="Pending work by kind and age as a sunburst" nodes={tree} groupTones={pileTonesOf(tree)} unit="items" animate={animate} height={plotHeight(300, height)} />
             )}
           </LensCard>
         </>
