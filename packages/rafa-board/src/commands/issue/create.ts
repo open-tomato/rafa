@@ -197,7 +197,7 @@ import { resolveUpstream, UPSTREAM_FLAG, upstreamGhRunner, upstreamRefusal } fro
  * `--help` lists the flag, and `src/tests/board-coupled/commands/issue/create.test.ts`
  * holds this line as it is.
  */
-const USAGE = 'rafa issue create (--title=<text> | --type=bug --summary=<text> --module=<name> --action=<name> --cause=<code>'
+const USAGE = 'rafa issue create (--title=<text> | --type=bug|debt --summary=<text> --module=<name> --action=<name> --cause=<code>'
   + ' --reproduce=<text>) [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]'
   + ' [--env=<place>] [--proposed=<code>] [--rerun=<command>] [--project=<name>] [--path=<file>] [--dry-run]';
 
