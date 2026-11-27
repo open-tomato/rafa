@@ -168,7 +168,9 @@ fragments after a `git fetch` to pick the right name).
 branch with no wrap-up to write it, such as a bot's pull request, and prints
 its path as the last line. `--plan` must match the plan id pattern, `--level`
 is one of `patch`, `minor`, `major` and `none`, and `--package` must name a
-public member of the checkout's workspace. A shipping level given no `--note`
+public member of the checkout's workspace. Under `release.packageFragments:
+refuse`, `--package` is refused before anything is written, naming the key and
+where it is set, and a line without it is written as before. A shipping level given no `--note`
 takes the title as its one note, with a warning. The name is `<plan>.md`, or
 `-2`, `-3` and on when that name already waits on `origin/<pr.base>`. A file
 already at the path, in the working tree or in `HEAD`, is refused, so a second
@@ -714,7 +716,8 @@ rafa leaves it off. The refusals and the dry run's line are under "The lock" in
 (default, a `package:` line is written as before the key) or `refuse` (the
 repository releases no package yet, so a fragment naming one is refused). Read
 through core's `oneOf`, so any other value is refused naming both. Declared in
-`packages/rafa/src/config-schema-release.ts`.
+`packages/rafa/src/config-schema-release.ts`. Read by `rafa release fragment`
+through the shared reading `packages/rafa-release/src/release/package-fragments.ts`.
 
 **`pr.versionCollision`** — Reaction to `missing` and `stale` preflight
 findings: `report` (default, warn and proceed), `ask` (ask the user), `refuse`
