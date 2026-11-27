@@ -32,9 +32,9 @@
 # --data-dir=/data` first, which writes the install record
 # /data/rafa-hub.install.json, then execs the server, so it gets the stop
 # signals. With `hub.storePath` left out, the SQLite store is opened beside
-# the config, in /data, so the store outlives the container. The hub
-# writes its logs as JSON lines on standard output and writes no log
-# file; read them with `docker logs`.
+# the config, in /data, so the store outlives the container. The install
+# prints one plain-text line; then the hub writes its logs as JSON lines on
+# standard output and no log file. Read them with `docker logs`.
 
 ARG BUN_VERSION=1.3.14
 

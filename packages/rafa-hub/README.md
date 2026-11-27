@@ -35,8 +35,8 @@ docker run -d -p 7373:7373 -v rafa-hub-data:/data rafa-hub
 
 Each start runs `rafa-hub install --data-dir=/data` before the server, and the
 server replaces the shell, so it is the process `docker stop` signals. The
-hub writes its logs as JSON lines on standard output; read them with
-`docker logs`, whose first line is the install's, in plain text.
+install prints one plain-text line; then the hub writes its logs as JSON
+lines on standard output. Read them with `docker logs`.
 
 ### Files in `/data`
 
