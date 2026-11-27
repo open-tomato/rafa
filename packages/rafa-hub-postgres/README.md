@@ -117,11 +117,13 @@ since nothing would read it.
 ### Models: with or without one
 
 Without `hub.index.embedding.model`, `vector` is `false` and `fts` and `graph`
-serve. That is a working hub, not a degraded one. Add a model when the hub has
-room for it. Changing the model or the precision restarts the hub with
-`vector` `false`, and a job re-embeds the rows from their text while `fts`
-answers. A vector written under another stored record is refused, and the
-refusal names both records.
+serve. That is a working hub, not a degraded one. This release hands no embedder
+to either engine, so `vector` stays `false` with a model named too; see
+[the hub's README](../rafa-hub/README.md#the-postgres-engine). The rest of this
+section is what a hub does once an embedder is given. Changing the model or the
+precision restarts the hub with `vector` `false`, and a job re-embeds the rows
+from their text while `fts` answers. A vector written under another stored
+record is refused, and the refusal names both records.
 
 ## The small-hub settings block
 
@@ -137,9 +139,10 @@ These are the settings for a host of about 512 MiB:
 | `max_parallel_maintenance_workers` | `0` |
 | `effective_cache_size` | `128MB` |
 
-The values are projected, not measured: the real hub has not been measured yet,
-so treat them as a starting point. The `paradedb` image's defaults assume a
-large host, with 3.8 GB of `shared_buffers`, which does not fit a small one.
+The spike ran with these values, in a 200 MiB container on a laptop (measured).
+The real hub has not been measured with them yet, so treat them as a starting
+point. The `paradedb` image's defaults assume a large host, with 3.8 GB of
+`shared_buffers`, which does not fit a small one.
 `shared_buffers` takes effect only after a restart.
 
 ## `maintenance_work_mem`: the HNSW build
