@@ -14,9 +14,12 @@
  *      migrations);
  *   2. the skew check, the hub's contract and migrations against this
  *      rafa's, where `--status` stops, sending and merging nothing;
- *   3. the push of the rows past the push cursor;
- *   4. the pull and its merge, which `--dry-run` runs with step 3
- *      without writing either the store or the state file;
+ *   3. and 4. the push of the rows past the push cursor and the pull
+ *      with its merge, in the order `effort.syncMerge` names: the pull
+ *      first under `ff-only`, the default, its push leaving out the rows
+ *      `merge_conflicts` names and run only once the pull completed, and
+ *      the push first under `merge`. `--dry-run` runs both without
+ *      writing either the store or the state file;
  *   5. the hub line.
  *
  * The two flags are two stop points, so typing both is refused. The
@@ -32,21 +35,28 @@
  *
  *   - a whole sync: the hub line `hubLine` makes, `hub: reachable,
  *     contract <n>, project <name>; pulled <n> rows`, ending `; <m> rows
- *     held back` when the pull held rows back;
+ *     held back` when the pull held rows back. A push that left out
+ *     conflicted rows (the reading's `conflicted` above zero, which only
+ *     `ff-only` asks for) is first given the held line `conflictedLine`
+ *     makes, a `warn` line, `effort sync: <n> rows held: they differ
+ *     from the hub's copy (merge_conflicts); the rest was pushed`: the
+ *     contact's `sync()` counts them and writes no line;
  *   - `--status`: `hub: reachable, contract <n>, project <name>; <p>
  *     rows waiting to push`, the count left out when the strategy counts
  *     none;
  *   - `--dry-run`: `hub: reachable, contract <n>, project <name>; dry
  *     run: <p> rows to push, <n> rows to pull, <c> rows in conflict;
  *     nothing was written`, `push not counted` in the first place when
- *     the strategy has no dry-run push;
+ *     the strategy has no dry-run push, and `; <h> rows would be held`
+ *     after the conflicts when the dry push counted conflicted rows it
+ *     would leave out (never under `merge`, which leaves none out);
  *   - `effort.sync` set to `local` or `file`, which no contact reaches:
  *     `effort sync: effort.sync is "<kind>", which syncs with no hub;
  *     nothing to sync`.
  *
  * A step that did not answer writes its own line and the command adds
- * none, so a contact is two lines at most: the pull's own line, then the
- * hub line or the line standing in its place.
+ * none, so a contact is three lines at most: the pull's own line, the
+ * held line, then the hub line or the line standing in its place.
  *
  * With `--output=json` the same lines are `log` events, and a run
  * exiting 0 gives {@link SyncCommandData} as the data of the terminal
@@ -76,7 +86,7 @@ import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
 import type { ConfigRoots } from '@open-tomato/rafa/core/config/load';
 import type { HubSyncReading, HubSyncStop } from '@open-tomato/rafa-effort';
 
-import { createHubContact, hubLine } from '@open-tomato/rafa-effort';
+import { conflictedLine, createHubContact, hubLine } from '@open-tomato/rafa-effort';
 
 import { expectNoArgument, readSwitch, requireProject, resolveProjectConfig } from '@open-tomato/rafa/commands/plan/plan-files';
 import { CommandExit } from '@open-tomato/rafa/core/command';
@@ -222,8 +232,26 @@ function dryRunLine(reading: Contacted): string | null {
   const held = heldBack > 0
     ? `, ${String(heldBack)} rows held back`
     : '';
-  return `${opening}; dry run: ${push}, ${String(pulled)} rows to pull${held}, ${String(conflicts)} rows in conflict;`
+  const conflicted = conflictedOf(reading);
+  const wouldHold = conflicted > 0
+    ? `; ${String(conflicted)} rows would be held`
+    : '';
+  return `${opening}; dry run: ${push}, ${String(pulled)} rows to pull${held}, ${String(conflicts)} rows in conflict${wouldHold};`
     + ' nothing was written';
+}
+
+/** The conflicted rows the run's push left out, or a dry push would have: 0 when no push answered. */
+function conflictedOf(reading: Contacted): number {
+  return reading.conflicted ?? 0;
+}
+
+/** The held line a whole sync writes before its hub line, or null when its push left no row out; see the module note. */
+function heldLine(reading: Contacted): string | null {
+  if (reading.stop !== null) return null;
+  const conflicted = conflictedOf(reading);
+  return conflicted > 0
+    ? conflictedLine(conflicted)
+    : null;
 }
 
 /** The line the command adds after a contacted run, or null when the contact's own line stands; see the module note. */
@@ -327,7 +355,11 @@ export async function runSync(context: RafaContext, seams: SyncCommandSeams): Pr
   const closing = reading.state === 'contacted'
     ? closingLine(reading)
     : null;
+  const held = reading.state === 'contacted'
+    ? heldLine(reading)
+    : null;
   if (reading.state === 'not-contacted') info(nothingToSyncLine(reading.strategy));
+  if (held !== null) warn(held);
   if (closing !== null) info(closing);
 
   const exitCode = syncExitCode(reading);
@@ -346,15 +378,19 @@ export function createSyncCommand(seams: SyncCommandSeams = {}): RafaCommand {
     name: 'effort sync',
     subject: 'effort',
     action: 'sync',
-    summary: 'sync the effort store with the hub: read its status, check skew, push, then pull and merge',
+    summary: 'sync the effort store with the hub: read its status, check skew, then pull and push in the order effort.syncMerge names',
     description: 'Makes one contact with the hub the `service` sync strategy names, in five steps: reads the'
-      + ' hub\'s status (its contract, this project and its migrations), checks it against this rafa, pushes the'
-      + ' rows past the push cursor, pulls and merges the other devices\' rows, then prints the hub line,'
-      + ' `hub: reachable, contract <n>, project <name>; pulled <n> rows`, ending `; <m> rows held back` when the'
-      + ' pull held rows back. A pull\'s own line, for rows projected to this rafa\'s schema or refilled, comes'
-      + ' first. `--status` stops after the check and prints the rows waiting to push; `--dry-run` pushes and'
-      + ' pulls without writing the store or the state file and prints what would be pushed, pulled and'
-      + ' recorded as conflicts. A hub that cannot be reached is one `warn` line and exits 0, the local store'
+      + ' hub\'s status (its contract, this project and its migrations), checks it against this rafa, pulls and'
+      + ' merges the other devices\' rows and pushes the rows past the push cursor in the order `effort.syncMerge`'
+      + ' names, then prints the hub line, `hub: reachable, contract <n>, project <name>; pulled <n> rows`, ending'
+      + ' `; <m> rows held back` when the pull held rows back. Under `ff-only`, the default, the pull comes first,'
+      + ' the push runs only once it completed and leaves out the rows `merge_conflicts` names, and a push that'
+      + ' left rows out prints `effort sync: <n> rows held: they differ from the hub\'s copy (merge_conflicts); the'
+      + ' rest was pushed` before the hub line; under `merge` the push comes first and nothing is left out. A'
+      + ' pull\'s own line, for rows projected to this rafa\'s schema or refilled, comes first. `--status` stops'
+      + ' after the check and prints the rows waiting to push; `--dry-run` pulls and pushes without writing the'
+      + ' store or the state file and prints what would be pushed, pulled and recorded as conflicts, adding'
+      + ' `; <n> rows would be held` when the push would leave rows out. A hub that cannot be reached is one `warn` line and exits 0, the local store'
       + ' kept as it is; under `effort.sync: local` or `file` it prints one line saying there is nothing to sync'
       + ' and exits 0. Exit code 1 for a refusal, each one line naming its next step: the hub or this rafa behind'
       + ' the other, a contract mismatch, a project the hub does not serve, a missing token; and for a strategy'
@@ -371,15 +407,15 @@ export function createSyncCommand(seams: SyncCommandSeams = {}): RafaCommand {
       },
       {
         name: DRY_RUN_FLAG,
-        description: 'Push and pull without writing: count the rows a push would send and what the merge would'
-          + ' add and record as conflicts, leaving the store and the state file as they are.',
+        description: 'Pull and push without writing: count the rows a push would send and hold, and what the merge'
+          + ' would add and record as conflicts, leaving the store and the state file as they are.',
         type: 'boolean',
       },
     ],
     examples: [
       {
         cmd: 'rafa effort sync',
-        note: 'Pushes, pulls and prints the hub line, or the one line saying why it could not.',
+        note: 'Pulls and pushes in the order effort.syncMerge names and prints the hub line, or the one line saying why it could not.',
       },
       {
         cmd: 'rafa effort sync --status',
@@ -387,7 +423,7 @@ export function createSyncCommand(seams: SyncCommandSeams = {}): RafaCommand {
       },
       {
         cmd: 'rafa effort sync --dry-run',
-        note: 'Shows what a sync would push, pull and record as conflicts, writing nothing.',
+        note: 'Shows what a sync would push, hold, pull and record as conflicts, writing nothing.',
       },
     ],
     outputs: ['text', 'json'],

@@ -725,7 +725,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/store/move', ['MOVE_TARGET', 'MoveRefusal', 'moveToSqlite']],
   ]],
   ['./commands/effort/sync.js', [
-    ['@open-tomato/rafa-effort', ['createHubContact', 'hubLine']],
+    ['@open-tomato/rafa-effort', ['conflictedLine', 'createHubContact', 'hubLine']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
     ['@open-tomato/rafa/core/config/load', ['loadConfig']],

@@ -364,7 +364,7 @@ export {
   SKEW_REFUSALS,
 } from './contact-attempt.js';
 export type { SkewCheckInput } from './contact-facts.js';
-export { capOf, hubFactsOf, hubSyncStatusOf, skewCheck } from './contact-facts.js';
+export { capOf, conflictedLine, hubFactsOf, hubSyncStatusOf, skewCheck } from './contact-facts.js';
 export type { BoundedPushRequest, PayloadCap } from './contact-pages.js';
 export { MAX_PULL_PAGES } from './contact-pages.js';
 
