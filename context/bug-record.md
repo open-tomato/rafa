@@ -41,6 +41,25 @@ field from them. A recurrence's comment gains the `Versions` it was
 seen again on and no other field. The two bodies share their `What` and
 `Artifact` sections, so either is read by the other's code.
 
+### The record type
+
+A record is filed under one of two types, `bug` or `debt`
+(`ISSUE_RECORD_TYPES`, `packages/rafa-board/src/commands/issue/declarations-shared.ts`).
+Both are one bug record: the same fields, the same checks, the same title
+template and the same upstream filing. A `bug` is a defect that makes
+something break. A `debt` is a gap report whose missing line only leaves a
+step to be done by hand. The breaking question sorts a gap report between
+them, worded the same in every filing place: "Does the missing line make
+something break, beyond a step done by hand?" Yes files `--type=bug`, no
+files `--type=debt`, both under `--module=cli-gap`. `rafa issue list
+--type=bug` is the bug count, so a gap report shows there only when it
+breaks something.
+
+`rafa issue edit <n> --type=bug|debt` moves a record between the two types. It
+changes the type and nothing else: the module, the cause, the priority, every
+other label and the body stay as they were. An older rafa may refuse a `debt`
+issue on a board: `debt` reads from the release that ships it.
+
 ### Three axes
 
 - **The title**, for a person reading a list: the summary, with the
@@ -137,6 +156,12 @@ alone when the module is `unknown`. A monorepo adds the project:
 
 The issue id is never a variable. The tracker assigns it after the title
 is written, and a listing prints it as a column.
+
+A `debt` record renders its title from the same `issues.titles.bug`
+template as a `bug`, so a gap report reads `cli-gap - <action>: <summary>`
+under either type. The template's `${type}` variable is printed only when a
+template names it, and the default does not, so the type never shows in a
+title by default.
 
 A template is refused at load when it cannot be parsed, when
 `${summary}` is not its last variable outside every group, and when a

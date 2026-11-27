@@ -42,7 +42,7 @@ test reads them.
 | `rafa-stretch-analyst` | da²: tests the person's hunches against the stretch's data, read-only, writing only `analysis.md` |
 | `rafa-stretch-sweep` | phase 1: recheck, security alerts, duplicate groups, ranking, tiers, the bucket report |
 | `rafa-stretch-pit-stop` | phase 3: the five checks after each item, and the decision |
-| `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
+| `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` report: a `bug` when it breaks something, else a `debt` |
 
 Every operator agent carries the single-command rule: run every `rafa` line as
 one command, no `cd … &&`, `;`, pipe or redirect. The allow rules match a
