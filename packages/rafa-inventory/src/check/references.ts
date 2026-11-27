@@ -188,9 +188,9 @@ const POSIX_FUNCTION_DEFINITION = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)\s*\{/;
  * Bash's own function syntax: the `function` keyword, a name, and an
  * optional empty `()`, then the same `{` rule as the POSIX form. The
  * keyword is what makes this shape unambiguous without requiring the
- * parens POSIX does.
+ * parens POSIX does; the `()` group holds the space after it, so no two runs share one.
  */
-const BASH_FUNCTION_DEFINITION = /^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\s*\))?\s*\{/;
+const BASH_FUNCTION_DEFINITION = /^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\s*\)\s*)?\{/;
 
 /**
  * The names `body` defines as a shell function anywhere in it. A name
@@ -373,11 +373,11 @@ function fenceInfo(raw: string): string {
   return (raw.split(/[\s,{]/)[0] ?? '').toLowerCase();
 }
 
-/** A whitespace-delimited word with its wrapping punctuation removed. */
+/** A whitespace-delimited word with its wrapping punctuation removed, the closing run scanned from its end. */
 function cleanToken(word: string): string {
-  return word
-    .replace(/^[('"`[{<]+/, '')
-    .replace(/[)'"`\]}>,;:.]+$/, '');
+  let end = word.length;
+  while (end > 0 && ')\'"`]}>,;:.'.includes(word.charAt(end - 1))) end -= 1;
+  return word.slice(0, end).replace(/^[('"`[{<]+/, '');
 }
 
 /**
