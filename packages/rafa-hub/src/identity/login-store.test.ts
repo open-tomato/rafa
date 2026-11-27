@@ -182,7 +182,7 @@ describe('openSqliteLoginStore over a file', () => {
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), 'rafa-hub-login-store-'));
-    path = keysFileName(join(directory, 'rafa-hub.sqlite'));
+    path = keysFileName(directory);
   });
 
   afterEach(() => {

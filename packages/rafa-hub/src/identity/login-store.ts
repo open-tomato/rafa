@@ -6,8 +6,8 @@
  *
  * ## The file
  *
- * The keys file `keysFileName` names (`rafa-hub.keys.sqlite` beside
- * `hub.storePath`), in a table of its own, `hub_login`, beside the key
+ * The keys file `resolveKeysFile` answers (`rafa-hub.keys.sqlite` in the
+ * install record's `dataDir`), in a table of its own, `hub_login`, beside the key
  * store's `hub_keys`. It is opened with `strict: true` and in WAL mode,
  * and its table is created on open when it is not there.
  *
@@ -82,7 +82,7 @@ export interface HubLoginStore {
 
 /** What {@link openSqliteLoginStore} is opened with. */
 export interface SqliteLoginStoreOptions {
-  /** The keys file, `keysFileName` of the store path, or `:memory:`. */
+  /** The keys file, as `resolveKeysFile` answers it, or `:memory:`. */
   readonly path: string;
   /** The clock `setAt` is read from; the system clock when left out. */
   readonly now?: () => Date;

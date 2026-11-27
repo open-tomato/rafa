@@ -6,13 +6,24 @@
  *
  * ## The file
  *
- * {@link keysFileName} names it: `rafa-hub.keys.sqlite` in the directory
- * of `hub.storePath` (the first project's store when `hub.projects` is
- * set). It is none of a project's files, neither its store, its devices
- * file (`devicesFileName`) nor its index file, so no project's merge swap
- * or listing touches it. The login credentials live in the same file,
+ * {@link keysFileName} names it: `rafa-hub.keys.sqlite` in the install
+ * record's `dataDir` (`install-record.ts`), since the file is the hub's
+ * own and no project's. It is none of a project's files, neither its
+ * store, its devices file (`devicesFileName`) nor its index file, so no
+ * project's merge swap or listing touches it. The login credentials live in the same file,
  * in a table of their own. It is opened with `strict: true` and in WAL
  * mode, and its table is created on open when it is not there.
+ *
+ * ## The old place, for one release
+ *
+ * Before the file followed `dataDir` it lived in the directory of
+ * `hub.storePath`, the first project's store when `hub.projects` is set
+ * ({@link oldKeysFileName}). {@link resolveKeysFile} answers the place a
+ * hub or `rafa-hub login` opens: the file in `dataDir`, unless the file
+ * is found at the old place alone, which is then opened there, for this
+ * release, with one warning line naming the new place. A file at both
+ * places opens the one in `dataDir` and says nothing, and so does a
+ * file at neither, which the open then creates in `dataDir`.
  *
  * ## A key
  *
@@ -42,11 +53,12 @@
  * name, never a key or a digest.
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
-/** The keys file's name, in the directory of `hub.storePath`. */
+/** The keys file's name, in the install record's `dataDir`. */
 export const KEYS_FILE = 'rafa-hub.keys.sqlite';
 
 /** What every minted key opens with. */
@@ -136,7 +148,7 @@ export interface HubKeyStore {
 
 /** What {@link openSqliteKeyStore} is opened with. */
 export interface SqliteKeyStoreOptions {
-  /** The keys file, {@link keysFileName} of the store path, or `:memory:`. */
+  /** The keys file, as {@link resolveKeysFile} answers it, or `:memory:`. */
   readonly path: string;
   /** The clock every timestamp is read from; the system clock when left out. */
   readonly now?: () => Date;
@@ -180,9 +192,46 @@ const DELETE_KEY = 'UPDATE hub_keys SET deleted = 1 WHERE name = $name';
 
 const STAMP_KEY = 'UPDATE hub_keys SET last_used_at = $at WHERE name = $name AND deleted = 0';
 
-/** The keys file beside the store at `storePath` (a name or a path): {@link KEYS_FILE} in its directory. */
-export function keysFileName(storePath: string): string {
+/** The keys file in the hub's data directory `dataDir` (the install record's): {@link KEYS_FILE} there. */
+export function keysFileName(dataDir: string): string {
+  return join(dataDir, KEYS_FILE);
+}
+
+/**
+ * Where the keys file lived before it followed `dataDir`: {@link KEYS_FILE}
+ * in the directory of the store at `storePath` (a name or a path).
+ * Read for one release, by {@link resolveKeysFile}.
+ */
+export function oldKeysFileName(storePath: string): string {
   return join(dirname(storePath), KEYS_FILE);
+}
+
+/** The keys file {@link resolveKeysFile} answers, and the warning an old place gives. */
+export interface KeysFilePlace {
+  /** The keys file to open. */
+  readonly path: string;
+  /**
+   * One warning line naming the new place when the file was found
+   * beside `hub.storePath` alone and is opened there; null otherwise.
+   */
+  readonly warning: string | null;
+}
+
+/**
+ * The keys file a hub over `dataDir` and `storePath` (`hub.storePath`,
+ * the first listed project's under `hub.projects`) opens:
+ * {@link keysFileName} of `dataDir`, unless the file is found at
+ * {@link oldKeysFileName} of `storePath` alone, which answers the old
+ * place with one warning line naming the new one. `exists` asks whether
+ * a file is there; `existsSync` when left out.
+ */
+export function resolveKeysFile(dataDir: string, storePath: string, exists: (path: string) => boolean = existsSync): KeysFilePlace {
+  const path = keysFileName(dataDir);
+  const old = oldKeysFileName(storePath);
+  if (resolve(old) === resolve(path) || exists(path) || !exists(old)) return Object.freeze({ path, warning: null });
+
+  const warning = `${old}: the keys file is found beside hub.storePath alone, so it is opened there for this release; its place is now ${path}, in the install record's dataDir: move it there before the next release`;
+  return Object.freeze({ path: old, warning });
 }
 
 /**

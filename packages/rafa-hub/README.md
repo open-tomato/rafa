@@ -97,8 +97,11 @@ repeats what was written, in case a key was pasted in place of its name.
 Under `api-key`, the hub reads each named variable once, when it starts, and
 serves a request whose `Authorization: Bearer` equals one of their values, or
 one of the keys created through its key routes, which it keeps hashed in
-`rafa-hub.keys.sqlite` beside `hub.storePath`. If a named variable is unset or
-empty, the hub logs one `config.refused` line naming the variable and exits 1. Under `github`, a push or a pull naming a listed
+`rafa-hub.keys.sqlite` in the install record's `dataDir`, the config file's
+directory by default. For one release, a keys file found only beside
+`hub.storePath`, its old place, is opened there with one `keys.old-place`
+warning naming the new place; move it into `dataDir`. If a named variable is
+unset or empty, the hub logs one `config.refused` line naming the variable and exits 1. Under `github`, a push or a pull naming a listed
 project is checked against that project's `repository`. Every other request is
 checked against the first listed project's.
 
@@ -394,8 +397,10 @@ rafa-hub keys create laptop
 ```
 
 `rafa-hub login` asks for a user name and a password at a terminal, twice for
-the password, and writes the login into `rafa-hub.keys.sqlite` beside
-`hub.storePath`; a running hub reads it on its next request. `rafa-hub keys`
+the password, and writes the login into `rafa-hub.keys.sqlite` in the install
+record's `dataDir` (at the old place beside `hub.storePath` for one release,
+with one warning line, when the file is found only there); a running hub reads
+it on its next request. `rafa-hub keys`
 reaches the hub at `--hub=<url>` or `RAFA_HUB_URL`, and signs in with
 `RAFA_HUB_LOGIN_USER` and `RAFA_HUB_LOGIN_PASSWORD` when both are set, asking
 for them otherwise. A hub whose login is `oauth` answers with a line pointing to

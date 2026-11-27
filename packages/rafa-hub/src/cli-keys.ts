@@ -5,17 +5,23 @@
  *
  * ## `rafa-hub login`
  *
- * Reads the hub's config from the file `RAFA_HUB_CONFIG` names and
- * writes the login into the keys file beside `hub.storePath` (the first
- * listed project's store when `hub.projects` is set), the file a hub
+ * Reads the install record beside the file `RAFA_HUB_CONFIG` names
+ * (`install-record.ts`), then the hub's config from that file, and
+ * writes the login into the keys file in the record's `dataDir` (the
+ * config file's directory when there is no record), the file a hub
  * running over that config checks on its next request; no restart is
- * needed. At a terminal it is a questionnaire: the user name, then the
+ * needed. For one release a keys file found only at its old place,
+ * beside `hub.storePath` (the first listed project's store when
+ * `hub.projects` is set), is written there, and one warning line on
+ * standard error names the new place (`resolveKeysFile`). A missing
+ * record prints nothing: the hub's start warns of it. At a terminal it is a questionnaire: the user name, then the
  * password twice, neither password echoed, and two that differ set
  * nothing. With standard input not a terminal it reads two lines, the
  * user name and the password, so a script or a test drives it.
  *
- * It refuses, setting nothing and exiting 1, a config the reader
- * refuses, a hub whose `hub.auth.adapter` is not `api-key` (no other
+ * It refuses, setting nothing and exiting 1, an install record the
+ * reader refuses (another format, another hub version, no valid
+ * record), a config the reader refuses, a hub whose `hub.auth.adapter` is not `api-key` (no other
  * adapter has a login), a hub whose `hub.auth.login.mode` is `oauth`
  * (its login is the provider's), input that ends before the answers,
  * and a user name holding a colon, which `Authorization: Basic` could
@@ -51,6 +57,7 @@
  */
 import type { HubConfig } from './config.js';
 import type { HubKey } from './identity/key-store.js';
+import type { HubInstallRecord } from './install-record.js';
 import type { Readable, Writable } from 'node:stream';
 
 import { mkdirSync } from 'node:fs';
@@ -58,9 +65,10 @@ import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Writable as WritableStream } from 'node:stream';
 
-import { HubConfigError, readHubConfig } from './config.js';
-import { KEY_NAME, keysFileName } from './identity/key-store.js';
+import { HUB_CONFIG_ENV, HubConfigError, readHubConfig } from './config.js';
+import { KEY_NAME, resolveKeysFile } from './identity/key-store.js';
 import { LOGIN_PASSWORD_VARIABLE, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
+import { readInstallRecord } from './install-record.js';
 import { KEYS_ROUTE } from './server-keys.js';
 
 /** The variable `rafa-hub keys` reads the hub's URL from when `--hub` is left out. */
@@ -283,8 +291,29 @@ export function isLoginCommand(args: readonly string[]): boolean {
   return args.length === LOGIN_ARGS.length && args[0] === LOGIN_ARGS[0];
 }
 
-/** Reads the config `env` names, or answers the refusal's line. */
-async function loginConfig(env: Readonly<Record<string, string | undefined>>): Promise<HubConfig | string> {
+/** The config and the install record a login is set over. */
+interface LoginSetting {
+  readonly config: HubConfig;
+  /** The record beside the config file, or its defaults when there is none. */
+  readonly record: HubInstallRecord;
+}
+
+/**
+ * Reads the install record beside the config file `env` names, for a
+ * hub at `hubVersion`, then the config; answers both, or the refusal's line.
+ */
+async function loginSetting(env: Readonly<Record<string, string | undefined>>, hubVersion: string): Promise<LoginSetting | string> {
+  const named = env[HUB_CONFIG_ENV];
+  let reading;
+  try {
+    reading = named === undefined || named.trim() === ''
+      ? null
+      : await readInstallRecord(named, hubVersion);
+  } catch (error) {
+    if (!(error instanceof HubConfigError)) throw error;
+
+    return `the install record was refused: ${error.problems.join('; ')}`;
+  }
   let config: HubConfig;
   try {
     config = await readHubConfig(env);
@@ -293,13 +322,15 @@ async function loginConfig(env: Readonly<Record<string, string | undefined>>): P
 
     return `the config was refused: ${error.problems.join('; ')}`;
   }
+  if (reading === null) return `${HUB_CONFIG_ENV} is not set, so no install record names the keys file's dataDir`;
+  const { record } = reading;
   if (config.authAdapter !== 'api-key') {
     return `the login exists only under hub.auth.adapter: api-key, and this hub's is ${config.authAdapter}`;
   }
   if (config.login?.mode === 'oauth') {
     return 'hub.auth.login.mode is oauth, so the login is the OAuth provider\'s: sign in at the hub\'s /login page';
   }
-  return config;
+  return { config, record };
 }
 
 /** Asks the user name and password, the password twice at a terminal; answers the pair or the refusal's line. */
@@ -321,17 +352,19 @@ async function askLogin(answers: PromptAnswers): Promise<Credentials | string> {
 
 /**
  * Sets the hub's login in the keys file of the config `env` names, from
- * the answers asked; see the module note. Answers the exit code: 0 with
- * one line on `out` once the login is set, 1 with one line on `err`
- * otherwise. Never exits the process.
+ * the answers asked, the install record beside it read for a hub at
+ * `hubVersion`; see the module note. Answers the exit code: 0 with one
+ * line on `out` once the login is set, 1 with one line on `err`
+ * otherwise. A keys file opened at its old place adds one warning line
+ * on `err`. Never exits the process.
  */
-export async function runLogin(env: Readonly<Record<string, string | undefined>>, options: RunLoginOptions = {}): Promise<number> {
+export async function runLogin(env: Readonly<Record<string, string | undefined>>, hubVersion: string, options: RunLoginOptions = {}): Promise<number> {
   const out = options.out ?? lineTo(process.stdout);
   const err = options.err ?? lineTo(process.stderr);
   const prefix = 'rafa-hub login';
-  const config = await loginConfig(env);
-  if (typeof config === 'string') {
-    err(`${prefix}: ${config}`);
+  const setting = await loginSetting(env, hubVersion);
+  if (typeof setting === 'string') {
+    err(`${prefix}: ${setting}`);
     return 1;
   }
 
@@ -347,7 +380,8 @@ export async function runLogin(env: Readonly<Record<string, string | undefined>>
     return 1;
   }
 
-  const path = keysFileName(config.storePath);
+  const { path, warning } = resolveKeysFile(setting.record.dataDir, setting.config.storePath);
+  if (warning !== null) err(`${prefix}: ${warning}`);
   let store;
   try {
     mkdirSync(dirname(path), { recursive: true });

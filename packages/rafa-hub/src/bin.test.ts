@@ -12,7 +12,9 @@
  * Under `hub.auth.adapter: api-key` the keys are variables of the
  * environment the case hands {@link runHub}, never the process's own,
  * and so are the login's user and password; the keys file and the
- * login it holds are made under the case's root.
+ * login it holds are made under the case's root, in the install
+ * record's `dataDir` (the config file's directory when the case writes
+ * no record), or at the old place beside `hub.storePath`.
  *
  * `rafa-hub index rebuild` runs over a store the `sqlite` connector made
  * under the case's root, seeded with one commit pushed from a real
@@ -393,9 +395,24 @@ function basic(user: string, password: string): string {
   return `Basic ${Buffer.from(`${user}:${password}`).toString('base64')}`;
 }
 
-/** The keys file beside the case's `hub.storePath`. */
+/** The keys file in the case's default `dataDir`, the config file's directory. */
 function keysFile(): string {
-  return keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+  return keysFileName(root);
+}
+
+/** The keys file's old place, beside the case's `hub.storePath`. */
+function oldKeysFile(): string {
+  return join(root, 'store', 'rafa-hub.keys.sqlite');
+}
+
+/** Sets the login `user` with `password` in the keys file at `path`; {@link LOGIN_USER} with {@link LOGIN_PASSWORD} when left out. */
+async function seedLogin(path: string, user = LOGIN_USER, password = LOGIN_PASSWORD): Promise<void> {
+  const store = openSqliteLoginStore({ path });
+  try {
+    await store.setLogin(user, password);
+  } finally {
+    store.close();
+  }
 }
 
 describe('runHub under hub.auth.adapter api-key, with the keys file', () => {
@@ -533,6 +550,68 @@ describe('runHub under hub.auth.adapter api-key, with the keys file', () => {
     expect(page.status).toBe(401);
     expect(await page.text()).toContain('/login/oauth/start');
     expect(served.some((entry) => entry.event === 'login.insecure')).toBe(false);
+  });
+
+  it('opens the keys file in the install record\'s dataDir, logging no keys.old-place line', async () => {
+    mkdirStore();
+    const dataDir = join(root, 'data');
+    mkdirSync(dataDir);
+    writeInstallRecord({ dataDir });
+
+    const { server, logged } = await startKeyed({ [LOGIN_USER_VARIABLE]: LOGIN_USER, [LOGIN_PASSWORD_VARIABLE]: LOGIN_PASSWORD });
+    const listed = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+
+    expect(listed.status).toBe(200);
+    expect(existsSync(keysFileName(dataDir))).toBe(true);
+    expect(existsSync(keysFile())).toBe(false);
+    expect(existsSync(oldKeysFile())).toBe(false);
+    expect(logged.some((entry) => entry.event === 'keys.old-place')).toBe(false);
+  });
+
+  it('opens a keys file found beside hub.storePath alone there, logging one keys.old-place warning naming the new place once it listens', async () => {
+    mkdirStore();
+    await seedLogin(oldKeysFile());
+
+    const { server, logged } = await startKeyed({});
+    const listed = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+
+    expect(listed.status).toBe(200);
+    expect(existsSync(keysFile())).toBe(false);
+    const warnings = logged.filter((entry) => entry.event === 'keys.old-place');
+    expect(warnings).toEqual([{
+      level: 'warn',
+      event: 'keys.old-place',
+      path: oldKeysFile(),
+      message: `${oldKeysFile()}: the keys file is found beside hub.storePath alone, so it is opened there for this release; its place is now ${keysFile()}, in the install record's dataDir: move it there before the next release`,
+    }]);
+    expect(logged.findIndex((entry) => entry.event === 'keys.old-place')).toBeGreaterThan(logged.findIndex((entry) => entry.event === 'listening'));
+  });
+
+  it('opens the keys file in dataDir, with no warning, when the old place holds one too', async () => {
+    mkdirStore();
+    await seedLogin(oldKeysFile());
+    await seedLogin(keysFile(), 'grace', 'another password 0002');
+
+    const { server, logged } = await startKeyed({});
+    const fromDataDir = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic('grace', 'another password 0002') } });
+    const fromOld = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+
+    expect(fromDataDir.status).toBe(200);
+    expect(fromOld.status).toBe(401);
+    expect(logged.some((entry) => entry.event === 'keys.old-place')).toBe(false);
+  });
+
+  it('logs no keys.old-place line under github, which opens no keys file, though the old place holds one', async () => {
+    mkdirStore();
+    await seedLogin(oldKeysFile());
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error('the hub refused its config');
+    running = [...running, server];
+
+    expect(logged.some((entry) => entry.event === 'keys.old-place')).toBe(false);
+    expect(existsSync(keysFile())).toBe(false);
   });
 
   it('answers 404 on the key routes and the page under github, making no keys file', async () => {
@@ -879,7 +958,7 @@ describe('bin.ts as a process', () => {
     expect(existsSync(join(root, INSTALL_RECORD_FILE))).toBe(false);
   });
 
-  it('runs login over two lines of standard input, setting the login in the keys file beside hub.storePath', async () => {
+  it('runs login over two lines of standard input, setting the login in the keys file in the config file\'s directory', async () => {
     const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373, '  auth:\n    adapter: api-key\n    apiKeys: [RAFA_HUB_BIN_KEY]\n') };
     const password = 'bin login password 0001';
 
@@ -888,7 +967,7 @@ describe('bin.ts as a process', () => {
 
     expect(stderr).toBe('');
     expect(code).toBe(0);
-    const keys = keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+    const keys = keysFileName(root);
     expect(stdout).toBe(`rafa-hub login: the login is set for ada, in ${keys}\n`);
     const store = openSqliteLoginStore({ path: keys });
     try {

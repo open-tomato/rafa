@@ -30,9 +30,13 @@
  * ## The keys file, the login and its routes, under `api-key`
  *
  * At start, under `api-key` alone, `runHub` opens the key store and the
- * login store in the keys file beside `hub.storePath` (`keysFileName`,
- * the first listed project's under `hub.projects`), creating its
- * directory as `rafa-hub login` does, no key taking a name
+ * login store in the keys file in the install record's `dataDir`
+ * (`resolveKeysFile`), creating its directory as `rafa-hub login` does.
+ * For one release a keys file found only at its old place, beside
+ * `hub.storePath` (the first listed project's under `hub.projects`), is
+ * opened there, and one `keys.old-place` warning naming the new place is
+ * logged once the hub listens, beside the other start warnings. No key
+ * takes a name
  * `hub.auth.apiKeys` holds. It hands the key store to the identity and
  * opens the login `hub.auth.login.mode` picks: under `basic` the login
  * store's, first set from `RAFA_HUB_LOGIN_USER` and
@@ -113,8 +117,8 @@
  *
  * ## `rafa-hub login` and `rafa-hub keys`
  *
- * `rafa-hub login` sets the hub's login in the keys file beside
- * `hub.storePath`, and `rafa-hub keys create|list|pause|delete` drives
+ * `rafa-hub login` sets the hub's login in the keys file in the install
+ * record's `dataDir`, and `rafa-hub keys create|list|pause|delete` drives
  * a hub's key routes at `--hub=<url>` or `RAFA_HUB_URL`; both live in
  * `cli-keys.ts`, whose module note says what each asks and prints.
  *
@@ -132,7 +136,7 @@
  * nothing.
  */
 import type { HubConfig } from './config.js';
-import type { HubKeyStore } from './identity/key-store.js';
+import type { HubKeyStore, KeysFilePlace } from './identity/key-store.js';
 import type { HubLoginStore } from './identity/login-store.js';
 import type { HubIdentity } from './identity/port.js';
 import type { HubInstallReading } from './install-record.js';
@@ -157,7 +161,7 @@ import { DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
 import { HUB_CONFIG_ENV, HubConfigError, readHubConfig } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
 import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
-import { keysFileName, openSqliteKeyStore } from './identity/key-store.js';
+import { openSqliteKeyStore, resolveKeysFile } from './identity/key-store.js';
 import { bootstrapLoginFromEnv, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
 import { readInstallRecord } from './install-record.js';
 import { openBasicLogin } from './login/basic.js';
@@ -225,14 +229,24 @@ function refusalOf(what: string, error: unknown): HubConfigError {
 }
 
 /**
- * Opens the key store in the keys file beside `config.storePath`,
- * creating its directory as `rafa-hub login` does, no key taking a name
+ * The keys file a hub over `install`'s `dataDir` and `config`'s
+ * `hub.storePath` opens (`resolveKeysFile`).
+ *
+ * @throws {HubConfigError} When no config file is named, so no record was read.
+ */
+function keysFileAt(install: HubInstallReading | null, config: HubConfig): KeysFilePlace {
+  if (install === null) throw new HubConfigError([`${HUB_CONFIG_ENV} is not set, so no install record names the keys file's dataDir`]);
+  return resolveKeysFile(install.record.dataDir, config.storePath);
+}
+
+/**
+ * Opens the key store in the keys file at `path`, creating its
+ * directory as `rafa-hub login` does, no key taking a name
  * `hub.auth.apiKeys` holds.
  *
  * @throws {HubConfigError} When the file does not open.
  */
-function openKeyStore(config: HubConfig): HubKeyStore {
-  const path = keysFileName(config.storePath);
+function openKeyStore(config: HubConfig, path: string): HubKeyStore {
   try {
     mkdirSync(dirname(path), { recursive: true });
     return openSqliteKeyStore({ path, reservedNames: config.apiKeys });
@@ -242,7 +256,7 @@ function openKeyStore(config: HubConfig): HubKeyStore {
 }
 
 /**
- * The login `hub.auth.login` picks, opened over the keys file: under
+ * The login `hub.auth.login` picks, opened over the keys file at `path`: under
  * `oauth` the provider's, its client secret read from `env` now; under
  * `basic` the login store's, its login set from `env` when none is set
  * (`bootstrapLoginFromEnv`), which logs `login.set` naming the user, or
@@ -251,7 +265,7 @@ function openKeyStore(config: HubConfig): HubKeyStore {
  * @throws {HubConfigError} When the client secret's variable is unset,
  *   or the bootstrap's user name is one no login can carry.
  */
-async function openLogin(config: HubConfig, env: Readonly<Record<string, string | undefined>>, log: HubLog, onStore: (store: HubLoginStore) => void): Promise<HubLogin> {
+async function openLogin(config: HubConfig, env: Readonly<Record<string, string | undefined>>, log: HubLog, path: string, onStore: (store: HubLoginStore) => void): Promise<HubLogin> {
   const oauth = config.login?.oauth ?? null;
   if (config.login?.mode === 'oauth' && oauth !== null) {
     try {
@@ -261,7 +275,6 @@ async function openLogin(config: HubConfig, env: Readonly<Record<string, string 
     }
   }
 
-  const path = keysFileName(config.storePath);
   let store: HubLoginStore;
   try {
     store = openSqliteLoginStore({ path });
@@ -281,8 +294,8 @@ async function openLogin(config: HubConfig, env: Readonly<Record<string, string 
 }
 
 /**
- * Opens the login over the keys file, then the key and login routes
- * over it and `store`, both answering `hub.auth.login.oauth.callbackUrl`'s
+ * Opens the login over the keys file `store` is kept in, at `keysPath`,
+ * then the key and login routes over it and `store`, both answering `hub.auth.login.oauth.callbackUrl`'s
  * origin beside each request's own. The login store it opens is handed
  * to `onStore`, for the caller to close.
  *
@@ -292,10 +305,11 @@ async function openLoginRoutesOver(
   config: HubConfig,
   env: Readonly<Record<string, string | undefined>>,
   log: HubLog,
-  store: HubKeyStore,
+  keys: { readonly store: HubKeyStore; readonly path: string },
   onStore: (store: HubLoginStore) => void,
 ): Promise<OpenedLogin> {
-  const login = await openLogin(config, env, log, onStore);
+  const { store } = keys;
+  const login = await openLogin(config, env, log, keys.path, onStore);
   const callbackUrl = config.login?.oauth?.callbackUrl ?? null;
   const origins = callbackUrl === null
     ? []
@@ -360,6 +374,13 @@ async function readInstallAtStart(env: HubEnv): Promise<HubInstallReading | null
     : readInstallRecord(named, HUB_VERSION);
 }
 
+/** Logs one `keys.old-place` warning when the keys file at `place` was found beside `hub.storePath` alone. */
+function warnOldKeysFile(place: KeysFilePlace | undefined, log: HubLog): void {
+  const warning = place?.warning ?? null;
+  if (place === undefined || warning === null) return;
+  log({ level: 'warn', event: 'keys.old-place', path: place.path, message: warning });
+}
+
 /** Logs one `install.missing` warning when `reading` found no record and answered the defaults. */
 function warnMissingInstallRecord(reading: HubInstallReading | null, log: HubLog): void {
   const warning = reading?.warning ?? null;
@@ -372,7 +393,7 @@ function warnMissingInstallRecord(reading: HubInstallReading | null, log: HubLog
  * the config, and starts the hub over it, answering the running
  * server, or null when the record or the config was refused, which is
  * logged. Under `api-key` it opens the key and login stores in the keys
- * file first, bootstraps the login from `env`, and closes both when the
+ * file in the record's `dataDir` first, bootstraps the login from `env`, and closes both when the
  * server stops. Never exits the process.
  */
 export async function runHub(env: Readonly<Record<string, string | undefined>>, options: RunHubOptions = {}): Promise<HubServer | null> {
@@ -385,19 +406,23 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   const connectPostgres = options.connectPostgres ?? connectPostgresHub;
   let install;
   let config;
+  let keysFile: KeysFilePlace | undefined;
   let identity;
   let keyLogin: OpenedLogin | undefined;
   let connected: HubConnected | undefined;
   try {
     install = await readInstallAtStart(env);
     config = await readHubConfig(env);
-    const store = config.authAdapter === 'api-key'
-      ? openKeyStore(config)
+    keysFile = config.authAdapter === 'api-key'
+      ? keysFileAt(install, config)
       : undefined;
+    const store = keysFile === undefined
+      ? undefined
+      : openKeyStore(config, keysFile.path);
     if (store !== undefined) opened.push(store);
     identity = openIdentity(config, env, options.githubApi ?? GITHUB_API, store);
-    if (store !== undefined) {
-      keyLogin = await openLoginRoutesOver(config, env, log, store, (loginStore) => opened.push(loginStore));
+    if (store !== undefined && keysFile !== undefined) {
+      keyLogin = await openLoginRoutesOver(config, env, log, { store, path: keysFile.path }, (loginStore) => opened.push(loginStore));
     }
     connected = await openAtStart(config, env, connectPostgres);
   } catch (error) {
@@ -430,6 +455,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     throw error;
   }
   warnMissingInstallRecord(install, log);
+  warnOldKeysFile(keysFile, log);
   warnInsecureLogin(keyLogin?.login, hostname, log);
   warnDangerousPayloadCap(config.maxPayloadRows, log);
   return opened.length === 0
@@ -663,7 +689,7 @@ if (import.meta.main) {
     process.exit(1);
   }
   if (command === 'index-rebuild') process.exit(await runIndexRebuild(process.env));
-  if (command === 'login') process.exit(await runLogin(process.env));
+  if (command === 'login') process.exit(await runLogin(process.env, HUB_VERSION));
   if (command === 'keys') process.exit(await runKeys(process.argv.slice(3), process.env));
   if (command === 'install') process.exit(await runInstall(process.argv.slice(3), process.env, HUB_VERSION));
 
