@@ -1884,6 +1884,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/bun-cache-line.sweep.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/bundled-tier.test.ts",
       "upwardEdgesIn": 0
     },
@@ -6018,7 +6023,7 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 612,
+        "test": 613,
         "testSupport": 22
       },
       "files": [
@@ -6443,6 +6448,7 @@
         "src/tests/board-sync-spawned.test.ts",
         "src/tests/board-trust-integration.test.ts",
         "src/tests/branch-integration.test.ts",
+        "src/tests/bun-cache-line.sweep.test.ts",
         "src/tests/bundled-tier.test.ts",
         "src/tests/checker-fixtures.test.ts",
         "src/tests/claim-commands-spawned.test.ts",
