@@ -5868,7 +5868,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 44,
+        "test": 45,
         "testSupport": 9
       },
       "files": [
@@ -5902,6 +5902,7 @@
         "packages/rafa-hub/src/login/oauth.test.ts",
         "packages/rafa-hub/src/login/testdata/stand-in-oauth.ts",
         "packages/rafa-hub/src/payload-cap.integration.test.ts",
+        "packages/rafa-hub/src/postgres-two-devices.integration.test.ts",
         "packages/rafa-hub/src/server-effort.test.ts",
         "packages/rafa-hub/src/server-keys.test.ts",
         "packages/rafa-hub/src/server-login.test.ts",
@@ -5957,7 +5958,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 54,
+        "packages/rafa-hub/": 55,
         "packages/rafa-hub-port/": 1,
         "packages/rafa-index/": 9
       },
