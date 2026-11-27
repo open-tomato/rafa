@@ -104,6 +104,23 @@ function namesPort(file: string, specifier: string): boolean {
     && resolve(dirname(file), specifier.replace(/\.js$/, '.ts')) === ALIAS_FILE;
 }
 
+/** A specifier text ending in a `port` module, the alias's own shape. */
+const PORT_SPECIFIER = /['"][^'"\n]*\/port(?:\.js|\.ts)?['"]/;
+
+/**
+ * Whether a file's text could hold an import of the port: it names the
+ * package, or a relative specifier ending in `port`. Only such a file is
+ * parsed, since parsing every file under `packages/` ran past the test
+ * timeout on a loaded CI runner.
+ *
+ * @param file - The absolute path.
+ * @returns True when the file is worth parsing.
+ */
+function mayNamePort(file: string): boolean {
+  const text = readFileSync(file, 'utf8');
+  return text.includes(PACKAGE_NAME) || PORT_SPECIFIER.test(text);
+}
+
 /**
  * The names every file under `packages/` outside this package imports
  * from the port.
@@ -113,7 +130,8 @@ function namesPort(file: string, specifier: string): boolean {
 function importedNames(): string[] {
   const files = readdirSync(PACKAGES_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && join(PACKAGES_DIR, entry.name) !== PACKAGE_DIR)
-    .flatMap((entry) => tsFiles(join(PACKAGES_DIR, entry.name)));
+    .flatMap((entry) => tsFiles(join(PACKAGES_DIR, entry.name)))
+    .filter(mayNamePort);
   const names = files.flatMap((file) => parse(file).statements
     .filter(ts.isImportDeclaration)
     .filter((statement) => ts.isStringLiteral(statement.moduleSpecifier) && namesPort(file, statement.moduleSpecifier.text))
