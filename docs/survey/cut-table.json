@@ -3354,6 +3354,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/release-package-fragments-integration.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/release-publish-workflow.test.ts",
       "upwardEdgesIn": 0
     },
@@ -6027,7 +6032,7 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 613,
+        "test": 614,
         "testSupport": 22
       },
       "files": [
@@ -6746,6 +6751,7 @@
         "src/tests/release-delivery-spawned-cli.test.ts",
         "src/tests/release-fragment-ci-config-spawned.test.ts",
         "src/tests/release-mechanics.test.ts",
+        "src/tests/release-package-fragments-integration.test.ts",
         "src/tests/release-publish-workflow.test.ts",
         "src/tests/release-settle-doctor-button-merge-spawned-cli.test.ts",
         "src/tests/release-settle-parallel-branches-spawned-cli.test.ts",
