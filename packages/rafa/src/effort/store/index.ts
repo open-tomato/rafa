@@ -78,6 +78,9 @@
  *     learning library's own `MergeResult`, and
  *     {@link readHeldMigrations}, the migration ids the rows a projected
  *     merge listed in `held_rows` lack;
+ *   - {@link readConflictedRows} (`merge-conflicts.ts`), the local rows
+ *     `merge_conflicts` names, by table, which a pull-first sync leaves
+ *     out of its push;
  *   - {@link readStoreOrigin} (`store-meta.ts`), the origin a store file
  *     records, by which a sync strategy names its device;
  *   - `TRUSTED_PERMISSIONS` (`trusted-permissions.ts`), the repository
@@ -144,6 +147,7 @@ export {
   WireExportRefusal,
   WireFormatError,
 } from './wire.js';
+export { readConflictedRows } from './merge-conflicts.js';
 export { mergeStore, readHeldMigrations } from './merge-store.js';
 export { openNdjsonStore } from './ndjson.js';
 export { openSqliteStore } from './sqlite.js';

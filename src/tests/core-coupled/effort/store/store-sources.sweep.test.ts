@@ -135,6 +135,7 @@ const DATABASE_OPENER_ALLOW_LIST: ReadonlySet<string> = new Set([
   'packages/rafa/src/effort/store/copy.ts',
   'packages/rafa/src/effort/store/schema-report.ts',
   'packages/rafa/src/effort/store/migrate.ts',
+  'packages/rafa/src/effort/store/merge-conflicts.ts',
   'packages/rafa/src/effort/store/merge-store.ts',
   'packages/rafa/src/effort/store/store-meta.ts',
   'packages/rafa/src/effort/store/fixture-extract.ts',

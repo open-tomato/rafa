@@ -213,6 +213,7 @@ import {
   selectEffortStore,
 } from '@open-tomato/rafa/store';
 import * as storeEntry from '@open-tomato/rafa/store';
+import { readConflictedRows } from '@open-tomato/rafa/store/merge-conflicts';
 import { mergeStore, readHeldMigrations } from '@open-tomato/rafa/store/merge-store';
 import { readStoreOrigin } from '@open-tomato/rafa/store/store-meta';
 import {
@@ -322,6 +323,7 @@ const RUNTIME_EXPORTS = [
   'planPrerequisites',
   'prerequisitesPathForPlan',
   'readConfigFile',
+  'readConflictedRows',
   'readHeldMigrations',
   'readProjectScope',
   'readRafaBlocks',
@@ -415,6 +417,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['planPrerequisites', entry.planPrerequisites, planPrerequisites],
   ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readConfigFile', entry.readConfigFile, readConfigFile],
+  ['readConflictedRows', entry.readConflictedRows, readConflictedRows],
   ['readHeldMigrations', entry.readHeldMigrations, readHeldMigrations],
   ['readProjectScope', entry.readProjectScope, readProjectScope],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],

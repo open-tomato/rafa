@@ -31,7 +31,7 @@
  *   - The whole `./store` surface: the port, both backends and the
  *     selector, with what the workspace packages take from it: the
  *     sync wire codec, `mergeStore` with `readHeldMigrations`,
- *     `readStoreOrigin` and `TRUSTED_PERMISSIONS`.
+ *     `readConflictedRows`, `readStoreOrigin` and `TRUSTED_PERMISSIONS`.
  *   - The whole config, `config.ts` and `config-load.ts`:
  *     {@link loadConfig}, which reads the project's config under a root
  *     and the user scope's under a home and ranks the
@@ -128,9 +128,10 @@
  *     them only through a command, and an entry is a public surface: a
  *     name added later breaks nobody, and a name removed breaks every
  *     caller that imported it. `mergeStore`, behind `rafa effort merge`,
- *     its `readHeldMigrations` and `readStoreOrigin` are the one
- *     exception, and only because `./store` exports them for the
- *     workspace packages and every subpath's names are on the root.
+ *     its `readHeldMigrations`, `readConflictedRows` and
+ *     `readStoreOrigin` are the one exception, and only because
+ *     `./store` exports them for the workspace packages and every
+ *     subpath's names are on the root.
  *   - The rest of `src/project/` and `src/modules/`: the root candidates,
  *     prompt and scaffold behind `rafa init`, and the module loader
  *     behind `rafa module list` and the CLI's start-up. Each is reached
@@ -375,6 +376,7 @@ export {
   mergeStore,
   openNdjsonStore,
   openSqliteStore,
+  readConflictedRows,
   readHeldMigrations,
   readStoreOrigin,
   selectEffortStore,
