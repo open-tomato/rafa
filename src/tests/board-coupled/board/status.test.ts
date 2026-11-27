@@ -175,6 +175,7 @@ describe('readLabelRows', () => {
         'spec:blocked',
         'module:unassigned',
         'module:cli-gap',
+        'type:debt',
         'type:epic',
         'horizon:now',
         'horizon:next',
@@ -184,6 +185,19 @@ describe('readLabelRows', () => {
         'rafa:in-development',
       ]);
     expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['label list']);
+  });
+
+  it('answers type:debt missing on a board without it and present on one that holds it', async () => {
+    const without = fakeBoard({ labels: LABEL_NAMES.filter((name) => name !== 'type:debt') });
+    const holding = fakeBoard({ labels: LABEL_NAMES });
+
+    const bare = await readLabelRows(without.run);
+    const held = await readLabelRows(holding.run);
+
+    expect(bare.filter((row) => row.outcome !== 'present').map((row) => [row.name, row.outcome]))
+      .toEqual([['type:debt', 'missing']]);
+    expect(rowNamed(held, 'type:debt')).toMatchObject({ kind: 'label', outcome: 'present' });
+    expect(outcomes(held)).toEqual(LABEL_NAMES.map(() => 'present'));
   });
 
   it('reads a label the repository spells in another case as present', async () => {
@@ -347,7 +361,7 @@ describe('readBoardStatus', () => {
     expect(snapshot(root)).toEqual(before);
   });
 
-  it('answers all eighteen rows missing over a bare repository and writes nothing', async () => {
+  it('answers all nineteen rows missing over a bare repository and writes nothing', async () => {
     const root = freshRoot('whole-bare');
     const gh = fakeBoard();
     const before = snapshot(root);
@@ -355,7 +369,7 @@ describe('readBoardStatus', () => {
     const status = await readBoardStatus({ gh: gh.run, root });
 
     expect(outcomes(status.rows)).toEqual(status.rows.map(() => 'missing'));
-    expect(boardGaps(status)).toHaveLength(18);
+    expect(boardGaps(status)).toHaveLength(19);
     expect(status.roadmapIssue).toBe(null);
     expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['label list', 'issue list']);
     expect(snapshot(root)).toEqual(before);
@@ -376,6 +390,7 @@ describe('readBoardStatus', () => {
         'needs-triage',
         'module:unassigned',
         'module:cli-gap',
+        'type:debt',
         'type:epic',
         'horizon:now',
         'horizon:next',

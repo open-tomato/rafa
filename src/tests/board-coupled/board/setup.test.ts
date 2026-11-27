@@ -1,6 +1,6 @@
 /**
  * Tests for the board setup (`packages/rafa-board/src/board/setup.ts`, its roadmap step in
- * `packages/rafa-board/src/board/setup-roadmap.ts`): the fifteen labels, the spec issue
+ * `packages/rafa-board/src/board/setup-roadmap.ts`): the sixteen labels, the spec issue
  * template, the pinned Roadmap issue, the `roadmap.issue` line written
  * into the project config, and a second run that writes nothing.
  *
@@ -231,7 +231,7 @@ function partNamed(parts: readonly { name: string }[], name: string): { name: st
 }
 
 describe('BOARD_LABELS', () => {
-  it('names the fifteen labels the workflow files under, each with a description', () => {
+  it('names the sixteen labels the workflow files under, each with a description', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toEqual([
       'type:spec',
       'spec:ready',
@@ -241,6 +241,7 @@ describe('BOARD_LABELS', () => {
       'needs-triage',
       'module:unassigned',
       'module:cli-gap',
+      'type:debt',
       'type:epic',
       'horizon:now',
       'horizon:next',
@@ -259,6 +260,7 @@ describe('BOARD_LABELS', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toContain(SPEC_BLOCKED_LABEL);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(GITHUB_LABELS.needsTriage);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.modulePrefix}unassigned`);
+    expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.typePrefix}debt`);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.typePrefix}epic`);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(ROADMAP_LABEL);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(CLAIMED_LABEL);
@@ -282,6 +284,7 @@ describe('setUpLabels', () => {
       ['needs-triage', 'present'],
       ['module:unassigned', 'created'],
       ['module:cli-gap', 'created'],
+      ['type:debt', 'created'],
       ['type:epic', 'created'],
       ['horizon:now', 'created'],
       ['horizon:next', 'created'],
@@ -298,6 +301,7 @@ describe('setUpLabels', () => {
       'spec:blocked',
       'module:unassigned',
       'module:cli-gap',
+      'type:debt',
       'type:epic',
       'horizon:now',
       'horizon:next',
@@ -376,6 +380,7 @@ describe('missingBoardLabels', () => {
         'type:bug',
         'needs-triage',
         'module:cli-gap',
+        'type:debt',
         'type:epic',
         'horizon:now',
         'horizon:next',
@@ -385,6 +390,14 @@ describe('missingBoardLabels', () => {
         'rafa:in-development',
       ]);
     expect(missingBoardLabels(BOARD_LABELS.map((label) => label.name))).toEqual([]);
+  });
+
+  it('answers type:debt alone missing on a board holding every other label, and nothing on one holding it', () => {
+    const names = BOARD_LABELS.map((label) => label.name);
+
+    expect(missingBoardLabels(names.filter((name) => name !== 'type:debt')).map((label) => label.name))
+      .toEqual(['type:debt']);
+    expect(missingBoardLabels(names)).toEqual([]);
   });
 });
 
