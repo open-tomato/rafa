@@ -133,11 +133,12 @@ function baseline(): SuiteBaseline {
   return baselineOf(result({ exitCode: 1, failures: [KNOWN] }), new Date('2026-09-30T00:00:00Z'), BASE);
 }
 
-/** A git at {@link HEAD} whose diff from {@link BASE} is `paths`. */
+/** A git at {@link HEAD} whose diff from {@link BASE} is `paths`, adding no deep import, so the task step joins no facade test. */
 function gitAt(paths: readonly string[] = ['src/a.ts']): GitRunner {
   const answers: Record<string, GitResult> = {
     'rev-parse --verify HEAD^{commit}': { ok: true, stdout: `${HEAD}\n`, stderr: '' },
     [`diff --name-only -z --no-renames ${BASE} HEAD`]: { ok: true, stdout: paths.map((path) => `${path}\0`).join(''), stderr: '' },
+    [`diff --unified=0 --no-renames --no-color ${BASE} HEAD`]: { ok: true, stdout: '', stderr: '' },
   };
   return (args) => answers[args.join(' ')] ?? { ok: false, stdout: '', stderr: `unscripted: ${args.join(' ')}` };
 }
