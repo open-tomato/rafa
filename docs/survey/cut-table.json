@@ -5888,7 +5888,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 48,
+        "test": 49,
         "testSupport": 9
       },
       "files": [
@@ -5919,6 +5919,7 @@
         "packages/rafa-hub/src/identity/testdata/broken-identity.fixture.ts",
         "packages/rafa-hub/src/identity/testdata/memory-identity.ts",
         "packages/rafa-hub/src/identity/testdata/stand-in-github.ts",
+        "packages/rafa-hub/src/image.test.ts",
         "packages/rafa-hub/src/install-record.integration.test.ts",
         "packages/rafa-hub/src/install-record.test.ts",
         "packages/rafa-hub/src/login/basic.test.ts",
@@ -5981,7 +5982,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 58,
+        "packages/rafa-hub/": 59,
         "packages/rafa-hub-port/": 1,
         "packages/rafa-index/": 9
       },

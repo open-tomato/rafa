@@ -18,9 +18,13 @@ Build the container from the repository root:
 docker build -f packages/rafa-hub/Dockerfile -t rafa-hub .
 ```
 
-The build copies the whole workspace, except what the root `.dockerignore`
-leaves out, and installs it from `bun.lock` before it bundles the hub, since the
-hub imports its sibling workspace packages and `drizzle-orm`.
+The build copies every workspace's `package.json` with `bun.lock`, installs the
+hub's graph from the lockfile alone, and then copies the sources of the hub and
+the workspace packages it imports. The container runs those sources, not a
+bundle, through the `rafa-hub` command on its `PATH`, so `sqlite-vec` loads from
+its installed package. Each start runs `rafa-hub install --data-dir=/data`
+before the server, which writes the install record
+`/data/rafa-hub.install.json`.
 
 Run it with a volume on `/data` holding the config file:
 
@@ -339,7 +343,7 @@ exits 1. A refused config or a store that does not open prints one line on
 standard error and exits 1 without rebuilding anything. A server
 already running over the store picks up the new index file on its next query,
 so it needs no restart. In the Docker container, run it with
-`docker exec <container> bun /app/rafa-hub.js index rebuild`.
+`docker exec <container> rafa-hub index rebuild`.
 
 Vector search needs an embedder, which this release does not ship, so `vector`
 is `false` on every hub, macOS included. A `vector` or `hybrid` search falls back
