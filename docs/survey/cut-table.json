@@ -2584,6 +2584,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/hub-requirements-page.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/import-cycle.sweep.test.ts",
       "upwardEdgesIn": 0
     },
@@ -6006,7 +6011,7 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 611,
+        "test": 612,
         "testSupport": 22
       },
       "files": [
@@ -6571,6 +6576,7 @@
         "src/tests/finished-task.test.ts",
         "src/tests/git-identity.sweep.test.ts",
         "src/tests/hint-tool-names.test.ts",
+        "src/tests/hub-requirements-page.test.ts",
         "src/tests/import-cycle.sweep.test.ts",
         "src/tests/init-board-project-spawned.test.ts",
         "src/tests/init-scope.test.ts",
