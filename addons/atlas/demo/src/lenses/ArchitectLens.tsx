@@ -1,11 +1,11 @@
-import type { LensResult } from '../data/source.js';
+import type { LensResult, MeasuredWorkspace } from '../data/source.js';
 
 import { Button, DataTable, useDashboard, type LegendItem, type ModalEntry } from '@open-tomato/atlas-ui';
-import { formatCompact, formatDay, formatPercent, useChartEngine, type HeatmapCell } from '@open-tomato/charts';
+import { formatCompact, formatDay, formatPercent, useChartEngine, type ChartTone, type HeatmapCell } from '@open-tomato/charts';
 import { useState, type ReactElement } from 'react';
 
 import { COMPONENT_KINDS, COMPONENT_TONES, COMPOSITION_TONES, SIZE_ROSE_TONES } from '../data/composition.js';
-import { LAYER_ORDER, LAYER_TONES } from '../data/graph.js';
+import { LAYER_ORDER, LAYER_TONES, type FlowLink } from '../data/graph.js';
 import {
   HOUR_SLOTS,
   LAST_DAY,
@@ -32,6 +32,9 @@ const P90_AVERAGE = 58;
 
 /** How many rows the import-flow and module-import source tables show. */
 const SANKEY_TABLE_LIMIT = 16;
+
+/** The external deps cell of a live composition row: the module scan counts none. */
+const NOT_COUNTED = 'not counted';
 
 const GRAPH_SOURCE = 'The workspace members and their dependencies, read from each package.json on 2026-11-02 (src/data/graph.ts).';
 
@@ -117,6 +120,50 @@ const FLOW = cardSpec({
 });
 
 const LAYER_LEGEND: readonly LegendItem[] = LAYER_ORDER.map((layer) => ({ id: layer, label: layer, tone: LAYER_TONES[layer] }));
+
+/** The rose's subtitle on the live page: module folders, not the mock's packages. */
+const ROSE_LIVE_SUBTITLE = 'one slice per module folder of 1,000 lines or more, the radius is its five kinds of lines; tone by layer';
+
+/** The sunburst's subtitle on the live page. */
+const COMPOSITION_LIVE_SUBTITLE = 'inner ring the module folder, toned by its layer; outer ring its source, tests, docs, config and fixtures';
+
+/** The Direction cell of a live import-flow row whose dependent sits in an earlier layer than its dependency. */
+const UPWARD = 'upward';
+
+/** The Direction cell of every other live import-flow row. */
+const DOWNWARD = 'downward';
+
+/**
+ * The legend of a live layer-toned card: one entry per layer of `tones`
+ * that `groups` names, in the column order `tones` holds them, so a
+ * layer of `atlas.layers` the mock does not know shows with its tone.
+ */
+function layerLegendOf(tones: Readonly<Record<string, ChartTone>>, groups: readonly (string | undefined)[]): LegendItem[] {
+  const shown = new Set(groups);
+  return Object.entries(tones)
+    .filter(([layer]) => shown.has(layer))
+    .map(([layer, tone]) => ({ id: layer, label: layer, tone }));
+}
+
+/** The live flow's subtitle: the columns, and how many imports point upward. */
+function flowLiveSubtitleOf(links: readonly FlowLink[]): string {
+  const upward = links.filter((link) => link.upward === true).length;
+  const imports = upward === 1
+    ? 'import flows'
+    : 'imports flow';
+  return `the layers of atlas.layers in rank order, unassigned last; ${upward} upward ${imports} into an earlier layer, listed first in the source table; the config packages' edges are left out`;
+}
+
+/** The live flow's source table: each edge with its direction, the upward ones first. */
+function liveFlowTable(workspace: MeasuredWorkspace): { columns: string[]; rows: string[][]; limit: number } {
+  const upward = workspace.sankeyLinks.filter((link) => link.upward === true);
+  const downward = workspace.sankeyLinks.filter((link) => link.upward !== true);
+  const rows = [
+    ...upward.map((link) => [link.source, link.target, UPWARD]),
+    ...downward.map((link) => [link.source, link.target, DOWNWARD]),
+  ];
+  return { columns: ['From', 'To', 'Direction'], rows, limit: SANKEY_TABLE_LIMIT };
+}
 
 /** The legend of the change-kind donut: one entry per slice, the mock's change levels or the live work types. */
 function changeLegend(mock: MockData): LegendItem[] {
@@ -250,9 +297,13 @@ export function ArchitectLens(): ReactElement {
       ),
     },
   };
+  const live = data?.source === 'live';
+  const layerTones = data?.workspace.layerTones ?? LAYER_TONES;
   const flowTable = data === undefined
     ? undefined
-    : { columns: ['From', 'To'], rows: data.workspace.sankeyLinks.map((link) => [link.source, link.target]), limit: SANKEY_TABLE_LIMIT };
+    : live
+      ? liveFlowTable(data.workspace)
+      : { columns: ['From', 'To'], rows: data.workspace.sankeyLinks.map((link) => [link.source, link.target]), limit: SANKEY_TABLE_LIMIT };
 
   return (
     <LensGrid
@@ -383,31 +434,52 @@ export function ArchitectLens(): ReactElement {
           </LensCard>
           <LensCard
             config={ROSE}
+            reads={['workspace']}
+            metaCard="sizeRose"
+            liveSubtitle={ROSE_LIVE_SUBTITLE}
             select={(result: LensResult) => result.workspace.sizeRose}
             info={ROSE_INFO}
-            legend={LAYER_LEGEND.filter((item) => item.id !== 'app')}
+            legend={live
+              ? (slices) => layerLegendOf(layerTones, slices.map((slice) => slice.group))
+              : LAYER_LEGEND.filter((item) => item.id !== 'app')}
             table={(slices) => ({ columns: ['Package', 'Layer', 'Lines'], rows: slices.map((slice) => [slice.label, slice.group ?? '', formatCompact(slice.value)]) })}
           >
             {({ data: slices, animate, height }) => (
-              <Nightingale ariaLabel="Package size as a Nightingale rose, one slice per package" slices={slices} groupTones={SIZE_ROSE_TONES} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(320, height)} />
+              <Nightingale ariaLabel="Package size as a Nightingale rose, one slice per package" slices={slices} groupTones={live
+                ? layerTones
+                : SIZE_ROSE_TONES} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(320, height)} />
             )}
           </LensCard>
           <LensCard
             config={COMPOSITION}
+            reads={['workspace']}
+            metaCard="composition"
+            liveSubtitle={COMPOSITION_LIVE_SUBTITLE}
             select={(result: LensResult) => result.workspace}
             info={COMPOSITION_INFO}
-            legend={COMPONENT_LEGEND}
-            table={(workspace) => ({ columns: ['Package', 'Source', 'Tests', 'Docs', 'Config', 'Fixtures', 'External deps'], rows: workspace.composition.map((pkg) => [pkg.id.replace(/^rafa-/, ''), formatCompact(pkg.source), formatCompact(pkg.tests), formatCompact(pkg.docs), formatCompact(pkg.config), formatCompact(pkg.fixtures), pkg.deps]) })}
+            legend={live
+              ? (workspace) => [...layerLegendOf(workspace.layerTones, workspace.compositionSunburst.map((node) => node.group)), ...COMPONENT_LEGEND]
+              : COMPONENT_LEGEND}
+            table={(workspace) => ({ columns: ['Package', 'Source', 'Tests', 'Docs', 'Config', 'Fixtures', 'External deps'], rows: workspace.composition.map((pkg) => [pkg.id.replace(/^rafa-/, ''), formatCompact(pkg.source), formatCompact(pkg.tests), formatCompact(pkg.docs), formatCompact(pkg.config), formatCompact(pkg.fixtures), pkg.deps ?? NOT_COUNTED]) })}
           >
             {({ data: workspace, animate, height }) => (
-              <Sunburst ariaLabel="Package composition as a sunburst: packages on the inner ring, their parts on the outer ring" nodes={workspace.compositionSunburst} groupTones={COMPOSITION_TONES} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(320, height)} />
+              <Sunburst ariaLabel="Package composition as a sunburst: packages on the inner ring, their parts on the outer ring" nodes={workspace.compositionSunburst} groupTones={live
+                ? { ...workspace.layerTones, ...COMPONENT_TONES }
+                : COMPOSITION_TONES} unit="lines" valueFormat={formatCompact} animate={animate} height={plotHeight(320, height)} />
             )}
           </LensCard>
           <LensCard
             config={FLOW}
+            reads={['workspace']}
+            metaCard="importFlow"
+            liveSubtitle={data === undefined
+              ? undefined
+              : flowLiveSubtitleOf(data.workspace.sankeyLinks)}
             select={(result: LensResult) => result.workspace}
             info={FLOW_INFO}
-            legend={LAYER_LEGEND}
+            legend={live
+              ? (workspace) => layerLegendOf(workspace.layerTones, workspace.layerOrder)
+              : LAYER_LEGEND}
             table={flowTable}
           >
             {({ data: workspace, animate, height }) => (
@@ -415,8 +487,8 @@ export function ArchitectLens(): ReactElement {
                 ariaLabel="Dependency flow between workspace members, columns by layer"
                 nodes={workspace.sankeyNodes}
                 links={workspace.sankeyLinks}
-                groupTones={LAYER_TONES}
-                groupOrder={[...LAYER_ORDER]}
+                groupTones={workspace.layerTones}
+                groupOrder={[...workspace.layerOrder]}
                 animate={animate}
                 height={plotHeight(360, height)}
               />

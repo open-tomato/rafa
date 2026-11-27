@@ -5,7 +5,7 @@
  * tile draws on the live page (`isWired`), and the note a wired card
  * shows there (`liveNoteOf`).
  */
-import type { LensField, LensResult } from '../data/source.js';
+import type { FieldMeta, LensField, LensResult, WorkspaceCard } from '../data/source.js';
 import type { CardSpec } from '@open-tomato/atlas-ui';
 import type { ChartHeight } from '@open-tomato/charts';
 
@@ -22,6 +22,14 @@ export const LIVE_SOURCE = 'Live: the Atlas API under /api/atlas, over the repli
 
 /** What a card or a tile that no live metric feeds says on the live page. */
 export const NOT_WIRED_TITLE = 'Not wired yet';
+
+/**
+ * What a tile whose catalogue entry is `collect` says on the live page,
+ * before the collector it names: rafa collects nothing it could read, so
+ * no metric will feed it until the collector exists. Distinct from
+ * `NOT_WIRED_TITLE` (Q1 of the data-integration spec).
+ */
+export const NEEDS_COLLECTOR_TITLE = 'Needs a collector';
 
 /** A card's spec as a lens writes it: the primitive by name, the rest of the spec, the source optional. */
 export type LensCardSpec = Omit<CardSpec, 'chart' | 'source' | 'animate'> & {
@@ -51,16 +59,23 @@ export function plotHeight(base: number, height: ChartHeight): ChartHeight {
  * The note a wired card shows on the live page: per metric behind
  * `reads`, its proxy note when it is a proxy, then the answer's row
  * count, so a thin reading (three red runs in 303) says how little stands
- * behind it. Undefined over the mock, or when no field read has a meta.
+ * behind it. A workspace card naming its `card` reads that card's own
+ * meta (`workspaceMeta`) in place of the fields'. Undefined over the
+ * mock, or when no field read has a meta.
  */
-export function liveNoteOf(result: LensResult, reads: readonly LensField[]): string | undefined {
+export function liveNoteOf(result: LensResult, reads: readonly LensField[], card?: WorkspaceCard): string | undefined {
   if (result.source === 'mock') return undefined;
-  const metas = reads.flatMap((field) => {
-    const meta = result.fieldMeta.get(field);
-    return meta === undefined
-      ? []
-      : [meta];
-  });
+  const own = card === undefined
+    ? undefined
+    : result.workspaceMeta.get(card);
+  const metas: readonly FieldMeta[] = own === undefined
+    ? reads.flatMap((field) => {
+      const meta = result.fieldMeta.get(field);
+      return meta === undefined
+        ? []
+        : [meta];
+    })
+    : [own];
   const metrics = [...new Set(metas.map((meta) => meta.metricId))];
   if (metrics.length === 0) return undefined;
   return metrics.map((metricId) => {

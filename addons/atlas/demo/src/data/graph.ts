@@ -5,6 +5,11 @@
  */
 import type { ChartTone, GraphLink, GraphNode } from '@open-tomato/charts';
 
+/** A Sankey link: `upward` when its dependent sits in an earlier layer than its dependency; absent reads as not. */
+export interface FlowLink extends GraphLink {
+  readonly upward?: boolean;
+}
+
 export const LAYER_ORDER = ['config', 'core', 'platform', 'feature', 'addon', 'app'] as const;
 export type Layer = typeof LAYER_ORDER[number];
 

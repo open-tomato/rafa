@@ -25,7 +25,10 @@
  * the loader's warnings. Before it dispatches, it makes the adapters
  * those modules registered the active registry with
  * `activateModuleAdapters` (`packages/rafa/src/modules/activate.ts`), so a module's
- * kind resolves through `CORE_ADAPTER_REGISTRY` for the invocation.
+ * kind resolves through `CORE_ADAPTER_REGISTRY` for the invocation, and
+ * sets the config key each of their command entries declares with
+ * `setModuleConfigKeys`, so the config load warns about none of them and
+ * the dispatcher hands a module's command its key's value.
  * It then builds the registry it dispatches through with
  * `createRosterRegistry` (`src/commands/index.ts`), core's commands
  * plus every bundled feature the project's config does not turn off
@@ -60,6 +63,7 @@
  */
 import { homedir } from 'node:os';
 
+import { setModuleConfigKeys } from '@open-tomato/rafa/core/config/load';
 import { activateModuleAdapters } from '@open-tomato/rafa/modules/activate';
 import { loadInvocationModules } from '@open-tomato/rafa/modules/load';
 
@@ -77,6 +81,7 @@ registerCoreServices();
 
 const modules = await loadInvocationModules({ cwd: process.cwd(), home: homedir() });
 activateModuleAdapters(modules);
+setModuleConfigKeys(modules.commands.flatMap(({ configKey }) => configKey ?? []));
 const registry = createRosterRegistry({ off: modules.disabledFeatures });
 const { exitCode } = await dispatch(process.argv.slice(2), {
   registry,

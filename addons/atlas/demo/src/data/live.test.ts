@@ -5,7 +5,8 @@
  * (`live-sources.ts`) mapped into its field, a GitHub-only metric with no
  * row marked not wired with the `--github` build line, each field's meta
  * (its row count, and a proxy's `ProxyNote`), the weeks the weekly
- * fields span, every other field marked not wired, an API that is not there failing with the start line, and
+ * fields span, the balance's nine indices asked over the fixed window
+ * ending with the build, an API that is not there failing with the start line, and
  * `?source=` reading as the mock unless it names `live`. The stub client
  * (`testdata/live-client.fixture.ts`) records every call. The page drawn
  * over each source is `App.test.tsx`'s, since this file imports no TSX.
@@ -13,7 +14,7 @@
 import type { SourceMetric } from './live-sources.js';
 import type { LiveMetric } from './live.js';
 import type { MockData } from './mock.js';
-import type { LensResult } from './source.js';
+import type { LensField, LensResult, WorkspaceCard } from './source.js';
 import type { StubCall } from './testdata/live-client.fixture.js';
 import type { QueryResult } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
@@ -24,6 +25,8 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { readPageSource } from '../url.js';
 
+import { BALANCE_CATALOGUE } from './balance.js';
+import { BALANCE_METRICS, hasNoBaseline } from './live-balance.js';
 import {
   defectDensityOf,
   GITHUB_BUILD_LINE,
@@ -34,6 +37,7 @@ import {
   SOURCE_METRICS,
   SOURCE_WIRED_FIELDS,
   WINDOWED_SOURCE_METRICS,
+  WORKSPACE_CARD_METRICS,
 } from './live-sources.js';
 import {
   createLiveLensSource,
@@ -48,11 +52,12 @@ import {
   WIRED_FIELDS,
 } from './live.js';
 import { TASK_MINUTE_EDGES } from './mock.js';
+import { lensResultOf } from './source.js';
 import {
   failingClient,
   resultOf,
   STUB_ANSWERS,
-  STUB_PLANS,
+  STUB_BUILT_AT,
   STUB_PROXIES,
   STUB_SOURCE_ANSWERS,
   STUB_WINDOW,
@@ -80,14 +85,15 @@ function columnsOnly(answer: QueryResult): QueryResult {
 
 /** A client answering every metric and the plans query with its stub columns and no row: the control the filled fields are held against. */
 function emptyClient(): AtlasClient {
+  const { client } = stubLiveClient();
   return {
-    ...stubLiveClient().client,
+    ...client,
     runMetric: (id) => {
       const answer = ANSWER_OF.get(id);
       if (answer === undefined) return Promise.reject(new Error(`no stub answer for ${id}`));
       return Promise.resolve(columnsOnly(answer));
     },
-    query: () => Promise.resolve(columnsOnly(STUB_PLANS)),
+    query: async (id, params) => columnsOnly(await client.query(id, params)),
   };
 }
 
@@ -125,17 +131,31 @@ describe('liveResultOf over a stub client: the requests', () => {
       { id: 'qa.open-bugs-per-day', window: undefined },
       { id: 'pm.minutes-per-agent', window: { last: '28d' } },
       { id: 'qa.defect-density', window: undefined },
+      { id: 'pm.out-of-scope-per-week', window: { last: '28d' } },
+      { id: 'pm.task-pile', window: undefined },
+      { id: 'dev.work-done', window: { last: '28d' } },
+      { id: 'arch.composition', window: undefined },
+      { id: 'arch.import-flow', window: undefined },
       { id: 'pm.tokens-per-day', window: previous },
       { id: 'arch.debt-ratio', window: previous },
     ]);
-    expect([...WINDOWED_SOURCE_METRICS].sort()).toEqual(['deploysPerWeek', 'minutesPerAgent', 'resolutionTime']);
+    expect([...WINDOWED_SOURCE_METRICS].sort()).toEqual(['deploysPerWeek', 'minutesPerAgent', 'resolutionTime', 'scopeCreep', 'workDone']);
   });
 
   it('reads the plans\' first sessions once, over the series window, for the outcome card', async () => {
     const { client, queries } = stubLiveClient();
     await liveResultOf(client, 'last-year');
 
-    expect(queries).toEqual([{ id: PLANS_SOURCE_ID, params: { window: { last: '52w' }, fields: ['plan_stub', 'first_at'], limit: 5_000 } }]);
+    expect(queries.filter((query) => query.id === PLANS_SOURCE_ID)).toEqual([{ id: PLANS_SOURCE_ID, params: { window: { last: '52w' }, fields: ['plan_stub', 'first_at'], limit: 5_000 } }]);
+  });
+
+  it('asks the balance metrics over the 91 days ending with the build\'s day, whatever the range', async () => {
+    const { client, queries } = stubLiveClient();
+    await liveResultOf(client, 'now');
+    const balance = queries.filter((query) => query.id !== PLANS_SOURCE_ID);
+
+    expect(balance).toHaveLength(Object.keys(BALANCE_METRICS).length);
+    for (const { params } of balance) expect(params.window).toEqual({ to: STUB_BUILT_AT.slice(0, 10), last: '91d' });
   });
 
   it('asks the two one-number tiles over the KPI window, every other metric over the series window', async () => {
@@ -164,10 +184,11 @@ describe('liveResultOf over a stub client: each field filled', () => {
     const mockFields = WIRED_FIELDS.filter((field): field is keyof MockData => field in result.mock);
     const mockNames: readonly string[] = mockFields;
 
-    expect(mockNames).toEqual(WIRED_FIELDS.filter((field) => field !== 'workspace'));
+    expect(mockNames).toEqual(WIRED_FIELDS.filter((field) => field !== 'workspace' && field !== 'balance'));
     for (const field of mockFields) {
       expect({ field, value: result.mock[field] }).not.toEqual({ field, value: empty.mock[field] });
     }
+    expect(result.balance).not.toEqual(empty.balance);
     expect(result.workspace.members).not.toEqual(empty.workspace.members);
     expect(result.workspace.edges).not.toEqual(empty.workspace.edges);
   });
@@ -295,10 +316,10 @@ describe('liveResultOf over a stub client: each field filled', () => {
 
   it('adds one bin past the last edge only when a session ran that long, to its minutes rounded up', () => {
     const at = new Date('2026-11-20');
-    const points = [180, 412.2, 20].map((y) => ({ x: at, y }));
+    const points = [180, 412.2, 20].map((y) => ({ x: at, y, label: 'task' }));
 
     expect(taskMinutesBinsOf(points).at(-1)).toEqual({ from: 180, to: 413, count: 2 });
-    expect(taskMinutesBinsOf([{ x: at, y: 179.9 }]).at(-1)).toEqual({ from: 120, to: 180, count: 1 });
+    expect(taskMinutesBinsOf([{ x: at, y: 179.9, label: 'task' }]).at(-1)).toEqual({ from: 120, to: 180, count: 1 });
   });
 
   it('reads the red verdict\'s share for the red CI tile', async () => {
@@ -338,9 +359,10 @@ describe('liveResultOf over a stub client: each field filled', () => {
 });
 
 describe('liveResultOf over a stub client: the phase-4 fields', () => {
-  it('wires the four fields phase 4 names, WIP, the two bug backlog fields, the minutes per agent and the defect density, each from its own metric', () => {
+  it('wires the four fields phase 4 names, WIP, the two bug backlog fields, the minutes per agent, the defect density and the three cards\' fields, each from its own metric', () => {
     expect(SOURCE_WIRED_FIELDS).toEqual([
       'deploysPerWeek', 'modules', 'workspace', 'wip', 'resolutionByPriority', 'bugOutcomeByLoopStart', 'openBugsPerDay', 'minutesPerAgent', 'defectDensity',
+      'scopeCreepPerWeek', 'scopeCreepAverage', 'taskPileTree', 'workDoneTree',
     ]);
     expect(Object.keys(SOURCE_METRIC_FIELDS)).toEqual(Object.keys(SOURCE_METRICS));
     for (const field of SOURCE_WIRED_FIELDS) expect({ field, wired: WIRED_FIELDS.includes(field) }).toEqual({ field, wired: true });
@@ -443,17 +465,70 @@ describe('liveResultOf over a stub client: the phase-4 fields', () => {
     expect(defectDensityOf(resultOf(['path', 'bugs', 'loc'], [['src/gone', 7, 0]]))).toBe(0);
   });
 
-  it('gives each phase-4 field its metric and row count, a proxy\'s note on the module fields', async () => {
+  it('fills the out-of-scope tile, the task pile and work done through live-cards.ts\'s mappers', async () => {
     const { result } = await liveResult();
 
-    for (const key of Object.keys(SOURCE_METRICS) as SourceMetric[]) {
-      for (const field of SOURCE_METRIC_FIELDS[key]) {
-        expect({ field, metricId: result.fieldMeta.get(field)?.metricId, rowCount: result.fieldMeta.get(field)?.rowCount })
-          .toEqual({ field, metricId: SOURCE_METRICS[key], rowCount: STUB_SOURCE_ANSWERS[key].meta.rowCount });
-      }
+    expect(result.mock.scopeCreepPerWeek).toEqual([0, 6, 0, 4]);
+    expect(result.mock.scopeCreepAverage).toBe(2.5);
+    expect(result.mock.taskPileTree.map((branch) => branch.id)).toEqual(['bug', 'chore', 'spec']);
+    expect(result.mock.workDoneTree.map((branch) => branch.id)).toEqual(['features', 'fixes', 'chores']);
+  });
+
+  it('gives each phase-4 field its metric and row count, a proxy\'s note on the module fields', async () => {
+    const { result } = await liveResult();
+    const firstOf = (field: LensField): SourceMetric | undefined => (Object.keys(SOURCE_METRICS) as SourceMetric[])
+      .find((key) => SOURCE_METRIC_FIELDS[key].includes(field));
+
+    for (const field of SOURCE_WIRED_FIELDS) {
+      const key = firstOf(field) ?? 'coupling';
+      expect({ field, metricId: result.fieldMeta.get(field)?.metricId, rowCount: result.fieldMeta.get(field)?.rowCount })
+        .toEqual({ field, metricId: SOURCE_METRICS[key], rowCount: STUB_SOURCE_ANSWERS[key].meta.rowCount });
     }
     expect(result.fieldMeta.get('modules')?.proxyNote).toBe(stubNoteOf('arch.loc-per-module'));
     expect(result.fieldMeta.get('wip')?.proxyNote).toBeUndefined();
+  });
+
+  it('keeps arch.coupling\'s meta on the workspace, which the composition and the import flow fill too', async () => {
+    const { result } = await liveResult();
+
+    expect(SOURCE_METRIC_FIELDS.composition).toEqual(['workspace']);
+    expect(SOURCE_METRIC_FIELDS.importFlow).toEqual(['workspace']);
+    expect(SOURCE_WIRED_FIELDS.filter((field) => field === 'workspace')).toHaveLength(1);
+    expect(result.fieldMeta.get('workspace')).toEqual({ metricId: 'arch.coupling', rowCount: 3, proxyNote: stubNoteOf('arch.coupling') });
+  });
+
+  it('keeps a meta per workspace card of its own metric: arch.composition for the rose and the sunburst, arch.import-flow for the Sankey', async () => {
+    const { result } = await liveResult();
+    const cards = Object.keys(WORKSPACE_CARD_METRICS) as WorkspaceCard[];
+
+    expect(cards).toEqual(['sizeRose', 'composition', 'importFlow']);
+    for (const card of cards) {
+      const key = WORKSPACE_CARD_METRICS[card];
+      expect({ card, ...result.workspaceMeta.get(card) }).toEqual({ card, metricId: SOURCE_METRICS[key], rowCount: STUB_SOURCE_ANSWERS[key].meta.rowCount });
+    }
+    expect(result.workspaceMeta.get('sizeRose')?.metricId).toBe('arch.composition');
+    expect(result.workspaceMeta.get('composition')?.metricId).toBe('arch.composition');
+    expect(result.workspaceMeta.get('importFlow')?.metricId).toBe('arch.import-flow');
+    expect(result.workspaceMeta.get('sizeRose')?.rowCount).toBeGreaterThan(0);
+    expect(result.workspaceMeta.get('importFlow')?.rowCount).toBeGreaterThan(0);
+    expect(result.fieldMeta.get('workspace')?.metricId).toBe('arch.coupling');
+  });
+
+  it('control: the mock result keeps no workspace card meta', () => {
+    expect(lensResultOf('past-month').workspaceMeta.size).toBe(0);
+  });
+
+  it('lays the architect cards\' fields into the workspace: the rose, the sunburst, the Sankey and its layers', async () => {
+    const { result } = await liveResult();
+
+    expect(result.workspace.sizeRose.map((slice) => slice.id)).toEqual(['packages/stub-core', 'packages/stub-loose']);
+    expect(result.workspace.compositionSunburst.map((node) => node.id)).toEqual(['packages/stub-core', 'packages/stub-loose', 'addons/stub-addon', 'packages/stub-lint']);
+    expect(result.workspace.composition.map((row) => row.id)).toEqual(['packages/stub-core', 'packages/stub-loose', 'addons/stub-addon', 'packages/stub-lint']);
+    expect(result.workspace.layerOrder).toEqual(['core', 'addon', 'unassigned']);
+    expect(Object.keys(result.workspace.layerTones)).toEqual(['config', 'core', 'addon', 'unassigned']);
+    expect(result.workspace.sankeyLinks.filter((link) => link.upward === true)).toEqual([
+      { source: '@open-tomato/stub-addon', target: '@open-tomato/stub-low', value: 1, upward: true },
+    ]);
   });
 });
 
@@ -465,20 +540,26 @@ describe('liveResultOf over a stub client: a replica with no GitHub data', () =>
     expect(GITHUB_BUILD_LINE).toBe('rafa module exec @open-tomato/rafa-atlas build --github');
     expect(result.notWired.has('resolutionByPriority')).toBe(true);
     expect(result.notWired.has('openBugsPerDay')).toBe(true);
-    expect([...result.notWiredDetail.entries()]).toEqual([['resolutionByPriority', GITHUB_NOT_READ], ['openBugsPerDay', GITHUB_NOT_READ]]);
-    expect(result.notWired.size).toBe(NOT_WIRED.size + 2);
+    expect(result.notWired.has('taskPileTree')).toBe(true);
+    expect([...result.notWiredDetail.entries()]).toEqual([
+      ['resolutionByPriority', GITHUB_NOT_READ],
+      ['openBugsPerDay', GITHUB_NOT_READ],
+      ['taskPileTree', GITHUB_NOT_READ],
+    ]);
+    expect(result.notWired.size).toBe(NOT_WIRED.size + 3);
   });
 
   it('control: keeps the offline phase-4 fields wired, and with GitHub data marks neither GitHub field', async () => {
     const offline = await liveResultOf(stubLiveClient({ github: false }).client, 'past-month');
     const { result } = await liveResult();
 
-    for (const field of ['deploysPerWeek', 'modules', 'workspace', 'wip', 'bugOutcomeByLoopStart'] as const) {
+    for (const field of ['deploysPerWeek', 'modules', 'workspace', 'wip', 'bugOutcomeByLoopStart', 'scopeCreepPerWeek', 'workDoneTree'] as const) {
       expect({ field, marked: offline.notWired.has(field) }).toEqual({ field, marked: false });
     }
     expect(offline.mock.bugOutcomeByLoopStart).toHaveLength(2);
     expect(result.notWired.has('resolutionByPriority')).toBe(false);
     expect(result.notWired.has('openBugsPerDay')).toBe(false);
+    expect(result.notWired.has('taskPileTree')).toBe(false);
   });
 });
 
@@ -486,7 +567,7 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
   it('gives every wired field its metric and its answer\'s row count, the previous-window fields the earlier answer\'s', async () => {
     const { result } = await liveResult();
 
-    expect([...result.fieldMeta.keys()].sort()).toEqual([...WIRED_FIELDS].sort());
+    expect([...result.fieldMeta.keys()].sort()).toEqual(WIRED_FIELDS.filter((field) => field !== 'balance').sort());
     for (const key of Object.keys(LIVE_METRICS) as LiveMetric[]) {
       const own = METRIC_FIELDS[key][0] ?? 'balance';
       expect({ key, rowCount: result.fieldMeta.get(own)?.rowCount }).toEqual({ key, rowCount: STUB_ANSWERS[key].meta.rowCount });
@@ -507,18 +588,42 @@ describe('liveResultOf over a stub client: field meta and the rest', () => {
     expect(result.fieldMeta.get('tokensPerDay')).toEqual({ metricId: 'pm.tokens-per-day', rowCount: 2 });
   });
 
-  it('marks every other field not wired, the balance and the workspace included, and leaves them empty', async () => {
+  it('marks no field not wired, the balance and the workspace included', async () => {
     const { result } = await liveResult();
 
     expect(result.notWired).toBe(NOT_WIRED);
     for (const field of WIRED_FIELDS) expect(result.notWired.has(field)).toBe(false);
-    expect([...result.notWired].sort()).toEqual(['balance', 'scopeCreepPerWeek', 'taskPileTree', 'workDoneTree']);
-    expect(result.notWired.size + WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
+    expect([...result.notWired]).toEqual([]);
+    expect(WIRED_FIELDS.length).toBe(Object.keys(result.mock).length + 2);
     expect(result.notWiredDetail.size).toBe(0);
-    expect(result.mock.scopeCreepPerWeek).toEqual([]);
+  });
+
+  it('fills the balance with the nine live indices, an index with no event in 12 weeks read as none', async () => {
+    const { result } = await liveResult();
+    const releases = result.balance.find((index) => index.id === 'releases');
+    const regressions = result.balance.find((index) => index.id === 'regressions');
+
+    expect(result.balance.map((index) => index.id)).toEqual(BALANCE_CATALOGUE.map((index) => index.id));
+    expect(releases?.value).toBe(2);
+    expect(regressions === undefined
+      ? false
+      : hasNoBaseline(regressions)).toBe(true);
+    expect(result.fieldMeta.has('balance')).toBe(false);
+  });
+
+  it('control: an answer naming no build time leaves the balance empty and marked not wired', async () => {
+    const { client } = stubLiveClient();
+    const noBuild: AtlasClient = {
+      ...client,
+      runMetric: async (id, window, signal) => {
+        const answer = await client.runMetric(id, window, signal);
+        return { ...answer, meta: { ...answer.meta, asOf: null } };
+      },
+    };
+    const result = await liveResultOf(noBuild, 'past-month');
+
     expect(result.balance).toEqual([]);
-    expect(result.workspace.composition).toEqual([]);
-    expect(result.workspace.sankeyNodes).toEqual([]);
+    expect(result.notWired.has('balance')).toBe(true);
   });
 
   it('names the series window\'s weeks, one per entry of the weekly fields that hold no dates', async () => {

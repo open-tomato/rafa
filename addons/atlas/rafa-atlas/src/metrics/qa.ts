@@ -71,8 +71,8 @@ export const BOARD_BUGS: readonly Filter[] = [
 /** The board bugs a loop filed: those whose body names a plan. */
 const FILED_BY_A_LOOP: Filter = { field: 'plan_stub', op: 'is_null', value: false };
 
-/** The board bugs with an open time: only a build run with --github fills one. */
-const READ_FROM_GITHUB: Filter = { field: 'created_at', op: 'is_null', value: false };
+/** The board issues with an open time: only a build run with --github fills one. */
+export const READ_FROM_GITHUB: Filter = { field: 'created_at', op: 'is_null', value: false };
 
 /** Routed bugs per week, stacked by the kind the loop read. */
 export const BUGS_BY_KIND: MetricDefinition = {

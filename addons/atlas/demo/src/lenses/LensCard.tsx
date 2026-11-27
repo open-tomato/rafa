@@ -1,4 +1,4 @@
-import type { LensField, LensResult } from '../data/source.js';
+import type { LensField, LensResult, WorkspaceCard } from '../data/source.js';
 
 import { Card, CardHeader, CardStatus, DashboardCard, useDashboard, type CardSpec, type DashboardCardProps } from '@open-tomato/atlas-ui';
 import { useMemo, type ReactElement } from 'react';
@@ -11,6 +11,8 @@ export interface LensCardProps<T> extends DashboardCardProps<LensResult, T> {
   readonly reads?: readonly LensField[];
   /** The subtitle on the live page, where the mock's (its 12 weeks, its sample) would not hold. */
   readonly liveSubtitle?: string;
+  /** The workspace card whose own metric's meta the live note names, in place of `workspace`'s (`arch.coupling`). */
+  readonly metaCard?: WorkspaceCard;
 }
 
 const NO_FIELDS: readonly LensField[] = [];
@@ -36,16 +38,17 @@ function notWiredDetailOf(result: LensResult, reads: readonly LensField[]): stri
  * A lens card: a `DashboardCard` that names the result fields it reads.
  * Over the mock it is the dashboard card as given. Over the live source
  * it draws only when `isWired` says so, with the live source line, the
- * live subtitle when given and `liveNoteOf`'s note in place of the mock's
+ * live subtitle when given and `liveNoteOf`'s note (of `metaCard`'s own
+ * metric, when given) in place of the mock's
  * in its spec; otherwise it is a card with the "not wired yet" empty state (Q1),
  * so no sample number shows on the live page. The state's line is the
  * result's own for a field it reads, when it has one (`notWiredDetail`).
  */
-export function LensCard<T>({ reads = NO_FIELDS, liveSubtitle, config, ...card }: LensCardProps<T>): ReactElement {
+export function LensCard<T>({ reads = NO_FIELDS, liveSubtitle, metaCard, config, ...card }: LensCardProps<T>): ReactElement {
   const { data } = useDashboard<LensResult>();
   const note = data === undefined
     ? undefined
-    : liveNoteOf(data, reads);
+    : liveNoteOf(data, reads, metaCard);
   const live = data?.source === 'live';
   const shown = useMemo(() => (live
     ? { ...config, subtitle: liveSubtitle ?? config.subtitle, source: LIVE_SOURCE, note }

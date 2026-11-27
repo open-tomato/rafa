@@ -1,8 +1,9 @@
 /**
  * The module seam: the manifest in `package.json` reads clean against the
  * running rafa, its entry is this folder's `index.ts`, and every command
- * the entry exports is one the dispatcher would mount. The control shows
- * the manifest check can fail: a manifest naming no entry is refused.
+ * the entry exports is one the dispatcher would mount, `build` and `serve`
+ * placed in a project and `describe` in none. The control shows the
+ * manifest check can fail: a manifest naming no entry is refused.
  */
 import { join } from 'node:path';
 
@@ -39,7 +40,14 @@ describe('the rafa-atlas module seam', () => {
     for (const command of commands) {
       expect(commandProblem(command)).toBeNull();
       expect(command.subject).toBe('atlas');
-      expect(command.needsProject).toBe(false);
     }
+  });
+
+  it('places build and serve in a project, and describe, which opens no replica, in none', () => {
+    expect(commands.map((command) => [command.action, command.needsProject])).toEqual([
+      ['build', true],
+      ['serve', true],
+      ['describe', false],
+    ]);
   });
 });

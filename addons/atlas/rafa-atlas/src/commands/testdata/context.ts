@@ -1,9 +1,12 @@
 /**
  * A `RafaContext` for the command tests: the lines each level printed,
  * the payload handed to `output.result`, and an abort controller for the
- * command's signal. `project` is null, as `module exec` hands a module
- * command, so the root comes from `ATLAS_PROJECT_ROOT` in `env`. Named
- * without `.test` so bun never runs it alone.
+ * command's signal. `project` is null, as for a command run outside the
+ * dispatcher (`../placement.test.ts` runs them through it), so the
+ * root comes from `ATLAS_PROJECT_ROOT` in `env`.
+ * `moduleConfig` is the raw `atlas` section the runtime would hand the
+ * command, `undefined` unless the options set one. Named without `.test`
+ * so bun never runs it alone.
  */
 import type { RafaContext } from '@open-tomato/rafa-core/core/command';
 
@@ -21,6 +24,8 @@ export interface TestContextOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly flags?: Readonly<Record<string, string | boolean>>;
   readonly outputMode?: 'text' | 'json';
+  /** The raw value of the module's config key, as the runtime hands it; `undefined` when left out. */
+  readonly moduleConfig?: unknown;
 }
 
 /** A context printing into `printed`, its signal aborted by `abort`. */
@@ -45,6 +50,7 @@ export function testContext(options: TestContextOptions = {}): { context: RafaCo
     verbosity: 1,
     signal: controller.signal,
     project: null,
+    moduleConfig: options.moduleConfig,
   } as unknown as RafaContext;
   return { context, printed, abort: () => {
     controller.abort();

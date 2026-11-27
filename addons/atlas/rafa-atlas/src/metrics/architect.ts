@@ -13,6 +13,15 @@
  * coupling (entry 18), and the upward edges `docs/survey/cut-table.json`
  * lists for architecture violations (entry 13). `local.modules` has no
  * time axis, so a window is refused on them: the card asks with none.
+ *
+ * `arch.composition` (spec C6 and C7) reads the same source as a direct
+ * metric: per module folder, its package, layer, layer rank and the five
+ * kinds of lines the rose and the sunburst draw. A folder no layer of
+ * `atlas.layers` lists answers NULL in both layer columns.
+ *
+ * `arch.import-flow` (spec C8) reads it as a direct metric too: per module
+ * folder, its path, package, layer, layer rank and import list, the edges
+ * the Sankey draws between layers.
  */
 import type { MetricDefinition } from '@open-tomato/atlas-data/contract';
 
@@ -170,8 +179,51 @@ export const VIOLATIONS: MetricDefinition = {
   proxyNote: 'A violation is an upward import the survey\'s cut table lists: a module it does not cover, or a project with no cut table, shows none.',
 };
 
+/** Each module folder's package, layer and five line counts: the rose and the sunburst (C6, C7). */
+export const COMPOSITION: MetricDefinition = {
+  id: 'arch.composition',
+  title: 'Composition',
+  lenses: ['architect'],
+  description: 'One row per module folder: its package, its atlas.layers layer and rank (NULL for a folder no layer lists), and its source, test, docs, config and fixture lines.',
+  sourceId: MODULES_SOURCE,
+  params: {
+    fields: ['path', 'package', 'layer', 'layer_rank', 'loc', 'test_loc', 'docs_loc', 'config_loc', 'fixtures_loc'],
+    orderBy: [{ key: 'path', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'lines',
+  chart: 'treemap',
+  feasibility: 'direct',
+};
+
+/**
+ * Each module folder's layer and the @open-tomato packages it imports: the
+ * import flow by layer (C8). The folders are read through the source's row
+ * read, `fields`, not a grouped query: the engine groups by `imports_json`,
+ * but refuses `layer_rank` as a group key, since the descriptor makes it a
+ * measure. A folder is already one row of `local.modules`, so the row read
+ * answers each import list as stored, a JSON array the card parses. The
+ * contract has no Sankey chart kind, so it names `heatmap`, as
+ * `arch.coupling` does for the same import lists.
+ */
+export const IMPORT_FLOW: MetricDefinition = {
+  id: 'arch.import-flow',
+  title: 'Import flow by layer',
+  lenses: ['architect'],
+  description: 'One row per module folder: its path, package, atlas.layers layer and rank (NULL for a folder no layer lists), and the @open-tomato packages it imports (a JSON array), the edges of the flow between layers.',
+  sourceId: MODULES_SOURCE,
+  params: {
+    fields: ['path', 'package', 'layer', 'layer_rank', 'imports_json'],
+    orderBy: [{ key: 'path', dir: 'asc' }],
+  },
+  formula: { kind: 'none' },
+  unit: 'modules',
+  chart: 'heatmap',
+  feasibility: 'direct',
+};
+
 /** The architect lens's PoC metrics, in the order section G lists them. */
 export const ARCHITECT_POC_METRICS: readonly MetricDefinition[] = [DEBT_RATIO, TASK_MINUTES_P50_P90, TOKENS_BY_MODEL, PREFLIGHT_HALTS];
 
 /** The architect lens's metrics: the PoC cut, then those over the module source. */
-export const ARCHITECT_METRICS: readonly MetricDefinition[] = [...ARCHITECT_POC_METRICS, LOC_PER_MODULE, COUPLING, VIOLATIONS];
+export const ARCHITECT_METRICS: readonly MetricDefinition[] = [...ARCHITECT_POC_METRICS, LOC_PER_MODULE, COUPLING, VIOLATIONS, COMPOSITION, IMPORT_FLOW];

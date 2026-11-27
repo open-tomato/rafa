@@ -197,6 +197,21 @@ describe('ingestBoard, issue_facts', () => {
   });
 });
 
+describe('ingestBoard, issue_type', () => {
+  it('reads the value of one type label, the first of two, and NULL for none', async () => {
+    const rows = [
+      fixtureRow(1, ['spec:ready', 'type:spec']),
+      fixtureRow(2, ['type:bug', 'type:debt']),
+      fixtureRow(3, ['spec:ready', 'module:notes']),
+    ];
+    const { issues } = await ingestAt(rootWith('issue-types', boardCacheText(rows)));
+
+    expect(issue(issues, 1)['issue_type']).toBe('spec');
+    expect(issue(issues, 2)['issue_type']).toBe('bug');
+    expect(issue(issues, 3)['issue_type']).toBeNull();
+  });
+});
+
 describe('ingestBoard, board_snapshot', () => {
   it('counts today\'s issues of each of the eleven stages, zeros included, the epic counted in none', async () => {
     const { snapshot, ingest } = await fixtureIngest();

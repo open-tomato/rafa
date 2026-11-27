@@ -4,7 +4,10 @@
  * each way, alpha holding a test file and a `node_modules`, `dist` and
  * `.tsbuild` folder the walk leaves out, and no cut table, so every
  * `upward_edges` reads NULL and the stamp says so. A second root adds a
- * cut table as the control that the column can be read. The counts
+ * cut table as the control that the column can be read. A third tree,
+ * `packages/kinds`, holds one file or more of each of the five line kinds,
+ * a snapshot and a test-named fixture among them, and a `node_modules`
+ * folder holding a file of every kind, none of which counts. The counts
  * `derive.ts` takes from the effort buckets are read over rows inserted
  * by hand, and one build over the effort fixture store checks the stamp
  * and the rows in the replica.
@@ -26,6 +29,7 @@ import {
   CUT_TABLE_FILE,
   importedPackagesOf,
   ingestModules,
+  lineKindOf,
   locOf,
   MODULES_SOURCE,
   parseCutTable,
@@ -180,6 +184,98 @@ describe('ingestModules over a tree of two packages with no cut table', () => {
 
     expect(rows).toEqual([]);
     expect(ingest.stamps[0]?.reason).toContain('the module globs packages/*, src/*, addons/* name no folder under the root');
+  });
+});
+
+/** A module holding files of the five kinds, and a node_modules folder holding one of each it skips. */
+const KINDS_TREE: Readonly<Record<string, string>> = {
+  'packages/kinds/package.json': JSON.stringify({ name: '@open-tomato/kinds' }),
+  'packages/kinds/eslint.config.mjs': 'import config from \'@open-tomato/eslint-config\';\nexport default config;\n',
+  'packages/kinds/config/settings.yaml': 'a: 1\n\nb: 2\n',
+  'packages/kinds/src/index.ts': 'export const one = 1;\n\nexport const two = 2;\n',
+  'packages/kinds/src/index.test.ts': 'it(\'reads one\', () => one);\n',
+  'packages/kinds/README.md': '# kinds\n\nWhat each file counts as.\n',
+  'packages/kinds/docs/notes.txt': 'a note under docs/\n',
+  'packages/kinds/src/__snapshots__/index.test.ts.snap': 'exports[`one 1`] = `1`;\n\nexports[`two 1`] = `2`;\nexports[`three 1`] = `3`;\n',
+  'packages/kinds/src/fixtures/case.test.ts': 'export const fixture = 1;\nexport const other = 2;\n',
+  'packages/kinds/src/notes.txt': 'counted in no kind\n',
+  'packages/kinds/node_modules/dep/package.json': '{\n  "name": "dep"\n}\n',
+  'packages/kinds/node_modules/dep/README.md': '# dep\nskipped\n',
+  'packages/kinds/node_modules/dep/index.ts': 'export const dep = 1;\n',
+  'packages/kinds/node_modules/dep/index.test.ts': 'it(\'skips\', () => 1);\n',
+  'packages/kinds/node_modules/dep/__snapshots__/index.test.ts.snap': 'exports[`skip 1`] = `1`;\n',
+};
+
+describe('ingestModules counting each file in one of five kinds', () => {
+  it('counts a markdown file and a file under docs/ as docs, a json, yaml and mjs file as config, and neither as source', async () => {
+    const root = join(scope, 'kinds-docs-config');
+    writeTree(root, KINDS_TREE);
+
+    const { rows } = await ingestAt(root);
+
+    expect(moduleRow(rows, 'packages/kinds')).toEqual(expect.objectContaining({ docs_loc: 3, config_loc: 5, files: 1, loc: 2 }));
+  });
+
+  it('counts a snapshot and a test-named file under fixtures/ as fixtures, not as tests', async () => {
+    const root = join(scope, 'kinds-fixtures');
+    writeTree(root, KINDS_TREE);
+
+    const { rows } = await ingestAt(root);
+
+    expect(moduleRow(rows, 'packages/kinds')).toEqual(expect.objectContaining({ fixtures_loc: 5, test_files: 1, test_loc: 1 }));
+  });
+
+  it('skips node_modules whole: the five kinds sum to the counted lines outside it', async () => {
+    const root = join(scope, 'kinds-skipped');
+    writeTree(root, KINDS_TREE);
+
+    const { rows } = await ingestAt(root);
+    const row = moduleRow(rows, 'packages/kinds');
+    const kinds = ['loc', 'test_loc', 'docs_loc', 'config_loc', 'fixtures_loc'].map((column) => Number(row[column]));
+    const counted = Object.entries(KINDS_TREE)
+      .filter(([path]) => !path.includes('/node_modules/') && !path.endsWith('/src/notes.txt'))
+      .reduce((sum, [, text]) => sum + locOf(text), 0);
+
+    expect(kinds.reduce((sum, each) => sum + each, 0)).toBe(counted);
+    expect(JSON.parse(String(row['imports_json']))).toEqual(['@open-tomato/eslint-config']);
+  });
+
+  it('control: the same node_modules files moved out of it count, so the skip is what left them out', async () => {
+    const root = join(scope, 'kinds-control');
+    const moved = Object.fromEntries(Object.entries(KINDS_TREE)
+      .map(([path, text]) => [path.replace('/node_modules/dep/', '/vendored/'), text]));
+    writeTree(root, moved);
+
+    const { rows } = await ingestAt(root);
+
+    expect(moduleRow(rows, 'packages/kinds')).toEqual(expect.objectContaining({
+      files: 2, loc: 3, test_files: 2, test_loc: 2, docs_loc: 5, config_loc: 8, fixtures_loc: 6,
+    }));
+  });
+});
+
+describe('lineKindOf', () => {
+  it('takes the first kind that matches, fixtures before docs, docs before tests, tests before config', () => {
+    expect(lineKindOf('src/__snapshots__/a.test.ts.snap')).toBe('fixtures');
+    expect(lineKindOf('src/fixtures/README.md')).toBe('fixtures');
+    expect(lineKindOf('src/board.fixture.ts')).toBe('fixtures');
+    expect(lineKindOf('src/stubs/hub.ts')).toBe('fixtures');
+    expect(lineKindOf('docs/api.test.ts')).toBe('docs');
+    expect(lineKindOf('src/x.test.mjs')).toBe('test');
+    expect(lineKindOf('src/tests/helper.ts')).toBe('test');
+    expect(lineKindOf('src/tests/cases.json')).toBe('config');
+  });
+
+  it('reads config files by ending, by name and as *.config scripts, and source by its endings', () => {
+    expect(['tsconfig.json', 'a.yml', 'bunfig.toml', 'x.cjs', 'Dockerfile', '.gitignore', 'vite.config.ts'].map(lineKindOf))
+      .toEqual(['config', 'config', 'config', 'config', 'config', 'config', 'config']);
+    expect(['src/a.ts', 'src/b.tsx', 'src/c.d.ts', 'src/d.css', 'src/e.html'].map(lineKindOf))
+      .toEqual(['source', 'source', 'source', 'source', 'source']);
+  });
+
+  it('counts a file of no known kind in none, and reads the folders below the module folder only', () => {
+    expect(['notes.txt', 'report.junit.xml', 'rows.jsonl', 'logo.png'].map(lineKindOf)).toEqual([null, null, null, null]);
+    expect(lineKindOf('fixture-path.ts')).toBe('source');
   });
 });
 

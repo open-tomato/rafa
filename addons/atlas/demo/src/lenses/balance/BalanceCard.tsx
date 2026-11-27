@@ -16,6 +16,7 @@ import {
   defaultEnabled,
   toggleIndex,
 } from '../../data/balance.js';
+import { axisIndexOf, hasNoBaseline, NONE_IN_12_WEEKS } from '../../data/live-balance.js';
 import { LensCard } from '../LensCard.js';
 import { cardSpec, plotHeight } from '../spec.js';
 
@@ -43,6 +44,9 @@ const BALANCE = cardSpec({
   note: 'the shape tilts toward the pole that grew: 📦 shipping is good growth, 🔥 failing is bad growth, 🛠️ foundation is investment; the dev keeps it round. The history switch stands in for the weeks the medians have behind them.',
 });
 
+/** The subtitle on the live page: the 7 days to the replica's build, whatever the range. */
+const LIVE_SUBTITLE = 'the 7 days to the replica\'s build over the median of the 12 weeks before, their mean when it is 0; the ring at 1 is as usual';
+
 const INFO = (
   <div className={balanceInfoVariants()}>
     <p>Each axis is one index, pulled toward one of three poles. The ring at 1 is the index&apos;s twelve-week median, so the shape is round on a week like the usual and bulges toward the pole that grew.</p>
@@ -53,7 +57,10 @@ const INFO = (
 
 /**
  * The balance radar with the reading beside it. The history switch sits in
- * the header; the index picker is the card menu's Indices entry.
+ * the header; the index picker is the card menu's Indices entry. On the
+ * live page it reads the live indices (`live-balance.ts`), and an axis
+ * whose index had no event in 12 weeks reads `NONE_IN_12_WEEKS` after its
+ * label and draws at 0, as the source table's row does.
  */
 export function BalanceCard(): ReactElement {
   const { Radar } = useChartEngine();
@@ -74,11 +81,15 @@ export function BalanceCard(): ReactElement {
   return (
     <LensCard
       config={BALANCE}
+      reads={['balance']}
+      liveSubtitle={LIVE_SUBTITLE}
       select={(result: LensResult) => result.balance}
       info={INFO}
       table={(indices) => ({
         columns: ['Index', 'Pole', 'This week', 'On'],
-        rows: indices.map((index) => [index.label, index.pole, `${index.value.toFixed(2)}×`, enabled.has(index.id)
+        rows: indices.map((index) => [index.label, index.pole, hasNoBaseline(index)
+          ? NONE_IN_12_WEEKS
+          : `${index.value.toFixed(2)}×`, enabled.has(index.id)
           ? 'on'
           : 'off']),
       })}
@@ -86,7 +97,7 @@ export function BalanceCard(): ReactElement {
       modals={modals}
     >
       {({ data: indices, animate, height }) => {
-        const axes = balanceAxes(indices, enabled);
+        const axes = balanceAxes(indices.map(axisIndexOf), enabled);
         return (
           <div className={balanceCardBodyVariants({ fill: height === 'fill' })}>
             <Radar

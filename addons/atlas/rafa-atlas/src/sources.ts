@@ -2,12 +2,12 @@
  * The table sources the registry serves so far, one spec per replica
  * bucket: `local.tasks` over `task_facts`, `local.daily` over
  * `daily_rollup`, `local.plans` over `plan_facts`, `local.bugs` over
- * `bug_facts`, `local.findings` over `finding_facts`, `local.ci` over
- * `ci_facts`, `local.commits` over `commit_facts`, `local.marks` over
- * `stretch_marks`, `local.issues` over `issue_facts`, `local.board`
- * over `board_snapshot`, `local.modules` over `module_facts` and
- * `local.prs` over `pr_facts`, which only a `--github` build fills. The build stamps `local.changes` too, and no spec here
- * defines it yet. Each spec is the descriptor without its build stamps,
+ * `bug_facts`, `local.findings` over `finding_facts`, `local.changes`
+ * over `change_facts`, `local.ci` over `ci_facts`, `local.commits` over
+ * `commit_facts`, `local.marks` over `stretch_marks`, `local.issues` over
+ * `issue_facts`, `local.board` over `board_snapshot`, `local.modules` over
+ * `module_facts` and `local.prs` over `pr_facts`, which only a `--github`
+ * build fills. Each spec is the descriptor without its build stamps,
  * which `defineTableSource` reads from the replica's `atlas_sources` rows
  * at each call.
  *
@@ -23,7 +23,7 @@ import { DAILY_SOURCE } from './build/daily.js';
 import { PLANS_SOURCE } from './build/derive.js';
 import { BOARD_SOURCE, ISSUES_SOURCE } from './ingest/board.js';
 import { TASKS_SOURCE } from './ingest/effort.js';
-import { BUGS_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
+import { BUGS_SOURCE, CHANGES_SOURCE, CI_SOURCE, FINDINGS_SOURCE } from './ingest/facts.js';
 import { COMMITS_SOURCE, MARKS_SOURCE } from './ingest/git.js';
 import { PRS_SOURCE } from './ingest/github.js';
 import { MODULES_SOURCE } from './ingest/modules.js';
@@ -253,6 +253,34 @@ export const FINDINGS_SPEC: TableSourceSpec = {
   table: 'finding_facts',
 };
 
+/**
+ * `local.changes`: one row per changelog entry a task reported, from
+ * `change_facts`. Its count measure is `id` under `count`, one per entry,
+ * since the table holds no numeric column to sum.
+ */
+export const CHANGES_SPEC: TableSourceSpec = {
+  descriptor: {
+    id: CHANGES_SOURCE,
+    source: 'local',
+    channel: 'changes',
+    title: 'Changes',
+    description: 'One row per changelog entry a task reported, read from the effort store.',
+    timeField: 'day',
+    grains: ['day', 'week', 'month', 'plan', 'all'],
+    fields: [
+      { ...id('id', 'Changes'), description: 'one per changelog entry: counted, it is the number of entries' },
+      id('session_id', 'Session'),
+      dimension('plan_stub', 'Plan'),
+      dimension('level', 'Level', 'major, minor, patch or none, as the task reported it'),
+      dimension('area', 'Area', 'the changelog section the task named, as written; NULL when it named none'),
+      dimension('module', 'Module', 'the longest module path the area, then the summary, names; NULL when neither names one'),
+      dimension('summary', 'Summary'),
+      time('day', 'Day', 'date'),
+    ],
+  },
+  table: 'change_facts',
+};
+
 /** `local.ci`: one row per CI reading of a plan's head, from `ci_facts`. */
 export const CI_SPEC: TableSourceSpec = {
   descriptor: {
@@ -360,6 +388,7 @@ export const ISSUES_SPEC: TableSourceSpec = {
       dimension('plan_stub', 'Plan', 'the plan its body names in a ## Plan block or a follow-ups comment; NULL for one filed by hand'),
       dimension('module', 'Module', 'the module:<x> label\'s value'),
       dimension('priority', 'Priority', 'the priority:<x> label\'s value'),
+      dimension('issue_type', 'Type', 'the value of its first type:<x> label; NULL for an issue with none'),
     ],
   },
   table: 'issue_facts',
@@ -402,6 +431,14 @@ export const MODULES_SPEC: TableSourceSpec = {
       measure('loc', 'Lines of code', 'integer', 'lines'),
       measure('test_files', 'Test files', 'integer', 'files'),
       measure('test_loc', 'Test lines of code', 'integer', 'lines'),
+      { ...measure('docs_loc', 'Docs lines', 'integer', 'lines'), description: 'markdown lines, and the lines of any file under a docs/ folder' },
+      { ...measure('config_loc', 'Config lines', 'integer', 'lines'), description: 'the lines of json, yaml, toml, mjs and the other config files' },
+      { ...measure('fixtures_loc', 'Fixture lines', 'integer', 'lines'), description: 'the lines of files under fixtures/, snapshots and stubs' },
+      dimension('layer', 'Layer', 'the atlas.layers layer that lists the module; NULL for a module no layer lists'),
+      {
+        ...measure('layer_rank', 'Layer rank', 'integer', 'rank'),
+        description: 'the place of its layer in atlas.layers, from 0; NULL for a module no layer lists',
+      },
       { ...measure('fan_in', 'Fan-in', 'integer', 'modules'), description: 'the other modules importing its package' },
       { ...measure('fan_out', 'Fan-out', 'integer', 'modules'), description: 'the other modules whose package it imports' },
       { ...dimension('imports_json', 'Imports', 'the @open-tomato packages it imports, its own left out, as a JSON array'), type: 'json' },
@@ -453,6 +490,6 @@ export const PRS_SPEC: TableSourceSpec = {
 
 /** Every source spec the registry defines, in the order `/sources` lists them. */
 export const SOURCE_SPECS: readonly TableSourceSpec[] = [
-  TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC, ISSUES_SPEC, BOARD_SPEC,
+  TASKS_SPEC, DAILY_SPEC, PLANS_SPEC, BUGS_SPEC, FINDINGS_SPEC, CHANGES_SPEC, CI_SPEC, COMMITS_SPEC, MARKS_SPEC, ISSUES_SPEC, BOARD_SPEC,
   MODULES_SPEC, PRS_SPEC,
 ];

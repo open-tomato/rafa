@@ -35,7 +35,8 @@
  *    single known `horizon:` label), and NULL for any other issue, which
  *    gets no Horizon on the board either. `module` and `priority` are the
  *    value of the first `module:<x>` and `priority:<x>` label (D15), else
- *    NULL. `plan_stub` is the first line of the fenced block under a
+ *    NULL, and `issue_type` that of the first `type:<x>` label, in label
+ *    order, else NULL. `plan_stub` is the first line of the fenced block under a
  *    `## Plan` heading, then the stub of a `<!-- rafa:follow-ups <stub> -->`
  *    comment, else NULL: a bug filed by hand. `created_at` and `closed_at`
  *    stay NULL offline (trap 3): the cache holds no time but `updatedAt`,
@@ -107,6 +108,9 @@ const MODULE_PREFIX = 'module:';
 
 /** The prefix of the label naming an issue's priority (D15). */
 const PRIORITY_PREFIX = 'priority:';
+
+/** The label prefix whose first value is an issue's `issue_type`. */
+const TYPE_PREFIX = 'type:';
 
 /** An issue's state, as the cache writes it. */
 export type BoardState = 'OPEN' | 'CLOSED';
@@ -299,6 +303,7 @@ function epicsBySlug(rows: readonly BoardRow[]): ReadonlyMap<string, number> {
 const ISSUE_COLUMNS: readonly string[] = [
   'number', 'title', 'state', 'state_reason', 'labels_json', 'is_bug', 'is_epic', 'epic_slug', 'parent_number',
   'stage', 'stage_basis', 'horizon', 'plan_stub', 'module', 'priority', 'created_at', 'closed_at',
+  'issue_type',
 ];
 
 /** 1 for true, 0 for false: SQLite's boolean. */
@@ -328,7 +333,7 @@ export function issueRow(row: BoardRow, epics: ReadonlyMap<string, number>, gith
     stage, github === undefined
       ? LABELS_BASIS
       : PRS_BASIS, horizon, row.planStub, labelValue(labels, MODULE_PREFIX), labelValue(labels, PRIORITY_PREFIX),
-    dates?.createdAt ?? null, dates?.closedAt ?? null,
+    dates?.createdAt ?? null, dates?.closedAt ?? null, labelValue(labels, TYPE_PREFIX),
   ];
 }
 

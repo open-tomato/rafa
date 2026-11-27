@@ -14,6 +14,12 @@
  * the GitHub-only metrics answer no rows offline (trap 3), and rows once
  * the build read GitHub.
  *
+ * Then the fields the replica stage added to the sources, each read
+ * through its source: `local.changes` by level, area and day, the
+ * `module_facts` line kinds and layer (both builds take two layers, the
+ * second listing beta by its package, so alpha stays unassigned), and
+ * `issue_facts.issue_type` per board row.
+ *
  * The board rows past `FIXTURE_ROWS`:
  *
  * | # | State | Labels | Body |
@@ -35,7 +41,9 @@ import { applyFormula, MetricDefinitionSchema } from '@open-tomato/atlas-data/co
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { buildAtlas } from '../build/index.js';
-import { CUT_TABLE_FILE } from '../ingest/modules.js';
+import { ISSUES_SOURCE } from '../ingest/board.js';
+import { CHANGES_SOURCE } from '../ingest/facts.js';
+import { CUT_TABLE_FILE, MODULES_SOURCE } from '../ingest/modules.js';
 import { boardCacheText, FIXTURE_ROWS, FOLLOW_UPS_PLAN, fixtureRow, planBlockBody, writeBoardFixture } from '../ingest/testdata/board-cache.fixture.js';
 import { FIXTURE_PLAN, writeFactsFixture, writeFixtureStore } from '../ingest/testdata/effort-store.fixture.js';
 import { writeGitFixture } from '../ingest/testdata/git-repo.fixture.js';
@@ -88,11 +96,20 @@ const EXTRA_DATES = [
   { number: 56, createdAt: '2026-11-02T09:00:00Z', closedAt: '2026-11-04T09:00:00Z' },
 ];
 
-/** The module tree: alpha and beta importing each other, the cut table covering alpha with one upward edge. */
+/** The layers both builds take: beta listed by its package in the second, alpha in none. */
+const LAYERS = [{ name: 'config', modules: ['packages/config'] }, { name: 'core', modules: ['@open-tomato/beta'] }];
+
+/**
+ * The module tree: alpha and beta importing each other, the cut table
+ * covering alpha with one upward edge; alpha also holds two docs lines and
+ * a three-line snapshot, and each package.json is one config line.
+ */
 const TREE: Readonly<Record<string, string>> = {
   'packages/alpha/package.json': JSON.stringify({ name: '@open-tomato/alpha' }),
   'packages/alpha/src/index.ts': 'import { shape } from \'@open-tomato/beta\';\nexport const draw = (): string => shape;\n',
   'packages/alpha/src/index.test.ts': 'import { draw } from \'@open-tomato/alpha\';\nit(\'draws\', () => draw());\n',
+  'packages/alpha/README.md': '# alpha\n\nDraws the shape beta names.\n',
+  'packages/alpha/src/__snapshots__/index.test.ts.snap': 'exports[`draws 1`] = `\n"round"\n`;\n',
   'packages/beta/package.json': JSON.stringify({ name: '@open-tomato/beta' }),
   'packages/beta/src/index.ts': 'export { draw } from \'@open-tomato/alpha\';\nexport const shape = \'round\';\nexport const size = 2;\n',
   [CUT_TABLE_FILE]: JSON.stringify({
@@ -121,12 +138,13 @@ function writeRoot(name: string): string {
 beforeAll(async () => {
   const offline = writeRoot('offline');
   const github = writeRoot('github');
-  await buildAtlas({ projectRoot: offline, env: {}, now: () => BUILT_AT, projectLabel: 'fixture' });
+  await buildAtlas({ projectRoot: offline, env: {}, now: () => BUILT_AT, projectLabel: 'fixture', layers: LAYERS });
   await buildAtlas({
     projectRoot: github,
     env: {},
     now: () => BUILT_AT,
     projectLabel: 'fixture',
+    layers: LAYERS,
     github: true,
     gh: fixtureGh(FIXTURE_PRS, [...FIXTURE_ISSUE_DATES, ...EXTRA_DATES]).runner,
   });
@@ -146,13 +164,18 @@ function metricOf(id: string): MetricDefinition {
   return metric;
 }
 
-/** `params` asked of `metric`'s source in the replica `which` names, with no window. */
-async function queryOf(which: keyof typeof registries, metric: MetricDefinition, params: QueryParams): Promise<QueryResult> {
+/** `params` asked of the source `sourceId` in the replica `which` names. */
+async function sourceQuery(which: keyof typeof registries, sourceId: string, params: QueryParams): Promise<QueryResult> {
   const registry = registries[which];
   if (registry === null) throw new Error(`no ${which} registry`);
-  const source = registry.sources.get(metric.sourceId);
-  if (source === undefined) throw new Error(`no source ${metric.sourceId}`);
+  const source = registry.sources.get(sourceId);
+  if (source === undefined) throw new Error(`no source ${sourceId}`);
   return source.query(params);
+}
+
+/** `params` asked of `metric`'s source in the replica `which` names, with no window. */
+async function queryOf(which: keyof typeof registries, metric: MetricDefinition, params: QueryParams): Promise<QueryResult> {
+  return sourceQuery(which, metric.sourceId, params);
 }
 
 /** The metric `id` asked of the replica `which` names, its formula applied. */
@@ -316,5 +339,82 @@ describe('the git, board and module readings', () => {
 
   it('answers each merged pull request for the cycle histogram, oldest merge first', async () => {
     expect(numbersOf(await answerOf('github', 'dev.pr-cycle-time'))).toEqual([7, 45, 61]);
+  });
+});
+
+describe('the fields the replica stage added, each read through its source', () => {
+  it('counts the change entries of local.changes by level and area, one per entry, the minor one with no area', async () => {
+    const rows = recordsOf(await sourceQuery('offline', CHANGES_SOURCE, {
+      groupBy: ['level', 'area'],
+      measures: [{ field: 'id', agg: 'count', as: 'changes' }],
+      orderBy: [{ key: 'level', dir: 'asc' }],
+    }));
+
+    expect(rows).toEqual([{ level: 'minor', area: null, changes: 1 }, { level: 'patch', area: 'board', changes: 1 }]);
+  });
+
+  it('buckets local.changes by its day, the time field, a window bounding it', async () => {
+    const all = recordsOf(await sourceQuery('offline', CHANGES_SOURCE, {
+      grain: 'day',
+      measures: [{ field: 'id', agg: 'count', as: 'changes' }],
+      orderBy: [{ key: 'day', dir: 'asc' }],
+    }));
+    const windowed = recordsOf(await sourceQuery('offline', CHANGES_SOURCE, {
+      window: { from: '2026-11-03', to: '2026-11-04' },
+      measures: [{ field: 'id', agg: 'count', as: 'changes' }],
+    }));
+
+    expect(all.map((row) => row['changes'])).toEqual([1, 1]);
+    expect(windowed).toEqual([{ changes: 1 }]);
+  });
+
+  it('reads the docs, config and fixture lines per module, the snapshot counted as a fixture and not a test', async () => {
+    const rows = recordsOf(await sourceQuery('offline', MODULES_SOURCE, {
+      fields: ['path', 'loc', 'test_loc', 'docs_loc', 'config_loc', 'fixtures_loc'],
+      orderBy: [{ key: 'path', dir: 'asc' }],
+    }));
+
+    expect(rows).toEqual([
+      { path: 'packages/alpha', loc: 2, test_loc: 2, docs_loc: 2, config_loc: 1, fixtures_loc: 3 },
+      { path: 'packages/beta', loc: 3, test_loc: 0, docs_loc: 0, config_loc: 1, fixtures_loc: 0 },
+    ]);
+  });
+
+  it('reads each module\'s layer and rank, beta in the second layer by its package and alpha NULL in both', async () => {
+    const rows = recordsOf(await sourceQuery('offline', MODULES_SOURCE, {
+      fields: ['path', 'layer', 'layer_rank'],
+      orderBy: [{ key: 'path', dir: 'asc' }],
+    }));
+    const grouped = recordsOf(await sourceQuery('offline', MODULES_SOURCE, {
+      groupBy: ['layer'],
+      measures: [{ field: 'layer_rank', agg: 'max', as: 'rank' }],
+      filters: [{ field: 'layer', op: 'eq', value: 'core' }],
+    }));
+
+    expect(rows).toEqual([
+      { path: 'packages/alpha', layer: null, layer_rank: null },
+      { path: 'packages/beta', layer: 'core', layer_rank: 1 },
+    ]);
+    expect(grouped).toEqual([{ layer: 'core', rank: 1 }]);
+  });
+
+  it('groups the issues by issue_type, the first type: label, an issue with none NULL', async () => {
+    const rows = recordsOf(await sourceQuery('offline', ISSUES_SOURCE, {
+      groupBy: ['issue_type'],
+      measures: [{ field: 'number', agg: 'count', as: 'issues' }],
+    }));
+    const untyped = numbersOf(await sourceQuery('offline', ISSUES_SOURCE, {
+      fields: ['number'],
+      filters: [{ field: 'issue_type', op: 'is_null' }],
+      orderBy: [{ key: 'number', dir: 'asc' }],
+    }));
+
+    expect([...rows].sort((a, b) => String(a['issue_type']).localeCompare(String(b['issue_type'])))).toEqual([
+      { issue_type: 'bug', issues: 4 },
+      { issue_type: 'epic', issues: 3 },
+      { issue_type: null, issues: 3 },
+      { issue_type: 'spec', issues: 2 },
+    ]);
+    expect(untyped).toEqual([51, 53, 56]);
   });
 });

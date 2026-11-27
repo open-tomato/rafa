@@ -34,7 +34,8 @@
     "manifestVersion": 1,
     "types": ["commands"],
     "provides": {
-      "commands": { "entry": "./src/commands/index.ts" }
+      "commands": { "entry": "./src/commands/index.ts" },
+      "config": { "key": "atlas" }
     },
     "requires": { "rafa": ">=0.53 <1" }
   }

@@ -43,6 +43,33 @@
  * setting's key as a leaf, so a key added to a section without its leaf
  * here, or the other way round, fails there.
  *
+ * ## A module's own key
+ *
+ * {@link ModuleSections} is the one interface here meant to be merged
+ * into. It is empty, and {@link ConfigShape} extends it, so a module
+ * that reads a top-level key of its own (the key its manifest names
+ * under `provides.config`) declares that key's file shape by declaration
+ * merging on the `./config` subpath, and a `rafa.config.ts` setting the
+ * key type-checks wherever the module's declaration is loaded:
+ *
+ * ```ts
+ * declare module '@open-tomato/rafa/config' {
+ *   interface ModuleSections {
+ *     readonly atlas: { readonly layers: readonly string[] };
+ *   }
+ * }
+ * ```
+ *
+ * The example is what a published consumer writes. Inside this repository
+ * the `./config` subpath lands on no file, so a module there merges into
+ * the file that declares `ModuleSections` by its path, as
+ * `addons/atlas/rafa-atlas/src/config-section.d.ts` does.
+ *
+ * Core never names a module's key: a top-level key no section and no
+ * merged {@link ModuleSections} declares is still refused.
+ * `shape.test.ts` checks both, in a program holding such a merge and in
+ * one without it.
+ *
  * Every type is `import type`, so this module loads nothing.
  */
 import type { BoardProjectLimitsShape } from '@open-tomato/rafa/config-schema-board-project';
@@ -155,8 +182,16 @@ export interface DangerousShape extends ReleaseDangerousShape {
   readonly selfUpdateDuringLoop: boolean;
 }
 
-/** The nested file shape: core's keys, and each section's; see the module note. */
+/**
+ * The top-level keys mounted modules read, each its file shape: empty
+ * here, widened by a module's declaration merging; see the module note.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- empty until a module merges its key in
+export interface ModuleSections {}
+
+/** The nested file shape: core's keys, each section's, and each module's; see the module note. */
 export interface ConfigShape extends
+  ModuleSections,
   BugsShape,
   ChecksShape,
   CollaborateShape,

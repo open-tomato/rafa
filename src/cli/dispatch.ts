@@ -38,7 +38,9 @@
  *      request, a version request, a refusal and `no_project` run no
  *      command and record none. Its context's `registry` is the one the
  *      line was routed through, with every module that loaded mounted on
- *      it, and its `project` the project resolved for it.
+ *      it, its `project` the project resolved for it, and its
+ *      `moduleConfig` the value of its module's config key (see "A
+ *      module's config key").
  *   6. The terminal result event is written, and the exit code answered
  *      (`ending.ts`).
  *
@@ -204,6 +206,30 @@
  * directory nor the home, so each answers outside a project as it does inside one, and
  * such a command runs with `project` null.
  *
+ * ## A module's config key
+ *
+ * A module's manifest may declare one top-level config key it reads,
+ * under `provides.config`, which its command entry carries as
+ * `configKey` (`packages/rafa/src/modules/load.ts`). A command routed
+ * from such a module's mount, once it is placed in a project, has the
+ * project's config loaded by `loadConfig`
+ * (`packages/rafa/src/core/config/config-load.ts`) inside the command's
+ * own logger scope, its warnings and pass lines written nowhere, since
+ * a command reading the config writes them once itself. The value
+ * `moduleConfig` answers for the key is the context's `moduleConfig`,
+ * whole and unread. It is answered only for a key among the keys
+ * `setModuleConfigKeys` set, which `src/rafa.ts` sets from the entries
+ * it hands in. A config `loadConfig` refuses ends the command as the
+ * `command_error` failure before it runs.
+ *
+ * Nothing is loaded, and `moduleConfig` is `undefined`, for a core
+ * command, a module declaring no key, and a module's command declaring
+ * `needsProject: false`, which runs with no project to read a config
+ * of. A key no config layer sets is `undefined` too. So a module command
+ * that reads its key leaves `needsProject` unset or `true`, as
+ * `rafa-atlas`'s `build` and `serve` do, while its `describe`, which
+ * opens no replica, declares `false` and runs outside a project too.
+ *
  * ## The command hook
  *
  * {@link DispatchOptions.commandHook} is called around a command that
@@ -268,6 +294,7 @@ import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '@open-tomato/rafa/ad
 import { CORE_ADAPTER_REGISTRY } from '@open-tomato/rafa/core/adapters';
 import { CommandExit , versionLine , runAsRunningCommand } from '@open-tomato/rafa/core/command';
 import { runWithDangerousPhrases } from '@open-tomato/rafa/core/config';
+import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { runWithActiveOutput } from '@open-tomato/rafa/core/output';
 import { resolveScope, ScopeError } from '@open-tomato/rafa/project/scope';
 
@@ -385,6 +412,8 @@ interface Settings {
   readonly home: () => string;
   /** The command hook, or null when none was handed in. */
   readonly commandHook: CommandHook | null;
+  /** The config key each module command entry declares, by module name. */
+  readonly configKeys: ReadonlyMap<string, string>;
 }
 
 /** An output that holds a command's result, and the payload it holds. */
@@ -590,6 +619,19 @@ function refusedFlags(route: CommandRoute): Ending | null {
   return { ...failure('unknown_flag', unknownFlagMessage(route.command, undeclared, route.label), found), exitCode: UNKNOWN_FLAG_EXIT };
 }
 
+/**
+ * The value of the config key the routed command's module declares, or
+ * `undefined`; see "A module's config key" in the module note.
+ */
+async function moduleConfigOf(route: CommandRoute, project: ProjectFound | null, settings: Settings): Promise<unknown> {
+  const key = route.module === null
+    ? undefined
+    : settings.configKeys.get(route.module.name);
+  if (key === undefined || project === null) return undefined;
+  const loaded = await loadConfig({ root: project.root, home: project.home }, {}, () => {});
+  return loaded.moduleConfig.get(key);
+}
+
 /** Runs a routed command with its context; see the module note. */
 async function runCommand(
   route: CommandRoute,
@@ -603,23 +645,27 @@ async function runCommand(
   for (const flag of readDeprecatedFlags(route).typed) settings.stderr.write(`${deprecatedFlagLine(route, flag)}\n`);
 
   const guarded = guardOutput(base.output, base.outputMode);
-  const context: RafaContext = Object.freeze({
+  const contextWith = (moduleConfig: unknown): RafaContext => Object.freeze({
     ...base,
     output: guarded.output,
     argv: Object.freeze([...route.argv]),
     registry,
     project,
+    moduleConfig,
   });
   const logger = commandLogger(base, project, settings);
   try {
-    await runWithCommandLogger(logger, async () => runAsRunningCommand(
-      route.command,
-      base.flags,
-      async () => runWithDangerousPhrases(
-        route.command.dangerous,
-        async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
-      ),
-    ));
+    await runWithCommandLogger(logger, async () => {
+      const context = contextWith(await moduleConfigOf(route, project, settings));
+      return runAsRunningCommand(
+        route.command,
+        base.flags,
+        async () => runWithDangerousPhrases(
+          route.command.dangerous,
+          async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
+        ),
+      );
+    });
     return success(guarded.payload());
   } catch (error) {
     const found = failureOf(error, boundaryOf(route.command));
@@ -764,6 +810,9 @@ export async function dispatch(argv: readonly string[], options: DispatchOptions
     cwd: () => options.cwd ?? process.cwd(),
     home: () => options.home ?? homedir(),
     commandHook: options.commandHook ?? null,
+    configKeys: new Map((options.modules ?? []).flatMap(({ name, configKey }) => configKey === undefined
+      ? []
+      : [[name, configKey] as const])),
   };
   const loaded = await loadModuleCommands(options.registry, options.modules ?? [], options.importModule);
   const route = routeLine(loaded.registry, argv);

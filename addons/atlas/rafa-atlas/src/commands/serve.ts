@@ -169,7 +169,7 @@ export const serveCommand: RafaCommand = {
     { cmd: execLine('serve', '--port=4400 --rebuild-every=30'), note: 'serves on port 4400 and builds again every 30 minutes' },
   ],
   outputs: ['text'],
-  needsProject: false,
+  needsProject: true,
   run: (context) => refusing(context, async () => {
     const port = wholeFlag(context, 'port', DEFAULT_SERVE_PORT, 0);
     if (port > MAX_PORT) throw new Error(`--port is ${port}, expected a port from 0 to ${MAX_PORT}`);

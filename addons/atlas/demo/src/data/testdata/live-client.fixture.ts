@@ -4,8 +4,10 @@
  * results below, one per PoC metric and one per metric of
  * `live-sources.ts`, in the columns the engine answers it with, and
  * records every call; `query` answers the plans' first sessions
- * (`STUB_PLANS`) and records every query; `listMetrics` answers
- * `STUB_DEFINITIONS`, whose proxies carry a stub note, whose two GitHub
+ * (`STUB_PLANS`) and the balance metrics' day rows
+ * (`STUB_BALANCE_ANSWERS`, from the sources `describeMetric` names for
+ * them) and records every query; `listMetrics` answers
+ * `STUB_DEFINITIONS`, whose proxies carry a stub note, whose three GitHub
  * metrics are `gh` and whose WIP metric has the goal `STUB_WIP_LIMIT`;
  * each other route refuses. Asked with `{ github: false }`, the GitHub
  * metrics answer no row, as after a build run without `--github`. The
@@ -16,11 +18,16 @@
 import type { MetricDefinition, QueryParams, QueryResult, Scalar, Window } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 
+import { BALANCE_METRICS, type BalanceMetric } from '../live-balance.js';
+import { DAY_MS } from '../live-read.js';
 import { PLANS_SOURCE_ID, SOURCE_METRICS, type SourceMetric } from '../live-sources.js';
 import { LIVE_METRICS, type LiveMetric } from '../live.js';
 
 /** The window the stub says it ran: 28 days ending 2026-11-23. */
 export const STUB_WINDOW: { readonly from: string; readonly to: string } = { from: '2026-10-26T00:00:00.000Z', to: '2026-11-23T00:00:00.000Z' };
+
+/** The stub's build time, every answer's `meta.asOf`: Sunday 2026-11-22, 09:00 UTC. */
+export const STUB_BUILT_AT = '2026-11-22T09:00:00.000Z';
 
 /** A result of string columns, `rows` and the window it ran over. */
 export function resultOf(
@@ -31,7 +38,7 @@ export function resultOf(
   return {
     columns: columns.map((key) => ({ key, label: key, type: 'string' })),
     rows,
-    meta: { asOf: '2026-11-22T09:00:00.000Z', partial: false, partialReasons: [], rowCount: rows.length, truncated: false, window },
+    meta: { asOf: STUB_BUILT_AT, partial: false, partialReasons: [], rowCount: rows.length, truncated: false, window },
   };
 }
 
@@ -172,6 +179,60 @@ export const STUB_DEFECT_DENSITY: QueryResult = resultOf(['path', 'bugs', 'loc',
   ['packages/stub-b', 1, 2_000, 0.0005],
 ], { from: null, to: null });
 
+/** Out-of-scope entries in the window's second and fourth weeks. */
+export const STUB_SCOPE_CREEP: QueryResult = resultOf(['week', 'entries'], [['2026-11-02', 6], ['2026-11-16', 4]]);
+
+/** Open typed issues, by type and open time, aged to the stub's build time (`meta.asOf`, 2026-11-22 09:00): 2, 53, 14 and 1 days. */
+export const STUB_TASK_PILE: QueryResult = resultOf(['issue_type', 'created_at', 'issues'], [
+  ['bug', '2026-11-20T09:00:00.000Z', 1],
+  ['bug', '2026-09-30T09:00:00.000Z', 2],
+  ['spec', '2026-11-08T09:00:00.000Z', 1],
+  ['chore', '2026-11-21T09:00:00.000Z', 1],
+], { from: null, to: null });
+
+/** Changelog entries by level and raw area: two spellings of docs, a spaced area, and a fix with no area. */
+export const STUB_WORK_DONE: QueryResult = resultOf(['level', 'area', 'entries'], [
+  ['major', 'Documentation', 1],
+  ['minor', 'docs', 2],
+  ['minor', 'tests', 4],
+  ['patch', ' Loop ', 3],
+  ['patch', null, 2],
+  ['none', 'board', 1],
+]);
+
+/**
+ * The five kinds of lines per module folder, in the layers config (rank 0),
+ * core (1) and addon (2): the core folder over 1,000 lines with no fixture
+ * line, the addon one under 1,000, a folder no layer lists, and one with
+ * no line at all.
+ */
+export const STUB_COMPOSITION: QueryResult = resultOf(
+  ['path', 'package', 'layer', 'layer_rank', 'loc', 'test_loc', 'docs_loc', 'config_loc', 'fixtures_loc'],
+  [
+    ['addons/stub-addon', '@open-tomato/stub-addon', 'addon', 2, 300, 200, 0, 40, 10],
+    ['packages/stub-core', '@open-tomato/stub-core', 'core', 1, 1_200, 600, 50, 100, 0],
+    ['packages/stub-empty', null, 'core', 1, 0, 0, 0, 0, 0],
+    ['packages/stub-loose', null, null, null, 900, 300, 0, 0, 0],
+    ['packages/stub-lint', '@open-tomato/eslint-config', 'config', 0, 0, 20, 0, 400, 0],
+  ],
+  { from: null, to: null },
+);
+
+/**
+ * Each module folder's layer and imports, in the layers of
+ * `STUB_COMPOSITION`: the addon imports the core one, a core folder
+ * imports the addon (an upward import), the folder no layer lists imports
+ * the core one, and the lint config package, which every folder imports,
+ * draws nothing.
+ */
+export const STUB_IMPORT_FLOW: QueryResult = resultOf(['path', 'package', 'layer', 'layer_rank', 'imports_json'], [
+  ['addons/stub-addon', '@open-tomato/stub-addon', 'addon', 2, '["@open-tomato/stub-core","@open-tomato/eslint-config"]'],
+  ['packages/stub-core', '@open-tomato/stub-core', 'core', 1, '["@open-tomato/eslint-config"]'],
+  ['packages/stub-low', '@open-tomato/stub-low', 'core', 1, '["@open-tomato/stub-addon"]'],
+  ['packages/stub-loose', null, null, null, '["@open-tomato/stub-core","@open-tomato/stub-outside"]'],
+  ['packages/stub-lint', '@open-tomato/eslint-config', 'config', 0, '[]'],
+], { from: null, to: null });
+
 /** The answer of each metric of `live-sources.ts`. */
 export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = {
   deploysPerWeek: STUB_DEPLOYS,
@@ -183,10 +244,70 @@ export const STUB_SOURCE_ANSWERS: Readonly<Record<SourceMetric, QueryResult>> = 
   openBugsPerDay: STUB_OPEN_BUGS,
   minutesPerAgent: STUB_MINUTES_PER_AGENT,
   defectDensity: STUB_DEFECT_DENSITY,
+  scopeCreep: STUB_SCOPE_CREEP,
+  taskPile: STUB_TASK_PILE,
+  workDone: STUB_WORK_DONE,
+  composition: STUB_COMPOSITION,
+  importFlow: STUB_IMPORT_FLOW,
 };
 
+/** The `YYYY-MM-DD` `back` days before the stub's build day. */
+function stubDayBack(back: number): string {
+  return new Date(Date.parse(STUB_BUILT_AT.slice(0, 10)) - back * DAY_MS).toISOString()
+    .slice(0, 10);
+}
+
+/** The weeks behind a balance index's baseline. */
+const BALANCE_BASELINE_WEEKS = 12;
+
+/**
+ * The day-grain answer of each metric the balance indices read: one
+ * release tag in each of the 12 baseline weeks and two in the 7 days to
+ * the build, so releases read 2.00×, and no row for every other metric,
+ * so each other index reads "none in 12 weeks".
+ */
+export const STUB_BALANCE_ANSWERS: Readonly<Record<BalanceMetric, QueryResult>> = {
+  changes: resultOf(['day', 'level', 'area', 'entries'], []),
+  planCompletion: resultOf(['day', 'started', 'completed'], []),
+  deploys: resultOf(['day', 'deploys'], [
+    ...Array.from({ length: BALANCE_BASELINE_WEEKS }, (_, week) => [stubDayBack((week + 1) * 7), 1]),
+    [stubDayBack(3), 1],
+    [stubDayBack(0), 1],
+  ]),
+  outOfScope: resultOf(['day', 'entries'], []),
+  sessions: resultOf(['day', 'work_type', 'status', 'sessions', 'minutes'], []),
+  repeats: resultOf(['day', 'sessions'], []),
+  regressions: resultOf(['day', 'bugs'], []),
+  bugsByKind: resultOf(['day', 'kind', 'bugs'], []),
+  ciVerdicts: resultOf(['day', 'verdict', 'readings'], []),
+};
+
+/** The source id the stub's definition of a balance metric names, its answer's key in `query`. */
+function balanceSourceOf(metricId: string): string {
+  return `stub.balance.${metricId}`;
+}
+
+/** The balance answer of each stub source id. */
+const BALANCE_ANSWER_OF: ReadonlyMap<string, QueryResult> = new Map((Object.keys(BALANCE_METRICS) as BalanceMetric[]).map((key) => [balanceSourceOf(BALANCE_METRICS[key]), STUB_BALANCE_ANSWERS[key]]));
+
+/** The stub's definition of a balance metric, as `describeMetric` answers it; refused for another id. */
+function balanceDefinitionOf(id: string): Promise<MetricDefinition> {
+  if (!Object.values(BALANCE_METRICS).includes(id)) return Promise.reject(new Error(`no stub definition for ${id}`));
+  return Promise.resolve({
+    id,
+    title: id,
+    lenses: ['developer'],
+    description: `stub definition of ${id}`,
+    sourceId: balanceSourceOf(id),
+    params: {},
+    formula: { kind: 'none' },
+    chart: 'line',
+    feasibility: 'direct',
+  });
+}
+
 /** The metrics the stub lists as GitHub-only, as the catalogue does. */
-export const STUB_GITHUB: readonly string[] = [SOURCE_METRICS.resolutionTime, SOURCE_METRICS.openBugsPerDay];
+export const STUB_GITHUB: readonly string[] = [SOURCE_METRICS.resolutionTime, SOURCE_METRICS.openBugsPerDay, SOURCE_METRICS.taskPile];
 
 /** The answer of each metric run over the window before the range's. */
 const STUB_PREVIOUS: Readonly<Partial<Record<LiveMetric, QueryResult>>> = { tokensPerDay: STUB_PREVIOUS_TOKENS, debtRatio: STUB_PREVIOUS_DEBT };
@@ -267,8 +388,10 @@ export interface StubOptions {
 
 /**
  * A client whose `runMetric` answers the results above and records each
- * call, and whose `query` answers `STUB_PLANS` for `local.plans` and
- * records each query; every other route refuses.
+ * call, whose `query` answers `STUB_PLANS` for `local.plans` and
+ * `STUB_BALANCE_ANSWERS` for the balance metrics' stub sources and
+ * records each query, and whose `describeMetric` answers the balance
+ * metrics; every other route refuses.
  */
 export function stubLiveClient({ github = true }: StubOptions = {}): StubLiveClient {
   const calls: StubCall[] = [];
@@ -281,12 +404,14 @@ export function stubLiveClient({ github = true }: StubOptions = {}): StubLiveCli
     describeSource: unused,
     query: (id, params) => {
       queries.push({ id, params });
-      return id === PLANS_SOURCE_ID
-        ? Promise.resolve(STUB_PLANS)
-        : Promise.reject(new Error(`no stub answer for a query of ${id}`));
+      if (id === PLANS_SOURCE_ID) return Promise.resolve(STUB_PLANS);
+      const balance = BALANCE_ANSWER_OF.get(id);
+      return balance === undefined
+        ? Promise.reject(new Error(`no stub answer for a query of ${id}`))
+        : Promise.resolve(balance);
     },
     listMetrics: () => Promise.resolve(STUB_DEFINITIONS),
-    describeMetric: unused,
+    describeMetric: balanceDefinitionOf,
     runMetric: (id, window) => {
       calls.push({ id, window });
       const source = SOURCE_ANSWER_OF.get(id);

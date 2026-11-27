@@ -1,6 +1,7 @@
 /**
  * The live source's metrics past the PoC cut: the git, board, module and
- * GitHub metrics of phase 4 and the minutes per agent, asked of the
+ * GitHub metrics of phase 4, the minutes per agent and the metrics of
+ * the out-of-scope tile, the task pile and work done, asked of the
  * Atlas API and mapped into the fields `SOURCE_METRIC_FIELDS` names. `live.ts` imports this module and
  * lays its fields over the PoC ones; the measured workspace of
  * `composition.ts` and `graph.ts` stays the mock page's.
@@ -11,9 +12,14 @@
  *   folder, grouped by the folder it sits in; `arch.coupling` fills the
  *   members and edges of `workspace`, one node per module and one edge per
  *   `@open-tomato` import of another module's package, dependency to
- *   dependent as `graph.ts` draws them. The rest of `workspace` (the
- *   package composition, the rose, the Sankey) holds nothing: no live
- *   metric measures it, and its cards read no field.
+ *   dependent as `graph.ts` draws them. `arch.composition` fills the
+ *   package composition, the rose and the sunburst of `workspace`, and
+ *   `arch.import-flow` its Sankey, its layer columns and their tones;
+ *   their mappers live in `live-architecture.ts`. All three fill the one
+ *   `workspace` field, listed once in `SOURCE_WIRED_FIELDS`, and its meta
+ *   is `arch.coupling`'s, the first of them; the rose, the sunburst and
+ *   the Sankey each keep their own metric's meta in `workspaceMeta`
+ *   (`WORKSPACE_CARD_METRICS`), which their live notes read.
  * - `dev.wip` fills `wip`, its count against the metric's `goal`, which
  *   `withAtlasTargets` lays over it from `wipLimit` (null with none).
  * - `qa.bug-outcome-by-loop-start` fills `bugOutcomeByLoopStart`: each
@@ -34,19 +40,26 @@
  *   over the module folders that hold code: a folder with no line left
  *   (one a bug's path names but the tree no longer holds) adds neither
  *   its bugs nor its lines.
+ * - `pm.out-of-scope-per-week` fills `scopeCreepPerWeek` and
+ *   `scopeCreepAverage`, `pm.task-pile` fills `taskPileTree` (GitHub-only,
+ *   so a replica built without `--github` draws `GITHUB_NOT_READ`) and
+ *   `dev.work-done` fills `workDoneTree`; their mappers live in
+ *   `live-cards.ts`.
  *
- * Every metric but deploys, resolution and the minutes per agent is
- * asked with no window: `local.modules` has no time axis, WIP and the
- * outcome read the board as of its cache (`local.issues` bounds a
- * window by `created_at`, NULL offline), and the bugs open on a day
- * include those opened before it.
+ * Every metric but deploys, resolution, the minutes per agent, the
+ * out-of-scope entries and work done is asked with no window:
+ * `local.modules` (coupling, composition, the import flow) has no time axis, WIP, the outcome and the task pile
+ * read the board as of its cache (`local.issues` bounds a window by
+ * `created_at`, NULL offline), and the bugs open on a day include those
+ * opened before it.
  */
 import type { BugOutcomeDay, MockData, OpenBugsDay, Wip } from './mock.js';
-import type { LensField } from './source.js';
+import type { FieldMeta, LensField, WorkspaceCard } from './source.js';
 import type { MetricDefinition, QueryResult, Scalar, Window } from '@open-tomato/atlas-data/contract';
 import type { AtlasClient } from '@open-tomato/atlas-transport/client';
 import type { BoxGroup, GraphLink, GraphNode, TreemapNode } from '@open-tomato/charts';
 
+import { scopeCreepOf, taskPileOf, workDoneOf } from './live-cards.js';
 import {
   boundsOf,
   columnOf,
@@ -73,7 +86,12 @@ export type SourceMetric =
   | 'bugOutcome'
   | 'openBugsPerDay'
   | 'minutesPerAgent'
-  | 'defectDensity';
+  | 'defectDensity'
+  | 'scopeCreep'
+  | 'taskPile'
+  | 'workDone'
+  | 'composition'
+  | 'importFlow';
 
 /** The catalogue id of each metric this module runs. */
 export const SOURCE_METRICS: Readonly<Record<SourceMetric, string>> = {
@@ -86,6 +104,11 @@ export const SOURCE_METRICS: Readonly<Record<SourceMetric, string>> = {
   openBugsPerDay: 'qa.open-bugs-per-day',
   minutesPerAgent: 'pm.minutes-per-agent',
   defectDensity: 'qa.defect-density',
+  scopeCreep: 'pm.out-of-scope-per-week',
+  taskPile: 'pm.task-pile',
+  workDone: 'dev.work-done',
+  composition: 'arch.composition',
+  importFlow: 'arch.import-flow',
 };
 
 /** The field each metric fills. */
@@ -99,16 +122,51 @@ export const SOURCE_METRIC_FIELDS: Readonly<Record<SourceMetric, readonly LensFi
   openBugsPerDay: ['openBugsPerDay'],
   minutesPerAgent: ['minutesPerAgent'],
   defectDensity: ['defectDensity'],
+  scopeCreep: ['scopeCreepPerWeek', 'scopeCreepAverage'],
+  taskPile: ['taskPileTree'],
+  workDone: ['workDoneTree'],
+  composition: ['workspace'],
+  importFlow: ['workspace'],
 };
 
 /** The metrics run in `SOURCE_METRICS` order. */
 export const SOURCE_METRIC_KEYS: readonly SourceMetric[] = Object.keys(SOURCE_METRICS) as SourceMetric[];
 
-/** The fields a metric of this module fills. */
-export const SOURCE_WIRED_FIELDS: readonly LensField[] = SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key]);
+/** The fields a metric of this module fills, each once: three metrics fill `workspace`. */
+export const SOURCE_WIRED_FIELDS: readonly LensField[] = [...new Set(SOURCE_METRIC_KEYS.flatMap((key) => SOURCE_METRIC_FIELDS[key]))];
+
+/** The metric each workspace card with one of its own reads: the rose and the sunburst `arch.composition`, the Sankey `arch.import-flow`. */
+export const WORKSPACE_CARD_METRICS: Readonly<Record<WorkspaceCard, SourceMetric>> = {
+  sizeRose: 'composition',
+  composition: 'composition',
+  importFlow: 'importFlow',
+};
+
+/** A field's or a card's meta: its metric, the row count of the answer that filled it and, for a proxy, the metric's note. */
+export function metaOf(metricId: string, answer: QueryResult | undefined, notes: ReadonlyMap<string, string>): FieldMeta {
+  const rowCount = answer?.meta.rowCount ?? 0;
+  const proxyNote = notes.get(metricId);
+  return proxyNote === undefined
+    ? { metricId, rowCount }
+    : { metricId, rowCount, proxyNote };
+}
+
+/** The meta of each workspace card with a metric of its own, from that metric's answer. */
+export function workspaceMetaOf(sources: SourceAnswers, notes: ReadonlyMap<string, string>): ReadonlyMap<WorkspaceCard, FieldMeta> {
+  return new Map((Object.keys(WORKSPACE_CARD_METRICS) as WorkspaceCard[]).map((card) => {
+    const key = WORKSPACE_CARD_METRICS[card];
+    return [card, metaOf(SOURCE_METRICS[key], sources.metrics[key], notes)] as const;
+  }));
+}
 
 /** The metrics asked over the range's series window; every other one is asked with none (see the module note). */
-export const WINDOWED_SOURCE_METRICS: ReadonlySet<SourceMetric> = new Set<SourceMetric>(['deploysPerWeek', 'resolutionTime', 'minutesPerAgent']);
+export const WINDOWED_SOURCE_METRICS: ReadonlySet<SourceMetric> = new Set<SourceMetric>([
+  'deploysPerWeek',
+  'resolutionTime',
+  'minutesPerAgent',
+  'scopeCreep',
+  'workDone',
+]);
 
 /** The source whose `first_at` dates a plan's bugs on the outcome card. */
 export const PLANS_SOURCE_ID = 'local.plans';
@@ -132,7 +190,18 @@ export interface SourceAnswers {
 /** The fields of the mock shape this module fills. */
 export type SourceFields = Pick<
   MockData,
-  'deploysPerWeek' | 'modules' | 'wip' | 'resolutionByPriority' | 'bugOutcomeByLoopStart' | 'openBugsPerDay' | 'minutesPerAgent' | 'defectDensity'
+  | 'deploysPerWeek'
+  | 'modules'
+  | 'wip'
+  | 'resolutionByPriority'
+  | 'bugOutcomeByLoopStart'
+  | 'openBugsPerDay'
+  | 'minutesPerAgent'
+  | 'defectDensity'
+  | 'scopeCreepPerWeek'
+  | 'scopeCreepAverage'
+  | 'taskPileTree'
+  | 'workDoneTree'
 >;
 
 /** The module graph `arch.coupling` gives: the members and edges of the live `workspace`. */
@@ -369,6 +438,7 @@ export function defectDensityOf(result: QueryResult): number {
 /** The fields this module fills, each from its answer; the WIP ceiling from the metric's listed goal. */
 export function sourceFieldsOf(answers: SourceAnswers, definitions: readonly MetricDefinition[]): SourceFields {
   const { metrics } = answers;
+  const scopeCreep = scopeCreepOf(metrics.scopeCreep);
   return {
     deploysPerWeek: deploysOf(metrics.deploysPerWeek),
     modules: moduleNodesOf(metrics.locPerModule),
@@ -378,6 +448,10 @@ export function sourceFieldsOf(answers: SourceAnswers, definitions: readonly Met
     openBugsPerDay: openBugsPerDayOf(metrics.openBugsPerDay, metrics.deploysPerWeek),
     minutesPerAgent: minutesPerAgentOf(metrics.minutesPerAgent),
     defectDensity: defectDensityOf(metrics.defectDensity),
+    scopeCreepPerWeek: scopeCreep.perWeek,
+    scopeCreepAverage: scopeCreep.average,
+    taskPileTree: taskPileOf(metrics.taskPile),
+    workDoneTree: workDoneOf(metrics.workDone),
   };
 }
 

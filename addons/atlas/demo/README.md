@@ -45,7 +45,7 @@ animation, for captures). No capture sets `source=live`.
 | Folder | Holds |
 |---|---|
 | `src/App.tsx` | the shell: lens tabs, the `RangeSelector`, the theme button, over one `DashboardData` |
-| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one, with the phase-4 metrics' mappers in `live-sources.ts` and the cell readers both share in `live-read.ts` |
+| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one, with the phase-4 metrics' mappers in `live-sources.ts`, the out-of-scope, task pile and work done mappers in `live-cards.ts`, the architect cards' in `live-architecture.ts`, the balance radar's in `live-balance.ts`, and the cell readers all of them share in `live-read.ts` |
 | `src/lenses/` | one file per lens and the `balance/` card; every card is a `LensCard` (a `DashboardCard` with the fields it `reads`) with a `CardSpec` and a `select` |
 | `src/templates/` | `LensGrid`: the tile row and the card grid |
 
@@ -77,18 +77,65 @@ edges of `workspace`, the network graph), WIP against the project's
 `wipLimit` (`wip`), and the bug backlog pair: outcome by loop start
 (`bugOutcomeByLoopStart`, each bug a loop filed counted on the day its
 plan's first session started) and open bugs per day (`openBugsPerDay`),
-with the resolution time by priority (`resolutionByPriority`). The
-package composition, the rose and the import flow stay the mock page's
-(`composition.ts`, `graph.ts`). The open bugs and the resolution time
-are GitHub-only: when their metric answers no row, the replica was built
+with the resolution time by priority (`resolutionByPriority`), the minutes per
+agent (`minutesPerAgent`, `pm.minutes-per-agent`) and the defect density
+(`defectDensity`, `qa.defect-density`). The out-of-scope tile, the task pile
+and work done have their mappers in `live-cards.ts`, which this module
+registers: `scopeCreepPerWeek` and `scopeCreepAverage`, `taskPileTree` and
+`workDoneTree`. The rest of `workspace` comes from `arch.composition` and
+`arch.import-flow` (`live-architecture.ts`): the package composition, the rose
+(folders of
+1,000 lines or more), the sunburst, and the import flow with its layer
+columns (`layerOrder`, `unassigned` last) and their tones (`layerTones`),
+each upward import marked `upward`. The open bugs, the resolution time
+and the task pile are GitHub-only: when their metric answers no row, the replica was built
 without `--github`, and the card shows "Not wired yet" with the build
 line `rafa module exec @open-tomato/rafa-atlas build --github` (the
 result's `notWiredDetail`).
 
+On the Project Management lens, the out-of-scope tile reads
+`scopeCreepPerWeek` and compares the last week against the window's
+weekly average (`scopeCreepAverage`); the task pile reads `taskPileTree`,
+the open issues by type label and age, its legend and tones taken from
+the branches the answer names. The on-time tile stands in for a
+catalogue entry marked `collect`: on the live page it draws the `collect`
+empty state, a dash and "needs a collector: needs a due date on plans"
+(`LensStat`'s `collect`), distinct from "not wired yet"; the mock page
+keeps its sample.
+
+On the Development lens, work done reads `workDoneTree`, the change
+entries by work type and tidied area, and its live subtitle says it reads
+the range in place of the mock's 12 weeks. The balance radar reads the
+result's `balance`, the nine indices of `live-balance.ts`, asked over the
+fixed 91 days ending with the replica's build time whatever the range.
+This week is the 7 days ending at that time, and each index's baseline is
+the 12 weeks before them: the median of their values, the mean when the
+median is 0, and none when the mean is 0 too. An index is this week over
+its baseline, to two decimals. An index with no baseline reads "none in 12
+weeks" after its axis label and in the source table, and draws at 0. An answer
+naming no build time leaves `balance` marked not wired. The mock page
+keeps the catalogue's values and subtitles.
+
+On the Architecture lens, the package size rose reads `workspace.sizeRose`,
+the composition sunburst `workspace.composition` and
+`compositionSunburst`, and the import flow `workspace.sankeyNodes` and
+`sankeyLinks` in the columns of `layerOrder`. All three take their tones
+and their legend from `layerTones`, so a layer of `atlas.layers` the mock
+does not name shows with its own tone. The charts package's Sankey tones
+a ribbon by its source node and takes no tone per link, so an upward
+import is told apart in words: the live subtitle counts them, and the
+source table lists them first with `upward` in its Direction column.
+The mock page keeps its subtitles, legends and two-column flow table.
+With every card wired, a live page over a replica built with `--github`
+draws no "Not wired yet".
+
 Every card and tile a live metric feeds names its `reads`. On the live
 page a wired card's note is `liveNoteOf`'s (`src/lenses/spec.ts`): the
 proxy note, when the metric is a proxy, and the row count behind it, so
-a thin reading says how little stands behind it. The weekly cards whose
+a thin reading says how little stands behind it. The rose and the
+sunburst name `arch.composition` and the import flow `arch.import-flow`
+(`metaCard`, read from the result's `workspaceMeta`), while `workspace`
+itself keeps `arch.coupling`'s. The weekly cards whose
 field holds no dates (bugs by kind, routes, preflight halts) label their
 weeks from the result's `weeks`, the series window's Mondays, and the
 stacked ones draw the kinds the answer names (`src/lenses/kinds.ts`).

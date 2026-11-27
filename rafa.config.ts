@@ -32,8 +32,22 @@
  * `.claude/skills/rafa-release/` with a `skill: rafa-release › <case>`
  * line (#1565): this repository ships those skills, so the pointer
  * always lands on a file a session can read.
+ *
+ * `atlas.layers` is the ordered list of columns Atlas's import flow card
+ * draws (spec C8): the spec's six layers, config, core, platform,
+ * feature, addon and app, holding every module the module scan finds.
+ * It sits here, not in `.rafa/atlas/config.json`, because that file is
+ * gitignored: the layers would live in one checkout and every other
+ * machine, the hub included, would draw each module `unassigned`. No
+ * layer goes into a `package.json` (the spec's rule). The empty type
+ * import of `config-section.js` loads the declaration that merges the
+ * `atlas` key into `ModuleSections`; without it `tsc` refuses the key as
+ * unknown (measured: TS2353 on `atlas`). The
+ * workspace holds no lint or TypeScript config package, so the config
+ * layer holds the root's config folders.
  */
 
+import type {} from './addons/atlas/rafa-atlas/src/config-section.js';
 import type { Config } from './src/config/index.js';
 
 export default [
@@ -54,5 +68,58 @@ export default [
     board: { project: { number: 7 } },
     roadmap: { issue: 31 },
     hints: { skills: true },
+    atlas: {
+      layers: [
+        { name: 'config', modules: ['src/config', 'src/schema'] },
+        {
+          name: 'core',
+          modules: ['@open-tomato/rafa-core', 'src/ports', 'src/errors', 'src/utils', 'src/adapters', 'src/project'],
+        },
+        {
+          name: 'platform',
+          modules: [
+            '@open-tomato/rafa-inventory',
+            '@open-tomato/rafa-index',
+            '@open-tomato/rafa-sync-service',
+            '@open-tomato/rafa-effort',
+            'src/modules',
+            'src/tiers',
+            'src/notices',
+            'src/fixtures',
+          ],
+        },
+        {
+          name: 'feature',
+          modules: [
+            '@open-tomato/rafa-board',
+            '@open-tomato/rafa-pr',
+            '@open-tomato/rafa-release',
+            '@open-tomato/rafa-run',
+            '@open-tomato/rafa-hub',
+            'src/board',
+            'src/bugs',
+            'src/ci',
+            'src/cleanup',
+            'src/effort',
+            'src/inventory',
+            'src/learning',
+            'src/loop',
+            'src/next',
+            'src/plan',
+            'src/pr',
+            'src/release',
+            'src/start',
+            'src/status',
+            'src/stretch',
+            'src/triage',
+          ],
+        },
+        { name: 'addon', modules: ['addons/atlas', '@open-tomato/dyno', '@open-tomato/rafa-d2c'] },
+        {
+          name: 'app',
+          modules: ['src/cli', 'src/commands', 'src/bundled', 'src/tools', 'src/suite', 'src/tests'],
+        },
+      ],
+    },
   },
 ] satisfies Config as Config;

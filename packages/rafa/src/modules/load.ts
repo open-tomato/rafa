@@ -130,6 +130,13 @@ export interface ModuleCommandEntry {
   readonly name: string;
   /** The absolute path of the file whose default export is the module's commands. */
   readonly entry: string;
+  /**
+   * The top-level config key the module's manifest declares under
+   * `provides.config`, or undefined when it declares none. The
+   * dispatcher hands a command of the module that key's value as its
+   * context's `moduleConfig`.
+   */
+  readonly configKey?: string;
 }
 
 /** Imports one entry file, answering its module namespace. */
@@ -402,7 +409,12 @@ export async function loadModules(settings: ModuleSettings, seams: ModuleLoadSea
     }
     if (state === 'loaded' && loading !== null && read.name !== null) {
       adapters = loading.adapters;
-      if (loading.commands !== null) commands.push(Object.freeze({ name: read.name, entry: loading.commands }));
+      const configKey = read.manifest?.provides.config?.key;
+      if (loading.commands !== null) {
+        commands.push(Object.freeze(configKey === undefined
+          ? { name: read.name, entry: loading.commands }
+          : { name: read.name, entry: loading.commands, configKey }));
+      }
     }
     if (state === 'refused') warnings.push(...problems.map((problem) => `module ${describeValue(read.name)}: ${problem}`));
 

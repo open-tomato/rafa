@@ -6,19 +6,22 @@
  * the same in every range.
  */
 import type { PageSource } from '../url.js';
+import type { FlowLink } from './graph.js';
 import type { DataSource, TimeRange } from '@open-tomato/atlas-ui';
-import type { GraphLink, GraphNode, RoseSlice, SunburstNode } from '@open-tomato/charts';
+import type { ChartTone, GraphLink, GraphNode, RoseSlice, SunburstNode } from '@open-tomato/charts';
 
 import { BALANCE_CATALOGUE, type BalanceIndex } from './balance.js';
 import { COMPOSITION_SUNBURST, PACKAGE_COMPOSITION, SIZE_ROSE, type PackageComposition } from './composition.js';
-import { SANKEY_LINKS, SANKEY_NODES, WORKSPACE_LINKS, WORKSPACE_NODES } from './graph.js';
+import { LAYER_ORDER, LAYER_TONES, SANKEY_LINKS, SANKEY_NODES, WORKSPACE_LINKS, WORKSPACE_NODES } from './graph.js';
 import { buildMock, MOCK_SEEDS, WEEK_DATES, type MockData, type MockSeeds } from './mock.js';
 import { between, seeded } from './random.js';
 
 /**
  * The workspace: package composition and the import graph. The mock's is
  * measured on 2026-11-02 (`composition.ts`, `graph.ts`); the live one holds
- * only `members` and `edges`, the module graph `arch.coupling` answers.
+ * the module graph `arch.coupling` answers in `members` and `edges`, and
+ * the composition, the rose, the Sankey and the layers `arch.composition`
+ * and `arch.import-flow` answer (`live-architecture.ts`).
  */
 export interface MeasuredWorkspace {
   readonly composition: readonly PackageComposition[];
@@ -27,7 +30,11 @@ export interface MeasuredWorkspace {
   readonly members: readonly GraphNode[];
   readonly edges: readonly GraphLink[];
   readonly sankeyNodes: readonly GraphNode[];
-  readonly sankeyLinks: readonly GraphLink[];
+  readonly sankeyLinks: readonly FlowLink[];
+  /** The Sankey's columns, left to right: the layers in rank order. */
+  readonly layerOrder: readonly string[];
+  /** The tone of each layer of `layerOrder`, the key every slice's and node's group names. */
+  readonly layerTones: Readonly<Record<string, ChartTone>>;
 }
 
 /** One field of a result set a card reads: a mock series, the balance indices or the measured workspace. */
@@ -43,6 +50,13 @@ export interface FieldMeta {
   readonly proxyNote?: string;
 }
 
+/**
+ * The cards that read `workspace` but whose rows come from a metric of
+ * their own, not from `arch.coupling`'s, whose meta the field keeps: the
+ * package size rose, the composition sunburst and the import flow.
+ */
+export type WorkspaceCard = 'sizeRose' | 'composition' | 'importFlow';
+
 /** No field marked: what the mock source answers, every field drawn. */
 const NONE_MARKED: ReadonlySet<LensField> = new Set<LensField>();
 
@@ -51,6 +65,9 @@ const NO_DETAIL: ReadonlyMap<LensField, string> = new Map<LensField, string>();
 
 /** No field filled by a metric: the mock's meta. */
 const NO_META: ReadonlyMap<LensField, FieldMeta> = new Map<LensField, FieldMeta>();
+
+/** No workspace card filled by a metric of its own: the mock's. */
+const NO_WORKSPACE_META: ReadonlyMap<WorkspaceCard, FieldMeta> = new Map<WorkspaceCard, FieldMeta>();
 
 /** What the page source answers for one range: every card's data. */
 export interface LensResult {
@@ -73,6 +90,12 @@ export interface LensResult {
    * and, for a proxy, its `ProxyNote`. The mock fills none.
    */
   readonly fieldMeta: ReadonlyMap<LensField, FieldMeta>;
+  /**
+   * Per workspace card with a metric of its own: that metric's meta, which
+   * the card's live note reads in place of `workspace`'s (`arch.coupling`).
+   * The mock fills none.
+   */
+  readonly workspaceMeta: ReadonlyMap<WorkspaceCard, FieldMeta>;
   /**
    * The Monday (UTC) of each week a weekly field without its own dates
    * holds one entry for (bugs by kind, routes, preflight halts), oldest
@@ -110,6 +133,8 @@ const WORKSPACE: MeasuredWorkspace = {
   edges: WORKSPACE_LINKS,
   sankeyNodes: SANKEY_NODES,
   sankeyLinks: SANKEY_LINKS,
+  layerOrder: LAYER_ORDER,
+  layerTones: LAYER_TONES,
 };
 
 /** The seeds one range draws with. */
@@ -130,7 +155,7 @@ function balanceOf(range: TimeRange): readonly BalanceIndex[] {
 
 /** The result set for one range, computed at once. */
 export function lensResultOf(range: TimeRange): LensResult {
-  return { range, source: 'mock', notWired: NONE_MARKED, notWiredDetail: NO_DETAIL, fieldMeta: NO_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
+  return { range, source: 'mock', notWired: NONE_MARKED, notWiredDetail: NO_DETAIL, fieldMeta: NO_META, workspaceMeta: NO_WORKSPACE_META, weeks: WEEK_DATES, mock: buildMock(seedsOf(range)), balance: balanceOf(range), workspace: WORKSPACE };
 }
 
 /** A page source over the mock that answers after `delayMs`. */

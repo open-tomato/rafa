@@ -30,7 +30,10 @@
  * 4. `ingestModules` reads the tree of each module `discoverModules`
  *    finds under the root into `module_facts` (files, LOC, imports and
  *    fan, and `upward_edges` from `docs/survey/cut-table.json`, NULL with
- *    no table), stamping `local.modules`.
+ *    no table), stamping `local.modules`. Each module's `layer` and
+ *    `layer_rank` are its place among the options' `layers`, NULL for a
+ *    module no layer lists, so a reader of the replica (the demo server,
+ *    the hub) takes the layers from it and never from the config.
  * 5. `ingestGithub` writes the read's pull requests into `pr_facts` and
  *    stamps `local.prs`: unread without the flag, failed with `gh`'s
  *    stderr after a failed read.
@@ -46,13 +49,15 @@
  * `<root>/.rafa/atlas/atlas.sqlite` is replaced whole by one rename, and
  * a failed step leaves the earlier replica as it was.
  *
- * The options take the project root, its plan folder and the `github`
- * switch; the project config (`loadAtlasConfig`) joins them once a source
- * reads it.
+ * The options take the project root, its plan folder, the `github`
+ * switch and the layers of the config's `atlas` section, which the
+ * caller reads (`readAtlasLayers`); the targets of `loadAtlasConfig` join
+ * them once a source reads them.
  */
 import type { GitRunner } from '../ingest/git.js';
 import type { GithubRead } from '../ingest/github.js';
 import type { SnapshotEnvironment } from '../ingest/snapshot.js';
+import type { AtlasLayer } from '../layers.js';
 import type { SourceStamp } from '@open-tomato/atlas-data/replica';
 import type { GhRunner } from '@open-tomato/rafa-board';
 
@@ -94,6 +99,8 @@ export interface BuildOptions {
   readonly github?: boolean;
   /** `gh` over the project root, asked only with `github` true; defaults to `createAtlasGhRunner(projectRoot)`. */
   readonly gh?: GhRunner;
+  /** The layers `module_facts` places each module in (`atlas.layers`, read by `readAtlasLayers`); none when left out. */
+  readonly layers?: readonly AtlasLayer[];
 }
 
 /** What one build wrote. */
@@ -162,6 +169,9 @@ export async function buildAtlas(options: BuildOptions): Promise<BuildSummary> {
     const modules = ingestModules(build, {
       root: options.projectRoot,
       globs: DEFAULT_MODULE_GLOBS,
+      ...(options.layers === undefined
+        ? {}
+        : { layers: options.layers }),
       ...(options.now === undefined
         ? {}
         : { now: options.now }),

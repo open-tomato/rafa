@@ -3,11 +3,18 @@
  * read the `--github` switch into the build's options, and refuse the way
  * a module must.
  *
- * `module exec` resolves no project, so the root is `ATLAS_PROJECT_ROOT`
- * when it is set, the context's project when the dispatcher handed one,
- * and the working directory otherwise. A worktree holds no effort store,
- * so a run from one names the main checkout through `ATLAS_PROJECT_ROOT`;
- * `RAFA_EFFORT_DIR` still wins for the store itself, as the build reads it.
+ * `build` and `serve` declare `needsProject: true`, so the dispatcher
+ * places them in the project holding the working directory, refuses a
+ * run outside any as `no_project` before the command starts, and hands
+ * them the project's `atlas` section as `moduleConfig`. `describe` opens
+ * no replica and keeps `needsProject: false`, so it answers outside a
+ * project too. The data root is `ATLAS_PROJECT_ROOT` when it is set, the
+ * context's project when the dispatcher handed one, and the working
+ * directory otherwise. A worktree holds no effort store, so a run from
+ * one names the main checkout through `ATLAS_PROJECT_ROOT`, which moves
+ * only where the data is read: the layers still come from the project
+ * the command was placed in. `RAFA_EFFORT_DIR` still wins for the store
+ * itself, as the build reads it.
  *
  * A module cannot throw core's `CommandExit` reliably, since the repo's
  * source can be a second copy of core beside the runtime that loaded it,
@@ -17,6 +24,14 @@
  * `--github` (D9) is the one switch that lets a build call `gh`: bare, or
  * `--github=true`, it is on; left out, `--no-github` or `--github=false`,
  * it is off, and any other value refuses naming the flag.
+ *
+ * The layers come from `context.moduleConfig`: the raw `atlas` section of
+ * the project's config, the key the manifest declares under
+ * `provides.config`, which the runtime hands the command unread. It is
+ * read through `readAtlasLayers` (`../layers.ts`), so a section that does
+ * not parse throws `AtlasConfigError`, which `refusing` prints as one
+ * error line per problem before the build starts; an unset section is
+ * no layers, and every `module_facts.layer` reads NULL.
  */
 import type { BuildOptions } from '../build/index.js';
 import type { GhRunner } from '@open-tomato/rafa-board';
@@ -25,6 +40,7 @@ import type { RafaContext, RafaFlagSpec } from '@open-tomato/rafa-core/core/comm
 import { resolve } from 'node:path';
 
 import { AtlasConfigError } from '../config.js';
+import { readAtlasLayers } from '../layers.js';
 
 /** The subject every Atlas command is grouped under. */
 export const SUBJECT = 'atlas';
@@ -61,12 +77,17 @@ export function githubFlagOf(context: RafaContext): boolean {
   throw new Error(`--${GITHUB_FLAG.name} is ${JSON.stringify(value)}, expected no value, true or false`);
 }
 
-/** The build options of the context: its root, its environment and `--github`; `gh`, when given, stands in for `gh`. */
+/**
+ * The build options of the context: its root, its environment, `--github`
+ * and the layers of its `atlas` section; `gh`, when given, stands in for
+ * `gh`. Throws `AtlasConfigError` for a section that does not parse.
+ */
 export function buildOptionsOf(context: RafaContext, gh?: GhRunner): BuildOptions {
   return {
     projectRoot: projectRootOf(context),
     env: context.env,
     github: githubFlagOf(context),
+    layers: readAtlasLayers(context.moduleConfig),
     ...(gh === undefined
       ? {}
       : { gh }),

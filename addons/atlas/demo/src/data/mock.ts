@@ -40,6 +40,8 @@ export const AGENTS: string[] = ['implementer', 'doc-updater', 'reviewer', 'tdd-
 export const WIP_LIMIT_MINUTES = 900;
 export const ACTIVE_BLOCKERS = 4;
 export const ON_TIME_SHARE = 0.78;
+/** The out-of-scope entries a week the mock's tile compares this week against. */
+export const SCOPE_CREEP_AVERAGE = 18;
 
 export const CHANGE_LEVELS: Kind[] = [
   { id: 'feat', label: 'feat', tone: 'series-1' },
@@ -225,6 +227,8 @@ export interface MockData {
   readonly activeBlockers: Blocker[];
   readonly minutesPerAgent: { agent: string; minutes: number }[];
   readonly scopeCreepPerWeek: number[];
+  /** The out-of-scope entries per week over the range: `SCOPE_CREEP_AVERAGE` on the mock. */
+  readonly scopeCreepAverage: number;
   readonly minutesByChangeKind: ChangeSlice[];
   readonly minutesByChangeKindPrevious: ChangeSlice[];
   readonly debtRatio: number;
@@ -477,6 +481,7 @@ export function buildMock(seeds: MockSeeds): MockData {
     workDoneTree,
     taskPileTree,
     defectDensity: DEFECT_DENSITY,
+    scopeCreepAverage: SCOPE_CREEP_AVERAGE,
     tokensThisWeek: sum(project.tokensPerDay.slice(-7).map((point) => point.y)),
     tokensLastWeek: sum(project.tokensPerDay.slice(-14, -7).map((point) => point.y)),
     tokensDailyAverage: Math.round(sum(project.tokensPerDay.map((point) => point.y)) / DAYS),

@@ -146,6 +146,27 @@ describe('a path source allowList names', () => {
     expect(CORE_ADAPTER_REGISTRY.find('tracker', 'demo')).toBeUndefined();
   });
 
+  it('carries the config key its manifest declares on its command entry, and none for one declaring no key', async () => {
+    const keyed = demoModule('keyed', {
+      provides: {
+        tracker: { kind: 'keyed', entry: './tracker.ts' },
+        commands: { entry: './commands.ts' },
+        config: { key: 'keyed' },
+      },
+    });
+    const bare = demoModule('bare', {
+      provides: { tracker: { kind: 'bare', entry: './tracker.ts' }, commands: { entry: './commands.ts' } },
+    });
+
+    const loaded = await load([pathSource(keyed), pathSource(bare)], ['keyed', 'bare']);
+
+    expect(loaded.warnings).toEqual([]);
+    expect(loaded.commands).toStrictEqual([
+      { name: 'keyed', entry: join(keyed, 'commands.ts'), configKey: 'keyed' },
+      { name: 'bare', entry: join(bare, 'commands.ts') },
+    ]);
+  });
+
   it('resolves a relative path against the base, and a scoped package name is its name', async () => {
     const dir = plantModule({ name: '@scope/demo', rafa: manifest() });
     const relativePath = dir.slice(tempBase.length + 1);

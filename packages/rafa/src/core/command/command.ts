@@ -38,6 +38,14 @@
  * `needsProject: false`, as `module exec`, `init` and `describe` do, it resolves
  * nothing, and `project` is null inside a project as outside one.
  *
+ * And it carries `moduleConfig`, for a module's command the raw value of
+ * the one top-level config key its module's manifest declares under
+ * `provides.config` (`packages/rafa/src/modules/manifest.ts`), from the
+ * highest config layer that sets it, whole and unread: the module
+ * validates it. It is `undefined` for every core command, for a module
+ * declaring no key, for a key no layer sets, and for a module's command
+ * running with `project` null. `src/cli/dispatch.ts` reads it.
+ *
  * `run` takes a `RafaContext`, where `CliCommand.run` takes a
  * `CliContext`, so the interface extends `CliCommand` without its `run`.
  * A `RafaContext` is a `CliContext`, so a `run` written against
@@ -141,6 +149,8 @@ export interface RafaContext extends CliContext {
   readonly registry: CommandRegistry;
   /** The project the command runs in, or null for a command declaring `needsProject: false`; see the module note. */
   readonly project: ProjectFound | null;
+  /** The value of the config key the command's module declares, or `undefined`; see the module note. */
+  readonly moduleConfig: unknown;
 }
 
 /** A command the dispatcher routes to by its subject and action. */

@@ -285,7 +285,7 @@ describe('validateManifest on the manifest itself', () => {
     expect(problemsOf(raw)).toEqual([
       'rafa carries "__proto__", which is none of: manifestVersion, types, provides, requires, prerequisites, source',
       'rafa carries "constructor", which is none of: manifestVersion, types, provides, requires, prerequisites, source',
-      `rafa.provides carries "constructor", which is none of: ${TYPES}`,
+      `rafa.provides carries "constructor", which is none of: ${TYPES}, config`,
       'rafa.provides.commands carries "__proto__", which is none of: entry',
       `rafa.requires.ports carries "__proto__", which is none of: ${PORTS}`,
       `rafa.requires.ports carries "constructor", which is none of: ${PORTS}`,
@@ -591,6 +591,56 @@ describe('validateManifest on sync', () => {
     expect(problemsOf(raw)).toEqual([
       'rafa.provides.sync is given, but rafa.types does not list sync',
       'rafa.requires.ports.sync is given, but rafa.types does not list sync',
+    ]);
+  });
+});
+
+describe('validateManifest on provides.config', () => {
+  /** A commands-only manifest also providing the config entry `config`. */
+  const withConfig = (config: unknown): Record<string, unknown> => commandsModule({
+    provides: { commands: { entry: './src/commands.ts' }, config },
+  });
+
+  it('answers no config entry when the manifest gives none', () => {
+    const { provides } = manifestOf(commandsModule());
+    expect(Object.hasOwn(provides, 'config')).toBe(false);
+    expect(provides.config).toBeUndefined();
+  });
+
+  it('accepts a key naming no core section, frozen, with types not listing config', () => {
+    const { types, provides } = manifestOf(withConfig({ key: 'atlas' }));
+    expect(types).toEqual(['commands']);
+    expect(provides.config).toEqual({ key: 'atlas' });
+    expect(Object.isFrozen(provides.config)).toBe(true);
+  });
+
+  it('refuses a blank key, a key not a string, a missing key and a key it does not read', () => {
+    expect(problemsOf(withConfig({ key: '' }))).toEqual(['rafa.provides.config.key is "", expected a non-empty string']);
+    expect(problemsOf(withConfig({ key: '  ' }))).toEqual(['rafa.provides.config.key is "  ", expected a non-empty string']);
+    expect(problemsOf(withConfig({ key: 3 }))).toEqual(['rafa.provides.config.key is 3, expected a non-empty string']);
+    expect(problemsOf(withConfig({}))).toEqual(['rafa.provides.config.key is missing']);
+    expect(problemsOf(withConfig('atlas'))).toEqual(['rafa.provides.config is "atlas", expected a mapping']);
+    expect(problemsOf(withConfig({ key: 'atlas', layers: [] }))).toEqual([
+      'rafa.provides.config carries "layers", which is none of: key',
+    ]);
+  });
+
+  it('refuses a key equal to a core section name, beside the manifest\'s other problems', () => {
+    const raw = commandsModule({
+      provides: { commands: { entry: './src/commands.ts' }, config: { key: 'loop' } },
+      source: ' ',
+    });
+    expect(problemsOf(raw)).toEqual([
+      'rafa.provides.config.key is "loop", a section core reads: a module names a top-level key of its own',
+      'rafa.source is " ", expected a non-empty string',
+    ]);
+  });
+
+  it('reads the core sections off the seams when they name them, so loop is refused only when listed', () => {
+    const seams: ManifestSeams = { ...SEAMS, coreConfigKeys: ['atlas'] };
+    expect(manifestOf(withConfig({ key: 'loop' }), seams).provides.config).toEqual({ key: 'loop' });
+    expect(problemsOf(withConfig({ key: 'atlas' }), seams)).toEqual([
+      'rafa.provides.config.key is "atlas", a section core reads: a module names a top-level key of its own',
     ]);
   });
 });

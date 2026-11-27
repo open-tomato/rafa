@@ -54,6 +54,15 @@ or a value that is not a whole number above zero, refuses the file with
 every problem named at once. The module reads no core `loadConfig`, and
 calls `gh` only under `--github`.
 
+`atlas.layers` is not in that file. It sits in the tracked `rafa.config.ts`, so
+every checkout draws the same import flow columns. The module reads the `atlas`
+key its manifest declares under `provides.config` (`context/cli.md`, "Loading
+modules"); the runtime hands the section over whole as `ctx.moduleConfig`, and
+`readAtlasLayers` (`src/layers.ts`) validates it, naming every problem at once.
+`build` places each module in the first layer listing its package or its
+folder and stamps `layer` and `layer_rank` into `module_facts`. With no `atlas`
+key, or no `layers` in it, every module sits in the `unassigned` column.
+
 ## Layout
 
 `src/ingest/` holds one reader per source: `effort.ts` (sessions from the
@@ -65,14 +74,15 @@ of `origin/HEAD`'s target, or of `HEAD` when that names none, with git run
 in the project root), `board.ts` (issues and today's counts by board stage
 from the board cache `<root>/.rafa/cache/board.json`, read once per build
 and stamped with its watermark; no cache stamps both sources missing),
-`modules.ts` (each module's files, LOC, `@open-tomato` imports and fan, and
-its upward edges from `docs/survey/cut-table.json`, NULL with no table),
+`modules.ts` (each module's files, each file's lines in one of the five kinds
+`loc`, `test_loc`, `docs_loc`, `config_loc` and `fixtures_loc`, `@open-tomato`
+imports and fan, and its upward edges from `docs/survey/cut-table.json`, NULL
+with no table),
 `github.ts` (pull requests and issue times through `gh`, under `--github`
 only), `attribute.ts` (the module column), and `snapshot.ts` (the
-`vacuumInto` copy). `src/sources.ts` holds the twelve source descriptors the
-registry serves, `local.tasks` to `local.prs`, one per bucket except
-`change_facts`, which the build stamps as `local.changes` with no descriptor
-yet. `src/build/` is the one-pass builder: `index.ts` writes the replica,
+`vacuumInto` copy). `src/sources.ts` holds the thirteen source descriptors
+the registry serves, `local.tasks` to `local.prs`, one per bucket.
+`src/build/` is the one-pass builder: `index.ts` writes the replica,
 `derive.ts` the work type, the rollups and each module's counts, and
 `daily.ts` the daily rollup. `src/metrics/` is the catalogue per lens,
 `src/registry.ts` the registry the handler serves, and `src/commands/` the
