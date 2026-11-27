@@ -5937,6 +5937,7 @@
         "packages/rafa-hub-postgres/src/index-rebuild-live.test.ts",
         "packages/rafa-hub-postgres/src/index-search.test.ts",
         "packages/rafa-hub-postgres/src/migrator.test.ts",
+        "packages/rafa-hub-postgres/src/public-types.test.ts",
         "packages/rafa-hub-postgres/src/reembed-job.test.ts",
         "packages/rafa-hub-postgres/src/schema.test.ts",
         "packages/rafa-hub-postgres/src/wire-migrations.test.ts",
