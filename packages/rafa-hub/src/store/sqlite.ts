@@ -189,7 +189,7 @@ export interface SqliteHubStoreOptions {
 export interface SqliteHubConnectorOptions extends SqliteHubStoreOptions {
   /** The embedder vector search embeds with; without one, `vector` is `false`. */
   readonly embedder?: IndexEmbedder;
-  /** The loader's inputs (`hub.store.sqliteLibrary` is its `library`), the process's own when left out. */
+  /** The loader's inputs (the install record's `sqliteLibrary` is its `library`), the process's own when left out. */
   readonly loader?: PrepareOptions;
   /** The project an index built at open records; {@link DEFAULT_INDEX_PROJECT} when left out. */
   readonly project?: string;

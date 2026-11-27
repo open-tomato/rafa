@@ -13,7 +13,8 @@
  * `24h`, `false` to ask GitHub on every request), with `0` and negative
  * values refused. The spec for #1428 adds two: `hub.store.sqliteLibrary`
  * (no default; the path of a vanilla `libsqlite3` that turns the index's
- * vector half on for a macOS hub) and `hub.index.rebuildAfterPush`
+ * vector half on for a macOS hub, read for one release only since #1614
+ * moved it to the install record) and `hub.index.rebuildAfterPush`
  * (default `true`; `false` leaves the index to `rafa-hub index
  * rebuild`). The spec for #1431 adds `hub.projects`, the list of
  * projects the hub serves, and `hub.auth.adapter` with

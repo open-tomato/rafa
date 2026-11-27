@@ -154,6 +154,14 @@ it already has, so the line is checked there and then not used. Vector search
 stays off with this line set, because no embedder ships in this release; see
 [The index](#the-index).
 
+This key is read for this release only. The library is an install fact, so
+`rafa-hub install --sqlite-library=<absolute path>` records it in the install
+record, `rafa-hub.install.json`, and the hub loads the library the record names.
+With the key set, the hub loads its library and logs one `config.deprecated`
+warning naming `rafa-hub install`. A record and a key that name different
+libraries stop the start with one `config.refused` line, and
+`rafa-hub index rebuild` exits 1 on the same mismatch.
+
 ### `hub.index.rebuildAfterPush`
 
 Whether the hub rebuilds the index of the pushed project after a push that added
@@ -339,9 +347,9 @@ to full text and prints this notice once per process: `hub index: vector
 search is off on this hub (no embedder configured); answering with full text`.
 
 The reason reads `no embedder configured` once the sqlite-vec extension loads.
-When it does not, the loader's own reason is printed: on macOS without
-`hub.store.sqliteLibrary`, it reads `no SQLite library is named, and macOS's own
-SQLite loads no extension`.
+When it does not, the loader's own reason is printed: on macOS with no SQLite
+library in the install record or `hub.store.sqliteLibrary`, it reads `no SQLite
+library is named, and macOS's own SQLite loads no extension`.
 
 ## The Postgres engine
 

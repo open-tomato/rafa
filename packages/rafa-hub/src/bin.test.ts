@@ -16,11 +16,17 @@
  * record's `dataDir` (the config file's directory when the case writes
  * no record), or at the old place beside `hub.storePath`.
  *
+ * The SQLite library a case names, in the install record or under
+ * `hub.store.sqliteLibrary`, is a path under the case's root that holds
+ * no file: the case reads the library the `sqlite` opener is handed, and
+ * the opener it hands in opens the real connector without it.
+ *
  * `rafa-hub index rebuild` runs over a store the `sqlite` connector made
  * under the case's root, seeded with one commit pushed from a real
  * export (`@open-tomato/rafa/store`), so the counts it prints are read
  * from rows rather than from an empty index.
  */
+import type { SqliteHubOpener } from './bin.js';
 import type { HubLogEntry, HubServer } from './server.js';
 import type { CommitEffortRow, WirePayload, WireRow } from '@open-tomato/rafa/store';
 
@@ -1089,5 +1095,139 @@ describe('runHub and the install record', () => {
     expect(lines[0]).toMatchObject({ level: 'error', event: 'config.refused' });
     expect(String(lines[0]?.['problems'])).toContain('written by hub 0.0.0-other');
     expect(String(lines[0]?.['problems'])).toEndWith('run rafa-hub install');
+  });
+});
+
+/** A `sqlite` opener recording the library each open is handed, then opening the real connector without it. */
+function recordingSqlite(): { readonly connectSqlite: SqliteHubOpener; readonly handed: (string | null)[] } {
+  const handed: (string | null)[] = [];
+  return {
+    connectSqlite: (context, options) => {
+      handed.push(options.loader?.library ?? null);
+      const { storeFiles, fileName, project } = options;
+      return connectSqliteHub(context, { ...storeFiles === undefined
+        ? {}
+        : { storeFiles }, ...fileName === undefined
+        ? {}
+        : { fileName }, ...project === undefined
+        ? {}
+        : { project } });
+    },
+    handed,
+  };
+}
+
+/** The `config.deprecated` warning `hub.store.sqliteLibrary` naming `library` gives, for the case's config and record. */
+function libraryKeyWarning(library: string): string {
+  return `${join(root, 'hub.yaml')}: hub.store.sqliteLibrary is read for this release only; run rafa-hub install --sqlite-library=${library} to record it in ${join(root, INSTALL_RECORD_FILE)}, then remove the key`;
+}
+
+describe('runHub and the SQLite library', () => {
+  /** Starts the hub over `extra` config lines with the recording opener, asks `/health` once, and answers what it handed and logged. */
+  async function startAndOpen(extra = ''): Promise<{ readonly handed: readonly (string | null)[]; readonly logged: readonly HubLogEntry[] }> {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const { connectSqlite, handed } = recordingSqlite();
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort(), extra) }, { log, connectSqlite, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(200);
+    return { handed, logged };
+  }
+
+  it('hands the loader the library the install record names, logging no config.deprecated line', async () => {
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord({ sqliteLibrary: library });
+
+    const { handed, logged } = await startAndOpen();
+
+    expect(handed).toEqual([library]);
+    expect(logged.filter((entry) => entry.event === 'config.deprecated')).toEqual([]);
+  });
+
+  it('hands the loader no library over a record naming none and no key, the control of the cases beside it', async () => {
+    writeInstallRecord();
+
+    const { handed, logged } = await startAndOpen();
+
+    expect(handed).toEqual([null]);
+    expect(logged.filter((entry) => entry.event === 'config.deprecated')).toEqual([]);
+  });
+
+  it('hands the loader hub.store.sqliteLibrary when the record names none, logging one config.deprecated warning naming rafa-hub install', async () => {
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord();
+
+    const { handed, logged } = await startAndOpen(`  store:\n    sqliteLibrary: ${library}\n`);
+
+    expect(handed).toEqual([library]);
+    const warnings = logged.filter((entry) => entry.event === 'config.deprecated');
+    expect(warnings).toEqual([{ level: 'warn', event: 'config.deprecated', key: 'hub.store.sqliteLibrary', message: libraryKeyWarning(library) }]);
+  });
+
+  it('hands the loader the record\'s library, still warning, when hub.store.sqliteLibrary names the same one', async () => {
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord({ sqliteLibrary: library });
+
+    const { handed, logged } = await startAndOpen(`  store:\n    sqliteLibrary: ${join(root, 'lib', '..', 'lib', 'libsqlite3.so')}\n`);
+
+    expect(handed).toEqual([library]);
+    expect(logged.filter((entry) => entry.event === 'config.deprecated')).toHaveLength(1);
+  });
+
+  it('answers null with one config.refused line naming both libraries when the record and hub.store.sqliteLibrary differ, opening nothing', async () => {
+    mkdirStore();
+    const recorded = join(root, 'lib', 'libsqlite3.so');
+    const written = join(root, 'other', 'libsqlite3.so');
+    const record = writeInstallRecord({ sqliteLibrary: recorded });
+    const port = await freePort();
+    const { log, logged } = collecting();
+    const { connectSqlite, handed } = recordingSqlite();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(port, `  store:\n    sqliteLibrary: ${written}\n`) }, { log, connectSqlite, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+
+    expect(server).toBeNull();
+    expect(logged).toEqual([{
+      level: 'error',
+      event: 'config.refused',
+      problems: [`${join(root, 'hub.yaml')}: hub.store.sqliteLibrary is "${written}" and the install record ${record} names "${recorded}"; expected one library: remove hub.store.sqliteLibrary, or run rafa-hub install --sqlite-library=${written} to record it instead`],
+    }]);
+    expect(handed).toEqual([]);
+    expect(await answersAt(port)).toBe(false);
+  });
+});
+
+describe('runIndexRebuild and the SQLite library', () => {
+  it('hands the loader the library the install record names, printing no warning', async () => {
+    mkdirStore();
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord({ sqliteLibrary: library });
+    const { connectSqlite, handed } = recordingSqlite();
+    const err: string[] = [];
+
+    const code = await runIndexRebuild({ [HUB_CONFIG_ENV]: writeConfig(7373) }, { out: () => undefined, err: (line) => err.push(line), connectSqlite });
+
+    expect(err).toEqual([]);
+    expect(code).toBe(0);
+    expect(handed).toEqual([library]);
+  });
+
+  it('answers 1 with one line naming both libraries when the record and hub.store.sqliteLibrary differ, opening nothing', async () => {
+    mkdirStore();
+    writeInstallRecord({ sqliteLibrary: join(root, 'lib', 'libsqlite3.so') });
+    const { connectSqlite, handed } = recordingSqlite();
+    const err: string[] = [];
+
+    const code = await runIndexRebuild(
+      { [HUB_CONFIG_ENV]: writeConfig(7373, `  store:\n    sqliteLibrary: ${join(root, 'other', 'libsqlite3.so')}\n`) },
+      { out: () => undefined, err: (line) => err.push(line), connectSqlite },
+    );
+
+    expect(code).toBe(1);
+    expect(err).toHaveLength(1);
+    expect(err[0]).toStartWith('rafa-hub index rebuild: the config was refused: ');
+    expect(err[0]).toContain('expected one library: remove hub.store.sqliteLibrary');
+    expect(handed).toEqual([]);
   });
 });
