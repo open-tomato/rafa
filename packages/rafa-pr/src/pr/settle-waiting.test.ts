@@ -39,6 +39,7 @@ const RELEASE: MergeGuardSettings = {
   prVersionCollision: 'report',
   dangerousAcceptVersionCollision: false,
   releasePackageFragments: 'allow',
+  releaseMoveLock: false,
 };
 
 /** Runs git in `cwd` under a fixed identity and no system config. */
