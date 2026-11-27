@@ -77,6 +77,7 @@ import type {
   RouteTarget,
   SkillResolverName,
   StoreBackend,
+  SyncMergeMode,
   SyncSkewMode,
   SyncStrategy,
   TierPin,
@@ -179,6 +180,7 @@ export interface ConfigShape extends
     readonly busyTimeoutMs: number;
     readonly sync: SyncStrategy;
     readonly syncSkew: SyncSkewMode;
+    readonly syncMerge: SyncMergeMode;
   };
   /** The `plan` keys. */
   readonly plan: {

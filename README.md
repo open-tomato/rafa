@@ -743,16 +743,18 @@ dangerous.selfUpdateDuringLoop: true (/repo/rafa.config.ts, entry 0)
 
 ### `effort`
 
-Three settings say how long a command waits for another rafa process that
+Four settings say how long a command waits for another rafa process that
 is writing the effort store before it gives up with `SQLITE_BUSY`, how the
-store travels between a project's devices, and what a device does when its
-hub holds other migrations.
+store travels between a project's devices, what a device does when its
+hub holds other migrations, and whether a service sync pulls before it
+pushes.
 
 | Key | Default | What it sets |
 |---|---|---|
 | `effort.busyTimeoutMs` | `5000` | the wait in milliseconds, a whole number from 1 to 60000 |
 | `effort.sync` | `local` | how the store travels: `local`, `file`, `git`, `service` or `p2p` |
 | `effort.syncSkew` | `refuse` | under `effort.sync: service`, what a device does when its hub holds other migrations: `refuse`, or `pull-projected` to pull rows cut to its own schema |
+| `effort.syncMerge` | `ff-only` | under `effort.sync: service`, the order of a sync: `ff-only` pulls first and leaves out of the push the rows that differ from the hub's copy, `merge` pushes first and holds nothing back |
 
 There is no unlimited wait, since a lock wait with no end can hang a
 loop; `0`, a fraction and a quoted `"5000"` are refused.

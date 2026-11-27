@@ -40,6 +40,7 @@ import type {
   RouteTarget,
   SkillResolverName,
   StoreBackend,
+  SyncMergeMode,
   SyncSkewMode,
   SyncStrategy,
   TierPin,
@@ -69,6 +70,12 @@ export interface RafaConfig {
    * migrations; read only under `effort.sync: service`. `effort.syncSkew`.
    */
   effortSyncSkew: SyncSkewMode;
+  /**
+   * Whether a sync pulls before it pushes, leaving out the rows that
+   * differ from the hub's copy, or pushes first; read only under
+   * `effort.sync: service`. `effort.syncMerge`.
+   */
+  effortSyncMerge: SyncMergeMode;
   /** How much of the plan a task prompt receives. `plan.inject`. */
   inject: InjectMode;
   /** Where plans are written and read. `plan.dir`. */
