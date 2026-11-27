@@ -551,8 +551,9 @@ memory.
 **A module's own top-level key is the one merge.** `ConfigShape` also extends
 `ModuleSections`, an empty interface `shape.ts` exports and the `./config`
 subpath publishes. A module that reads a top-level key of its own declares the
-key's file shape by `declare module '@open-tomato/rafa/config'` on
-`ModuleSections`, so a `rafa.config.ts` setting it type-checks where that
+key's file shape by `declare module` on `ModuleSections`: the `./config`
+subpath outside this repository, the file's path inside it (`context/cli.md`,
+"Loading modules"), so a `rafa.config.ts` setting it type-checks where that
 declaration is loaded; a top-level key nothing declares is still refused.
 `src/config/shape.test.ts` checks both in a program holding such a merge, and
 the same merge against the emitted declarations. At run time `loadConfig`

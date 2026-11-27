@@ -8,7 +8,7 @@
  * `qa.ts`). G's fourth PM row names two metrics, `pm.planned-vs-sessions`
  * and `pm.active-blockers`, so its 16 rows are 17 definitions. After it
  * each lens lists the phase 4 metrics over the git, board, module and
- * GitHub sources: 14 more, five of them GitHub-only (`feasibility` `gh`),
+ * GitHub sources, five of them GitHub-only (`feasibility` `gh`),
  * answering rows only after a build run with `--github`. Then the
  * metrics of the remaining cards: `pm.out-of-scope-per-week` (C1) and
  * `pm.task-pile` (C3), GitHub-only as well, `dev.work-done` (C4), and

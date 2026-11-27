@@ -21,10 +21,14 @@ run with `--github`. No build calls `gh` without `--github` (D9); a failed
 and builds the rest, exit 0 (D18). The bug outcome and the drop rate read
 only the board bugs a loop filed, those whose body names a plan
 (`plan_stub`); a bug filed by hand is left out of both. The demo's live
-page draws seven phase 4 metrics (deploys per week, the module treemap and
-import graph, WIP, the bug outcome by loop start, open bugs per day and
-resolution time by priority), two of them GitHub-only: a card with no rows
-says "Not wired yet" and names the `--github` build line. The stretch marks
+page draws the phase 4 metrics (deploys per week, the module treemap and
+import graph, WIP, the bug outcome by loop start, open bugs per day, resolution
+time by priority, minutes per agent and defect density), the out-of-scope
+tile, the task pile, work done, the balance radar and the architecture cards.
+A field the replica cannot answer reads "Not wired yet"; the GitHub-only ones
+(the task pile, open bugs, resolution time) name the `--github` build line. The
+on-time tile is the exception: its entry is `collect`, so it draws a
+needs-a-collector empty state with no number. The stretch marks
 are served but not drawn: the build stores them in `stretch_marks` and the
 API serves them as `local.marks`; no chart draws them yet, since the
 charts package should own the mark (D19). The design is the main
@@ -83,6 +87,18 @@ state with the build line
 (`rafa module exec @open-tomato/rafa-atlas build`) to run. A solo developer
 runs `ATLAS_PROJECT_ROOT=<main checkout> bun run --cwd addons/atlas/demo dev`
 from a worktree, then opens `?source=live`.
+
+**The layers come from the tracked config.** `rafa.config.ts` holds the
+`atlas` section: `layers`, the import flow card's columns, each a name and the
+modules it holds by package name or by folder. The module reads that key as its
+manifest declares it (`provides.config`, see `context/cli.md`, "Loading
+modules") and `readAtlasLayers` validates it. The build stamps each module's
+`layer` and `layer_rank` into `module_facts` (replica version 5), so a reader
+of the replica (the demo, the hub) draws the checkout's columns and reads no
+config. A module no layer lists sits in the `unassigned` column, and an import
+that goes up a layer is marked `upward`. The module scan counts each file's
+lines in one of five kinds: `loc`, `test_loc`, `docs_loc`, `config_loc` and
+`fixtures_loc`.
 
 **Work type is a proxy (D4).** Loop branches carry no type, so the split
 reads the highest change level a session reported: `major` and `minor` are

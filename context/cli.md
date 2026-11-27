@@ -3051,6 +3051,24 @@ refused config list no module action and say nothing of why.
   replaced as `baseAdapterRegistry()`. `resolveTracker`,
   `selectEffortStore` and `rafa plan` resolve through
   `CORE_ADAPTER_REGISTRY`, so they find a loaded module's kind.
+- **A module's config key** is `provides.config` (`{ key }`, no feature type
+  and not in `types`): the one top-level key of the config the module reads.
+  `validateManifest` refuses a key a core section reads, since core would
+  then answer the module's value as its own. `load.ts` carries the key on the
+  module's command entries as `configKey`, `src/rafa.ts` sets it with
+  `setModuleConfigKeys`, so `loadConfig` lifts it out unwarned, and the
+  dispatcher hands its raw value to the module's commands as
+  `ctx.moduleConfig`, whole and unread. The module validates the value itself:
+  Atlas reads `atlas` this way and `readAtlasLayers` (`rafa-atlas/src/layers.ts`)
+  checks it. A `rafa.config.ts` that sets the key type-checks only where its
+  shape is merged into `ModuleSections` (below).
+- **`ModuleSections`** is the empty interface `src/config/shape.ts` exports
+  and the `./config` subpath publishes, which `ConfigShape` extends. A module
+  merges its key's file shape into it by declaration merging, from a `.d.ts`
+  the program loads (`rafa-atlas/src/config-section.d.ts` for `atlas`), so a
+  key no merge declares stays refused. Inside this repository the merge names
+  the file (`'../../../../src/config/index.js'`), since the published subpath
+  lands on no file here.
 - **`module list`** loads the modules again from the config, from
   `baseAdapterRegistry()`, which `loadModules` starts from when handed no
   registry, so no module meets its own kind already held, and lists

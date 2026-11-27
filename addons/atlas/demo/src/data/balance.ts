@@ -2,7 +2,9 @@
  * The balance radar: a catalogue of indices, each pulled toward one of three
  * poles, with up to three switched on per pole. Every index is a share or a
  * rate over the same twelve weeks and the same store tables, divided by its
- * own twelve-week median, so 1.0 is "as usual" on every axis and the shape's
+ * own twelve-week median (the mean of the twelve when the median is 0, and
+ * none when the mean is 0 too, as the live page reads it), so 1.0 is "as
+ * usual" on every axis and the shape's
  * bulge reads as a tilt toward shipping, the fire or the foundation.
  *
  * Shipping 📦 (growth is good)
@@ -39,7 +41,7 @@ export interface BalanceIndex {
   definition: string;
   /** The store tables the ratio reads. */
   tables: string;
-  /** This week over the twelve-week median. */
+  /** This week over the twelve-week median, or the mean of the twelve when the median is 0. */
   value: number;
   /** Switched on by default. */
   on: boolean;

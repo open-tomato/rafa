@@ -45,7 +45,7 @@ animation, for captures). No capture sets `source=live`.
 | Folder | Holds |
 |---|---|
 | `src/App.tsx` | the shell: lens tabs, the `RangeSelector`, the theme button, over one `DashboardData` |
-| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one, with the phase-4 metrics' mappers in `live-sources.ts`, the architect cards' in `live-architecture.ts`, and the cell readers both share in `live-read.ts` |
+| `src/data/` | the mock (`buildMock(seeds)`), the measured workspace and the balance catalogue; `source.ts` is the mock page source, `live.ts` the live one, with the phase-4 metrics' mappers in `live-sources.ts`, the out-of-scope, task pile and work done mappers in `live-cards.ts`, the architect cards' in `live-architecture.ts`, the balance radar's in `live-balance.ts`, and the cell readers all of them share in `live-read.ts` |
 | `src/lenses/` | one file per lens and the `balance/` card; every card is a `LensCard` (a `DashboardCard` with the fields it `reads`) with a `CardSpec` and a `select` |
 | `src/templates/` | `LensGrid`: the tile row and the card grid |
 
@@ -77,9 +77,14 @@ edges of `workspace`, the network graph), WIP against the project's
 `wipLimit` (`wip`), and the bug backlog pair: outcome by loop start
 (`bugOutcomeByLoopStart`, each bug a loop filed counted on the day its
 plan's first session started) and open bugs per day (`openBugsPerDay`),
-with the resolution time by priority (`resolutionByPriority`). The
-rest of `workspace` comes from `arch.composition` and `arch.import-flow`
-(`live-architecture.ts`): the package composition, the rose (folders of
+with the resolution time by priority (`resolutionByPriority`), the minutes per
+agent (`minutesPerAgent`, `pm.minutes-per-agent`) and the defect density
+(`defectDensity`, `qa.defect-density`). The out-of-scope tile, the task pile
+and work done have their mappers in `live-cards.ts`, which this module
+registers: `scopeCreepPerWeek` and `scopeCreepAverage`, `taskPileTree` and
+`workDoneTree`. The rest of `workspace` comes from `arch.composition` and
+`arch.import-flow` (`live-architecture.ts`): the package composition, the rose
+(folders of
 1,000 lines or more), the sunburst, and the import flow with its layer
 columns (`layerOrder`, `unassigned` last) and their tones (`layerTones`),
 each upward import marked `upward`. The open bugs, the resolution time
@@ -102,9 +107,12 @@ On the Development lens, work done reads `workDoneTree`, the change
 entries by work type and tidied area, and its live subtitle says it reads
 the range in place of the mock's 12 weeks. The balance radar reads the
 result's `balance`, the nine indices of `live-balance.ts`, asked over the
-fixed 91 days ending with the replica's build time whatever the range;
-an index with no event in its 12 baseline weeks reads "none in 12 weeks"
-after its axis label and in the source table, and draws at 0. An answer
+fixed 91 days ending with the replica's build time whatever the range.
+This week is the 7 days ending at that time, and each index's baseline is
+the 12 weeks before them: the median of their values, the mean when the
+median is 0, and none when the mean is 0 too. An index is this week over
+its baseline, to two decimals. An index with no baseline reads "none in 12
+weeks" after its axis label and in the source table, and draws at 0. An answer
 naming no build time leaves `balance` marked not wired. The mock page
 keeps the catalogue's values and subtitles.
 

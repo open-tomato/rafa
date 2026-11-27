@@ -60,6 +60,11 @@
  * }
  * ```
  *
+ * The example is what a published consumer writes. Inside this repository
+ * the `./config` subpath lands on no file, so a module there merges into
+ * the file that declares `ModuleSections` by its path, as
+ * `addons/atlas/rafa-atlas/src/config-section.d.ts` does.
+ *
  * Core never names a module's key: a top-level key no section and no
  * merged {@link ModuleSections} declares is still refused.
  * `shape.test.ts` checks both, in a program holding such a merge and in
