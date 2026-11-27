@@ -347,7 +347,10 @@ under `packages/`.
 **The `service` strategy makes one contact per command through
 `createHubContact` (`packages/rafa-effort/src/effort/sync/contact.ts`), which
 never throws and never sets the exit code.** A contact runs `pushThenPull()`
-(push then pull), `pull()` alone, `status()`, or `sync({ stop })`. `status()`
+(under `effort.syncMerge: ff-only`, the default, pull then push, skipping the
+push after a pull that did not answer and leaving out the rows
+`merge_conflicts` names; under `merge`, push then pull), `pull()` alone,
+`status()`, or `sync({ stop })`. `status()`
 is a pull alone, then the hub line's facts from the strategy's `hubStatus()`,
 read by shape off the status answer the pull kept, which `hubLine` formats as
 `hub: reachable, contract <n>, project <name>; pulled <n> rows` (`; <m> rows
@@ -366,8 +369,8 @@ nothing is loaded, selected or written. The `service` adapter is selected once
 per contact by `selectSync` through the registry `loadModules` answers, and a
 selection that fails (e.g., `SyncModuleMissing`) is written once through
 the caller's `warn`. **When sync runs:** `rafa effort collect` makes one
-contact and pushes then pulls after storing rows and writing its summary;
-`rafa loop start` makes one contact for the run and pushes then pulls at
+contact and runs `pushThenPull()` after storing rows and writing its summary;
+`rafa loop start` makes one contact for the run and runs `pushThenPull()` at
 the end of each task, whatever its outcome, its pulls naming the run's
 session id as `SyncPullRequest.sessionId` so the merge's live-loop guard
 passes the run's own record; `rafa next` (including `--dry-run`) and
@@ -389,7 +392,8 @@ sync: the hub at <url> is unreachable (<first line of why>); this command
 used the local store, and its rows sync on the next contact`. An unreachable
 hub does not prevent the command from running: it uses the local store and
 exits with the status it would have had, and an unreachable push skips its
-pull so a command waits out one timeout. The name `HubUnreachable` is
+pull (an unreachable pull its push, under `ff-only`) so a command waits out
+one timeout. The name `HubUnreachable` is
 matched on the error's `name` property rather than its class, so a module
 can throw a plain `Error({ name: 'HubUnreachable' })` and import no value
 from core. A rejection named `HubContractMismatch` (the hub speaks another
@@ -402,7 +406,8 @@ stands, each line once per contact, and its push still pulls. A pull answer
 carrying a `notice` (the `pulled <n> rows projected` and `refilled <n> rows held
 back since <date>` lines) is written as it stands, once per pull page. Any other
 rejection is written as `effort sync: <push|pull> over service failed:
-<message>`, and a refused push still attempts its pull.
+<message>`, and a refused push still attempts its pull; a pull run first,
+under `ff-only`, skips its push whenever it did not answer.
 **The payload cap:** a contact reads the hub's `maxPayloadRows` by shape
 off the strategy's `hubStatus()`, once per run, and splits a push by cursor
 into payloads under it, asking `push({ to: null, limit })` of a strategy

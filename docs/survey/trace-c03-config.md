@@ -207,7 +207,7 @@ Multi-step paths the cluster drives end to end. Each is an ordered chain of func
 5. **`skill search` and `agent search`:** rank the inventory by the question (top twelve) → copy the files to a scratch directory → one Claude session under the fixed template → read the `rafa:search` block → quote check against the copies → one effort row of kind `search` → print. `runSearch` in `src/inventory/search/index.ts`; `--no-model` stops after the ranking.
 6. **`plan risk` and `plan needs`:** plan path → config → the plan's tasks, command spans and shell fences, the accounts (push remote and its visibility, tracker, provider), the environment's credential-looking names → findings. `assessPlanRisk` (`src/plan/risk.ts`) and `readPlanNeeds` (`src/plan/needs.ts`); no session starts.
 7. **`effort collect`:** the main checkout's session-log folder and each worktree's → sessions already in the store skipped → new session and commit rows appended → skills each session invoked counted into the `skill_invocations` table. `collect` in `src/effort/collect.ts`.
-8. **Device sync contact:** the strategy `effort.sync` names → `local` and `file` skipped → `loadModules` for the others → push then pull, or a pull alone → at most one unreachable-hub line. `createHubContact` in `src/effort/sync/contact.ts`.
+8. **Device sync contact:** the strategy `effort.sync` names → `local` and `file` skipped → `loadModules` for the others → pull then push under `effort.syncMerge: ff-only`, push then pull under `merge`, or a pull alone → at most one unreachable-hub line. `createHubContact` in `src/effort/sync/contact.ts`.
 
 ## Gaps
 

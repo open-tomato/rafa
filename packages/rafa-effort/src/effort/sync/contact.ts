@@ -2,9 +2,34 @@
  * The one call a command makes to sync its effort store with the other
  * devices of its project: {@link createHubContact}, which selects the
  * `Sync` the project's `effort.sync` names through the loaded module
- * registry, then runs a push followed by a pull, or a pull alone, or a
- * pull answering the hub line's facts after it (`status()`), or the
- * steps of a whole sync, stopping where it is asked to (`sync()`).
+ * registry, then runs a push and a pull in the order `effort.syncMerge`
+ * names (`pushThenPull()`; see `The order`), or a pull alone, or a pull
+ * answering the hub line's facts after it (`status()`), or the steps of
+ * a whole sync, stopping where it is asked to (`sync()`).
+ *
+ * ## The order
+ *
+ * `pushThenPull()` runs the direction `pull-then-push` under
+ * `effort.syncMerge: ff-only`, the default, and `push-then-pull` under
+ * `merge`; the member keeps its name for its callers, `rafa effort
+ * collect` and the loop's end of each task.
+ *
+ *   - **`pull-then-push`** pulls first, as `pull()` does, and pushes only
+ *     after a pull whose outcome is `done`: a pull that found the hub
+ *     unreachable, speaking another contract, refusing for skew or
+ *     failing skips the push, which is `skipped` in the reading. Under
+ *     `effort.syncSkew: pull-projected` the projected pull answers, so
+ *     the push goes on. The push asks `leaveOutConflicted: true`, so the
+ *     strategy sends no row `merge_conflicts` names, whichever merge
+ *     recorded it, and moves its push cursor past each. The rows it
+ *     left out are read by shape off the answer's `conflicted`
+ *     ({@link conflictedOf}), summed over a push split under the cap,
+ *     and when there are any one line is written through `warn`, once
+ *     for the run: `effort sync: <n> rows held: they differ from the
+ *     hub's copy (merge_conflicts); the rest was pushed`. These are no
+ *     `held_rows`: those are the rows a projected pull held back.
+ *   - **`push-then-pull`** pushes first, asking nothing more, then pulls;
+ *     nothing is left out of its push.
  *
  * ## Which strategies are contacted
  *
@@ -35,8 +60,9 @@
  * writes another, so a command prints at most one such line however
  * many runs it makes: the loop makes one contact for its run and a run
  * at the end of each task. A push that found the hub unreachable skips
- * the pull after it, so a command waits out one timeout and not two.
- * Every later run still pushes and pulls: rows sync on the next contact.
+ * the pull after it, so a command waits out one timeout and not two, as
+ * a pull first that found it so skips the push after it. Every later
+ * run still pushes and pulls: rows sync on the next contact.
  *
  * ## Contract mismatch
  *
@@ -50,8 +76,9 @@
  * contract <w>; nothing was sent. Next step: <step>`, and is written
  * through `warn` as it stands, its first line alone, once per contact
  * however many runs meet it. A mismatched push skips the pull after it,
- * since the same hub refuses the pull for the same reason; a later run
- * still tries, and writes nothing more.
+ * since the same hub refuses the pull for the same reason, and a
+ * mismatched pull first skips the push; a later run still tries, and
+ * writes nothing more.
  *
  * ## Skew refusals
  *
@@ -68,7 +95,8 @@
  * the `<direction> over <kind> failed:` wrap below. Each line is written
  * once per contact however many runs meet it. A push the hub refused
  * this way still pulls, since the hub still answers the rows this rafa
- * can read; a later run still tries both.
+ * can read, while a pull first refused this way skips the push (`The
+ * order`); a later run still tries both.
  *
  * ## A pull's notice
  *
@@ -141,7 +169,8 @@
  *     `HubContractMismatch` or a skew refusal —
  *     a refused token, a `409` from an older hub naming no migration,
  *     the merge's own refusal — is written as `effort sync: <direction> over
- *     <kind> failed: <message>`, and a refused push still pulls. Under
+ *     <kind> failed: <message>`, and a refused push still pulls, while a
+ *     failed pull first skips the push (`The order`). Under
  *     `sync()` a refused token and a project the hub does not serve are
  *     refusals with their own line instead; see `The sync`.
  *
@@ -230,8 +259,8 @@
  * failure of the status read, so a command waits out one timeout and
  * pushes nothing it could not check; a step it never reached is null in
  * the reading. A push that failed for another reason still pulls, as
- * `pushThenPull()`'s does. A refusal sets no exit code: the reading
- * says the run was refused, and the command exits on it.
+ * `pushThenPull()`'s does under `merge`. A refusal sets no exit code:
+ * the reading says the run was refused, and the command exits on it.
  *
  * ## The run's own record
  *
@@ -288,6 +317,8 @@ import { loadModules, moduleSettings } from '@open-tomato/rafa/modules/load';
 import { createAttempts } from './contact-attempt.js';
 import {
   capOf,
+  conflictedLine,
+  conflictedOf,
   conflictsOf,
   countOf,
   dryRunRowsOf,
@@ -395,7 +426,15 @@ export interface HubContactSeams {
 
 /** One invocation's contact with the other devices; see the module note. */
 export interface HubContact {
-  /** Pushes this store's rows, then pulls the others' unless the push found the hub unreachable or mismatched. */
+  /**
+   * Pushes this store's rows and pulls the others', in the order
+   * `effort.syncMerge` names: under `ff-only` (the default) it pulls
+   * first and pushes only after a pull that answered, leaving out the
+   * conflicted rows; under `merge` it pushes first, then pulls unless
+   * the push found the hub unreachable or mismatched. The name is the
+   * member's from before the order followed the setting, kept for its
+   * callers. See the module note's `The order`.
+   */
   readonly pushThenPull: () => Promise<HubContactReading>;
   /** Pulls the others' rows alone. */
   readonly pull: () => Promise<HubContactReading>;
@@ -514,6 +553,14 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     if (notice !== null) input.warn(notice);
   };
 
+  /** Writes the held line once for a push that left out conflicted rows; see the module note's `The order`. */
+  const held = (push: HubContactStep<SyncPushResult>): void => {
+    const count = push.outcome === 'done'
+      ? conflictedOf(push.result)
+      : 0;
+    if (count > 0) input.warn(conflictedLine(count));
+  };
+
   /** Runs `direction`, answering its reading, the `Sync` it ran over, null when none was, and the run's one status read. */
   const run = async (direction: HubContactDirection): Promise<Ran> => {
     const reached = await reach();
@@ -523,13 +570,22 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     const cap: PayloadCap = hub === null
       ? null
       : async () => capOf(await hub());
+    const pullNow = (): Promise<HubContactStep<SyncPullResult>> => attempt('pull', () => pagedPull(sync, pullRequest, cap, noticed));
 
+    if (direction === 'pull-then-push') {
+      const pull = await pullNow();
+      const push: HubContactStep<SyncPushResult> = pull.outcome === 'done'
+        ? await attempt('push', () => splitPush(sync, cap, true))
+        : SKIPPED;
+      held(push);
+      return { reading: { state: 'contacted', strategy, push, pull }, sync, hub };
+    }
     const push = direction === 'push-then-pull'
       ? await attempt('push', () => splitPush(sync, cap))
       : null;
     const pull: HubContactStep<SyncPullResult> = push?.outcome === 'unreachable' || push?.outcome === 'mismatch'
       ? SKIPPED
-      : await attempt('pull', () => pagedPull(sync, pullRequest, cap, noticed));
+      : await pullNow();
     return { reading: { state: 'contacted', strategy, push, pull }, sync, hub };
   };
 
@@ -627,8 +683,13 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
       : syncSteps(reached.sync, options.stop ?? null);
   };
 
+  /** The order `pushThenPull()` runs under `effort.syncMerge`: pull first under `ff-only`, push first under `merge`. */
+  const ordered: HubContactDirection = config.effortSyncMerge === 'merge'
+    ? 'push-then-pull'
+    : 'pull-then-push';
+
   return Object.freeze({
-    pushThenPull: async () => (await run('push-then-pull')).reading,
+    pushThenPull: async () => (await run(ordered)).reading,
     pull: async () => (await run('pull')).reading,
     status,
     sync: syncRun,

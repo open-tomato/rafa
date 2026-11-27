@@ -8,8 +8,12 @@
  */
 import type { SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
 
-/** Which directions a run takes. */
-export type HubContactDirection = 'push-then-pull' | 'pull';
+/**
+ * Which directions a run takes, in order: a push then a pull under
+ * `effort.syncMerge: merge`, a pull then a push under `ff-only`, or a
+ * pull alone.
+ */
+export type HubContactDirection = 'push-then-pull' | 'pull-then-push' | 'pull';
 
 /** What one direction of a run came to. */
 export type HubContactStep<Result> =
@@ -29,8 +33,9 @@ export type HubContactStep<Result> =
   | { readonly outcome: 'failed'; readonly problem: string }
   /**
    * Not run: the push before it found the hub unreachable or speaking
-   * another contract, or under `sync()`'s dry run a push to a strategy
-   * with no dry run.
+   * another contract, the pull before it under `pull-then-push` did not
+   * answer, or under `sync()`'s dry run a push to a strategy with no dry
+   * run.
    */
   | { readonly outcome: 'skipped' };
 
@@ -40,7 +45,7 @@ export type HubContactReading =
   | { readonly state: 'not-contacted'; readonly strategy: string }
   /** No `Sync` could be selected; `problem` was written through `warn` once. */
   | { readonly state: 'unselected'; readonly strategy: string; readonly problem: string }
-  /** The selected `Sync` was run; `push` is null for a pull alone. */
+  /** The selected `Sync` was run; `push` is null for a pull alone, and `skipped` after a pull first that did not answer. */
   | {
     readonly state: 'contacted';
     readonly strategy: string;

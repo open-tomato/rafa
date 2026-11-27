@@ -115,9 +115,13 @@ format core's `packages/rafa/src/effort/store/wire.ts` defines.
   the store). The merge's rules are documented in `context/effort-merge.md`.
 
 A command syncs through one contact, once per invocation, and makes it when:
-- `rafa effort collect` pushes then pulls once its rows are stored.
-- `rafa loop start` makes one contact for its run and pushes then pulls at the
+- `rafa effort collect` pushes and pulls once its rows are stored.
+- `rafa loop start` makes one contact for its run and pushes and pulls at the
   end of each task, whatever its outcome.
+
+Both pull first under `effort.syncMerge: ff-only` (the default), and push only
+after a pull that completed, leaving out the rows `merge_conflicts` names;
+under `merge` they push first, then pull.
 - `rafa status`, `rafa next` (`--dry-run` included), and `rafa effort report`
   pull alone before they read, whether or not they write.
 
