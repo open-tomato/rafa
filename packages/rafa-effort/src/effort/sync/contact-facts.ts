@@ -116,6 +116,22 @@ export function dryRunRowsOf(result: SyncPushResult): number | null {
     : null;
 }
 
+/**
+ * The conflicted rows a push left out, by shape off its `conflicted`:
+ * the rows `merge_conflicts` names that a push asked
+ * `leaveOutConflicted: true` did not send. 0 for an answer counting
+ * none, as a push asked without it answers. See `contact.ts`'s module
+ * note, `The order`.
+ */
+export function conflictedOf(result: SyncPushResult): number {
+  return countOf((result as { readonly conflicted?: unknown }).conflicted) ?? 0;
+}
+
+/** The line a push writes when it left out `count` conflicted rows; see `contact.ts`'s module note, `The order`. */
+export function conflictedLine(count: number): string {
+  return `${OPENING}: ${String(count)} rows held: they differ from the hub's copy (merge_conflicts); the rest was pushed`;
+}
+
 /** The rows a pull's merge found in conflict; 0 for a pull with nothing to merge. */
 export function conflictsOf(result: SyncPullResult): number {
   return result.status === 'pulled'

@@ -18,6 +18,13 @@
  * under another name wrapped as a failure, and a pull's notice written
  * beside answers whose notice is absent, empty or misplaced.
  *
+ * The cases written for the push-first order run under `effort.syncMerge:
+ * merge` ({@link SERVICE}); `The order` runs the same fixture under the
+ * default `ff-only` beside it, so a pull first is read off the calls
+ * against a push first, a push skipped after a pull that did not answer
+ * beside one pushed after a pull that did, and the held line at one
+ * beside none at zero.
+ *
  * Every root is a path under a temporary directory of this file's own
  * that is never made, and the core cases hold it absent after, but for
  * the {@link pullBeforeRead} cases: each makes a root of its own there,
@@ -25,7 +32,7 @@
  */
 import type { AdapterContext } from '@open-tomato/rafa/core/adapters';
 import type { ResolvedConfig } from '@open-tomato/rafa/core/config';
-import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest } from '@open-tomato/rafa/ports';
+import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '@open-tomato/rafa/ports';
 import type { HubContactSeams } from '@open-tomato/rafa-effort/effort/sync/contact';
 
 import '../../../../config-registry.js';
@@ -81,8 +88,14 @@ function resolving(text: string): ResolvedConfig {
   return resolveConfig({ cli: {}, file: parseConfigText(text, join(ROOT, '.rafa', 'config.yaml')), user: null });
 }
 
-/** A project naming `service` and the hub. */
-const SERVICE = `effort:\n  sync: service\nhub:\n  url: ${HUB_URL}\n`;
+/** A project naming `service` and the hub, under `effort.syncMerge: merge`, whose `pushThenPull()` pushes first. */
+const SERVICE = `effort:\n  sync: service\n  syncMerge: merge\nhub:\n  url: ${HUB_URL}\n`;
+
+/** The same project naming no `effort.syncMerge`, so the default `ff-only`, whose `pushThenPull()` pulls first. */
+const SERVICE_DEFAULT = `effort:\n  sync: service\nhub:\n  url: ${HUB_URL}\n`;
+
+/** The same project naming `effort.syncMerge: ff-only`. */
+const SERVICE_FF_ONLY = `effort:\n  sync: service\n  syncMerge: ff-only\nhub:\n  url: ${HUB_URL}\n`;
 
 /** What one direction of the fixture does when called. */
 type Behaviour =
@@ -250,6 +263,129 @@ describe('a contact that reaches the hub', () => {
       pull: { outcome: 'done', result: { status: 'nothing-to-sync' } },
     });
     expect(lines).toEqual([]);
+  });
+});
+
+/** The held line a pull-first push writes for `count` conflicted rows, spelled out as the spec words it. */
+function heldLine(count: number): string {
+  return `effort sync: ${String(count)} rows held: they differ from the hub's copy (merge_conflicts); the rest was pushed`;
+}
+
+/** Registers a `service` whose pull answers and whose push answers it left out `conflicted` rows, recording each request. */
+function conflicting(conflicted: number): { readonly calls: string[]; readonly seams: HubContactSeams } {
+  const calls: string[] = [];
+  const adapters = CORE_ADAPTER_REGISTRY.register({
+    port: 'sync',
+    kind: 'service',
+    portVersion: PORT_VERSIONS.sync,
+    create: (): Sync => ({
+      kind: 'service',
+      push: (request: SyncPushRequest) => {
+        calls.push(`push ${JSON.stringify(request)}`);
+        return Promise.resolve({ status: 'pushed', path: null, conflicted } as SyncPushResult);
+      },
+      pull: (request: SyncPullRequest) => {
+        calls.push(`pull ${JSON.stringify(request)}`);
+        return Promise.resolve({ status: 'nothing-to-sync' } as const);
+      },
+    }),
+  });
+  return { calls, seams: { modules: { adapters, manifest: MANIFEST_SEAMS } } };
+}
+
+/** The push a pull-first run asks, leaving out the conflicted rows. */
+const PUSH_LEAVING_OUT = 'push {"to":null,"leaveOutConflicted":true}';
+
+describe('the order under effort.syncMerge', () => {
+  it.each([
+    ['the default', SERVICE_DEFAULT],
+    ['ff-only', SERVICE_FF_ONLY],
+  ])('pulls first under %s, then pushes leaving out the conflicted rows', async (_label, text) => {
+    const service = fixture('answer', 'answer');
+    const { lines, contact } = contacting(resolving(text), service.seams);
+
+    expect(await contact.pushThenPull()).toEqual({
+      state: 'contacted',
+      strategy: 'service',
+      push: { outcome: 'done', result: { status: 'pushed', path: null } },
+      pull: { outcome: 'done', result: { status: 'nothing-to-sync' } },
+    });
+    expect(service.calls).toEqual(['pull {"from":null,"dryRun":false}', PUSH_LEAVING_OUT]);
+    expect(lines).toEqual([]);
+  });
+
+  it('while under merge it pushes first, asking nothing more, then pulls, the control', async () => {
+    const service = fixture('answer', 'answer');
+    const { contact } = contacting(resolving(SERVICE), service.seams);
+
+    await contact.pushThenPull();
+
+    expect(service.calls).toEqual(['push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+  });
+
+  it.each([
+    ['an unreachable pull', 'unreachable', 'unreachable'],
+    ['a mismatched pull', 'mismatch', 'mismatch'],
+    ['a pull refused for skew', 'rafa-behind', 'refused'],
+    ['a failed pull', 'refuse', 'failed'],
+  ] as const)('skips the push after %s, writing the pull\'s one line', async (_label, behaviour, outcome) => {
+    const service = fixture('answer', behaviour);
+    const { lines, contact } = contacting(resolving(SERVICE_DEFAULT), service.seams);
+
+    expect(await contact.pushThenPull()).toMatchObject({ push: { outcome: 'skipped' }, pull: { outcome } });
+    expect(service.calls).toEqual(['pull {"from":null,"dryRun":false}']);
+    expect(lines).toHaveLength(1);
+  });
+
+  it('still pulls first and skips each push on later runs of the same contact, writing no second line', async () => {
+    const service = fixture('answer', 'unreachable');
+    const { lines, contact } = contacting(resolving(SERVICE_DEFAULT), service.seams);
+
+    await contact.pushThenPull();
+    await contact.pushThenPull();
+
+    expect(service.calls).toEqual(['pull {"from":null,"dryRun":false}', 'pull {"from":null,"dryRun":false}']);
+    expect(unreachableLines(lines)).toEqual(lines);
+    expect(lines).toHaveLength(1);
+  });
+
+  it('writes no held line for a push that left out no row', async () => {
+    const service = conflicting(0);
+    const { lines, contact } = contacting(resolving(SERVICE_DEFAULT), service.seams);
+
+    expect(await contact.pushThenPull()).toMatchObject({ push: { outcome: 'done', result: { conflicted: 0 } } });
+    expect(service.calls).toEqual(['pull {"from":null,"dryRun":false}', PUSH_LEAVING_OUT]);
+    expect(lines).toEqual([]);
+  });
+
+  it('writes the held line once for a push that left out one row', async () => {
+    const service = conflicting(1);
+    const { lines, contact } = contacting(resolving(SERVICE_DEFAULT), service.seams);
+
+    expect(await contact.pushThenPull()).toMatchObject({ push: { outcome: 'done', result: { conflicted: 1 } } });
+    expect(lines).toEqual([heldLine(1)]);
+  });
+
+  it('writes the held line after the pull\'s notice, the pull running first', async () => {
+    const calls: string[] = [];
+    const adapters = CORE_ADAPTER_REGISTRY.register({
+      port: 'sync',
+      kind: 'service',
+      portVersion: PORT_VERSIONS.sync,
+      create: (): Sync => ({
+        kind: 'service',
+        push: () => Promise.resolve({ status: 'pushed', path: null, conflicted: 1 } as SyncPushResult),
+        pull: () => {
+          calls.push('pull');
+          return Promise.resolve({ status: 'pulled', merge: MERGED, notice: PROJECTED_LINE } as SyncPullResult);
+        },
+      }),
+    });
+    const { lines, contact } = contacting(resolving(SERVICE_DEFAULT), { modules: { adapters, manifest: MANIFEST_SEAMS } });
+
+    await contact.pushThenPull();
+
+    expect(lines).toEqual([PROJECTED_LINE, heldLine(1)]);
   });
 });
 

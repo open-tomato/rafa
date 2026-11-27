@@ -125,6 +125,7 @@ import {
   skillResolverName,
   STORE_BACKENDS,
   subsetOf,
+  SYNC_MERGE_MODES,
   SYNC_SKEW_MODES,
   SYNC_STRATEGIES,
   text,
@@ -164,6 +165,7 @@ export type CoreSetting =
   | 'effortBusyTimeoutMs'
   | 'effortSync'
   | 'effortSyncSkew'
+  | 'effortSyncMerge'
   | 'inject'
   | 'planDir'
   | 'specsDir'
@@ -222,6 +224,7 @@ const CORE_SPECS: CoreSection['settings'] = {
   effortBusyTimeoutMs: { key: 'effort.busyTimeoutMs', read: busyTimeoutMs, cli: false },
   effortSync: { key: 'effort.sync', read: oneOf(SYNC_STRATEGIES), cli: false },
   effortSyncSkew: { key: 'effort.syncSkew', read: oneOf(SYNC_SKEW_MODES), cli: false },
+  effortSyncMerge: { key: 'effort.syncMerge', read: oneOf(SYNC_MERGE_MODES), cli: false },
   inject: { key: 'plan.inject', read: oneOf(INJECT_MODES), cli: true },
   planDir: { key: 'plan.dir', read: directory, cli: true },
   specsDir: { key: 'specs.dir', read: directory, cli: true },
@@ -332,6 +335,7 @@ const CORE_DEFAULTS: CoreSection['defaults'] = Object.freeze({
   effortBusyTimeoutMs: 5000,
   effortSync: 'local',
   effortSyncSkew: 'refuse',
+  effortSyncMerge: 'ff-only',
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),

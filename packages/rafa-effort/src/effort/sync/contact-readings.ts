@@ -8,8 +8,12 @@
  */
 import type { SyncPullResult, SyncPushResult } from '@open-tomato/rafa/ports';
 
-/** Which directions a run takes. */
-export type HubContactDirection = 'push-then-pull' | 'pull';
+/**
+ * Which directions a run takes, in order: a push then a pull under
+ * `effort.syncMerge: merge`, a pull then a push under `ff-only`, or a
+ * pull alone.
+ */
+export type HubContactDirection = 'push-then-pull' | 'pull-then-push' | 'pull';
 
 /** What one direction of a run came to. */
 export type HubContactStep<Result> =
@@ -29,8 +33,9 @@ export type HubContactStep<Result> =
   | { readonly outcome: 'failed'; readonly problem: string }
   /**
    * Not run: the push before it found the hub unreachable or speaking
-   * another contract, or under `sync()`'s dry run a push to a strategy
-   * with no dry run.
+   * another contract, the pull before it under `pull-then-push` did not
+   * answer, or under `sync()`'s dry run a push to a strategy with no dry
+   * run.
    */
   | { readonly outcome: 'skipped' };
 
@@ -40,7 +45,7 @@ export type HubContactReading =
   | { readonly state: 'not-contacted'; readonly strategy: string }
   /** No `Sync` could be selected; `problem` was written through `warn` once. */
   | { readonly state: 'unselected'; readonly strategy: string; readonly problem: string }
-  /** The selected `Sync` was run; `push` is null for a pull alone. */
+  /** The selected `Sync` was run; `push` is null for a pull alone, and `skipped` after a pull first that did not answer. */
   | {
     readonly state: 'contacted';
     readonly strategy: string;
@@ -122,10 +127,17 @@ export interface HubSyncContacted {
    * was asked.
    */
   readonly pending: HubContactStep<number | null> | null;
-  /** Step 3, the push; `skipped` under `dry-run` for a strategy with no dry run. */
+  /** The push, step 3 under `effort.syncMerge: merge` and step 4 under `ff-only`; `skipped` under `dry-run` for a strategy with no dry run. */
   readonly push: HubContactStep<SyncPushResult> | null;
-  /** Step 4, the pull and its merge. */
+  /** The pull and its merge, step 4 under `effort.syncMerge: merge` and step 3 under `ff-only`. */
   readonly pull: HubContactStep<SyncPullResult> | null;
+  /**
+   * The conflicted rows the push left out, the ones `merge_conflicts`
+   * names, or under `dry-run` would have: 0 for a push that left none
+   * out, as every push under `merge` does, and null when no push
+   * answered. Never the `heldBack` rows a projected pull held back.
+   */
+  readonly conflicted: number | null;
   /** Step 5, the hub line's facts, or `skipped` when the pull did not answer or was not run. */
   readonly hub: HubContactStep<HubSyncLineFacts>;
 }

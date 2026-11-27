@@ -276,6 +276,17 @@ export const SYNC_SKEW_MODES = ['refuse', 'pull-projected'] as const;
 /** One of the two sync-skew modes. */
 export type SyncSkewMode = (typeof SYNC_SKEW_MODES)[number];
 
+/**
+ * How a service sync orders its pull and its push, as `effort.syncMerge`
+ * names it: `ff-only` pulls first and leaves out of the push every local
+ * row `merge_conflicts` names, `merge` pushes first and pulls after,
+ * holding nothing back. Read only under `effort.sync: service`.
+ */
+export const SYNC_MERGE_MODES = ['ff-only', 'merge'] as const;
+
+/** One of the two sync-merge modes. */
+export type SyncMergeMode = (typeof SYNC_MERGE_MODES)[number];
+
 /** How the board records epics and blockers: labels, or GitHub's own links. */
 export const BOARD_RELATIONSHIP_MODES = ['labels', 'native'] as const;
 

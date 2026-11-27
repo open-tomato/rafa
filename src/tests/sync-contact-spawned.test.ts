@@ -1,5 +1,5 @@
 /**
- * Where a command pushes then pulls through its hub contact
+ * Where a command pushes and pulls through its hub contact
  * (`packages/rafa-effort/src/effort/sync/contact.ts`), spawned as the real `rafa` binary
  * (`src/tests/cli-capture.ts`) in scratch projects under this file's
  * temporary directory:
@@ -25,14 +25,17 @@
  * its push and pull each log their direction to `.rafa/sync-calls.log`
  * and reject as a hub that cannot be reached. So the log counts the
  * contacts a command made, and each case reads the unreachable line
- * whole, counted, beside the log.
+ * whole, counted, beside the log. Under the default `effort.syncMerge:
+ * ff-only` a contact pulls first, so the unreachable pull skips the
+ * push; the same project naming `merge` pushes first, so its unreachable
+ * push skips the pull.
  *
  * Each claim sits beside a control that could have failed it: the same
  * project naming `effort.sync: local` and `effort.sync: file`, which
  * load the same module and contact nothing — `local` moves no rows, and
  * `file` moves them only through `rafa effort copy`/`import`, which none
  * of these commands calls — and, for the loop, a plan of two tasks,
- * which pushes twice and still writes the line once.
+ * which contacts twice and still writes the line once.
  */
 import type { ScratchRepo } from './cli-capture.js';
 
@@ -77,13 +80,19 @@ const PULL_UNREACHABLE_LINE = `warn: ${hubUnreachableLine(HUB_URL, new Error('co
 /** What every line a contact writes opens with. */
 const SYNC_OPENING = 'effort sync:';
 
-/** A config naming `strategy` as `effort.sync`, loading the hub-down module either way. */
-function configFor(strategy: 'service' | 'local' | 'file'): string {
+/** The `effort.syncMerge` a project names, or `default` for one naming none. */
+type SyncMerge = 'default' | 'merge';
+
+/** A config naming `strategy` as `effort.sync`, and `merge` as `effort.syncMerge` when asked, loading the hub-down module either way. */
+function configFor(strategy: 'service' | 'local' | 'file', syncMerge: SyncMerge = 'default'): string {
   return [
     'pr:',
     '  provider: none',
     'effort:',
     `  sync: ${strategy}`,
+    ...syncMerge === 'merge'
+      ? ['  syncMerge: merge']
+      : [],
     'hub:',
     `  url: ${HUB_URL}`,
     'modules:',
@@ -118,8 +127,8 @@ function git(scratch: ScratchRepo, ...args: string[]): void {
   if (!result.ok) throw new Error(`git ${args.join(' ')} in a fixture step: ${result.stderr}`);
 }
 
-/** A scratch project with one commit and the config for `strategy`, both notices dismissed. */
-function plantProject(strategy: 'service' | 'local' | 'file'): ScratchRepo {
+/** A scratch project with one commit and the config for `strategy` and `syncMerge`, both notices dismissed. */
+function plantProject(strategy: 'service' | 'local' | 'file', syncMerge: SyncMerge = 'default'): ScratchRepo {
   const scratch = plantScratchRepo(tempBase);
   writeDismissed(scratch.home, NOTICE_IDS);
   git(scratch, 'config', 'user.name', 'Rafa Sync');
@@ -128,7 +137,7 @@ function plantProject(strategy: 'service' | 'local' | 'file'): ScratchRepo {
   writeFileSync(join(scratch.repo, '.gitignore'), '.plans/\n.rafa/\nprogress.txt\n', 'utf8');
   git(scratch, 'add', '-A');
   git(scratch, 'commit', '-q', '--no-verify', '-m', 'seed');
-  plantProjectConfig(scratch.repo, configFor(strategy));
+  plantProjectConfig(scratch.repo, configFor(strategy, syncMerge));
   return scratch;
 }
 
@@ -219,8 +228,8 @@ function plantSessionClaude(scratch: ScratchRepo): void {
 const PLAN_FLAG = '--plan=.plans/PLAN-sync.md';
 
 /** A project for the loop on `feat/sync`, its plan holding `tasks`, over a stand-in session. */
-function plantLoopProject(strategy: 'service' | 'local', tasks: readonly string[]): ScratchRepo {
-  const scratch = plantProject(strategy);
+function plantLoopProject(strategy: 'service' | 'local', tasks: readonly string[], syncMerge: SyncMerge = 'default'): ScratchRepo {
+  const scratch = plantProject(strategy, syncMerge);
   plantSessionClaude(scratch);
   git(scratch, 'checkout', '-q', '-b', 'feat/sync');
   mkdirSync(join(scratch.repo, '.plans'));
@@ -235,17 +244,17 @@ function tracker(scratch: ScratchRepo): string {
 }
 
 describe('rafa effort collect under a service whose hub is down', () => {
-  it('stores its rows, pushes once, writes one unreachable line and exits 0, where local and file contact nothing', () => {
+  it('stores its rows, pulls once, writes one unreachable line and exits 0, where local and file contact nothing', () => {
     const scratch = plantProject('service');
     const run = runRafa(scratch, scratch.repo, ['effort', 'collect', '--no-sessions']);
     const output = `${run.stdout}${run.stderr}`;
 
     expectExit(run, 0, scratch);
     expect(run.stdout).toContain('+1 rows');
-    expect(linesEqualTo(output, UNREACHABLE_LINE)).toBe(1);
+    expect(linesEqualTo(output, PULL_UNREACHABLE_LINE)).toBe(1);
     expect(syncLines(output)).toBe(1);
-    // The unreachable push skipped its pull.
-    expect(syncCalls(scratch)).toEqual(['push']);
+    // Under the default ff-only the unreachable pull skipped its push.
+    expect(syncCalls(scratch)).toEqual(['pull']);
 
     // The controls: the same project naming `local` or `file` stores the same row and contacts nothing.
     for (const strategy of ['local', 'file'] as const) {
@@ -258,20 +267,34 @@ describe('rafa effort collect under a service whose hub is down', () => {
       expect(syncCalls(control)).toEqual([]);
     }
   }, RUN_TIMEOUT);
+
+  it('pushes once under effort.syncMerge: merge, its unreachable push skipping the pull, the control', () => {
+    const scratch = plantProject('service', 'merge');
+    const run = runRafa(scratch, scratch.repo, ['effort', 'collect', '--no-sessions']);
+    const output = `${run.stdout}${run.stderr}`;
+
+    expectExit(run, 0, scratch);
+    expect(linesEqualTo(output, UNREACHABLE_LINE)).toBe(1);
+    expect(syncLines(output)).toBe(1);
+    expect(syncCalls(scratch)).toEqual(['push']);
+  }, RUN_TIMEOUT);
 });
 
 describe('rafa loop start under a service whose hub is down', () => {
-  it('pushes at the end of each task and writes the unreachable line once for the run', () => {
-    const scratch = plantLoopProject('service', ['First task', 'Second task']);
+  it.each([
+    ['pulls', 'default', 'pull', PULL_UNREACHABLE_LINE],
+    ['pushes, under effort.syncMerge: merge,', 'merge', 'push', UNREACHABLE_LINE],
+  ] as const)('%s first at the end of each task, skipping the other, and writes the unreachable line once for the run', (_label, syncMerge, first, line) => {
+    const scratch = plantLoopProject('service', ['First task', 'Second task'], syncMerge);
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
     const output = `${run.stdout}${run.stderr}`;
 
     expectExit(run, 0, scratch);
     expect(tracker(scratch)).toContain('- [x] First task');
     expect(tracker(scratch)).toContain('- [x] Second task');
-    // One push per task, each skipping its pull, and one line for the whole run.
-    expect(syncCalls(scratch)).toEqual(['push', 'push']);
-    expect(linesEqualTo(output, UNREACHABLE_LINE)).toBe(1);
+    // One contact per task, each skipping its second direction, and one line for the whole run.
+    expect(syncCalls(scratch)).toEqual([first, first]);
+    expect(linesEqualTo(output, line)).toBe(1);
     expect(syncLines(output)).toBe(1);
   }, RUN_TIMEOUT);
 

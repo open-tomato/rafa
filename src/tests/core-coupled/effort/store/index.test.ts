@@ -78,6 +78,7 @@ import { resolveConfig } from '@open-tomato/rafa/core/config';
 import { loadConfig } from '@open-tomato/rafa/core/config/load';
 import { STORE_BACKENDS } from '@open-tomato/rafa/core/config/sections';
 import * as entry from '@open-tomato/rafa/store';
+import { readConflictedRows } from '@open-tomato/rafa/store/merge-conflicts';
 import { mergeStore, readHeldMigrations } from '@open-tomato/rafa/store/merge-store';
 import { openNdjsonStore } from '@open-tomato/rafa/store/ndjson';
 import { openSqliteStore } from '@open-tomato/rafa/store/sqlite';
@@ -169,6 +170,7 @@ const RUNTIME_EXPORTS = [
   'mergeStore',
   'openNdjsonStore',
   'openSqliteStore',
+  'readConflictedRows',
   'readHeldMigrations',
   'readStoreOrigin',
   'selectEffortStore',
@@ -334,6 +336,7 @@ describe('the ./store entry', () => {
   it('re-exports what the workspace packages need, the modules\' own bindings', () => {
     expect(entry.mergeStore).toBe(mergeStore);
     expect(entry.readHeldMigrations).toBe(readHeldMigrations);
+    expect(entry.readConflictedRows).toBe(readConflictedRows);
     expect(entry.readStoreOrigin).toBe(readStoreOrigin);
     expect(entry.TRUSTED_PERMISSIONS).toBe(TRUSTED_PERMISSIONS);
     expect(entry.exportWirePayload).toBe(wire.exportWirePayload);

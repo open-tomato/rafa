@@ -11,7 +11,11 @@
  *
  * Each claim sits beside a control that could have failed it: a whole
  * sync pushing and pulling beside `status` and `dry-run` stopping short
- * of it; a dry-run push sent to a strategy with a dry run beside one
+ * of it; the pull first under `effort.syncMerge: ff-only`, its push
+ * leaving out the conflicted rows, beside the push first under `merge`
+ * asking nothing more; a pull that did not answer ending an `ff-only`
+ * run before the push beside the same pull under `merge`, after a push
+ * that went out; a dry-run push sent to a strategy with a dry run beside one
  * withheld from a strategy without; each refusal beside the same hub
  * answering with nothing to refuse; the rafa-behind refusal beside
  * `pull-projected` letting it through; and a token error refusing
@@ -91,6 +95,9 @@ const MANIFEST_SEAMS = { rafaVersion: '0.1.0', portVersions: PORT_VERSIONS };
 /** A project naming `service` and the hub, under the default `effort.syncSkew: refuse`. */
 const SERVICE = `effort:\n  sync: service\nhub:\n  url: ${HUB_URL}\n`;
 
+/** The same project under `effort.syncMerge: merge`, which pushes first. */
+const SERVICE_MERGE = `effort:\n  sync: service\n  syncMerge: merge\nhub:\n  url: ${HUB_URL}\n`;
+
 /** The same project under `effort.syncSkew: pull-projected`. */
 const SERVICE_PROJECTED = `effort:\n  sync: service\n  syncSkew: pull-projected\nhub:\n  url: ${HUB_URL}\n`;
 
@@ -108,6 +115,18 @@ const STATUS_FACTS: HubSyncStatus = { contractVersion: WIRE_CONTRACT_VERSION, pr
 
 /** The rows the stub's dry-run push says it would send. */
 const DRY_RUN_ROWS = 9;
+
+/** The conflicted rows the stub's push says it left out when asked to. */
+const CONFLICTED_ROWS = 1;
+
+/** The call the stub records for a whole sync's pull. */
+const PULL = 'pull {"from":null,"dryRun":false}';
+
+/** The call the stub records for a push under `merge`, asking nothing more. */
+const PUSH = 'push {"to":null}';
+
+/** The call the stub records for a push under `ff-only`, leaving out the conflicted rows. */
+const PUSH_LEAVING_OUT = 'push {"to":null,"leaveOutConflicted":true}';
 
 /** The rows the stub's `pendingPush()` counts. */
 const PENDING_ROWS = 4;
@@ -173,12 +192,19 @@ interface Stub {
   readonly seams: HubContactSeams;
 }
 
-/** The push a `service` strategy answers: a dry run's counting its rows, any other's delivered. */
+/**
+ * The push a `service` strategy answers: a dry run's counting its rows,
+ * any other's delivered, and either counting {@link CONFLICTED_ROWS}
+ * left out when asked `leaveOutConflicted: true`, as the strategy does.
+ */
 function servicePush(request: SyncPushRequest): Promise<SyncPushResult> {
-  const { dryRun } = request as { readonly dryRun?: unknown };
+  const { dryRun, leaveOutConflicted } = request as { readonly dryRun?: unknown; readonly leaveOutConflicted?: unknown };
+  const counted: { readonly conflicted?: number } = leaveOutConflicted === true
+    ? { conflicted: CONFLICTED_ROWS }
+    : {};
   return Promise.resolve(dryRun === true
-    ? { status: 'pushed', path: null, dryRun: true, rows: DRY_RUN_ROWS } as SyncPushResult
-    : { status: 'pushed', path: null });
+    ? { status: 'pushed', path: null, dryRun: true, rows: DRY_RUN_ROWS, ...counted } as SyncPushResult
+    : { status: 'pushed', path: null, ...counted } as SyncPushResult);
 }
 
 /** A pull that merged 312 rows, two of them in conflict. */
@@ -248,13 +274,39 @@ function rejecting(error: Error): () => Promise<never> {
 }
 
 describe('sync() with no stop', () => {
-  it('reads the status, pushes, then pulls, in order, and answers the hub line\'s facts with no second status read', async () => {
+  it('reads the status, pulls, then pushes leaving out the conflicted rows under ff-only, the default, carrying their count', async () => {
     const service = stub();
     const { lines, contact } = contacting(SERVICE, service.seams);
 
     const reading = await contact.sync();
 
-    expect(service.calls).toEqual(['hubStatus', 'push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+    expect(service.calls).toEqual(['hubStatus', PULL, PUSH_LEAVING_OUT]);
+    expect(reading).toEqual({
+      state: 'contacted',
+      strategy: 'service',
+      stop: null,
+      status: { outcome: 'done', result: STATUS_FACTS },
+      refusal: null,
+      pending: null,
+      push: { outcome: 'done', result: { status: 'pushed', path: null, conflicted: CONFLICTED_ROWS } as SyncPushResult },
+      pull: { outcome: 'done', result: { status: 'pulled', merge: merged(312, 2) } },
+      conflicted: CONFLICTED_ROWS,
+      hub: {
+        outcome: 'done',
+        result: { contractVersion: WIRE_CONTRACT_VERSION, projectId: PROJECT_ID, projectName: 'rafa', pulled: 312, heldBack: 0, conflicts: 2 },
+      },
+    });
+    // The count is the command's to print: sync() writes no held line.
+    expect(lines).toEqual([]);
+  });
+
+  it('reads the status, pushes, then pulls under merge, asking nothing more of the push, with no second status read', async () => {
+    const service = stub();
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
+
+    const reading = await contact.sync();
+
+    expect(service.calls).toEqual(['hubStatus', PUSH, PULL]);
     expect(reading).toEqual({
       state: 'contacted',
       strategy: 'service',
@@ -264,6 +316,7 @@ describe('sync() with no stop', () => {
       pending: null,
       push: { outcome: 'done', result: { status: 'pushed', path: null } },
       pull: { outcome: 'done', result: { status: 'pulled', merge: merged(312, 2) } },
+      conflicted: 0,
       hub: {
         outcome: 'done',
         result: { contractVersion: WIRE_CONTRACT_VERSION, projectId: PROJECT_ID, projectName: 'rafa', pulled: 312, heldBack: 0, conflicts: 2 },
@@ -277,7 +330,7 @@ describe('sync() with no stop', () => {
     const { contact } = contacting(SERVICE, service.seams);
 
     expect(contacted(await contact.sync({ stop: null })).stop).toBeNull();
-    expect(service.calls).toEqual(['hubStatus', 'push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+    expect(service.calls).toEqual(['hubStatus', PULL, PUSH_LEAVING_OUT]);
   });
 
   it('pulls with the run\'s session id, as pull() does', async () => {
@@ -286,7 +339,7 @@ describe('sync() with no stop', () => {
 
     await contacting(SERVICE, service.seams, sessionId).contact.sync();
 
-    expect(service.calls.at(-1)).toBe(`pull {"from":null,"dryRun":false,"sessionId":"${sessionId}"}`);
+    expect(service.calls).toEqual(['hubStatus', `pull {"from":null,"dryRun":false,"sessionId":"${sessionId}"}`, PUSH_LEAVING_OUT]);
   });
 
   it('writes the pull\'s notice and carries the rows held back into the facts', async () => {
@@ -308,18 +361,57 @@ describe('sync() with no stop', () => {
 
     expect(reading.status).toEqual({ outcome: 'done', result: { contractVersion: null, projectId: null, projectName: null, migrations: null } });
     expect(reading.refusal).toBeNull();
-    expect(service.calls).toEqual(['push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+    expect(service.calls).toEqual([PULL, PUSH_LEAVING_OUT]);
     expect(lines).toEqual([]);
   });
 
-  it('still pulls after a push that failed for another reason, refusing nothing', async () => {
+  it('still pulls after a push that failed for another reason under merge, refusing nothing', async () => {
+    const service = stub({ push: rejecting(new Error('the hub refused push: HTTP 409')) });
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
+
+    const reading = contacted(await contact.sync());
+
+    expect(reading).toMatchObject({ refusal: null, push: { outcome: 'failed' }, pull: { outcome: 'done' }, conflicted: null, hub: { outcome: 'done' } });
+    expect(service.calls).toEqual(['hubStatus', PUSH, PULL]);
+    expect(lines).toEqual(['effort sync: push over service failed: the hub refused push: HTTP 409']);
+  });
+
+  it('answers the hub line after a pull first and a push that failed for another reason under ff-only, counting no conflicted rows', async () => {
     const service = stub({ push: rejecting(new Error('the hub refused push: HTTP 409')) });
     const { lines, contact } = contacting(SERVICE, service.seams);
 
     const reading = contacted(await contact.sync());
 
-    expect(reading).toMatchObject({ refusal: null, push: { outcome: 'failed' }, pull: { outcome: 'done' }, hub: { outcome: 'done' } });
+    expect(reading).toMatchObject({ refusal: null, pull: { outcome: 'done' }, push: { outcome: 'failed' }, conflicted: null, hub: { outcome: 'done' } });
+    expect(service.calls).toEqual(['hubStatus', PULL, PUSH_LEAVING_OUT]);
     expect(lines).toEqual(['effort sync: push over service failed: the hub refused push: HTTP 409']);
+  });
+
+  it.each([
+    ['unreachable', named(HUB_UNREACHABLE, 'connect ECONNREFUSED'), 'unreachable', null],
+    ['mismatched', named(HUB_CONTRACT_MISMATCH, 'effort sync: the hub speaks contract 2, this rafa contract 1; nothing was sent.'), 'mismatch', 'contract'],
+    ['refused for skew', named(RAFA_UPDATE_REQUIRED, RAFA_BEHIND_LINE), 'refused', 'skew'],
+    ['failed', new Error('the merge refused'), 'failed', null],
+  ] as const)('ends the run before the push after a pull first that was %s, under ff-only', async (_case, error, outcome, cause) => {
+    const service = stub({ pull: rejecting(error) });
+    const { lines, contact } = contacting(SERVICE, service.seams);
+
+    const reading = contacted(await contact.sync());
+
+    expect(service.calls).toEqual(['hubStatus', PULL]);
+    expect(reading).toMatchObject({ pull: { outcome }, push: null, conflicted: null, hub: { outcome: 'skipped' } });
+    expect(reading.refusal?.cause ?? null).toBe(cause);
+    expect(lines).toHaveLength(1);
+  });
+
+  it('pushes first under merge, so the same failed pull comes after a push that went out, the control', async () => {
+    const service = stub({ pull: rejecting(new Error('the merge refused')) });
+    const { contact } = contacting(SERVICE_MERGE, service.seams);
+
+    const reading = contacted(await contact.sync());
+
+    expect(service.calls).toEqual(['hubStatus', PUSH, PULL]);
+    expect(reading).toMatchObject({ push: { outcome: 'done' }, pull: { outcome: 'failed' }, conflicted: 0 });
   });
 });
 
@@ -340,6 +432,7 @@ describe('sync() stopping at status', () => {
       pending: { outcome: 'done', result: PENDING_ROWS },
       push: null,
       pull: null,
+      conflicted: null,
       hub: { outcome: 'skipped' },
     });
     expect(lines).toEqual([]);
@@ -379,9 +472,27 @@ describe('sync() stopping at status', () => {
 });
 
 describe('sync() stopping at dry-run', () => {
-  it('asks a dry-run push and a dry-run pull, answering the rows each would move and the conflicts', async () => {
+  it('asks a dry-run pull, then a dry-run push leaving out the conflicted rows under ff-only, counting them and writing nothing', async () => {
     const service = stub();
     const { lines, contact } = contacting(SERVICE, service.seams);
+
+    const reading = contacted(await contact.sync({ stop: 'dry-run' }));
+
+    expect(service.calls).toEqual(['hubStatus', 'pull {"from":null,"dryRun":true}', 'push {"to":null,"dryRun":true,"leaveOutConflicted":true}']);
+    expect(reading).toMatchObject({
+      stop: 'dry-run',
+      refusal: null,
+      pending: { outcome: 'done', result: DRY_RUN_ROWS },
+      push: { outcome: 'done', result: { status: 'pushed', dryRun: true, rows: DRY_RUN_ROWS, conflicted: CONFLICTED_ROWS } },
+      conflicted: CONFLICTED_ROWS,
+      hub: { outcome: 'done', result: { pulled: 312, conflicts: 2 } },
+    });
+    expect(lines).toEqual([]);
+  });
+
+  it('asks a dry-run push, then a dry-run pull under merge, answering the rows each would move and no conflicted rows', async () => {
+    const service = stub();
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
 
     const reading = contacted(await contact.sync({ stop: 'dry-run' }));
 
@@ -391,9 +502,20 @@ describe('sync() stopping at dry-run', () => {
       refusal: null,
       pending: { outcome: 'done', result: DRY_RUN_ROWS },
       push: { outcome: 'done', result: { status: 'pushed', dryRun: true, rows: DRY_RUN_ROWS } },
+      conflicted: 0,
       hub: { outcome: 'done', result: { pulled: 312, conflicts: 2 } },
     });
     expect(lines).toEqual([]);
+  });
+
+  it('asks no dry-run push after a dry-run pull that did not answer under ff-only, counting nothing', async () => {
+    const service = stub({ pull: rejecting(named(HUB_UNREACHABLE, 'connect ECONNREFUSED')) });
+    const { contact } = contacting(SERVICE, service.seams);
+
+    const reading = contacted(await contact.sync({ stop: 'dry-run' }));
+
+    expect(service.calls).toEqual(['hubStatus', 'pull {"from":null,"dryRun":true}']);
+    expect(reading).toMatchObject({ pull: { outcome: 'unreachable' }, push: null, pending: null, conflicted: null });
   });
 
   it('answers 0 rows waiting for a dry-run push with no store to read', async () => {
@@ -447,28 +569,58 @@ describe('sync() refused for skew', () => {
     const { lines, contact } = contacting(SERVICE_PROJECTED, service.seams);
 
     expect(contacted(await contact.sync()).refusal).toBeNull();
-    expect(service.calls).toEqual(['hubStatus', 'push {"to":null}', 'pull {"from":null,"dryRun":false}']);
+    // Under ff-only, the default, the projected pull answers, so the push goes on.
+    expect(service.calls).toEqual(['hubStatus', PULL, PUSH_LEAVING_OUT]);
     expect(lines).toEqual([]);
   });
 
-  it('refuses a push the hub answered with HubUpgradeRequired, and skips the pull', async () => {
+  it('refuses a push the hub answered with HubUpgradeRequired under merge, and skips the pull', async () => {
+    const service = stub({ hubStatus: statusWith({ migrations: null }), push: rejecting(named(HUB_UPGRADE_REQUIRED, HUB_BEHIND_LINE)) });
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
+
+    const reading = contacted(await contact.sync());
+
+    expect(reading).toMatchObject({ refusal: { cause: 'skew', line: HUB_BEHIND_LINE }, push: { outcome: 'refused' }, pull: null });
+    expect(service.calls).toEqual(['hubStatus', PUSH]);
+    expect(lines).toEqual([HUB_BEHIND_LINE]);
+  });
+
+  it('refuses a push after a pull first under ff-only, its line standing in the hub line\'s place', async () => {
     const service = stub({ hubStatus: statusWith({ migrations: null }), push: rejecting(named(HUB_UPGRADE_REQUIRED, HUB_BEHIND_LINE)) });
     const { lines, contact } = contacting(SERVICE, service.seams);
 
     const reading = contacted(await contact.sync());
 
-    expect(reading).toMatchObject({ refusal: { cause: 'skew', line: HUB_BEHIND_LINE }, push: { outcome: 'refused' }, pull: null });
-    expect(service.calls).toEqual(['hubStatus', 'push {"to":null}']);
+    expect(reading).toMatchObject({
+      refusal: { cause: 'skew', line: HUB_BEHIND_LINE },
+      pull: { outcome: 'done' },
+      push: { outcome: 'refused' },
+      conflicted: null,
+      hub: { outcome: 'skipped' },
+    });
+    expect(service.calls).toEqual(['hubStatus', PULL, PUSH_LEAVING_OUT]);
     expect(lines).toEqual([HUB_BEHIND_LINE]);
   });
 
-  it('refuses a pull the hub answered with RafaUpdateRequired', async () => {
+  it('refuses a pull the hub answered with RafaUpdateRequired under ff-only, with no push attempt', async () => {
     const service = stub({ pull: rejecting(named(RAFA_UPDATE_REQUIRED, RAFA_BEHIND_LINE)) });
     const { lines, contact } = contacting(SERVICE, service.seams);
 
     const reading = contacted(await contact.sync());
 
-    expect(reading).toMatchObject({ refusal: { cause: 'skew', line: RAFA_BEHIND_LINE }, pull: { outcome: 'refused' }, hub: { outcome: 'skipped' } });
+    expect(reading).toMatchObject({ refusal: { cause: 'skew', line: RAFA_BEHIND_LINE }, pull: { outcome: 'refused' }, push: null, hub: { outcome: 'skipped' } });
+    expect(service.calls).toEqual(['hubStatus', PULL]);
+    expect(lines).toEqual([RAFA_BEHIND_LINE]);
+  });
+
+  it('refuses the same pull under merge after a push that went out, the control', async () => {
+    const service = stub({ pull: rejecting(named(RAFA_UPDATE_REQUIRED, RAFA_BEHIND_LINE)) });
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
+
+    const reading = contacted(await contact.sync());
+
+    expect(reading).toMatchObject({ refusal: { cause: 'skew', line: RAFA_BEHIND_LINE }, push: { outcome: 'done' }, pull: { outcome: 'refused' } });
+    expect(service.calls).toEqual(['hubStatus', PUSH, PULL]);
     expect(lines).toEqual([RAFA_BEHIND_LINE]);
   });
 
@@ -503,10 +655,10 @@ describe('sync() refused for the contract', () => {
     expect(lines).toEqual([line]);
   });
 
-  it('refuses a push rejecting with HubContractMismatch, and skips the pull', async () => {
+  it('refuses a push rejecting with HubContractMismatch under merge, and skips the pull', async () => {
     const line = 'effort sync: the hub speaks contract 2, this rafa contract 1; nothing was sent. Next step: rafa self-update';
     const service = stub({ hubStatus: 'absent', push: rejecting(named(HUB_CONTRACT_MISMATCH, line)) });
-    const { lines, contact } = contacting(SERVICE, service.seams);
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
 
     const reading = contacted(await contact.sync());
 
@@ -516,14 +668,14 @@ describe('sync() refused for the contract', () => {
 });
 
 describe('sync() refused for the project', () => {
-  it('refuses a push the hub answered with its unserved-project line, and skips the pull', async () => {
+  it('refuses a push the hub answered with its unserved-project line under merge, and skips the pull', async () => {
     const service = stub({ push: rejecting(new Error(NOT_SERVED)) });
-    const { lines, contact } = contacting(SERVICE, service.seams);
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
 
     const reading = contacted(await contact.sync());
 
     expect(reading).toMatchObject({ refusal: { cause: 'project', line: `effort sync: ${NOT_SERVED}` }, push: { outcome: 'refused' }, pull: null });
-    expect(service.calls).toEqual(['hubStatus', 'push {"to":null}']);
+    expect(service.calls).toEqual(['hubStatus', PUSH]);
     expect(lines).toEqual([`effort sync: ${NOT_SERVED}`]);
   });
 
@@ -598,12 +750,12 @@ describe('sync() over a hub that does not answer', () => {
     expect(lines).toEqual(['effort sync: hub status over service failed: the hub\'s answer to status is not JSON']);
   });
 
-  it('skips the pull after an unreachable push, refusing nothing', async () => {
+  it('skips the pull after an unreachable push under merge, refusing nothing', async () => {
     const service = stub({ push: rejecting(named(HUB_UNREACHABLE, 'timed out after 3000 ms')) });
-    const { lines, contact } = contacting(SERVICE, service.seams);
+    const { lines, contact } = contacting(SERVICE_MERGE, service.seams);
 
     expect(contacted(await contact.sync())).toMatchObject({ refusal: null, push: { outcome: 'unreachable' }, pull: null });
-    expect(service.calls).toEqual(['hubStatus', 'push {"to":null}']);
+    expect(service.calls).toEqual(['hubStatus', PUSH]);
     expect(lines).toHaveLength(1);
   });
 });

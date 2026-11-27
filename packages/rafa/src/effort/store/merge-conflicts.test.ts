@@ -13,14 +13,30 @@
  * migration the pull lacked would fill read NULL here, `cause` and
  * `resolution` standing in for them, and its pair is listed in
  * `held_rows` with a migration id of no real catalogue.
+ *
+ * `readConflictedRows` takes a path, so its cases build the store as a
+ * file under one directory of `tmpdir()`, removed after the file runs,
+ * close the writing connection, and read the file back. A conflict it
+ * reads is either recorded by `settleMatches` or planted straight into
+ * `merge_conflicts`, as two fields of one row or a second table need.
  */
 import type { HeldCopy, TableSettlement } from './merge-conflicts.js';
 import type { SQLQueryBindings } from 'bun:sqlite';
 
-import { Database } from 'bun:sqlite';
-import { afterEach, describe, expect, it } from 'bun:test';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { RECOMPUTED_COMPARISONS, SET_ONCE_FILLS, settleMatches, takeHeldCopies } from './merge-conflicts.js';
+import { Database } from 'bun:sqlite';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
+
+import {
+  readConflictedRows,
+  RECOMPUTED_COMPARISONS,
+  SET_ONCE_FILLS,
+  settleMatches,
+  takeHeldCopies,
+} from './merge-conflicts.js';
 import { MERGE_RULES, RECOMPUTED, SET_ONCE } from './merge-rules.js';
 import { unionStores } from './merge-union.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
@@ -658,5 +674,115 @@ describe('a held copy, taken whole before the comparison', () => {
 
     expect(copies).toEqual(unions.map(({ table }) => ({ table, taken: [], refused: [] })));
     expect(local.query('SELECT name FROM sqlite_master WHERE name = \'held_rows\'').all()).toEqual([]);
+  });
+});
+
+/** The directory the file stores of `readConflictedRows` live in. */
+const scope = mkdtempSync(join(tmpdir(), 'rafa-merge-conflicts-'));
+afterAll(() => {
+  rmSync(scope, { recursive: true, force: true });
+});
+
+/** A store file `name` under {@link scope}, brought through every migration, planted by `plant`, then closed. */
+function storeFile(name: string, plant: (db: Database) => void): string {
+  const path = join(scope, `${name}.sqlite`);
+  const db = new Database(path, { create: true });
+  try {
+    for (const { sql } of SQLITE_MIGRATIONS) db.run(sql);
+    plant(db);
+  } finally {
+    db.close();
+  }
+  return path;
+}
+
+/** Records a conflict on `table`'s row `localSeq` straight into `merge_conflicts`. */
+function recordConflict(db: Database, table: string, localSeq: number, field: string | null, mergeId = 'merge-1'): void {
+  db.query<unknown, SQLQueryBindings[]>(
+    'INSERT INTO merge_conflicts (merge_id, table_name, local_seq, field, incoming, recorded_at) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(mergeId, table, localSeq, field, '{}', TRAIL.recordedAt);
+}
+
+/** The number of rows `merge_conflicts` holds in the store file at `path`. */
+function conflictCount(path: string): number {
+  const db = new Database(path, { readonly: true });
+  try {
+    return db.query<{ n: number }, []>('SELECT count(*) AS n FROM merge_conflicts').get()?.n ?? 0;
+  } finally {
+    db.close();
+  }
+}
+
+/** A conflicted-rows map as plain entries, each set spread in its order. */
+function entriesOf(rows: ReadonlyMap<string, ReadonlySet<number>>): [string, number[]][] {
+  return [...rows].map(([table, seqs]) => [table, [...seqs]]);
+}
+
+describe('readConflictedRows', () => {
+  it('answers an empty, frozen map for a store with no conflict recorded', () => {
+    const path = storeFile('none', (db) => {
+      plantFinding(db, finding('alone'), 'store-a');
+    });
+
+    const rows = readConflictedRows(path);
+
+    expect(rows.size).toBe(0);
+    expect(Object.isFrozen(rows)).toBe(true);
+    expect(conflictCount(path)).toBe(0);
+  });
+
+  it('answers an empty map for a path with no file, and makes none', () => {
+    const path = join(scope, 'absent.sqlite');
+
+    expect(readConflictedRows(path).size).toBe(0);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it('answers an empty map for a schema before merge_conflicts', () => {
+    const path = join(scope, 'early.sqlite');
+    const db = new Database(path, { create: true });
+    db.run('CREATE TABLE findings (seq INTEGER PRIMARY KEY)');
+    db.close();
+
+    expect(readConflictedRows(path).size).toBe(0);
+  });
+
+  it('names the local row of the one conflict settleMatches recorded', () => {
+    const path = storeFile('settled', (db) => {
+      const other = memoryStore();
+      plantFinding(db, finding('agree'), 'store-a');
+      plantFinding(other, finding('agree'), 'store-a');
+      plantFinding(db, finding('here'), 'store-cloned');
+      plantFinding(other, finding('there'), 'store-cloned');
+      const settled = settleMatches(db, other, unionStores(db, other), TRAIL);
+      expect(entryFor(settled, 'findings').conflicts).toEqual([{ localSeq: 2, incomingSeq: 2, field: null }]);
+    });
+
+    const rows = readConflictedRows(path);
+
+    expect(entriesOf(rows)).toEqual([['findings', [2]]]);
+    expect(Object.isFrozen(rows.get('findings'))).toBe(true);
+  });
+
+  it('gives one entry for two fields of one row, recorded under two merges', () => {
+    const path = storeFile('two-fields', (db) => {
+      plantFinding(db, finding('twice'), 'store-a');
+      recordConflict(db, 'findings', 1, 'tracker_ref');
+      recordConflict(db, 'findings', 1, null, 'merge-2');
+    });
+
+    expect(conflictCount(path)).toBe(2);
+    expect(entriesOf(readConflictedRows(path))).toEqual([['findings', [1]]]);
+  });
+
+  it('keys each table apart, in name order, its seqs ascending', () => {
+    const path = storeFile('two-tables', (db) => {
+      recordConflict(db, 'sessions', 7, null);
+      recordConflict(db, 'findings', 4, null);
+      recordConflict(db, 'findings', 2, 'tracker_ref');
+      recordConflict(db, 'sessions', 3, null);
+    });
+
+    expect(entriesOf(readConflictedRows(path))).toEqual([['findings', [2, 4]], ['sessions', [3, 7]]]);
   });
 });

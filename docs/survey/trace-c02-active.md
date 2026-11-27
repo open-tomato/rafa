@@ -36,7 +36,7 @@ Non-test imports leaving the cluster (223 edges, 87 distinct files), by the clus
 
 | Target cluster | Edges | Distinct files | Files a cut would have to give `c02-active` access to |
 | --- | --- | --- | --- |
-| `c03-config` | 82 | 24 | `src/config.ts`, `src/config-load.ts`, `src/config-schema.ts`, `packages/rafa/src/config-schema-tests.ts`, `packages/rafa/src/config-schema-wrap-up.ts`, `src/config-sections.ts`, `src/adapters/registry.ts`, `src/agents/roster.ts`, `src/tiers/{delivery,resolve,routing,serve,skill-names}.ts`, `src/inventory/{record,trees,search/rank}.ts`, `src/schema/tiers.ts`, `src/effort/sync/contact.ts`, `src/start/{plan-path,preflight-sync,risk-total}.ts`, `src/task/skill-index.ts`, `src/utils/{agent-definition,session-env}.ts` |
+| `c03-config` | 82 | 24 | `src/config.ts`, `src/config-load.ts`, `src/config-schema.ts`, `packages/rafa/src/config-schema-tests.ts`, `packages/rafa/src/config-schema-wrap-up.ts`, `src/config-sections.ts`, `src/adapters/registry.ts`, `src/agents/roster.ts`, `src/tiers/{delivery,resolve,routing,serve,skill-names}.ts`, `src/inventory/{record,trees,search/rank}.ts`, `src/schema/tiers.ts`, `packages/rafa-effort/src/effort/sync/contact.ts`, `src/start/{plan-path,preflight-sync,risk-total}.ts`, `src/task/skill-index.ts`, `src/utils/{agent-definition,session-env}.ts` |
 | `c07-index` | 34 | 16 | `src/pr/{index,provider,preflight-items}.ts`, `src/utils/git.ts`, `src/claims/{device,plan-claim}.ts`, `src/commands/plan/claim-route.ts`, `src/start/{branch,branch-decision,claim-catch-up,pr-lifecycle,preflight-claim,runner-pr}.ts`, `src/board/{issue-board,trust}.ts`, `src/schema/project-id.ts` |
 | `c06-command` | 22 | 3 | `src/cli/command.ts`, `src/cli/running.ts`, `src/commands/plan/validate.ts` |
 | `c04-sqlite` | 20 | 11 | `src/effort/store/{dispatches,findings,location,preflight,schema-report,sqlite}.ts`, `src/effort/session-log.ts`, `src/report/{parse,record}.ts`, `src/utils/progress.ts`, `src/cli/version.ts` |
@@ -169,7 +169,7 @@ Nothing here is a registered step. These are the units a loop run executes, in t
 | task commit | `src/start/commit.ts` (`finishCleanExit`) | a `rafa:report` of `status: blocked` or with a blocker, a missing report, or a refused commit holds the task | behaviour |
 | task step | `src/start/suite-step.ts` (`runTaskStep`), `lint-step.ts`, `type-step.ts`, `task-always-run.ts` | scoped tests, `eslint` over the changed files and `tsc` over the changed test files, red only on a failure the base did not hold | behaviour |
 | triage | `src/start/triage.ts` (`c10-index`) | a failure is a warning; a security or unflagged bug goes only to the private tracker | 🧭 |
-| device sync | `src/effort/sync/contact.ts` (`c03-config`) | never throws; at most one unreachable-hub line per run | 🧭 |
+| device sync | `packages/rafa-effort/src/effort/sync/contact.ts` (`c03-config`) | never throws; at most one unreachable-hub line per run | 🧭 |
 | pre-wrap-up step | `src/start/suite-step.ts` (`runPreWrapUpStep`) | the full suite; red twice stops before the wrap-up | behaviour |
 | wrap-up session | `src/start/wrap-up.ts`, `wrap-up-retry.ts` | `loop.wrapUp.retries` sessions are spawned when no pull request is open, then the runner opens it | 🧭 |
 | release stage | `src/start/release-stage.ts` (`c09-version`), `release-body.ts` | a refused rewrite restores the loop's own fragment; a stage that cannot run prepares nothing | 🧭 |

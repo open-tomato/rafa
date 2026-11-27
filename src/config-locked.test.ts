@@ -16,12 +16,13 @@ describe('LOCKED_SETTINGS', () => {
     expect(LOCKED_SETTINGS.filter((name) => !names.has(name))).toEqual([]);
   });
 
-  it('locks effort.sync, effort.syncSkew, prerequisites.required and the claims keys and nothing else', () => {
+  it('locks effort.sync, effort.syncSkew, effort.syncMerge, prerequisites.required and the claims keys and nothing else', () => {
     const keys = LOCKED_SETTINGS.map((name) => SETTINGS[name].key);
 
     expect(keys).toEqual([
       'effort.sync',
       'effort.syncSkew',
+      'effort.syncMerge',
       'prerequisites.required',
       'claims.staleAfter',
       'claims.ahead',
