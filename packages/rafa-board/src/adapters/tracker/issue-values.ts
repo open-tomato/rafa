@@ -17,7 +17,7 @@
  * member the union lacks, so `check-types` fails on a list that drifts
  * from its port union either way. The keys come back in the order the
  * record spells them, which is the source's order: lifecycle order for
- * the states. The exceptions are `epic` and `spec`, rafa's own types,
+ * the states. The exceptions are `epic`, `spec` and `debt`, rafa's own types,
  * which the source lacks and which come last, in that order.
  */
 import type { IssuePriority, IssueState, IssueType } from '@open-tomato/rafa/ports';
@@ -32,6 +32,7 @@ const TYPE_MEMBERS = {
   'package-api': true,
   'epic': true,
   'spec': true,
+  'debt': true,
 } satisfies Record<IssueType, true>;
 
 /** Every priority, closed over {@link IssuePriority}. */
@@ -53,7 +54,7 @@ const STATE_MEMBERS = {
   'cancelled': true,
 } satisfies Record<IssueState, true>;
 
-/** Every issue type, in the source's order with `epic` and `spec` last. Frozen. */
+/** Every issue type, in the source's order with `epic`, `spec` and `debt` last. Frozen. */
 export const ISSUE_TYPES: readonly IssueType[] = Object.freeze(
   Object.keys(TYPE_MEMBERS) as IssueType[],
 );

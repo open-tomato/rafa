@@ -43,8 +43,8 @@
  *     export and the port does not live twice. Member types and their
  *     TSDoc are carried over as written, so they speak of open-tomato's
  *     OPT numbers, CLI and ledger, with three exceptions: {@link TrackerKind}
- *     is opened, {@link IssueType} gains `epic` and `spec`, and the note on
- *     `IssueRef.externalId` names the `local` adapter's issue number
+ *     is opened, {@link IssueType} gains `epic`, `spec` and `debt`, and the
+ *     note on `IssueRef.externalId` names the `local` adapter's issue number
  *     where the source named a file path. Four members are rafa's own
  *     and absent from the source, all optional: the `openIssues`
  *     reading, with the {@link OpenIssue} it answers, the `filedIssues`
@@ -205,12 +205,13 @@ export type PortType = keyof PortVersions;
 export type TrackerKind = 'github' | 'linear' | 'local' | (string & {});
 
 /**
- * What an issue is for. `epic` and `spec` are rafa's own members, absent
- * from the source: an issue labelled `type:epic` groups the issues
- * carrying its `epic:<slug>` label, and one labelled `type:spec` holds a
- * spec on the board.
+ * What an issue is for. `epic`, `spec` and `debt` are rafa's own members,
+ * absent from the source: an issue labelled `type:epic` groups the issues
+ * carrying its `epic:<slug>` label, one labelled `type:spec` holds a spec
+ * on the board, and one labelled `type:debt` is a bug record whose gap
+ * makes nothing break.
  */
-export type IssueType = 'code' | 'bug' | 'spike' | 'adr' | 'chore' | 'package-api' | 'epic' | 'spec';
+export type IssueType = 'code' | 'bug' | 'spike' | 'adr' | 'chore' | 'package-api' | 'epic' | 'spec' | 'debt';
 
 /** How urgent an issue is, once triage has set it. */
 export type IssuePriority = 'urgent' | 'high' | 'medium' | 'low';
