@@ -387,10 +387,37 @@ describe('GET /v1/status', () => {
         contractVersion: WIRE_CONTRACT_VERSION,
         migrations: ['0001-base'],
         capabilities: { fts: false, vector: false, graph: false, projection: false },
+        maxPayloadRows: null,
+        embedding: { model: null, hash: null, dimension: null },
         rows: { commits: 3 },
         devices: [{ device: A, lastPushAt: T0 }, { device: B, lastPushAt: T0 }],
       },
     });
+  });
+
+  it('answers each embedding field as null while the serving store has vectors off', async () => {
+    const base = memoryStore();
+    const { server } = start({ openStore: () => ({ ...base, contract: () => ({ ...base.contract(), embedding: null }) }) });
+
+    const { data } = await envelope(await send(server, 'GET', HUB_ROUTES.status, WRITER));
+
+    expect(data?.embedding).toEqual({ model: null, hash: null, dimension: null });
+  });
+
+  it('answers the serving store\'s embedding model, hash and dimension, never its precision', async () => {
+    const embedding = { model: 'nomic-embed-text', hash: 'sha256-abc', dimension: 768 };
+    const base = memoryStore();
+    const { server } = start({
+      openStore: () => ({
+        ...base,
+        contract: () => ({ ...base.contract(), capabilities: { ...base.contract().capabilities, vector: true }, embedding }),
+      }),
+    });
+
+    const { data } = await envelope(await send(server, 'GET', HUB_ROUTES.status, WRITER));
+
+    expect(data?.embedding).toEqual(embedding);
+    expect((data?.capabilities as Record<string, unknown>).vector).toBe(true);
   });
 
   it('refuses a query parameter, as it reads none', async () => {

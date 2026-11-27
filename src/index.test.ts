@@ -214,6 +214,7 @@ import {
 } from '@open-tomato/rafa/store';
 import * as storeEntry from '@open-tomato/rafa/store';
 import { mergeStore, readHeldMigrations } from '@open-tomato/rafa/store/merge-store';
+import { readStoreOrigin } from '@open-tomato/rafa/store/store-meta';
 import {
   decodeWirePayload,
   encodeWirePayload,
@@ -324,6 +325,7 @@ const RUNTIME_EXPORTS = [
   'readHeldMigrations',
   'readProjectScope',
   'readRafaBlocks',
+  'readStoreOrigin',
   'registerAdapters',
   'registerCoreAdapters',
   'registerCoreConfigSections',
@@ -416,6 +418,7 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['readHeldMigrations', entry.readHeldMigrations, readHeldMigrations],
   ['readProjectScope', entry.readProjectScope, readProjectScope],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
+  ['readStoreOrigin', entry.readStoreOrigin, readStoreOrigin],
   ['registerAdapters', entry.registerAdapters, registerAdapters],
   ['registerCoreAdapters', entry.registerCoreAdapters, registerCoreAdapters],
   ['registerCoreConfigSections', entry.registerCoreConfigSections, registerCoreConfigSections],

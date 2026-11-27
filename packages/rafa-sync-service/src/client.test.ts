@@ -38,7 +38,7 @@ const STATUS = {
 };
 
 /** The project fields a status answer naming no `projects` reads as. */
-const NO_PROJECTS = { projects: [], projectsNamed: false };
+const NO_PROJECTS = { projects: [], projectsNamed: false, maxPayloadRows: null };
 
 /** What {@link STATUS} reads as: version 1, no capability, the version unnamed. */
 const STATUS_READ = { ...STATUS, contractVersion: UNNAMED_CONTRACT_VERSION, capabilities: {}, contractNamed: false, ...NO_PROJECTS };
@@ -213,6 +213,26 @@ describe('status', () => {
     expect(await clientOf(behindHub.url).status()).toEqual(STATUS_READ);
     expect(await clientOf(naming.url).status())
       .toEqual({ ...STATUS, contractVersion: 2, capabilities: CAPABILITIES, contractNamed: true, ...NO_PROJECTS });
+  });
+
+  it('reads a maxPayloadRows the hub names as its cap, and one it names none or null of as no cap', async () => {
+    const capped = standIn(() => success({ ...CONTRACT_STATUS, maxPayloadRows: 4 }));
+    const unlimited = standIn(() => success({ ...CONTRACT_STATUS, maxPayloadRows: null }));
+    const silent = standIn(() => success(CONTRACT_STATUS));
+    expect(await clientOf(capped.url).status()).toEqual({ ...CONTRACT_STATUS_READ, maxPayloadRows: 4 });
+    expect((await clientOf(unlimited.url).status()).maxPayloadRows).toBeNull();
+    expect((await clientOf(silent.url).status()).maxPayloadRows).toBeNull();
+  });
+
+  it.each([
+    ['zero', 0],
+    ['a fraction', 1.5],
+    ['text', 'unlimited'],
+  ])('refuses a maxPayloadRows of %s as malformed', async (_label: string, cap: unknown) => {
+    const hub = standIn(() => success({ ...CONTRACT_STATUS, maxPayloadRows: cap }));
+    const error = await rejectionOf(clientOf(hub.url).status());
+    expect(error).toBeInstanceOf(HubAnswerMalformed);
+    expect(error.message).toBe('the hub\'s answer to status holds a maxPayloadRows that is not a whole number above zero');
   });
 
   it('keeps a version 0 the hub names, for the caller to judge', async () => {

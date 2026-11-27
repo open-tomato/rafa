@@ -1,5 +1,5 @@
 /**
- * The hub's config reader: the ten server keys `rafa-hub` reads from
+ * The hub's config reader: the fifteen server keys `rafa-hub` reads from
  * the YAML file the {@link HUB_CONFIG_ENV} environment variable names,
  * each with its default and its reader, resolved into one frozen
  * {@link HubConfig} or refused with every problem at once as a
@@ -20,8 +20,17 @@
  * `hub.auth.apiKeys`, which choose how a caller is identified (see
  * below). The spec for #1433 adds `hub.auth.login`, the login that
  * guards the key routes under `api-key`, read by `config-login.ts`
- * (whose TSDoc holds its readings). The client's keys (`hub.url`, `hub.tokenSecret`,
- * `hub.timeout`) are core's, read by `packages/rafa/src/config-schema-hub.ts` from a
+ * (whose TSDoc holds its readings). The spec for #1429 adds four, read
+ * with the rest of `hub.store` and `hub.index` by `config-store.ts`
+ * (whose TSDoc holds their readings): `hub.store.engine` (default
+ * `sqlite`), `hub.store.postgres.urlVariable` (default `POSTGRES_URL`
+ * under `postgres`), `hub.index.embedding.model` (no default; vectors
+ * off) and `hub.index.embedding.precision` (default `half`), and one
+ * outside `hub`, read by `config-dangerous.ts` (whose TSDoc holds its
+ * readings): `dangerous.hub.maxPayloadRows` (default `50000`,
+ * `unlimited` for no cap), the most rows one push or pull page holds.
+ * The client's keys (`hub.url`, `hub.tokenSecret`, `hub.timeout`) are
+ * core's, read by `packages/rafa/src/config-schema-hub.ts` from a
  * project's `.rafa/config.yaml`; this file is the server's own and
  * never a project's.
  *
@@ -47,15 +56,6 @@
  *     unit: `1.5h`, `10M`, ` 10m` and a bare number are refused, and so
  *     is anything below `1m` or above `24h`. `false` turns the cache
  *     off; `true` names no duration and is refused.
- *   - `hub.store.sqliteLibrary` must be an absolute path, and a relative
- *     one is refused rather than resolved: the library is handed to
- *     `Database.setCustomSQLite`, which the process loads once and
- *     before any database opens, so a path that names a different file
- *     from another directory would be a silent wrong load. Left out, it
- *     is null, and the connector answers `vector: false` where the
- *     engine needs it.
- *   - `hub.index.rebuildAfterPush` is `true` or `false` and nothing
- *     else: `'false'` and `0` are refused, not read as off.
  *   - `hub.projects` is a non-empty list of mappings holding exactly
  *     `id` (the project's root commit sha, 40 lowercase hex characters,
  *     as git prints it and a device sends it), `name` (any non-empty
@@ -86,18 +86,22 @@
  *   - `hub.auth.login` is read by `config-login.ts`: refused under
  *     `github`, null there when left out, and `basic` when left out
  *     under `api-key`.
- *   - A key under `hub`, `hub.auth`, `hub.store` or `hub.index` that the
- *     hub does not read is
- *     refused rather than ignored: the file is the hub's alone, so an
+ *   - A key under `hub` or `hub.auth` that the hub does not read is
+ *     refused rather than ignored, as `config-store.ts` refuses one under
+ *     `hub.store` and `hub.index`: the file is the hub's alone, so an
  *     unknown key there is a misspelling (`cachefor`) that would
  *     otherwise leave a default in force without a word.
  */
+import type { HubDangerousConfig } from './config-dangerous.js';
 import type { HubLoginConfig } from './config-login.js';
+import type { HubIndexConfig, HubStoreConfig } from './config-store.js';
 
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 
+import { readDangerousConfig } from './config-dangerous.js';
 import { readLoginConfig } from './config-login.js';
+import { readIndexConfig, readStoreConfig } from './config-store.js';
 
 /** The environment variable naming the hub's config file. */
 export const HUB_CONFIG_ENV = 'RAFA_HUB_CONFIG';
@@ -157,9 +161,6 @@ export const DEFAULT_AUTH_ADAPTER: HubAuthAdapter = 'github';
 /** An environment variable name, as `hub.auth.apiKeys` takes each entry. */
 const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
 
-/** `hub.index.rebuildAfterPush` when it is left out. */
-export const DEFAULT_REBUILD_AFTER_PUSH = true;
-
 /** The keys the hub reads under `hub`. */
 const HUB_KEYS: readonly string[] = Object.freeze(['repository', 'port', 'storePath', 'projects', 'auth', 'store', 'index']);
 
@@ -168,12 +169,6 @@ const PROJECT_KEYS: readonly string[] = Object.freeze(['id', 'name', 'repository
 
 /** The keys the hub reads under `hub.auth`. */
 const AUTH_KEYS: readonly string[] = Object.freeze(['adapter', 'apiKeys', 'cacheFor', 'login']);
-
-/** The keys the hub reads under `hub.store`. */
-const STORE_KEYS: readonly string[] = Object.freeze(['sqliteLibrary']);
-
-/** The keys the hub reads under `hub.index`. */
-const INDEX_KEYS: readonly string[] = Object.freeze(['rebuildAfterPush']);
 
 /** What `hub.repository` takes, as a refusal says it. */
 const REPOSITORY_EXPECTED = 'expected a GitHub repository as owner/name, such as open-tomato/rafa';
@@ -205,12 +200,6 @@ const API_KEYS_EXPECTED = 'expected a non-empty list of environment variable nam
 /** What an entry of `hub.auth.apiKeys` takes, as a refusal says it. */
 const API_KEY_NAME_EXPECTED = 'expected an environment variable name of A-Z, 0-9 and _, not opening with a digit, such as RAFA_HUB_KEY; the value written is not repeated';
 
-/** What `hub.store.sqliteLibrary` takes, as a refusal says it. */
-const SQLITE_LIBRARY_EXPECTED = 'expected an absolute path to a vanilla libsqlite3, such as /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib';
-
-/** What `hub.index.rebuildAfterPush` takes, as a refusal says it. */
-const REBUILD_AFTER_PUSH_EXPECTED = 'expected true or false';
-
 /** One project the hub serves: an entry of `hub.projects`, or the default one. */
 export interface HubProject {
   /**
@@ -227,8 +216,12 @@ export interface HubProject {
   readonly storePath: string;
 }
 
-/** The hub's settings, resolved. */
-export interface HubConfig {
+/**
+ * The hub's settings, resolved: the keys of `hub.store` and `hub.index`,
+ * read by `config-store.ts`, and of `dangerous`, read by
+ * `config-dangerous.ts`, beside the ones below.
+ */
+export interface HubConfig extends HubStoreConfig, HubIndexConfig, HubDangerousConfig {
   /**
    * The repository whose permission decides who may sync. `hub.repository`,
    * or the first listed project's when `hub.projects` is set.
@@ -265,17 +258,6 @@ export interface HubConfig {
    * neither exists. `hub.auth.login`, read by `config-login.ts`.
    */
   readonly login: HubLoginConfig | null;
-  /**
-   * The absolute path of the vanilla `libsqlite3` the index loads its
-   * vector extension through, or null when none is named.
-   * `hub.store.sqliteLibrary`.
-   */
-  readonly sqliteLibrary: string | null;
-  /**
-   * Whether a push that added rows rebuilds the project's index; `false`
-   * leaves it to `rafa-hub index rebuild`. `hub.index.rebuildAfterPush`.
-   */
-  readonly rebuildAfterPush: boolean;
 }
 
 /** The hub's config refused: every problem found, one sentence each. */
@@ -534,25 +516,6 @@ function readApiKeys(path: string, adapter: HubAuthAdapter | undefined, raw: unk
     : { value: Object.freeze([...raw] as string[]), problems: [] };
 }
 
-/** Reads `hub.store.sqliteLibrary`: an absolute path, null when left out. */
-function readSqliteLibrary(path: string, raw: unknown): Reading<string | null> {
-  if (raw === undefined) return { value: null, problems: [] };
-
-  const isPath = typeof raw === 'string' && raw.trim() === raw && isAbsolute(raw);
-  return isPath
-    ? { value: raw, problems: [] }
-    : refusal(path, 'hub.store.sqliteLibrary', raw, SQLITE_LIBRARY_EXPECTED);
-}
-
-/** Reads `hub.index.rebuildAfterPush`, {@link DEFAULT_REBUILD_AFTER_PUSH} when left out. */
-function readRebuildAfterPush(path: string, raw: unknown): Reading<boolean> {
-  if (raw === undefined) return { value: DEFAULT_REBUILD_AFTER_PUSH, problems: [] };
-
-  return typeof raw === 'boolean'
-    ? { value: raw, problems: [] }
-    : refusal(path, 'hub.index.rebuildAfterPush', raw, REBUILD_AFTER_PUSH_EXPECTED);
-}
-
 /** One problem per key of `section` outside `known`, named by `prefix`. */
 function unknownKeys(path: string, prefix: string, section: Readonly<Record<string, unknown>>, known: readonly string[]): string[] {
   return Object.keys(section)
@@ -589,16 +552,18 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     throw new HubConfigError([`${path}: not valid YAML: ${reason}`]);
   }
 
-  const hub = isMapping(document)
-    ? document['hub']
-    : undefined;
+  const sections: Readonly<Record<string, unknown>> = isMapping(document)
+    ? document
+    : {};
+  const hub = sections['hub'];
   if (!isMapping(hub)) {
     throw new HubConfigError([`${path}: hub is ${describeValue(hub)}, expected a mapping holding hub.repository`]);
   }
 
   const auth = section(path, 'auth', hub['auth'], AUTH_KEYS);
-  const store = section(path, 'store', hub['store'], STORE_KEYS);
-  const index = section(path, 'index', hub['index'], INDEX_KEYS);
+  const store = readStoreConfig(path, hub['store']);
+  const index = readIndexConfig(path, hub['index']);
+  const dangerous = readDangerousConfig(path, sections['dangerous']);
   const projects = readProjects(path, hub['projects']);
   const repository = projects === undefined
     ? readRepository(path, hub['repository'])
@@ -611,8 +576,6 @@ export function parseHubConfig(text: string, path: string): HubConfig {
   const apiKeys = readApiKeys(path, authAdapter.value, auth.value?.['apiKeys']);
   const login = readLoginConfig(path, authAdapter.value, auth.value?.['login']);
   const cacheFor = readCacheFor(path, auth.value?.['cacheFor']);
-  const sqliteLibrary = readSqliteLibrary(path, store.value?.['sqliteLibrary']);
-  const rebuildAfterPush = readRebuildAfterPush(path, index.value?.['rebuildAfterPush']);
 
   const problems = [
     ...unknownKeys(path, 'hub', hub, HUB_KEYS),
@@ -626,9 +589,8 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     ...cacheFor.problems,
     ...login.problems,
     ...store.problems,
-    ...sqliteLibrary.problems,
     ...index.problems,
-    ...rebuildAfterPush.problems,
+    ...dangerous.problems,
   ];
   if (problems.length > 0) throw new HubConfigError(problems);
 
@@ -643,8 +605,9 @@ export function parseHubConfig(text: string, path: string): HubConfig {
     authAdapter: authAdapter.value as HubAuthAdapter,
     apiKeys: apiKeys.value as readonly string[],
     login: login.value as HubLoginConfig | null,
-    sqliteLibrary: sqliteLibrary.value as string | null,
-    rebuildAfterPush: rebuildAfterPush.value as boolean,
+    ...(store.value as HubStoreConfig),
+    ...(index.value as HubIndexConfig),
+    ...(dangerous.value as HubDangerousConfig),
   });
 }
 

@@ -29,6 +29,13 @@
  *     `project` on push and pull; each push and pull's `project` query
  *     is recorded in {@link StandInHub.projectQueries}.
  *
+ *   - Once {@link StandInHub.setMaxPayloadRows} names a cap, the status
+ *     answers it as `maxPayloadRows`, a push carrying more rows is
+ *     refused `413` and nothing is kept, and a pull page is cut at the
+ *     cap as the hub's store cuts it: tables in order, rows in `seq`
+ *     order, the cut table's cursor at its last answered row and a
+ *     table past the cut's at the request's.
+ *
  * It merges nothing: a row is matched by its origin pair alone. Every
  * push and pull is recorded in {@link StandInHub.requests}, and
  * {@link StandInHub.setFault} answers each with a response of the
@@ -80,6 +87,8 @@ export interface StandInHub {
   readonly projectQueries: readonly (string | null)[];
   /** Names `projects` on the status answer from now on; null names none, as a hub one release behind. */
   readonly setProjects: (projects: readonly { readonly id: string; readonly name: string }[] | null) => void;
+  /** Caps push payloads and pull pages at `cap` rows from now on; null caps nothing and names no cap. */
+  readonly setMaxPayloadRows: (cap: number | null) => void;
   /** Stops listening, so the next request fails to connect. */
   readonly stop: () => Promise<void>;
 }
@@ -91,6 +100,9 @@ const PUSHED_AT = '2026-10-01T09:00:00.000Z';
 function success(data: unknown): Response {
   return Response.json({ success: true, data });
 }
+
+/** The status a push over the cap is refused with, as the hub's push route answers it. */
+const OVER_CAP = 413;
 
 /** How a row is identified across stores: its origin pair. */
 function pairOf(row: WireRow): string {
@@ -110,6 +122,7 @@ export function startStandInHub(): StandInHub {
   let statusReads = 0;
   const projectQueries: (string | null)[] = [];
   let projects: readonly { readonly id: string; readonly name: string }[] | null = null;
+  let cap: number | null = null;
 
   const status = (): Response => {
     statusReads += 1;
@@ -123,10 +136,17 @@ export function startStandInHub(): StandInHub {
       ...projects === null
         ? {}
         : { projects },
+      ...cap === null
+        ? {}
+        : { maxPayloadRows: cap },
     });
   };
 
   const push = (payload: WirePayload): Response => {
+    const carried = Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
+    if (cap !== null && carried > cap) {
+      return Response.json({ success: false, error: `over dangerous.hub.maxPayloadRows of ${String(cap)}` }, { status: OVER_CAP });
+    }
     migrations = payload.migrations;
     let received = 0;
     let added = 0;
@@ -147,9 +167,15 @@ export function startStandInHub(): StandInHub {
   const pull = (device: string, since: WireCursor, named: readonly string[] | null): Response => {
     const answered: Record<string, readonly WireRow[]> = {};
     const cursor: Record<string, number> = {};
+    let room = cap ?? Number.POSITIVE_INFINITY;
     for (const [table, rows] of tables) {
-      answered[table] = rows.filter((row) => Number(row.seq) > (since[table] ?? 0) && row['origin_store'] !== device);
-      cursor[table] = rows.length;
+      const past = rows.filter((row) => Number(row.seq) > (since[table] ?? 0) && row['origin_store'] !== device);
+      const kept = past.slice(0, room);
+      room -= kept.length;
+      answered[table] = kept;
+      cursor[table] = kept.length === past.length
+        ? rows.length
+        : Number(kept.at(-1)?.seq ?? since[table] ?? 0);
     }
     const lacking = named === null
       ? []
@@ -225,6 +251,9 @@ export function startStandInHub(): StandInHub {
     projectQueries,
     setProjects: (named) => {
       projects = named;
+    },
+    setMaxPayloadRows: (named) => {
+      cap = named;
     },
     stop: () => server.stop(true),
   };

@@ -1,8 +1,8 @@
 # rafa
 
 The agent task loop for ralph, packaged and ready to ship: a single-package
-implementation of the loop from `agentic-research`, under bun, published to
-npm as `@open-tomato/rafa`. Core, the hub, the sync service and the six
+implementation of the loop from `agentic-research`, under bun, published to npm
+as `@open-tomato/rafa`. Core, `rafa-hub*`, `rafa-index`, sync service and six
 feature packages are bun workspaces in `packages/`; Atlas's in `addons/atlas/`.
 
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
@@ -32,8 +32,8 @@ back into every turn and the split would save nothing.
 
 - `context/workflow.md` — branch, PR and merge, the task-shape routing
   table, and what each agent does.
-- `context/verification.md` — the gate order and how to read their
-  captures.
+- `context/verification.md` — the gate order and how to read their captures.
+- `context/rafa-hub.md` — the hub: install, config, projects, connectors.
 - `context/effort-store.md` — the store port, its two backends, row
   origins, store metadata, copy detection, sync (push, pull, registry,
   file exchange, locked keys), and what a new kind or field has to touch.

@@ -40,6 +40,24 @@
  * no `missing`, from an older hub, passes on as `HubRefused` with its
  * message as it stands. Neither moves the push cursor.
  *
+ * ## A bounded push and a pull's page
+ *
+ * A push asked with a `limit` ({@link ServicePushRequest}), as the
+ * contact asks one under the hub's `maxPayloadRows`, sends at most
+ * `limit` rows past the push cursor: the export is cut as the hub cuts
+ * a pull page, its tables taken in the order the export answers them,
+ * each in `seq` order, until `limit` rows are kept. The cursor of a
+ * table sent whole is the export's, that of the table the cut falls in
+ * the `seq` of its last row sent, and that of a table past the cut the
+ * push cursor's, so the next push sends the rest. A dry run asked a
+ * `limit` counts the cut. A `limit` that is not a whole number above
+ * zero is refused with a `TypeError` before anything is read.
+ *
+ * Every `pulled` answer carries `rows`, the rows the hub's page held
+ * across its tables: the hub cuts every page at its cap, so a page
+ * whose `rows` reaches the cap may have more behind it, and the contact
+ * pulls again.
+ *
  * ## The push's dry run and the rows waiting
  *
  * A push asked with `dryRun: true` ({@link ServicePushRequest}) does
@@ -184,8 +202,9 @@
  * ## The hub's status
  *
  * {@link ServiceSync.hubStatus} answers the hub's contract version, the
- * project push and pull name with the name the hub gives it, and the
- * migrations the hub holds, all read off the hub client's kept status
+ * project push and pull name with the name the hub gives it, the
+ * migrations the hub holds, and its `maxPayloadRows` (null when its
+ * status names none), all read off the hub client's kept status
  * answer: a strategy that answers `hubStatus()` and then pushes and
  * pulls reads `/v1/status` once. It reads no store and needs none, and
  * it refuses no contract version: a hub speaking another one is
@@ -220,7 +239,7 @@
 import type { HubClient, HubPullOptions } from './client.js';
 import type { SecretReader } from './token.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '@open-tomato/rafa/ports';
-import type { MergeOptions, StoreBackend, StoreMergeResult, WireCursor, WirePayload } from '@open-tomato/rafa/store';
+import type { MergeOptions, StoreBackend, StoreMergeResult, WireCursor, WirePayload, WireRow } from '@open-tomato/rafa/store';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
@@ -231,13 +250,13 @@ import {
   mergeStore,
   openSqliteStore,
   readHeldMigrations,
+  readStoreOrigin,
   STORE_BACKENDS,
   WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
 } from '@open-tomato/rafa/store';
 import { readProjectIdentity } from '@open-tomato/rafa/store/store-identity';
-import { Database } from 'bun:sqlite';
 
 import { createHubClient, HubRefused } from './client.js';
 import { clearHeldBack, keepHeldBack, readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
@@ -257,9 +276,6 @@ export const SELF_UPDATE = 'rafa self-update';
 
 /** The command that moves an NDJSON project's rows into the SQLite store, as core spells it. */
 export const MOVE_TO_SQLITE = 'rafa effort move --to=sqlite';
-
-/** How long reading the origin waits on a writer: core's `effort.busyTimeoutMs` default. */
-const BUSY_TIMEOUT_MS = 5000;
 
 /** What a push or pull that moves no rows answers. */
 const NOTHING_TO_SYNC: SyncPushResult & SyncPullResult = Object.freeze({ status: 'nothing-to-sync' });
@@ -399,11 +415,18 @@ export class HubContractMismatch extends Error {
  */
 export type ServiceSyncSkew = 'refuse' | 'pull-projected';
 
-/** A pull's answer: core's `SyncPullResult`, a projected pull that merged also carrying the line to write. */
+/** A pull that merged: core's `pulled` answer with the rows the hub's page held; see the module note. */
+export type ServicePulled = Extract<SyncPullResult, { readonly status: 'pulled' }> & {
+  /** The rows the hub's page held, across its tables. */
+  readonly rows: number;
+};
+
+/** A pull's answer: core's `SyncPullResult`, a merged one carrying its page's rows and maybe the line to write. */
 export type ServicePullResult =
-  | SyncPullResult
-  | (Extract<SyncPullResult, { readonly status: 'pulled' }> & {
-    /** The `pulled <n> rows projected` line; see the module note. */
+  | Exclude<SyncPullResult, { readonly status: 'pulled' }>
+  | ServicePulled
+  | (ServicePulled & {
+    /** The `pulled <n> rows projected` or `refilled` line; see the module note. */
     readonly notice: string;
   });
 
@@ -417,12 +440,16 @@ export interface ServiceHubStatus {
   readonly projectName: string | null;
   /** The migration ids the hub holds, in the order it names them. */
   readonly migrations: readonly string[];
+  /** The most rows the hub takes in a push and answers in a pull page; null when its status names none. */
+  readonly maxPayloadRows: number | null;
 }
 
 /** What a push is asked: core's `SyncPushRequest`, with the dry run. */
 export interface ServicePushRequest extends SyncPushRequest {
   /** Counts the rows the push would send, sending nothing and moving no cursor; see the module note. */
   readonly dryRun?: boolean;
+  /** The most rows the push sends past the push cursor, a whole number above zero; every row when left out. */
+  readonly limit?: number;
 }
 
 /** A push's answer: core's `SyncPushResult`, a dry run's also carrying the rows it would have sent. */
@@ -520,20 +547,8 @@ function refuseNdjson(backend: StoreBackend): void {
 
 /** The origin the store at `path` records, or a refusal naming what mints one. */
 function readOrigin(path: string): string {
-  const db = new Database(path, { readonly: true });
-  let origin: unknown;
-  try {
-    db.run(`PRAGMA busy_timeout = ${String(BUSY_TIMEOUT_MS)}`);
-    const hasMeta = db
-      .query<{ name: string }, []>('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'store_meta\'')
-      .get() !== null;
-    origin = hasMeta
-      ? db.query<{ store_id: unknown }, []>('SELECT store_id FROM store_meta WHERE id = 1').get()?.store_id
-      : undefined;
-  } finally {
-    db.close();
-  }
-  if (typeof origin === 'string' && origin !== '') return origin;
+  const origin = readStoreOrigin(path);
+  if (origin !== null) return origin;
   throw new ServiceSyncRefusal(
     `${REFUSAL}: the store at ${path} records no origin, so the hub could not tell its rows apart from another device's.`
       + ' Nothing was sent. A rafa command that writes the store inside the project\'s git repository mints one.',
@@ -555,6 +570,33 @@ function resolveProject(repoRoot: string, configured: string | null | undefined)
 /** The rows `payload` carries, across its tables. */
 function rowsIn(payload: WirePayload): number {
   return Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
+}
+
+/** Refuses a push `limit` that is not a whole number above zero; see the module note. */
+function checkLimit(limit: number | undefined): void {
+  if (limit === undefined || (Number.isInteger(limit) && limit > 0)) return;
+  throw new TypeError(`${REFUSAL}: a push limit of ${String(limit)} cannot be sent; expected a whole number above zero`);
+}
+
+/** `payload`, exported past `since`, cut to its first `limit` rows with the cursor past them; see the module note. */
+function cutPayload(payload: WirePayload, since: WireCursor, limit: number | undefined): WirePayload {
+  if (limit === undefined || rowsIn(payload) <= limit) return payload;
+  const tables: Record<string, readonly WireRow[]> = {};
+  const cursor: Record<string, number> = { ...payload.cursor };
+  let room = limit;
+  for (const [table, rows] of Object.entries(payload.tables)) {
+    const kept = rows.length <= room
+      ? rows
+      : Object.freeze(rows.slice(0, room));
+    tables[table] = kept;
+    room -= kept.length;
+    if (kept === rows) continue;
+    const last = kept.at(-1);
+    cursor[table] = last === undefined
+      ? since[table] ?? 0
+      : Number(last.seq);
+  }
+  return Object.freeze({ ...payload, tables: Object.freeze(tables), cursor: Object.freeze(cursor) });
 }
 
 /** Refuses a payload naming a migration outside `known`. */
@@ -634,18 +676,19 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
       : undefined;
   };
 
-  /** The rows of the store under `origin` past its push cursor; reads only. */
-  const pastPushCursor = (origin: string): WirePayload => exportWirePayload({
-    path: storePath,
-    cursor: readSyncCursors(statePath, origin, hub.url).push,
-  });
+  /** The rows of the store under `origin` past its push cursor, at most `limit` of them; reads only. */
+  const pastPushCursor = (origin: string, limit?: number): WirePayload => {
+    const since = readSyncCursors(statePath, origin, hub.url).push;
+    return cutPayload(exportWirePayload({ path: storePath, cursor: since }), since, limit);
+  };
 
-  const push = async ({ to, dryRun = false }: ServicePushRequest): Promise<ServicePushResult> => {
+  const push = async ({ to, dryRun = false, limit }: ServicePushRequest): Promise<ServicePushResult> => {
     refusePath('to', to);
+    checkLimit(limit);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
     const reached = await agreedClient();
-    const payload = pastPushCursor(origin);
+    const payload = pastPushCursor(origin, limit);
     if (dryRun) return Object.freeze({ status: 'pushed', path: null, dryRun: true, rows: rowsIn(payload) });
     await pushOrRefuse(reached, origin, payload);
     writeSyncCursor(statePath, origin, hub.url, 'push', payload.cursor);
@@ -688,19 +731,20 @@ export function createServiceSync(options: ServiceSyncOptions): ServiceSync {
     if (!dryRun) writeSyncCursor(statePath, origin, hub.url, 'pull', payload.cursor);
     if (heldBack !== undefined && projected === undefined && caughtUp && !dryRun) clearHeldBack(statePath, origin, hub.url);
     if (merge === undefined) return NOTHING_TO_SYNC;
+    const rows = rowsIn(payload);
     if (projected !== undefined) {
-      return Object.freeze({ status: 'pulled', merge, notice: projectedPullLine(rowsIn(payload), waitingIn(payload)) });
+      return Object.freeze({ status: 'pulled', merge, rows, notice: projectedPullLine(rows, waitingIn(payload)) });
     }
     return Object.freeze(refill === undefined
-      ? { status: 'pulled', merge }
-      : { status: 'pulled', merge, notice: refilledLine(merge.rowsRefilled, refill.since) });
+      ? { status: 'pulled', merge, rows }
+      : { status: 'pulled', merge, rows, notice: refilledLine(merge.rowsRefilled, refill.since) });
   };
 
   const hubStatus = async (): Promise<ServiceHubStatus> => {
     const reached = await hubClient();
-    const { contractVersion, migrations } = await reached.status();
+    const { contractVersion, migrations, maxPayloadRows } = await reached.status();
     const projectId = project ?? resolveProject(options.repoRoot, hub.project);
-    return Object.freeze({ contractVersion, projectId, projectName: await reached.projectName(), migrations });
+    return Object.freeze({ contractVersion, projectId, projectName: await reached.projectName(), migrations, maxPayloadRows });
   };
 
   return Object.freeze({ kind: 'service', push, pull, pendingPush, hubStatus });

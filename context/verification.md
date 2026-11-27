@@ -287,8 +287,10 @@ with three gates. **Triggers:** pull requests into `main`, `integration`
 or `stretch/**`, and pushes to `stretch/**`. **Gates** (each step runs
 unless the job was cancelled): ring 0's job `verify` runs `bun test`,
 `bunx eslint .`, and
-`bun run check-types`, the root config and the ten composite members,
-which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
+`bun run check-types`, the root config and the eleven composite members,
+which hold the types; it runs the `paradedb` service
+(`paradedb/paradedb:0.26.4-pg18`, pinned by digest) and hands its tests
+`POSTGRES_URL`, which `affected` does not set. Ring 1's job `affected` runs `bun run verify:affected`
 (`turbo run lint check-types test --affected`), `bunx tsc --build
 tsconfig.references.json` and `bun scripts/workspace/graph-check.ts`.
 `affected` checks out the whole history and names turbo's base in

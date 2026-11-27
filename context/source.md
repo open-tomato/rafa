@@ -93,7 +93,7 @@ and `erasableSyntaxOnly`**. Every tsconfig reaches it by one chain: the
 root `tsconfig.json` and each composite member's `tsconfig.json` extend
 `tsconfig.packages.json`, which extends `@open-tomato/typescript-config/base`,
 the name the root's `^0.1.0` line installs into `node_modules`. So the root
-config and the ten composite members are held to both flags by
+config and the twelve composite members are held to both flags by
 `bun run check-types`, with no flag on the command line. The base also sets
 `declaration`, because `tsc` refuses `isolatedDeclarations` without it; under
 the base's `noEmit` it writes no
@@ -101,7 +101,7 @@ file. The root `tsconfig.json` excludes `**/*.test.ts`,
 so `check-types` does not hold a test file under `src/` or `scripts/`. The
 runner's type step does, for the test files a task adds or edits: its scratch
 config extends `tsconfig.json` and takes the flags with it. The
-`tsconfig.json` of each of the ten composite members leaves its test files out
+`tsconfig.json` of each of the twelve composite members leaves its test files out
 too, as the root does, so `check-types` holds no test file anywhere: `tsc`
 reports no `isolatedDeclarations` error for a program with any other error,
 and the test files carry hundreds (the spike's probe 8, #804).
@@ -760,13 +760,19 @@ names come from, and the facade entry is no node.
 ### Packages under `packages/`
 
 - **`packages/*` is a bun workspace** (`workspaces` in the root
-  `package.json`) with ten members, all `private`: the three that
+  `package.json`) with twelve members, all `private`: the three that
   predate the facades, `packages/rafa/` (`@open-tomato/rafa-core`, core, the
   name for good), `packages/rafa-hub/` (`@open-tomato/rafa-hub`),
   `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`); the tenth,
   `packages/rafa-index/` (`@open-tomato/rafa-index`), the hub's search index,
   which imports only `bun:sqlite`, `node:` builtins, `sqlite-vec` and its own
-  files; and the six feature packages that
+  files; the eleventh, `packages/rafa-hub-port/` (`@open-tomato/rafa-hub-port`),
+  the hub's type-only store port, which imports only core's `./store` entry
+  and which `packages/rafa-hub/src/store/port.ts` re-exports; the twelfth,
+  `packages/rafa-hub-postgres/` (`@open-tomato/rafa-hub-postgres`), the
+  hub's `postgres` connector on Drizzle over `Bun.sql` (`drizzle-orm` and
+  `drizzle-kit`, its `drizzle.config.ts` beside its `index.ts`); and the six
+  feature packages that
   `docs/survey/facade-pile.md` lists as passing, `packages/rafa-effort/`,
   `packages/rafa-inventory/`, `packages/rafa-board/`,
   `packages/rafa-release/`, `packages/rafa-pr/` and `packages/rafa-run/`,
@@ -1208,7 +1214,7 @@ names come from, and the facade entry is no node.
   `bun run check-types` runs `tsc --noEmit` over the root, whose `tsconfig.json`
   leaves out `packages/` and the test files, then `bun run --filter
   './packages/*' check-types`, which runs the `check-types` script of each
-  member that has one: `tsc --build` in the ten composite members. `bun run
+  member that has one: `tsc --build` in the eleven composite members. `bun run
   lint` lints package code from the root config like `src/`, its `testdata/`
   folders included, and so does the runner's lint step on a task's diff; the
   root `eslint.config.mjs` ignores `**/.tsbuild/**`, so the root `eslint .`
@@ -1231,26 +1237,29 @@ names come from, and the facade entry is no node.
   references `../rafa`, has a `check-types` script and an entry in the solution
   file, and its `bunfig.toml` preloads `test-preload.ts`, which registers
   core's section alone, so `bun test` run from its folder reads core's settings.
-- **The composite recipe builds the ten composite members' declarations.**
+- **The composite recipe builds the twelve composite members' declarations.**
   The `tsconfig.json` of `packages/rafa`, `packages/rafa-board`,
-  `packages/rafa-effort`, `packages/rafa-hub`, `packages/rafa-index`,
-  `packages/rafa-inventory`, `packages/rafa-pr`, `packages/rafa-release`,
-  `packages/rafa-run` and `packages/rafa-sync-service` keeps the `extends` of
-  `tsconfig.packages.json` and sets `composite: true`, `noEmit: false`,
+  `packages/rafa-effort`, `packages/rafa-hub`, `packages/rafa-hub-port`,
+  `packages/rafa-hub-postgres`, `packages/rafa-index`, `packages/rafa-inventory`, `packages/rafa-pr`,
+  `packages/rafa-release`, `packages/rafa-run` and `packages/rafa-sync-service`
+  keeps the `extends` of `tsconfig.packages.json` and sets `composite: true`,
+  `noEmit: false`,
   `emitDeclarationOnly: true`, `rootDir` (`"src"` in `packages/rafa`,
   `packages/rafa-hub` and `packages/rafa-sync-service`, or `"."` in the six
-  feature packages and `packages/rafa-index`, whose `index.ts` sits beside
-  `src/`), `outDir: ".tsbuild"` and
-  `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages
+  feature packages, `packages/rafa-hub-port`, `packages/rafa-hub-postgres` and
+  `packages/rafa-index`, whose `index.ts` sits beside `src/`),
+  `outDir: ".tsbuild"` and `tsBuildInfoFile: ".tsbuild/tsconfig.tsbuildinfo"`, the last so two packages
   never share one (TS6377). It leaves its test files out, and its `references`
-  name what it imports: core and `packages/rafa-index` none, `packages/rafa-hub`
-  `../rafa` and `../rafa-index`, and every other member `../rafa` and the
-  feature packages it imports. `tsc --build` builds a
-  reference first, reads core through `paths` from that reference's
-  declarations, and is a no-op on a second run. `.tsbuild/` is gitignored at
-  every depth. Each of the four code packages' `turbo.json` (core, the hub,
-  the index and the sync service) extends the root's (`"extends": ["//"]`) and
-  declares `check-types.outputs` as `.tsbuild/**`, so a cache hit restores the
+  name what it imports: core and `packages/rafa-index` none,
+  `packages/rafa-hub-postgres` `../rafa`, `../rafa-hub-port` and
+  `../rafa-index`, `packages/rafa-hub` those three and
+  `../rafa-hub-postgres`, `packages/rafa-hub-port` `../rafa`, and every other member
+  `../rafa` and the feature packages it imports. `tsc --build` builds a reference first, reads core through `paths`
+  from that reference's declarations, and is a no-op on a second run.
+  `.tsbuild/` is gitignored at every depth. Each of the six code packages'
+  `turbo.json` (core, the hub, the hub's store port, the postgres connector,
+  the index and the sync service) extends the root's (`"extends": ["//"]`)
+  and declares `check-types.outputs` as `.tsbuild/**`, so a cache hit restores the
   declarations a dependent's build reads. The six feature packages have no
   `turbo.json`, so their `check-types` runs under the root's definition, which
   declares no outputs. A service with its reference to core dropped fails with

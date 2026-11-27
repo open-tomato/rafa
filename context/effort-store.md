@@ -400,9 +400,20 @@ A rejection named `HubUpgradeRequired` or `RafaUpdateRequired` (the hub or
 this rafa is behind the other's migrations) is also written as its message
 stands, each line once per contact, and its push still pulls. A pull answer
 carrying a `notice` (the `pulled <n> rows projected` and `refilled <n> rows held
-back since <date>` lines) is written as it stands, once per pull. Any other
+back since <date>` lines) is written as it stands, once per pull page. Any other
 rejection is written as `effort sync: <push|pull> over service failed:
 <message>`, and a refused push still attempts its pull.
+**The payload cap:** a contact reads the hub's `maxPayloadRows` by shape
+off the strategy's `hubStatus()`, once per run, and splits a push by cursor
+into payloads under it, asking `push({ to: null, limit })` of a strategy
+carrying `pendingPush()` until no rows wait; it repeats a pull while the
+page's answer says (`rows`) it came back full. A hub naming no cap, a
+strategy with no `pendingPush()` and a dry run push and pull once
+(`packages/rafa-effort/src/effort/sync/contact-pages.ts`). The `service`
+strategy answers `maxPayloadRows` on `hubStatus()`, sends at most `limit`
+rows a push past its push cursor, and answers `rows` on every `pulled`
+page (`packages/rafa-sync-service/src/sync.ts`, `A bounded push and a
+pull's page`).
 `pullBeforeRead` reads the config without writing its warnings and contacts
 nothing when the config is refused, leaving the refusal to the command.
 

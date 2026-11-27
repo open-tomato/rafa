@@ -1,9 +1,13 @@
 # The rafa hub as a container: `rafa-hub` (src/bin.ts) bundled into one
 # file and run on the `oven/bun` image.
 #
-# Build from the repository root, since the hub imports core's
-# `@open-tomato/rafa/store` subpath, which resolves through the root's
-# `tsconfig.packages.json` to `packages/rafa/` (context/source.md):
+# Build from the repository root. The hub imports its sibling workspace
+# packages (`@open-tomato/rafa-index`, `rafa-hub-port`, `rafa-hub-postgres`
+# and core's `@open-tomato/rafa/store` subpath) and, through the postgres
+# connector, `drizzle-orm` from npm, so the build stage copies the whole
+# workspace (less what `.dockerignore` at the root leaves out) and runs
+# `bun install --frozen-lockfile`, which needs every workspace's
+# `package.json` and links each package into `node_modules`:
 #
 #   docker build -f packages/rafa-hub/Dockerfile -t rafa-hub .
 #
@@ -21,10 +25,8 @@ ARG BUN_VERSION=1.3.14
 
 FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /repo
-COPY package.json tsconfig.packages.json ./
-COPY src ./src
-COPY packages/rafa ./packages/rafa
-COPY packages/rafa-hub ./packages/rafa-hub
+COPY . .
+RUN bun install --frozen-lockfile --production --ignore-scripts
 RUN bun build packages/rafa-hub/src/bin.ts --target=bun --outfile=/out/rafa-hub.js
 
 FROM oven/bun:${BUN_VERSION}-slim

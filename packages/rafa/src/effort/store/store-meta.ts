@@ -197,6 +197,9 @@ import { clearReplacedStoreIds, recordReplacedStoreId } from './store-replaced.j
 /** The width of the unsigned device and inode values. */
 const STORED_INTEGER_BITS = 64;
 
+/** How long {@link readStoreOrigin} waits on another connection's lock. */
+const ORIGIN_BUSY_TIMEOUT_MS = 5000;
+
 /**
  * The reasons that make the file a mint finds a copy of the store its
  * row was minted for, at another host or path. A mint with neither
@@ -312,6 +315,27 @@ export function readStoreMeta(db: Database): StoreMeta | null {
     mintedAt: row.minted_at,
     generation: row.generation,
   };
+}
+
+/**
+ * The origin the store file at `path` records, the `store_id` of its
+ * `store_meta` row, read on a read-only connection of its own; null when
+ * it holds no such table, no row or an empty id. A reader outside core,
+ * such as a sync strategy, names a device by it. Throws SQLite's own
+ * error when the file cannot be opened.
+ */
+export function readStoreOrigin(path: string): string | null {
+  const db = new Database(path, { readonly: true });
+  try {
+    db.run(`PRAGMA busy_timeout = ${String(ORIGIN_BUSY_TIMEOUT_MS)}`);
+    if (!hasStoreMetaTable(db)) return null;
+    const origin = db.query<{ store_id: unknown }, []>('SELECT store_id FROM store_meta WHERE id = 1').get()?.store_id;
+    return typeof origin === 'string' && origin !== ''
+      ? origin
+      : null;
+  } finally {
+    db.close();
+  }
 }
 
 /**

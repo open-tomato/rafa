@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.packages.json",
+  // Composite, so `tsc --build tsconfig.references.json` builds it with the
+  // other members. It references core, for the wire's row shapes, the hub's
+  // store port, whose `HubStore` and `HubIndex` the connector implements, and
+  // the index, whose ranking the connector's index half shares.
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": ".tsbuild",
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
+  },
+  "include": ["index.ts", "drizzle.config.ts", "src"],
+  // *.test.ts stays out of check-types, as at the root, until the test
+  // type-checking work lands (.rafa/specs/test-type-checking.md).
+  "exclude": ["**/*.test.ts"],
+  "references": [{ "path": "../rafa" }, { "path": "../rafa-hub-port" }, { "path": "../rafa-index" }]
+}

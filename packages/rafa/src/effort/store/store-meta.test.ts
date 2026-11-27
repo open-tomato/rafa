@@ -31,6 +31,7 @@ import {
   carryStoreIdentity,
   fromStoredInteger,
   readStoreMeta,
+  readStoreOrigin,
   settleStoreIdentity,
   toStoredInteger,
 } from './store-meta.js';
@@ -633,6 +634,47 @@ describe('readStoreMeta and the generation column', () => {
     }
 
     expect(metaOf(path)?.generation).toBe('gen-1');
+  });
+});
+
+describe('readStoreOrigin', () => {
+  it('answers the origin the store at the path records', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('origin', seams);
+
+    expect(readStoreOrigin(path)).toBe(meta.storeId);
+  });
+
+  it('answers the origin of a store whose row predates the generation column', () => {
+    expect(readStoreOrigin(storeBeforeGeneration('origin-old'))).toBe('store-old');
+  });
+
+  it('answers null for a file with no store_meta table, writing none', () => {
+    const path = freshPath('origin-no-table');
+    new Database(path, { readwrite: true, create: true }).close();
+
+    expect(readStoreOrigin(path)).toBeNull();
+    expect(statSync(path).size).toBe(0);
+  });
+
+  it('answers null for a store_meta holding no row', () => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('origin-no-row', seams);
+    const db = new Database(path, { readwrite: true });
+    try {
+      db.run('DELETE FROM store_meta');
+    } finally {
+      db.close();
+    }
+
+    expect(readStoreOrigin(path)).toBeNull();
+  });
+
+  it('throws for a path holding no file, creating none', () => {
+    const path = freshPath('origin-absent');
+
+    expect(() => readStoreOrigin(path)).toThrow('unable to open database file');
+    expect(existsSync(path)).toBe(false);
   });
 });
 

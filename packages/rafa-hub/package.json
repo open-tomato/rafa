@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@open-tomato/rafa-core": "workspace:*",
+    "@open-tomato/rafa-hub-port": "workspace:*",
+    "@open-tomato/rafa-hub-postgres": "workspace:*",
     "@open-tomato/rafa-index": "workspace:*"
   },
   "devDependencies": {

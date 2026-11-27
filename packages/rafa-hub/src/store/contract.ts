@@ -23,6 +23,13 @@
  * a migration the hub lacks is refused with is the adapter's own, and
  * its own suite's.
  *
+ * The paged cases hold a pull naming a `limit` to the port's rule: at
+ * most that many rows across every table, the caller's own counting
+ * none, and a cursor that resumes past the page, so pulling page after
+ * page reaches every row once, each page but the last full. The
+ * contract cases hold `maxPayloadRows` to the cap the context names,
+ * `null` when it names none.
+ *
  * The project cases run over a hub listing two projects: an unlisted
  * project refused with the line naming `hub.projects`, a pull answering
  * none of the other project's rows, a push leaving the other project's
@@ -53,6 +60,7 @@ import type {
   HubPullRequest,
   HubServedProject,
   HubStore,
+  HubStoreContext,
   HubStoreFactory,
   HubStoreStatus,
 } from './port.js';
@@ -107,6 +115,13 @@ const SESSIONS = 'sessions';
 const PROJECT_ONE: HubServedProject = { id: '1'.repeat(40), name: 'open-tomato/one' };
 const PROJECT_TWO: HubServedProject = { id: '2'.repeat(40), name: 'open-tomato/two' };
 const UNLISTED = '3'.repeat(40);
+
+/** The payload cap the contract case opens an adapter with. */
+const CAP = 2;
+
+/** The rows a paged pull is cut at, and the most pages the resume case pulls before it gives up. */
+const PAGE_LIMIT = 2;
+const MOST_PAGES = 10;
 
 /** The line a request naming a project not listed is refused with. */
 const NOT_SERVED = `rafa-hub: project ${UNLISTED} is not served here; add it under hub.projects`;
@@ -238,14 +253,15 @@ export function builders(template: () => WireTemplate): {
   return { commit, session, payload };
 }
 
-/** Opens a fresh adapter over a new directory and a settable clock, listing `projects` when given. */
-async function openWorld(factory: HubStoreFactory, projects?: readonly HubServedProject[]): Promise<World> {
+/** What a case may add to the context beyond its directory and clock. */
+type WorldExtra = Pick<HubStoreContext, 'projects' | 'maxPayloadRows'>;
+
+/** Opens a fresh adapter over a new directory and a settable clock, with `extra` in its context. */
+async function openWorld(factory: HubStoreFactory, extra: WorldExtra = {}): Promise<World> {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hub-contract-')));
   let reading = T0;
   try {
-    const store = await factory({ directory, now: () => new Date(reading), ...(projects === undefined
-      ? {}
-      : { projects }) });
+    const store = await factory({ directory, now: () => new Date(reading), ...extra });
     return {
       store,
       setClock: (iso) => {
@@ -283,6 +299,13 @@ function countIn(status: HubStoreStatus, table: string): number {
 /** Every row a pull answered, across its tables. */
 function rowsIn(payload: WirePayload): number {
   return Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
+}
+
+/** The origin pairs `payload` carries across every table, each prefixed by its table, sorted. */
+function everyPairIn(payload: WirePayload): string[] {
+  return Object.entries(payload.tables)
+    .flatMap(([table, rows]) => rows.map((row) => `${table} ${pairOf(row)}`))
+    .sort();
 }
 
 /** The outcome of `run`, a refusal whether it threw at once or rejected. */
@@ -330,6 +353,13 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
       world = undefined;
       await open?.close();
     });
+    /** Replaces the case's adapter with one opened with `extra` in its context. */
+    const reopen = async (extra: WorldExtra): Promise<void> => {
+      const replaced = world;
+      world = undefined;
+      await replaced?.close();
+      world = await openWorld(factory, extra);
+    };
 
     describe('push', () => {
       it('answers the rows a push carried and how many were new, at the clock\'s time', async () => {
@@ -461,6 +491,49 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
       });
     });
 
+    describe('a paged pull', () => {
+      /**
+       * Five rows B pulls and one it never does: its own commit, relayed
+       * by A ahead of A's rows so it holds the lowest hub seq, where a
+       * page counting it would come up short.
+       */
+      const seed = async (): Promise<void> => {
+        await hub().push({ device: A, payload: payload({ [COMMITS]: [commit(B, 1)] }) });
+        await hub().push({ device: A, payload: payload({ [COMMITS]: [commit(A, 1), commit(A, 2), commit(A, 3)], [SESSIONS]: [session(A, 4), session(A, 5)] }) });
+      };
+
+      it('answers at most the limit\'s rows across every table, the caller\'s own counting none', async () => {
+        await seed();
+        const whole = await pull(B);
+        const page = await hub().pull({ device: B, since: {}, limit: 3 });
+        const wide = await hub().pull({ device: B, since: {}, limit: 50 });
+
+        expect(rowsIn(whole)).toBe(5);
+        expect(rowsIn(page)).toBe(3);
+        expect(everyPairIn(page).filter((pair) => !everyPairIn(whole).includes(pair))).toEqual([]);
+        expect(decodeWirePayload(encodeWirePayload(page))).toEqual(page);
+        expect(everyPairIn(wide)).toEqual(everyPairIn(whole));
+      });
+
+      it('reaches every row once over pages pulled with the cursor each answered, each page but the last full', async () => {
+        await seed();
+        const whole = await pull(B);
+        const pages: WirePayload[] = [];
+        let since: WireCursor = {};
+        while (pages.length < MOST_PAGES) {
+          const page = await hub().pull({ device: B, since, limit: PAGE_LIMIT });
+          pages.push(page);
+          since = page.cursor;
+          if (rowsIn(page) < PAGE_LIMIT) break;
+        }
+        const after = await hub().pull({ device: B, since, limit: PAGE_LIMIT });
+
+        expect(pages.map(rowsIn)).toEqual([2, 2, 1]);
+        expect(pages.flatMap(everyPairIn).sort()).toEqual(everyPairIn(whole));
+        expect(rowsIn(after)).toBe(0);
+      });
+    });
+
     describe('a pull from a device behind the hub', () => {
       /** The template's ids up to {@link BEHIND_FROM}: a device that lacks it and every id after. */
       const behind = (): readonly string[] => {
@@ -563,6 +636,14 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
 
         expect(values.every((value) => typeof value === 'boolean')).toBe(true);
       });
+
+      it('answers no payload cap when its context names none, and the cap its context names', async () => {
+        const uncapped = hub().contract().maxPayloadRows;
+        await reopen({ maxPayloadRows: CAP });
+        const capped = hub().contract().maxPayloadRows;
+
+        expect([uncapped, capped]).toEqual([null, CAP]);
+      });
     });
 
     describe('last push per device', () => {
@@ -603,10 +684,7 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
     describe('projects', () => {
       /** Replaces the case's adapter with one listing both projects. */
       beforeEach(async () => {
-        const single = world;
-        world = undefined;
-        await single?.close();
-        world = await openWorld(factory, [PROJECT_ONE, PROJECT_TWO]);
+        await reopen({ projects: [PROJECT_ONE, PROJECT_TWO] });
       });
 
       const pushTo = (project: string, device: string, tables: Readonly<Record<string, readonly WireRow[]>>): Promise<unknown> => hub().push({ device, project, payload: payload(tables) });

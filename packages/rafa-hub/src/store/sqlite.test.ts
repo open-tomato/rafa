@@ -235,6 +235,19 @@ describe('the SQLite hub store', () => {
     });
   });
 
+  describe('a paged pull', () => {
+    it('refuses a limit that is no whole number above zero, and serves a limit of one, as the control', async () => {
+      const store = hub();
+      await seed(store);
+
+      for (const limit of [0, -1, 1.5]) {
+        await expect(store.pull({ device: B, since: {}, limit })).rejects.toThrow(`rafa-hub: a pull limit of ${String(limit)} cannot be served; expected a whole number above zero`);
+      }
+      const page = await store.pull({ device: B, since: {}, limit: 1 });
+      expect(page.tables['commits']?.map((row) => row['origin_seq'])).toEqual([1]);
+    });
+  });
+
   describe('reopened over its directory', () => {
     it('keeps the rows, the hub seq cursor and each device\'s last push', async () => {
       const first = hub();

@@ -2584,6 +2584,11 @@
     },
     {
       "kind": "test",
+      "path": "src/tests/hub-requirements-page.test.ts",
+      "upwardEdgesIn": 0
+    },
+    {
+      "kind": "test",
       "path": "src/tests/import-cycle.sweep.test.ts",
       "upwardEdgesIn": 0
     },
@@ -5788,8 +5793,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 32,
-        "test": 19,
+        "source": 36,
+        "test": 22,
         "testSupport": 0
       },
       "files": [
@@ -5838,6 +5843,13 @@
         "packages/rafa-effort/src/effort/skill-signals.ts",
         "packages/rafa-effort/src/effort/skill-use.test.ts",
         "packages/rafa-effort/src/effort/skill-use.ts",
+        "packages/rafa-effort/src/effort/sync/contact-attempt.ts",
+        "packages/rafa-effort/src/effort/sync/contact-facts.ts",
+        "packages/rafa-effort/src/effort/sync/contact-pages.test.ts",
+        "packages/rafa-effort/src/effort/sync/contact-pages.ts",
+        "packages/rafa-effort/src/effort/sync/contact-readings.ts",
+        "packages/rafa-effort/src/effort/sync/contact-status.test.ts",
+        "packages/rafa-effort/src/effort/sync/contact-sync.test.ts",
         "packages/rafa-effort/src/effort/sync/contact.ts",
         "packages/rafa-effort/src/effort/sync/doctor-reading.ts",
         "packages/rafa-effort/src/effort/sync/file.ts",
@@ -5846,7 +5858,7 @@
         "packages/rafa-effort/src/effort/trend-stats.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-effort/": 51
+        "packages/rafa-effort/": 58
       },
       "folders": [
         "packages/rafa-effort/"
@@ -5862,14 +5874,16 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 40,
+        "test": 45,
         "testSupport": 9
       },
       "files": [
         "packages/rafa-hub/src/bin.test.ts",
         "packages/rafa-hub/src/bin.ts",
         "packages/rafa-hub/src/cli-keys.test.ts",
+        "packages/rafa-hub/src/config-dangerous.test.ts",
         "packages/rafa-hub/src/config-login.test.ts",
+        "packages/rafa-hub/src/config-store.test.ts",
         "packages/rafa-hub/src/config.test.ts",
         "packages/rafa-hub/src/config.ts",
         "packages/rafa-hub/src/contract-skew.integration.test.ts",
@@ -5893,6 +5907,9 @@
         "packages/rafa-hub/src/login/basic.test.ts",
         "packages/rafa-hub/src/login/oauth.test.ts",
         "packages/rafa-hub/src/login/testdata/stand-in-oauth.ts",
+        "packages/rafa-hub/src/payload-cap.integration.test.ts",
+        "packages/rafa-hub/src/postgres-two-devices.integration.test.ts",
+        "packages/rafa-hub/src/server-effort.test.ts",
         "packages/rafa-hub/src/server-keys.test.ts",
         "packages/rafa-hub/src/server-login.test.ts",
         "packages/rafa-hub/src/server-query.ts",
@@ -5917,6 +5934,25 @@
         "packages/rafa-hub/src/testdata/test-secrets.ts",
         "packages/rafa-hub/src/two-devices.integration.test.ts",
         "packages/rafa-hub/src/two-projects.integration.test.ts",
+        "packages/rafa-hub-port/index.test.ts",
+        "packages/rafa-hub-postgres/index.test.ts",
+        "packages/rafa-hub-postgres/src/connection.test.ts",
+        "packages/rafa-hub-postgres/src/embedding-record.test.ts",
+        "packages/rafa-hub-postgres/src/hub-connector.test.ts",
+        "packages/rafa-hub-postgres/src/hub-merge.test.ts",
+        "packages/rafa-hub-postgres/src/hub-projects.test.ts",
+        "packages/rafa-hub-postgres/src/hub-store.test.ts",
+        "packages/rafa-hub-postgres/src/index-build.test.ts",
+        "packages/rafa-hub-postgres/src/index-capabilities.test.ts",
+        "packages/rafa-hub-postgres/src/index-links.test.ts",
+        "packages/rafa-hub-postgres/src/index-probe.test.ts",
+        "packages/rafa-hub-postgres/src/index-rebuild-live.test.ts",
+        "packages/rafa-hub-postgres/src/index-search.test.ts",
+        "packages/rafa-hub-postgres/src/migrator.test.ts",
+        "packages/rafa-hub-postgres/src/public-types.test.ts",
+        "packages/rafa-hub-postgres/src/reembed-job.test.ts",
+        "packages/rafa-hub-postgres/src/schema.test.ts",
+        "packages/rafa-hub-postgres/src/wire-migrations.test.ts",
         "packages/rafa-index/src/fusion.test.ts",
         "packages/rafa-index/src/imports.test.ts",
         "packages/rafa-index/src/index.integration.test.ts",
@@ -5928,11 +5964,13 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 51,
+        "packages/rafa-hub/": 55,
+        "packages/rafa-hub-port/": 1,
         "packages/rafa-index/": 9
       },
       "folders": [
         "packages/rafa-hub/",
+        "packages/rafa-hub-port/",
         "packages/rafa-index/"
       ],
       "name": "rafa-hub",
@@ -5946,23 +5984,25 @@
       "edges": [],
       "fileCounts": {
         "source": 4,
-        "test": 5,
-        "testSupport": 1
+        "test": 6,
+        "testSupport": 2
       },
       "files": [
         "packages/rafa-sync-service/src/client.test.ts",
         "packages/rafa-sync-service/src/client.ts",
         "packages/rafa-sync-service/src/core-subpaths.test.ts",
+        "packages/rafa-sync-service/src/no-sql.test.ts",
         "packages/rafa-sync-service/src/state.test.ts",
         "packages/rafa-sync-service/src/state.ts",
         "packages/rafa-sync-service/src/sync.test.ts",
         "packages/rafa-sync-service/src/sync.ts",
+        "packages/rafa-sync-service/src/testdata/planted-sql.fixture.ts",
         "packages/rafa-sync-service/src/testdata/stand-in-hub.ts",
         "packages/rafa-sync-service/src/token.test.ts",
         "packages/rafa-sync-service/src/token.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-sync-service/": 10
+        "packages/rafa-sync-service/": 12
       },
       "folders": [
         "packages/rafa-sync-service/"
@@ -5978,7 +6018,7 @@
       "edges": [],
       "fileCounts": {
         "source": 178,
-        "test": 611,
+        "test": 612,
         "testSupport": 22
       },
       "files": [
@@ -6543,6 +6583,7 @@
         "src/tests/finished-task.test.ts",
         "src/tests/git-identity.sweep.test.ts",
         "src/tests/hint-tool-names.test.ts",
+        "src/tests/hub-requirements-page.test.ts",
         "src/tests/import-cycle.sweep.test.ts",
         "src/tests/init-board-project-spawned.test.ts",
         "src/tests/init-scope.test.ts",

@@ -8,6 +8,7 @@
  *
  * The workflow holds three jobs under the same triggers, permissions and
  * timeout: `verify` (ring 0) runs the whole suite, lint and types,
+ * and runs the `paradedb` service, pinned by digest, behind `POSTGRES_URL`;
  * `affected` (ring 1) runs `turbo` over the packages a change reaches,
  * the type references and the workspace graph check, against the base
  * `TURBO_SCM_BASE` names, and `atlas` runs each publishable Atlas
@@ -35,11 +36,18 @@ interface Step {
   readonly with?: Readonly<Record<string, unknown>>;
 }
 
+/** One service container of a job, as the workflow writes it. */
+interface Service {
+  readonly image: string;
+  readonly ports?: readonly string[];
+}
+
 /** One job of the workflow, as the workflow writes it. */
 interface Job {
   readonly 'runs-on': string;
   readonly 'timeout-minutes': number;
   readonly env?: Readonly<Record<string, unknown>>;
+  readonly services?: Readonly<Record<string, Service>>;
   readonly steps: readonly Step[];
 }
 
@@ -54,6 +62,12 @@ interface Workflow {
 function parse(text: string): Workflow {
   return Bun.YAML.parse(text) as Workflow;
 }
+
+/** The database URL the job `verify` hands its tests. */
+const POSTGRES_URL = 'postgres://rafa:rafa@localhost:5432/rafa';
+
+/** An image reference pinned by its sha256 digest. */
+const DIGEST_PINNED = /^paradedb\/paradedb@sha256:[0-9a-f]{64}$/;
 
 /** The parsed workflow. */
 const WORKFLOW = parse(TEXT);
@@ -197,11 +211,22 @@ describe('the job verify, ring 0', () => {
     ]);
   });
 
-  it('checks out the default shallow history and sets no env', () => {
+  it('checks out the default shallow history and sets POSTGRES_URL alone', () => {
     const checkout = stepsOf('verify').find((step) => step.uses === 'actions/checkout@v7');
 
     expect(checkout?.with).toBeUndefined();
-    expect(WORKFLOW.jobs['verify']?.env).toBeUndefined();
+    expect(WORKFLOW.jobs['verify']?.env).toEqual({ POSTGRES_URL });
+  });
+
+  it('runs the paradedb service from an image pinned by digest, on the port POSTGRES_URL names', () => {
+    const service = WORKFLOW.jobs['verify']?.services?.['paradedb'];
+
+    expect(service?.image).toMatch(DIGEST_PINNED);
+    expect(service?.ports).toEqual(['5432:5432']);
+  });
+
+  it('would see a floating tag, the control over an image named by tag', () => {
+    expect('paradedb/paradedb:0.26.4-pg18').not.toMatch(DIGEST_PINNED);
   });
 });
 
@@ -223,6 +248,11 @@ describe('the job affected, ring 1', () => {
     expect(expression).toContain('format(\'origin/{0}\', github.base_ref)');
     expect(expression).toContain('|| \'origin/integration\'');
     expect(Object.keys(WORKFLOW.on).filter((trigger) => trigger !== 'pull_request')).toEqual(['push']);
+  });
+
+  it('runs no service and sets no POSTGRES_URL', () => {
+    expect(WORKFLOW.jobs['affected']?.services).toBeUndefined();
+    expect(WORKFLOW.jobs['affected']?.env?.['POSTGRES_URL']).toBeUndefined();
   });
 
   it('turns turbo\'s telemetry off', () => {
