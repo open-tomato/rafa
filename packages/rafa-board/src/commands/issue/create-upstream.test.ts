@@ -220,7 +220,7 @@ describe('issue create --upstream refuses a type other than bug', () => {
     const outcome = await run(plantProject(COLLABORATE_CONFIG), { title: 'Faster plan show', upstream: 'rafa' }, boards);
     expect([outcome.exitCode, outcome.message]).toEqual([
       1,
-      '❌ issue create --upstream=rafa: --type=code is not filed upstream: only a bug is, --type=bug with its fields. Nothing was filed.',
+      '❌ issue create --upstream=rafa: --type=code is not filed upstream: only a bug record is, --type=bug or --type=debt with its fields. Nothing was filed.',
     ]);
     expect(boards.calls).toEqual([]);
   });
@@ -375,6 +375,19 @@ describe('issue create --upstream=rafa, filed', () => {
     expect(leaksName(`${filed?.title ?? ''}\n${filed?.body ?? ''}`)).toBe(false);
     expect(filed?.labels).toEqual(expect.arrayContaining(['type:bug', 'module:loop', 'cause:git:new-context']));
     expect(boards.calls[0]).toEqual(REPO_VIEW);
+    expectOnUpstream(boards);
+  });
+
+  it('files a --type=debt record on the upstream under type:debt, its title rendered from its fields', async () => {
+    const boards = boardsOf();
+    const outcome = await run(plantProject(COLLABORATE_CONFIG), { ...UPSTREAM_LINE, type: 'debt' }, boards);
+
+    expect([outcome.exitCode, outcome.message]).toEqual([0, '']);
+    expect(outcome.info[0]).toBe(`Created github issue 1 on ${UPSTREAM}.`);
+    const filed = boards.upstream.issue('1');
+    expect(filed?.title).toBe(HIDDEN_TITLE);
+    expect(filed?.labels).toEqual(expect.arrayContaining(['type:debt', 'module:loop', 'cause:git:new-context']));
+    expect(filed?.labels).not.toContain('type:bug');
     expectOnUpstream(boards);
   });
 

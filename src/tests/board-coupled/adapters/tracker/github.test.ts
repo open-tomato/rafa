@@ -185,6 +185,7 @@ runTrackerContract({
   transitionableStates: TRANSITIONABLE,
   editsIssues: true,
   editsPriority: true,
+  editsType: true,
 });
 
 describe('creating an issue', () => {

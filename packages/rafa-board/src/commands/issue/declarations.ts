@@ -35,8 +35,10 @@
  * So a constant a declaration spells and a module also reads lives
  * here, and the module imports it from here: `ISSUE_LIST_FLAGS`
  * (`list.ts`, and `src/commands/roadmap.ts`, which declares most of
- * them), `PRIORITY_FLAG` (`edit-priority.ts`), `STAMP_FLAG`
- * (`check.ts`), `READY_YES_FLAG` and `READY_DRY_RUN_FLAG` (`ready.ts`),
+ * them), `PRIORITY_FLAG` (`edit-priority.ts`), `TYPE_FLAG`
+ * (`edit-type.ts`, which reads `ISSUE_RECORD_TYPES` from here too),
+ * `STAMP_FLAG` (`check.ts`), `READY_YES_FLAG` and `READY_DRY_RUN_FLAG`
+ * (`ready.ts`),
  * and `UNBLOCK_ALL_FLAG` and `UNBLOCK_YES_FLAG` (`unblock.ts`).
  *
  * The values a declaration spells from outside `src/commands/`, which
@@ -58,11 +60,19 @@ import type { CommandDeclaration, RafaFlagSpec } from '@open-tomato/rafa/core/co
 
 import { HINT_FLAG_SPEC } from '@open-tomato/rafa/core/command';
 
-import { ISSUE_PRIORITY_WORDS, ISSUE_STATE_WORDS, ISSUE_SUBJECT, ISSUE_TYPE_WORDS, issueUpstreamFlagSpec } from './declarations-shared.js';
+import {
+  ISSUE_PRIORITY_WORDS,
+  ISSUE_RECORD_TYPES,
+  ISSUE_STATE_WORDS,
+  ISSUE_SUBJECT,
+  ISSUE_TYPE_WORDS,
+  issueUpstreamFlagSpec,
+} from './declarations-shared.js';
 
 export { DEFAULT_ISSUE_TYPE, ISSUE_CREATE_DECLARATION, ISSUE_TRIAGE_MODULE } from './declarations-create.js';
 export {
   ISSUE_PRIORITY_WORDS,
+  ISSUE_RECORD_TYPES,
   ISSUE_STATE_WORDS,
   ISSUE_SUBJECT,
   ISSUE_TYPE_WORDS,
@@ -82,6 +92,9 @@ export const ISSUE_BLOCKED_LABEL = 'spec:blocked';
 
 /** The flag `issue edit` sets a priority with. */
 export const PRIORITY_FLAG = 'priority';
+
+/** The flag `issue edit` moves an issue between the record types with. */
+export const TYPE_FLAG = 'type';
 
 /** The flag `issue check` re-stamps every reference with. */
 export const STAMP_FLAG = 'stamp';
@@ -527,7 +540,10 @@ export const ISSUE_EDIT_DECLARATION: CommandDeclaration = Object.freeze<CommandD
     + ' same block already closing the body answers `already`. `--replace-file` replaces the body and'
     + ' `--title` the title. `--priority` sets the priority, removes every other and takes the issue out'
     + ' of triage in one write, alone or beside `--title`, weighed by the gates as a title change; a priority'
-    + ' the issue already holds alone answers `already`. After the write the issue is read again: a body that no longer holds what was'
+    + ' the issue already holds alone answers `already`. `--type` moves an issue between the record types,'
+    + ` ${ISSUE_RECORD_TYPES.join(' and ')}, keeping its other labels and its body, alone or beside \`--title\`,`
+    + ' weighed as a title change; an issue of any other type is refused with exit code 1, and one already of'
+    + ' the type answers `already`. After the write the issue is read again: a body that no longer holds what was'
     + ' written answers `conflict` with exit code 1, the bodies read before and after saved under'
     + ' `.rafa/scratch/`. An append on an issue already planned answers `stale-copy` and names'
     + ' `rafa plan create --issue=<n> --refresh`, which it never runs. `--dry-run` prints each gate\'s'
@@ -545,12 +561,12 @@ export const ISSUE_EDIT_DECLARATION: CommandDeclaration = Object.freeze<CommandD
     {
       name: 'append-file',
       description: 'A file holding the text to append, read whole; `-` reads standard input.'
-        + ' Needs --reason. Not with --append, --replace-file, --title or --priority.',
+        + ' Needs --reason. Not with --append, --replace-file, --title, --priority or --type.',
       type: 'string',
     },
     {
       name: 'append',
-      description: 'The text to append. Needs --reason. Not with --append-file, --replace-file, --title or --priority.',
+      description: 'The text to append. Needs --reason. Not with --append-file, --replace-file, --title, --priority or --type.',
       type: 'string',
     },
     {
@@ -560,18 +576,25 @@ export const ISSUE_EDIT_DECLARATION: CommandDeclaration = Object.freeze<CommandD
     },
     {
       name: 'replace-file',
-      description: 'A file holding the new body, read whole; `-` reads standard input. Not with an append or --priority.',
+      description: 'A file holding the new body, read whole; `-` reads standard input. Not with an append, --priority or --type.',
       type: 'string',
     },
     {
       name: 'title',
-      description: 'The new title, alone or beside --replace-file or --priority. Not with an append.',
+      description: 'The new title, alone or beside --replace-file, --priority or --type. Not with an append.',
       type: 'string',
     },
     {
       name: PRIORITY_FLAG,
       description: `The new priority, one of ${ISSUE_PRIORITY_WORDS.join(', ')}: it replaces the one the issue holds and takes`
-        + ' the issue out of triage. Alone or beside --title. Not with an append or --replace-file.',
+        + ' the issue out of triage. Alone or beside --title. Not with an append, --replace-file or --type.',
+      type: 'string',
+    },
+    {
+      name: TYPE_FLAG,
+      description: `The new type, one of ${ISSUE_RECORD_TYPES.join(', ')}: moves an issue of one record type to the other,`
+        + ' keeping its other labels and its body; an issue of any other type is refused. Alone or beside --title.'
+        + ' Not with an append, --replace-file or --priority.',
       type: 'string',
     },
     {
@@ -601,6 +624,10 @@ export const ISSUE_EDIT_DECLARATION: CommandDeclaration = Object.freeze<CommandD
     {
       cmd: 'rafa issue edit 57 --priority=high --dry-run',
       note: 'Prints each gate\'s reading and the swap, such as `priority: needs-triage → high`, and writes nothing.',
+    },
+    {
+      cmd: 'rafa issue edit 57 --type=bug --dry-run',
+      note: 'Prints each gate\'s reading and the swap, such as `type: debt → bug`, and writes nothing.',
     },
     {
       cmd: 'rafa issue edit 57 --replace-file=spec.md --output=json',

@@ -99,7 +99,7 @@ afterAll(() => {
 const SPAWN_TIMEOUT = 30_000;
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue create (--title=<text> | --type=bug --summary=<text> --module=<name> --action=<name> --cause=<code>'
+const USAGE = 'rafa issue create (--title=<text> | --type=bug|debt --summary=<text> --module=<name> --action=<name> --cause=<code>'
   + ' --reproduce=<text>) [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]'
   + ' [--env=<place>] [--proposed=<code>] [--rerun=<command>] [--project=<name>] [--path=<file>] [--dry-run]';
 
@@ -128,7 +128,7 @@ const FILED_LINE = ['issue', 'create', '--title=Timeouts in plan show', '--type=
 const DRAFT_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{}, '--title is required: --title=<value>'],
   [{ title: '  ' }, '--title cannot be blank: --title=<value>'],
-  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
+  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec, debt'],
   [{ title: 'x', priority: 'p1' }, '--priority is "p1", expected one of: urgent, high, medium, low'],
   [{ title: 'x', module: '' }, '--module cannot be blank: --module=<value>'],
   [{ title: 'x', body: true }, '--body needs a value: --body=<value>'],
@@ -480,7 +480,7 @@ describe('rafa issue create, dispatched', () => {
     expect(refused).toEqual({
       exitCode: 1,
       stdout: '',
-      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec\nUsage: ${USAGE}\n`,
+      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec, debt\nUsage: ${USAGE}\n`,
     });
     expect(untitled.stderr).toBe(`❌ --title is required: --title=<value>\nUsage: ${USAGE}\n`);
     expect(argument.stderr).toBe(`❌ Expected no argument, got 1: bug\nUsage: ${USAGE}\n`);

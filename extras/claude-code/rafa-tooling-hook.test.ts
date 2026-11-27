@@ -12,6 +12,7 @@ import { CORE_REGISTRY } from '../../src/commands/index';
 import {
   commandsOf,
   ISSUE_CREATE_FLAGS,
+  ISSUE_CREATE_TYPES,
   issueCreateOptionsOf,
   jsonFieldsOf,
   judgeLine,
@@ -147,9 +148,11 @@ describe('judgeLine: gh issue create', () => {
     expect(denied('gh issue create --title x --label type:bug,module:cli,priority:high')).toContain('`rafa issue create --title=x --type=bug --module=cli --priority=high`');
   });
 
-  test('says what else a bug needs, and nothing of it for another type', () => {
-    const note = 'A bug is filed from its fields: add `--action`, `--cause` and `--reproduce`';
+  test('says what else a bug or debt report needs, and nothing of it for another type', () => {
+    const note = 'A bug or debt report is filed from a bug\'s fields: add `--action`, `--cause` and `--reproduce`';
     expect(denied('gh issue create --title x --label type:bug,module:cli')).toContain(note);
+    expect(denied('gh issue create --title x --label type:debt,module:cli-gap')).toContain('`rafa issue create --title=x --type=debt --module=cli-gap`');
+    expect(denied('gh issue create --title x --label type:debt,module:cli-gap')).toContain(note);
     expect(denied('gh issue create --title x --label type:spec')).not.toContain(note);
   });
 
@@ -342,6 +345,7 @@ describe('judgeLine: gh pr view --json', () => {
     expect(verdict?.reason).toContain('does not answer the --json field someFieldRafaLacks.');
     expect(verdict?.reason).toContain('rafa issue list --module=cli-gap --search="pr show someFieldRafaLacks"');
     expect(verdict?.reason).toContain('rafa issue create --type=bug --module=cli-gap --action="pr show" --summary="has no someFieldRafaLacks" --cause=cli:new-context --reproduce="<the gh line>"');
+    expect(verdict?.reason).toContain('rafa issue create --type=debt --module=cli-gap --action="pr show" --summary="has no someFieldRafaLacks" --cause=cli:new-context --reproduce="<the gh line>"');
     expect(verdict?.reason.endsWith(reportOffer('rafa pr show', ['someFieldRafaLacks']))).toBe(true);
   });
 
@@ -370,14 +374,24 @@ describe('judgeLine: gh pr view --json', () => {
 });
 
 describe('reportOffer', () => {
-  test('ends with the ask-once rule and names the duplicate search before the report line', () => {
+  test('names the duplicate search, the ask-once rule and the breaking question before both report lines', () => {
     const offer = reportOffer('rafa issue create', ['--epic']);
     const search = offer.indexOf('rafa issue list --module=cli-gap --search="issue create --epic"');
     const ask = offer.indexOf('ask the person once');
-    const file = offer.indexOf('rafa issue create --type=bug --module=cli-gap --action="issue create" --summary="has no --epic" --cause=cli:new-context --reproduce="<the gh line>" --body=');
+    const question = offer.indexOf('does the missing line make something break, beyond a step done by hand?');
+    const fields = '--module=cli-gap --action="issue create" --summary="has no --epic" --cause=cli:new-context --reproduce="<the gh line>" --body=';
+    const bug = offer.indexOf(`If it breaks, run \`rafa issue create --type=bug ${fields}`);
+    const debt = offer.indexOf(`if not, run \`rafa issue create --type=debt ${fields}`);
     expect(search).toBeGreaterThan(-1);
     expect(ask).toBeGreaterThan(search);
-    expect(file).toBeGreaterThan(ask);
+    expect(question).toBeGreaterThan(ask);
+    expect(bug).toBeGreaterThan(question);
+    expect(debt).toBeGreaterThan(bug);
+  });
+
+  test('keeps the search free of a --type, so it finds a report of either type', () => {
+    const search = /`(rafa issue list [^`]+)`/.exec(reportOffer('rafa pr show', ['x']))?.[1] ?? '';
+    expect(search).toBe('rafa issue list --module=cli-gap --search="pr show x"');
   });
 
   test('carries a placeholder when no single gap is named', () => {
@@ -461,12 +475,21 @@ describe('drift from what rafa describe says', () => {
     expect(ISSUE_CREATE_FLAGS.filter((flag) => !declared.includes(flag))).toEqual([]);
   });
 
-  test('every flag of the gap report\'s rafa issue create line is a flag of that command', () => {
+  test('every flag of the gap report\'s two rafa issue create lines is a flag of that command', () => {
     const declared = (entry('issue', 'create')?.flags ?? []).map((flag) => flag.name);
-    const line = /`(rafa issue create [^`]+)`/.exec(reportOffer('rafa pr show', ['x']))?.[1] ?? '';
-    const written = [...line.matchAll(/--([a-z-]+)=/g)].map((match) => match[1] ?? '');
-    expect(written).toEqual(['type', 'module', 'action', 'summary', 'cause', 'reproduce', 'body']);
-    expect(written.filter((flag) => !declared.includes(flag))).toEqual([]);
+    const lines = [...reportOffer('rafa pr show', ['x']).matchAll(/`(rafa issue create [^`]+)`/g)].map((match) => match[1] ?? '');
+    expect(lines.map((line) => /--type=([a-z]+)/.exec(line)?.[1])).toEqual(['bug', 'debt']);
+    for (const line of lines) {
+      const written = [...line.matchAll(/--([a-z-]+)=/g)].map((match) => match[1] ?? '');
+      expect(written).toEqual(['type', 'module', 'action', 'summary', 'cause', 'reproduce', 'body']);
+      expect(written.filter((flag) => !declared.includes(flag))).toEqual([]);
+    }
+  });
+
+  test('every --type the hook maps a type: label onto is a type rafa issue create takes', () => {
+    const type = (entry('issue', 'create')?.flags ?? []).find((flag) => flag.name === 'type');
+    expect(JSON.stringify(type)).toContain('debt');
+    expect(ISSUE_CREATE_TYPES).toContain('debt');
   });
 
   test('every mapped flag of a full gh issue create line is a flag of that command', () => {

@@ -120,9 +120,9 @@
  *   - `editable` and `edit`, rafa's own pair, which the source lacks:
  *     one `gh issue view --json title,body,state,labels,author`, and one
  *     `gh issue edit` with the body handed to `gh` on stdin through
- *     `--body-file -` and a priority swapped as labels. `github-edit.ts`
- *     holds the pair and its note; the runner hands `gh` a `stdin` when
- *     one is given, and keeps stdin closed otherwise.
+ *     `--body-file -` and a priority and a type swapped as labels.
+ *     `github-edit.ts` holds the pair and its note; the runner hands `gh`
+ *     a `stdin` when one is given, and keeps stdin closed otherwise.
  *
  * Kept as the source has them: `create` makes every label it sends with
  * `gh label create --force` before `gh issue create`, because the source
@@ -822,7 +822,14 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
       };
     },
 
-    ...createGithubEditMembers({ run, issueNumberOf: issueNumberOfRef, parseJson, labelNames, labels: GITHUB_LABELS }),
+    ...createGithubEditMembers({
+      run,
+      issueNumberOf: issueNumberOfRef,
+      parseJson,
+      labelNames,
+      typeOf: typeOfLabels,
+      labels: GITHUB_LABELS,
+    }),
   };
   return Object.freeze(tracker);
 }

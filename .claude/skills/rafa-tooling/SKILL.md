@@ -209,13 +209,17 @@ pipe, or read `${pipestatus[1]}` in zsh. In zsh, `echo ====` fails with
 
 When you find a rafa command lacks a flag or field the `gh` command has,
 the hook may let the `gh` command through with a reason naming it. Before
-filing a new issue, search for existing gap reports:
+filing a new issue, search for existing gap reports, with no `--type`:
 
 ```bash
 rafa issue list --module=cli-gap --search="<action> <flag>"
 ```
 
-If nothing matches, ask once (this conversation) before filing a bug:
+If nothing matches, ask the person once (this conversation) before filing.
+Ask the breaking question: does the missing line make something break,
+beyond a step done by hand? Breaking means a command prints or does
+something wrong, two refusals leave no way through, or a hand-over names
+the wrong line. On a yes, file a bug:
 
 ```bash
 rafa issue create --type=bug --module=cli-gap --action="<action>" \
@@ -223,13 +227,25 @@ rafa issue create --type=bug --module=cli-gap --action="<action>" \
   --reproduce="<the gh line used in its place>" --body="…"
 ```
 
+On a no, file a debt report, which is a bug record under another type
+with the same fields and title:
+
+```bash
+rafa issue create --type=debt --module=cli-gap --action="<action>" \
+  --summary="has no <flag or field>" --cause=cli:new-context \
+  --reproduce="<the gh line used in its place>" --body="…"
+```
+
 Replace `<action>` with the rafa subject and action, without the word
 `rafa` (e.g. `issue create`, `pr show`), and `<flag or field>` with the
-missing flag or JSON field name. A bug is filed from its fields, so the
-line carries the four a bug needs: rafa renders the title from them, as
-`cli-gap - pr show: has no <field>`, and refuses a bug that leaves one
-out, naming it. In the body, describe what the flag or field does and why
-rafa needs it.
+missing flag or JSON field name. A bug or debt report is filed from its
+fields, so the line carries the four a bug needs: rafa renders the title
+from them, as `cli-gap - pr show: has no <field>`, and refuses a bug or
+debt report that leaves one out, naming it. In the body, describe what the
+flag or field does and why rafa needs it.
+
+A debt report that later breaks something moves to a bug with
+`rafa issue edit <n> --type=bug`, which keeps its record.
 
 ## The mappings
 
