@@ -553,6 +553,15 @@ and merges whatever `pr.versionCollision` says; `rafa pr triage` gives it no
 released or collides with reads as any branch does, fix included, and an
 ordinary branch stamping a version still reads `stale`.
 
+Under `release.packageFragments: refuse`, `rafa pr merge` refuses with exit 1,
+ahead of every answer above and before anything is asked, a head whose
+`release.fragments` holds any fragment with a `package:` line, whether the
+branch added it or inherited it from the base: the head's tree is read at
+`origin/<head>` through `readFragmentTree`, and the refusal names the key and,
+one line each, every such file with its package
+(`readHeadPackageFragments`, `packages/rafa-release/src/release/guard-merge.ts`).
+Under `allow` the guard reads as it did before the key.
+
 ### The stale-docs chore
 
 The documentation lines a doc task could not settle go to one `chore` issue per
@@ -717,7 +726,8 @@ rafa leaves it off. The refusals and the dry run's line are under "The lock" in
 repository releases no package yet, so a fragment naming one is refused). Read
 through core's `oneOf`, so any other value is refused naming both. Declared in
 `packages/rafa/src/config-schema-release.ts`. Read by `rafa release fragment`
-through the shared reading `packages/rafa-release/src/release/package-fragments.ts`.
+and by the release guard `rafa pr merge` runs, both through the shared reading
+`packages/rafa-release/src/release/package-fragments.ts`.
 
 **`pr.versionCollision`** — Reaction to `missing` and `stale` preflight
 findings: `report` (default, warn and proceed), `ask` (ask the user), `refuse`

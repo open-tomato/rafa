@@ -8,6 +8,13 @@
  * The fetch case is paired with its control: the same clone read while
  * its remote is still there carries no fetch note, so the note the
  * broken remote adds is the fetch's and not one every reading carries.
+ *
+ * The head's package fragments under `release.packageFragments` are read
+ * off real clones, refusals first: a fragment the branch added and one it
+ * inherited from its base, both refused under `refuse`; then the same
+ * tree under `allow` and a root-only tree under `refuse`, both refusing
+ * nothing. The `allow` case also counts the git commands it ran, so its
+ * empty answer is the setting's and not a tree that read as empty.
  */
 import type { MergeGuardSettings } from './guard-merge.js';
 import type { GuardRead, GuardReading, GuardVerdict } from './guard.js';
@@ -23,7 +30,7 @@ import { join } from 'node:path';
 import { createGitRunner } from '@open-tomato/rafa/core/git';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { guardReaction, mergeGuardSettings, readMergeGuard } from './guard-merge.js';
+import { guardReaction, mergeGuardSettings, readHeadPackageFragments, readMergeGuard } from './guard-merge.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-guard-merge-')));
@@ -111,12 +118,13 @@ describe('the reaction', () => {
 });
 
 describe('the settings it carries', () => {
-  it('copies the guard\'s nine settings and nothing more off a wider config', () => {
+  it('copies the guard\'s ten settings and nothing more off a wider config', () => {
     const wider: MergeGuardSettings & { readonly planDir: string } = {
       ...SETTINGS,
       releaseEnabled: 'auto',
       prVersionCollision: 'ask',
       dangerousAcceptVersionCollision: true,
+      releasePackageFragments: 'refuse',
       planDir: '.rafa/plans',
     };
 
@@ -130,10 +138,15 @@ describe('the settings it carries', () => {
       'releaseFragments',
       'releaseHeading',
       'releaseMoveLock',
+      'releasePackageFragments',
       'releaseStrategy',
       'releaseVersionFile',
     ]);
-    expect(kept).toMatchObject({ prVersionCollision: 'ask', dangerousAcceptVersionCollision: true });
+    expect(kept).toMatchObject({
+      prVersionCollision: 'ask',
+      dangerousAcceptVersionCollision: true,
+      releasePackageFragments: 'refuse',
+    });
   });
 });
 
@@ -237,5 +250,106 @@ describe('a fetch that fails over refs the clone still holds', () => {
       'main could not be fetched from origin, so the guard reads whatever this clone already holds for origin/main',
       `${HEAD} could not be fetched from origin, so the guard reads whatever this clone already holds for origin/${HEAD}`,
     ]);
+  });
+});
+
+/** A fragment's text for `plan`, with a `package:` line when `packageName` is given. */
+function fragmentText(plan: string, packageName?: string): string {
+  const packageLine = packageName === undefined
+    ? []
+    : [`package: ${packageName}`];
+  return ['---', `plan: ${plan}`, `title: ${plan} title`, 'level: minor', ...packageLine, '---', '', '- a: one', ''].join('\n');
+}
+
+/** Writes `files` under `dir` and commits them as `message`. */
+function commitFiles(dir: string, message: string, files: Readonly<Record<string, string>>): void {
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(join(dir, path, '..'), { recursive: true });
+    writeFileSync(join(dir, path), text, 'utf8');
+  }
+  run(dir, 'add', '.');
+  run(dir, 'commit', '-q', '-m', message);
+}
+
+/**
+ * A bare origin and a clone whose `main` commits `base` and whose
+ * {@link HEAD}, forked after it, commits `branch`; both pushed.
+ */
+function plantFragments(base: Readonly<Record<string, string>>, branch: Readonly<Record<string, string>>): string {
+  const root = realpathSync(mkdtempSync(join(tempBase, 'fragments-')));
+  const bare = join(root, 'origin.git');
+  const clone = join(root, 'clone');
+  run(root, 'init', '-q', '--bare', '--initial-branch=main', bare);
+  run(root, 'init', '-q', '--initial-branch=main', clone);
+  commitFiles(clone, 'first', { 'package.json': '{\n  "name": "demo",\n  "version": "0.24.0"\n}\n', ...base });
+  run(clone, 'remote', 'add', 'origin', bare);
+  run(clone, 'push', '-q', '-u', 'origin', 'main');
+  run(clone, 'switch', '-q', '-c', HEAD);
+  commitFiles(clone, 'feature', { 'src/a.ts': 'export const a = 1;\n', ...branch });
+  run(clone, 'push', '-q', '-u', 'origin', HEAD);
+  return clone;
+}
+
+/** The sentence the shared reading names a refused `path` releasing `@scope/x` with. */
+function refusedSentence(path: string): string {
+  return `${path} names package @scope/x, and release.packageFragments is refuse: this project takes no package fragments`;
+}
+
+describe('the head\'s package fragments', () => {
+  /** The settings under `mode`. */
+  const under = (mode: 'allow' | 'refuse') => ({ releaseFragments: '.changes', releasePackageFragments: mode });
+
+  it('refuses a package fragment the branch added under refuse, naming its path', () => {
+    const clone = plantFragments({}, { '.changes/rafa-2.md': fragmentText('rafa-2', '@scope/x') });
+
+    const refused = readHeadPackageFragments({ git: createGitRunner(clone), settings: under('refuse'), head: HEAD });
+
+    expect(refused).toEqual([{
+      path: '.changes/rafa-2.md',
+      package: '@scope/x',
+      sentence: refusedSentence('.changes/rafa-2.md'),
+    }]);
+  });
+
+  it('refuses a package fragment the branch inherited from its base, beside the root one it added', () => {
+    const clone = plantFragments(
+      { '.changes/rafa-1.md': fragmentText('rafa-1', '@scope/x') },
+      { '.changes/rafa-2.md': fragmentText('rafa-2') },
+    );
+
+    const refused = readHeadPackageFragments({ git: createGitRunner(clone), settings: under('refuse'), head: HEAD });
+
+    expect(refused.map(({ path, sentence }) => [path, sentence])).toEqual([
+      ['.changes/rafa-1.md', refusedSentence('.changes/rafa-1.md')],
+    ]);
+  });
+
+  it('refuses nothing under allow over the same tree, and reads no git for it', () => {
+    const clone = plantFragments(
+      { '.changes/rafa-1.md': fragmentText('rafa-1', '@scope/x') },
+      { '.changes/rafa-2.md': fragmentText('rafa-2', '@scope/x') },
+    );
+    const ran: string[] = [];
+    const real = createGitRunner(clone);
+    const git: GitRunner = (args) => {
+      ran.push(args.join(' '));
+      return real(args);
+    };
+
+    expect(readHeadPackageFragments({ git, settings: under('allow'), head: HEAD })).toEqual([]);
+    expect(ran).toEqual([]);
+    // The control: the same tree and runner under refuse reads git and refuses both.
+    expect(readHeadPackageFragments({ git, settings: under('refuse'), head: HEAD }).map(({ path }) => path))
+      .toEqual(['.changes/rafa-1.md', '.changes/rafa-2.md']);
+    expect(ran.length).toBeGreaterThan(0);
+  });
+
+  it('refuses nothing under refuse over a tree of root fragments alone', () => {
+    const clone = plantFragments(
+      { '.changes/rafa-1.md': fragmentText('rafa-1') },
+      { '.changes/rafa-2.md': fragmentText('rafa-2') },
+    );
+
+    expect(readHeadPackageFragments({ git: createGitRunner(clone), settings: under('refuse'), head: HEAD })).toEqual([]);
   });
 });
