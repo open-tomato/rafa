@@ -328,6 +328,10 @@
       "value": false,
       "source": "default"
     },
+    "releasePackageFragments": {
+      "value": "allow",
+      "source": "default"
+    },
     "releasePublish": {
       "value": "manual",
       "source": "default"

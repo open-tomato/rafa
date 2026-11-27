@@ -1,7 +1,7 @@
 /**
  * The commented lines the config `rafa init` writes carries for the
- * seven settings the release-settle plan and the lock plan add: five
- * under `release`, then `pr.versionCollision` and
+ * eight settings the release-settle plan, the lock plan and the package
+ * fragments plan add: six under `release`, then `pr.versionCollision` and
  * `dangerous.acceptVersionCollision`, each
  * spelled at its schema default, read off the release section that
  * defines it (`PR_DEFAULTS`, `RELEASE_DEFAULTS` and
@@ -29,8 +29,9 @@ import { DANGEROUS_RELEASE_DEFAULTS, PR_DEFAULTS, RELEASE_DEFAULTS } from '@open
 /**
  * The commented lines the config `rafa init` writes carries for the
  * four `release` settings that fold change fragments into a version,
- * then `moveLock`, which has settle also write `rafa.lock`, each at its
- * schema default. `src/project/scaffold.ts` places them under
+ * then `moveLock`, which has settle also write `rafa.lock`, and
+ * `packageFragments`, which says whether a fragment may name a package,
+ * each at its schema default. `src/project/scaffold.ts` places them under
  * `# release:`, after `heading`.
  */
 export const RELEASE_FRAGMENT_LINES: readonly string[] = Object.freeze([
@@ -39,6 +40,7 @@ export const RELEASE_FRAGMENT_LINES: readonly string[] = Object.freeze([
   `#   settle: ${RELEASE_DEFAULTS.releaseSettle}                 # push | pr, how settle lands the version on the base branch`,
   `#   tag: ${RELEASE_DEFAULTS.releaseTag}                  # manual | settle, who tags a settled version`,
   `#   moveLock: ${String(RELEASE_DEFAULTS.releaseMoveLock)}              # true has settle also write rafa.lock to the version it settles, for the repository that releases rafa`,
+  `#   packageFragments: ${RELEASE_DEFAULTS.releasePackageFragments}        # allow | refuse, whether a fragment may name a package`,
 ]);
 
 /** The commented `pr.versionCollision` line, placed under `# pr:`. */

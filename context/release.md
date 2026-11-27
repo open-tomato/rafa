@@ -652,7 +652,7 @@ the exit code.
 
 ### Config keys
 
-Nine keys control the release flow, all under the `release` section except two:
+Ten keys control the release flow, all under the `release` section except two:
 
 **`release.fragments`** — Path to the fragments directory (default `.changes/`).
 Tracked, not gitignored. Fragment filenames are `<plan id>.md`, or `-2`, `-3`
@@ -710,6 +710,12 @@ that releases rafa keeps its lock moving with each release. A project that uses
 rafa leaves it off. The refusals and the dry run's line are under "The lock" in
 "Settle and its deliveries". Read by `rafa release settle` and its dry run.
 
+**`release.packageFragments`** — Whether a fragment may name a package: `allow`
+(default, a `package:` line is written as before the key) or `refuse` (the
+repository releases no package yet, so a fragment naming one is refused). Read
+through core's `oneOf`, so any other value is refused naming both. Declared in
+`packages/rafa/src/config-schema-release.ts`.
+
 **`pr.versionCollision`** — Reaction to `missing` and `stale` preflight
 findings: `report` (default, warn and proceed), `ask` (ask the user), `refuse`
 (error and stop). `collision` always refuses, requiring
@@ -720,7 +726,7 @@ to override a `collision` finding and allow a merge. Use only when you have
 merged a branch already stamped with the same version and need to unblock
 another.
 
-Beside the nine, one key under `hints` sets how the steps print:
+Beside the ten, one key under `hints` sets how the steps print:
 **`hints.skills`** — Boolean (default `false`, read through `flag`). `true`
 adds the skill line to each step that has a case, as "Placed steps and the
 skill line" describes. Read by `rafa release tag`, `rafa release settle` and
@@ -731,6 +737,7 @@ All keys are optional. An absent `release.fragments` defaults to `.changes/`, an
 absent `release.strategy` defaults to `semver-by-level`, an absent
 `release.settle` defaults to `push`, an absent `release.tag` defaults to
 `manual`, an absent `release.publishCommand` defaults to `npm publish`, an
-absent `release.publish` defaults to `manual`, and an absent `release.moveLock`
-defaults to `false`. They're set by `rafa init` and
+absent `release.publish` defaults to `manual`, an absent `release.moveLock`
+defaults to `false`, and an absent `release.packageFragments` defaults to
+`allow`. They're set by `rafa init` and
 read by `loadConfig`.
