@@ -298,10 +298,10 @@ describe('liveResultOf over a stub client: each field filled', () => {
 
   it('adds one bin past the last edge only when a session ran that long, to its minutes rounded up', () => {
     const at = new Date('2026-11-20');
-    const points = [180, 412.2, 20].map((y) => ({ x: at, y }));
+    const points = [180, 412.2, 20].map((y) => ({ x: at, y, label: 'task' }));
 
     expect(taskMinutesBinsOf(points).at(-1)).toEqual({ from: 180, to: 413, count: 2 });
-    expect(taskMinutesBinsOf([{ x: at, y: 179.9 }]).at(-1)).toEqual({ from: 120, to: 180, count: 1 });
+    expect(taskMinutesBinsOf([{ x: at, y: 179.9, label: 'task' }]).at(-1)).toEqual({ from: 120, to: 180, count: 1 });
   });
 
   it('reads the red verdict\'s share for the red CI tile', async () => {
