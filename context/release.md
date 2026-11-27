@@ -165,22 +165,24 @@ fragments after a `git fetch` to pick the right name).
 
 `rafa release fragment --plan=<id> --level=<level> --title=<text>
 [--note=<area>: <summary>]... [--package=<name>]` writes one fragment for a
-branch with no wrap-up to write it, such as a bot's pull request, and prints
-its path as the last line. `--plan` must match the plan id pattern, `--level`
-is one of `patch`, `minor`, `major` and `none`, and `--package` must name a
-public member of the checkout's workspace. Under `release.packageFragments:
-refuse`, `--package` is refused before anything is written, naming the key and
-where it is set, and a line without it is written as before. A shipping level given no `--note`
-takes the title as its one note, with a warning. The name is `<plan>.md`, or
-`-2`, `-3` and on when that name already waits on `origin/<pr.base>`. A file
-already at the path, in the working tree or in `HEAD`, is refused, so a second
-run never duplicates the first. The fragment is written under the git worktree
-of the directory the command runs in (`git rev-parse --show-toplevel`), not
-under the project root a linked worktree with no `.rafa/` resolves to, while
+branch with no wrap-up to write it, such as a bot's pull request, and prints its
+path as the last line. `--plan` must match the plan id pattern, `--level` is one
+of `patch`, `minor`, `major` and `none`, and `--package` must name a public
+member of the checkout's workspace. Under `release.packageFragments: refuse`,
+`--package` is refused before anything is written, naming the key and where it
+is set, and a line without it is written as before. `rafa pr merge` refuses the
+same fragments at its guard, a head whose tree holds one naming a package, see
+"Guards: the preflight check". A shipping level given no `--note` takes the
+title as its one note, with a warning. The name is `<plan>.md`, or `-2`, `-3`
+and on when that name already waits on `origin/<pr.base>`. A file already at the
+path, in the working tree or in `HEAD`, is refused, so a second run never
+duplicates the first. The fragment is written under the git worktree of the
+directory the command runs in (`git rev-parse --show-toplevel`), not under the
+project root a linked worktree with no `.rafa/` resolves to, while
 `release.fragments` and `pr.base` are still read from the project's config.
-Outside any repository it falls back to the project root. The printed path
-(and the json `path`) is relative when that worktree root is the project root,
-and absolute when it is not.
+Outside any repository it falls back to the project root. The printed path (and
+the json `path`) is relative when that worktree root is the project root, and
+absolute when it is not.
 
 The bot fragment workflow, `release-bot-fragment.yml`, writes that fragment for
 a Dependabot pull request. It runs on `pull_request_target` for
