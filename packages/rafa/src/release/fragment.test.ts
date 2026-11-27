@@ -2,8 +2,16 @@
  * Tests for the change fragment format (`packages/rafa/src/release/fragment.ts`):
  * the parser and its four refusals, the optional `package` key, the
  * serialiser, the name allocation, and the two readers of a tree's
- * names (`directoryPrefix`, `fragmentIdOf`). Everything is driven from
- * string literals; the module opens no file.
+ * names (`directoryPrefix`, `fragmentIdOf`). The module opens no file,
+ * and every case but one is driven from string literals.
+ *
+ * That one reads this repository's `.changes/` by design, and runs only
+ * while `rafa.config.ts` sets `release.packageFragments: 'refuse'`.
+ * Under `allow`, or with the key unset, it is skipped and a line naming
+ * the key is printed, so flipping the setting needs no edit here. The
+ * file is imported as it stands, with no user or local layer over it
+ * and no config section registered, so the case reads the same from the
+ * package folder as from the root.
  *
  * Things here that would pass while wrong:
  *
@@ -23,11 +31,14 @@
  *    text, not only the parsed fragment.
  */
 import type { Fragment } from './fragment.js';
+import type { ReleaseShape } from '../config-schema-release.js';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
+
+import { PACKAGE_FRAGMENT_MODES, RELEASE_DEFAULTS } from '../config-schema-release.js';
 
 import { allocateFragmentName, directoryPrefix, fragmentIdOf, parseFragment, serializeFragment } from './fragment.js';
 
@@ -50,6 +61,27 @@ const VALID_FRAGMENT: Fragment = {
   package: null,
   notes: ['- next: one hop to a blocker\'s epic', '- board: the roadmap shows blockers'],
 };
+
+const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..');
+
+/**
+ * `release.packageFragments` as this repository's `rafa.config.ts` sets
+ * it: the last entry naming it answers, and the default when none does.
+ */
+async function repositoryPackageFragments(): Promise<string> {
+  const loaded = await import(join(REPO_ROOT, 'rafa.config.ts')) as {
+    readonly default: readonly { readonly release?: Partial<ReleaseShape['release']> }[];
+  };
+  const named = loaded.default.flatMap((entry) => entry.release?.packageFragments ?? []);
+  return named.at(-1) ?? RELEASE_DEFAULTS.releasePackageFragments;
+}
+
+const packageFragments = await repositoryPackageFragments();
+const takesPackageFragments = packageFragments === 'allow';
+if (takesPackageFragments) {
+  process.stdout.write('skipped: release.packageFragments is allow in rafa.config.ts, '
+    + 'so a fragment under .changes/ may name a package\n');
+}
 
 /** VALID with its `level:` line replaced by `line`, or dropped for null. */
 function withLevelLine(line: string | null): string {
@@ -274,10 +306,12 @@ describe('fragmentIdOf', () => {
 });
 
 describe('package key against real and scoped fragments', () => {
-  test('every fragment under this repository\'s .changes/ parses with package null', () => {
+  test.skipIf(takesPackageFragments)('every fragment under this repository\'s .changes/ parses with package null', () => {
+    // A misspelt value is neither mode: fail on it rather than pin or skip.
+    expect<readonly string[]>(PACKAGE_FRAGMENT_MODES).toContain(packageFragments);
     // A release commit deletes every fragment, and git keeps no empty folder,
     // so on a just-settled tree `.changes/` is absent: no fragment to read.
-    const dir = join(import.meta.dir, '..', '..', '..', '..', '.changes');
+    const dir = join(REPO_ROOT, '.changes');
     if (!existsSync(dir)) return;
     const names = readdirSync(dir).filter((name) => name.endsWith('.md'));
 
