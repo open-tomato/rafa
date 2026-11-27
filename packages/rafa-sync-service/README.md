@@ -95,9 +95,11 @@ When the hub is unreachable:
 4. Rows are queued for sync on the next successful contact.
 
 An unreachable hub does not prevent `rafa effort collect`, `rafa loop start`,
-`rafa status`, `rafa next`, or `rafa effort report` from running. A push that
-cannot reach the hub skips its pull, so a command waits for one timeout; a
-pull that fails still reads the local store.
+`rafa status`, `rafa next`, or `rafa effort report` from running. The first
+step of a contact that cannot reach the hub skips the other, so a command waits
+for one timeout: under `ff-only`, the default, an unreachable pull skips its
+push; under `merge`, an unreachable push skips its pull. A pull that fails still
+reads the local store.
 
 ## How sync works
 

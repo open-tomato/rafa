@@ -18,7 +18,7 @@
  *     `sqlite.ts`'s row store, `bring-forward.ts`'s log insert).
  *   - No `new Database(` outside `sqlite.ts`, `fix-schema.ts`,
  *     `copy.ts`, `schema-report.ts`, `migrate.ts`, `merge-store.ts`,
- *     `store-meta.ts`, `fixture-extract.ts`,
+ *     `merge-conflicts.ts`, `store-meta.ts`, `fixture-extract.ts`,
  *     `testdata/merge-scenarios.ts`, `testdata/store-rows.ts` and
  *     `wire.ts`.
  *     Every other opener of a SQLite
@@ -37,6 +37,9 @@
  *     `merge-store.ts` opens the other store `{ readonly: true }`,
  *     which no open through `withSqliteStore` is, and brings forward
  *     only files it built itself, with `builtAside`.
+ *     `merge-conflicts.ts` reads `merge_conflicts` off the store
+ *     `{ readonly: true }`, which no open through `withSqliteStore` is,
+ *     and runs the guard itself before it opens the store.
  *     `store-meta.ts` carries the store's identity onto the file a
  *     rebuild swaps in (`carryStoreIdentity`): it reads the live store
  *     `{ readonly: true }` and writes the parallel file's own row, and a

@@ -88,7 +88,7 @@ The `issue` subject is held in two clusters: these four here, and `list`, `ready
 | `loop start` (`src/start.ts` line 562, `c02-active`) | one triage per run, handed each task's report | `start/triage.ts` (`createStartTriage`, `runStartFailures`) |
 | the board's epic readers (`src/board/epics.ts`, `epic-context.ts`, `c01-github`; `board-body.ts`, `c05-sessions`) and `rafa epic new` (`src/commands/epic/new.ts`) | the body of an epic and the epic template | `board/epic-body.ts`, `board/epic-template.ts` |
 | the store's tracker references (`src/effort/store/tracker-refs.ts`, `c04-sqlite`) and the fixture scrub (`src/fixtures/scrub.ts`, `c04-sqlite`) | the port types; local-path redaction and the triage's secrets | `ports/index.ts`, `triage/local-paths.ts`, `triage/triage.ts` |
-| the effort sync strategies (`src/effort/sync/contact.ts`, `select.ts`, `file.ts`, `c03-config` and `c04-sqlite`), `src/modules/manifest.ts` and the hub packages (`c12-index`) | the Sync port | `ports/index.ts` (types only, through `@open-tomato/rafa/ports` for the packages) |
+| the effort sync strategies (`packages/rafa-effort/src/effort/sync/contact.ts`, `select.ts`, `file.ts`, `c03-config` and `c04-sqlite`), `src/modules/manifest.ts` and the hub packages (`c12-index`) | the Sync port | `ports/index.ts` (types only, through `@open-tomato/rafa/ports` for the packages) |
 
 ### Most imported from outside
 

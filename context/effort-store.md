@@ -439,7 +439,10 @@ beside `effort.sync: local` it has no effect. Core declares it as
 key is among `LOCKED_SETTINGS`, and `selectSync` hands it to the service
 adapter as `syncSkew` (`packages/rafa/src/config-schema-hub.ts`). An example:
 `effort: { sync: service, syncSkew: pull-projected }`. The cases and the
-line each writes are in the wire contract's skew table below.
+line each writes are in the wire contract's skew table below. Under
+`effort.syncMerge: ff-only`, the default, a refused pull also stops the push,
+and `pull-projected` lets the pull complete so the push goes on; the
+`effort.syncMerge` paragraph below sets out the order.
 
 **A projected pull leaves two marks: rows listed in `held_rows`, and a
 `heldBack` mark in `sync-service.json`.** A pull the hub answers projected
