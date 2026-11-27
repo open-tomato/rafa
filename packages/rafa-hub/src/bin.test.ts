@@ -35,6 +35,7 @@ import { HUB_CONFIG_ENV } from './config.js';
 import { keysFileName } from './identity/key-store.js';
 import { LOGIN_PASSWORD_VARIABLE, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
 import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
+import { INSTALL_RECORD_FILE } from './install-record.js';
 import { HUB_ROUTES } from './server.js';
 import { connectSqliteHub } from './store/sqlite.js';
 
@@ -708,6 +709,14 @@ describe('hubCommandOf', () => {
     [['keys', 'create', 'ci', '--hub=https://hub.example.org'], 'keys'],
     [['keys'], null],
     [['keys', 'create'], null],
+    [['install'], 'install'],
+    [['install', '--data-dir=/data', '--sqlite-library=/opt/lib/libsqlite3.so'], 'install'],
+    [['install', '--model=bge', '--model-path=/models/bge.gguf', '--model-dimension=384'], 'install'],
+    [['install', '--data-dir'], null],
+    [['install', '--data-dir=/a', '--data-dir=/b'], null],
+    [['install', '--store=/data'], null],
+    [['install', 'now'], null],
+    [['--data-dir=/data'], null],
   ] as const)('reads %p as %p', (args, command) => {
     expect(hubCommandOf(args)).toBe(command);
   });
@@ -840,7 +849,34 @@ describe('bin.ts as a process', () => {
     const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
 
     expect(code).toBe(1);
-    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
+    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, rafa-hub install [--data-dir=<path>] [--sqlite-library=<path>] [--model=<id> [--model-path=<path>] [--model-dimension=<n>]], or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
+  });
+
+  it('runs install, writing the record beside the config file and printing one line', async () => {
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373) };
+    const dataDir = join(root, 'data');
+
+    const child = Bun.spawn([process.execPath, BIN, 'install', `--data-dir=${dataDir}`], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(stderr).toBe('');
+    expect(code).toBe(0);
+    const recordPath = join(root, INSTALL_RECORD_FILE);
+    expect(stdout).toStartWith(`rafa-hub install: wrote ${recordPath} for hub ${HUB_VERSION} on bun ${Bun.version}: dataDir ${dataDir}, `);
+    const record = JSON.parse(readFileSync(recordPath, 'utf8')) as Record<string, unknown>;
+    expect(record).toEqual({ installVersion: 1, hub: HUB_VERSION, bun: Bun.version, dataDir, sqliteLibrary: null, models: [] });
+  });
+
+  it('exits 1 with the usage line for install arguments naming no flag it takes, writing no record', async () => {
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373) };
+
+    const child = Bun.spawn([process.execPath, BIN, 'install', '--store=/data'], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stderr).toStartWith('rafa-hub: install --store=/data is not a command; usage: ');
+    expect(stderr).toContain('rafa-hub install [--data-dir=<path>]');
+    expect(existsSync(join(root, INSTALL_RECORD_FILE))).toBe(false);
   });
 
   it('runs login over two lines of standard input, setting the login in the keys file beside hub.storePath', async () => {

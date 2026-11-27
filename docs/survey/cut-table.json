@@ -5888,12 +5888,13 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 46,
+        "test": 47,
         "testSupport": 9
       },
       "files": [
         "packages/rafa-hub/src/bin.test.ts",
         "packages/rafa-hub/src/bin.ts",
+        "packages/rafa-hub/src/cli-install.test.ts",
         "packages/rafa-hub/src/cli-keys.test.ts",
         "packages/rafa-hub/src/config-dangerous.test.ts",
         "packages/rafa-hub/src/config-login.test.ts",
@@ -5979,7 +5980,7 @@
         "packages/rafa-index/src/search.test.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-hub/": 56,
+        "packages/rafa-hub/": 57,
         "packages/rafa-hub-port/": 1,
         "packages/rafa-index/": 9
       },

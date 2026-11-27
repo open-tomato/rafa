@@ -106,8 +106,16 @@
  * a hub's key routes at `--hub=<url>` or `RAFA_HUB_URL`; both live in
  * `cli-keys.ts`, whose module note says what each asks and prints.
  *
+ * ## `rafa-hub install`
+ *
+ * `rafa-hub install` writes the hub's install record beside the file
+ * `RAFA_HUB_CONFIG` names, from `--data-dir`, `--sqlite-library` and
+ * `--model` with `--model-path` and `--model-dimension`, flags left out
+ * keeping the record's values; it lives in `cli-install.ts`, whose
+ * module note says what it checks and prints.
+ *
  * {@link runHub} and {@link runIndexRebuild}, like `cli-keys.ts`'s
- * `runLogin` and `runKeys`, are the whole command but the process's
+ * `runLogin` and `runKeys` and `cli-install.ts`'s `runInstall`, are the whole command but the process's
  * exit, so a test runs them in process; importing this file starts
  * nothing.
  */
@@ -129,6 +137,7 @@ import { connectPostgresHub } from '@open-tomato/rafa-hub-postgres';
 
 import packageJson from '../package.json';
 
+import { INSTALL_USAGE, INSTALL_WORD, installCommandOf, runInstall } from './cli-install.js';
 import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { DEFAULT_MAX_PAYLOAD_ROWS, isDangerousPayloadCap, MAX_PAYLOAD_ROWS_KEY } from './config-dangerous.js';
 import { DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
@@ -154,10 +163,10 @@ const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 export const INDEX_REBUILD_ARGS: readonly string[] = Object.freeze(['index', 'rebuild']);
 
 /** What `rafa-hub` takes, as a refused argument list says it. */
-export const HUB_USAGE: string = `usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or ${KEYS_USAGE}`;
+export const HUB_USAGE: string = `usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, ${INSTALL_USAGE}, or ${KEYS_USAGE}`;
 
 /** What one run of `rafa-hub` does, by its arguments. */
-export type HubCommand = 'serve' | 'index-rebuild' | 'login' | 'keys';
+export type HubCommand = 'serve' | 'index-rebuild' | 'login' | 'keys' | 'install';
 
 /** Opens the `postgres` connector: `connectPostgresHub`'s shape. */
 export type PostgresHubOpener = (context: HubStoreContext, options: PostgresHubOptions) => Promise<HubConnected>;
@@ -508,6 +517,11 @@ export function hubCommandOf(args: readonly string[]): HubCommand | null {
       ? null
       : 'keys';
   }
+  if (args[0] === INSTALL_WORD) {
+    return installCommandOf(args.slice(1)) === null
+      ? null
+      : 'install';
+  }
 
   const isRebuild = args.length === INDEX_REBUILD_ARGS.length
     && args.every((arg, at) => arg === INDEX_REBUILD_ARGS[at]);
@@ -612,6 +626,7 @@ if (import.meta.main) {
   if (command === 'index-rebuild') process.exit(await runIndexRebuild(process.env));
   if (command === 'login') process.exit(await runLogin(process.env));
   if (command === 'keys') process.exit(await runKeys(process.argv.slice(3), process.env));
+  if (command === 'install') process.exit(await runInstall(process.argv.slice(3), process.env, HUB_VERSION));
 
   await serve();
 }
