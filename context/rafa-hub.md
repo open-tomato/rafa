@@ -7,6 +7,58 @@ authority for that subject. The operator's setup is in
 `packages/rafa-hub-postgres/README.md`. The wire contract the devices and the
 hub share is in `context/effort-store.md`, under "Wire contract".
 
+## Install record
+
+`rafa-hub.install.json` is the install record: what `rafa-hub install` decided,
+kept beside the file `RAFA_HUB_CONFIG` names (`/data/rafa-hub.install.json` in
+the image). It is to the hub what a lockfile is to a project: written by the
+install, read at start, never edited. Its format, reader and writer live in
+`packages/rafa-hub/src/install-record.ts`.
+
+Format `1` holds six keys:
+
+- `installVersion`, the record's format, `1`.
+- `hub`, the version of the hub that wrote it.
+- `bun`, the Bun version the install ran on.
+- `dataDir`, the absolute directory the hub keeps what it writes in: the config
+  file's directory by default.
+- `sqliteLibrary`, the absolute path of the SQLite library to load, or `null`
+  for Bun's own.
+- `models`, one `{ id, path, hash, dimension }` per installed embedding model,
+  `hash` the SHA-256 of the model file; empty until one is installed.
+
+There is one writer, `rafa-hub install`, in
+`packages/rafa-hub/src/cli-install.ts`: it writes the whole record each time it
+runs. A flag left out keeps the value the record already holds, so a start that
+passes only `--data-dir` keeps a library or a model recorded earlier. Nothing
+else writes the file.
+
+The reader is `readInstallRecord`, called at start by `bin.ts` and by the key
+commands in `cli-keys.ts`. It answers as follows:
+
+- No file: the defaults (`dataDir` the config file's directory, no library, no
+  models) and one warning line.
+- A file that exists but cannot be read: refused.
+- An `installVersion` other than `1`: refused.
+- A `hub` naming another version than the running hub: refused.
+- Not JSON, not an object, or a key missing, unknown or of the wrong shape:
+  refused.
+
+Every refusal names the record's path and ends with `run rafa-hub install`.
+
+The keys file, `rafa-hub.keys.sqlite` under `api-key`, sits in the record's
+`dataDir`, as `keysFileName` in `packages/rafa-hub/src/identity/key-store.ts`
+gives it. For one release, a keys file found only beside `hub.storePath`, its
+old place, is opened there with one `keys.old-place` warning; move it into
+`dataDir`.
+
+The config key `hub.store.sqliteLibrary` is an alias of the record's
+`sqliteLibrary`, read for this release only. With the key set and no library in
+the record, the hub loads the key's library and logs one `config.deprecated`
+warning naming `rafa-hub install`. With both naming the same library, the
+record's is loaded and the warning is given. Two different libraries stop the
+start with a refusal, so remove the key once the record names the library.
+
 ## Connectors
 
 A connector is one storage engine behind the hub. It opens a `HubStore`, which
