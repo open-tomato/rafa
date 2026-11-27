@@ -1,8 +1,8 @@
 # rafa
 
 The agent task loop for ralph, packaged and ready to ship: a single-package
-implementation of the loop from `agentic-research`, under bun, published to
-npm as `@open-tomato/rafa`. Core, the hub, the sync service and the six
+implementation of the loop from `agentic-research`, under bun, published to npm
+as `@open-tomato/rafa`. Core, `rafa-hub*`, `rafa-index`, sync service and six
 feature packages are bun workspaces in `packages/`; Atlas's in `addons/atlas/`.
 
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`

@@ -5793,8 +5793,8 @@
       "clearedByIssue118": 0,
       "edges": [],
       "fileCounts": {
-        "source": 32,
-        "test": 20,
+        "source": 36,
+        "test": 22,
         "testSupport": 0
       },
       "files": [
@@ -5843,7 +5843,13 @@
         "packages/rafa-effort/src/effort/skill-signals.ts",
         "packages/rafa-effort/src/effort/skill-use.test.ts",
         "packages/rafa-effort/src/effort/skill-use.ts",
+        "packages/rafa-effort/src/effort/sync/contact-attempt.ts",
+        "packages/rafa-effort/src/effort/sync/contact-facts.ts",
         "packages/rafa-effort/src/effort/sync/contact-pages.test.ts",
+        "packages/rafa-effort/src/effort/sync/contact-pages.ts",
+        "packages/rafa-effort/src/effort/sync/contact-readings.ts",
+        "packages/rafa-effort/src/effort/sync/contact-status.test.ts",
+        "packages/rafa-effort/src/effort/sync/contact-sync.test.ts",
         "packages/rafa-effort/src/effort/sync/contact.ts",
         "packages/rafa-effort/src/effort/sync/doctor-reading.ts",
         "packages/rafa-effort/src/effort/sync/file.ts",
@@ -5852,7 +5858,7 @@
         "packages/rafa-effort/src/effort/trend-stats.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-effort/": 52
+        "packages/rafa-effort/": 58
       },
       "folders": [
         "packages/rafa-effort/"
