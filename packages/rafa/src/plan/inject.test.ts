@@ -35,6 +35,16 @@ import { findNextTask, insertTrackerTask, listTrackerTasks, updateTrackerLine } 
 
 import { renderInjection } from './inject.js';
 
+/**
+ * The spec's one-second bound on a crafted context: the old blank-line
+ * trim, tried from every newline of a long blank run, took about 2.3 s
+ * on {@link CRAFTED_BLANK_LINES} blank lines and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Blank lines inside the crafted plan context, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_BLANK_LINES = 50_000;
+
 /** Joins lines into a document ending in a newline, as an editor saves one. */
 function doc(...lines: string[]): string {
   return `${lines.join('\n')}\n`;
@@ -364,6 +374,19 @@ describe('contexts', () => {
 
     const rendered = renderInjection({ mode: 'task', plan: doc(...lines), task });
     expect(rendered.text).toStartWith('## Plan context\n\n  indented first\n\nsecond\n\n## Stage: only\n');
+  });
+  it('keeps a long blank run inside a context, within REDOS_BOUND_MS', () => {
+    const blanks: string[] = Array.from({ length: CRAFTED_BLANK_LINES }, () => '');
+    const lines = withContexts(['a', ...blanks, 'b'], ['Stage.']);
+    const task = dispatchedAt(lines, '- [ ] The task');
+    const plan = doc(...lines);
+
+    const started = performance.now();
+    const rendered = renderInjection({ mode: 'task', plan, task });
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(rendered.text).toBe(doc('## Plan context', '', 'a', ...blanks, 'b', '', '## Stage: only', '', 'Stage.', '', '- [ ] The task'));
   });
 });
 

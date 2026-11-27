@@ -10,6 +10,24 @@ import { describe, expect, it } from 'bun:test';
 
 import { failedCaseNamesIn, testFailureOf } from './test-failure.js';
 
+/**
+ * The spec's one-second bound on a crafted `(fail)` line: the old
+ * pattern, its three whitespace runs able to share one long run, took
+ * about 1.9 s at 1,500 spaces and 119 s at 6,000, growing with the cube,
+ * and was killed at 120 s on {@link CRAFTED_SPACES}.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Spaces after `(fail)` in the crafted line, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_SPACES = 50_000;
+
+/**
+ * The crafted line: `(fail)`, a long space run, then a name a carriage
+ * return breaks, which no case name may hold, so the line is no case and
+ * the old pattern tried every split of the run before saying so.
+ */
+const CRAFTED_FAIL_LINE = `(fail)${' '.repeat(CRAFTED_SPACES)}x\ry`;
+
 const BUN_CAPTURE = [
   'bun test v1.4.2 (744846f84)',
   '',
@@ -116,6 +134,17 @@ describe('testFailureOf', () => {
   it('answers null for a bug with no artifact and a what naming no case', () => {
     expect(testFailureOf({ what: 'src/a.test.ts is slow', artifact: null })).toBeNull();
   });
+
+  it('reads no case off a long whitespace run before a broken name, and the next line\'s case, within REDOS_BOUND_MS', () => {
+    const bug = { what: 'a test fails', artifact: `src/a.test.ts:\n${CRAFTED_FAIL_LINE}\n(fail) a > b [1ms]` };
+
+    const started = performance.now();
+    const failure = testFailureOf(bug);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(failure).toEqual({ file: 'src/a.test.ts', name: 'a > b', evidence: CRAFTED_FAIL_LINE });
+  });
 });
 
 describe('failedCaseNamesIn', () => {
@@ -125,6 +154,37 @@ describe('failedCaseNamesIn', () => {
 
   it('reads a (fail) line with no timing and one timed in seconds', () => {
     expect(failedCaseNamesIn('(fail) a > b\r\n(fail) c > d [1.50s]')).toEqual(['a > b', 'c > d']);
+  });
+
+  it('reads each (fail) line\'s name as the shortest one its whitespace and timing leave', () => {
+    const lines = [
+      '  (fail)\ta > b [2.5ms]  ',
+      '(fail) a  [1ms] ',
+      '(fail) a [1ms] [2ms]',
+      '(fail) [1ms]',
+      '(fail)  \t[1ms]',
+      '(fail)   ',
+      '(fail) \u2028 ',
+      '(fail)  \u2028x',
+      '(fail) a [1ms]\u2028',
+      '(fail) a\u2028 [1ms]',
+    ];
+
+    expect(failedCaseNamesIn(lines.join('\n'))).toEqual(['a > b', 'a', 'a [1ms]', '[1ms]', '[1ms]', ' ', ' ', 'x', 'a', 'a']);
+  });
+
+  it('reads no case off a line whose name would hold a line break, or that is no (fail) line', () => {
+    expect(failedCaseNamesIn(['(fail) a\u2028b', '(fail) a\rb', '(fail)a', '(fail) ', '(fail) \u2028', 'x (fail) a'].join('\n')))
+      .toEqual([]);
+  });
+
+  it('reads no case off a long whitespace run before a broken name, and the next line\'s case, within REDOS_BOUND_MS', () => {
+    const started = performance.now();
+    const names = failedCaseNamesIn(`src/a.test.ts:\n${CRAFTED_FAIL_LINE}\n(fail) a > b [1ms]\n`);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(names).toEqual(['a > b']);
   });
 
   it('answers nothing for a capture with no (fail) line, and skips pass and file > case lines', () => {

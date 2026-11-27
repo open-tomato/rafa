@@ -75,8 +75,14 @@ const TEST_FILE = '(?:/?(?:[\\w.@+-]+/)*)[\\w.@+-]+\\.(?:test|spec)\\.[cm]?[jt]s
 /** Every test file path in a text. */
 const TEST_FILE_ANYWHERE = new RegExp(`(?<![\\w.@+/-])${TEST_FILE}(?![\\w])`, 'g');
 
-/** Bun's `(fail)` line: the case name, then the timing bun appends. */
-const FAIL_LINE = /^\s*\(fail\)\s+(.+?)(?:\s+\[\d+(?:\.\d+)?m?s\])?\s*$/;
+/** Bun's `(fail)` marker opening a line, after any whitespace. */
+const FAIL_MARK = /^\s*\(fail\)/;
+
+/** The timing bun appends to a `(fail)` line, alone: `[0.19ms]`, `[1.50s]`. */
+const FAIL_TIMING = /^\[\d+(?:\.\d+)?m?s\]$/;
+
+/** A line break, which a case name never holds: what a regex's `.` does not match. */
+const LINE_BREAK = /[\n\r\u2028\u2029]/;
 
 /** A `file > case` line: a test file's path, ` > `, then the case name. */
 const FILE_CASE_LINE = new RegExp(`^\\s*(${TEST_FILE})\\s+>\\s+(.+?)\\s*$`);
@@ -97,6 +103,73 @@ const NOISE_LINES: readonly RegExp[] = [
 /** What a leading `error: ` reads as. */
 const ERROR_PREFIX = /^error:\s+/;
 
+/** Where the rest of a `(fail)` line, after the marker, ends its content, and its trailing timing. */
+interface FailTail {
+  /** Where the content ends: only whitespace follows. */
+  readonly content: number;
+  /** Where the whitespace before a trailing timing starts and where the timing opens, or null when none ends the content. */
+  readonly timing: { readonly gap: number; readonly open: number } | null;
+}
+
+/** The {@link FailTail} of `rest`. The timing holds no `[`, so it opens at the content's last one. */
+function failTailOf(rest: string): FailTail {
+  const core = rest.trimEnd();
+  const open = core.lastIndexOf('[');
+  const gap = core.slice(0, open).trimEnd().length;
+  const timed = open !== -1 && gap < open && FAIL_TIMING.test(core.slice(open));
+  return {
+    content: core.length,
+    timing: timed
+      ? { gap, open }
+      : null,
+  };
+}
+
+/**
+ * Where the shortest case name opening at `start` of `rest` ends, or null
+ * when none does: at the gap before a trailing timing when that leaves the
+ * name a character and the gap one, else at the content's end, and never
+ * past the line break at `lineBreak`, the first at or after `start`.
+ */
+function nameEndFrom(start: number, tail: FailTail, lineBreak: number, rest: string): number | null {
+  if (tail.timing !== null) {
+    const end = Math.max(tail.timing.gap, start + 1);
+    if (end < tail.timing.open && end <= lineBreak) return end;
+  }
+  const end = Math.max(tail.content, start + 1);
+  return end <= rest.length && end <= lineBreak
+    ? end
+    : null;
+}
+
+/**
+ * The case name on Bun's `(fail)` line `line`, or null when it is none:
+ * the shortest name of a character or more, holding no line break, that
+ * leaves a trailing timing with whitespace before it, or else whitespace
+ * only, read from the end of the whitespace after the marker, then from
+ * one character earlier each time no name fits. That is what
+ * `/^\s*\(fail\)\s+(.+?)(?:\s+\[\d+(?:\.\d+)?m?s\])?\s*$/` read, here in
+ * linear time, where the regex's three whitespace runs could share one
+ * long run and took cubic time on it (CodeQL js/polynomial-redos).
+ */
+function failedCaseNameOf(line: string): string | null {
+  const mark = FAIL_MARK.exec(line);
+  if (mark === null) return null;
+  const rest = line.slice(mark[0].length);
+  const lead = rest.length - rest.trimStart().length;
+  const tail = failTailOf(rest);
+  const breakAfterLead = rest.slice(lead).search(LINE_BREAK);
+  let lineBreak = breakAfterLead === -1
+    ? rest.length
+    : lead + breakAfterLead;
+  for (let start = lead; start >= 1; start -= 1) {
+    if (LINE_BREAK.test(rest.charAt(start))) lineBreak = start;
+    const end = nameEndFrom(start, tail, lineBreak, rest);
+    if (end !== null) return rest.slice(start, end);
+  }
+  return null;
+}
+
 /** A case line read: where it is, its name, and the file it names when it is a `file > case` line. */
 interface CaseLine {
   readonly index: number;
@@ -106,8 +179,8 @@ interface CaseLine {
 
 /** The case line `line` is, at `index`, or null. */
 function caseLineOf(line: string, index: number): CaseLine | null {
-  const fail = FAIL_LINE.exec(line);
-  if (fail !== null) return { index, name: fail[1]!, file: null };
+  const failName = failedCaseNameOf(line);
+  if (failName !== null) return { index, name: failName, file: null };
   const fileCase = FILE_CASE_LINE.exec(line);
   return fileCase === null
     ? null
@@ -197,6 +270,6 @@ export function testFailureOf(bug: Pick<ReportBug, 'what' | 'artifact'>): TestFa
  */
 export function failedCaseNamesIn(capture: string): readonly string[] {
   return linesOf(capture)
-    .map((line) => FAIL_LINE.exec(line)?.[1])
-    .filter((name): name is string => name !== undefined);
+    .map((line) => failedCaseNameOf(line))
+    .filter((name): name is string => name !== null);
 }
