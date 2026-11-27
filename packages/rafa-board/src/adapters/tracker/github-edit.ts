@@ -15,7 +15,9 @@
  * its login. The ref is answered as it was handed over. The priority is
  * read off the labels as `get` reads it in `github.ts`: the value of the
  * first `priority:` label when that is one of the port's priorities,
- * else null.
+ * else null. The type is read off them by `get`'s own reader, which
+ * `github.ts` hands over: the value of the first `type:` label when that
+ * is one of the port's types, else `code`.
  *
  * The read asks for no `url`, so it cannot tell an open pull request
  * from an issue the way `get` does: `gh issue view` answers a pull
@@ -39,11 +41,11 @@
  * wrote in the rejection of a failure.
  *
  * Before anything is sent, `edit` refuses a change that is not a
- * mapping, that names no body, no title and no priority, whose body or
- * title is not a string, or whose priority is not one of the port's
- * priorities, as the `local` adapter refuses one.
+ * mapping, that names no body, no title, no priority and no type, whose
+ * body or title is not a string, or whose priority or type is not one of
+ * the port's, as the `local` adapter refuses one.
  *
- * ## A priority
+ * ## A priority and a type
  *
  * A priority is a label swap in that same `gh issue edit`: `--add-label
  * priority:<value>`, and one `--remove-label` for each other `priority:`
@@ -63,7 +65,14 @@
  * sends no `gh issue edit`. A label another edit writes between the read
  * and the write is not seen.
  *
- * The label added is made first, with `gh label create <label> --force`
+ * A type is a label swap the same way, in that same `gh issue edit`:
+ * `--add-label type:<value>` unless the read holds it, and one
+ * `--remove-label` for each other `type:` label the read holds. Every
+ * other label, the module, cause and priority among them, is named in
+ * neither flag and stays. An issue holding the type already, and no
+ * other `type:` label, has nothing to swap, as for a priority.
+ *
+ * Each label added is made first, with `gh label create <label> --force`
  * and `--repo` when the ref names one, as `create` makes the labels it
  * sends: `rafa init --board` makes `needs-triage` and no `priority:`
  * label, and what `gh issue edit` does with a label the repository lacks
@@ -82,11 +91,11 @@
  * each refusal and `github.ts`, which imports this module, is imported
  * by it for types alone.
  */
-import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '@open-tomato/rafa/ports';
+import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, IssueType, Tracker } from '@open-tomato/rafa/ports';
 
 import { describeValue, isMapping } from '@open-tomato/rafa/core/config/sections';
 
-import { ISSUE_PRIORITIES } from './issue-values.js';
+import { ISSUE_PRIORITIES, ISSUE_TYPES } from './issue-values.js';
 
 /** What every refusal opens with, as `github.ts` spells it. */
 const PREFIX = 'github tracker';
@@ -107,14 +116,20 @@ export interface GithubEditReaders {
   readonly parseJson: (stdout: string, command: string) => unknown;
   /** The names of a payload's labels, or null when they are not a list of named labels. */
   readonly labelNames: (value: unknown) => string[] | null;
-  /** The label names a priority is held as, which `github.ts` spells in `GITHUB_LABELS`. */
-  readonly labels: PriorityLabels;
+  /** The type an issue's labels carry, as `get` reads it: `typeOfLabels` in `github.ts`. */
+  readonly typeOf: (labels: readonly string[]) => IssueType;
+  /** The label names a priority and a type are held as, which `github.ts` spells in `GITHUB_LABELS`. */
+  readonly labels: EditLabels;
 }
 
-/** What opens a priority's label, and the label of an issue triage has set no priority for. */
-export interface PriorityLabels {
+/**
+ * What opens a priority's label, the label of an issue triage has set no
+ * priority for, and what opens a type's label.
+ */
+export interface EditLabels {
   readonly priorityPrefix: string;
   readonly needsTriage: string;
+  readonly typePrefix: string;
 }
 
 /** The pair, as the `Tracker` port names its members. */
@@ -153,6 +168,11 @@ function isPriority(value: unknown): value is IssuePriority {
   return ISSUE_PRIORITIES.some((priority) => priority === value);
 }
 
+/** True when `value` is one of the port's types. */
+function isType(value: unknown): value is IssueType {
+  return ISSUE_TYPES.some((type) => type === value);
+}
+
 /**
  * The priority an issue's labels carry: the value of the first label
  * opening with `prefix` when that is one of the port's priorities, else
@@ -168,15 +188,18 @@ function priorityOf(held: readonly string[], prefix: string): IssuePriority | nu
 /** The first thing wrong with a change, or null when nothing is. */
 function editProblem(change: unknown): string | null {
   if (!isMapping(change)) return `the change is ${describeValue(change)}, expected a mapping`;
-  const { body, title, priority } = change;
-  if (body === undefined && title === undefined && priority === undefined) {
-    return 'the change names no body, no title and no priority';
+  const { body, title, priority, type } = change;
+  if (body === undefined && title === undefined && priority === undefined && type === undefined) {
+    return 'the change names no body, no title, no priority and no type';
   }
   if (body !== undefined && typeof body !== 'string') return `body is ${describeValue(body)}, expected a string`;
   if (title !== undefined && typeof title !== 'string') return `title is ${describeValue(title)}, expected a string`;
-  return priority === undefined || isPriority(priority)
+  if (priority !== undefined && !isPriority(priority)) {
+    return `priority is ${describeValue(priority)}, expected one of: ${ISSUE_PRIORITIES.join(', ')}`;
+  }
+  return type === undefined || isType(type)
     ? null
-    : `priority is ${describeValue(priority)}, expected one of: ${ISSUE_PRIORITIES.join(', ')}`;
+    : `type is ${describeValue(type)}, expected one of: ${ISSUE_TYPES.join(', ')}`;
 }
 
 /** The labels one edit adds and removes. */
@@ -185,7 +208,7 @@ interface LabelSwap {
   readonly removed: readonly string[];
 }
 
-/** The swap of an edit naming no priority. */
+/** The swap of an edit naming no priority and no type. */
 const NO_SWAP: LabelSwap = Object.freeze({ added: [], removed: [] });
 
 /**
@@ -193,7 +216,7 @@ const NO_SWAP: LabelSwap = Object.freeze({ added: [], removed: [] });
  * other, out of triage: the priority's label added unless held, and each
  * other priority label and the triage label removed, of those held.
  */
-function swapFor(priority: IssuePriority, held: readonly string[], labels: PriorityLabels): LabelSwap {
+function prioritySwap(priority: IssuePriority, held: readonly string[], labels: EditLabels): LabelSwap {
   const wanted = `${labels.priorityPrefix}${priority}`;
   return {
     added: held.includes(wanted)
@@ -201,6 +224,37 @@ function swapFor(priority: IssuePriority, held: readonly string[], labels: Prior
       : [wanted],
     removed: held.filter((label) => label !== wanted
       && (label === labels.needsTriage || label.startsWith(labels.priorityPrefix))),
+  };
+}
+
+/**
+ * The swap that leaves an issue holding `held` with `type` and no other:
+ * the type's label added unless held, and each other type label removed,
+ * of those held. No other label is named.
+ */
+function typeSwap(type: IssueType, held: readonly string[], labels: EditLabels): LabelSwap {
+  const wanted = `${labels.typePrefix}${type}`;
+  return {
+    added: held.includes(wanted)
+      ? []
+      : [wanted],
+    removed: held.filter((label) => label !== wanted && label.startsWith(labels.typePrefix)),
+  };
+}
+
+/** The swap `change` names over an issue holding `held`: its priority's, then its type's. */
+function swapOf(change: IssueEdit, held: readonly string[], labels: EditLabels): LabelSwap {
+  const swaps = [
+    ...(change.priority === undefined
+      ? []
+      : [prioritySwap(change.priority, held, labels)]),
+    ...(change.type === undefined
+      ? []
+      : [typeSwap(change.type, held, labels)]),
+  ];
+  return {
+    added: swaps.flatMap((swap) => swap.added),
+    removed: swaps.flatMap((swap) => swap.removed),
   };
 }
 
@@ -213,7 +267,7 @@ function optionalFlag(name: string, value: string | undefined): string[] {
 
 /** Makes the `editable` and `edit` pair over the adapter's readers; see the module note. */
 export function createGithubEditMembers(readers: GithubEditReaders): GithubEditMembers {
-  const { run, issueNumberOf, parseJson, labelNames, labels } = readers;
+  const { run, issueNumberOf, parseJson, labelNames, typeOf, labels } = readers;
 
   const editable = async (ref: IssueRef): Promise<EditableIssue> => {
     const number = issueNumberOf(ref);
@@ -221,16 +275,16 @@ export function createGithubEditMembers(readers: GithubEditReaders): GithubEditM
     const stdout = await run(['issue', 'view', number, ...optionalFlag('--repo', ref.repo), '--json', EDITABLE_FIELDS], command);
     const viewed = viewedEditable(parseJson(stdout, command), labelNames);
     if (typeof viewed === 'string') throw new Error(`${PREFIX}: ${command} answered ${viewed}`);
-    return { ref, ...viewed, priority: priorityOf(viewed.labels, labels.priorityPrefix) };
+    return { ref, ...viewed, priority: priorityOf(viewed.labels, labels.priorityPrefix), type: typeOf(viewed.labels) };
   };
 
   const edit = async (ref: IssueRef, change: IssueEdit): Promise<void> => {
     const number = issueNumberOf(ref);
     const problem = editProblem(change);
     if (problem !== null) throw new TypeError(`${PREFIX}: refused an edit of issue #${number}: ${problem}`);
-    const swap = change.priority === undefined
+    const swap = change.priority === undefined && change.type === undefined
       ? NO_SWAP
-      : swapFor(change.priority, (await editable(ref)).labels, labels);
+      : swapOf(change, (await editable(ref)).labels, labels);
     const split = swap.removed.find((label) => label.includes(','));
     if (split !== undefined) {
       throw new Error(
@@ -247,7 +301,7 @@ export function createGithubEditMembers(readers: GithubEditReaders): GithubEditM
       ...swap.added.flatMap((label) => ['--add-label', label]),
       ...swap.removed.flatMap((label) => ['--remove-label', label]),
     ];
-    // The issue holds the priority already, alone and out of triage, and the change names nothing else.
+    // The issue holds the priority and the type already, each alone and out of triage, and the change names nothing else.
     if (flags.length === 0) return;
     const repoFlag = optionalFlag('--repo', ref.repo);
     for (const label of swap.added) {

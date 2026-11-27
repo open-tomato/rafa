@@ -386,23 +386,41 @@ export interface EditableIssue {
    * tracker that answers none.
    */
   readonly priority?: IssuePriority | null;
+  /**
+   * The type the tracker holds for the issue, as `get` answers
+   * {@link IssueDraft.type}. Absent on a tracker whose `edit` writes no
+   * type: a caller reads it here before it hands {@link IssueEdit} a
+   * type, and hands none to a tracker that answers none.
+   */
+  readonly type?: IssueType;
 }
 
 /**
- * What one `edit` writes: a new body, a new title, a new priority, or
- * any of the three together. Whatever it leaves out stays as the
- * tracker holds it. A body is written whole: an append is the caller's,
- * which hands the old body with its update below it. A priority is
- * written in place of the one the issue held, and takes the issue out
- * of triage: after it the tracker holds that priority and no other, and
- * no mark that triage has yet to set one. An edit never returns an
- * issue to triage, so the member holds no null. The union holds an edit
- * to at least one of the three.
+ * What one `edit` writes: a new body, a new title, a new priority, a
+ * new type, or any of the four together. Whatever it leaves out stays
+ * as the tracker holds it. A body is written whole: an append is the
+ * caller's, which hands the old body with its update below it. A
+ * priority is written in place of the one the issue held, and takes the
+ * issue out of triage: after it the tracker holds that priority and no
+ * other, and no mark that triage has yet to set one. An edit never
+ * returns an issue to triage, so the member holds no null. A type is
+ * written in place of the one the issue held too, leaving its other
+ * marks, its module, cause and priority among them, as they were. The
+ * union holds an edit to at least one of the four.
  */
 export type IssueEdit =
-  | { readonly body: string; readonly title?: string; readonly priority?: IssuePriority }
-  | { readonly body?: string; readonly title: string; readonly priority?: IssuePriority }
-  | { readonly body?: string; readonly title?: string; readonly priority: IssuePriority };
+  | (IssueEditFields & { readonly body: string })
+  | (IssueEditFields & { readonly title: string })
+  | (IssueEditFields & { readonly priority: IssuePriority })
+  | (IssueEditFields & { readonly type: IssueType });
+
+/** Every member an {@link IssueEdit} may name, each optional. */
+interface IssueEditFields {
+  readonly body?: string;
+  readonly title?: string;
+  readonly priority?: IssuePriority;
+  readonly type?: IssueType;
+}
 
 /** What a tracker's platform supports beyond issues themselves. */
 export interface TrackerCapabilities {

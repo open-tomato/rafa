@@ -217,6 +217,7 @@ runTrackerContract({
   expectedKind: 'local',
   editsIssues: true,
   editsPriority: true,
+  editsType: true,
   clock: advanceableContractClock,
   create: async (clock) => {
     contractDir = freshDir('contract');
@@ -946,6 +947,7 @@ describe('editing a local issue', () => {
       labels: [],
       author: '',
       priority: 'urgent',
+      type: 'bug',
     });
   });
 
@@ -1066,7 +1068,7 @@ describe('editing a local issue', () => {
     expect(readFileSync(join(dir, '1.md'), 'utf8')).not.toBe(before);
   });
 
-  it('refuses an edit naming no body, no title and no priority, leaving the file as it was', async () => {
+  it('refuses an edit naming no body, no title, no priority and no type, leaving the file as it was', async () => {
     const dir = freshDir('edit-empty');
     const tracker = localTracker(dir);
     const ref = await tracker.create(draftFixture());
@@ -1075,7 +1077,7 @@ describe('editing a local issue', () => {
     const empty = {} as unknown as { body: string };
 
     await expect(tracker.edit?.(ref, empty)).rejects.toThrow(
-      'local tracker: refused an edit naming no body, no title and no priority',
+      'local tracker: refused an edit naming no body, no title, no priority and no type',
     );
     expect(readFileSync(join(dir, '1.md'), 'utf8')).toBe(before);
     await tracker.edit?.(ref, { body: 'Changed.\n' });

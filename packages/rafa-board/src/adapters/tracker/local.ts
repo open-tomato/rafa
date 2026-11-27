@@ -109,18 +109,20 @@
  *     before any file is read, rather than answered as no issues.
  *   - `editable` and `edit`, rafa's own pair, which the source lacks.
  *     `editable` reads the file the ref names, as `get` does, and
- *     answers its title, body and `priority` field, open unless its
- *     state is one of {@link CLOSED_STATES}, with no labels and an empty
- *     author, since an issue file holds neither. `edit` rewrites that
- *     file with the body, the title and the priority the change names,
- *     keeping every other field, so a later read answers the written
- *     text byte for byte. A priority is the file's `priority` field, and
- *     a null there is the whole of triage's mark, so writing one swaps
- *     the old priority and takes the issue out of triage at once. A
- *     change naming none of the three is refused with nothing written,
- *     as is a body or title no read would accept, and a priority that
- *     is not one of the port's: a null too, which a file may hold and an
- *     edit may not write.
+ *     answers its title, body, `priority` and `type` fields, open unless
+ *     its state is one of {@link CLOSED_STATES}, with no labels and an
+ *     empty author, since an issue file holds neither. `edit` rewrites
+ *     that file with the body, the title, the priority and the type the
+ *     change names, keeping every other field, `module` and `cause`
+ *     among them, so a later read answers the written text byte for
+ *     byte. A priority is the file's `priority` field, and a null there
+ *     is the whole of triage's mark, so writing one swaps the old
+ *     priority and takes the issue out of triage at once. A type is the
+ *     file's `type` field, written in place of the one it held. A change
+ *     naming none of the four is refused with nothing written, as is a
+ *     body or title no read would accept, a priority that is not one of
+ *     the port's, a null too, which a file may hold and an edit may not
+ *     write, and a type that is not one of the port's.
  *
  * Kept as the source has them: `preflight` always answers ok, since the
  * file system is the last resort; the capabilities are all false; `find`
@@ -664,18 +666,25 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
         labels: [],
         author: '',
         priority: record.draft.priority,
+        type: record.draft.type,
       };
     },
 
     edit: async (ref: IssueRef, change: IssueEdit): Promise<void> => {
-      const { priority } = change;
-      if (change.body === undefined && change.title === undefined && priority === undefined) {
-        throw new TypeError(`${PREFIX}: refused an edit naming no body, no title and no priority`);
+      const { priority, type } = change;
+      if (change.body === undefined && change.title === undefined && priority === undefined && type === undefined) {
+        throw new TypeError(`${PREFIX}: refused an edit naming no body, no title, no priority and no type`);
       }
       if (priority !== undefined && !oneOf(ISSUE_PRIORITIES)(priority)) {
         throw new TypeError(
           `${PREFIX}: refused to write an invalid issue: priority is ${describeValue(priority)},`
             + ` expected one of: ${ISSUE_PRIORITIES.join(', ')}`,
+        );
+      }
+      if (type !== undefined && !oneOf(ISSUE_TYPES)(type)) {
+        throw new TypeError(
+          `${PREFIX}: refused to write an invalid issue: type is ${describeValue(type)},`
+            + ` expected one of: ${ISSUE_TYPES.join(', ')}`,
         );
       }
       const { number, record } = await read(ref);
@@ -690,6 +699,9 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
         ...(priority === undefined
           ? {}
           : { priority }),
+        ...(type === undefined
+          ? {}
+          : { type }),
       };
       await rewrite(number, { ...record, draft });
     },

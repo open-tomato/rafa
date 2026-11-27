@@ -39,6 +39,14 @@
  * always reddened contract cases over the fake as well, which refuses a
  * label the repository lacks, one the issue holds, and a removal of one
  * it lacks.
+ *
+ * The type cases arrived on 2026-11-27, the reading held equal to
+ * `get`'s and the swap to its commands in order, as the priority's is.
+ * One mutation of `github-edit.ts` was driven that day, the module
+ * restored byte-identical (sha256) after: the other `type:` labels never
+ * removed reddened the five swap cases here and the shared type case in
+ * `github.test.ts`, where the issue then holds both labels and `get`
+ * reads the first.
  */
 import type { GhResult, GhRunner } from './github.js';
 import type { IssueEdit, IssueRef, Tracker } from '@open-tomato/rafa/ports';
@@ -99,6 +107,9 @@ function viewPayload(overrides: Record<string, unknown> = {}): Record<string, un
   };
 }
 
+/** The port's types, as a refusal lists them. */
+const TYPES = 'code, bug, spike, adr, chore, package-api, epic, spec, debt';
+
 /** A body holding a flag, a non-ASCII letter, inner blank lines and a trailing newline. */
 const BODY = '--web\n\n## Context\n\ncafé, two words\n\n**Updated 2026-10-06, notes:**\n\nNarrow it.\n';
 
@@ -119,7 +130,20 @@ describe('reading an issue to edit', () => {
       labels: ['module:auth', 'type:bug', 'priority:urgent'],
       author: 'rafa-fake',
       priority: 'urgent',
+      type: 'bug',
     });
+  });
+
+  it.each([
+    ['the first of two type labels', ['type:debt', 'type:bug'], 'debt'],
+    ['code for a first type label the port does not name', ['type:feature', 'type:bug'], 'code'],
+    ['code for an issue holding no label', [], 'code'],
+  ] as const)('answers %s as the type, as get answers it', async (_name, labels, type) => {
+    const { tracker, fake } = await overOneIssue();
+    fake.update('1', (issue) => ({ ...issue, labels: [...labels] }));
+
+    expect((await pairOf(tracker).editable(githubRef('1'))).type).toBe(type);
+    expect((await tracker.get(githubRef('1'))).type).toBe(type);
   });
 
   it.each([
@@ -238,9 +262,11 @@ describe('editing an issue', () => {
   });
 
   it.each([
-    ['naming no body, no title and no priority', {}, 'the change names no body, no title and no priority'],
+    ['naming no body, no title, no priority and no type', {}, 'the change names no body, no title, no priority and no type'],
     ['holding a priority the port does not name', { priority: 'p0' }, 'priority is "p0", expected one of: urgent, high, medium, low'],
     ['holding a null priority', { priority: null, title: 't' }, 'priority is null, expected one of: urgent, high, medium, low'],
+    ['holding a type the port does not name', { type: 'feature' }, `type is "feature", expected one of: ${TYPES}`],
+    ['holding a null type', { type: null, title: 't' }, `type is null, expected one of: ${TYPES}`],
     ['holding a body that is not a string', { body: 7 }, 'body is 7, expected a string'],
     ['holding a title that is not a string', { title: null, body: 'b' }, 'title is null, expected a string'],
     ['that is not a mapping', 'body', 'the change is "body", expected a mapping'],
@@ -450,5 +476,108 @@ describe('editing an issue\'s priority', () => {
     );
     expect(fake.calls().slice(before)).toEqual([['issue', 'view', '9', '--json', EDITABLE_FIELDS]]);
     expect(fake.issue('1')?.labels).toEqual(['module:auth', 'type:bug', 'priority:urgent']);
+  });
+});
+
+describe('editing an issue\'s type', () => {
+  /** The view `edit` reads the held labels with, for issue 1. */
+  const VIEW = ['issue', 'view', '1', '--json', EDITABLE_FIELDS];
+
+  /** A github tracker over a fresh fake holding one debt issue with a module, a cause and a priority, and the fake. */
+  async function overDebt(): Promise<{ tracker: Tracker; fake: ReturnType<typeof createFakeGh> }> {
+    const fake = createFakeGh();
+    const tracker = createGithubTracker({ gh: fake.run });
+    await tracker.create(draftFixture({ opt: 0, type: 'debt', module: 'cli-gap', priority: 'low', cause: 'cli:new-context' }));
+    return { tracker, fake };
+  }
+
+  it('swaps the type label in one gh issue edit, after reading the labels and making the new one, keeping every other label', async () => {
+    const { tracker, fake } = await overDebt();
+    const before = fake.calls().length;
+    const body = fake.issue('1')?.body;
+
+    expect(fake.issue('1')?.labels).toEqual(['module:cli-gap', 'type:debt', 'cause:cli:new-context', 'priority:low']);
+    await pairOf(tracker).edit(githubRef('1'), { type: 'bug' });
+
+    expect(fake.calls().slice(before)).toEqual([
+      VIEW,
+      ['label', 'create', 'type:bug', '--force'],
+      ['issue', 'edit', '1', '--add-label', 'type:bug', '--remove-label', 'type:debt'],
+    ]);
+    expect(fake.inputs().slice(before)).toEqual([undefined, undefined, undefined]);
+    expect(fake.issue('1')?.labels).toEqual(['module:cli-gap', 'cause:cli:new-context', 'priority:low', 'type:bug']);
+    expect(fake.issue('1')?.body).toBe(body);
+  });
+
+  it('removes every other type label held, adding none held already', async () => {
+    const { tracker, fake } = await overDebt();
+    fake.update('1', (issue) => ({ ...issue, labels: ['type:debt', 'module:cli-gap', 'type:bug', 'type:feature'] }));
+    const before = fake.calls().length;
+
+    await pairOf(tracker).edit(githubRef('1'), { type: 'bug' });
+
+    expect(fake.calls().slice(before)).toEqual([
+      VIEW,
+      ['issue', 'edit', '1', '--remove-label', 'type:debt', '--remove-label', 'type:feature'],
+    ]);
+    expect(fake.issue('1')?.labels).toEqual(['module:cli-gap', 'type:bug']);
+  });
+
+  it('sends no gh issue edit for a type held already and alone, beside the move it sends', async () => {
+    const { tracker, fake } = await overDebt();
+    const { edit } = pairOf(tracker);
+    const before = fake.calls().length;
+
+    await edit(githubRef('1'), { type: 'debt' });
+
+    expect(fake.calls().slice(before)).toEqual([VIEW]);
+    await edit(githubRef('1'), { type: 'bug' });
+
+    const sent = fake.calls().slice(before + 1);
+    expect(sent.at(-1)).toEqual(['issue', 'edit', '1', '--add-label', 'type:bug', '--remove-label', 'type:debt']);
+  });
+
+  it('sends a type beside a priority in one command, the priority swap first, with one read', async () => {
+    const { tracker, fake } = await overDebt();
+    const before = fake.calls().length;
+
+    await pairOf(tracker).edit(githubRef('1'), { priority: 'high', type: 'bug' });
+
+    expect(fake.calls().slice(before)).toEqual([
+      VIEW,
+      ['label', 'create', 'priority:high', '--force'],
+      ['label', 'create', 'type:bug', '--force'],
+      [
+        'issue',
+        'edit',
+        '1',
+        '--add-label',
+        'priority:high',
+        '--add-label',
+        'type:bug',
+        '--remove-label',
+        'priority:low',
+        '--remove-label',
+        'type:debt',
+      ],
+    ]);
+    expect(fake.issue('1')?.labels).toEqual(['module:cli-gap', 'cause:cli:new-context', 'priority:high', 'type:bug']);
+  });
+
+  it('refuses a move naming a held type label that holds a comma, sending nothing after the read, beside one it sends', async () => {
+    const { tracker, fake } = await overDebt();
+    const { edit } = pairOf(tracker);
+    fake.update('1', (issue) => ({ ...issue, labels: ['type:debt,chore', 'module:cli-gap'] }));
+    const before = fake.calls().length;
+
+    await expect(edit(githubRef('1'), { type: 'bug' })).rejects.toThrow(
+      'github tracker: refused an edit of issue #1: it holds the label "type:debt,chore",'
+      + ' and a label holding a comma cannot be named to gh issue edit',
+    );
+    expect(fake.calls().slice(before)).toEqual([VIEW]);
+    fake.update('1', (issue) => ({ ...issue, labels: ['type:debt', 'module:cli-gap'] }));
+    await edit(githubRef('1'), { type: 'bug' });
+
+    expect(fake.issue('1')?.labels).toEqual(['module:cli-gap', 'type:bug']);
   });
 });
