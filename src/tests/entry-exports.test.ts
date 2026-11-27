@@ -235,6 +235,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'readHeldMigrations',
     'readProjectScope',
     'readRafaBlocks',
+    'readStoreOrigin',
     'registerAdapters',
     'registerCoreAdapters',
     'registerCoreConfigSections',
@@ -380,6 +381,7 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
     'openNdjsonStore',
     'openSqliteStore',
     'readHeldMigrations',
+    'readStoreOrigin',
     'selectEffortStore',
   ],
   'packages/rafa/src/ports/index.ts': [

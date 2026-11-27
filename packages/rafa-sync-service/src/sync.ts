@@ -250,13 +250,13 @@ import {
   mergeStore,
   openSqliteStore,
   readHeldMigrations,
+  readStoreOrigin,
   STORE_BACKENDS,
   WIRE_CONTRACT_VERSION,
   WIRE_FORMAT,
   WIRE_VERSION,
 } from '@open-tomato/rafa/store';
 import { readProjectIdentity } from '@open-tomato/rafa/store/store-identity';
-import { Database } from 'bun:sqlite';
 
 import { createHubClient, HubRefused } from './client.js';
 import { clearHeldBack, keepHeldBack, readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
@@ -276,9 +276,6 @@ export const SELF_UPDATE = 'rafa self-update';
 
 /** The command that moves an NDJSON project's rows into the SQLite store, as core spells it. */
 export const MOVE_TO_SQLITE = 'rafa effort move --to=sqlite';
-
-/** How long reading the origin waits on a writer: core's `effort.busyTimeoutMs` default. */
-const BUSY_TIMEOUT_MS = 5000;
 
 /** What a push or pull that moves no rows answers. */
 const NOTHING_TO_SYNC: SyncPushResult & SyncPullResult = Object.freeze({ status: 'nothing-to-sync' });
@@ -550,20 +547,8 @@ function refuseNdjson(backend: StoreBackend): void {
 
 /** The origin the store at `path` records, or a refusal naming what mints one. */
 function readOrigin(path: string): string {
-  const db = new Database(path, { readonly: true });
-  let origin: unknown;
-  try {
-    db.run(`PRAGMA busy_timeout = ${String(BUSY_TIMEOUT_MS)}`);
-    const hasMeta = db
-      .query<{ name: string }, []>('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'store_meta\'')
-      .get() !== null;
-    origin = hasMeta
-      ? db.query<{ store_id: unknown }, []>('SELECT store_id FROM store_meta WHERE id = 1').get()?.store_id
-      : undefined;
-  } finally {
-    db.close();
-  }
-  if (typeof origin === 'string' && origin !== '') return origin;
+  const origin = readStoreOrigin(path);
+  if (origin !== null) return origin;
   throw new ServiceSyncRefusal(
     `${REFUSAL}: the store at ${path} records no origin, so the hub could not tell its rows apart from another device's.`
       + ' Nothing was sent. A rafa command that writes the store inside the project\'s git repository mints one.',

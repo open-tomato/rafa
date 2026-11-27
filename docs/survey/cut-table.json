@@ -5972,23 +5972,25 @@
       "edges": [],
       "fileCounts": {
         "source": 4,
-        "test": 5,
-        "testSupport": 1
+        "test": 6,
+        "testSupport": 2
       },
       "files": [
         "packages/rafa-sync-service/src/client.test.ts",
         "packages/rafa-sync-service/src/client.ts",
         "packages/rafa-sync-service/src/core-subpaths.test.ts",
+        "packages/rafa-sync-service/src/no-sql.test.ts",
         "packages/rafa-sync-service/src/state.test.ts",
         "packages/rafa-sync-service/src/state.ts",
         "packages/rafa-sync-service/src/sync.test.ts",
         "packages/rafa-sync-service/src/sync.ts",
+        "packages/rafa-sync-service/src/testdata/planted-sql.fixture.ts",
         "packages/rafa-sync-service/src/testdata/stand-in-hub.ts",
         "packages/rafa-sync-service/src/token.test.ts",
         "packages/rafa-sync-service/src/token.ts"
       ],
       "filesByFolder": {
-        "packages/rafa-sync-service/": 10
+        "packages/rafa-sync-service/": 12
       },
       "folders": [
         "packages/rafa-sync-service/"

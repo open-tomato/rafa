@@ -78,6 +78,8 @@
  *     learning library's own `MergeResult`, and
  *     {@link readHeldMigrations}, the migration ids the rows a projected
  *     merge listed in `held_rows` lack;
+ *   - {@link readStoreOrigin} (`store-meta.ts`), the origin a store file
+ *     records, by which a sync strategy names its device;
  *   - `TRUSTED_PERMISSIONS` (`trusted-permissions.ts`), the repository
  *     permissions that are write access, so a hub checking a token's
  *     login spells them as core does.
@@ -145,6 +147,7 @@ export {
 export { mergeStore, readHeldMigrations } from './merge-store.js';
 export { openNdjsonStore } from './ndjson.js';
 export { openSqliteStore } from './sqlite.js';
+export { readStoreOrigin } from './store-meta.js';
 export { EFFORT_KEY_PROJECTIONS } from './types.js';
 export { TRUSTED_PERMISSIONS } from './trusted-permissions.js';
 
