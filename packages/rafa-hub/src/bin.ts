@@ -71,6 +71,18 @@
  * `/health` until it opens, which is what an operator reads. `SIGINT`
  * and `SIGTERM` stop the server, close the store and exit 0.
  *
+ * ## The install record at start
+ *
+ * `runHub` reads the install record beside the config file
+ * (`install-record.ts`) before the running config. A record the reader
+ * refuses (another format, another hub version, no valid record) is
+ * logged as one `config.refused` line naming `run rafa-hub install`,
+ * and the command exits 1 without listening, as for a refused config.
+ * No record at all answers the defaults and logs one `install.missing`
+ * warning once the hub listens, beside the other start warnings, so a
+ * start refused for any reason still logs its one `config.refused`
+ * line alone.
+ *
  * ## The start under `postgres`
  *
  * Under `postgres` the start opens the connector before it listens,
@@ -123,6 +135,7 @@ import type { HubConfig } from './config.js';
 import type { HubKeyStore } from './identity/key-store.js';
 import type { HubLoginStore } from './identity/login-store.js';
 import type { HubIdentity } from './identity/port.js';
+import type { HubInstallReading } from './install-record.js';
 import type { HubLogin } from './login/basic.js';
 import type { HubKeyRoutes } from './server-keys.js';
 import type { HubLoginRoutes } from './server-login.js';
@@ -141,11 +154,12 @@ import { INSTALL_USAGE, INSTALL_WORD, installCommandOf, runInstall } from './cli
 import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { DEFAULT_MAX_PAYLOAD_ROWS, isDangerousPayloadCap, MAX_PAYLOAD_ROWS_KEY } from './config-dangerous.js';
 import { DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
-import { HubConfigError, readHubConfig } from './config.js';
+import { HUB_CONFIG_ENV, HubConfigError, readHubConfig } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
 import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
 import { keysFileName, openSqliteKeyStore } from './identity/key-store.js';
 import { bootstrapLoginFromEnv, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
+import { readInstallRecord } from './install-record.js';
 import { openBasicLogin } from './login/basic.js';
 import { openOAuthLogin } from './login/oauth.js';
 import { openKeyRoutes } from './server-keys.js';
@@ -333,8 +347,30 @@ function warnDangerousPayloadCap(maxPayloadRows: number | null, log: HubLog): vo
 }
 
 /**
- * Reads the config `env` names and starts the hub over it, answering
- * the running server, or null when the config was refused, which is
+ * Reads the install record beside the config file `env` names, for this
+ * hub's {@link HUB_VERSION}; null when no config file is named, which
+ * {@link readHubConfig} then refuses.
+ *
+ * @throws {HubConfigError} When the record is refused.
+ */
+async function readInstallAtStart(env: HubEnv): Promise<HubInstallReading | null> {
+  const named = env[HUB_CONFIG_ENV];
+  return named === undefined || named.trim() === ''
+    ? null
+    : readInstallRecord(named, HUB_VERSION);
+}
+
+/** Logs one `install.missing` warning when `reading` found no record and answered the defaults. */
+function warnMissingInstallRecord(reading: HubInstallReading | null, log: HubLog): void {
+  const warning = reading?.warning ?? null;
+  if (reading === null || warning === null) return;
+  log({ level: 'warn', event: 'install.missing', path: reading.path, message: warning });
+}
+
+/**
+ * Reads the install record beside the config file `env` names, then
+ * the config, and starts the hub over it, answering the running
+ * server, or null when the record or the config was refused, which is
  * logged. Under `api-key` it opens the key and login stores in the keys
  * file first, bootstraps the login from `env`, and closes both when the
  * server stops. Never exits the process.
@@ -347,11 +383,13 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     for (const file of opened.splice(0).reverse()) file.close();
   };
   const connectPostgres = options.connectPostgres ?? connectPostgresHub;
+  let install;
   let config;
   let identity;
   let keyLogin: OpenedLogin | undefined;
   let connected: HubConnected | undefined;
   try {
+    install = await readInstallAtStart(env);
     config = await readHubConfig(env);
     const store = config.authAdapter === 'api-key'
       ? openKeyStore(config)
@@ -391,6 +429,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     closeOpened();
     throw error;
   }
+  warnMissingInstallRecord(install, log);
   warnInsecureLogin(keyLogin?.login, hostname, log);
   warnDangerousPayloadCap(config.maxPayloadRows, log);
   return opened.length === 0

@@ -909,3 +909,106 @@ describe('bin.ts as a process', () => {
     expect(stderr).toBe('rafa-hub keys list: no hub to reach; pass --hub=<url> or set RAFA_HUB_URL\n');
   });
 });
+
+/** Writes an install record beside the case's config file, `fields` over a valid one this hub wrote; answers its path. */
+function writeInstallRecord(fields: Readonly<Record<string, unknown>> = {}): string {
+  const path = join(root, INSTALL_RECORD_FILE);
+  const record = { installVersion: 1, hub: HUB_VERSION, bun: Bun.version, dataDir: root, sqliteLibrary: null, models: [], ...fields };
+  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+  return path;
+}
+
+describe('runHub and the install record', () => {
+  it('serves with no install record, logging one install.missing warning naming the record and rafa-hub install', async () => {
+    mkdirStore();
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    const warnings = logged.filter((entry) => entry.event === 'install.missing');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ level: 'warn', path: join(root, 'rafa-hub.install.json') });
+    expect(String(warnings[0]?.['message'])).toBe(`${join(root, 'rafa-hub.install.json')}: no install record; using the defaults (dataDir ${root}, no SQLite library, no models); run rafa-hub install to write one`);
+  });
+
+  it('serves over a record this hub wrote, logging no install.missing line', async () => {
+    mkdirStore();
+    writeInstallRecord();
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    expect(logged.filter((entry) => entry.event === 'install.missing')).toEqual([]);
+  });
+
+  it('answers null with one config.refused line naming run rafa-hub install for a record another hub version wrote, listening nowhere', async () => {
+    mkdirStore();
+    const path = writeInstallRecord({ hub: '0.0.0-other' });
+    const port = await freePort();
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(port) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(logged[0]?.['problems']).toEqual([`${path}: written by hub 0.0.0-other, and this hub is ${HUB_VERSION}; run rafa-hub install`]);
+    expect(await answersAt(port)).toBe(false);
+  });
+
+  it('answers null with one config.refused line for a record that is no valid record', async () => {
+    const path = join(root, INSTALL_RECORD_FILE);
+    writeFileSync(path, 'not json');
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toStartWith(`${path}: not a valid install record: not valid JSON`);
+    expect(String(logged[0]?.['problems'])).toEndWith('; run rafa-hub install');
+  });
+
+  it('reads the record before the running config: a refused record is the one problem logged when the config file is absent too', async () => {
+    const path = writeInstallRecord({ installVersion: 2 });
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: join(root, 'absent.yaml') }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]?.['problems']).toEqual([`${path}: installVersion is 2, expected 1, the install record format this hub reads; run rafa-hub install`]);
+  });
+
+  it('logs no install.missing line before a refused config, its config.refused line alone', async () => {
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: join(root, 'absent.yaml') }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain('could not be read');
+  });
+
+  it('exits 1 as a process with one config.refused line on standard output for a record another hub version wrote', async () => {
+    writeInstallRecord({ hub: '0.0.0-other' });
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(await freePort()) };
+
+    const child = Bun.spawn([process.execPath, BIN], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stderr).toBe('');
+    const lines = jsonLines(stdout);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(lines[0]?.['problems'])).toContain('written by hub 0.0.0-other');
+    expect(String(lines[0]?.['problems'])).toEndWith('run rafa-hub install');
+  });
+});
