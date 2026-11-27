@@ -3,8 +3,10 @@
  * `connectSqliteHub` in `sqlite.ts`: refusals first, a vector search
  * naming `fts` while vector search is off, under either reason, then what
  * the half answers. That covers the index file attached on open,
- * capabilities from the loader, the embedder and `ref_links`, and the
- * file attached again after a rebuild or a push renames a new one in.
+ * capabilities from the loader, the embedder and `ref_links`, the
+ * connector's `sqliteVec` answer over a stubbed macOS loader that names
+ * its library or refuses it, and the file attached again after a rebuild
+ * or a push renames a new one in.
  *
  * Stores are made under the temporary directory, as the contract suite
  * makes them: the connector creates its own, and a push carries a commit
@@ -35,6 +37,9 @@ import { connectSqliteHub, indexFileName, openSqliteHubStore } from './sqlite.js
 const A = 'aaaaaaaa-0000-4000-8000-00000000000a';
 const T0 = '2026-11-09T10:00:00.000Z';
 const PROJECT = 'fixture-project';
+
+/** The library a stubbed loader names; no file is there, since the stub's `setCustomSQLite` never opens it. */
+const STUB_LIBRARY = '/nonexistent/rafa-1614/libsqlite3.dylib';
 
 /** The connector as the port types it, so the case below fails to compile if it stops fitting. */
 const CONNECTOR: HubConnector = connectSqliteHub;
@@ -309,6 +314,33 @@ describe('the sqlite connector\'s index half', () => {
 
       expect(index.capabilities().graph).toBe(true);
       expect(walked).toEqual({ graph: true, links: [{ depth: 1, id: '#1', kind: 'issue' }, { depth: 2, id: '#2', kind: 'pr' }] });
+    });
+  });
+
+  describe('the sqlite-vec answer', () => {
+    /** A loader standing in macOS's: `platform` darwin, a library named, and `setCustomSQLite` answering `named`. */
+    const stubbedLoader = (named: boolean): PrepareOptions => ({ library: STUB_LIBRARY, platform: 'darwin', setCustomSQLite: () => named });
+
+    it('answers loaded with no why when the stubbed loader names the library, though vector is off with no embedder', async () => {
+      const hub = await connectSqliteHub(
+        { directory, now: () => new Date(T0) },
+        { loader: { state: createLoaderState(), ...stubbedLoader(true) }, project: PROJECT },
+      );
+      opened.push(hub.store);
+
+      expect(hub.sqliteVec).toEqual({ loaded: true, why: null });
+      expect(hub.index.capabilities().vector).toBe(false);
+    });
+
+    it('answers not loaded with the loader\'s why when the stubbed loader names no library, an embedder given', async () => {
+      const hub = await connectSqliteHub(
+        { directory, now: () => new Date(T0) },
+        { embedder: FIXTURE_EMBEDDER, loader: { state: createLoaderState(), ...stubbedLoader(false) }, project: PROJECT },
+      );
+      opened.push(hub.store);
+
+      expect(hub.sqliteVec).toEqual({ loaded: false, why: `Database.setCustomSQLite(${STUB_LIBRARY}) loaded no library` });
+      expect(hub.index.capabilities().vector).toBe(false);
     });
   });
 

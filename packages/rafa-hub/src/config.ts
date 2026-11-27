@@ -13,7 +13,8 @@
  * `24h`, `false` to ask GitHub on every request), with `0` and negative
  * values refused. The spec for #1428 adds two: `hub.store.sqliteLibrary`
  * (no default; the path of a vanilla `libsqlite3` that turns the index's
- * vector half on for a macOS hub) and `hub.index.rebuildAfterPush`
+ * vector half on for a macOS hub, read for one release only since #1614
+ * moved it to the install record) and `hub.index.rebuildAfterPush`
  * (default `true`; `false` leaves the index to `rafa-hub index
  * rebuild`). The spec for #1431 adds `hub.projects`, the list of
  * projects the hub serves, and `hub.auth.adapter` with
@@ -91,6 +92,12 @@
  *     `hub.store` and `hub.index`: the file is the hub's alone, so an
  *     unknown key there is a misspelling (`cachefor`) that would
  *     otherwise leave a default in force without a word.
+ *   - An `install` key, at the top level or under `hub`, is refused with
+ *     a problem naming `rafa-hub install`: the install's values (its
+ *     data directory, SQLite library and models) live in the install
+ *     record that command writes, read before this file, and the two
+ *     key sets never overlap. Under `hub` it is refused once, by that
+ *     problem, and not again as an unknown key.
  */
 import type { HubDangerousConfig } from './config-dangerous.js';
 import type { HubLoginConfig } from './config-login.js';
@@ -516,6 +523,28 @@ function readApiKeys(path: string, adapter: HubAuthAdapter | undefined, raw: unk
     : { value: Object.freeze([...raw] as string[]), problems: [] };
 }
 
+/** The key an install record holds, refused in the operator's config file at the top level and under `hub`. */
+const INSTALL_KEY = 'install';
+
+/**
+ * One problem for each `install` key written at the top level of the
+ * file or under `hub`: the install's values live in the install record
+ * `rafa-hub install` writes, so the two key sets never overlap.
+ */
+function installKeys(path: string, sections: Readonly<Record<string, unknown>>, hub: Readonly<Record<string, unknown>>): string[] {
+  return [
+    { key: INSTALL_KEY, holder: sections },
+    { key: `hub.${INSTALL_KEY}`, holder: hub },
+  ]
+    .filter(({ holder }) => Object.hasOwn(holder, INSTALL_KEY))
+    .map(({ key }) => `${path}: ${key} is not a key of the hub's config; expected the install's values in the install record, written by rafa-hub install`);
+}
+
+/** `hub` without its `install` key, which {@link installKeys} refuses on its own. */
+function withoutInstall(hub: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(Object.entries(hub).filter(([key]) => key !== INSTALL_KEY));
+}
+
 /** One problem per key of `section` outside `known`, named by `prefix`. */
 function unknownKeys(path: string, prefix: string, section: Readonly<Record<string, unknown>>, known: readonly string[]): string[] {
   return Object.keys(section)
@@ -578,7 +607,8 @@ export function parseHubConfig(text: string, path: string): HubConfig {
   const cacheFor = readCacheFor(path, auth.value?.['cacheFor']);
 
   const problems = [
-    ...unknownKeys(path, 'hub', hub, HUB_KEYS),
+    ...installKeys(path, sections, hub),
+    ...unknownKeys(path, 'hub', withoutInstall(hub), HUB_KEYS),
     ...repository.problems,
     ...port.problems,
     ...storePath.problems,

@@ -94,7 +94,10 @@
  * when given, opens the store and opens the first served
  * project's index, handing it the loader's answer, the embedder and the
  * catalogue's tables. Its `fts`, `vector` and `graph` are the ones the
- * index answers, and its `projection` the store's.
+ * index answers, and its `projection` the store's. It answers the first
+ * served project's `sqliteVec` beside them, whether `sqlite-vec` loaded
+ * into that index's connection and the loader's why when it did not,
+ * which the hub logs on its `store.opened` line.
  * Each index is opened once its store file exists, and a failed first
  * index open closes the store. Another project's index is opened on its
  * first use; an open that fails there is tried again on the next. An
@@ -121,7 +124,7 @@ import type {
   HubStoreContext,
   HubStoreStatus,
 } from './port.js';
-import type { SqliteHubIndex } from './sqlite-index.js';
+import type { SqliteHubIndex, SqliteVecAnswer } from './sqlite-index.js';
 import type { Catalogue, HubMigrationCatalogue, ProjectStore } from './sqlite-project.js';
 import type { IndexEmbedder, PrepareOptions } from '@open-tomato/rafa-index';
 
@@ -135,6 +138,7 @@ import { DEFAULT_PROJECT_ID, DEFAULT_STORE_FILE } from '../config.js';
 import { openSqliteHubIndex, routeSqliteHubIndex } from './sqlite-index.js';
 import { openProjectStore, readCatalogue } from './sqlite-project.js';
 
+export type { SqliteVecAnswer } from './sqlite-index.js';
 export type { HubMigrationCatalogue } from './sqlite-project.js';
 export { devicesFileName, HUB_PACKAGE, HUB_UPGRADE, HubUpgradeRequired, PROJECTION_PLANS } from './sqlite-project.js';
 
@@ -189,7 +193,7 @@ export interface SqliteHubStoreOptions {
 export interface SqliteHubConnectorOptions extends SqliteHubStoreOptions {
   /** The embedder vector search embeds with; without one, `vector` is `false`. */
   readonly embedder?: IndexEmbedder;
-  /** The loader's inputs (`hub.store.sqliteLibrary` is its `library`), the process's own when left out. */
+  /** The loader's inputs (the install record's `sqliteLibrary` is its `library`), the process's own when left out. */
   readonly loader?: PrepareOptions;
   /** The project an index built at open records; {@link DEFAULT_INDEX_PROJECT} when left out. */
   readonly project?: string;
@@ -198,10 +202,12 @@ export interface SqliteHubConnectorOptions extends SqliteHubStoreOptions {
 /** The project an index built at open records when the connector is given none. */
 export const DEFAULT_INDEX_PROJECT = 'rafa-hub';
 
-/** The store and index the `sqlite` connector opens. */
+/** The store and index the `sqlite` connector opens, with the extension's answer at the first index's open. */
 export interface SqliteHub {
   readonly store: HubStore;
   readonly index: HubIndex;
+  /** Whether `sqlite-vec` loaded into the first served project's index, and the loader's why when it did not. */
+  readonly sqliteVec: SqliteVecAnswer;
 }
 
 /** Where one served project is kept. */
@@ -395,6 +401,7 @@ export async function connectSqliteHub(context: HubStoreContext, options: Sqlite
   const { store } = routed;
   return {
     index,
+    sqliteVec: first.sqliteVec,
     store: Object.freeze({
       ...store,
       close: async () => {

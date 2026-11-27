@@ -21,7 +21,7 @@
 import type { StandInOAuth } from './login/testdata/stand-in-oauth.js';
 import type { HubLogEntry, HubServer } from './server.js';
 
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -78,9 +78,14 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-/** Writes the scratch config under `oauth` and starts the hub over it. */
+/**
+ * Writes the scratch config under `oauth` and starts the hub over it,
+ * making the store's directory, which the keys file in `dataDir` no
+ * longer makes.
+ */
 async function startHub(): Promise<HubServer> {
   const path = join(root, 'hub.yaml');
+  mkdirSync(join(root, 'store'), { recursive: true });
   writeFileSync(path, [
     'hub:',
     `  repository: ${REPOSITORY}`,

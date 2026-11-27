@@ -58,7 +58,7 @@ function bearer(plain: string): Readonly<Record<string, string>> {
 
 identityContract('api-key (store)', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'rafa-hub-api-key-contract-'));
-  const store = openSqliteKeyStore({ path: keysFileName(join(directory, 'rafa.sqlite')), reservedNames: [FIRST] });
+  const store = openSqliteKeyStore({ path: keysFileName(directory), reservedNames: [FIRST] });
   const served = await store.create('contract-served', 'octocat');
   const forbidden = await store.create('contract-forbidden', 'octocat');
   await store.pause('contract-forbidden');
@@ -249,7 +249,7 @@ describe('the API-key identity adapter', () => {
 
     beforeEach(() => {
       directory = mkdtempSync(join(tmpdir(), 'rafa-hub-api-key-'));
-      store = openSqliteKeyStore({ path: keysFileName(join(directory, 'rafa.sqlite')), now: () => new Date(NOW), reservedNames: [FIRST] });
+      store = openSqliteKeyStore({ path: keysFileName(directory), now: () => new Date(NOW), reservedNames: [FIRST] });
     });
 
     afterEach(() => {

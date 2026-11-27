@@ -63,6 +63,13 @@
  *     why: the loader's, the load's, or `no embedder configured`.
  *   - `graph` is whether the store holds a `ref_links` table at open.
  *
+ * Beside them the half keeps {@link SqliteHubIndex.sqliteVec}, the
+ * extension's own answer at open: whether `sqlite-vec` loaded into the
+ * read connection, or the loader's why when the loader answered `false`
+ * and nothing was loaded. It is not `vector`: with no embedder the
+ * extension can load and `vector` still be `false`. The hub logs it on
+ * its `store.opened` line (`server.ts`).
+ *
  * The index answers no `projection`: whether a pull is projected is the
  * store's answer, which `connectSqliteHub` composes beside these three.
  *
@@ -139,9 +146,18 @@ export interface SqliteHubIndexOptions {
   readonly loaderState?: LoaderState;
 }
 
-/** The index half once open: the index, and the call that releases its connection. */
+/** Whether `sqlite-vec` loaded into the index's read connection at open, and the why when it did not. */
+export interface SqliteVecAnswer {
+  readonly loaded: boolean;
+  /** The loader's or the load's why when `loaded` is `false`; `null` when it loaded. */
+  readonly why: string | null;
+}
+
+/** The index half once open: the index, the extension's answer, and the call that releases its connection. */
 export interface SqliteHubIndex {
   readonly index: HubIndex;
+  /** Whether `sqlite-vec` loaded at open, whatever `vector` the embedder rule left; see the module note. */
+  readonly sqliteVec: SqliteVecAnswer;
   /** Closes the read connection; every call on the index is refused after. */
   readonly close: () => void;
 }
@@ -374,6 +390,7 @@ export async function openSqliteHubIndex(options: SqliteHubIndexOptions): Promis
       }
     },
     index: Object.freeze(index),
+    sqliteVec: Object.freeze({ loaded: first.loaded.vector, why: first.loaded.why }),
   };
 }
 

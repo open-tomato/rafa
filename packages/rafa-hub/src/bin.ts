@@ -8,7 +8,8 @@
  * `hub.repository` in `hub.storePath`). Under `sqlite` (the default)
  * that is `connectSqliteHub` (`store/sqlite.ts`), each project's store
  * at the file its `storePath` names and its index beside it, the loader
- * handed `hub.store.sqliteLibrary`; under `postgres` it is
+ * handed the SQLite library the install record's `sqliteLibrary` names
+ * (see "The install record at start"); under `postgres` it is
  * `connectPostgresHub` (`@open-tomato/rafa-hub-postgres`), reading its
  * URL from the variable `hub.store.postgres.urlVariable` names in the
  * command's environment. Neither is handed an embedder here. The server
@@ -30,9 +31,13 @@
  * ## The keys file, the login and its routes, under `api-key`
  *
  * At start, under `api-key` alone, `runHub` opens the key store and the
- * login store in the keys file beside `hub.storePath` (`keysFileName`,
- * the first listed project's under `hub.projects`), creating its
- * directory as `rafa-hub login` does, no key taking a name
+ * login store in the keys file in the install record's `dataDir`
+ * (`resolveKeysFile`), creating its directory as `rafa-hub login` does.
+ * For one release a keys file found only at its old place, beside
+ * `hub.storePath` (the first listed project's under `hub.projects`), is
+ * opened there, and one `keys.old-place` warning naming the new place is
+ * logged once the hub listens, beside the other start warnings. No key
+ * takes a name
  * `hub.auth.apiKeys` holds. It hands the key store to the identity and
  * opens the login `hub.auth.login.mode` picks: under `basic` the login
  * store's, first set from `RAFA_HUB_LOGIN_USER` and
@@ -71,6 +76,29 @@
  * `/health` until it opens, which is what an operator reads. `SIGINT`
  * and `SIGTERM` stop the server, close the store and exit 0.
  *
+ * ## The install record at start
+ *
+ * `runHub` reads the install record beside the config file
+ * (`install-record.ts`) before the running config. A record the reader
+ * refuses (another format, another hub version, no valid record) is
+ * logged as one `config.refused` line naming `run rafa-hub install`,
+ * and the command exits 1 without listening, as for a refused config.
+ * No record at all answers the defaults and logs one `install.missing`
+ * warning once the hub listens, beside the other start warnings, so a
+ * start refused for any reason still logs its one `config.refused`
+ * line alone.
+ *
+ * The SQLite library the store and index load is the record's
+ * `sqliteLibrary`. For one release the operator file's
+ * `hub.store.sqliteLibrary` is still read (`chooseSqliteLibrary` in
+ * `config-store.ts`): named there, it loads, and one `config.deprecated`
+ * warning naming `rafa-hub install` is logged once the hub listens; a
+ * record and a file naming different libraries are one `config.refused`
+ * line, the start opening nothing. `rafa-hub index rebuild` loads the
+ * library the same way and refuses the same mismatch, reading the record
+ * before the config as the start does; its warnings are the serving
+ * start's, so it prints neither the missing-record line nor this one.
+ *
  * ## The start under `postgres`
  *
  * Under `postgres` the start opens the connector before it listens,
@@ -101,42 +129,55 @@
  *
  * ## `rafa-hub login` and `rafa-hub keys`
  *
- * `rafa-hub login` sets the hub's login in the keys file beside
- * `hub.storePath`, and `rafa-hub keys create|list|pause|delete` drives
+ * `rafa-hub login` sets the hub's login in the keys file in the install
+ * record's `dataDir`, and `rafa-hub keys create|list|pause|delete` drives
  * a hub's key routes at `--hub=<url>` or `RAFA_HUB_URL`; both live in
  * `cli-keys.ts`, whose module note says what each asks and prints.
  *
+ * ## `rafa-hub install`
+ *
+ * `rafa-hub install` writes the hub's install record beside the file
+ * `RAFA_HUB_CONFIG` names, from `--data-dir`, `--sqlite-library` and
+ * `--model` with `--model-path` and `--model-dimension`, flags left out
+ * keeping the record's values; it lives in `cli-install.ts`, whose
+ * module note says what it checks and prints.
+ *
  * {@link runHub} and {@link runIndexRebuild}, like `cli-keys.ts`'s
- * `runLogin` and `runKeys`, are the whole command but the process's
+ * `runLogin` and `runKeys` and `cli-install.ts`'s `runInstall`, are the whole command but the process's
  * exit, so a test runs them in process; importing this file starts
  * nothing.
  */
+import type { SqliteLibraryChoice } from './config-store.js';
 import type { HubConfig } from './config.js';
-import type { HubKeyStore } from './identity/key-store.js';
+import type { HubKeyStore, KeysFilePlace } from './identity/key-store.js';
 import type { HubLoginStore } from './identity/login-store.js';
 import type { HubIdentity } from './identity/port.js';
+import type { HubInstallReading } from './install-record.js';
 import type { HubLogin } from './login/basic.js';
 import type { HubKeyRoutes } from './server-keys.js';
 import type { HubLoginRoutes } from './server-login.js';
 import type { HubConnected, HubLog, HubServer } from './server.js';
 import type { HubServedProject, HubStoreContext, IndexRebuildResult } from './store/port.js';
+import type { SqliteHubConnectorOptions } from './store/sqlite.js';
 import type { PostgresHubOptions } from '@open-tomato/rafa-hub-postgres';
 
 import { mkdirSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 
 import { connectPostgresHub } from '@open-tomato/rafa-hub-postgres';
 
 import packageJson from '../package.json';
 
+import { INSTALL_USAGE, INSTALL_WORD, installCommandOf, runInstall } from './cli-install.js';
 import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { DEFAULT_MAX_PAYLOAD_ROWS, isDangerousPayloadCap, MAX_PAYLOAD_ROWS_KEY } from './config-dangerous.js';
-import { DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
-import { HubConfigError, readHubConfig } from './config.js';
+import { chooseSqliteLibrary, DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
+import { HUB_CONFIG_ENV, HubConfigError, readHubConfig } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
 import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
-import { keysFileName, openSqliteKeyStore } from './identity/key-store.js';
+import { openSqliteKeyStore, resolveKeysFile } from './identity/key-store.js';
 import { bootstrapLoginFromEnv, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
+import { readInstallRecord } from './install-record.js';
 import { openBasicLogin } from './login/basic.js';
 import { openOAuthLogin } from './login/oauth.js';
 import { openKeyRoutes } from './server-keys.js';
@@ -154,13 +195,22 @@ const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 export const INDEX_REBUILD_ARGS: readonly string[] = Object.freeze(['index', 'rebuild']);
 
 /** What `rafa-hub` takes, as a refused argument list says it. */
-export const HUB_USAGE: string = `usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or ${KEYS_USAGE}`;
+export const HUB_USAGE: string = `usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, ${INSTALL_USAGE}, or ${KEYS_USAGE}`;
 
 /** What one run of `rafa-hub` does, by its arguments. */
-export type HubCommand = 'serve' | 'index-rebuild' | 'login' | 'keys';
+export type HubCommand = 'serve' | 'index-rebuild' | 'login' | 'keys' | 'install';
 
 /** Opens the `postgres` connector: `connectPostgresHub`'s shape. */
 export type PostgresHubOpener = (context: HubStoreContext, options: PostgresHubOptions) => Promise<HubConnected>;
+
+/** Opens the `sqlite` connector: `connectSqliteHub`'s shape. */
+export type SqliteHubOpener = (context: HubStoreContext, options: SqliteHubConnectorOptions) => Promise<HubConnected>;
+
+/** The connectors {@link connectHub} opens, one per engine. */
+interface HubOpeners {
+  readonly connectPostgres: PostgresHubOpener;
+  readonly connectSqlite: SqliteHubOpener;
+}
 
 /** The environment `rafa-hub` reads its config file's name, its keys and its URL variable from. */
 type HubEnv = Readonly<Record<string, string | undefined>>;
@@ -169,6 +219,8 @@ type HubEnv = Readonly<Record<string, string | undefined>>;
 export interface RunHubOptions {
   /** Opens the connector under `hub.store.engine: postgres`; `connectPostgresHub` when left out. */
   readonly connectPostgres?: PostgresHubOpener;
+  /** Opens the connector under `hub.store.engine: sqlite`; `connectSqliteHub` when left out. */
+  readonly connectSqlite?: SqliteHubOpener;
   /** Where log lines go; standard output when left out. */
   readonly log?: HubLog;
   /** GitHub's API root; {@link GITHUB_API} when left out. */
@@ -202,14 +254,44 @@ function refusalOf(what: string, error: unknown): HubConfigError {
 }
 
 /**
- * Opens the key store in the keys file beside `config.storePath`,
- * creating its directory as `rafa-hub login` does, no key taking a name
+ * The keys file a hub over `install`'s `dataDir` and `config`'s
+ * `hub.storePath` opens (`resolveKeysFile`).
+ *
+ * @throws {HubConfigError} When no config file is named, so no record was read.
+ */
+function keysFileAt(install: HubInstallReading | null, config: HubConfig): KeysFilePlace {
+  if (install === null) throw new HubConfigError([`${HUB_CONFIG_ENV} is not set, so no install record names the keys file's dataDir`]);
+  return resolveKeysFile(install.record.dataDir, config.storePath);
+}
+
+/**
+ * The SQLite library a hub over `install`'s record and `config`'s
+ * `hub.store.sqliteLibrary`, read from the file `env` names, loads
+ * (`chooseSqliteLibrary`), with the warning the key gives.
+ *
+ * @throws {HubConfigError} When no config file is named, so no record
+ *   was read, or the record and the file name different libraries.
+ */
+function sqliteLibraryAt(install: HubInstallReading | null, config: HubConfig, env: HubEnv): SqliteLibraryChoice {
+  const named = env[HUB_CONFIG_ENV];
+  if (install === null || named === undefined) throw new HubConfigError([`${HUB_CONFIG_ENV} is not set, so no install record names the SQLite library`]);
+
+  const choice = chooseSqliteLibrary(
+    { path: install.path, library: install.record.sqliteLibrary },
+    { path: resolve(named), library: config.sqliteLibrary },
+  );
+  if (choice.value === undefined) throw new HubConfigError(choice.problems);
+  return choice.value;
+}
+
+/**
+ * Opens the key store in the keys file at `path`, creating its
+ * directory as `rafa-hub login` does, no key taking a name
  * `hub.auth.apiKeys` holds.
  *
  * @throws {HubConfigError} When the file does not open.
  */
-function openKeyStore(config: HubConfig): HubKeyStore {
-  const path = keysFileName(config.storePath);
+function openKeyStore(config: HubConfig, path: string): HubKeyStore {
   try {
     mkdirSync(dirname(path), { recursive: true });
     return openSqliteKeyStore({ path, reservedNames: config.apiKeys });
@@ -219,7 +301,7 @@ function openKeyStore(config: HubConfig): HubKeyStore {
 }
 
 /**
- * The login `hub.auth.login` picks, opened over the keys file: under
+ * The login `hub.auth.login` picks, opened over the keys file at `path`: under
  * `oauth` the provider's, its client secret read from `env` now; under
  * `basic` the login store's, its login set from `env` when none is set
  * (`bootstrapLoginFromEnv`), which logs `login.set` naming the user, or
@@ -228,7 +310,7 @@ function openKeyStore(config: HubConfig): HubKeyStore {
  * @throws {HubConfigError} When the client secret's variable is unset,
  *   or the bootstrap's user name is one no login can carry.
  */
-async function openLogin(config: HubConfig, env: Readonly<Record<string, string | undefined>>, log: HubLog, onStore: (store: HubLoginStore) => void): Promise<HubLogin> {
+async function openLogin(config: HubConfig, env: Readonly<Record<string, string | undefined>>, log: HubLog, path: string, onStore: (store: HubLoginStore) => void): Promise<HubLogin> {
   const oauth = config.login?.oauth ?? null;
   if (config.login?.mode === 'oauth' && oauth !== null) {
     try {
@@ -238,7 +320,6 @@ async function openLogin(config: HubConfig, env: Readonly<Record<string, string 
     }
   }
 
-  const path = keysFileName(config.storePath);
   let store: HubLoginStore;
   try {
     store = openSqliteLoginStore({ path });
@@ -258,8 +339,8 @@ async function openLogin(config: HubConfig, env: Readonly<Record<string, string 
 }
 
 /**
- * Opens the login over the keys file, then the key and login routes
- * over it and `store`, both answering `hub.auth.login.oauth.callbackUrl`'s
+ * Opens the login over the keys file `store` is kept in, at `keysPath`,
+ * then the key and login routes over it and `store`, both answering `hub.auth.login.oauth.callbackUrl`'s
  * origin beside each request's own. The login store it opens is handed
  * to `onStore`, for the caller to close.
  *
@@ -269,10 +350,11 @@ async function openLoginRoutesOver(
   config: HubConfig,
   env: Readonly<Record<string, string | undefined>>,
   log: HubLog,
-  store: HubKeyStore,
+  keys: { readonly store: HubKeyStore; readonly path: string },
   onStore: (store: HubLoginStore) => void,
 ): Promise<OpenedLogin> {
-  const login = await openLogin(config, env, log, onStore);
+  const { store } = keys;
+  const login = await openLogin(config, env, log, keys.path, onStore);
   const callbackUrl = config.login?.oauth?.callbackUrl ?? null;
   const origins = callbackUrl === null
     ? []
@@ -324,10 +406,46 @@ function warnDangerousPayloadCap(maxPayloadRows: number | null, log: HubLog): vo
 }
 
 /**
- * Reads the config `env` names and starts the hub over it, answering
- * the running server, or null when the config was refused, which is
+ * Reads the install record beside the config file `env` names, for this
+ * hub's {@link HUB_VERSION}; null when no config file is named, which
+ * {@link readHubConfig} then refuses.
+ *
+ * @throws {HubConfigError} When the record is refused.
+ */
+async function readInstallAtStart(env: HubEnv): Promise<HubInstallReading | null> {
+  const named = env[HUB_CONFIG_ENV];
+  return named === undefined || named.trim() === ''
+    ? null
+    : readInstallRecord(named, HUB_VERSION);
+}
+
+/** Logs one `keys.old-place` warning when the keys file at `place` was found beside `hub.storePath` alone. */
+function warnOldKeysFile(place: KeysFilePlace | undefined, log: HubLog): void {
+  const warning = place?.warning ?? null;
+  if (place === undefined || warning === null) return;
+  log({ level: 'warn', event: 'keys.old-place', path: place.path, message: warning });
+}
+
+/** Logs one `config.deprecated` warning naming `rafa-hub install` when `choice` was read from `hub.store.sqliteLibrary`. */
+function warnSqliteLibraryKey(choice: SqliteLibraryChoice | undefined, log: HubLog): void {
+  const warning = choice?.warning ?? null;
+  if (warning === null) return;
+  log({ level: 'warn', event: 'config.deprecated', key: 'hub.store.sqliteLibrary', message: warning });
+}
+
+/** Logs one `install.missing` warning when `reading` found no record and answered the defaults. */
+function warnMissingInstallRecord(reading: HubInstallReading | null, log: HubLog): void {
+  const warning = reading?.warning ?? null;
+  if (reading === null || warning === null) return;
+  log({ level: 'warn', event: 'install.missing', path: reading.path, message: warning });
+}
+
+/**
+ * Reads the install record beside the config file `env` names, then
+ * the config, and starts the hub over it, answering the running
+ * server, or null when the record or the config was refused, which is
  * logged. Under `api-key` it opens the key and login stores in the keys
- * file first, bootstraps the login from `env`, and closes both when the
+ * file in the record's `dataDir` first, bootstraps the login from `env`, and closes both when the
  * server stops. Never exits the process.
  */
 export async function runHub(env: Readonly<Record<string, string | undefined>>, options: RunHubOptions = {}): Promise<HubServer | null> {
@@ -337,22 +455,30 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   const closeOpened = (): void => {
     for (const file of opened.splice(0).reverse()) file.close();
   };
-  const connectPostgres = options.connectPostgres ?? connectPostgresHub;
+  const openers: HubOpeners = { connectPostgres: options.connectPostgres ?? connectPostgresHub, connectSqlite: options.connectSqlite ?? connectSqliteHub };
+  let install;
   let config;
+  let library: SqliteLibraryChoice | undefined;
+  let keysFile: KeysFilePlace | undefined;
   let identity;
   let keyLogin: OpenedLogin | undefined;
   let connected: HubConnected | undefined;
   try {
+    install = await readInstallAtStart(env);
     config = await readHubConfig(env);
-    const store = config.authAdapter === 'api-key'
-      ? openKeyStore(config)
+    library = sqliteLibraryAt(install, config, env);
+    keysFile = config.authAdapter === 'api-key'
+      ? keysFileAt(install, config)
       : undefined;
+    const store = keysFile === undefined
+      ? undefined
+      : openKeyStore(config, keysFile.path);
     if (store !== undefined) opened.push(store);
     identity = openIdentity(config, env, options.githubApi ?? GITHUB_API, store);
-    if (store !== undefined) {
-      keyLogin = await openLoginRoutesOver(config, env, log, store, (loginStore) => opened.push(loginStore));
+    if (store !== undefined && keysFile !== undefined) {
+      keyLogin = await openLoginRoutesOver(config, env, log, { store, path: keysFile.path }, (loginStore) => opened.push(loginStore));
     }
-    connected = await openAtStart(config, env, connectPostgres);
+    connected = await openAtStart(config, library.library, env, openers);
   } catch (error) {
     closeOpened();
     if (!(error instanceof HubConfigError)) throw error;
@@ -362,7 +488,8 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   }
 
   const { repository, port, rebuildAfterPush } = config;
-  const reopen = (): Promise<HubConnected> => connectHub(config, env, connectPostgres);
+  const { library: sqliteLibrary } = library;
+  const reopen = (): Promise<HubConnected> => connectHub(config, sqliteLibrary, env, openers);
   let server;
   try {
     server = startHubServer({
@@ -382,6 +509,9 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     closeOpened();
     throw error;
   }
+  warnMissingInstallRecord(install, log);
+  warnOldKeysFile(keysFile, log);
+  warnSqliteLibraryKey(library, log);
   warnInsecureLogin(keyLogin?.login, hostname, log);
   warnDangerousPayloadCap(config.maxPayloadRows, log);
   return opened.length === 0
@@ -429,18 +559,23 @@ function servedProjects(config: HubConfig): readonly HubServedProject[] {
 
 /**
  * Opens the connector `hub.store.engine` names over `config`'s projects
- * and its payload cap: under `postgres` by `connectPostgres`, its URL read
- * from `env` by the variable `hub.store.postgres.urlVariable` names; under
- * `sqlite` each project's store and index in its file, over its library.
+ * and its payload cap: under `postgres` by `openers.connectPostgres`, its
+ * URL read from `env` by the variable `hub.store.postgres.urlVariable`
+ * names, and answers its store and index alone, so the `store.opened`
+ * line holds no `sqliteVec`; under `sqlite` by `openers.connectSqlite`,
+ * each project's store and index in its file, the loader handed
+ * `sqliteLibrary`, the library {@link chooseSqliteLibrary} picked, and
+ * answers the connector's `sqliteVec` with them.
  */
-function connectHub(config: HubConfig, env: HubEnv, connectPostgres: PostgresHubOpener): Promise<HubConnected> {
-  const { storePath, sqliteLibrary, repository, projects, maxPayloadRows } = config;
+function connectHub(config: HubConfig, sqliteLibrary: string | null, env: HubEnv, openers: HubOpeners): Promise<HubConnected> {
+  const { storePath, repository, projects, maxPayloadRows } = config;
   const context: HubStoreContext = { directory: dirname(storePath), now: () => new Date(), projects: servedProjects(config), maxPayloadRows };
   if (config.storeEngine === 'postgres') {
-    return connectPostgres(context, { urlVariable: config.postgresUrlVariable ?? DEFAULT_POSTGRES_URL_VARIABLE, env });
+    const opened = openers.connectPostgres(context, { urlVariable: config.postgresUrlVariable ?? DEFAULT_POSTGRES_URL_VARIABLE, env });
+    return opened.then(({ store, index }) => ({ store, index }));
   }
 
-  return connectSqliteHub(
+  return openers.connectSqlite(
     context,
     {
       fileName: basename(storePath),
@@ -459,11 +594,11 @@ function connectHub(config: HubConfig, env: HubEnv, connectPostgres: PostgresHub
  * @throws {HubConfigError} When the `postgres` connector does not open,
  *   the problem its refusal.
  */
-async function openAtStart(config: HubConfig, env: HubEnv, connectPostgres: PostgresHubOpener): Promise<HubConnected | undefined> {
+async function openAtStart(config: HubConfig, sqliteLibrary: string | null, env: HubEnv, openers: HubOpeners): Promise<HubConnected | undefined> {
   if (config.storeEngine !== 'postgres') return undefined;
 
   try {
-    return await connectHub(config, env, connectPostgres);
+    return await connectHub(config, sqliteLibrary, env, openers);
   } catch (error) {
     throw refusalOf('hub.store.engine is postgres and its store did not open', error);
   }
@@ -508,6 +643,11 @@ export function hubCommandOf(args: readonly string[]): HubCommand | null {
       ? null
       : 'keys';
   }
+  if (args[0] === INSTALL_WORD) {
+    return installCommandOf(args.slice(1)) === null
+      ? null
+      : 'install';
+  }
 
   const isRebuild = args.length === INDEX_REBUILD_ARGS.length
     && args.every((arg, at) => arg === INDEX_REBUILD_ARGS[at]);
@@ -522,6 +662,8 @@ export interface RunIndexRebuildOptions {
   readonly out?: (line: string) => void;
   /** Where a refusal's line goes; standard error when left out. */
   readonly err?: (line: string) => void;
+  /** Opens the connector under `hub.store.engine: sqlite`; `connectSqliteHub` when left out. */
+  readonly connectSqlite?: SqliteHubOpener;
 }
 
 /** The prefix every line of `rafa-hub index rebuild` opens with. */
@@ -547,20 +689,25 @@ export function rebuiltLine(result: IndexRebuildResult): string {
 }
 
 /**
- * Reads the config `env` names, opens its connector, runs one rebuild
- * of each listed project's index in turn and closes the store,
- * answering the exit code: 0 when every rebuild swapped its index in,
- * each printing its counts line on `out`, or 1 when one failed, its line
- * on `err`, the others still run. A refused config and a connector that
- * did not open answer 1 with one line on `err` and run no rebuild.
+ * Reads the install record beside the config `env` names, then the
+ * config, opens its connector over the SQLite library the two pick, runs
+ * one rebuild of each listed project's index in turn and closes the
+ * store, answering the exit code: 0 when every rebuild swapped its index
+ * in, each printing its counts line on `out`, or 1 when one failed, its
+ * line on `err`, the others still run. A refused record or config, two
+ * different libraries, and a connector that did not open answer 1 with
+ * one line on `err` and run no rebuild.
  * Never exits the process.
  */
 export async function runIndexRebuild(env: Readonly<Record<string, string | undefined>>, options: RunIndexRebuildOptions = {}): Promise<number> {
   const out = options.out ?? ((line: string) => process.stdout.write(`${line}\n`));
   const err = options.err ?? ((line: string) => process.stderr.write(`${line}\n`));
   let config;
+  let library;
   try {
+    const install = await readInstallAtStart(env);
     config = await readHubConfig(env);
+    library = sqliteLibraryAt(install, config, env);
   } catch (error) {
     if (!(error instanceof HubConfigError)) throw error;
 
@@ -570,7 +717,7 @@ export async function runIndexRebuild(env: Readonly<Record<string, string | unde
 
   let connected;
   try {
-    connected = await connectHub(config, env, connectPostgresHub);
+    connected = await connectHub(config, library.library, env, { connectPostgres: connectPostgresHub, connectSqlite: options.connectSqlite ?? connectSqliteHub });
   } catch (error) {
     err(`${REBUILD_PREFIX}: ${storeNamed(config)} did not open: ${oneLine(error)}`);
     return 1;
@@ -610,8 +757,9 @@ if (import.meta.main) {
     process.exit(1);
   }
   if (command === 'index-rebuild') process.exit(await runIndexRebuild(process.env));
-  if (command === 'login') process.exit(await runLogin(process.env));
+  if (command === 'login') process.exit(await runLogin(process.env, HUB_VERSION));
   if (command === 'keys') process.exit(await runKeys(process.argv.slice(3), process.env));
+  if (command === 'install') process.exit(await runInstall(process.argv.slice(3), process.env, HUB_VERSION));
 
   await serve();
 }

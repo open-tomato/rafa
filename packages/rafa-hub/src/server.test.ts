@@ -1342,3 +1342,39 @@ describe('index rebuild after a push, per project', () => {
     expect(() => startListedConnected(index)).not.toThrow();
   });
 });
+
+describe('the store.opened line', () => {
+  /** The `store.opened` lines logged by a hub whose `/health` answered, so its store has opened. */
+  async function openedLines(started: Started): Promise<HubLogEntry[]> {
+    expect((await send(started.server, 'GET', HUB_ROUTES.health)).status).toBe(200);
+    return entries(started.lines).filter((entry) => entry.event === 'store.opened');
+  }
+
+  it('holds sqliteVec loaded with no why when the connector answers the extension loaded', async () => {
+    const sqliteVec = { loaded: true, why: null };
+    const started = start({ openConnected: () => Promise.resolve({ store: memoryStore(), index: standInIndex().index, sqliteVec }) });
+
+    const lines = await openedLines(started);
+
+    expect(lines.map(({ level, event, sqliteVec: answer }) => ({ level, event, sqliteVec: answer }))).toEqual([{ level: 'info', event: 'store.opened', sqliteVec }]);
+  });
+
+  it('holds sqliteVec not loaded with the loader\'s why when the connector answers the extension refused', async () => {
+    const sqliteVec = { loaded: false, why: 'Database.setCustomSQLite(/stub/libsqlite3.dylib) loaded no library' };
+    const started = start({ openConnected: () => Promise.resolve({ store: memoryStore(), index: standInIndex().index, sqliteVec }) });
+
+    const lines = await openedLines(started);
+
+    expect(lines.map(({ sqliteVec: answer }) => answer)).toEqual([sqliteVec]);
+  });
+
+  it('holds no sqliteVec when the connector answers none, as the postgres connector does, nor over openStore', async () => {
+    const connected = start({ openConnected: () => Promise.resolve({ store: memoryStore(), index: standInIndex().index }) });
+    const plain = start();
+
+    const lines = [...await openedLines(connected), ...await openedLines(plain)];
+
+    expect(lines).toHaveLength(2);
+    expect(lines.map((line) => Object.keys(line).includes('sqliteVec'))).toEqual([false, false]);
+  });
+});

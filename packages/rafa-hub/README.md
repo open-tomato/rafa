@@ -12,30 +12,136 @@ sync strategy.
 
 ## Building and running
 
-Build the container from the repository root:
+Build the image from the repository root:
 
 ```shell
 docker build -f packages/rafa-hub/Dockerfile -t rafa-hub .
 ```
 
-The build copies the whole workspace, except what the root `.dockerignore`
-leaves out, and installs it from `bun.lock` before it bundles the hub, since the
-hub imports its sibling workspace packages and `drizzle-orm`.
+The build installs the hub's graph from `bun.lock` alone: a frozen, production
+install with no install scripts, filtered to `@open-tomato/rafa-hub`. Only then
+does it copy the sources of the hub and of the workspace packages it imports,
+so a source change leaves the install layer cached. The image runs those
+sources, not a bundle: `rafa-hub` on its `PATH` runs the hub's `bin.ts` under
+Bun, and `sqlite-vec` loads from its installed package under
+`node_modules/.bun/`. CI's `hub-image` job builds this image on each pull
+request that touches the hub, and starts an `api-key` hub from it.
 
-Run it with a volume on `/data` holding the config file:
+Run it with a volume on `/data`:
 
 ```shell
 docker run -d -p 7373:7373 -v rafa-hub-data:/data rafa-hub
 ```
 
-The hub needs `/data/rafa-hub.yaml`, described below. With `hub.storePath` left
-out, the SQLite store is opened beside the config, in `/data`, so the store
-outlives the container restart. The hub writes its logs as JSON lines on
-standard output; read them with `docker logs`.
+Each start runs `rafa-hub install --data-dir=/data` before the server, and the
+server replaces the shell, so it is the process `docker stop` signals. The
+install prints one plain-text line; then the hub writes its logs as JSON
+lines on standard output. Read them with `docker logs`.
+
+### Files in `/data`
+
+Everything the hub keeps is in `/data`. The image sets `RAFA_HUB_CONFIG` to
+`/data/rafa-hub.yaml`, the operator's config, which needs at least
+`hub.repository`, as [Configuration](#configuration) describes. The hub then
+keeps:
+
+- `rafa-hub.install.json`, the install record, written by each start.
+- `rafa-hub.sqlite`, the store, unless `hub.storePath` names another file.
+  Under `hub.projects`, each project's `storePath` names its own.
+- `rafa-hub.devices.sqlite`, the devices table.
+- `rafa-hub.index.sqlite`, the index, [described here](#the-index).
+- `rafa-hub.keys.sqlite`, under `api-key` only, with the keys and the login.
+  It sits in the install record's `dataDir`, which is `/data`.
+
+A relative `storePath` resolves against the config file's directory. An
+absolute path outside `/data` is lost with the container, so keep stores
+inside the volume.
+
+### The install record
+
+`rafa-hub.install.json` is to the hub what a lockfile is to a project: the
+install writes it, the start reads it, and nobody edits it. It holds six keys:
+`installVersion`, `hub`, `bun`, `dataDir`, `sqliteLibrary` and `models`. A start
+passes only `--data-dir`, so a library or a model recorded earlier stays as it
+was. The first line of `docker logs` reads like this:
+
+```text
+rafa-hub install: wrote /data/rafa-hub.install.json for hub 0.0.0 on bun 1.3.14: dataDir /data, sqliteLibrary none, Bun's own, models none
+```
+
+### The start line
+
+The hub logs one `store.opened` line when its store opens, and the line
+answers two things: that the store opened, and whether `sqlite-vec` loaded.
+
+```json
+{"level":"info","event":"store.opened","sqliteVec":{"loaded":true,"why":null}}
+```
+
+When the extension does not load, `loaded` is `false` and `why` holds the
+loader's reason. The store still opens, since the loader raises nothing.
+Vector search stays off while no embedder ships, whatever the extension's
+state.
 
 The container includes a health check that asks `/health` every 30 seconds once
 the startup period ends. The hub answers `503` until its store opens, so a
 failing check means the store did not open; read the logs to see why.
+
+### Login and keys in the container
+
+Under `api-key`, the container's one bootstrap key comes from the environment
+variable that `hub.auth.apiKeys` names, passed on start as
+`docker run -e RAFA_HUB_KEY=…`. Set the login once, then mint keys, both through
+`docker exec`:
+
+```shell
+docker exec -it <container> rafa-hub login
+docker exec -it <container> rafa-hub keys create laptop --hub=http://127.0.0.1:7373
+```
+
+`rafa-hub login` asks for a user name, then the password twice, at a terminal.
+Without one, the three lines are read from standard input in that order, so a
+pipe can answer them. `keys create` signs in with `RAFA_HUB_LOGIN_USER` and
+`RAFA_HUB_LOGIN_PASSWORD` when both are set in the command's environment, and
+asks otherwise. It prints the key once. The same login opens the key page at
+`/login` on the hub's address. To set the login at start instead, see
+[`hub.auth.login`](#hubauthlogin).
+
+### `linux/arm64`
+
+The image takes the platform of the Docker host, so the same `docker build` on
+an arm64 machine gives a `linux/arm64` image. CI builds `linux/amd64` alone, on
+`ubuntu-latest`. `linux/arm64` is built and checked by hand until a runner for
+it exists: build it on the arm machine, then run it and read its start line and
+`/health` as above.
+
+### `rafa-hub install --sqlite-library`
+
+`rafa-hub install --sqlite-library=<path>` records the SQLite library the hub
+loads for its index in the install record: a vanilla `libsqlite3`, on macOS
+only, as in `/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib`. The install
+refuses a file that is not there and writes nothing. A relative path resolves
+against the working directory, as `RAFA_HUB_CONFIG` does. For a macOS hub run
+from source, run this once instead of putting the path in the operator's file:
+
+```shell
+RAFA_HUB_CONFIG=./rafa-hub.yaml bun packages/rafa-hub/src/bin.ts install --sqlite-library=/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib
+```
+
+Left out, the flag keeps the record's library, and a record with none holds
+null. Linux loads its extension through the SQLite it already has, so the flag
+checks the file there and the hub does not use it. Vector search stays off with
+a library set, because no embedder ships in this release; see
+[The index](#the-index).
+
+The config key `hub.store.sqliteLibrary` is read for this release only. A
+relative path is refused there, since the library is loaded once, before any
+database opens in the process. Left out, the key is null. With it set and no
+library in the record, the hub loads its library and logs one
+`config.deprecated` warning naming `rafa-hub install`. A record and a key that
+name different libraries stop the start with one `config.refused` line, and
+`rafa-hub index rebuild` exits 1 on the same mismatch. Run the install once and
+remove the key.
 
 ## Configuration
 
@@ -97,8 +203,11 @@ repeats what was written, in case a key was pasted in place of its name.
 Under `api-key`, the hub reads each named variable once, when it starts, and
 serves a request whose `Authorization: Bearer` equals one of their values, or
 one of the keys created through its key routes, which it keeps hashed in
-`rafa-hub.keys.sqlite` beside `hub.storePath`. If a named variable is unset or
-empty, the hub logs one `config.refused` line naming the variable and exits 1. Under `github`, a push or a pull naming a listed
+`rafa-hub.keys.sqlite` in the install record's `dataDir`, the config file's
+directory by default. For one release, a keys file found only beside
+`hub.storePath`, its old place, is opened there with one `keys.old-place`
+warning naming the new place; move it into `dataDir`. If a named variable is
+unset or empty, the hub logs one `config.refused` line naming the variable and exits 1. Under `github`, a push or a pull naming a listed
 project is checked against that project's `repository`. Every other request is
 checked against the first listed project's.
 
@@ -140,16 +249,6 @@ Accepts whole digits then `s`, `m` or `h` — for example, `10m` or `24h` — fr
 `1m` to `24h`. Defaults to `10m`. Set to `false` to ask GitHub on every request;
 `true` and invalid durations are refused. The unit names `s` (seconds), `m`
 (minutes) and `h` (hours), and fractional durations like `1.5h` are refused.
-
-### `hub.store.sqliteLibrary`
-
-The absolute path of a vanilla `libsqlite3` that the hub loads for its index,
-on macOS only, as in `/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib`. A relative
-path is refused, since the library is loaded once, before any database opens in
-the process. Left out, it is null. Linux loads its extension through the SQLite
-it already has, so the line is checked there and then not used. Vector search
-stays off with this line set, because no embedder ships in this release; see
-[The index](#the-index).
 
 ### `hub.index.rebuildAfterPush`
 
@@ -239,17 +338,17 @@ hub:
   storePath: /data/rafa-hub.sqlite
   auth:
     cacheFor: 10m
-  store:
-    sqliteLibrary: /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib
   index:
     rebuildAfterPush: false
 ```
 
 This example is a macOS hub that leaves rebuilds to the operator. With `port`,
-`auth.cacheFor`, `store.sqliteLibrary` and `index.rebuildAfterPush` left out,
-they take their defaults: `7373`, `10m`, none and `true`. The lightest
-configuration above has neither index key: it answers `fts`, and `graph` when
-the store holds `ref_links`, and `vector: false` with the notice below.
+`auth.cacheFor` and `index.rebuildAfterPush` left out, they take their defaults:
+`7373`, `10m` and `true`. Its SQLite library is not in the file; the install
+records it, as [Building and running](#building-and-running) describes. The
+lightest configuration above has neither index key: it answers `fts`, and
+`graph` when the store holds `ref_links`, and `vector: false` with the notice
+below.
 
 ## Running a local hub
 
@@ -328,7 +427,7 @@ exits 1. A refused config or a store that does not open prints one line on
 standard error and exits 1 without rebuilding anything. A server
 already running over the store picks up the new index file on its next query,
 so it needs no restart. In the Docker container, run it with
-`docker exec <container> bun /app/rafa-hub.js index rebuild`.
+`docker exec <container> rafa-hub index rebuild`.
 
 Vector search needs an embedder, which this release does not ship, so `vector`
 is `false` on every hub, macOS included. A `vector` or `hybrid` search falls back
@@ -336,9 +435,9 @@ to full text and prints this notice once per process: `hub index: vector
 search is off on this hub (no embedder configured); answering with full text`.
 
 The reason reads `no embedder configured` once the sqlite-vec extension loads.
-When it does not, the loader's own reason is printed: on macOS without
-`hub.store.sqliteLibrary`, it reads `no SQLite library is named, and macOS's own
-SQLite loads no extension`.
+When it does not, the loader's own reason is printed: on macOS with no SQLite
+library in the install record or `hub.store.sqliteLibrary`, it reads `no SQLite
+library is named, and macOS's own SQLite loads no extension`.
 
 ## The Postgres engine
 
@@ -394,8 +493,10 @@ rafa-hub keys create laptop
 ```
 
 `rafa-hub login` asks for a user name and a password at a terminal, twice for
-the password, and writes the login into `rafa-hub.keys.sqlite` beside
-`hub.storePath`; a running hub reads it on its next request. `rafa-hub keys`
+the password, and writes the login into `rafa-hub.keys.sqlite` in the install
+record's `dataDir` (at the old place beside `hub.storePath` for one release,
+with one warning line, when the file is found only there); a running hub reads
+it on its next request. `rafa-hub keys`
 reaches the hub at `--hub=<url>` or `RAFA_HUB_URL`, and signs in with
 `RAFA_HUB_LOGIN_USER` and `RAFA_HUB_LOGIN_PASSWORD` when both are set, asking
 for them otherwise. A hub whose login is `oauth` answers with a line pointing to
