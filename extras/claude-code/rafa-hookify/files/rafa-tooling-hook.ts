@@ -87,7 +87,7 @@ export const PR_SHOW_ANSWERED_FIELDS: readonly string[] = Object.freeze([
 const PR_SHOW_ANSWERS = new Set(PR_SHOW_ANSWERED_FIELDS);
 
 /** The `--type` values `rafa issue create` takes, each mapped from a `type:<t>` label. */
-export const ISSUE_CREATE_TYPES: readonly string[] = Object.freeze(['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic', 'spec']);
+export const ISSUE_CREATE_TYPES: readonly string[] = Object.freeze(['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic', 'spec', 'debt']);
 
 /** The `--priority` values `rafa issue create` takes, each mapped from a `priority:<p>` label. */
 export const ISSUE_CREATE_PRIORITIES: readonly string[] = Object.freeze(['urgent', 'high', 'medium', 'low']);
@@ -134,12 +134,16 @@ const useRafa = (instead: string, rafa: string, notes: readonly string[] = []): 
  * `missing` names what `command` lacks; with none or several named, the
  * search and summary carry a `<flag or field>` placeholder.
  *
- * The report is a bug, so it is filed from the fields a bug needs: its
- * action is `command` without the word `rafa`, the shape an action takes,
- * its summary says what the command lacks, its cause is `cli:new-context`
- * and its reproduce step is the `gh` line used in its place. The search
- * drops `rafa` too: a title rafa renders does not hold it, and a title
- * filed before still matches the words left.
+ * Before filing, the offer asks the breaking question: does the missing
+ * line make something break, beyond a step done by hand? A yes files the
+ * report as `--type=bug`, a no as `--type=debt`, and both lines are named.
+ * Either is a bug record, filed from the fields a bug needs: its action is
+ * `command` without the word `rafa`, the shape an action takes, its
+ * summary says what the command lacks, its cause is `cli:new-context` and
+ * its reproduce step is the `gh` line used in its place. The search
+ * carries no `--type`, so it finds a report of either type, and drops
+ * `rafa` too: a title rafa renders does not hold it, and a title filed
+ * before still matches the words left.
  */
 export const reportOffer = (command: string, missing: readonly string[]): string => {
   const gap = missing.length === 1
@@ -149,7 +153,8 @@ export const reportOffer = (command: string, missing: readonly string[]): string
     ? ', once for each one named'
     : '';
   const action = command.replace(/^rafa /, '');
-  return `If rafa should have a line for this, report the gap: first run \`rafa issue list --module=cli-gap --search="${action} ${gap}"\`${each}, and when an open report covers it, say which one and file nothing. Otherwise ask the person once whether to report it, never filing unasked; on a yes, run \`rafa issue create --type=bug --module=cli-gap --action="${action}" --summary="has no ${gap}" --cause=cli:new-context --reproduce="<the gh line>" --body=…\` with this reason, the rafa line and what it lacks in the body, and no local path.`;
+  const fields = `--module=cli-gap --action="${action}" --summary="has no ${gap}" --cause=cli:new-context --reproduce="<the gh line>" --body=…`;
+  return `If rafa should have a line for this, report the gap: first run \`rafa issue list --module=cli-gap --search="${action} ${gap}"\`${each}, and when an open report covers it, say which one and file nothing. Otherwise ask the person once whether to report it, never filing unasked. On a yes, ask: does the missing line make something break, beyond a step done by hand? Breaking means a command prints or does something wrong, two refusals leave no way through, or a hand-over names the wrong line. If it breaks, run \`rafa issue create --type=bug ${fields}\`; if not, run \`rafa issue create --type=debt ${fields}\`. Put this reason, the rafa line and what it lacks in the body, and no local path.`;
 };
 
 const letThrough = (instead: string, why: string, command: string, missing: readonly string[]): Verdict => ({
@@ -396,8 +401,8 @@ const judgeIssueCreate = (instead: string, words: string[]): Verdict => {
       ...flags.some((flag) => flag.startsWith('--title='))
         ? []
         : ['`rafa issue create` needs a `--title`, which this line leaves out: add one.'],
-      ...flags.includes('--type=bug')
-        ? ['A bug is filed from its fields: add `--action`, `--cause` and `--reproduce`, and a module with `--module`; `rafa issue create --help` says what each holds.']
+      ...flags.includes('--type=bug') || flags.includes('--type=debt')
+        ? ['A bug or debt report is filed from a bug\'s fields: add `--action`, `--cause` and `--reproduce`, and a module with `--module`; `rafa issue create --help` says what each holds.']
         : [],
       ...leavesSpecBlocked
         ? ['Leave `spec:blocked` off: rafa adds it itself when the body file carries a `Blocked by: #<n>` line.']
