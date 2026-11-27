@@ -44,6 +44,20 @@ import {
   upstreamRefusal,
 } from './worktree-upstream.js';
 
+/**
+ * The spec's one-second bound on reading a crafted standard error: the
+ * old lock pattern took about 10 s on {@link CRAFTED_LENGTH} characters
+ * and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/**
+ * Characters in the crafted standard error: ten times the plan's 50,000,
+ * since the old lock pattern took 98 ms on 50,000 characters of its slow
+ * shape, which no bound of a second could catch, and 10.6 s on this many.
+ */
+const CRAFTED_LENGTH = 500_000;
+
 /** The branch every stubbed case sets the upstream of. */
 const BRANCH = 'feat/rafa-960';
 
@@ -218,6 +232,34 @@ describe('isConfigLockRefusal', () => {
   it('does not read a command that succeeded, whatever it wrote', () => {
     expect(isConfigLockRefusal(SET)).toBe(false);
     expect(isConfigLockRefusal({ ...LOCKED, ok: true })).toBe(false);
+  });
+
+  it('reads the lock line below a long run of lock openings that never end, within REDOS_BOUND_MS', () => {
+    const opening = 'could not lock config file ';
+    const openings = opening.repeat(Math.ceil(CRAFTED_LENGTH / opening.length));
+    const stderr = `${openings}\nerror: could not lock config file .git/config: File exists\n`;
+
+    const started = performance.now();
+    const refused = isConfigLockRefusal({ ok: false, stdout: '', stderr });
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(refused).toBe(true);
+  });
+
+  it('reads the lock line only whole on one line, a path between its two halves and nothing after them', () => {
+    const refused = (stderr: string): boolean => isConfigLockRefusal({ ok: false, stdout: '', stderr });
+
+    expect(refused('could not lock config file x: File exists')).toBe(true);
+    expect(refused('error: could not lock config file .git/config: File exists\r\n')).toBe(true);
+    expect(refused('error: could not lock config file a: File exists: File exists')).toBe(true);
+    expect(refused('could not lock config file a\nerror: could not lock config file b: File exists')).toBe(true);
+    expect(refused('could not lock config file : File exists')).toBe(false);
+    expect(refused('error: could not lock config file .git/config\n: File exists')).toBe(false);
+    expect(refused('error: could not lock config file .git/config: File exists.')).toBe(false);
+    expect(refused('error: could not lock config file a\u2028b: File exists')).toBe(false);
+    expect(refused('error: could not lock config file a\rb: File exists')).toBe(false);
+    expect(refused('File exists: could not lock config file x')).toBe(false);
   });
 });
 

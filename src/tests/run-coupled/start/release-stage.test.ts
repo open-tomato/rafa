@@ -687,6 +687,16 @@ describe('prepareReleaseStage over a real checkout', () => {
   });
 });
 
+/**
+ * The spec's one-second bound on reading a crafted plan line: the old
+ * title heading pattern took about 2.5 s on {@link CRAFTED_RUN}
+ * characters and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Characters in a crafted line's repeated run, the 50,000 of the plan's slow shape. */
+const CRAFTED_RUN = 50_000;
+
 describe('planTitleIn', () => {
   const ASSUMED = assumptionsHeading([{ heading: 'Design', what: 'the store backend is not named', blocking: false, assumption: 'the SQLite backend' }]);
 
@@ -710,6 +720,30 @@ describe('planTitleIn', () => {
   it('answers an ordinary plan\'s first heading as before', () => {
     expect(planTitleIn('# Plan: rafa-21 — release title\n\n# Later\n', 'stub')).toBe('rafa-21 — release title');
     expect(planTitleIn('# A plain title\n\n# Later\n', 'stub')).toBe('A plain title');
+  });
+
+  it('reads a title heading as one hash, a space run and a title holding no line terminator', () => {
+    expect(planTitleIn('#   Spaced title\n', 'stub')).toBe('Spaced title');
+    expect(planTitleIn('# \tTabbed title\n', 'stub')).toBe('Tabbed title');
+    expect(planTitleIn('#    \n# Next\n', 'stub')).toBe('Next');
+    expect(planTitleIn('# x', 'stub')).toBe('x');
+    expect(planTitleIn('#NoSpace\n## Two\n', 'stub')).toBe('stub');
+    expect(planTitleIn('#\tTab first\n', 'stub')).toBe('stub');
+    expect(planTitleIn('# CRLF title\r\n', 'stub')).toBe('stub');
+    expect(planTitleIn('# \rafter a return\n', 'stub')).toBe('stub');
+    expect(planTitleIn('# a\u2028b\n', 'stub')).toBe('stub');
+    expect(planTitleIn('# a\u2029b\n', 'stub')).toBe('stub');
+  });
+
+  it('reads no title off a long space run before a return, within REDOS_BOUND_MS', () => {
+    const plan = [`# ${' '.repeat(CRAFTED_RUN)}\r`, '# Kept title'].join('\n');
+
+    const started = performance.now();
+    const title = planTitleIn(plan, 'stub');
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(title).toBe('Kept title');
   });
 });
 
