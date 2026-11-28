@@ -43,7 +43,8 @@ lines on standard output. Read them with `docker logs`.
 Everything the hub keeps is in `/data`. The image sets `RAFA_HUB_CONFIG` to
 `/data/rafa-hub.config.ts`, the operator's config, which needs at least
 `hub.repository`, as [Configuration](#configuration) describes; a volume
-holding `/data/rafa-hub.yaml` and no `.ts` file reads that YAML file. The hub
+holding `/data/rafa-hub.yaml` and no `.ts` file reads that YAML file, with one
+warning line, as the [legacy YAML form](#legacy-yaml-form) describes. The hub
 then keeps:
 
 - `rafa-hub.install.json`, the install record, written by each start.
@@ -127,7 +128,7 @@ against the working directory, as `RAFA_HUB_CONFIG` does. For a macOS hub run
 from source, run this once instead of putting the path in the operator's file:
 
 ```shell
-RAFA_HUB_CONFIG=./rafa-hub.yaml bun packages/rafa-hub/src/bin.ts install --sqlite-library=/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib
+RAFA_HUB_CONFIG=./rafa-hub.config.ts bun packages/rafa-hub/src/bin.ts install --sqlite-library=/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib
 ```
 
 Left out, the flag keeps the record's library, and a record with none holds
@@ -148,12 +149,57 @@ remove the key.
 ## Configuration
 
 The hub reads `RAFA_HUB_CONFIG`, an absolute or relative path to the config
-file, resolving relative paths against the working directory: a `.ts` file
-(`rafa-hub.config.ts`) or a YAML one (`rafa-hub.yaml`). A missing `.ts` file
-beside a `rafa-hub.yaml` reads that YAML file instead; with neither, the start
-is refused naming the `.ts` path, and with both in one directory it is refused
-naming both. In Docker, the environment variable is set to
-`/data/rafa-hub.config.ts`.
+file, resolving relative paths against the working directory. The file is
+`rafa-hub.config.ts`, a module whose default export is the config, written as
+`export default { … } satisfies HubConfigFile`, with `HubConfigFile` imported as
+a type from `@open-tomato/rafa-hub`. Bun runs the file as it stands, and a
+type-only import is erased, so the file needs no installed package. In Docker,
+the environment variable is set to `/data/rafa-hub.config.ts`. The keys below
+are written in the `.ts` form; [the legacy YAML form](#legacy-yaml-form) shows
+the same file as YAML.
+
+### Which file is read
+
+- A named `.ts` file that exists is read as the config.
+- A named `.ts` file that is missing, with a `rafa-hub.yaml` beside it, reads
+  that YAML file instead, as the fallback.
+- A named `.ts` file that is missing, with no `rafa-hub.yaml` beside it, refuses
+  the start, naming the `.ts` path.
+- A `rafa-hub.config.ts` and a `rafa-hub.yaml` in one directory refuse the
+  start whichever one is named, naming both paths. Keep one of them.
+- A name ending in neither, such as `hub.yml`, is read as YAML.
+
+The refusals print one `config.refused` line at a start. `rafa-hub health`
+prints the same refusal on standard error and exits 1.
+
+### The YAML warning
+
+Every serve start that reads YAML, named or as the fallback, logs one
+`config.yaml` warning line. It names the YAML file, the `.ts` file to write
+beside it, and rafa 1.0.0 as the release that drops YAML. No command writes the
+`.ts` form for you: the warning and the example below are the move. From rafa
+1.0.0 the hub refuses a YAML config. `rafa-hub install` and `rafa-hub health`
+read the config through the same loader and print no warning, since the health
+check runs every 30 seconds.
+
+### The top level
+
+The file's top level holds only `hub` and `dangerous`, and `dangerous` holds
+only `hub`. A key written anywhere else is refused, naming its path and where it
+belongs. For example, `dangerous: { maxPayloadRows: 'unlimited' }` is refused as
+`dangerous.maxPayloadRows`, since `dangerous.hub` is the only key under
+`dangerous`. An `install` key is refused in both forms, naming
+`rafa-hub install`: the install's values live in the install record that command
+writes. A function value is refused wherever it is written, naming its key
+path, since the config runs no function.
+
+### `rafa-hub health`
+
+`rafa-hub health` reads the config through the same loader the server uses, then
+asks `http://127.0.0.1:<hub.port>/health` on this machine. It exits 0 when the
+hub answers `200` and 1 otherwise, and prints the reason on standard error when
+the config is refused or the hub is not reached. The container's `HEALTHCHECK`
+runs it.
 
 ### `hub.repository`
 
@@ -323,11 +369,14 @@ it runs.
 
 ### Example configuration
 
-The lightest configuration names only the repository:
+The lightest configuration names only the repository, in `rafa-hub.config.ts`:
 
-```yaml
-hub:
-  repository: open-tomato/rafa
+```ts
+import type { HubConfigFile } from '@open-tomato/rafa-hub';
+
+export default {
+  hub: { repository: 'open-tomato/rafa' },
+} satisfies HubConfigFile;
 ```
 
 It serves one project from `rafa-hub.sqlite` beside the config, on port `7373`,
@@ -337,15 +386,18 @@ about each token's permission. The lightest one that runs without GitHub is in
 
 A macOS hub that leaves rebuilds to the operator:
 
-```yaml
-hub:
-  repository: open-tomato/rafa
-  port: 7373
-  storePath: /data/rafa-hub.sqlite
-  auth:
-    cacheFor: 10m
-  index:
-    rebuildAfterPush: false
+```ts
+import type { HubConfigFile } from '@open-tomato/rafa-hub';
+
+export default {
+  hub: {
+    repository: 'open-tomato/rafa',
+    port: 7373,
+    storePath: '/data/rafa-hub.sqlite',
+    auth: { cacheFor: '10m' },
+    index: { rebuildAfterPush: false },
+  },
+} satisfies HubConfigFile;
 ```
 
 This example is a macOS hub that leaves rebuilds to the operator. With `port`,
@@ -356,26 +408,52 @@ lightest configuration above has neither index key: it answers `fts`, and
 `graph` when the store holds `ref_links`, and `vector: false` with the notice
 below.
 
+### Legacy YAML form
+
+A `rafa-hub.yaml` file still starts the hub, and the start warns once, as
+[The YAML warning](#the-yaml-warning) describes. From rafa 1.0.0 the hub refuses
+it. The lightest configuration, as YAML, reads the same:
+
+```yaml
+hub:
+  repository: open-tomato/rafa
+```
+
+To move it, write the same object as the default export of
+`rafa-hub.config.ts`, as the first example above does, then remove the YAML
+file. A directory holding both files refuses the start, so the removal is not
+optional.
+
 ## Running a local hub
 
 A hub on this machine for one device takes one config, one exported key and a
 `hub.url` in the device's config. The config names the `api-key` adapter, so
 the hub asks GitHub about nothing and the key is the only caller it knows:
 
-```yaml
-hub:
-  repository: open-tomato/rafa
-  auth:
-    adapter: api-key
-    apiKeys: [RAFA_HUB_KEY]
+```ts
+import type { HubConfigFile } from '@open-tomato/rafa-hub';
+
+export default {
+  hub: {
+    repository: 'open-tomato/rafa',
+    auth: { adapter: 'api-key', apiKeys: ['RAFA_HUB_KEY'] },
+  },
+} satisfies HubConfigFile;
 ```
 
-Save it as `rafa-hub.yaml`, export the key the config names, and start the hub
-over the config:
+Save it as `rafa-hub.config.ts`, export the key the config names, and start the
+hub over the config:
 
 ```shell
 export RAFA_HUB_KEY=<a long random value>
-RAFA_HUB_CONFIG=./rafa-hub.yaml bun packages/rafa-hub/src/bin.ts
+RAFA_HUB_CONFIG=./rafa-hub.config.ts bun packages/rafa-hub/src/bin.ts
+```
+
+Before the device connects, `rafa-hub health` checks the same config and asks
+the hub whether it answers, from a second shell:
+
+```shell
+RAFA_HUB_CONFIG=./rafa-hub.config.ts bun packages/rafa-hub/src/bin.ts health
 ```
 
 The device's project names the hub and the secret holding the key. The device
