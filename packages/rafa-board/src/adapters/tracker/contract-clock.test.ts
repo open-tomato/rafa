@@ -14,7 +14,8 @@
  * tracker left on its system clock, so the case rejects, the issues
  * being dated by the wall clock the advance never moved. Then positive:
  * the tracker's `now` reads the handed clock, and the case resolves in
- * under 100 ms.
+ * under 800 ms: room for the tracker's file work on a loaded runner, and
+ * less than the 1100 ms the case waits when its clock is the wall clock.
  */
 import type { ContractClock } from './contract-clock.js';
 import type { Tracker } from '@open-tomato/rafa/ports';
@@ -103,8 +104,13 @@ describe('realContractClock', () => {
 
 const CUT_OFF_CASE_NAME = 'filedIssues answers a bug moved to done after the cut-off, leaving out a spike and an earlier bug';
 
-/** The most the cut-off case may take on the wall clock once no wait is left in it. */
-const CUT_OFF_CEILING_MS = 100;
+/**
+ * The most the cut-off case may take on the wall clock once no wait is left
+ * in it. The span holds the tracker's file work, which a loaded runner can
+ * stretch past 100 ms, so the ceiling sits well above that and under the
+ * 1100 ms the case's `advance` waits on the wall clock.
+ */
+const CUT_OFF_CEILING_MS = 800;
 
 describe('the cut-off case against a local tracker', () => {
   let tempDir = '';
@@ -146,7 +152,7 @@ describe('the cut-off case against a local tracker', () => {
     await expect(run()).rejects.toBeDefined();
   });
 
-  it('resolves in under 100 ms when the tracker reads the handed clock', async () => {
+  it('resolves in under 800 ms when the tracker reads the handed clock', async () => {
     const run = cutOffCase((issuesDir, clock) => createLocalTracker({
       issuesDir,
       fallbackReason: null,
