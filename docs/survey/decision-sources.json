@@ -6389,7 +6389,7 @@
           "section": "Branch creation with loop start"
         }
       ],
-      "text": "A branch holding any other commit is never merged: one warning says how many commits behind `origin/<base>` it is, and the run goes on.",
+      "text": "A branch holding any other commit is never merged: one warning says how many commits behind `origin/<base>` it is, and the run goes on to the claim check, which refuses a first dispatch of a claimed plan on such a branch.",
       "title": null
     },
     {
