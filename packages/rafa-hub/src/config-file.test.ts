@@ -1,6 +1,9 @@
 /**
- * Tests for the hub's config written as a `.ts` module
- * (`config-file.ts`): the load through define-config's `createLoader`
+ * Tests for the hub's config file (`config-file.ts`): which file
+ * `RAFA_HUB_CONFIG` leads to and in which form, `readHubConfig`'s answer
+ * and its refusals (both files in one directory, the YAML fallback beside
+ * a missing `.ts` file, neither file), then the `.ts` module's load
+ * through define-config's `createLoader`
  * into the `HubConfig` the same document reads to as YAML, each `false`
  * the merge removes set back, the section schemas for `hub` and
  * `dangerous`, and every refusal: an unresolved value import naming its
@@ -19,7 +22,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { hubSectionSchemas, loadHubConfigFile, missingImportProblem, restoredDocument } from './config-file.js';
+import { hubSectionSchemas, loadHubConfigFile, locateHubConfig, missingImportProblem, readHubConfig, restoredDocument } from './config-file.js';
 import { HubConfigError, parseHubConfig } from './config.js';
 
 /** Where a project key belongs, as a refusal says it. */
@@ -33,6 +36,15 @@ const PORT_EXPECTED = 'expected a whole number from 1 to 65535, such as 7373';
 
 /** What `dangerous.hub.maxPayloadRows` takes, as a refusal says it. */
 const ROWS_EXPECTED = 'expected a whole number from 1 up, such as 50000, or unlimited';
+
+/** What a refusal of both files in one directory says after naming them. */
+const BOTH = 'both are the hub\'s config file, in one directory; expected one, '
+  + 'so move what rafa-hub.yaml holds into rafa-hub.config.ts and remove rafa-hub.yaml';
+
+/** A YAML config file's text: `hub.repository` set, then `lines` under `hub`. */
+function hubYaml(...lines: string[]): string {
+  return ['hub:', '  repository: open-tomato/rafa', ...lines.map((line) => `  ${line}`), ''].join('\n');
+}
 
 /** The `.ts` form of a config opening with the type-only import the README shows. */
 function module(body: string): string {
@@ -74,6 +86,171 @@ async function refusalOf(path: string): Promise<readonly string[]> {
   }
   throw new Error(`${path} loaded; expected a refusal`);
 }
+
+/** The problems `readHubConfig` refuses `env` with, or a failure if it reads. */
+async function readRefusalOf(env: Readonly<Record<string, string | undefined>>): Promise<readonly string[]> {
+  try {
+    await readHubConfig(env);
+  } catch (error) {
+    expect(error).toBeInstanceOf(HubConfigError);
+    return (error as HubConfigError).problems;
+  }
+  throw new Error(`${String(env['RAFA_HUB_CONFIG'])} was read; expected a refusal`);
+}
+
+describe('readHubConfig', () => {
+  it('reads the YAML file RAFA_HUB_CONFIG names, resolving the store beside it, as the yaml form', async () => {
+    const path = await fixture('hub.yaml', hubYaml('port: 9000'));
+
+    expect(await readHubConfig({ RAFA_HUB_CONFIG: path })).toEqual({
+      form: 'yaml',
+      path,
+      config: {
+        repository: 'open-tomato/rafa',
+        port: 9000,
+        storePath: join(dir, 'rafa-hub.sqlite'),
+        projects: [{ id: 'default', name: 'open-tomato/rafa', repository: 'open-tomato/rafa', storePath: join(dir, 'rafa-hub.sqlite') }],
+        cacheForMs: 600_000,
+        authAdapter: 'github',
+        apiKeys: [],
+        login: null,
+        storeEngine: 'sqlite',
+        postgresUrlVariable: null,
+        sqliteLibrary: null,
+        rebuildAfterPush: true,
+        embeddingModel: null,
+        embeddingPrecision: 'half',
+        maxPayloadRows: 50_000,
+      },
+    });
+  });
+
+  it('reads the .ts file RAFA_HUB_CONFIG names as the ts form, to the config its YAML twin reads to', async () => {
+    const path = await fixture('rafa-hub.config.ts', module('{ hub: { repository: \'open-tomato/rafa\', port: 9000 } }'));
+    const twin = await fixture('twin.yaml', hubYaml('port: 9000'));
+
+    const reading = await readHubConfig({ RAFA_HUB_CONFIG: path });
+
+    expect(reading.form).toBe('ts');
+    expect(reading.path).toBe(path);
+    expect(reading.config).toEqual((await readHubConfig({ RAFA_HUB_CONFIG: twin })).config);
+    expect(Object.isFrozen(reading)).toBe(true);
+  });
+
+  it('refuses an unset or empty RAFA_HUB_CONFIG', async () => {
+    const expected = ['RAFA_HUB_CONFIG is not set; expected the path of the hub\'s config file, such as rafa-hub.config.ts'];
+
+    for (const env of [{}, { RAFA_HUB_CONFIG: '' }, { RAFA_HUB_CONFIG: '  ' }]) {
+      expect(await readRefusalOf(env)).toEqual(expected);
+    }
+  });
+
+  it('refuses a YAML file that cannot be read, naming its path', async () => {
+    const path = join(dir, 'absent.yaml');
+
+    const problems = await readRefusalOf({ RAFA_HUB_CONFIG: path });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toStartWith(`${path}: the hub's config file could not be read: `);
+  });
+
+  it('refuses the problems of a file it read, in either form', async () => {
+    const yaml = await fixture('hub.yaml', hubYaml('port: -1'));
+    const ts = await fixture('hub.config.ts', module('{ hub: { repository: \'open-tomato/rafa\', port: -1 } }'));
+
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: yaml })).toEqual([`${yaml}: hub.port is -1, ${PORT_EXPECTED}`]);
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: ts })).toEqual([`${ts}: hub.port is -1, ${PORT_EXPECTED}`]);
+  });
+});
+
+describe('readHubConfig over the file-location rules', () => {
+  it('refuses rafa-hub.config.ts and rafa-hub.yaml in one directory, naming both, whichever is named', async () => {
+    const ts = await fixture('rafa-hub.config.ts', module('{ hub: { repository: \'open-tomato/rafa\' } }'));
+    const yaml = await fixture('rafa-hub.yaml', hubYaml());
+    const other = join(dir, 'hub.yaml');
+    const expected = [`${ts} and ${yaml}: ${BOTH}`];
+
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: ts })).toEqual(expected);
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: yaml })).toEqual(expected);
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: other })).toEqual(expected);
+  });
+
+  it('reads each of the two files when it stands alone in its directory', async () => {
+    const ts = await fixture('rafa-hub.config.ts', module('{ hub: { repository: \'open-tomato/rafa\', port: 7001 } }'));
+    const read = await readHubConfig({ RAFA_HUB_CONFIG: ts });
+    await rm(ts);
+    const yaml = await fixture('rafa-hub.yaml', hubYaml('port: 7002'));
+
+    expect(read.config.port).toBe(7001);
+    expect((await readHubConfig({ RAFA_HUB_CONFIG: yaml })).config.port).toBe(7002);
+  });
+
+  it('reads rafa-hub.yaml beside a missing named .ts file as the yaml form', async () => {
+    const yaml = await fixture('rafa-hub.yaml', hubYaml('port: 7003'));
+
+    for (const name of ['rafa-hub.config.ts', 'hub.config.ts']) {
+      const reading = await readHubConfig({ RAFA_HUB_CONFIG: join(dir, name) });
+      expect(reading.form).toBe('yaml');
+      expect(reading.path).toBe(yaml);
+      expect(reading.config.port).toBe(7003);
+    }
+  });
+
+  it('refuses a missing .ts file with neither file beside it, naming the .ts path', async () => {
+    const path = join(dir, 'rafa-hub.config.ts');
+
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: path })).toEqual([
+      `${path}: the hub's config file could not be read: no file at this path, and no rafa-hub.yaml beside it to read instead`,
+    ]);
+  });
+
+  it('falls back to rafa-hub.yaml alone: a YAML file of another name beside the .ts path is no fallback', async () => {
+    await fixture('hub.yaml', hubYaml());
+    const path = join(dir, 'rafa-hub.config.ts');
+
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: path })).toEqual([
+      `${path}: the hub's config file could not be read: no file at this path, and no rafa-hub.yaml beside it to read instead`,
+    ]);
+  });
+
+  it('reads a directory carrying the YAML file\'s name as no file, so neither both nor the fallback holds', async () => {
+    const ts = await fixture('rafa-hub.config.ts', module('{ hub: { repository: \'open-tomato/rafa\', port: 7004 } }'));
+    await mkdir(join(dir, 'rafa-hub.yaml'));
+
+    expect((await readHubConfig({ RAFA_HUB_CONFIG: ts })).config.port).toBe(7004);
+    await rm(ts);
+    expect(await readRefusalOf({ RAFA_HUB_CONFIG: ts })).toEqual([
+      `${ts}: the hub's config file could not be read: no file at this path, and no rafa-hub.yaml beside it to read instead`,
+    ]);
+  });
+
+  it('loads a named .ts file of another name beside rafa-hub.yaml, as the two-file rule names only rafa-hub.config.ts', async () => {
+    await fixture('rafa-hub.yaml', hubYaml('port: 7005'));
+    const ts = await fixture('hub.config.ts', module('{ hub: { repository: \'open-tomato/rafa\', port: 7006 } }'));
+
+    const reading = await readHubConfig({ RAFA_HUB_CONFIG: ts });
+
+    expect(reading.form).toBe('ts');
+    expect(reading.config.port).toBe(7006);
+  });
+
+  it('reads a name ending in neither .ts nor .yaml as YAML, as before', async () => {
+    const path = await fixture('hub.yml', hubYaml('port: 7007'));
+
+    const reading = await readHubConfig({ RAFA_HUB_CONFIG: path });
+
+    expect(reading.form).toBe('yaml');
+    expect(reading.config.port).toBe(7007);
+  });
+});
+
+describe('locateHubConfig', () => {
+  it('resolves a relative name against the working directory', async () => {
+    const located = await locateHubConfig('relative/hub.yaml');
+
+    expect(located).toEqual({ form: 'yaml', path: join(process.cwd(), 'relative/hub.yaml') });
+  });
+});
 
 describe('loadHubConfigFile', () => {
   it('reads a .ts file to the HubConfig its YAML twin reads to', async () => {

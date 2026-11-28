@@ -145,9 +145,12 @@ remove the key.
 
 ## Configuration
 
-The hub reads `RAFA_HUB_CONFIG`, an absolute or relative path to the YAML config
-file, resolving relative paths against the working directory. In Docker, the
-environment variable is set to `/data/rafa-hub.yaml`.
+The hub reads `RAFA_HUB_CONFIG`, an absolute or relative path to the config
+file, resolving relative paths against the working directory: a `.ts` file
+(`rafa-hub.config.ts`) or a YAML one (`rafa-hub.yaml`). A missing `.ts` file
+beside a `rafa-hub.yaml` reads that YAML file instead; with neither, the start
+is refused naming the `.ts` path, and with both in one directory it is refused
+naming both. In Docker, the environment variable is set to `/data/rafa-hub.yaml`.
 
 ### `hub.repository`
 

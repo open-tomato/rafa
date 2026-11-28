@@ -1,9 +1,10 @@
 /**
  * The hub's config reader: the fifteen server keys `rafa-hub` reads from
- * the YAML file the {@link HUB_CONFIG_ENV} environment variable names,
- * each with its default and its reader, resolved into one frozen
- * {@link HubConfig} or refused with every problem at once as a
- * {@link HubConfigError}.
+ * the config file the {@link HUB_CONFIG_ENV} environment variable names
+ * (found, and loaded when written as `.ts`, by `config-file.ts`'s
+ * `readHubConfig`), each with its default and its reader, resolved into
+ * one frozen {@link HubConfig} or refused with every problem at once as
+ * a {@link HubConfigError}.
  *
  * ## The keys
  *
@@ -111,7 +112,6 @@ import type { HubDangerousConfig } from './config-dangerous.js';
 import type { HubLoginConfig } from './config-login.js';
 import type { HubIndexConfig, HubStoreConfig } from './config-store.js';
 
-import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 
 import { readDangerousConfig } from './config-dangerous.js';
@@ -658,30 +658,4 @@ export function readHubDocument(document: unknown, path: string): HubConfig {
     ...(index.value as HubIndexConfig),
     ...(dangerous.value as HubDangerousConfig),
   });
-}
-
-/**
- * Reads the hub's config from the file `env[`{@link HUB_CONFIG_ENV}`]`
- * names, a relative name resolved against the working directory.
- * Refuses with a {@link HubConfigError} when the variable is unset or
- * empty, when the file cannot be read, and for every problem
- * {@link parseHubConfig} finds.
- */
-export async function readHubConfig(env: Readonly<Record<string, string | undefined>> = process.env): Promise<HubConfig> {
-  const named = env[HUB_CONFIG_ENV];
-  if (named === undefined || named.trim() === '') {
-    throw new HubConfigError([`${HUB_CONFIG_ENV} is not set; expected the path of the hub's YAML config file`]);
-  }
-
-  const path = resolve(named);
-  let text: string;
-  try {
-    text = await readFile(path, 'utf8');
-  } catch (error) {
-    const reason = error instanceof Error
-      ? error.message
-      : String(error);
-    throw new HubConfigError([`${path}: the hub's config file could not be read: ${reason}`]);
-  }
-  return parseHubConfig(text, path);
 }

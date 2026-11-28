@@ -1,9 +1,39 @@
 /**
- * The hub's config written as a `.ts` module, `rafa-hub.config.ts`,
- * loaded through `createLoader` from `@open-tomato/define-config`, as the
+ * The hub's config file: where it is, which of its two forms it is
+ * written in, and the load of the `.ts` form, `rafa-hub.config.ts`,
+ * through `createLoader` from `@open-tomato/define-config`, as the
  * client's `loadScope` (`packages/rafa/src/core/config/config-load.ts`)
- * loads a project's `rafa.config.ts`, and read into the one frozen
+ * loads a project's `rafa.config.ts`, read into the one frozen
  * `HubConfig` a `rafa-hub.yaml` file reads to (#1659).
+ *
+ * ## The file and its form
+ *
+ * {@link readHubConfig} reads the file the `RAFA_HUB_CONFIG` variable
+ * names, a relative name resolved against the working directory, and
+ * answers the config with the form it was read in and the file read,
+ * as a {@link HubConfigReading}. {@link locateHubConfig} decides which
+ * file that is, in this order:
+ *
+ *   - {@link HUB_CONFIG_MODULE_FILE} and {@link HUB_CONFIG_YAML_FILE}
+ *     both in the named file's directory refuse the start, naming both
+ *     paths, whichever of the two (or neither) is named: one directory
+ *     holds one config, never two to choose between.
+ *   - A named `.ts` file is the `.ts` form, loaded as below.
+ *   - A named `.ts` file that is missing, beside a
+ *     {@link HUB_CONFIG_YAML_FILE}, reads that YAML file as the
+ *     fallback, so a volume written before #1659 keeps starting once the
+ *     default names `rafa-hub.config.ts`.
+ *   - A named `.ts` file with neither beside it is refused naming the
+ *     `.ts` path, the file to write.
+ *   - Any other name is the YAML form, read as before #1659 by
+ *     `parseHubConfig` (`config.ts`).
+ *
+ * Readings the spec leaves to this module: a path "holds" a file when it
+ * names a regular file, so a directory carrying either name is no file;
+ * the both-files rule looks only for those two names, so a named
+ * `hub.config.ts` beside a `rafa-hub.yaml` loads; and a name ending in
+ * neither `.ts` nor `.yaml` (`hub.yml`) is still read as YAML, as every
+ * name was before.
  *
  * ## The load
  *
@@ -84,17 +114,41 @@
 import type { HubConfig } from './config.js';
 import type { Diagnostic, LoadResult, Provenance, StandardSchemaV1 } from '@open-tomato/define-config';
 
-import { basename, dirname, extname, resolve } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 
 import { createLoader } from '@open-tomato/define-config';
 
-import { HubConfigError, readHubDocument } from './config.js';
+import { HUB_CONFIG_ENV, HubConfigError, parseHubConfig, readHubDocument } from './config.js';
 
 /** The one layer the hub's config file is loaded as. */
 export const HUB_CONFIG_LAYER = 'hub';
 
 /** The extension of the config module this file loads. */
 export const HUB_CONFIG_MODULE_EXTENSION = '.ts';
+
+/** The name of the hub's config file in its `.ts` form. */
+export const HUB_CONFIG_MODULE_FILE = 'rafa-hub.config.ts';
+
+/** The name of the hub's config file in its YAML form, read beside a missing `.ts` file. */
+export const HUB_CONFIG_YAML_FILE = 'rafa-hub.yaml';
+
+/** The form a hub config file is written in. */
+export type HubConfigForm = 'ts' | 'yaml';
+
+/** The file {@link locateHubConfig} chose and the form it is read in. */
+export interface HubConfigLocation {
+  /** The form the file is read in. */
+  readonly form: HubConfigForm;
+  /** The file, absolute: the named one, or the YAML fallback beside it. */
+  readonly path: string;
+}
+
+/** What {@link readHubConfig} answers: the config, and the file and form it was read from. */
+export interface HubConfigReading extends HubConfigLocation {
+  /** The config the file names. */
+  readonly config: HubConfig;
+}
 
 /** The hub's own package, whose types a config file imports. */
 export const HUB_PACKAGE = '@open-tomato/rafa-hub';
@@ -340,4 +394,85 @@ function readOrRefuse(document: Mapping, path: string, merged: readonly string[]
     if (error instanceof HubConfigError) throw new HubConfigError([...error.problems, ...merged]);
     throw error;
   }
+}
+
+/** Whether `path` names a regular file; anything that cannot be read as one is none. */
+async function holdsFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Which file the hub reads for the name `named`, a relative name resolved
+ * against the working directory, and in which form; see "The file and
+ * its form" in the module note.
+ *
+ * @param named - The path `RAFA_HUB_CONFIG` names.
+ * @returns The file to read and its form.
+ * @throws {HubConfigError} When the named file's directory holds both
+ *   {@link HUB_CONFIG_MODULE_FILE} and {@link HUB_CONFIG_YAML_FILE},
+ *   naming both, or when a named `.ts` file is missing with no YAML file
+ *   beside it, naming the `.ts` path.
+ */
+export async function locateHubConfig(named: string): Promise<HubConfigLocation> {
+  const path = resolve(named);
+  const dir = dirname(path);
+  const module = join(dir, HUB_CONFIG_MODULE_FILE);
+  const yaml = join(dir, HUB_CONFIG_YAML_FILE);
+  const [moduleHeld, yamlHeld] = await Promise.all([holdsFile(module), holdsFile(yaml)]);
+  if (moduleHeld && yamlHeld) {
+    throw new HubConfigError([
+      `${module} and ${yaml}: both are the hub's config file, in one directory; expected one, `
+      + `so move what ${HUB_CONFIG_YAML_FILE} holds into ${HUB_CONFIG_MODULE_FILE} and remove ${HUB_CONFIG_YAML_FILE}`,
+    ]);
+  }
+  if (extname(path) !== HUB_CONFIG_MODULE_EXTENSION) return { form: 'yaml', path };
+
+  const namedHeld = path === module
+    ? moduleHeld
+    : await holdsFile(path);
+  if (namedHeld) return { form: 'ts', path };
+  if (yamlHeld) return { form: 'yaml', path: yaml };
+
+  throw new HubConfigError([
+    `${path}: the hub's config file could not be read: no file at this path, and no ${HUB_CONFIG_YAML_FILE} beside it to read instead`,
+  ]);
+}
+
+/** Reads the YAML config file at `path` with `parseHubConfig`; a file that cannot be read is refused naming it. */
+async function readYamlFile(path: string): Promise<HubConfig> {
+  let text: string;
+  try {
+    text = await readFile(path, 'utf8');
+  } catch (error) {
+    throw new HubConfigError([`${path}: the hub's config file could not be read: ${messageOf(error)}`]);
+  }
+  return parseHubConfig(text, path);
+}
+
+/**
+ * Reads the hub's config from the file `env[`{@link HUB_CONFIG_ENV}`]`
+ * names, chosen by {@link locateHubConfig}: a `.ts` file through
+ * {@link loadHubConfigFile}, a YAML file through `parseHubConfig`.
+ *
+ * @param env - The environment holding `RAFA_HUB_CONFIG`.
+ * @returns The frozen config, with the file it was read from and its form.
+ * @throws {HubConfigError} When the variable is unset or empty, for
+ *   either refusal of {@link locateHubConfig}, when the file cannot be
+ *   read, and for every problem its reader finds.
+ */
+export async function readHubConfig(env: Readonly<Record<string, string | undefined>> = process.env): Promise<HubConfigReading> {
+  const named = env[HUB_CONFIG_ENV];
+  if (named === undefined || named.trim() === '') {
+    throw new HubConfigError([`${HUB_CONFIG_ENV} is not set; expected the path of the hub's config file, such as ${HUB_CONFIG_MODULE_FILE}`]);
+  }
+
+  const { form, path } = await locateHubConfig(named);
+  const config = form === 'ts'
+    ? await loadHubConfigFile(path)
+    : await readYamlFile(path);
+  return Object.freeze({ config, form, path });
 }

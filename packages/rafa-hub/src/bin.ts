@@ -171,8 +171,9 @@ import packageJson from '../package.json';
 import { INSTALL_USAGE, INSTALL_WORD, installCommandOf, runInstall } from './cli-install.js';
 import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { DEFAULT_MAX_PAYLOAD_ROWS, isDangerousPayloadCap, MAX_PAYLOAD_ROWS_KEY } from './config-dangerous.js';
+import { readHubConfig } from './config-file.js';
 import { chooseSqliteLibrary, DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
-import { HUB_CONFIG_ENV, HubConfigError, readHubConfig } from './config.js';
+import { HUB_CONFIG_ENV, HubConfigError } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
 import { GITHUB_API, openGitHubIdentity, projectRepositoryResolver } from './identity/github.js';
 import { openSqliteKeyStore, resolveKeysFile } from './identity/key-store.js';
@@ -465,7 +466,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   let connected: HubConnected | undefined;
   try {
     install = await readInstallAtStart(env);
-    config = await readHubConfig(env);
+    ({ config } = await readHubConfig(env));
     library = sqliteLibraryAt(install, config, env);
     keysFile = config.authAdapter === 'api-key'
       ? keysFileAt(install, config)
@@ -706,7 +707,7 @@ export async function runIndexRebuild(env: Readonly<Record<string, string | unde
   let library;
   try {
     const install = await readInstallAtStart(env);
-    config = await readHubConfig(env);
+    ({ config } = await readHubConfig(env));
     library = sqliteLibraryAt(install, config, env);
   } catch (error) {
     if (!(error instanceof HubConfigError)) throw error;
