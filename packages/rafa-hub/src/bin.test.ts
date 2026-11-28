@@ -809,6 +809,9 @@ describe('hubCommandOf', () => {
     [['install', '--store=/data'], null],
     [['install', 'now'], null],
     [['--data-dir=/data'], null],
+    [['health'], 'health'],
+    [['health', '--port=7373'], null],
+    [['health', 'now'], null],
   ] as const)('reads %p as %p', (args, command) => {
     expect(hubCommandOf(args)).toBe(command);
   });
@@ -941,7 +944,7 @@ describe('bin.ts as a process', () => {
     const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
 
     expect(code).toBe(1);
-    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, rafa-hub install [--data-dir=<path>] [--sqlite-library=<path>] [--model=<id> [--model-path=<path>] [--model-dimension=<n>]], or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
+    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, rafa-hub health, rafa-hub install [--data-dir=<path>] [--sqlite-library=<path>] [--model=<id> [--model-path=<path>] [--model-dimension=<n>]], or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
   });
 
   it('runs install, writing the record beside the config file and printing one line', async () => {

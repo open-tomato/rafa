@@ -5888,12 +5888,13 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 52,
+        "test": 53,
         "testSupport": 9
       },
       "files": [
         "packages/rafa-hub/src/bin.test.ts",
         "packages/rafa-hub/src/bin.ts",
+        "packages/rafa-hub/src/cli-health.test.ts",
         "packages/rafa-hub/src/cli-install.test.ts",
         "packages/rafa-hub/src/cli-keys.test.ts",
         "packages/rafa-hub/src/config-dangerous.test.ts",
