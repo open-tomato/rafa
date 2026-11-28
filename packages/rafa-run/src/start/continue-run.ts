@@ -70,8 +70,10 @@
  *
  * Every decision emits one `decision` event (`./loop-events.ts`) and one
  * line. A stop emits, after it, the stop's own event (`task-blocked`, or
- * `halt` for a suite step), which is not emitted otherwise, and ends the
- * run by throwing a `LoopEnd` (`./continue-exits.ts`). The pass-over
+ * `halt` for a suite step), which is not emitted otherwise, then the
+ * `halt` {@link stopEventsOf} adds for a held stop (see the last
+ * section), and ends the run by throwing a `LoopEnd`
+ * (`./continue-exits.ts`). The pass-over
  * list is written on the run's record each time it changes
  * (`RunSession.decisionsChanged`), a `--force-wrap-up` run's kept on its
  * record though it ends `done`. The run opens with the list the plan's
@@ -86,7 +88,8 @@
  * Under `--output=json` (`activeOutputMode`) no session is spawned: the
  * stop emits `decision-needed`, holding the task, its line, why it
  * stopped, the open tasks, the retries in a row left and the rendered prompt,
- * then the stop's own event, and the run ends with
+ * then the stop's own event and a held stop's `halt`, as a `stop`
+ * emits them, and the run ends with
  * {@link DECISION_NEEDED_EXIT}, the tracker as the stop left it. The
  * caller decides and starts the run again with `--continue --decide=`.
  * The events output is read by the operators as text is, and decides
@@ -139,6 +142,13 @@
  * and `rafa stretch item` read it ended on. Every other stop, one its
  * report holds or a session that exited nonzero, emits its
  * `task-blocked` alone, as before.
+ *
+ * A held stop decided once its retries are spent ends on the same
+ * events when the decision ends the run: a `stop`, or json mode's
+ * `decision-needed`, emits {@link stopEventsOf}'s events after its own
+ * line, so its `task-blocked` is followed by the same `halt` (#1672).
+ * A held stop whose decision session SIGINT ended emits its
+ * `task-blocked` naming `interrupted` alone.
  *
  * Every line goes through the active output (`core/output/active.ts`).
  */
@@ -315,13 +325,15 @@ export function emitStopEvents(stop: TaskStop): void {
   for (const event of stopEventsOf(stop)) emitLoopEvent(event);
 }
 
-/** The subject of one decision: the task, why it stopped, and the event its stop emits. */
+/** The subject of one decision: the task, why it stopped, and the events its stop emits. */
 interface DecisionSubject {
   readonly taskInfo: TaskInfo;
   /** The task as the retries key it, read in the same tracker as `taskInfo`. */
   readonly retryTask: RetryTask;
   readonly holds: readonly string[];
   readonly stopEvent: StopEvent;
+  /** What a decision that ends the run emits after its own event: `stopEvent`, then a held stop's `halt` ({@link stopEventsOf}). */
+  readonly stopEvents: readonly LoopEvent[];
 }
 
 /** When a stop is decided: at once, once the retries are spent, or never. */
@@ -391,25 +403,29 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   const skipLines = (trackerContent: string): ReadonlySet<number> => skippedLines(list, trackerContent);
 
   const subjectOf = (stop: DecisionStop): DecisionSubject | null => {
-    if (stop.kind === 'clean-exit') return { taskInfo: stop.taskInfo, retryTask: stop.retryTask, holds: stop.finished.holds, stopEvent: stop.stopEvent };
-    if (stop.kind === 'session-exit') {
-      return { taskInfo: stop.taskInfo, retryTask: stop.retryTask, holds: [`session exited ${stop.exitCode}`], stopEvent: stop.stopEvent };
+    if (stop.kind !== 'suite-red') {
+      const holds = stop.kind === 'clean-exit'
+        ? stop.finished.holds
+        : [`session exited ${stop.exitCode}`];
+      return { taskInfo: stop.taskInfo, retryTask: stop.retryTask, holds, stopEvent: stop.stopEvent, stopEvents: stopEventsOf(stop) };
     }
     const content = readTracker();
     const blocked = findNextTask(content, { skipLines: skipLines(content) });
     if (blocked?.status !== 'blocked') return null;
+    const stopEvent: StopEvent = { kind: 'halt', reason: SUITE_STEP_RED };
     return {
       taskInfo: blocked,
       retryTask: retryTaskOf(blocked, content),
       holds: [blocked.blocker ?? SUITE_STEP_RED],
-      stopEvent: { kind: 'halt', reason: SUITE_STEP_RED },
+      stopEvent,
+      stopEvents: [stopEvent],
     };
   };
 
   const stopWith = (decision: ContinueDecision, subject: DecisionSubject): never => {
     const line = shownLine(subject.taskInfo);
     emitLoopEvent({ kind: 'decision', strategy: 'stop', line, reason: decision.reason });
-    emitLoopEvent(subject.stopEvent);
+    for (const event of subject.stopEvents) emitLoopEvent(event);
     throw new LoopEnd(DECISION_STOP_EXIT, `⛔ The --continue decision on line ${line} is stop: ${decision.reason}`);
   };
 
@@ -443,7 +459,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
       retriesLeft: retries.left(),
       prompt,
     });
-    emitLoopEvent(subject.stopEvent);
+    for (const event of subject.stopEvents) emitLoopEvent(event);
     throw new LoopEnd(DECISION_NEEDED_EXIT, [
       `🧭 A decision is needed for the stop on line ${line}; the decision-needed event holds its prompt.`,
       '   Run again with --continue --decide=retry|stop|jump|defer (--approach=<text> for retry, --after=<line> for defer).',
@@ -591,6 +607,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
       retryTask: retryTaskOf(taskInfo, trackerContent),
       holds: [taskInfo.blocker ?? 'blocked by an earlier run'],
       stopEvent,
+      stopEvents: [stopEvent],
     });
   };
 

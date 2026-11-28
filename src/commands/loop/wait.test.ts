@@ -14,22 +14,38 @@
  * `task-blocked` line that `--until=blocked` answers on the same file; a
  * suspend of an hour leaves `quiet` waiting for its awake minutes; the
  * note for a missing events file is counted across several polls.
+ *
+ * The cases of a held stop a `--continue` decision ends (#1672) plant no
+ * events: `rafa-run`'s own `createRunDecisions`, bound to the case's
+ * events file by `bindEventsFile`, writes them, decided `stop` by a
+ * stand-in session or left needing a decision under `--output=json`.
+ * The #1544 case reading a held `task-blocked` alone as no ending is
+ * their control.
  */
 import type { LoopWaitSeams } from './wait.js';
+import type { DecisionStop, RunDecisionsOptions } from '@open-tomato/rafa-run/start/continue-run';
 import type { LoopEvent } from '@open-tomato/rafa-run/start/loop-events';
 
-import { appendFileSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { eventsFilePath, summaryOf } from '@open-tomato/rafa-run/start/loop-events';
+import { setActiveOutput } from '@open-tomato/rafa/core/output';
+import { sinkOutput } from '@open-tomato/rafa/tests/output-sinks';
+import { findNextTask } from '@open-tomato/rafa/utils/tracker';
+import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd } from '@open-tomato/rafa-run/start/continue-exits';
+import { createRunDecisions } from '@open-tomato/rafa-run/start/continue-run';
+import { bindEventsFile, eventsFilePath, summaryOf, taskPosition, unbindEventsFile } from '@open-tomato/rafa-run/start/loop-events';
+import { retryTaskOf } from '@open-tomato/rafa-run/start/retry-budget';
 
 import { createAwakeClock } from '../../loop/awake-clock.js';
 import { WAIT_REASONS } from '../../loop/wait-reasons.js';
 import { dispatchInProject, eventsOf } from '../../tests/cli-capture.js';
 import {
+  DEMO_PLAN_PATH,
+  DEMO_TRACKER_PATH,
   LOOP_SUBJECTS,
   PID,
   plantDemoProject,
@@ -533,6 +549,91 @@ describe('rafa loop wait, a held stop (#1544)', () => {
       ok: false,
       error: { code: 'command_exit', message: `rafa· halt             ${HELD_TEXT}: Second task` },
     });
+  });
+});
+
+/** A `rafa:decision` block deciding `stop`, as the decision session answers it. */
+const STOP_DECISION = ['```rafa:decision', 'strategy: stop', 'reason: "The task text is wrong."', '```', ''].join('\n');
+
+/** The demo tracker's `[BLOCKED]` second task, held on nothing but its absences, as `finishCleanExit` answers it. */
+function heldStop(trackerPath: string): DecisionStop {
+  const content = readFileSync(trackerPath, 'utf8');
+  const taskInfo = findNextTask(content);
+  if (taskInfo === null) throw new Error('the demo tracker holds no open task');
+  return {
+    kind: 'clean-exit',
+    taskInfo,
+    retryTask: retryTaskOf(taskInfo, content),
+    finished: {
+      attempt: { outcome: 'nothing-to-commit', subject: 's', sha: null, failedStep: null, exitCode: null, message: '' },
+      holds: [NO_REPORT_HOLD, 'no commit: the task changed no tracked file'],
+    },
+    stopEvent: { kind: 'task-blocked', position: taskPosition(content, taskInfo.lineNum), reason: NO_REPORT_HOLD },
+  };
+}
+
+/**
+ * Writes the events file of a `--continue` run on `project` that meets
+ * the held stop with its retries spent, through the run's own
+ * `createRunDecisions` bound to that file: decided `stop` by the session,
+ * or left needing a decision under `--output=json`. Answers the run's exit code.
+ */
+async function decidedHeldRun(project: ReturnType<typeof plantDemoProject>, mode: 'text' | 'json'): Promise<number> {
+  const trackerPath = join(project.root, DEMO_TRACKER_PATH);
+  const options: RunDecisionsOptions = {
+    continueArgs: { on: true, directive: null, forceWrapUp: false },
+    repoRoot: project.root,
+    checkout: project.root,
+    trackerPath,
+    planPath: join(project.root, DEMO_PLAN_PATH),
+    settings: { loopContinueCriteria: '.rafa/continue-criteria.md', loopContinueCriteriaMode: 'extend', loopForceWrapUpMaxNewFailures: false },
+    settingSources: ['project', 'local'],
+    session: { decisionsChanged: () => undefined },
+    retries: { retry: () => false, left: () => 0, lastRefusal: () => 'spent' },
+    isInterrupted: () => false,
+    seed: [],
+    spawn: () => Promise.resolve({ exitCode: 0, stdout: STOP_DECISION }),
+    mode: () => mode,
+  };
+  setActiveOutput(sinkOutput({}));
+  bindEventsFile(project.root, SESSION_ID);
+  try {
+    await createRunDecisions(options).atStop(heldStop(trackerPath));
+  } catch (error) {
+    if (error instanceof LoopEnd) return error.exitCode;
+    throw error;
+  } finally {
+    unbindEventsFile();
+    setActiveOutput(null);
+  }
+  throw new Error('the held stop did not end the run');
+}
+
+/** The names of the events in `file`, in order. */
+function namesIn(file: string): readonly string[] {
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => (JSON.parse(line) as { readonly name: string }).name);
+}
+
+describe('rafa loop wait, a held stop a --continue decision ends (#1672)', () => {
+  it.each([
+    ['decided stop by the session', 'text', DECISION_STOP_EXIT, 'decision'],
+    ['needing a decision under --output=json', 'json', DECISION_NEEDED_EXIT, 'decision-needed'],
+  ] as const)('answers the run %s on its halt: the held reason once, and the halt\'s exit code', async (_path, mode, runExit, opening) => {
+    const project = plantDemoProject(tempBase);
+    plantSession(project.root, sessionRecord());
+
+    expect(await decidedHeldRun(project, mode)).toBe(runExit);
+    expect(namesIn(eventsFilePath(project.root, SESSION_ID))).toEqual([opening, 'task-blocked', 'halt']);
+
+    const run = await wait(project, [], clocked({ isAlive: () => false }).seams);
+
+    expect(run.stdout).toBe(`rafa· halt             ${HELD_TEXT}: Second task\n`);
+    expect(run.stdout.split(HELD_TEXT)).toHaveLength(2);
+    expect([run.exitCode, run.stderr]).toEqual([exitOf('halt'), '']);
+    expect(readLoopEnding(project.root, SESSION_ID)).toEqual({ kind: 'halt', reason: `${HELD_TEXT}: Second task` });
   });
 });
 
