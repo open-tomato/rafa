@@ -722,6 +722,13 @@ describe('planTitleIn', () => {
     expect(planTitleIn('# A plain title\n\n# Later\n', 'stub')).toBe('A plain title');
   });
 
+  it('reads a CRLF plan\'s title as its LF copy reads it', () => {
+    const lf = `${ASSUMED}# Plan: rafa-21 — release title\n\n## Stage\n`;
+    const crlf = lf.replaceAll('\n', '\r\n');
+    expect(planTitleIn(crlf, 'stub')).toBe('rafa-21 — release title');
+    expect(planTitleIn(crlf, 'stub')).toBe(planTitleIn(lf, 'stub'));
+  });
+
   it('reads a title heading as one hash, a space run and a title holding no line terminator', () => {
     expect(planTitleIn('#   Spaced title\n', 'stub')).toBe('Spaced title');
     expect(planTitleIn('# \tTabbed title\n', 'stub')).toBe('Tabbed title');
@@ -729,7 +736,8 @@ describe('planTitleIn', () => {
     expect(planTitleIn('# x', 'stub')).toBe('x');
     expect(planTitleIn('#NoSpace\n## Two\n', 'stub')).toBe('stub');
     expect(planTitleIn('#\tTab first\n', 'stub')).toBe('stub');
-    expect(planTitleIn('# CRLF title\r\n', 'stub')).toBe('stub');
+    expect(planTitleIn('# CRLF title\r\n', 'stub')).toBe('CRLF title');
+    expect(planTitleIn('# a\r\r\n', 'stub')).toBe('stub');
     expect(planTitleIn('# \rafter a return\n', 'stub')).toBe('stub');
     expect(planTitleIn('# a\u2028b\n', 'stub')).toBe('stub');
     expect(planTitleIn('# a\u2029b\n', 'stub')).toBe('stub');
