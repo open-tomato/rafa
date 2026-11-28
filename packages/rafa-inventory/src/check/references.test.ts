@@ -164,6 +164,16 @@ function textsOf(references: readonly BodyReference[], kind: 'path' | 'tool'): s
   return references.filter((reference) => reference.kind === kind).map((item) => item.text);
 }
 
+/**
+ * The spec's one-second bound on a crafted body: the old function
+ * definition and closing punctuation patterns each took about 3 s on
+ * {@link CRAFTED_RUN} characters and grow with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Characters in a crafted body's repeated run, the 50,000 of the plan's slow shape. */
+const CRAFTED_RUN = 50_000;
+
 describe('the seams', () => {
   it('resolves a body against the project it is handed and no other', () => {
     const root = plant({
@@ -239,6 +249,26 @@ describe('what a body names', () => {
     const references = collectReferences(body(`See ${span('src/plan.ts:315')}.`));
 
     expect(textsOf(references, 'path')).toEqual(['src/plan.ts']);
+  });
+
+  it('strips the closing punctuation run off a word and keeps what sits inside it', () => {
+    const references = collectReferences(body(
+      `${span('(src/a.ts),')} ${span('"src/b.ts".')} ${span('[src/c.ts:12]).')}`,
+      `${span('src/d.ts;:')} ${span('src/e.ts).x')} ${span('))..')} ${span('<src/f.ts>')}`,
+    ));
+
+    expect(textsOf(references, 'path')).toEqual(['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/d.ts', 'src/f.ts']);
+  });
+
+  it('reads no path off a word whose quote run ends in a letter, within REDOS_BOUND_MS', () => {
+    const text = body(`${span(`a${'"'.repeat(CRAFTED_RUN)}x`)} ${span('src/kept.ts')}`);
+
+    const started = performance.now();
+    const references = collectReferences(text);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(textsOf(references, 'path')).toEqual(['src/kept.ts']);
   });
 
   it('numbers a reference by its line in the body', () => {
@@ -554,6 +584,39 @@ describe('resolution', () => {
     expect(codesOf(posix.issues)).toEqual(['missing-tool']);
     expect(posix.issues[0]?.message).toContain('nosuchtool');
     expect(bashStyle.issues).toEqual([]);
+  });
+
+  it('reads the function keyword form with or without its parens, and never without its brace', () => {
+    const found = checkReferences(
+      body(...fence(
+        'bash',
+        'function _a() {',
+        'function _b ( ) {',
+        'function _c{',
+        'function _d',
+        'function _e()',
+        '_a; _b; _c',
+        '_d',
+        '_e',
+      )),
+      { projectRoot: null, skillDir: null, pathDirs: [] },
+    );
+
+    expect(found.issues.map((issue) => issue.reference.text)).toEqual(['_d', '_e']);
+  });
+
+  it('defines no function off a keyword line with a long space run and no brace, within REDOS_BOUND_MS', () => {
+    const text = body(
+      `function A${' '.repeat(CRAFTED_RUN)}x`,
+      ...fence('bash', 'A --flag', 'function B {', '}', 'B'),
+    );
+
+    const started = performance.now();
+    const found = checkReferences(text, { projectRoot: null, skillDir: null, pathDirs: [] });
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(found.issues.map((issue) => issue.reference.text)).toEqual(['A']);
   });
 });
 

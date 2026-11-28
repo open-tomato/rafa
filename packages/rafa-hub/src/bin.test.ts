@@ -12,13 +12,31 @@
  * Under `hub.auth.adapter: api-key` the keys are variables of the
  * environment the case hands {@link runHub}, never the process's own,
  * and so are the login's user and password; the keys file and the
- * login it holds are made under the case's root.
+ * login it holds are made under the case's root, in the install
+ * record's `dataDir` (the config file's directory when the case writes
+ * no record), or at the old place beside `hub.storePath`.
+ *
+ * The SQLite library a case names, in the install record or under
+ * `hub.store.sqliteLibrary`, is a path under the case's root that holds
+ * no file: the case reads the library the `sqlite` opener is handed, and
+ * the opener it hands in opens the real connector without it.
+ *
+ * The `store.opened` cases open the real `sqlite` connector over a
+ * stubbed macOS loader, on a loader state of the case's own, whose
+ * `setCustomSQLite` names the library or refuses it, and read the
+ * `sqliteVec` the line holds; under `postgres` the stand-in connector is
+ * the `sqlite` one, which answers a `sqliteVec` the line must not hold.
  *
  * `rafa-hub index rebuild` runs over a store the `sqlite` connector made
  * under the case's root, seeded with one commit pushed from a real
  * export (`@open-tomato/rafa/store`), so the counts it prints are read
  * from rows rather than from an empty index.
+ *
+ * The `config.yaml` cases start the hub from a named YAML file, from the
+ * `rafa-hub.yaml` read beside a missing named `.ts` file, and, as the
+ * control, from a `.ts` file, which logs none.
  */
+import type { SqliteHubOpener } from './bin.js';
 import type { HubLogEntry, HubServer } from './server.js';
 import type { CommitEffortRow, WirePayload, WireRow } from '@open-tomato/rafa/store';
 
@@ -27,6 +45,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { encodeWirePayload, exportWirePayload, openSqliteStore, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { createLoaderState } from '@open-tomato/rafa-index/loader';
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
@@ -35,6 +54,7 @@ import { HUB_CONFIG_ENV } from './config.js';
 import { keysFileName } from './identity/key-store.js';
 import { LOGIN_PASSWORD_VARIABLE, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
 import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
+import { INSTALL_RECORD_FILE } from './install-record.js';
 import { HUB_ROUTES } from './server.js';
 import { connectSqliteHub } from './store/sqlite.js';
 
@@ -226,6 +246,143 @@ describe('runHub', () => {
     expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(503);
     expect(logged.some((entry) => entry.event === 'store.unavailable')).toBe(true);
   });
+
+  /** The `config.dangerous` lines a hub started with `dangerous.hub.maxPayloadRows` written as `cap` logs; left out under undefined. */
+  async function dangerousLines(cap: string | undefined): Promise<HubLogEntry[]> {
+    const { log, logged } = collecting();
+    const extra = cap === undefined
+      ? ''
+      : `dangerous:\n  hub:\n    maxPayloadRows: ${cap}\n`;
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort(), extra) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its config: ${JSON.stringify(logged)}`);
+    await server.stop();
+    return logged.filter((entry) => entry.event === 'config.dangerous');
+  }
+
+  it('logs one config.dangerous warning at start for dangerous.hub.maxPayloadRows unlimited or above 50000', async () => {
+    mkdirStore();
+
+    for (const [cap, value] of [['unlimited', 'unlimited'], ['50001', '50001']] as const) {
+      const lines = await dangerousLines(cap);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({ level: 'warn', key: 'dangerous.hub.maxPayloadRows', value });
+      expect(String(lines[0]?.['message'])).toStartWith(`dangerous.hub.maxPayloadRows is ${value}, above the default 50000`);
+    }
+  });
+
+  it('logs no config.dangerous line for the default, left out or written, or a cap below it', async () => {
+    mkdirStore();
+
+    for (const cap of [undefined, '50000', '100']) {
+      expect(await dangerousLines(cap)).toEqual([]);
+    }
+  });
+
+  it('answers null with a config.refused line naming dangerous.hub.maxPayloadRows when it is 0', async () => {
+    const { log, logged } = collecting();
+    const config = writeConfig(await freePort(), 'dangerous:\n  hub:\n    maxPayloadRows: 0\n');
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: config }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain('dangerous.hub.maxPayloadRows is 0');
+  });
+
+  it('answers dangerous.hub.maxPayloadRows as maxPayloadRows on GET /v1/status: 50000 left out, the cap written, null for unlimited', async () => {
+    mkdirStore();
+    const { log } = collecting();
+    const auth = '  auth:\n    adapter: api-key\n    apiKeys:\n      - RAFA_HUB_BIN_KEY\n';
+
+    for (const [written, answered] of [[undefined, 50_000], ['7', 7], ['unlimited', null]] as const) {
+      const cap = written === undefined
+        ? ''
+        : `dangerous:\n  hub:\n    maxPayloadRows: ${written}\n`;
+      const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort(), auth + cap), RAFA_HUB_BIN_KEY: API_KEY }, { log, hostname: '127.0.0.1' });
+      if (server === null) throw new Error('the hub refused its config');
+      const status = await fetch(`${server.url}${HUB_ROUTES.status}`, { headers: { authorization: `Bearer ${API_KEY}` } });
+      const body = await status.json() as { readonly data?: Record<string, unknown> };
+      await server.stop();
+
+      expect(status.status).toBe(200);
+      expect(body.data?.['maxPayloadRows']).toBe(answered);
+    }
+  });
+});
+
+/** The variable the `postgres` cases name in `hub.store.postgres.urlVariable`, set in no case's environment. */
+const PG_URL_VARIABLE = 'RAFA_HUB_BIN_PG_URL';
+
+/** The `hub.store` lines of a hub on `postgres` reading its URL from {@link PG_URL_VARIABLE}. */
+const POSTGRES_STORE = `  store:\n    engine: postgres\n    postgres:\n      urlVariable: ${PG_URL_VARIABLE}\n`;
+
+/** The refusal the `postgres` connector opens with on a database missing `pg_search` alone (`connection.ts`). */
+const MISSING_PG_SEARCH = 'hub postgres: the database lacks the extension pg_search; install pg_search on it (CREATE EXTENSION) before the hub starts on postgres';
+
+/** Whether a server answers at `port` on the loopback address. */
+async function answersAt(port: number): Promise<boolean> {
+  return fetch(`http://127.0.0.1:${String(port)}${HUB_ROUTES.health}`).then(() => true, () => false);
+}
+
+describe('runHub under hub.store.engine postgres', () => {
+  it('answers null with a config.refused line naming the URL variable when it is unset, listening nowhere', async () => {
+    const { log, logged } = collecting();
+    const port = await freePort();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(port, POSTGRES_STORE) }, { log, githubApi: 'http://127.0.0.1:9' });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain(`the environment variable ${PG_URL_VARIABLE} is unset`);
+    expect(await answersAt(port)).toBe(false);
+  });
+
+  it('answers null with a config.refused line naming pg_search when the database misses it, listening nowhere', async () => {
+    const { log, logged } = collecting();
+    const port = await freePort();
+    const handed: { urlVariable: string; env: unknown }[] = [];
+    const env = { [HUB_CONFIG_ENV]: writeConfig(port, POSTGRES_STORE), [PG_URL_VARIABLE]: 'postgres://stand-in' };
+
+    const server = await runHub(env, {
+      log,
+      githubApi: 'http://127.0.0.1:9',
+      connectPostgres: (_context, options) => {
+        handed.push({ urlVariable: options.urlVariable, env: options.env });
+        return Promise.reject(new Error(MISSING_PG_SEARCH));
+      },
+    });
+
+    expect(server).toBeNull();
+    expect(handed).toEqual([{ urlVariable: PG_URL_VARIABLE, env }]);
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain('lacks the extension pg_search');
+    expect(await answersAt(port)).toBe(false);
+  });
+
+  it('serves the connector it opened at start, opening it once, when the open succeeds', async () => {
+    mkdirStore();
+    const { log } = collecting();
+    let opens = 0;
+    const env = { [HUB_CONFIG_ENV]: writeConfig(await freePort(), POSTGRES_STORE), [PG_URL_VARIABLE]: 'postgres://stand-in' };
+
+    const server = await runHub(env, {
+      log,
+      githubApi: 'http://127.0.0.1:9',
+      connectPostgres: (context) => {
+        opens += 1;
+        return connectSqliteHub(context);
+      },
+    });
+    if (server === null) throw new Error('the hub refused its start');
+    running = [...running, server];
+
+    expect(opens).toBe(1);
+    expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(200);
+    expect(opens).toBe(1);
+  });
 });
 
 /** `hub.auth` under `api-key`, naming `RAFA_HUB_BIN_KEY`, plus `login` lines indented under it. */
@@ -255,9 +412,24 @@ function basic(user: string, password: string): string {
   return `Basic ${Buffer.from(`${user}:${password}`).toString('base64')}`;
 }
 
-/** The keys file beside the case's `hub.storePath`. */
+/** The keys file in the case's default `dataDir`, the config file's directory. */
 function keysFile(): string {
-  return keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+  return keysFileName(root);
+}
+
+/** The keys file's old place, beside the case's `hub.storePath`. */
+function oldKeysFile(): string {
+  return join(root, 'store', 'rafa-hub.keys.sqlite');
+}
+
+/** Sets the login `user` with `password` in the keys file at `path`; {@link LOGIN_USER} with {@link LOGIN_PASSWORD} when left out. */
+async function seedLogin(path: string, user = LOGIN_USER, password = LOGIN_PASSWORD): Promise<void> {
+  const store = openSqliteLoginStore({ path });
+  try {
+    await store.setLogin(user, password);
+  } finally {
+    store.close();
+  }
 }
 
 describe('runHub under hub.auth.adapter api-key, with the keys file', () => {
@@ -395,6 +567,68 @@ describe('runHub under hub.auth.adapter api-key, with the keys file', () => {
     expect(page.status).toBe(401);
     expect(await page.text()).toContain('/login/oauth/start');
     expect(served.some((entry) => entry.event === 'login.insecure')).toBe(false);
+  });
+
+  it('opens the keys file in the install record\'s dataDir, logging no keys.old-place line', async () => {
+    mkdirStore();
+    const dataDir = join(root, 'data');
+    mkdirSync(dataDir);
+    writeInstallRecord({ dataDir });
+
+    const { server, logged } = await startKeyed({ [LOGIN_USER_VARIABLE]: LOGIN_USER, [LOGIN_PASSWORD_VARIABLE]: LOGIN_PASSWORD });
+    const listed = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+
+    expect(listed.status).toBe(200);
+    expect(existsSync(keysFileName(dataDir))).toBe(true);
+    expect(existsSync(keysFile())).toBe(false);
+    expect(existsSync(oldKeysFile())).toBe(false);
+    expect(logged.some((entry) => entry.event === 'keys.old-place')).toBe(false);
+  });
+
+  it('opens a keys file found beside hub.storePath alone there, logging one keys.old-place warning naming the new place once it listens', async () => {
+    mkdirStore();
+    await seedLogin(oldKeysFile());
+
+    const { server, logged } = await startKeyed({});
+    const listed = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+
+    expect(listed.status).toBe(200);
+    expect(existsSync(keysFile())).toBe(false);
+    const warnings = logged.filter((entry) => entry.event === 'keys.old-place');
+    expect(warnings).toEqual([{
+      level: 'warn',
+      event: 'keys.old-place',
+      path: oldKeysFile(),
+      message: `${oldKeysFile()}: the keys file is found beside hub.storePath alone, so it is opened there for this release; its place is now ${keysFile()}, in the install record's dataDir: move it there before the next release`,
+    }]);
+    expect(logged.findIndex((entry) => entry.event === 'keys.old-place')).toBeGreaterThan(logged.findIndex((entry) => entry.event === 'listening'));
+  });
+
+  it('opens the keys file in dataDir, with no warning, when the old place holds one too', async () => {
+    mkdirStore();
+    await seedLogin(oldKeysFile());
+    await seedLogin(keysFile(), 'grace', 'another password 0002');
+
+    const { server, logged } = await startKeyed({});
+    const fromDataDir = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic('grace', 'another password 0002') } });
+    const fromOld = await fetch(`${server.url}/v1/keys`, { headers: { authorization: basic(LOGIN_USER, LOGIN_PASSWORD) } });
+
+    expect(fromDataDir.status).toBe(200);
+    expect(fromOld.status).toBe(401);
+    expect(logged.some((entry) => entry.event === 'keys.old-place')).toBe(false);
+  });
+
+  it('logs no keys.old-place line under github, which opens no keys file, though the old place holds one', async () => {
+    mkdirStore();
+    await seedLogin(oldKeysFile());
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error('the hub refused its config');
+    running = [...running, server];
+
+    expect(logged.some((entry) => entry.event === 'keys.old-place')).toBe(false);
+    expect(existsSync(keysFile())).toBe(false);
   });
 
   it('answers 404 on the key routes and the page under github, making no keys file', async () => {
@@ -571,6 +805,17 @@ describe('hubCommandOf', () => {
     [['keys', 'create', 'ci', '--hub=https://hub.example.org'], 'keys'],
     [['keys'], null],
     [['keys', 'create'], null],
+    [['install'], 'install'],
+    [['install', '--data-dir=/data', '--sqlite-library=/opt/lib/libsqlite3.so'], 'install'],
+    [['install', '--model=bge', '--model-path=/models/bge.gguf', '--model-dimension=384'], 'install'],
+    [['install', '--data-dir'], null],
+    [['install', '--data-dir=/a', '--data-dir=/b'], null],
+    [['install', '--store=/data'], null],
+    [['install', 'now'], null],
+    [['--data-dir=/data'], null],
+    [['health'], 'health'],
+    [['health', '--port=7373'], null],
+    [['health', 'now'], null],
   ] as const)('reads %p as %p', (args, command) => {
     expect(hubCommandOf(args)).toBe(command);
   });
@@ -628,6 +873,21 @@ describe('bin.ts as a process', () => {
     expect(lines[0]).toMatchObject({ level: 'error', event: 'config.refused' });
     expect(String(lines[0]?.['problems'])).toContain('hub.auth.apiKeys[0]');
     expect(stdout).not.toContain(API_KEY);
+  });
+
+  it('exits 1 at start under hub.store.engine postgres with one config.refused line naming the unset URL variable', async () => {
+    const env: Record<string, string | undefined> = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373, POSTGRES_STORE) };
+    delete env[PG_URL_VARIABLE];
+
+    const child = Bun.spawn([process.execPath, BIN], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stderr).toBe('');
+    const lines = jsonLines(stdout);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(lines[0]?.['problems'])).toContain(`the environment variable ${PG_URL_VARIABLE} is unset`);
   });
 
   it('serves /health, then stops on SIGTERM and exits 0, every line of standard output JSON', async () => {
@@ -688,10 +948,37 @@ describe('bin.ts as a process', () => {
     const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
 
     expect(code).toBe(1);
-    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
+    expect(stderr).toBe('rafa-hub: index is not a command; usage: rafa-hub (serves the hub), rafa-hub index rebuild, rafa-hub login, rafa-hub health, rafa-hub install [--data-dir=<path>] [--sqlite-library=<path>] [--model=<id> [--model-path=<path>] [--model-dimension=<n>]], or rafa-hub keys <list | create <name> | pause <name> | delete <name>> [--hub=<url>]\n');
   });
 
-  it('runs login over two lines of standard input, setting the login in the keys file beside hub.storePath', async () => {
+  it('runs install, writing the record beside the config file and printing one line', async () => {
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373) };
+    const dataDir = join(root, 'data');
+
+    const child = Bun.spawn([process.execPath, BIN, 'install', `--data-dir=${dataDir}`], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(stderr).toBe('');
+    expect(code).toBe(0);
+    const recordPath = join(root, INSTALL_RECORD_FILE);
+    expect(stdout).toStartWith(`rafa-hub install: wrote ${recordPath} for hub ${HUB_VERSION} on bun ${Bun.version}: dataDir ${dataDir}, `);
+    const record = JSON.parse(readFileSync(recordPath, 'utf8')) as Record<string, unknown>;
+    expect(record).toEqual({ installVersion: 1, hub: HUB_VERSION, bun: Bun.version, dataDir, sqliteLibrary: null, models: [] });
+  });
+
+  it('exits 1 with the usage line for install arguments naming no flag it takes, writing no record', async () => {
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373) };
+
+    const child = Bun.spawn([process.execPath, BIN, 'install', '--store=/data'], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stderr).toStartWith('rafa-hub: install --store=/data is not a command; usage: ');
+    expect(stderr).toContain('rafa-hub install [--data-dir=<path>]');
+    expect(existsSync(join(root, INSTALL_RECORD_FILE))).toBe(false);
+  });
+
+  it('runs login over two lines of standard input, setting the login in the keys file in the config file\'s directory', async () => {
     const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(7373, '  auth:\n    adapter: api-key\n    apiKeys: [RAFA_HUB_BIN_KEY]\n') };
     const password = 'bin login password 0001';
 
@@ -700,7 +987,7 @@ describe('bin.ts as a process', () => {
 
     expect(stderr).toBe('');
     expect(code).toBe(0);
-    const keys = keysFileName(join(root, 'store', 'rafa-hub.sqlite'));
+    const keys = keysFileName(root);
     expect(stdout).toBe(`rafa-hub login: the login is set for ada, in ${keys}\n`);
     const store = openSqliteLoginStore({ path: keys });
     try {
@@ -719,5 +1006,351 @@ describe('bin.ts as a process', () => {
     expect(code).toBe(1);
     expect(stdout).toBe('');
     expect(stderr).toBe('rafa-hub keys list: no hub to reach; pass --hub=<url> or set RAFA_HUB_URL\n');
+  });
+});
+
+/** Writes an install record beside the case's config file, `fields` over a valid one this hub wrote; answers its path. */
+function writeInstallRecord(fields: Readonly<Record<string, unknown>> = {}): string {
+  const path = join(root, INSTALL_RECORD_FILE);
+  const record = { installVersion: 1, hub: HUB_VERSION, bun: Bun.version, dataDir: root, sqliteLibrary: null, models: [], ...fields };
+  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+  return path;
+}
+
+describe('runHub and the install record', () => {
+  it('serves with no install record, logging one install.missing warning naming the record and rafa-hub install', async () => {
+    mkdirStore();
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    const warnings = logged.filter((entry) => entry.event === 'install.missing');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ level: 'warn', path: join(root, 'rafa-hub.install.json') });
+    expect(String(warnings[0]?.['message'])).toBe(`${join(root, 'rafa-hub.install.json')}: no install record; using the defaults (dataDir ${root}, no SQLite library, no models); run rafa-hub install to write one`);
+  });
+
+  it('serves over a record this hub wrote, logging no install.missing line', async () => {
+    mkdirStore();
+    writeInstallRecord();
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    expect(logged.filter((entry) => entry.event === 'install.missing')).toEqual([]);
+  });
+
+  it('answers null with one config.refused line naming run rafa-hub install for a record another hub version wrote, listening nowhere', async () => {
+    mkdirStore();
+    const path = writeInstallRecord({ hub: '0.0.0-other' });
+    const port = await freePort();
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(port) }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(logged[0]?.['problems']).toEqual([`${path}: written by hub 0.0.0-other, and this hub is ${HUB_VERSION}; run rafa-hub install`]);
+    expect(await answersAt(port)).toBe(false);
+  });
+
+  it('answers null with one config.refused line for a record that is no valid record', async () => {
+    const path = join(root, INSTALL_RECORD_FILE);
+    writeFileSync(path, 'not json');
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toStartWith(`${path}: not a valid install record: not valid JSON`);
+    expect(String(logged[0]?.['problems'])).toEndWith('; run rafa-hub install');
+  });
+
+  it('reads the record before the running config: a refused record is the one problem logged when the config file is absent too', async () => {
+    const path = writeInstallRecord({ installVersion: 2 });
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: join(root, 'absent.yaml') }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]?.['problems']).toEqual([`${path}: installVersion is 2, expected 1, the install record format this hub reads; run rafa-hub install`]);
+  });
+
+  it('logs no install.missing line before a refused config, its config.refused line alone', async () => {
+    const { log, logged } = collecting();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: join(root, 'absent.yaml') }, { log });
+
+    expect(server).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(logged[0]?.['problems'])).toContain('could not be read');
+  });
+
+  it('exits 1 as a process with one config.refused line on standard output for a record another hub version wrote', async () => {
+    writeInstallRecord({ hub: '0.0.0-other' });
+    const env = { ...process.env, [HUB_CONFIG_ENV]: writeConfig(await freePort()) };
+
+    const child = Bun.spawn([process.execPath, BIN], { env, stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+
+    expect(code).toBe(1);
+    expect(stderr).toBe('');
+    const lines = jsonLines(stdout);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ level: 'error', event: 'config.refused' });
+    expect(String(lines[0]?.['problems'])).toContain('written by hub 0.0.0-other');
+    expect(String(lines[0]?.['problems'])).toEndWith('run rafa-hub install');
+  });
+});
+
+/** A `sqlite` opener recording the library each open is handed, then opening the real connector without it. */
+function recordingSqlite(): { readonly connectSqlite: SqliteHubOpener; readonly handed: (string | null)[] } {
+  const handed: (string | null)[] = [];
+  return {
+    connectSqlite: (context, options) => {
+      handed.push(options.loader?.library ?? null);
+      const { storeFiles, fileName, project } = options;
+      return connectSqliteHub(context, { ...storeFiles === undefined
+        ? {}
+        : { storeFiles }, ...fileName === undefined
+        ? {}
+        : { fileName }, ...project === undefined
+        ? {}
+        : { project } });
+    },
+    handed,
+  };
+}
+
+/** The `config.deprecated` warning `hub.store.sqliteLibrary` naming `library` gives, for the case's config and record. */
+function libraryKeyWarning(library: string): string {
+  return `${join(root, 'hub.yaml')}: hub.store.sqliteLibrary is read for this release only; run rafa-hub install --sqlite-library=${library} to record it in ${join(root, INSTALL_RECORD_FILE)}, then remove the key`;
+}
+
+describe('runHub and the SQLite library', () => {
+  /** Starts the hub over `extra` config lines with the recording opener, asks `/health` once, and answers what it handed and logged. */
+  async function startAndOpen(extra = ''): Promise<{ readonly handed: readonly (string | null)[]; readonly logged: readonly HubLogEntry[] }> {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const { connectSqlite, handed } = recordingSqlite();
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(await freePort(), extra) }, { log, connectSqlite, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(200);
+    return { handed, logged };
+  }
+
+  it('hands the loader the library the install record names, logging no config.deprecated line', async () => {
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord({ sqliteLibrary: library });
+
+    const { handed, logged } = await startAndOpen();
+
+    expect(handed).toEqual([library]);
+    expect(logged.filter((entry) => entry.event === 'config.deprecated')).toEqual([]);
+  });
+
+  it('hands the loader no library over a record naming none and no key, the control of the cases beside it', async () => {
+    writeInstallRecord();
+
+    const { handed, logged } = await startAndOpen();
+
+    expect(handed).toEqual([null]);
+    expect(logged.filter((entry) => entry.event === 'config.deprecated')).toEqual([]);
+  });
+
+  it('hands the loader hub.store.sqliteLibrary when the record names none, logging one config.deprecated warning naming rafa-hub install', async () => {
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord();
+
+    const { handed, logged } = await startAndOpen(`  store:\n    sqliteLibrary: ${library}\n`);
+
+    expect(handed).toEqual([library]);
+    const warnings = logged.filter((entry) => entry.event === 'config.deprecated');
+    expect(warnings).toEqual([{ level: 'warn', event: 'config.deprecated', key: 'hub.store.sqliteLibrary', message: libraryKeyWarning(library) }]);
+  });
+
+  it('hands the loader the record\'s library, still warning, when hub.store.sqliteLibrary names the same one', async () => {
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord({ sqliteLibrary: library });
+
+    const { handed, logged } = await startAndOpen(`  store:\n    sqliteLibrary: ${join(root, 'lib', '..', 'lib', 'libsqlite3.so')}\n`);
+
+    expect(handed).toEqual([library]);
+    expect(logged.filter((entry) => entry.event === 'config.deprecated')).toHaveLength(1);
+  });
+
+  it('answers null with one config.refused line naming both libraries when the record and hub.store.sqliteLibrary differ, opening nothing', async () => {
+    mkdirStore();
+    const recorded = join(root, 'lib', 'libsqlite3.so');
+    const written = join(root, 'other', 'libsqlite3.so');
+    const record = writeInstallRecord({ sqliteLibrary: recorded });
+    const port = await freePort();
+    const { log, logged } = collecting();
+    const { connectSqlite, handed } = recordingSqlite();
+
+    const server = await runHub({ [HUB_CONFIG_ENV]: writeConfig(port, `  store:\n    sqliteLibrary: ${written}\n`) }, { log, connectSqlite, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+
+    expect(server).toBeNull();
+    expect(logged).toEqual([{
+      level: 'error',
+      event: 'config.refused',
+      problems: [`${join(root, 'hub.yaml')}: hub.store.sqliteLibrary is "${written}" and the install record ${record} names "${recorded}"; expected one library: remove hub.store.sqliteLibrary, or run rafa-hub install --sqlite-library=${written} to record it instead`],
+    }]);
+    expect(handed).toEqual([]);
+    expect(await answersAt(port)).toBe(false);
+  });
+});
+
+describe('runIndexRebuild and the SQLite library', () => {
+  it('hands the loader the library the install record names, printing no warning', async () => {
+    mkdirStore();
+    const library = join(root, 'lib', 'libsqlite3.so');
+    writeInstallRecord({ sqliteLibrary: library });
+    const { connectSqlite, handed } = recordingSqlite();
+    const err: string[] = [];
+
+    const code = await runIndexRebuild({ [HUB_CONFIG_ENV]: writeConfig(7373) }, { out: () => undefined, err: (line) => err.push(line), connectSqlite });
+
+    expect(err).toEqual([]);
+    expect(code).toBe(0);
+    expect(handed).toEqual([library]);
+  });
+
+  it('answers 1 with one line naming both libraries when the record and hub.store.sqliteLibrary differ, opening nothing', async () => {
+    mkdirStore();
+    writeInstallRecord({ sqliteLibrary: join(root, 'lib', 'libsqlite3.so') });
+    const { connectSqlite, handed } = recordingSqlite();
+    const err: string[] = [];
+
+    const code = await runIndexRebuild(
+      { [HUB_CONFIG_ENV]: writeConfig(7373, `  store:\n    sqliteLibrary: ${join(root, 'other', 'libsqlite3.so')}\n`) },
+      { out: () => undefined, err: (line) => err.push(line), connectSqlite },
+    );
+
+    expect(code).toBe(1);
+    expect(err).toHaveLength(1);
+    expect(err[0]).toStartWith('rafa-hub index rebuild: the config was refused: ');
+    expect(err[0]).toContain('expected one library: remove hub.store.sqliteLibrary');
+    expect(handed).toEqual([]);
+  });
+});
+
+/** The library the stubbed loader names; no file is there, since its `setCustomSQLite` never opens it. */
+const STUB_LIBRARY = '/nonexistent/rafa-1614/libsqlite3.dylib';
+
+/** A `sqlite` opener over the real connector, its loader a stubbed macOS one whose `setCustomSQLite` answers `named`. */
+function stubbedLoaderSqlite(named: boolean): SqliteHubOpener {
+  return (context, options) => connectSqliteHub(context, {
+    ...options,
+    loader: { library: STUB_LIBRARY, platform: 'darwin', setCustomSQLite: () => named, state: createLoaderState() },
+  });
+}
+
+describe('runHub and the store.opened line', () => {
+  /** Starts the hub over `env` and `options`, asks `/health` once, and answers the `store.opened` lines it logged. */
+  async function openedLines(env: Record<string, string>, options: Parameters<typeof runHub>[1]): Promise<HubLogEntry[]> {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const server = await runHub(env, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1', ...options });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+
+    expect((await fetch(`${server.url}${HUB_ROUTES.health}`)).status).toBe(200);
+    return logged.filter((entry) => entry.event === 'store.opened');
+  }
+
+  it('holds the sqlite connector\'s sqliteVec, loaded with no why, when the stubbed loader names the library', async () => {
+    const lines = await openedLines({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { connectSqlite: stubbedLoaderSqlite(true) });
+
+    expect(lines).toEqual([{ level: 'info', event: 'store.opened', sqliteVec: { loaded: true, why: null } }]);
+  });
+
+  it('holds the sqlite connector\'s sqliteVec, not loaded with the loader\'s why, when the stubbed loader refuses the library', async () => {
+    const lines = await openedLines({ [HUB_CONFIG_ENV]: writeConfig(await freePort()) }, { connectSqlite: stubbedLoaderSqlite(false) });
+
+    expect(lines).toEqual([{
+      level: 'info',
+      event: 'store.opened',
+      sqliteVec: { loaded: false, why: `Database.setCustomSQLite(${STUB_LIBRARY}) loaded no library` },
+    }]);
+  });
+
+  it('holds no sqliteVec under hub.store.engine postgres, though the stand-in connector answers one', async () => {
+    const answered: unknown[] = [];
+    const env = { [HUB_CONFIG_ENV]: writeConfig(await freePort(), POSTGRES_STORE), [PG_URL_VARIABLE]: 'postgres://stand-in' };
+
+    const lines = await openedLines(env, {
+      connectPostgres: async (context) => {
+        const hub = await connectSqliteHub(context, { loader: { state: createLoaderState() } });
+        answered.push(hub.sqliteVec);
+        return hub;
+      },
+    });
+
+    expect(answered).toHaveLength(1);
+    expect(answered[0]).toBeDefined();
+    expect(lines).toEqual([{ level: 'info', event: 'store.opened' }]);
+  });
+});
+
+describe('runHub and the config.yaml warning', () => {
+  /** Starts the hub on the file `named`, answering what it logged. */
+  async function startOn(named: string): Promise<readonly HubLogEntry[]> {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const server = await runHub({ [HUB_CONFIG_ENV]: named }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+    return logged;
+  }
+
+  it('logs one config.yaml warning for a named YAML file, naming rafa-hub.config.ts and rafa 1.0.0', async () => {
+    const yaml = writeConfig(await freePort());
+
+    const warnings = (await startOn(yaml)).filter((entry) => entry.event === 'config.yaml');
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ level: 'warn', path: yaml });
+    expect(warnings[0]?.['message']).toBe(
+      `${yaml}: the hub's config is read from YAML, which rafa 1.0.0 stops reading; `
+      + `write what it holds to ${join(root, 'rafa-hub.config.ts')} as its default export, remove hub.yaml, and name it in RAFA_HUB_CONFIG`,
+    );
+  });
+
+  it('logs one config.yaml warning for the rafa-hub.yaml read beside a missing named .ts file, naming that file', async () => {
+    const yaml = join(root, 'rafa-hub.yaml');
+    writeFileSync(yaml, readFileSync(writeConfig(await freePort()), 'utf8'));
+    rmSync(join(root, 'hub.yaml'));
+    const ts = join(root, 'rafa-hub.config.ts');
+
+    const warnings = (await startOn(ts)).filter((entry) => entry.event === 'config.yaml');
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ level: 'warn', path: yaml });
+    expect(warnings[0]?.['message']).toBe(
+      `${yaml}: the hub's config is read from YAML, which rafa 1.0.0 stops reading; `
+      + `write what it holds to ${ts} as its default export, remove rafa-hub.yaml`,
+    );
+  });
+
+  it('logs no config.yaml line for a start from a .ts file', async () => {
+    const ts = join(root, 'rafa-hub.config.ts');
+    writeFileSync(ts, `export default { hub: { repository: '${REPOSITORY}', port: ${String(await freePort())}, storePath: 'store/rafa-hub.sqlite' } };\n`);
+
+    const logged = await startOn(ts);
+
+    expect(logged.filter((entry) => entry.event === 'config.yaml')).toEqual([]);
+    expect(logged.filter((entry) => entry.level === 'error')).toEqual([]);
   });
 });

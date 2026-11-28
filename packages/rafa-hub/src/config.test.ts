@@ -1,22 +1,16 @@
 /**
- * Tests for the hub's config reader (`config.ts`): the ten server keys,
- * their defaults, the refusal of `0`, negative and out-of-range values,
- * and the file `RAFA_HUB_CONFIG` names.
+ * Tests for the hub's config reader (`config.ts`): its server keys,
+ * their defaults, and the refusal of `0`, negative and out-of-range
+ * values. The file `RAFA_HUB_CONFIG` names is `config-file.test.ts`'s.
  *
  * Each refusal sits beside an accepting control of the same key, so a
  * reader that refused everything, or a check that never fired, fails
  * here rather than passing. Every refusal is SPELLED, never built from
- * the module's own constants. Files are written under a fresh `tmpdir`
- * directory per case, and the environment is handed in, never read
- * from `process.env`.
+ * the module's own constants.
  */
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { describe, expect, it } from 'bun:test';
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-
-import { cacheForMs, HubConfigError, parseHubConfig, readHubConfig } from './config.js';
+import { cacheForMs, HubConfigError, parseHubConfig } from './config.js';
 
 /** The config file's path, as a refusal names it. */
 const PATH = '/srv/hub/hub.yaml';
@@ -38,12 +32,6 @@ const API_KEYS_EXPECTED = 'expected a non-empty list of environment variable nam
 
 /** What an entry of `hub.auth.apiKeys` says it expected. */
 const API_KEY_NAME_EXPECTED = 'expected an environment variable name of A-Z, 0-9 and _, not opening with a digit, such as RAFA_HUB_KEY; the value written is not repeated';
-
-/** What `hub.store.sqliteLibrary` says it expected. */
-const LIBRARY_EXPECTED = 'expected an absolute path to a vanilla libsqlite3, such as /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib';
-
-/** What `hub.index.rebuildAfterPush` says it expected. */
-const REBUILD_EXPECTED = 'expected true or false';
 
 /** What `hub.projects` says it expected. */
 const PROJECTS_EXPECTED = 'expected a non-empty list of projects, each a mapping holding id, name, repository and storePath';
@@ -90,7 +78,7 @@ function problemsOf(attempt: () => unknown): readonly string[] {
 }
 
 describe('defaults', () => {
-  it('fills port, storePath, cacheFor, sqliteLibrary and rebuildAfterPush when only hub.repository is written', () => {
+  it('fills port, storePath, cacheFor and the store and index keys when only hub.repository is written', () => {
     expect(parseHubConfig(hubYaml(), PATH)).toEqual({
       repository: 'open-tomato/rafa',
       port: 7373,
@@ -100,8 +88,13 @@ describe('defaults', () => {
       authAdapter: 'github',
       apiKeys: [],
       login: null,
+      storeEngine: 'sqlite',
+      postgresUrlVariable: null,
       sqliteLibrary: null,
       rebuildAfterPush: true,
+      embeddingModel: null,
+      embeddingPrecision: 'half',
+      maxPayloadRows: 50_000,
     });
   });
 
@@ -115,7 +108,10 @@ describe('defaults', () => {
       '  sqliteLibrary: /opt/sqlite/libsqlite3.dylib',
       'index:',
       '  rebuildAfterPush: false',
-    ), PATH);
+      '  embedding:',
+      '    model: nomic-embed-text-v1.5',
+      '    precision: full',
+    ).concat('\ndangerous:\n  hub:\n    maxPayloadRows: 1000'), PATH);
 
     expect(config).toEqual({
       repository: 'open-tomato/rafa',
@@ -126,8 +122,13 @@ describe('defaults', () => {
       authAdapter: 'github',
       apiKeys: [],
       login: null,
+      storeEngine: 'sqlite',
+      postgresUrlVariable: null,
       sqliteLibrary: '/opt/sqlite/libsqlite3.dylib',
       rebuildAfterPush: false,
+      embeddingModel: 'nomic-embed-text-v1.5',
+      embeddingPrecision: 'full',
+      maxPayloadRows: 1000,
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -426,71 +427,11 @@ describe('hub.auth.adapter and hub.auth.apiKeys', () => {
   });
 });
 
-describe('hub.store.sqliteLibrary', () => {
-  it('refuses a relative path, a padded path and an empty string, naming an absolute one', () => {
-    const cases = ['lib/libsqlite3.dylib', './libsqlite3.dylib', '\' /opt/sqlite/libsqlite3.dylib\'', '\'\''];
-
-    expect(cases.map((raw) => problemsOf(() => parseHubConfig(hubYaml('store:', `  sqliteLibrary: ${raw}`), PATH)))).toEqual([
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is "lib/libsqlite3.dylib", ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is "./libsqlite3.dylib", ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is " /opt/sqlite/libsqlite3.dylib", ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is "", ${LIBRARY_EXPECTED}`],
-    ]);
-  });
-
-  it('refuses a number, a boolean, null and a list without coercing', () => {
-    const cases = ['42', 'true', 'null', '[/opt/sqlite/libsqlite3.dylib]'];
-
-    expect(cases.map((raw) => problemsOf(() => parseHubConfig(hubYaml('store:', `  sqliteLibrary: ${raw}`), PATH)))).toEqual([
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is 42, ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is true, ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is null, ${LIBRARY_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.store.sqliteLibrary is /opt/sqlite/libsqlite3.dylib, ${LIBRARY_EXPECTED}`],
-    ]);
-  });
-
-  it('keeps an absolute path as written, and is null when left out or the section is empty', () => {
-    const read = (...lines: string[]) => parseHubConfig(hubYaml(...lines), PATH).sqliteLibrary;
-
-    expect([
-      read('store:', '  sqliteLibrary: /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib'),
-      read('store:', '  sqliteLibrary: /usr/lib/../lib/libsqlite3.so'),
-      read(),
-      read('store: {}'),
-    ]).toEqual(['/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib', '/usr/lib/../lib/libsqlite3.so', null, null]);
-  });
-});
-
-describe('hub.index.rebuildAfterPush', () => {
-  it('refuses a quoted boolean, a number, null and yes without coercing', () => {
-    const cases = ['\'false\'', '0', '1', 'null', 'yes'];
-
-    expect(cases.map((raw) => problemsOf(() => parseHubConfig(hubYaml('index:', `  rebuildAfterPush: ${raw}`), PATH)))).toEqual([
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is "false", ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is 0, ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is 1, ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is null, ${REBUILD_EXPECTED}`],
-      [`/srv/hub/hub.yaml: hub.index.rebuildAfterPush is "yes", ${REBUILD_EXPECTED}`],
-    ]);
-  });
-
-  it('reads true and false as written, and true when left out', () => {
-    const read = (...lines: string[]) => parseHubConfig(hubYaml(...lines), PATH).rebuildAfterPush;
-
-    expect([
-      read('index:', '  rebuildAfterPush: false'),
-      read('index:', '  rebuildAfterPush: true'),
-      read(),
-      read('index: {}'),
-    ]).toEqual([false, true, true, true]);
-  });
-});
-
 describe('the document', () => {
   it('refuses unknown keys under hub.store and hub.index, beside a known-key control', () => {
     expect(problemsOf(() => parseHubConfig(hubYaml('store:', '  sqlitelibrary: /opt/libsqlite3.dylib', 'index:', '  rebuild: false'), PATH))).toEqual([
-      '/srv/hub/hub.yaml: hub.store.sqlitelibrary is not a key the hub reads; expected one of hub.store.sqliteLibrary',
-      '/srv/hub/hub.yaml: hub.index.rebuild is not a key the hub reads; expected one of hub.index.rebuildAfterPush',
+      '/srv/hub/hub.yaml: hub.store.sqlitelibrary is not a key the hub reads; expected one of hub.store.engine, hub.store.sqliteLibrary, hub.store.postgres',
+      '/srv/hub/hub.yaml: hub.index.rebuild is not a key the hub reads; expected one of hub.index.rebuildAfterPush, hub.index.embedding',
     ]);
     expect(parseHubConfig(hubYaml('store:', '  sqliteLibrary: /opt/libsqlite3.dylib', 'index:', '  rebuildAfterPush: false'), PATH))
       .toMatchObject({ sqliteLibrary: '/opt/libsqlite3.dylib', rebuildAfterPush: false });
@@ -498,8 +439,8 @@ describe('the document', () => {
 
   it('refuses a store or index section that is not a mapping', () => {
     expect(problemsOf(() => parseHubConfig(hubYaml('store: /opt/libsqlite3.dylib', 'index: true'), PATH))).toEqual([
-      '/srv/hub/hub.yaml: hub.store is "/opt/libsqlite3.dylib", expected a mapping holding sqliteLibrary',
-      '/srv/hub/hub.yaml: hub.index is true, expected a mapping holding rebuildAfterPush',
+      '/srv/hub/hub.yaml: hub.store is "/opt/libsqlite3.dylib", expected a mapping holding engine, sqliteLibrary, postgres',
+      '/srv/hub/hub.yaml: hub.index is true, expected a mapping holding rebuildAfterPush, embedding',
     ]);
   });
 
@@ -508,6 +449,18 @@ describe('the document', () => {
     expect(problemsOf(() => parseHubConfig(hubYaml('prot: 7373', 'auth:', '  cachefor: 10m'), PATH))).toEqual([
       '/srv/hub/hub.yaml: hub.prot is not a key the hub reads; expected one of hub.repository, hub.port, hub.storePath, hub.projects, hub.auth, hub.store, hub.index',
       '/srv/hub/hub.yaml: hub.auth.cachefor is not a key the hub reads; expected one of hub.auth.adapter, hub.auth.apiKeys, hub.auth.cacheFor, hub.auth.login',
+    ]);
+  });
+
+  it('refuses an install key at the top level and under hub, naming rafa-hub install, beside a control without one', () => {
+    const problem = (key: string) => `/srv/hub/hub.yaml: ${key} is not a key of the hub's config; expected the install's values in the install record, written by rafa-hub install`;
+    expect(parseHubConfig(hubYaml('port: 7373').concat('\ndangerous:\n  hub:\n    maxPayloadRows: 1000'), PATH).port).toBe(7373);
+    expect(problemsOf(() => parseHubConfig(hubYaml().concat('\ninstall:\n  dataDir: /data'), PATH))).toEqual([problem('install')]);
+    expect(problemsOf(() => parseHubConfig(hubYaml('install:', '  dataDir: /data'), PATH))).toEqual([problem('hub.install')]);
+    expect(problemsOf(() => parseHubConfig(hubYaml('install: ~', 'prot: 7373').concat('\ninstall: {}'), PATH))).toEqual([
+      problem('install'),
+      problem('hub.install'),
+      '/srv/hub/hub.yaml: hub.prot is not a key the hub reads; expected one of hub.repository, hub.port, hub.storePath, hub.projects, hub.auth, hub.store, hub.index',
     ]);
   });
 
@@ -539,61 +492,5 @@ describe('the document', () => {
 
     expect(problems).toHaveLength(1);
     expect(problems[0]).toStartWith('/srv/hub/hub.yaml: not valid YAML: ');
-  });
-});
-
-describe('readHubConfig', () => {
-  let dir = '';
-
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'rafa-hub-config-'));
-  });
-
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
-  it('reads the file RAFA_HUB_CONFIG names, resolving the store beside it', async () => {
-    const path = join(dir, 'hub.yaml');
-    await writeFile(path, hubYaml('port: 9000'));
-
-    expect(await readHubConfig({ RAFA_HUB_CONFIG: path })).toEqual({
-      repository: 'open-tomato/rafa',
-      port: 9000,
-      storePath: join(dir, 'rafa-hub.sqlite'),
-      projects: [{ id: 'default', name: 'open-tomato/rafa', repository: 'open-tomato/rafa', storePath: join(dir, 'rafa-hub.sqlite') }],
-      cacheForMs: 600_000,
-      authAdapter: 'github',
-      apiKeys: [],
-      login: null,
-      sqliteLibrary: null,
-      rebuildAfterPush: true,
-    });
-  });
-
-  it('refuses an unset or empty RAFA_HUB_CONFIG', async () => {
-    const expected = ['RAFA_HUB_CONFIG is not set; expected the path of the hub\'s YAML config file'];
-
-    for (const env of [{}, { RAFA_HUB_CONFIG: '' }, { RAFA_HUB_CONFIG: '  ' }]) {
-      const error = await readHubConfig(env).then(() => null, (thrown: unknown) => thrown);
-      expect(error).toBeInstanceOf(HubConfigError);
-      expect((error as HubConfigError).problems).toEqual(expected);
-    }
-  });
-
-  it('refuses a file that cannot be read, naming its path', async () => {
-    const path = join(dir, 'absent.yaml');
-    const error = await readHubConfig({ RAFA_HUB_CONFIG: path }).then(() => null, (thrown: unknown) => thrown);
-
-    expect(error).toBeInstanceOf(HubConfigError);
-    expect((error as HubConfigError).problems[0]).toStartWith(`${path}: the hub's config file could not be read: `);
-  });
-
-  it('refuses the problems of a file it read', async () => {
-    const path = join(dir, 'hub.yaml');
-    await writeFile(path, hubYaml('port: -1'));
-    const error = await readHubConfig({ RAFA_HUB_CONFIG: path }).then(() => null, (thrown: unknown) => thrown);
-
-    expect((error as HubConfigError).problems).toEqual([`${path}: hub.port is -1, ${PORT_EXPECTED}`]);
   });
 });

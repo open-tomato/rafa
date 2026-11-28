@@ -167,11 +167,10 @@ function countOf(db: Database): number {
 }
 
 describe('the reading-supersedes entry', () => {
-  it('is in the catalogue under its id, additive, as the last entry', () => {
+  it('is in the catalogue under its id, additive', () => {
     expect(ENTRY?.id).toBe(ENTRY_ID);
     expect(ENTRY?.breaks).toEqual([]);
     expect(ENTRY?.contract).toBeUndefined();
-    expect(SQLITE_MIGRATIONS.at(-1)?.id).toBe(ENTRY_ID);
   });
 
   it('makes a merged table, append-only by the fact it names, among the tables whose inserts stamp their origin', () => {
@@ -222,7 +221,7 @@ describe('reading-supersedes over a store an older runtime left', () => {
     expect(before.sessions).toHaveLength(1);
     expect(before.plan_ci).toHaveLength(1);
     expect(rowsOf(path, tables)).toEqual(before);
-    expect(tablesOf(path).filter((table) => !tables.includes(table))).toEqual(['reading_supersedes', 'schema_migrations']);
+    expect(tablesOf(path).filter((table) => !tables.includes(table))).toEqual(['held_rows', 'reading_supersedes', 'schema_migrations']);
     expect(sessions).toEqual([JSON.parse(OLD_ROW_JSON) as SessionEffortRow]);
   });
 

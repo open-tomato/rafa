@@ -51,16 +51,64 @@
  *
  * The union's collisions, rows it refused on another UNIQUE key, are
  * not matches and are not read here.
+ *
+ * ## A held copy
+ *
+ * A row a projected pull brought in is listed in `held_rows` by its
+ * table and origin pair (`merge-store.ts`): it lacks the columns of the
+ * migrations its listing names, so it is a truncated copy of a row, not
+ * a settled one. Before the comparison, {@link takeHeldCopies} reads
+ * each pair whose row here is listed. It rewrites that row from the
+ * incoming one, every column taken whole and no column rule consulted,
+ * except three kept from the row here: its `seq`, its origin pair, and
+ * each {@link SET_ONCE} field, today `findings.tracker_ref`. The listing
+ * is then dropped, and the pair goes on to the comparison above, which
+ * now finds the two rows equal, or differing only in a set-once field,
+ * and settles that field by its rule (`settleSetOnce`): a value here,
+ * written while the row was held, is kept against NULL there, and NULL
+ * here takes the value there. So a held copy records no
+ * `merge_conflicts` row for what its truncation left out; only two
+ * different filled values of a set-once field, one finding filed twice,
+ * are recorded, as for any pair. A pair whose row here is not listed is
+ * compared as it always was, and so is every pair of a table the
+ * caller names as cut: under a projected merge the incoming rows of a
+ * projected table lack columns too, so none of them is a full row, and
+ * the listing step (`merge-store.ts`) keeps the row listed, its
+ * `missing` the ids of both lists.
+ *
+ * The rewrite deletes the row here and inserts the incoming one under
+ * the same `seq`, since a statement whose table and columns are read
+ * from the store is one `merge-rules.sweep.test.ts` cannot read. When
+ * the incoming row collides with another row here on a UNIQUE key, the
+ * rewrite is rolled back: the row here stays as it was and listed, and
+ * the pair is compared as any other, a difference outside every edited
+ * field recorded as a conflict.
+ *
+ * ## Reading the conflicted rows
+ *
+ * {@link readConflictedRows} answers, by a store file's path, which
+ * local rows `merge_conflicts` names: each `table_name` with the set of
+ * its `local_seq` values, whichever merge recorded them, a hub pull or
+ * `rafa effort merge`. A row named twice, under two fields or two
+ * merges, is one entry. These are the conflicted rows a pull-first sync
+ * leaves out of its push; they are not the rows `held_rows` lists, which
+ * a projected pull brought in truncated.
  */
 import type { TableUnion, UnionMatch } from './merge-union.js';
-import type { Database, SQLQueryBindings } from 'bun:sqlite';
+import type { SQLQueryBindings } from 'bun:sqlite';
+
+import { existsSync } from 'node:fs';
+
+import { Database, SQLiteError } from 'bun:sqlite';
 
 import { storedLogPathOf } from '../session-log-path.js';
 
+import { guardTestProcess } from './location.js';
 import { withoutGap } from './merge-commit-gaps.js';
 import { MERGE_RULES, RECOMPUTED, SET_ONCE } from './merge-rules.js';
 import { carriedColumns } from './merge-union.js';
 import { quoted } from './rebuild-aside.js';
+import { activeStoreSettings } from './settings.js';
 
 /** The merge these conflicts are recorded under. */
 export interface ConflictTrail {
@@ -254,4 +302,165 @@ export function settleMatches(
   trail: ConflictTrail,
 ): TableSettlement[] {
   return local.transaction(() => unions.map((union) => settleTable(local, other, union, trail)))();
+}
+
+/** What the held-copy step did with one merged table's matched pairs. */
+export interface HeldCopy {
+  readonly table: string;
+  /** The local `seq` of each listed row rewritten from the incoming row, its listing dropped. */
+  readonly taken: readonly number[];
+  /** The local `seq` of each listed row the incoming row collided on another UNIQUE key, left as it was and listed. */
+  readonly refused: readonly number[];
+}
+
+/** The local table naming each row a projected pull brought in truncated. */
+const HELD_TABLE = 'held_rows';
+
+const HELD_LISTING = 'SELECT count(*) AS n FROM held_rows WHERE table_name = ? AND origin_store = ? AND origin_seq = ?';
+
+const DROP_LISTING = 'DELETE FROM held_rows WHERE table_name = ? AND origin_store = ? AND origin_seq = ?';
+
+/** The columns a held copy keeps from the row here besides `seq`: the origin pair. */
+const KEPT_ORIGIN = ['origin_store', 'origin_seq'];
+
+/** Whether the store open on `db` holds a listing in `held_rows`; false for a schema before the table. */
+function holdsListings(db: Database): boolean {
+  const table = db
+    .query<{ n: number }, [string]>('SELECT count(*) AS n FROM sqlite_master WHERE type = \'table\' AND name = ?')
+    .get(HELD_TABLE);
+  if (table?.n !== 1) return false;
+  return (db.query<{ n: number }, []>('SELECT count(*) AS n FROM held_rows').get()?.n ?? 0) > 0;
+}
+
+/** Whether `row`, a row of `table` here, is listed in `held_rows` by its origin pair. */
+function isListed(db: Database, table: string, row: StoredRow): boolean {
+  const { origin_store: store, origin_seq: seq } = row;
+  if (typeof store !== 'string' || typeof seq !== 'number') return false;
+  return (db.query<{ n: number }, [string, string, number]>(HELD_LISTING).get(table, store, seq)?.n ?? 0) > 0;
+}
+
+/** Whether `error` is SQLite refusing a row on a constraint. */
+function isConstraintRefusal(error: unknown): boolean {
+  return error instanceof SQLiteError && (error.code ?? '').startsWith('SQLITE_CONSTRAINT');
+}
+
+/**
+ * Rewrites the listed row `here` from `there` and drops its listing, in
+ * one savepoint, as the module note says; answers false, with nothing
+ * written, when the incoming row collides on another UNIQUE key.
+ */
+function rewriteHeld(
+  local: Database,
+  table: string,
+  columns: readonly string[],
+  kept: ReadonlySet<string>,
+  here: StoredRow,
+  there: StoredRow,
+): boolean {
+  const values = columns.map((column) => (kept.has(column)
+    ? here[column]
+    : there[column]) ?? null);
+  const placeholders = columns.map(() => '?').join(', ');
+  try {
+    local.transaction(() => {
+      local.query<unknown, [number]>(`DELETE FROM ${quoted(table)} WHERE seq = ?`).run(Number(here.seq));
+      local
+        .query<unknown, SQLQueryBindings[]>(`INSERT INTO ${quoted(table)} (seq, ${columns.map(quoted).join(', ')}) VALUES (?, ${placeholders})`)
+        .run(Number(here.seq), ...values);
+      local.query<unknown, SQLQueryBindings[]>(DROP_LISTING).run(table, here.origin_store ?? null, here.origin_seq ?? null);
+    })();
+    return true;
+  } catch (error) {
+    if (isConstraintRefusal(error)) return false;
+    throw error;
+  }
+}
+
+/** Takes the held copies among one table's matched pairs. */
+function takeTableCopies(local: Database, other: Database, union: TableUnion): HeldCopy {
+  const rule = MERGE_RULES[union.table];
+  if (rule?.scope !== 'merged') throw new Error(`${union.table} is not a merged table in MERGE_RULES`);
+  const columns = carriedColumns(local, union.table);
+  const setOnce = Object.keys(rule.edited).filter((field) => rule.edited[field] === SET_ONCE);
+  const kept = new Set([...KEPT_ORIGIN, ...setOnce]);
+  const outcomes = union.matched.flatMap((match: UnionMatch) => {
+    const here = rowAt(local, union.table, columns, match.localSeq, 'here');
+    if (!isListed(local, union.table, here)) return [];
+    const there = rowAt(other, union.table, columns, match.incomingSeq, 'in the other store');
+    return [{ localSeq: match.localSeq, taken: rewriteHeld(local, union.table, columns, kept, here, there) }];
+  });
+  return {
+    table: union.table,
+    taken: outcomes.filter(({ taken }) => taken).map(({ localSeq }) => localSeq),
+    refused: outcomes.filter(({ taken }) => !taken).map(({ localSeq }) => localSeq),
+  };
+}
+
+/**
+ * The held-copy step, run before {@link settleMatches} over the same
+ * `unions`: rewrites each matched row here that `held_rows` lists from
+ * the incoming row and drops its listing, as the module note says, in
+ * one transaction. A table in `cut`, whose incoming rows a projected
+ * pull cut down, takes no copy. `other` is only read, and a store with
+ * nothing listed is not read at all. Answers one entry per union entry,
+ * in its order; every pair stays in `unions` for the comparison.
+ */
+export function takeHeldCopies(
+  local: Database,
+  other: Database,
+  unions: readonly TableUnion[],
+  cut: ReadonlySet<string> = new Set(),
+): HeldCopy[] {
+  const none = (table: string): HeldCopy => ({ table, taken: [], refused: [] });
+  if (!holdsListings(local)) return unions.map(({ table }) => none(table));
+  return local.transaction(() => unions.map((union) => cut.has(union.table)
+    ? none(union.table)
+    : takeTableCopies(local, other, union)))();
+}
+
+/** Each table name `merge_conflicts` names, with the `local_seq` values it names under it. */
+export type ConflictedRows = ReadonlyMap<string, ReadonlySet<number>>;
+
+/** The local table recording each conflict a merge did not settle. */
+const CONFLICTS_TABLE = 'merge_conflicts';
+
+const CONFLICTED_ROWS = 'SELECT DISTINCT table_name, local_seq FROM merge_conflicts ORDER BY table_name, local_seq';
+
+/**
+ * The conflicted rows of the store file at `path`, as the module note
+ * says: a map from each table name `merge_conflicts` names to the set of
+ * `local_seq` values it names under that table, tables in name order and
+ * each set in ascending order. Two conflicts on one row, two fields or
+ * two merges, give one entry.
+ *
+ * The store is opened read-only, after the test guard
+ * (`guardTestProcess`, `location.ts`), and closed before this returns,
+ * so nothing is written and no migration runs. A path with no file, and
+ * a schema before `merge_conflicts`, answer an empty map, as does a
+ * store with no conflict recorded.
+ *
+ * The map and each set are frozen with `Object.freeze` and typed
+ * read-only. `Object.freeze` stops a property write, not `Map.set` or
+ * `Set.add`, so it is the read-only types that keep a caller from
+ * changing the entries.
+ */
+export function readConflictedRows(path: string): ConflictedRows {
+  guardTestProcess(path);
+  if (!existsSync(path)) return Object.freeze(new Map());
+  const db = new Database(path, { readonly: true });
+  try {
+    db.run(`PRAGMA busy_timeout = ${String(activeStoreSettings().busyTimeoutMs)}`);
+    const hasTable = db
+      .query<{ n: number }, [string]>('SELECT count(*) AS n FROM sqlite_master WHERE type = \'table\' AND name = ?')
+      .get(CONFLICTS_TABLE)?.n === 1;
+    if (!hasTable) return Object.freeze(new Map());
+    const rows = db.query<{ table_name: string; local_seq: number }, []>(CONFLICTED_ROWS).all();
+    const tables = [...new Set(rows.map(({ table_name: table }) => table))];
+    return Object.freeze(new Map(tables.map((table) => [
+      table,
+      Object.freeze(new Set(rows.filter(({ table_name: name }) => name === table).map(({ local_seq: seq }) => seq))),
+    ])));
+  } finally {
+    db.close();
+  }
 }

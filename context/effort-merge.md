@@ -18,8 +18,8 @@ machine and are not combined. The `sessions`, `commits`, `findings`,
 `blockers`, `out_of_scope_bugs`, `changes`, `skill_invocations`,
 `preflight`, `dispatches`, `plan_ci`, `report_absences`, `task_reports`,
 `stale_docs`, `bug_routes` and `reading_supersedes` tables are merged.
-The `schema_migrations`, `store_meta`, `store_replaced`, `merges` and
-`merge_conflicts` tables are local.
+The `schema_migrations`, `store_meta`, `store_replaced`, `merges`,
+`merge_conflicts` and `held_rows` tables are local.
 
 **A merged table's rule holds:** its identity columns (which match rows
 with NULL origin), the columns that can change after insert (each with
@@ -67,6 +67,22 @@ the insert's column list with no trigger and no `UPDATE`. A store with
 no `store_meta` row stamps NULL in both columns. A row an older runtime
 inserted reads as any other (with NULL origin fields).
 
+**The held-copy step takes a row a projected pull cut whole.** A row here
+listed in `held_rows` is held back: a projected pull brought its cut copy
+in. When the other store holds that row's origin pair matched, the step runs
+before the conflict step, in the same transaction, and rewrites the row here
+from the incoming one. Every column is taken whole, with no column rule
+consulted, except the row's `seq`, its origin pair, and each set-once field
+(`findings.tracker_ref` today). The listing is then dropped. The set-once
+field is settled by its rule in the conflict step, so a value written here
+while the row was held is kept against NULL there. A held copy records no
+`merge_conflicts` row for what its truncation left out. The step runs in any
+merge, and a table the projected map names takes no copy, since its incoming
+rows were cut too. A rewrite that collides with another row on a UNIQUE key
+is rolled back, and the row stays listed. `rowsRefilled` counts the rows
+taken, and the `held_rows` count check holds the table to the rows a merge
+listed (`rowsHeld`) less those it took (`merge-store.ts`).
+
 ### Rafa effort merge
 
 **`rafa effort merge <file> [--dry-run]` joins another device's store into the
@@ -103,6 +119,11 @@ continues. After the merge completes, if a copy was detected, the local
 store is asked to mint a new `origin_store` on the next write, so the
 incoming store's rows are brought in under the old origin and the new
 device's future writes go under a new one.
+
+**Held copies are taken whole first.** The held-copy step, `takeHeldCopies`
+(`store/merge-conflicts.ts`), runs before the comparison below. Its rule is
+under Merge rules above, and a table the merge's `projected` map names takes
+no copy.
 
 **Set-once fills and conflicts.** For each row the union matched,
 `settleMatches` compares the rows on every column except `seq` and the

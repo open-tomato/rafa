@@ -75,7 +75,14 @@
  *   - {@link mergeStore} (`merge-store.ts`), the one route by which rows
  *     are merged, with its options and its result, the latter as
  *     `StoreMergeResult`, the name `./ports` gives it beside the
- *     learning library's own `MergeResult`;
+ *     learning library's own `MergeResult`, and
+ *     {@link readHeldMigrations}, the migration ids the rows a projected
+ *     merge listed in `held_rows` lack;
+ *   - {@link readConflictedRows} (`merge-conflicts.ts`), the local rows
+ *     `merge_conflicts` names, by table, which a pull-first sync leaves
+ *     out of its push;
+ *   - {@link readStoreOrigin} (`store-meta.ts`), the origin a store file
+ *     records, by which a sync strategy names its device;
  *   - `TRUSTED_PERMISSIONS` (`trusted-permissions.ts`), the repository
  *     permissions that are write access, so a hub checking a token's
  *     login spells them as core does.
@@ -140,9 +147,11 @@ export {
   WireExportRefusal,
   WireFormatError,
 } from './wire.js';
-export { mergeStore } from './merge-store.js';
+export { readConflictedRows } from './merge-conflicts.js';
+export { mergeStore, readHeldMigrations } from './merge-store.js';
 export { openNdjsonStore } from './ndjson.js';
 export { openSqliteStore } from './sqlite.js';
+export { readStoreOrigin } from './store-meta.js';
 export { EFFORT_KEY_PROJECTIONS } from './types.js';
 export { TRUSTED_PERMISSIONS } from './trusted-permissions.js';
 

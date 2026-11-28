@@ -61,9 +61,11 @@ describe('SOURCE_ROOTS', () => {
 });
 
 describe('MEMBERS_LEFT_OUT', () => {
-  it('names the three members kept out, each with a reason', () => {
+  it('names the five members kept out, each with a reason', () => {
     expect(Object.keys(MEMBERS_LEFT_OUT).sort()).toEqual([
       'packages/rafa-hub',
+      'packages/rafa-hub-port',
+      'packages/rafa-hub-postgres',
       'packages/rafa-index',
       'packages/rafa-sync-service',
     ]);

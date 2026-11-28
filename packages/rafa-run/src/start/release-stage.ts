@@ -286,8 +286,14 @@ export interface ReleaseFinish extends ReleaseBodyRecord {
   readonly levelReport: string | null;
 }
 
-/** The plan title heading: one `#`, a space, and the title after it. */
-const PLAN_HEADING = /^# +(.+)$/;
+/**
+ * The plan title heading: one `#`, a space, and the title after it,
+ * which holds no line terminator. The title opens past the whole space
+ * run, so the run and the title never share a character to try again
+ * (CodeQL `js/polynomial-redos`); a heading of spaces alone captures
+ * nothing, which the caller reads as no title.
+ */
+const PLAN_HEADING = /^# +([^ \n\r\u2028\u2029].*)?$/;
 
 /** The label a plan title opens with, which the heading already implies. */
 const PLAN_LABEL = /^plan\s*[:—–-]\s*/i;
@@ -312,12 +318,15 @@ function releaseTitle(input: ReleaseStageInput): string {
  * other than {@link ASSUMPTIONS_HEADING}, which the readiness gate puts
  * above a plan created under assumptions and which names no release;
  * else `planStub` (empty when null).
+ * Each line loses one trailing `\r` before the match, so a CRLF plan
+ * reads the same title as its LF copy.
  * The runner-opened pull request takes its title from here too
  * (`start/wrap-up-run.ts`), so the fragment and that title cannot name
  * the plan two ways.
  */
 export function planTitleIn(planContent: string, planStub: string | null): string {
   const headings = planContent.split('\n')
+    .map((line) => line.replace(/\r$/, ''))
     .filter((line) => line.trim() !== ASSUMPTIONS_HEADING)
     .map((line) => (PLAN_HEADING.exec(line)?.[1] ?? '').trim())
     .filter((heading) => heading !== '');

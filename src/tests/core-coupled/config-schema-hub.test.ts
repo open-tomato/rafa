@@ -285,13 +285,27 @@ describe('hubContextOf', () => {
   it('answers the url, the secret name and the timeout in milliseconds, frozen', () => {
     const context = hubContextOf({ hubUrl: 'https://hub.example.org', hubTokenSecret: 'rafa-hub-token', hubTimeout: '7s' });
 
-    expect(context).toEqual({ url: 'https://hub.example.org', tokenSecret: 'rafa-hub-token', timeoutMs: 7000, project: null });
+    expect(context).toEqual({ url: 'https://hub.example.org', tokenSecret: 'rafa-hub-token', timeoutMs: 7000, syncSkew: 'refuse', project: null });
     expect(Object.isFrozen(context)).toBe(true);
   });
 
   it('answers the resolved defaults for a url alone', () => {
     expect(hubContextOf({ hubUrl: 'https://hub.example.org' }))
-      .toEqual({ url: 'https://hub.example.org', tokenSecret: null, timeoutMs: 3000, project: null });
+      .toEqual({ url: 'https://hub.example.org', tokenSecret: null, timeoutMs: 3000, syncSkew: 'refuse', project: null });
+  });
+
+  it('carries effortSyncSkew as syncSkew, either word as written', () => {
+    const skews = (['refuse', 'pull-projected'] as const)
+      .map((effortSyncSkew) => hubContextOf({ hubUrl: 'https://hub.example.org', effortSyncSkew })?.syncSkew);
+
+    expect(skews).toEqual(['refuse', 'pull-projected']);
+  });
+
+  it('carries the resolved effort.syncSkew of a service config', () => {
+    const file = parseConfigText('effort:\n  sync: service\n  syncSkew: pull-projected\nhub:\n  url: https://hub.example.org\n', PROJECT);
+    const { config } = resolveConfig({ file });
+
+    expect(hubContextOf(config)?.syncSkew).toBe('pull-projected');
   });
 
   it('carries a set hub.project as project', () => {
@@ -301,6 +315,7 @@ describe('hubContextOf', () => {
   it('answers nothing with no url, whatever else is named', () => {
     expect(hubContextOf({ hubUrl: null, hubTokenSecret: 'rafa-hub-token', hubTimeout: '7s' })).toBeUndefined();
     expect(hubContextOf({})).toBeUndefined();
+    expect(hubContextOf({ effortSyncSkew: 'pull-projected' })).toBeUndefined();
   });
 
   it('refuses a timeout no config accepts, which only a hand-built config can carry', () => {

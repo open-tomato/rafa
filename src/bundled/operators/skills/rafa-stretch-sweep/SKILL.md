@@ -30,6 +30,7 @@ person's approval.
 rafa bug recheck --all
 rafa roadmap --full
 rafa issue list --type=bug --limit=200
+rafa issue list --type=debt --module=cli-gap --limit=200
 rafa effort report --trend
 ```
 
@@ -38,6 +39,12 @@ verdict per bug. A `gone` bug is closed by the sweep as fixed; a
 `gone (trigger removed?)` bug stays open, since its rerun passes only
 because what set it off was removed; a `flaky` one is grouped as a bug
 of its own, never read as fixed.
+
+The gap group reads both lists: the `--type=bug` list and the
+`--type=debt --module=cli-gap` list, since a gap report that only names
+a missing line files as debt. A report that turns out to break
+something is moved with `rafa issue edit <n> --type=bug`, which keeps
+its record.
 
 Read the roadmap's "now" epics first: their members are where the
 project already said the work is.

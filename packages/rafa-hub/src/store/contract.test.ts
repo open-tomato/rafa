@@ -4,8 +4,20 @@
  * the index suite twice per connector: once as configured and once with
  * the extension held off, so the vector cases run under both answers.
  * A connector's setup (the embedder, the extension held off) reaches it
- * through {@link INDEX_SETUPS}, keyed by the same names; a connector
- * added without one fails the guard case here.
+ * through {@link INDEX_SETUPS}, keyed by the same names, beside the probe
+ * the suite reads the store's and the index's identities with and the
+ * planter of its `ref_links`; a connector added without one fails the
+ * guard case here, unless it is named as having no index half yet. Each
+ * index case is held to close every store it opened: one still open
+ * after the suite's own hook fails that case.
+ *
+ * `postgres` runs behind the `POSTGRES_URL` gate
+ * (`testdata/postgres-gate.ts`): closed, a skipped case names the gate;
+ * open, both suites run over the connector with each case's stores in
+ * schemas of their own, beside a gate case that fails when the connection
+ * is refused. Its index setup (`testdata/postgres-index-setup.ts`) holds
+ * the extension off by giving no embedder. Both answers of the gate are
+ * held by `bun test` spawned on `testdata/postgres-gate.fixture.ts`.
  *
  * The row suite also runs against the in-memory stand-in
  * (`testdata/memory-store.ts`), which is no connector, then against the
@@ -29,32 +41,55 @@
  * no load. Each is held to fail its named case, in the run as configured
  * or in the run with the extension off, and the `none` run is held to pass.
  */
-import type { HubIndexConnector, HubIndexFiles } from './index-contract.js';
+import type { HubIndexConnector, HubIndexLinkPlanter, HubIndexProbe } from './index-contract.js';
 import type { HubServedProject, HubStore } from './port.js';
 
 import { join } from 'node:path';
 
 import { createLoaderState } from '@open-tomato/rafa-index/loader';
-import { describe, expect, it } from 'bun:test';
-
-import { DEFAULT_STORE_FILE } from '../config.js';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { HUB_CONNECTORS } from './connectors.js';
 import { builders, hubStoreContract, readTemplate } from './contract.js';
 import { hubIndexContract, INDEX_CONTRACT_EMBEDDER } from './index-contract.js';
-import { connectSqliteHub, indexFileName } from './sqlite.js';
+import { plantSqliteRefLinks, SQLITE_INDEX_PROBE } from './sqlite-index-probe.js';
+import { connectSqliteHub } from './sqlite.js';
 import { openMemoryHubStore } from './testdata/memory-store.js';
+import { openNoProjectionHubStore } from './testdata/no-projection-store.js';
+import {
+  describePostgresGate,
+  isolatedPostgresStore,
+  POSTGRES_GATE_CASE,
+  POSTGRES_GATE_SUITE,
+  POSTGRES_SKIP_LINE,
+  postgresGate,
+} from './testdata/postgres-gate.js';
+import { postgresIndexSetup } from './testdata/postgres-index-setup.js';
 
-/** How the index suite opens one connector of {@link HUB_CONNECTORS}, and the files it reads. */
+/**
+ * How the index suite opens one connector of {@link HUB_CONNECTORS},
+ * reads its store's and index's identities, and plants its `ref_links`.
+ */
 interface IndexSetup {
   readonly connect: HubIndexConnector;
-  readonly files: HubIndexFiles;
+  readonly probe: HubIndexProbe;
+  readonly plantLinks: HubIndexLinkPlanter;
 }
+
+const POSTGRES = postgresGate(process.env);
+
+/** The `postgres` index setup; its URL is empty, and nothing of it is called, while the gate is closed. */
+const POSTGRES_INDEX = postgresIndexSetup(POSTGRES.open
+  ? POSTGRES.url
+  : '');
 
 /**
  * The index suite's setup per connector name. `sqlite` holds the
  * extension off the way macOS does with no library named, on a loader
- * state of its own so the process's stays unmarked.
+ * state of its own so the process's stays unmarked, and is probed by
+ * its store file's sha256 and its index file's inode
+ * (`sqlite-index-probe.ts`). `postgres` is the setup of
+ * `testdata/postgres-index-setup.ts`.
  */
 const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
   sqlite: {
@@ -64,27 +99,80 @@ const INDEX_SETUPS: Readonly<Record<string, IndexSetup>> = Object.freeze({
         ? { library: null, platform: 'darwin', state: createLoaderState() }
         : { state: createLoaderState() },
     }),
-    files: { index: indexFileName(DEFAULT_STORE_FILE), store: DEFAULT_STORE_FILE },
+    plantLinks: plantSqliteRefLinks,
+    probe: SQLITE_INDEX_PROBE,
   },
+  postgres: POSTGRES_INDEX,
 });
 
+/** The connectors whose index half is not built, so the index suite does not run over them. */
+const NO_INDEX_YET: readonly string[] = Object.freeze([]);
+
 describe('the connectors both suites run over', () => {
-  it('holds an index setup for every connector by name, and none other', () => {
-    expect(Object.keys(INDEX_SETUPS).sort()).toEqual(Object.keys(HUB_CONNECTORS).sort());
+  it('holds an index setup for every connector with an index by name, and none other', () => {
+    const indexed = Object.keys(HUB_CONNECTORS).filter((name) => !NO_INDEX_YET.includes(name));
+
+    expect(Object.keys(INDEX_SETUPS).sort()).toEqual(indexed.sort());
+  });
+
+  it('names only connectors it knows as having no index yet', () => {
+    expect(NO_INDEX_YET.filter((name) => !Object.hasOwn(HUB_CONNECTORS, name))).toEqual([]);
   });
 });
 
+/** The stores an index case opened and has not closed yet, across every connector. */
+const OPEN_INDEX_STORES = new Set<HubStore>();
+
+/** `connect`, each store it opens held in {@link OPEN_INDEX_STORES} until its close is called. */
+function trackingStores(connect: HubIndexConnector): HubIndexConnector {
+  return async (context, setup) => {
+    const hub = await connect(context, setup);
+    const store: HubStore = Object.freeze({
+      ...hub.store,
+      close: () => {
+        OPEN_INDEX_STORES.delete(store);
+        return hub.store.close();
+      },
+    });
+    OPEN_INDEX_STORES.add(store);
+    return { ...hub, store };
+  };
+}
+
+describePostgresGate(POSTGRES);
+// Runs after the suite's own hook has closed the case's stores, so a store
+// still open here is one the case left open: it fails that case, and is
+// closed so it holds no client through the later ones. Dropped case by case,
+// the schemas never pile up in the catalogue the later cases read.
+afterEach(async () => {
+  const left = [...OPEN_INDEX_STORES];
+  try {
+    await Promise.allSettled(left.map((store) => store.close()));
+    await POSTGRES_INDEX.dropMade();
+  } finally {
+    expect(left.length).toBe(0);
+  }
+});
+
 for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
-  hubStoreContract(name, async (context) => (await connector(context)).store);
+  // The registry's own entry stores in the default schemas of a real hub,
+  // so postgres runs the same connector under schemas of each case's own.
+  const isPostgres = name === 'postgres';
+  if (isPostgres && !POSTGRES.open) continue;
+  hubStoreContract(name, isPostgres && POSTGRES.open
+    ? isolatedPostgresStore(POSTGRES.url)
+    : async (context) => (await connector(context)).store);
   const setup = INDEX_SETUPS[name];
   if (setup !== undefined) {
-    const options = { embedder: INDEX_CONTRACT_EMBEDDER, files: setup.files };
-    hubIndexContract(name, setup.connect, options);
-    hubIndexContract(`${name}, extension off`, setup.connect, { ...options, holdExtensionOff: true });
+    const options = { embedder: INDEX_CONTRACT_EMBEDDER, plantLinks: setup.plantLinks, probe: setup.probe };
+    const connect = trackingStores(setup.connect);
+    hubIndexContract(name, connect, options);
+    hubIndexContract(`${name}, extension off`, connect, { ...options, holdExtensionOff: true });
   }
 }
 
 hubStoreContract('in-memory stand-in', openMemoryHubStore);
+hubStoreContract('no-projection fixture', openNoProjectionHubStore);
 
 /** Two listed projects, as `hub.projects` would name them. */
 const PROJECT_ONE: HubServedProject = { id: '1'.repeat(40), name: 'open-tomato/one' };
@@ -167,7 +255,7 @@ function titleOf(line: string, prefix: string): string | null {
 }
 
 /** Spawns `bun test` on `fixture` with `env` set, answering the exit code and the lines the child printed. */
-async function spawnFixture(fixture: string, env: Readonly<Record<string, string>>): Promise<{ readonly exitCode: number; readonly lines: readonly string[] }> {
+async function spawnFixture(fixture: string, env: Readonly<Record<string, string | undefined>>): Promise<{ readonly exitCode: number; readonly lines: readonly string[] }> {
   const child = Bun.spawn([process.execPath, 'test', fixture], {
     cwd: PACKAGE_DIR,
     env: { ...process.env, ...env },
@@ -231,6 +319,11 @@ const FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
     'projects > leaves the other project\'s row counts and devices unchanged by a push to one',
   ]],
   ['edits-rows', ['pull > carries every column as pushed but the recomputed gap, with seq the hub\'s own in rising order past the cursor']],
+  ['ignores-limit', [
+    'a paged pull > answers at most the limit\'s rows across every table, the caller\'s own counting none',
+    'a paged pull > reaches every row once over pages pulled with the cursor each answered, each page but the last full',
+  ]],
+  ['skips-past-page', ['a paged pull > reaches every row once over pages pulled with the cursor each answered, each page but the last full']],
 ];
 
 describe('the contract suite against a broken stand-in', () => {
@@ -266,8 +359,8 @@ const INDEX_FIXTURE_CASE_TIMEOUT_MS = 60_000;
 /** Each index fault, and the cases named for the rule it breaks. */
 const INDEX_FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
   ['index-in-store', [
-    'a rebuild beside a push > leaves the store file\'s sha256 as the push left it, and swaps a new index file in',
-    'a rebuild beside a push > leaves the store file\'s sha256 unchanged by a rebuild run alone',
+    'a rebuild beside a push > leaves the store\'s identity as the push left it, and swaps a new index in',
+    'a rebuild beside a push > leaves the store\'s identity unchanged by a rebuild run alone',
   ]],
   ['answers-bodies', [
     'what a search answers > holds only a table, an origin pair and a score per hit, in frozen records, for fts',
@@ -294,4 +387,45 @@ describe('the index contract suite against a broken connector', () => {
       expect(cases.filter((title) => !run.failed.includes(title))).toEqual([]);
     }, INDEX_FIXTURE_CASE_TIMEOUT_MS);
   }
+});
+
+/** The fixture a postgres gate run spawns `bun test` on. */
+const GATE_FIXTURE = join(import.meta.dir, 'testdata', 'postgres-gate.fixture.ts');
+
+/** A URL whose port refuses every connection. */
+const REFUSED_URL = 'postgres://hub:gate-password@127.0.0.1:1/hub';
+
+/** The variables under which bun prints no line for a skipped case, left out of a gate run. */
+const QUIET_VARIABLES = Object.freeze({ AGENT: undefined, CLAUDECODE: undefined, REPL_ID: undefined });
+
+/** Runs the gate fixture with `POSTGRES_URL` set to `url`, empty closing the gate. */
+function runGate(url: string): ReturnType<typeof spawnFixture> {
+  return spawnFixture(GATE_FIXTURE, { ...QUIET_VARIABLES, POSTGRES_URL: url });
+}
+
+describe('the postgres gate, spawned', () => {
+  it('prints a skip line naming the gate, and fails nothing, when it is closed', async () => {
+    const { exitCode, lines } = await runGate('');
+
+    expect(exitCode).toBe(0);
+    expect(lines.filter((line) => line.startsWith('(skip) '))).toEqual([`(skip) ${POSTGRES_GATE_SUITE} > ${POSTGRES_SKIP_LINE}`]);
+    expect(POSTGRES_SKIP_LINE).toContain('POSTGRES_URL');
+  });
+
+  it('fails the gate case when it is open and the connection is refused, repeating no password', async () => {
+    const { exitCode, lines } = await runGate(REFUSED_URL);
+    const failed = lines.flatMap((line) => titleOf(line, FAIL_MARK) ?? []);
+
+    expect(exitCode).toBe(1);
+    expect(failed).toEqual([`${POSTGRES_GATE_SUITE} > ${POSTGRES_GATE_CASE}`]);
+    expect(lines.join('\n')).toContain('POSTGRES_URL is set and the connection failed');
+    expect(lines.join('\n')).not.toContain('gate-password');
+  });
+
+  it('repeats no password of a URL that cannot be parsed', async () => {
+    const { exitCode, lines } = await runGate('postgres://hub:gate-password@[unparsed');
+
+    expect(exitCode).toBe(1);
+    expect(lines.join('\n')).not.toContain('gate-password');
+  });
 });

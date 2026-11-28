@@ -16,11 +16,25 @@
  *   - A status read answers the hub's status shape with the contract
  *     core's `WIRE_CONTRACT_VERSION` names and no capability, so the
  *     hub client sends `contractVersion` on push and pull.
+ *   - Once {@link StandInHub.setProjection} names a map, the status
+ *     answers `projection: true`, and a pull naming `migrations` that
+ *     lack an id the stand-in holds is answered as a projecting hub
+ *     answers it: the pushed migrations the pull names, the same rows,
+ *     that map as `projected` and the cut columns it was handed, if
+ *     any, as `projectedColumns`. A pull naming none, or naming every
+ *     id held, is answered whole.
  *
  *   - {@link StandInHub.setProjects} makes the status answer name
  *     `projects`, as a hub serving projects does, so the client sends
  *     `project` on push and pull; each push and pull's `project` query
  *     is recorded in {@link StandInHub.projectQueries}.
+ *
+ *   - Once {@link StandInHub.setMaxPayloadRows} names a cap, the status
+ *     answers it as `maxPayloadRows`, a push carrying more rows is
+ *     refused `413` and nothing is kept, and a pull page is cut at the
+ *     cap as the hub's store cuts it: tables in order, rows in `seq`
+ *     order, the cut table's cursor at its last answered row and a
+ *     table past the cut's at the request's.
  *
  * It merges nothing: a row is matched by its origin pair alone. Every
  * push and pull is recorded in {@link StandInHub.requests}, and
@@ -47,6 +61,8 @@ export interface SeenRequest {
   readonly rows: number;
   /** The `contractVersion` query parameter, or null when it was left out. */
   readonly contractVersion: string | null;
+  /** The `migrations` query parameter, or null when it was left out. */
+  readonly migrations: string | null;
 }
 
 /** A running stand-in. */
@@ -62,10 +78,17 @@ export interface StandInHub {
   readonly setFault: (answer: (() => Response) | null) => void;
   /** Ids a pull names beyond the migrations pushed, as a hub newer than the device's rafa would. */
   readonly setExtraMigrations: (ids: readonly string[]) => void;
+  /** Answers `projection: true` and projects a pull naming `migrations` with `projected` and `columns`; null answers whole. */
+  readonly setProjection: (
+    projected: Readonly<Record<string, readonly string[]>> | null,
+    columns?: Readonly<Record<string, readonly string[]>>,
+  ) => void;
   /** The `project` query parameter of every push and pull seen, in order, null when it was left out. */
   readonly projectQueries: readonly (string | null)[];
   /** Names `projects` on the status answer from now on; null names none, as a hub one release behind. */
   readonly setProjects: (projects: readonly { readonly id: string; readonly name: string }[] | null) => void;
+  /** Caps push payloads and pull pages at `cap` rows from now on; null caps nothing and names no cap. */
+  readonly setMaxPayloadRows: (cap: number | null) => void;
   /** Stops listening, so the next request fails to connect. */
   readonly stop: () => Promise<void>;
 }
@@ -77,6 +100,9 @@ const PUSHED_AT = '2026-10-01T09:00:00.000Z';
 function success(data: unknown): Response {
   return Response.json({ success: true, data });
 }
+
+/** The status a push over the cap is refused with, as the hub's push route answers it. */
+const OVER_CAP = 413;
 
 /** How a row is identified across stores: its origin pair. */
 function pairOf(row: WireRow): string {
@@ -90,10 +116,13 @@ export function startStandInHub(): StandInHub {
   const pairs = new Set<string>();
   let migrations: readonly string[] = [];
   let extra: readonly string[] = [];
+  let projection: Readonly<Record<string, readonly string[]>> | null = null;
+  let cutColumns: Readonly<Record<string, readonly string[]>> | undefined;
   let fault: (() => Response) | null = null;
   let statusReads = 0;
   const projectQueries: (string | null)[] = [];
   let projects: readonly { readonly id: string; readonly name: string }[] | null = null;
+  let cap: number | null = null;
 
   const status = (): Response => {
     statusReads += 1;
@@ -103,14 +132,21 @@ export function startStandInHub(): StandInHub {
       rows: Object.fromEntries([...tables].map(([table, rows]) => [table, rows.length])),
       devices: [],
       contractVersion: WIRE_CONTRACT_VERSION,
-      capabilities: { fts: false, vector: false, graph: false, projection: false },
+      capabilities: { fts: false, vector: false, graph: false, projection: projection !== null },
       ...projects === null
         ? {}
         : { projects },
+      ...cap === null
+        ? {}
+        : { maxPayloadRows: cap },
     });
   };
 
   const push = (payload: WirePayload): Response => {
+    const carried = Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
+    if (cap !== null && carried > cap) {
+      return Response.json({ success: false, error: `over dangerous.hub.maxPayloadRows of ${String(cap)}` }, { status: OVER_CAP });
+    }
     migrations = payload.migrations;
     let received = 0;
     let added = 0;
@@ -128,20 +164,35 @@ export function startStandInHub(): StandInHub {
     return success({ received, added, at: PUSHED_AT });
   };
 
-  const pull = (device: string, since: WireCursor): Response => {
+  const pull = (device: string, since: WireCursor, named: readonly string[] | null): Response => {
     const answered: Record<string, readonly WireRow[]> = {};
     const cursor: Record<string, number> = {};
+    let room = cap ?? Number.POSITIVE_INFINITY;
     for (const [table, rows] of tables) {
-      answered[table] = rows.filter((row) => Number(row.seq) > (since[table] ?? 0) && row['origin_store'] !== device);
-      cursor[table] = rows.length;
+      const past = rows.filter((row) => Number(row.seq) > (since[table] ?? 0) && row['origin_store'] !== device);
+      const kept = past.slice(0, room);
+      room -= kept.length;
+      answered[table] = kept;
+      cursor[table] = kept.length === past.length
+        ? rows.length
+        : Number(kept.at(-1)?.seq ?? since[table] ?? 0);
     }
-    const payload: WirePayload = {
-      format: WIRE_FORMAT,
-      version: WIRE_VERSION,
-      migrations: [...migrations, ...extra],
-      tables: answered,
-      cursor,
-    };
+    const lacking = named === null
+      ? []
+      : [...migrations, ...extra].filter((id) => !named.includes(id));
+    const payload: WirePayload = projection === null || named === null || lacking.length === 0
+      ? { format: WIRE_FORMAT, version: WIRE_VERSION, migrations: [...migrations, ...extra], tables: answered, cursor }
+      : {
+        format: WIRE_FORMAT,
+        version: WIRE_VERSION,
+        migrations: migrations.filter((id) => named.includes(id)),
+        tables: answered,
+        cursor,
+        projected: projection,
+        ...(cutColumns === undefined
+          ? {}
+          : { projectedColumns: cutColumns }),
+      };
     return success(payload);
   };
 
@@ -168,13 +219,17 @@ export function startStandInHub(): StandInHub {
           ? 0
           : Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0),
         contractVersion: url.searchParams.get('contractVersion'),
+        migrations: url.searchParams.get('migrations'),
       });
       projectQueries.push(url.searchParams.get('project'));
       if (fault !== null) return fault();
       if (payload !== null) return push(payload);
+      const named = url.searchParams.get('migrations');
       return pull(url.searchParams.get('device') ?? '', sinceText === null
         ? {}
-        : JSON.parse(sinceText) as WireCursor);
+        : JSON.parse(sinceText) as WireCursor, named === null
+        ? null
+        : named.split(','));
     },
   });
 
@@ -189,9 +244,16 @@ export function startStandInHub(): StandInHub {
     setExtraMigrations: (ids) => {
       extra = ids;
     },
+    setProjection: (projected, columns) => {
+      projection = projected;
+      cutColumns = columns;
+    },
     projectQueries,
     setProjects: (named) => {
       projects = named;
+    },
+    setMaxPayloadRows: (named) => {
+      cap = named;
     },
     stop: () => server.stop(true),
   };

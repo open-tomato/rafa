@@ -1,0 +1,22 @@
+# The build context of packages/rafa-hub/Dockerfile, which is the
+# repository root: the Dockerfile copies the workspace manifests and then
+# the folders of the hub's packages by name, so leave out what the host
+# installed or built inside them, the git history, the loop's own state and
+# any local secrets, so the image's `bun install --frozen-lockfile` links
+# the hub's graph from the lockfile alone and no host `node_modules` lands
+# over it.
+**/node_modules
+**/dist
+**/out
+**/.tsbuild
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+.git
+.rafa
+.ralph
+.tmp
+.claude/settings.local.json
+**/.env
+**/.env.*
+progress.txt

@@ -121,6 +121,8 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['store', 'store'],
   ['effortBusyTimeoutMs', 'effort.busyTimeoutMs'],
   ['effortSync', 'effort.sync'],
+  ['effortSyncSkew', 'effort.syncSkew'],
+  ['effortSyncMerge', 'effort.syncMerge'],
   ['hubUrl', 'hub.url'],
   ['hubTokenSecret', 'hub.tokenSecret'],
   ['hubTimeout', 'hub.timeout'],
@@ -184,6 +186,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releasePublishCommand', 'release.publishCommand'],
   ['releasePublish', 'release.publish'],
   ['releaseMoveLock', 'release.moveLock'],
+  ['releasePackageFragments', 'release.packageFragments'],
   ['errorsCodes', 'errors.codes'],
   ['bugsRecheckRuns', 'bugs.recheck.runs'],
   ['bugsRecheckTimeoutSeconds', 'bugs.recheck.timeoutSeconds'],
@@ -676,6 +679,7 @@ describe('knownKeysAbove', () => {
         'publishCommand',
         'publish',
         'moveLock',
+        'packageFragments',
       ],
     ]);
     expect(knownKeysAbove('cleanup.staleDayz')).toEqual([

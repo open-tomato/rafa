@@ -50,6 +50,7 @@ const TABLES = [
   'commits',
   'dispatches',
   'findings',
+  'held_rows',
   'merge_conflicts',
   'merges',
   'out_of_scope_bugs',
@@ -148,7 +149,7 @@ describe('the skill_invocations table', () => {
     // The control: the first ten entries make every earlier table and no
     // skill_invocations table, so the table this write fills came from a
     // later entry, and was not added to a shipped one.
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts' && table !== 'held_rows'));
 
     writeSkillInvocations(root, [COUNTED]);
 
@@ -302,7 +303,7 @@ describe('readSkillInvocations', () => {
   it('brings a version-10 store forward and answers none, the table just made', () => {
     const root = freshRoot('read-from-v10');
     plantAtVersion(root, 10);
-    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts'));
+    expect(tablesOf(root)).toEqual(TABLES.filter((table) => table !== 'schema_migrations' && table !== 'skill_invocations' && table !== 'plan_ci' && table !== 'stale_docs' && table !== 'bug_routes' && table !== 'reading_supersedes' && table !== 'store_meta' && table !== 'store_replaced' && table !== 'merges' && table !== 'merge_conflicts' && table !== 'held_rows'));
 
     expect(readSkillInvocations(root)).toEqual([]);
     expect(tablesOf(root)).toEqual(TABLES);

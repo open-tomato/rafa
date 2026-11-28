@@ -9,6 +9,8 @@
  * The store stand-in keeps rows in `Map`s by origin pair, and counts
  * its hub `seq` per table apart from the rows it holds. It keeps one such
  * store per project the context lists, and one for a context listing none.
+ * A pull naming a `limit` stops once it has answered that many rows, its
+ * cursor at the last row answered in the table it stopped in.
  */
 import type { HubAction, HubIdentity, IdentityAnswer } from './identity/port.js';
 import type {
@@ -110,12 +112,18 @@ function openMapProjectStore(context: HubStoreContext): HubStore {
   const pull = (request: HubPullRequest): Promise<WirePayload> => {
     const answered: Record<string, readonly WireRow[]> = {};
     const cursor: Record<string, number> = { ...request.since };
+    let room = request.limit ?? Number.POSITIVE_INFINITY;
     for (const [name, table] of tables) {
       const since = request.since[name] ?? 0;
-      answered[name] = [...table.rows.values()]
+      const past = [...table.rows.values()]
         .filter((row) => Number(row.seq) > since && row['origin_store'] !== request.device)
         .sort((left, right) => Number(left.seq) - Number(right.seq));
-      cursor[name] = Math.max(since, table.lastSeq);
+      const kept = past.slice(0, room);
+      answered[name] = kept;
+      cursor[name] = kept.length === past.length
+        ? Math.max(since, table.lastSeq)
+        : Number(kept.at(-1)?.seq ?? since);
+      room -= kept.length;
     }
     return Promise.resolve({ format: WIRE_FORMAT, version: WIRE_VERSION, migrations, tables: answered, cursor });
   };
@@ -132,6 +140,7 @@ function openMapProjectStore(context: HubStoreContext): HubStore {
     contractVersion: WIRE_CONTRACT_VERSION,
     migrations,
     capabilities: { fts: false, vector: false, graph: false, projection: false },
+    maxPayloadRows: context.maxPayloadRows ?? null,
   });
 
   return { push, pull, status, contract, close: () => Promise.resolve() };

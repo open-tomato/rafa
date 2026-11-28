@@ -149,6 +149,8 @@ describe('readClaimCatchUp over a stubbed git', () => {
       behind: 3,
       ahead: 2,
       workCommits: 1,
+      firstWork: { sha: BRANCH_TIP, subject: 'feat: start the work' },
+      claimCommits: [sha(1)],
       mergeBase: FORK,
       baseTip: BASE_TIP,
     });
@@ -188,6 +190,41 @@ describe('readClaimCatchUp over a stubbed git', () => {
     });
 
     expect(reading).toMatchObject({ kind: 'behind', workCommits: 1 });
+  });
+
+  it('names as firstWork the newest work commit, the first git log lists under the claims made after it (#1669)', () => {
+    const { reading } = read({
+      [OWN_COMMITS]: ok(line(BRANCH_TIP, [sha(1)], 'claim(rafa-631): take')
+        + line(sha(1), [sha(2)], 'claim(rafa-631): claim')
+        + line(sha(2), [sha(3)], 'chore: apply #1605')
+        + line(sha(3), [FORK], 'feat: older work')),
+    });
+
+    expect(reading).toMatchObject({
+      kind: 'behind',
+      ahead: 4,
+      workCommits: 2,
+      firstWork: { sha: sha(2), subject: 'chore: apply #1605' },
+      claimCommits: [sha(1), BRANCH_TIP],
+    });
+  });
+
+  it('names every claim commit oldest first, those before a work commit included, and leaves catch-up merges out (#1669)', () => {
+    const { reading } = read({
+      [OWN_COMMITS]: ok(line(BRANCH_TIP, [sha(1)], 'claim(rafa-631): take')
+        + line(sha(1), [sha(2), EARLIER_BASE], `Merge remote-tracking branch '${BASE_REF}' into ${BRANCH}`)
+        + line(sha(2), [sha(3)], 'chore: apply #1605')
+        + line(sha(3), [FORK], 'claim(rafa-631): claim')),
+      [`merge-base ${EARLIER_BASE} ${BASE_TIP}`]: ok(`${EARLIER_BASE}\n`),
+    });
+
+    expect(reading).toMatchObject({
+      kind: 'behind',
+      ahead: 4,
+      workCommits: 1,
+      firstWork: { sha: sha(2), subject: 'chore: apply #1605' },
+      claimCommits: [sha(3), BRANCH_TIP],
+    });
   });
 
   it('reads a claim subject of any issue and action word as a claim commit', () => {

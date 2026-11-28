@@ -94,6 +94,7 @@ export type {
 export {
   guardReaction,
   mergeGuardSettings,
+  readHeadPackageFragments,
   readMergeGuard,
 } from './src/release/guard-merge.js';
 

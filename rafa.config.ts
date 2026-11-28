@@ -19,6 +19,12 @@
  * holds: the 0.50.0 settle ran from a checkout with it unset and left the
  * lock at 0.49.0. A checkout's YAML can still turn it off.
  *
+ * `release.packageFragments: 'refuse'` has `rafa release fragment
+ * --package` and the merge guard refuse a package fragment (#1619):
+ * `addons/atlas/ui` has no package release yet, so a fragment naming it
+ * would have nothing to fold into. It flips to `allow` with Atlas's
+ * first package release.
+ *
  * `pr.base`, `release.settle`, `release.enabled`, `board.project.number`
  * and `roadmap.issue` sit here for the same reason. This file makes
  * every worktree a project root of its own, so the project walk stops in
@@ -49,7 +55,12 @@ export default [
       publish: ['full'],
     },
     loop: { worktreeSetup: 'bun install --frozen-lockfile' },
-    release: { moveLock: true, enabled: true, settle: 'pr' },
+    release: {
+      moveLock: true,
+      packageFragments: 'refuse',
+      enabled: true,
+      settle: 'pr',
+    },
     pr: { base: 'integration' },
     board: { project: { number: 7 } },
     roadmap: { issue: 31 },

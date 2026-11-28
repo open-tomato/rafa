@@ -15,9 +15,9 @@
  * planted, which marks task two `[BLOCKED]` and ends the run with the
  * worktree on `feat/<stub>` and the tracker's first unticked line being
  * task two. The release file is then planted and the loop started again;
- * it is killed once task two's commit lands, before the wrap-up that
- * follows would add git traffic this file proves nothing with, as
- * `worktree-start-integration.test.ts` does.
+ * it is killed once task two's commit lands and its tracker line is
+ * ticked, before the wrap-up that follows would add git traffic this file
+ * proves nothing with.
  *
  * The refusals are the other half: a start over a worktree path that
  * holds another branch, and one whose `feat/<stub>` is checked out at
@@ -59,7 +59,7 @@ const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 /** How long the whole case, both runs included, may take. */
 const RUN_TIMEOUT = { timeout: 90_000 };
 
-/** How long task two's commit may take to land before this file gives up waiting for it. */
+/** How long task two's commit and tick may take to land before this file gives up waiting for them. */
 const POLL_TIMEOUT_MS = 45_000;
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-worktree-restart-')));
@@ -198,13 +198,21 @@ function plantRestartScratch(): ScratchRepo {
   return scratch;
 }
 
-/** Polls `read` every `pollMs` until it answers other than null, or throws past `timeoutMs`. */
-async function waitUntil<T>(read: () => T | null, timeoutMs: number, pollMs = 50): Promise<T> {
+/**
+ * Polls `read` every `pollMs` until it answers other than null, or throws
+ * past `timeoutMs` with what `failure` answers at that moment.
+ */
+async function waitUntil<T>(
+  read: () => T | null,
+  timeoutMs: number,
+  failure: () => string,
+  pollMs = 50,
+): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (true) {
     const value = read();
     if (value !== null) return value;
-    if (Date.now() >= deadline) throw new Error('timed out waiting for a condition to hold');
+    if (Date.now() >= deadline) throw new Error(failure());
     await Bun.sleep(pollMs);
   }
 }
@@ -370,9 +378,19 @@ describe('rafa loop start --as-worktree, started again over a stopped run\'s wor
 
     const proc = spawnSecondStart(scratch);
     try {
-      await waitUntil(() => commitCount(scratch, worktreePath) > commitsBefore
-        ? true
-        : null, POLL_TIMEOUT_MS);
+      // The loop commits a task before it ticks the tracker line, so the commit alone is too early to read it.
+      let secondLine: string | undefined;
+      await waitUntil(
+        () => {
+          secondLine = trackerTaskLines(scratch)[1];
+          const ticked = secondLine?.startsWith('- [x] ') === true;
+          return ticked && commitCount(scratch, worktreePath) > commitsBefore
+            ? true
+            : null;
+        },
+        POLL_TIMEOUT_MS,
+        () => `timed out waiting for task two's commit and tick; the tracker line read was ${JSON.stringify(secondLine)}`,
+      );
 
       expect(worktreePaths(scratch)).toEqual(listingBefore);
       expect(git(scratch, worktreePath, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(BRANCH);

@@ -47,11 +47,15 @@
  *
  * ## Opening
  *
- * Opening learns this build's migration catalogue, which the store
- * subpath does not export: two empty payloads are materialised under
- * the temporary directory, one is merged into the other, which brings
- * it to every migration this rafa knows, and its export names them, and
- * the merged tables with them. The scratch files are removed. A store
+ * Opening learns the migration catalogue the store is kept at, which
+ * the store subpath does not export: two empty payloads are materialised
+ * under the temporary directory, one is merged into the other, which
+ * brings it to every migration of the catalogue, and its export names
+ * them, and the merged tables with them. The scratch files are removed.
+ * The catalogue is this build's own unless
+ * {@link SqliteHubStoreOptions.migrations} hands another down, as a test
+ * does to stand a hub one migration ahead of the build that runs it;
+ * every materialise and merge the store runs then takes that one. A store
  * file that is not there is then built as an empty payload naming that
  * catalogue, materialised beside it and renamed into place, so the file
  * exists once the adapter is open. An open that fails throws, which is
@@ -59,54 +63,26 @@
  * by an older hub is not brought forward on open; the next push's merge
  * brings it forward, as a merge brings any store it writes.
  *
- * ## Push
+ * ## Push, pull and pages
  *
- * In this order:
- *
- *   1. A payload naming a migration outside the catalogue is refused
- *      with {@link HubUpgradeRequired}, naming the ids and the hub
- *      upgrade to run, before anything is written: its store is newer
- *      than this hub. A payload naming fewer is taken, since the merge
- *      brings its materialised store forward.
- *   2. A payload holding rows is materialised (`materialiseWirePayload`)
- *      and merged into the store (`mergeStore`), the only route by which
- *      a row reaches it. `added` is the merge's `rowsAdded`: a row whose
- *      origin pair the store holds is matched and skipped. A payload
- *      holding no row is not merged, since a merge rewrites the whole
- *      file to add nothing.
- *   3. The merge's whole-file backup, `<store>.before-merge-<stamp>.bak`,
- *      is removed once the merged file is in place. A merge swaps in a
- *      file it has already checked, and a hub keeping one backup per
- *      push would hold a copy of its store for every push it took.
- *   4. The device's last push is stamped at the context's clock.
- *
- * Every step is synchronous, so one push runs to its end before any
- * other request is served, and two pushes never build over the same
- * file. One process holds the store: two hubs over one file would each
- * rename a merge over the other's.
- *
- * The merge is handed a project reader that names no project. The
- * store is never opened for writing through a device's route, so it is
- * never minted and records no project, and the merge would otherwise
- * ask git about the directory the hub keeps its file in. The project a
- * push is for is chosen by the file it is merged into, never by the
- * merge.
- *
- * ## Pull
- *
- * The store's export past the cursor (`exportWirePayload`), with every
- * row whose `origin_store` is the caller's left out. The export's `seq`
- * is the store's own, so it is the hub `seq` the port names, and its
- * cursor, one snapshot of the store, moves past the rows left out too.
+ * Each project's store file is opened by `openProjectStore` in
+ * `sqlite-project.ts`, whose module note says what a push does, in
+ * order, how a pull is answered and projected to a device behind the
+ * store, and how a pull naming a `limit` is cut into a page.
  *
  * ## Contract
  *
  * `contract()` answers `WIRE_CONTRACT_VERSION`, the contract version
  * this build's rafa speaks, with the migration ids the store file holds,
  * read from the file as `status()` reads them so the two never disagree.
- * The store {@link openSqliteHubStore} opens answers every capability
- * `false`: it answers push, pull and status and nothing beyond them. The
- * store {@link connectSqliteHub} opens answers its index's capabilities.
+ * The store {@link openSqliteHubStore} opens answers `projection: true`
+ * and `fts`, `vector` and `graph` `false`: projection is a promise about
+ * its own pull, and it has no index to search or walk. The store
+ * {@link connectSqliteHub} opens answers `fts`, `vector` and `graph` from
+ * its index and `projection` from the store, since the index answers no
+ * `projection`. Both answer the context's `maxPayloadRows` as given, and
+ * `null`, no cap, when it gives none: the cap is the hub's config, and
+ * the store enforces none of it.
  *
  * ## The connector
  *
@@ -114,9 +90,14 @@
  * above and its index, `sqlite-index.ts`, over one context. It calls the
  * loader (`prepareSqlite`) before it opens any database, since on macOS a
  * SQLite library is named only before the process's first open. Then it
- * learns the catalogue, opens the store and opens the first served
+ * learns the catalogue, the one its `migrations` option hands down
+ * when given, opens the store and opens the first served
  * project's index, handing it the loader's answer, the embedder and the
- * catalogue's tables. Its capabilities are the ones the index answers.
+ * catalogue's tables. Its `fts`, `vector` and `graph` are the ones the
+ * index answers, and its `projection` the store's. It answers the first
+ * served project's `sqliteVec` beside them, whether `sqlite-vec` loaded
+ * into that index's connection and the loader's why when it did not,
+ * which the hub logs on its `store.opened` line.
  * Each index is opened once its store file exists, and a failed first
  * index open closes the store. Another project's index is opened on its
  * first use; an open that fails there is tried again on the next. An
@@ -137,58 +118,29 @@
 import type {
   HubCapabilities,
   HubContract,
-  HubDevice,
   HubIndex,
-  HubPullRequest,
-  HubPushRequest,
-  HubPushResult,
   HubServedProject,
   HubStore,
   HubStoreContext,
   HubStoreStatus,
 } from './port.js';
-import type { SqliteHubIndex } from './sqlite-index.js';
-import type { MergeOptions, WireCursor, WirePayload } from '@open-tomato/rafa/store';
+import type { SqliteHubIndex, SqliteVecAnswer } from './sqlite-index.js';
+import type { Catalogue, HubMigrationCatalogue, ProjectStore } from './sqlite-project.js';
 import type { IndexEmbedder, PrepareOptions } from '@open-tomato/rafa-index';
 
-import { randomUUID } from 'node:crypto';
-import { existsSync, renameSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 
-import {
-  exportWirePayload,
-  materialiseWirePayload,
-  mergeStore,
-  WIRE_CONTRACT_VERSION,
-  WIRE_FORMAT,
-  WIRE_VERSION,
-} from '@open-tomato/rafa/store';
+import { WIRE_CONTRACT_VERSION } from '@open-tomato/rafa/store';
 import { prepareSqlite } from '@open-tomato/rafa-index';
-import { Database } from 'bun:sqlite';
 
 import { DEFAULT_PROJECT_ID, DEFAULT_STORE_FILE } from '../config.js';
 
 import { openSqliteHubIndex, routeSqliteHubIndex } from './sqlite-index.js';
+import { openProjectStore, readCatalogue } from './sqlite-project.js';
 
-/** The package a hub refused as too old is upgraded to. */
-export const HUB_PACKAGE = '@open-tomato/rafa-hub';
-
-/** What a refused push is told to do next. */
-export const HUB_UPGRADE: string = `upgrade the hub to a ${HUB_PACKAGE} release whose rafa knows these migrations, then push again`;
-
-/** A push whose store has applied migrations this hub does not know. */
-export class HubUpgradeRequired extends Error {
-  override readonly name = 'HubUpgradeRequired';
-  /** The ids the payload named that the hub lacks, in the payload's order. */
-  readonly missing: readonly string[];
-  /** The one thing to do next: {@link HUB_UPGRADE}. */
-  readonly nextStep: string = HUB_UPGRADE;
-
-  constructor(missing: readonly string[]) {
-    super(`rafa-hub: the pushing store has applied migration ${missing.join(', ')}, which this hub does not know. Nothing was merged. Next step: ${HUB_UPGRADE}.`);
-    this.missing = Object.freeze([...missing]);
-  }
-}
+export type { SqliteVecAnswer } from './sqlite-index.js';
+export type { HubMigrationCatalogue } from './sqlite-project.js';
+export { devicesFileName, HUB_PACKAGE, HUB_UPGRADE, HubUpgradeRequired, PROJECTION_PLANS } from './sqlite-project.js';
 
 /** A push, pull, status or rebuild naming a project the hub does not list. */
 export class HubProjectNotServed extends Error {
@@ -227,6 +179,8 @@ export interface SqliteHubStoreOptions {
    * context lists projects.
    */
   readonly fileName?: string;
+  /** The catalogue the store is kept at, in place of this build's own; see the module note. */
+  readonly migrations?: HubMigrationCatalogue;
   /**
    * Each listed project's store file. A listed project left out is kept
    * in `<id>.sqlite` in the context's directory; an entry naming a
@@ -239,7 +193,7 @@ export interface SqliteHubStoreOptions {
 export interface SqliteHubConnectorOptions extends SqliteHubStoreOptions {
   /** The embedder vector search embeds with; without one, `vector` is `false`. */
   readonly embedder?: IndexEmbedder;
-  /** The loader's inputs (`hub.store.sqliteLibrary` is its `library`), the process's own when left out. */
+  /** The loader's inputs (the install record's `sqliteLibrary` is its `library`), the process's own when left out. */
   readonly loader?: PrepareOptions;
   /** The project an index built at open records; {@link DEFAULT_INDEX_PROJECT} when left out. */
   readonly project?: string;
@@ -248,10 +202,12 @@ export interface SqliteHubConnectorOptions extends SqliteHubStoreOptions {
 /** The project an index built at open records when the connector is given none. */
 export const DEFAULT_INDEX_PROJECT = 'rafa-hub';
 
-/** The store and index the `sqlite` connector opens. */
+/** The store and index the `sqlite` connector opens, with the extension's answer at the first index's open. */
 export interface SqliteHub {
   readonly store: HubStore;
   readonly index: HubIndex;
+  /** Whether `sqlite-vec` loaded into the first served project's index, and the loader's why when it did not. */
+  readonly sqliteVec: SqliteVecAnswer;
 }
 
 /** Where one served project is kept. */
@@ -272,100 +228,12 @@ interface ProjectLayout {
   readonly placeOf: (project: string | undefined) => ProjectPlace;
 }
 
-/** This build's migrations and merged tables, as its own export names them. */
-interface Catalogue {
-  readonly migrations: readonly string[];
-  readonly tables: readonly string[];
-}
-
-/** The merge's project reader: the hub's store names no project. */
-const NO_PROJECT: NonNullable<MergeOptions['readProject']> = () => ({ rootCommit: null, remote: null });
-
-/** What the adapter can answer beyond push, pull and status: nothing. */
-const CAPABILITIES: HubCapabilities = Object.freeze({ fts: false, vector: false, graph: false, projection: false });
-
-const DEVICES_SCHEMA = 'CREATE TABLE IF NOT EXISTS devices (device TEXT PRIMARY KEY NOT NULL, last_push_at TEXT NOT NULL) STRICT';
-
-const STAMP_DEVICE = `INSERT INTO devices (device, last_push_at) VALUES (?, ?)
-  ON CONFLICT (device) DO UPDATE SET last_push_at = excluded.last_push_at`;
-
-const READ_DEVICES = 'SELECT device, last_push_at AS lastPushAt FROM devices ORDER BY device';
-
-/** The file each device's last push is kept in, beside the store `fileName` (a name or a path). */
-export function devicesFileName(fileName: string): string {
-  return `${fileName.replace(/\.sqlite$/, '')}.devices.sqlite`;
-}
+/** What the adapter can answer beyond push, pull and status: a projected pull, and no index of its own. */
+const CAPABILITIES: HubCapabilities = Object.freeze({ fts: false, vector: false, graph: false, projection: true });
 
 /** The file the index is kept in, beside the store `fileName` (a name or a path). */
 export function indexFileName(fileName: string): string {
   return `${fileName.replace(/\.sqlite$/, '')}.index.sqlite`;
-}
-
-/** A payload with no rows naming `migrations`. */
-function emptyPayload(migrations: readonly string[]): WirePayload {
-  return { format: WIRE_FORMAT, version: WIRE_VERSION, migrations, tables: {}, cursor: {} };
-}
-
-/** Merges the store at `otherPath` into the one at `path`, swapping the merged file in. */
-function merge(path: string, otherPath: string, now: () => Date): ReturnType<typeof mergeStore> {
-  return mergeStore({
-    path,
-    otherPath,
-    backend: 'sqlite',
-    dryRun: false,
-    stamp: randomUUID(),
-    now,
-    readProject: NO_PROJECT,
-  });
-}
-
-/** Learns this build's catalogue from a scratch store it merges forward; see the module note. */
-function readCatalogue(now: () => Date): Catalogue {
-  const base = materialiseWirePayload(emptyPayload([]), { now });
-  try {
-    const other = materialiseWirePayload(emptyPayload([]), { now });
-    try {
-      merge(base.path, other.path, now);
-    } finally {
-      other.release();
-    }
-    const exported = exportWirePayload({ path: base.path });
-    return Object.freeze({ migrations: exported.migrations, tables: Object.freeze(Object.keys(exported.tables)) });
-  } finally {
-    base.release();
-  }
-}
-
-/** Builds an empty store holding `catalogue`'s migrations at `path`, in `directory`. */
-function createStore(path: string, directory: string, catalogue: Catalogue, now: () => Date): void {
-  const built = materialiseWirePayload(emptyPayload(catalogue.migrations), { now, tempDir: directory });
-  try {
-    renameSync(built.path, path);
-  } finally {
-    built.release();
-  }
-}
-
-/** Refuses a payload naming a migration outside `catalogue`. */
-function refuseNewerStore(payload: WirePayload, catalogue: Catalogue): void {
-  const missing = payload.migrations.filter((id) => !catalogue.migrations.includes(id));
-  if (missing.length > 0) throw new HubUpgradeRequired(missing);
-}
-
-/** The rows held in each merged table the store at `path` holds. */
-function countRows(path: string, tables: readonly string[]): Readonly<Record<string, number>> {
-  const db = new Database(path, { readonly: true });
-  try {
-    const held = new Set(db
-      .query<{ name: string }, []>('SELECT name FROM sqlite_master WHERE type = \'table\'')
-      .all()
-      .map(({ name }) => name));
-    return Object.freeze(Object.fromEntries(tables
-      .filter((table) => held.has(table))
-      .map((table) => [table, db.query<{ n: number }, []>(`SELECT count(*) AS n FROM "${table}"`).get()?.n ?? 0])));
-  } finally {
-    db.close();
-  }
 }
 
 /** Runs `work` now, answering its value or its throw as a promise. */
@@ -373,76 +241,6 @@ function settle<T>(work: () => T): Promise<T> {
   return new Promise((resolve) => {
     resolve(work());
   });
-}
-
-/** One project's store file opened: the port's calls over that file alone. */
-interface ProjectStore {
-  readonly push: (request: HubPushRequest) => HubPushResult;
-  readonly pull: (request: HubPullRequest) => WirePayload;
-  /** The project's migrations, rows and devices, without the projects served. */
-  readonly status: () => HubStoreStatus;
-  /** The migration ids the project's store file holds. */
-  readonly migrations: () => readonly string[];
-  readonly close: () => void;
-}
-
-/**
- * Opens the store file at `path` under a catalogue already learned,
- * creating it when it is not there, with its devices file beside it.
- */
-function openProjectStore(path: string, catalogue: Catalogue, now: () => Date): ProjectStore {
-  if (!existsSync(path)) createStore(path, dirname(path), catalogue, now);
-  const devices = new Database(devicesFileName(path), { create: true, readwrite: true, strict: true });
-  devices.run(DEVICES_SCHEMA);
-  const pastEverything: WireCursor = Object.fromEntries(catalogue.tables.map((table) => [table, Number.MAX_SAFE_INTEGER]));
-
-  const push = (request: HubPushRequest): HubPushResult => {
-    const { device, payload } = request;
-    refuseNewerStore(payload, catalogue);
-    const received = Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
-    let added = 0;
-    if (received > 0) {
-      const wire = materialiseWirePayload(payload, { now });
-      try {
-        const merged = merge(path, wire.path, now);
-        added = merged.rowsAdded;
-        if (merged.backupPath !== null) rmSync(merged.backupPath, { force: true });
-      } finally {
-        wire.release();
-      }
-    }
-    const at = now().toISOString();
-    devices.query(STAMP_DEVICE).run(device, at);
-    return { received, added, at };
-  };
-
-  const pull = (request: HubPullRequest): WirePayload => {
-    const exported = exportWirePayload({ path, cursor: request.since });
-    const tables = Object.fromEntries(Object.entries(exported.tables)
-      .map(([table, rows]) => [table, Object.freeze(rows.filter((row) => row['origin_store'] !== request.device))]));
-    return Object.freeze({ ...exported, tables: Object.freeze(tables) });
-  };
-
-  const migrations = (): readonly string[] => exportWirePayload({ path, cursor: pastEverything }).migrations;
-
-  const status = (): HubStoreStatus => ({
-    migrations: migrations(),
-    rows: countRows(path, catalogue.tables),
-    devices: devices
-      .query<HubDevice, []>(READ_DEVICES)
-      .all()
-      .map((row) => Object.freeze({ ...row })),
-  });
-
-  return {
-    push,
-    pull,
-    status,
-    migrations,
-    close: () => {
-      devices.close();
-    },
-  };
 }
 
 /**
@@ -523,6 +321,7 @@ function openRoutedStore(context: HubStoreContext, layout: ProjectLayout, catalo
         contractVersion: WIRE_CONTRACT_VERSION,
         migrations: opened(layout.first).migrations(),
         capabilities: CAPABILITIES,
+        maxPayloadRows: context.maxPayloadRows ?? null,
       }),
       close: () => settle(() => {
         closed = true;
@@ -541,7 +340,7 @@ function openRoutedStore(context: HubStoreContext, layout: ProjectLayout, catalo
  * note.
  */
 export function openSqliteHubStore(context: HubStoreContext, options: SqliteHubStoreOptions = {}): HubStore {
-  return openRoutedStore(context, layoutOf(context, options), readCatalogue(context.now)).store;
+  return openRoutedStore(context, layoutOf(context, options), readCatalogue(context.now, options.migrations)).store;
 }
 
 /**
@@ -554,7 +353,7 @@ export function openSqliteHubStore(context: HubStoreContext, options: SqliteHubS
  */
 export async function connectSqliteHub(context: HubStoreContext, options: SqliteHubConnectorOptions = {}): Promise<SqliteHub> {
   const prepared = prepareSqlite(options.loader);
-  const catalogue = readCatalogue(context.now);
+  const catalogue = readCatalogue(context.now, options.migrations);
   const layout = layoutOf(context, options);
   const routed = openRoutedStore(context, layout, catalogue);
   const openHalf = (place: ProjectPlace): Promise<SqliteHubIndex> => openSqliteHubIndex({
@@ -602,6 +401,7 @@ export async function connectSqliteHub(context: HubStoreContext, options: Sqlite
   const { store } = routed;
   return {
     index,
+    sqliteVec: first.sqliteVec,
     store: Object.freeze({
       ...store,
       close: async () => {
@@ -613,7 +413,11 @@ export async function connectSqliteHub(context: HubStoreContext, options: Sqlite
         halves.clear();
         await store.close();
       },
-      contract: (): HubContract => Object.freeze({ ...store.contract(), capabilities: index.capabilities() }),
+      contract: (): HubContract => {
+        const own = store.contract();
+        const capabilities: HubCapabilities = Object.freeze({ ...index.capabilities(), projection: own.capabilities.projection });
+        return Object.freeze({ ...own, capabilities });
+      },
     }),
   };
 }

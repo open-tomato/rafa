@@ -15,9 +15,20 @@
  *
  * Push, pull past a cursor excluding the caller's own origin,
  * idempotent repeat pushes, each device's last push, and row counts:
- * the rules `port.ts` lists as what an adapter owes. What a push naming
+ * the rules `port.ts` lists as what an adapter owes, and the projected
+ * pull: a store answering `projection: true` answers a device behind it
+ * rows at the device's schema, one answering `false` is refused by the
+ * hub's route (`409` with `missing`), each run by the capability the
+ * store answers. What a push naming
  * a migration the hub lacks is refused with is the adapter's own, and
  * its own suite's.
+ *
+ * The paged cases hold a pull naming a `limit` to the port's rule: at
+ * most that many rows across every table, the caller's own counting
+ * none, and a cursor that resumes past the page, so pulling page after
+ * page reaches every row once, each page but the last full. The
+ * contract cases hold `maxPayloadRows` to the cap the context names,
+ * `null` when it names none.
  *
  * The project cases run over a hub listing two projects: an unlisted
  * project refused with the line naming `hub.projects`, a pull answering
@@ -49,6 +60,7 @@ import type {
   HubPullRequest,
   HubServedProject,
   HubStore,
+  HubStoreContext,
   HubStoreFactory,
   HubStoreStatus,
 } from './port.js';
@@ -75,10 +87,20 @@ import {
 } from '@open-tomato/rafa/store';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { HUB_ACTIONS } from '../identity/port.js';
+import { openMemoryIdentity } from '../identity/testdata/memory-identity.js';
+import { HUB_ROUTES, startHubServer } from '../server.js';
+
 /** The three devices a case pushes and pulls as, each named by its store origin. */
 const A = 'aaaaaaaa-0000-4000-8000-00000000000a';
 const B = 'bbbbbbbb-0000-4000-8000-00000000000b';
 const C = 'cccccccc-0000-4000-8000-00000000000c';
+
+/** The first migration of the template a device behind the hub lacks: it adds `sessions.worktree`. */
+const BEHIND_FROM = 'session-worktree';
+
+/** The token the refusal case's hub knows. */
+const REFUSAL_TOKEN = 'contract-refusal-token-0001';
 
 /** The clock's first reading, and two later ones. */
 const T0 = '2026-09-30T10:00:00.000Z';
@@ -93,6 +115,13 @@ const SESSIONS = 'sessions';
 const PROJECT_ONE: HubServedProject = { id: '1'.repeat(40), name: 'open-tomato/one' };
 const PROJECT_TWO: HubServedProject = { id: '2'.repeat(40), name: 'open-tomato/two' };
 const UNLISTED = '3'.repeat(40);
+
+/** The payload cap the contract case opens an adapter with. */
+const CAP = 2;
+
+/** The rows a paged pull is cut at, and the most pages the resume case pulls before it gives up. */
+const PAGE_LIMIT = 2;
+const MOST_PAGES = 10;
 
 /** The line a request naming a project not listed is refused with. */
 const NOT_SERVED = `rafa-hub: project ${UNLISTED} is not served here; add it under hub.projects`;
@@ -224,14 +253,15 @@ export function builders(template: () => WireTemplate): {
   return { commit, session, payload };
 }
 
-/** Opens a fresh adapter over a new directory and a settable clock, listing `projects` when given. */
-async function openWorld(factory: HubStoreFactory, projects?: readonly HubServedProject[]): Promise<World> {
+/** What a case may add to the context beyond its directory and clock. */
+type WorldExtra = Pick<HubStoreContext, 'projects' | 'maxPayloadRows'>;
+
+/** Opens a fresh adapter over a new directory and a settable clock, with `extra` in its context. */
+async function openWorld(factory: HubStoreFactory, extra: WorldExtra = {}): Promise<World> {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hub-contract-')));
   let reading = T0;
   try {
-    const store = await factory({ directory, now: () => new Date(reading), ...(projects === undefined
-      ? {}
-      : { projects }) });
+    const store = await factory({ directory, now: () => new Date(reading), ...extra });
     return {
       store,
       setClock: (iso) => {
@@ -269,6 +299,13 @@ function countIn(status: HubStoreStatus, table: string): number {
 /** Every row a pull answered, across its tables. */
 function rowsIn(payload: WirePayload): number {
   return Object.values(payload.tables).reduce((total, rows) => total + rows.length, 0);
+}
+
+/** The origin pairs `payload` carries across every table, each prefixed by its table, sorted. */
+function everyPairIn(payload: WirePayload): string[] {
+  return Object.entries(payload.tables)
+    .flatMap(([table, rows]) => rows.map((row) => `${table} ${pairOf(row)}`))
+    .sort();
 }
 
 /** The outcome of `run`, a refusal whether it threw at once or rejected. */
@@ -316,6 +353,13 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
       world = undefined;
       await open?.close();
     });
+    /** Replaces the case's adapter with one opened with `extra` in its context. */
+    const reopen = async (extra: WorldExtra): Promise<void> => {
+      const replaced = world;
+      world = undefined;
+      await replaced?.close();
+      world = await openWorld(factory, extra);
+    };
 
     describe('push', () => {
       it('answers the rows a push carried and how many were new, at the clock\'s time', async () => {
@@ -447,6 +491,122 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
       });
     });
 
+    describe('a paged pull', () => {
+      /**
+       * Five rows B pulls and one it never does: its own commit, relayed
+       * by A ahead of A's rows so it holds the lowest hub seq, where a
+       * page counting it would come up short.
+       */
+      const seed = async (): Promise<void> => {
+        await hub().push({ device: A, payload: payload({ [COMMITS]: [commit(B, 1)] }) });
+        await hub().push({ device: A, payload: payload({ [COMMITS]: [commit(A, 1), commit(A, 2), commit(A, 3)], [SESSIONS]: [session(A, 4), session(A, 5)] }) });
+      };
+
+      it('answers at most the limit\'s rows across every table, the caller\'s own counting none', async () => {
+        await seed();
+        const whole = await pull(B);
+        const page = await hub().pull({ device: B, since: {}, limit: 3 });
+        const wide = await hub().pull({ device: B, since: {}, limit: 50 });
+
+        expect(rowsIn(whole)).toBe(5);
+        expect(rowsIn(page)).toBe(3);
+        expect(everyPairIn(page).filter((pair) => !everyPairIn(whole).includes(pair))).toEqual([]);
+        expect(decodeWirePayload(encodeWirePayload(page))).toEqual(page);
+        expect(everyPairIn(wide)).toEqual(everyPairIn(whole));
+      });
+
+      it('reaches every row once over pages pulled with the cursor each answered, each page but the last full', async () => {
+        await seed();
+        const whole = await pull(B);
+        const pages: WirePayload[] = [];
+        let since: WireCursor = {};
+        while (pages.length < MOST_PAGES) {
+          const page = await hub().pull({ device: B, since, limit: PAGE_LIMIT });
+          pages.push(page);
+          since = page.cursor;
+          if (rowsIn(page) < PAGE_LIMIT) break;
+        }
+        const after = await hub().pull({ device: B, since, limit: PAGE_LIMIT });
+
+        expect(pages.map(rowsIn)).toEqual([2, 2, 1]);
+        expect(pages.flatMap(everyPairIn).sort()).toEqual(everyPairIn(whole));
+        expect(rowsIn(after)).toBe(0);
+      });
+    });
+
+    describe('a pull from a device behind the hub', () => {
+      /** The template's ids up to {@link BEHIND_FROM}: a device that lacks it and every id after. */
+      const behind = (): readonly string[] => {
+        const ids = build.payload({}).migrations;
+        const index = ids.indexOf(BEHIND_FROM);
+        if (index < 0) throw new Error(`hub store contract: the template names no ${BEHIND_FROM}`);
+        return ids.slice(0, index);
+      };
+      const seed = (): Promise<unknown> => hub().push({
+        device: A,
+        payload: payload({ [COMMITS]: [commit(A, 1)], [SESSIONS]: [session(A, 2)] }),
+      });
+
+      it('answers rows projected to its schema, naming each cut table, when the store projects', async () => {
+        if (!hub().contract().capabilities.projection) return;
+        await seed();
+        const whole = await pull(B);
+        const projected = await hub().pull({ device: B, since: {}, migrations: behind() });
+
+        expect(whole.projected).toBeUndefined();
+        expect(projected.migrations).toEqual(behind());
+        expect(projected.projected?.[SESSIONS]).toEqual([BEHIND_FROM]);
+        expect(projected.projectedColumns?.[SESSIONS]).toEqual(['worktree']);
+        expect(Object.keys(projected.cursor).sort()).toEqual(Object.keys(projected.tables).sort());
+        expect(projected.tables[COMMITS]).toEqual(whole.tables[COMMITS]);
+        expect(whole.tables[SESSIONS]?.map((row) => 'worktree' in row)).toEqual([true]);
+        expect(projected.tables[SESSIONS]?.map((row) => 'worktree' in row)).toEqual([false]);
+      });
+
+      it('answers a device naming every id the store holds whole, with no projected, when the store projects', async () => {
+        if (!hub().contract().capabilities.projection) return;
+        await seed();
+        const whole = await pull(B);
+        const named = await hub().pull({ device: B, since: {}, migrations: hub().contract().migrations });
+
+        expect(named.projected).toBeUndefined();
+        expect(named.projectedColumns).toBeUndefined();
+        expect(named).toEqual(whole);
+      });
+
+      it('is refused by the hub with a 409 naming what it lacks, when the store cannot project', async () => {
+        if (hub().contract().capabilities.projection) return;
+        await seed();
+        const store = hub();
+        const server = startHubServer({
+          port: 0,
+          hostname: '127.0.0.1',
+          version: '0.0.0',
+          identity: openMemoryIdentity({ [REFUSAL_TOKEN]: { id: 'contract', may: HUB_ACTIONS } }),
+          openStore: () => ({ ...store, close: () => Promise.resolve() }),
+          log: () => undefined,
+        });
+        try {
+          const ids = behind();
+          const missing = store.contract().migrations.filter((id) => !ids.includes(id));
+          const get = (named: readonly string[]): Promise<Response> => fetch(
+            `${server.url}${HUB_ROUTES.pull}?device=${B}&migrations=${named.join(',')}`,
+            { headers: { authorization: `Bearer ${REFUSAL_TOKEN}` } },
+          );
+          const refused = await get(ids);
+          const body = await refused.json() as { success: boolean; missing?: string[]; error: string };
+          const served = await get(store.contract().migrations);
+
+          expect(refused.status).toBe(409);
+          expect([body.success, body.missing]).toEqual([false, missing]);
+          expect(body.error).toContain('rafa self-update');
+          expect(served.status).toBe(200);
+        } finally {
+          await server.stop();
+        }
+      });
+    });
+
     describe('contract', () => {
       it('speaks the wire contract version the codec names', () => {
         const { contractVersion } = hub().contract();
@@ -475,6 +635,14 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
         const values = Object.values(capabilities);
 
         expect(values.every((value) => typeof value === 'boolean')).toBe(true);
+      });
+
+      it('answers no payload cap when its context names none, and the cap its context names', async () => {
+        const uncapped = hub().contract().maxPayloadRows;
+        await reopen({ maxPayloadRows: CAP });
+        const capped = hub().contract().maxPayloadRows;
+
+        expect([uncapped, capped]).toEqual([null, CAP]);
       });
     });
 
@@ -516,10 +684,7 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
     describe('projects', () => {
       /** Replaces the case's adapter with one listing both projects. */
       beforeEach(async () => {
-        const single = world;
-        world = undefined;
-        await single?.close();
-        world = await openWorld(factory, [PROJECT_ONE, PROJECT_TWO]);
+        await reopen({ projects: [PROJECT_ONE, PROJECT_TWO] });
       });
 
       const pushTo = (project: string, device: string, tables: Readonly<Record<string, readonly WireRow[]>>): Promise<unknown> => hub().push({ device, project, payload: payload(tables) });

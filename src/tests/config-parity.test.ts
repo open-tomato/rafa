@@ -31,7 +31,13 @@
  * end of the known keys the unknown-key warning lists, in all three; the
  * `hints` section added one entry, `hintsSkills` at its `false` default
  * from source `default`, and `hints` after `collaborate` at the end of
- * the known keys in all three fixtures, and moved nothing else.
+ * the known keys in all three fixtures, and moved nothing else; the core
+ * key `effort.syncSkew` added one `load-config.json` entry, its `refuse`
+ * default from source `default`, and moved nothing else; the `release`
+ * key `release.packageFragments` added one `load-config.json` entry, its
+ * `allow` default from source `default`, and moved nothing else; the core
+ * key `effort.syncMerge` added one `load-config.json` entry, its `ff-only`
+ * default from source `default`, and moved nothing else.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

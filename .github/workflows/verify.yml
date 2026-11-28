@@ -17,6 +17,24 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The hub's postgres connector tests reach a database only through
+    # POSTGRES_URL. The image is pinned by digest (0.26.4-pg18), never a tag.
+    services:
+      paradedb:
+        image: paradedb/paradedb@sha256:4abbafffb4e59e679821c5882faf91c494022bb3242fc73b789e753f43df1361
+        env:
+          POSTGRES_USER: rafa
+          POSTGRES_PASSWORD: rafa
+          POSTGRES_DB: rafa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rafa -d rafa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      POSTGRES_URL: postgres://rafa:rafa@localhost:5432/rafa
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -128,3 +146,275 @@ jobs:
       - name: Stories
         if: ${{ !cancelled() }}
         run: bun run check:stories
+
+  hub-image:
+    # The hub's image, built and started as an operator would: a plain
+    # `docker build` of packages/rafa-hub/Dockerfile, no new action.
+    # GitHub's `paths:` filter is workflow-wide, so the first step lists
+    # the pull request's changed files and every later step runs only when
+    # one lies under HUB_PATHS: the files the image is built from and every
+    # folder of the hub's workspace closure, core by the folders the hub's
+    # imports reach. `packages/rafa-hub/src/image.test.ts` holds the list to
+    # that closure. On a push to `stretch/**` every step runs.
+    # Three volumes, each with its own container: HUB_VOLUME holds a
+    # rafa-hub.yaml alone, read as the fallback of the image's
+    # RAFA_HUB_CONFIG with one `config.yaml` warning, until the image's own
+    # HEALTHCHECK reports `healthy`; HUB_EMPTY_VOLUME holds nothing, so its
+    # start exits non-zero naming the `.ts` file; HUB_TS_VOLUME holds a
+    # rafa-hub.config.ts with a type-only import and a port that is not the
+    # default, which `rafa-hub health` reaches inside the container.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUB_IMAGE: rafa-hub-ci
+      HUB_CONTAINER: rafa-hub-ci
+      HUB_VOLUME: rafa-hub-ci-data
+      HUB_PORT: '7373'
+      HUB_CONFIG_TS: /data/rafa-hub.config.ts
+      HUB_EMPTY_CONTAINER: rafa-hub-ci-empty
+      HUB_EMPTY_VOLUME: rafa-hub-ci-empty-data
+      HUB_TS_CONTAINER: rafa-hub-ci-ts
+      HUB_TS_VOLUME: rafa-hub-ci-ts-data
+      HUB_TS_PORT: '7474'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Changed paths
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          HUB_PATHS: |
+            .dockerignore
+            .github/workflows/verify.yml
+            bun.lock
+            package.json
+            tsconfig.packages.json
+            packages/rafa-hub/
+            packages/rafa-hub-port/
+            packages/rafa-hub-postgres/
+            packages/rafa-index/
+            packages/rafa/package.json
+            packages/rafa/src/core/
+            packages/rafa/src/effort/session-log-path.ts
+            packages/rafa/src/effort/store/
+            packages/rafa/src/schema/
+            packages/rafa/src/utils/
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "A $EVENT event: the image is built unfiltered."
+            echo 'hub=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A path ending in / names its folder, any other path one file.
+          matches() {
+            local path
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              if [ "$1" = "$path" ] || { [ "${path%/}" != "$path" ] && [ "${1#"$path"}" != "$1" ]; }; then
+                return 0
+              fi
+            done <<< "$HUB_PATHS"
+            return 1
+          }
+          hub=false
+          while IFS= read -r file; do
+            if [ -n "$file" ] && matches "$file"; then
+              echo "Reaches the image: $file"
+              hub=true
+            fi
+          done < <(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD")
+          if [ "$hub" = false ]; then
+            echo 'No changed file reaches the image: the later steps are skipped.'
+          fi
+          echo "hub=$hub" >> "$GITHUB_OUTPUT"
+
+      - name: Bun version
+        id: bun
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          manager=$(jq -r '.packageManager // empty' package.json)
+          case "$manager" in
+            bun@*) ;;
+            *) echo "package.json names packageManager '$manager', not bun@<version>"; exit 1 ;;
+          esac
+          echo "version=${manager#bun@}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        if: steps.paths.outputs.hub == 'true'
+        env:
+          BUN_VERSION: ${{ steps.bun.outputs.version }}
+        run: docker build -f packages/rafa-hub/Dockerfile --build-arg BUN_VERSION="$BUN_VERSION" -t "$HUB_IMAGE" .
+
+      - name: Config
+        # The volume is new, so its first mount copies the image's /data,
+        # owned by `bun`, and the config is written as that user.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          printf '%s\n' \
+            'hub:' \
+            '  repository: open-tomato/rafa' \
+            '  auth:' \
+            '    adapter: api-key' \
+            '    apiKeys: [RAFA_HUB_KEY]' \
+            | docker run --rm -i -v "$HUB_VOLUME:/data" "$HUB_IMAGE" sh -c 'cat > /data/rafa-hub.yaml'
+
+      - name: Start
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          RAFA_HUB_KEY=$(openssl rand -hex 32)
+          export RAFA_HUB_KEY
+          docker run -d --name "$HUB_CONTAINER" -p "127.0.0.1:$HUB_PORT:7373" -e RAFA_HUB_KEY -v "$HUB_VOLUME:/data" "$HUB_IMAGE"
+
+      - name: Health
+        # The image's HEALTHCHECK start period, read from the image, bounds
+        # the wait for /health to answer 200.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          period=$(docker image inspect -f '{{json .Config.Healthcheck.StartPeriod}}' "$HUB_IMAGE")
+          deadline=$(( $(date +%s) + period / 1000000000 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$HUB_PORT/health" || true)
+            if [ "$status" = 200 ]; then
+              echo "/health answered 200."
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "/health did not answer 200 within the $(( period / 1000000000 ))s start period (last: ${status:-none})."
+          exit 1
+
+      - name: Start line
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          line=$(docker logs "$HUB_CONTAINER" 2>/dev/null | jq -c -n -R '[inputs | fromjson? | select(.event == "store.opened")] | .[0] // empty')
+          echo "${line:-no store.opened line}"
+          [ -n "$line" ] || exit 1
+          if [ "$(jq -r '.sqliteVec.loaded' <<< "$line")" != true ]; then
+            echo "sqlite-vec did not load: $(jq -r '.sqliteVec.why' <<< "$line")"
+            exit 1
+          fi
+
+      - name: Keys file
+        if: steps.paths.outputs.hub == 'true'
+        run: docker exec "$HUB_CONTAINER" test -f /data/rafa-hub.keys.sqlite
+
+      - name: Install record
+        if: steps.paths.outputs.hub == 'true'
+        env:
+          BUN_VERSION: ${{ steps.bun.outputs.version }}
+        run: |
+          record=$(docker exec "$HUB_CONTAINER" cat /data/rafa-hub.install.json)
+          echo "$record"
+          jq -e --arg bun "$BUN_VERSION" '.dataDir == "/data" and .bun == $bun' <<< "$record" > /dev/null
+
+      - name: YAML warning
+        # The volume holds rafa-hub.yaml and no `.ts` file, so the start
+        # reads the YAML as the fallback and logs one `config.yaml` warning
+        # naming the `.ts` file to write and the release that drops YAML.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          lines=$(docker logs "$HUB_CONTAINER" 2>/dev/null | jq -c -n -R '[inputs | fromjson? | select(.event == "config.yaml")]')
+          echo "$lines"
+          jq -e --arg ts "$HUB_CONFIG_TS" '
+            length == 1
+            and .[0].level == "warn"
+            and .[0].path == "/data/rafa-hub.yaml"
+            and (.[0].message | contains($ts) and contains("rafa 1.0.0"))
+          ' <<< "$lines" > /dev/null
+
+      - name: Health check
+        # The image's own HEALTHCHECK, `rafa-hub health`, as Docker runs it:
+        # its start period, interval and timeout, read from the image, bound
+        # the wait for the container's health to read `healthy`.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          read -r period interval timeout < <(docker image inspect -f '{{json .Config.Healthcheck.StartPeriod}} {{json .Config.Healthcheck.Interval}} {{json .Config.Healthcheck.Timeout}}' "$HUB_IMAGE")
+          wait=$(( (period + interval + timeout) / 1000000000 ))
+          deadline=$(( $(date +%s) + wait ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            health=$(docker inspect -f '{{.State.Health.Status}}' "$HUB_CONTAINER")
+            case "$health" in
+              healthy) echo "The health check reports healthy."; exit 0 ;;
+              unhealthy) break ;;
+            esac
+            sleep 1
+          done
+          echo "The health check reports ${health:-nothing}, not healthy, within ${wait}s."
+          docker inspect -f '{{json .State.Health}}' "$HUB_CONTAINER"
+          exit 1
+
+      - name: Empty volume
+        # A new volume holds no config, so the start's install refuses it,
+        # naming the `.ts` file the image's RAFA_HUB_CONFIG names, and the
+        # container exits non-zero. `timeout` bounds a start that hangs, and
+        # the exit code is the container's, never the client's.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          timeout 120 docker run --name "$HUB_EMPTY_CONTAINER" -v "$HUB_EMPTY_VOLUME:/data" "$HUB_IMAGE" || true
+          read -r state code < <(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$HUB_EMPTY_CONTAINER")
+          echo "The container is $state, exit $code."
+          if [ "$state" != exited ] || [ "$code" = 0 ]; then
+            exit 1
+          fi
+          docker logs "$HUB_EMPTY_CONTAINER" 2>&1 | grep -F "$HUB_CONFIG_TS: "
+
+      - name: TS config
+        # The `.ts` config imports the hub's config type alone, which is
+        # erased before the file runs, so it loads from /data with no
+        # node_modules beside it.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          docker run --rm -i -v "$HUB_TS_VOLUME:/data" "$HUB_IMAGE" sh -c "cat > $HUB_CONFIG_TS" <<CONFIG
+          import type { HubConfigFile } from '@open-tomato/rafa-hub';
+
+          export default {
+            hub: { repository: 'open-tomato/rafa', port: $HUB_TS_PORT },
+          } satisfies HubConfigFile;
+          CONFIG
+
+      - name: TS start
+        if: steps.paths.outputs.hub == 'true'
+        run: docker run -d --name "$HUB_TS_CONTAINER" -v "$HUB_TS_VOLUME:/data" "$HUB_IMAGE"
+
+      - name: TS health
+        # `rafa-hub health` inside the container reads the `.ts` config and
+        # asks /health on its port, within the image's start period; the
+        # `listening` line shows the hub took that port, not the default.
+        if: steps.paths.outputs.hub == 'true'
+        run: |
+          period=$(docker image inspect -f '{{json .Config.Healthcheck.StartPeriod}}' "$HUB_IMAGE")
+          deadline=$(( $(date +%s) + period / 1000000000 ))
+          passed=false
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            if said=$(docker exec "$HUB_TS_CONTAINER" rafa-hub health 2>&1); then
+              passed=true
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$passed" != true ]; then
+            echo "rafa-hub health did not pass within the $(( period / 1000000000 ))s start period: ${said:-no output}"
+            exit 1
+          fi
+          echo "rafa-hub health passed."
+          port=$(docker logs "$HUB_TS_CONTAINER" 2>/dev/null | jq -r -n -R '[inputs | fromjson? | select(.event == "listening")] | .[0].port // empty')
+          echo "The hub listens on ${port:-no port}."
+          [ "$port" = "$HUB_TS_PORT" ]
+
+      - name: Logs
+        if: ${{ !cancelled() && steps.paths.outputs.hub == 'true' }}
+        run: |
+          for container in "$HUB_CONTAINER" "$HUB_EMPTY_CONTAINER" "$HUB_TS_CONTAINER"; do
+            echo "::group::$container"
+            docker logs "$container" || true
+            echo '::endgroup::'
+          done
+
+      - name: Clean up
+        if: ${{ always() && steps.paths.outputs.hub == 'true' }}
+        run: |
+          docker rm -f "$HUB_CONTAINER" "$HUB_EMPTY_CONTAINER" "$HUB_TS_CONTAINER" || true
+          docker volume rm "$HUB_VOLUME" "$HUB_EMPTY_VOLUME" "$HUB_TS_VOLUME" || true

@@ -1,6 +1,6 @@
 ---
 name: rafa-stretch-gap-log
-description: "Use when a stretch step needs raw gh, git or shell because no rafa line does it: file it as a module:cli-gap bug."
+description: "Use when a stretch step needs raw gh, git or shell because no rafa line does it: file a module:cli-gap bug or a debt report."
 provenance: first-party
 source: rafa
 stage: alpha
@@ -41,15 +41,29 @@ Search first, so a gap is filed once:
 rafa issue list --module=cli-gap --search="<the step in a few words>"
 ```
 
-When none matches, file it:
+When none matches, ask the breaking question, worded the same in every
+filing place: does the missing line make something break, beyond a step
+done by hand? Breaking means a command prints or does something wrong,
+two refusals leave no way through, or a hand-over names the wrong line.
+
+On a yes, file a bug:
 
 ```bash
 rafa issue create --type=bug --module=cli-gap --action="<the rafa action that came closest, or unknown>" --summary="<the step rafa cannot do yet>" --cause=cli:new-context --reproduce="<the raw line>" --body="<the rafa line that came closest, what it lacks>"
 ```
 
-A bug is filed from its fields, and rafa renders its title from them. A
-line that leaves one of the four out is refused, naming it. The action
-is lower-case, without the word `rafa`: `pr open`, `loop start`.
+On a no, file a debt report, which is a bug record under another type with
+the same fields and title:
+
+```bash
+rafa issue create --type=debt --module=cli-gap --action="<the rafa action that came closest, or unknown>" --summary="<the step rafa cannot do yet>" --cause=cli:new-context --reproduce="<the raw line>" --body="<the rafa line that came closest, what it lacks>"
+```
+
+A bug or a debt report is filed from its fields, and rafa renders its title
+from them. A line that leaves one of the four out is refused, naming it.
+The action is lower-case, without the word `rafa`: `pr open`, `loop start`.
+A debt report that later breaks something moves to a bug with
+`rafa issue edit <n> --type=bug`, which keeps its record.
 
 When one matches, add the stretch's case to it:
 
@@ -64,14 +78,17 @@ with `--upstream=rafa`, and comment the same way:
 ```bash
 rafa issue list --upstream=rafa --module=cli-gap --search="<the step in a few words>"
 rafa issue create --upstream=rafa --type=bug --module=cli-gap --action="<the rafa action that came closest, or unknown>" --summary="<the step rafa cannot do yet>" --cause=cli:new-context --reproduce="<the raw line>" --body="<the rafa line that came closest, what it lacks>"
+rafa issue create --upstream=rafa --type=debt --module=cli-gap --action="<the rafa action that came closest, or unknown>" --summary="<the step rafa cannot do yet>" --cause=cli:new-context --reproduce="<the raw line>" --body="<the rafa line that came closest, what it lacks>"
 rafa issue comment <n> --upstream=rafa --body="Seen again in stretch <n>: <the raw line>."
 ```
 
-Only a bug is filed upstream: `--type=bug` is the only type it takes. The
-upstream check refuses a run when the config does not set
-`collaborate.rafa`, or when this board's owner differs from the upstream's,
-and a refused line files nothing. A private sibling is named "a private
-sibling repository" in the title and the body, never by its name.
+Only a bug or a debt report is filed upstream: `--type=bug` and
+`--type=debt` are the only types it takes, and the breaking question
+above picks between them. The upstream check refuses a run when the
+config does not set `collaborate.rafa`, or when this board's owner differs
+from the upstream's, and a refused line files nothing. A private sibling is
+named "a private sibling repository" in the title and the body, never by
+its name.
 
 The board is public: no local path, host name, user name or secret in the
 title or the body.

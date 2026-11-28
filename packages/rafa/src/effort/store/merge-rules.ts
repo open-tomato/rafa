@@ -11,7 +11,8 @@
  * `<table>_by_origin` over the pair, and is one of the
  * `ORIGIN_TABLES` (`origins.ts`). A `local` table never leaves its
  * machine: the migration log, the store's identity row, the ids it
- * replaced and the merge trail describe this one file, and a merge neither reads them from the
+ * replaced, the merge trail and the rows held back from a projected pull
+ * (`held_rows`) describe this one file, and a merge neither reads them from the
  * other store nor writes them from it.
  *
  * ## Identity
@@ -139,4 +140,5 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   store_replaced: { scope: 'local' },
   merges: { scope: 'local' },
   merge_conflicts: { scope: 'local' },
+  held_rows: { scope: 'local' },
 };

@@ -36,6 +36,8 @@ const KEYS: readonly (readonly [string, string])[] = [
   ['store', 'store'],
   ['effortBusyTimeoutMs', 'effort.busyTimeoutMs'],
   ['effortSync', 'effort.sync'],
+  ['effortSyncSkew', 'effort.syncSkew'],
+  ['effortSyncMerge', 'effort.syncMerge'],
   ['inject', 'plan.inject'],
   ['planDir', 'plan.dir'],
   ['specsDir', 'specs.dir'],
@@ -99,6 +101,8 @@ const DEFAULTS: Readonly<Record<string, unknown>> = {
   store: 'sqlite',
   effortBusyTimeoutMs: 5000,
   effortSync: 'local',
+  effortSyncSkew: 'refuse',
+  effortSyncMerge: 'ff-only',
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),
@@ -273,6 +277,32 @@ describe('core through the section contract', () => {
     expect(refusal).toThrow(
       'dangerous.acceptStaleRefs is defined by package "core" and again by package "intruder"',
     );
+  });
+});
+
+describe('effort.syncMerge', () => {
+  const spec = CORE_SECTION.settings.effortSyncMerge;
+  const at = { label: spec.key, key: spec.key };
+
+  it('defaults to ff-only, and takes no flag', () => {
+    expect(CORE_SECTION.defaults.effortSyncMerge).toBe('ff-only');
+    expect(spec.cli).toBe(false);
+  });
+
+  it('reads merge as itself', () => {
+    expect(spec.read('merge', at)).toEqual({ value: 'merge', problems: [], extras: [] });
+  });
+
+  it('refuses a mode outside the two, naming them as effort.syncSkew names its own', () => {
+    const reading = spec.read('rebase', at);
+    expect(reading.value).toBeUndefined();
+    expect(reading.problems).toEqual(['effort.syncMerge is "rebase", expected one of: ff-only, merge']);
+    const skew = CORE_SECTION.settings.effortSyncSkew;
+    expect(skew.read('rebase', { label: skew.key, key: skew.key })).toEqual({
+      value: undefined,
+      problems: ['effort.syncSkew is "rebase", expected one of: refuse, pull-projected'],
+      extras: [],
+    });
   });
 });
 

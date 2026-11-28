@@ -21,6 +21,16 @@ import { fetchTransport, localTransport } from './transport.js';
 
 const BASE_URL = 'http://atlas.test/api/atlas';
 
+/**
+ * The spec's one-second bound on a crafted base URL: the old trailing-slash
+ * trim took about 2.2 s on the 50,000-character shape below, and grows with
+ * its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Slashes in the crafted base URL's run, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_SLASHES = 50_000;
+
 /** A `fetch` stand-in answering through `answer`, recording each Request; `fetchTransport` hands it a string URL. */
 function fakeFetch(answer: (request: Request) => Promise<Response>): { readonly fetch: typeof fetch; readonly seen: readonly Request[] } {
   const seen: Request[] = [];
@@ -168,5 +178,24 @@ describe('localTransport', () => {
 
     expect(error).toBe(controller.signal.reason);
     expect(called).toBe(false);
+  });
+});
+
+describe('fetchTransport, a crafted base URL', () => {
+  it('trims no slash off a base URL whose slash run is not at its end, within REDOS_BOUND_MS', async () => {
+    const baseUrl = `http://h${'/'.repeat(CRAFTED_SLASHES)}x`;
+    const sent: string[] = [];
+    const call = async (input: string): Promise<Response> => {
+      sent.push(input);
+      return new Response('');
+    };
+
+    const started = performance.now();
+    const transport = fetchTransport({ baseUrl, fetch: call as typeof fetch });
+    const elapsed = performance.now() - started;
+    await transport.send({ method: 'GET', path: '/sources', query: {}, body: undefined, headers: {} });
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(sent).toEqual([`${baseUrl}/sources`]);
   });
 });

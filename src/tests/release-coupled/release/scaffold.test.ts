@@ -38,8 +38,8 @@ function keysOf(lines: readonly string[]): readonly string[] {
 }
 
 describe('RELEASE_FRAGMENT_LINES', () => {
-  it('spells the five settings in the order the scaffold places them', () => {
-    expect(keysOf(RELEASE_FRAGMENT_LINES)).toEqual(['fragments', 'strategy', 'settle', 'tag', 'moveLock']);
+  it('spells the six settings in the order the scaffold places them', () => {
+    expect(keysOf(RELEASE_FRAGMENT_LINES)).toEqual(['fragments', 'strategy', 'settle', 'tag', 'moveLock', 'packageFragments']);
   });
 
   it('is commented on every line, which a line with its mark dropped is not', () => {
@@ -58,6 +58,7 @@ describe('RELEASE_FRAGMENT_LINES', () => {
       CONFIG_DEFAULTS.releaseSettle,
       CONFIG_DEFAULTS.releaseTag,
       String(CONFIG_DEFAULTS.releaseMoveLock),
+      CONFIG_DEFAULTS.releasePackageFragments,
     ]);
     expect(values).not.toContain('pr');
   });

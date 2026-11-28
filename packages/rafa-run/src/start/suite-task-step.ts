@@ -13,6 +13,14 @@
  * neither module reads the other's bindings at load, only inside the
  * functions. {@link checkRunsOf} is exported for the pre-wrap-up step
  * (`suite-step.ts`), which runs a path list or `affected` as this step does.
+ *
+ * The task step alone joins to its `tests.alwaysRun` files the facade
+ * tests the task's added deep imports reach (`facade-always-run.ts`, whose
+ * note says why no other part of the step runs them), each once, and
+ * prints one `🧩 Facade check added` line per test it adds. They run
+ * wherever the always-run files run, so an `affected` step takes them in
+ * its second run and a `full` step, which runs them already, reads no
+ * diff for them.
  */
 
 import type { Settling, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams } from './suite-step.js';
@@ -27,6 +35,7 @@ import { activeOutput } from '@open-tomato/rafa/core/output';
 
 import { resolveChecks } from '../suite/checks.js';
 
+import { readFacadeAlwaysRun } from './facade-always-run.js';
 import { isRepairTask } from './suite-blocker.js';
 import { takeRetakes } from './suite-retake-alone.js';
 import {
@@ -101,6 +110,22 @@ export function checkRunsOf(run: CheckRun, related: boolean, base: string, alway
     return { narrowing: { changedSince: base }, alwaysRun: joined, timed: joined };
   }
   return { narrowing: {}, alwaysRun: [], timed: [] };
+}
+
+/**
+ * The `tests.alwaysRun` files, then each facade test the task's diff from
+ * `base` reaches that they do not already name, with one line printed per
+ * test added. See the module note.
+ */
+function taskAlwaysRunOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, base: string): readonly string[] {
+  const files = readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun);
+  const checks = readFacadeAlwaysRun(seams.git, base, context.checkout);
+  const joined = withAlwaysRun(files, checks.map((check) => check.test));
+  const added = new Set(joined.slice(files.length));
+  for (const check of checks) {
+    if (added.has(check.test)) activeOutput().info(`🧩 Facade check added: ${check.test} (a new deep import in ${check.file})`);
+  }
+  return joined;
 }
 
 /** The scope the run record holds for a task's check run: `module` for the path list a `tests=module` line reads, else the list run. */
@@ -200,7 +225,7 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const scope = await taskScopeOf(context, seams, input, entry, diff);
   const runs = scope === null
     ? { narrowing: {}, alwaysRun: [], timed: [] }
-    : checkRunsOf(scope, entry.related, input.base, () => readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
+    : checkRunsOf(scope, entry.related, input.base, () => taskAlwaysRunOf(context, seams, input.base));
   const label = `task step after "${input.task}"`;
   if (runs.narrowing.paths?.length === 0) return settleNothingRan(context, seams, input, null, `🧪 ${label}: no test file in the paths checks.task names; nothing to run.`);
   const result = await runWithAlwaysRun(context, seams, 'task', runs);

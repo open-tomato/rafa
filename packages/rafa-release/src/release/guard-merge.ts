@@ -4,8 +4,9 @@
  * reaction the two settings choose for what it answers.
  *
  * ```text
- * readMergeGuard(input)             → fetch base and head, then readGuard       (git)
- * guardReaction(reading, settings)  → silent | print | report | ask | refuse | accept  (pure)
+ * readMergeGuard(input)                   → fetch base and head, then readGuard       (git)
+ * readHeadPackageFragments(input)         → the head's refused package fragments      (git)
+ * guardReaction(reading, settings)        → silent | print | report | ask | refuse | accept  (pure)
  * ```
  *
  * `./guard.ts` reads and fetches nothing; its caller fetches the base
@@ -35,16 +36,34 @@
  * with no merge base), and a refusal naming no answer would stop a merge
  * over a question nobody could answer. `refuse` and `ask` are reactions
  * to an answer the guard gave.
+ *
+ * ## Package fragments
+ *
+ * Under `release.packageFragments: refuse` the head may hold no fragment
+ * with a `package:` line, wherever it came from: the head's whole
+ * `release.fragments` directory is read at `origin/<head>` through
+ * `readFragmentTree` (`./fragment-tree.ts`), so a fragment the branch
+ * inherited from its base is refused as one it added is, since both are
+ * in the tree the merge lands. Which fragment is refused is the shared
+ * reading's (`./package-fragments.ts`), the one `rafa release fragment`
+ * asks, so the command and the merge cannot disagree. Under `allow`
+ * nothing is read. A tree git cannot read refuses nothing: the guard's
+ * own reading of the same ref reports what failed, as the reaction
+ * table's "not read" row says.
  */
 import type { ReleaseFileSettings } from './enabled.js';
 import type { GuardNotesReader, GuardReading } from './guard.js';
+import type { RefusedPackageFragment } from './package-fragments.js';
 import type { SettleSettings } from './settle.js';
+import type { PackageFragmentMode } from '@open-tomato/rafa/config-schema-release';
 import type { VersionCollisionMode } from '@open-tomato/rafa/core/config/sections';
 import type { GitRunner } from '@open-tomato/rafa/core/git';
 
 import { gitSaid } from '@open-tomato/rafa/core/git';
 
+import { readFragmentTree } from './fragment-tree.js';
 import { readGuard } from './guard.js';
+import { refusedPackageFragments } from './package-fragments.js';
 import { RELEASE_REMOTE } from './version.js';
 
 /**
@@ -56,6 +75,8 @@ export interface MergeGuardSettings extends SettleSettings, ReleaseFileSettings 
   readonly prVersionCollision: VersionCollisionMode;
   /** Whether a `collision` merges anyway. `dangerous.acceptVersionCollision`. */
   readonly dangerousAcceptVersionCollision: boolean;
+  /** Whether the head may hold a fragment naming a package. `release.packageFragments`. */
+  readonly releasePackageFragments: PackageFragmentMode;
 }
 
 /** What {@link readMergeGuard} reads. */
@@ -92,6 +113,7 @@ export function mergeGuardSettings(config: MergeGuardSettings): MergeGuardSettin
     releaseMoveLock: config.releaseMoveLock,
     prVersionCollision: config.prVersionCollision,
     dangerousAcceptVersionCollision: config.dangerousAcceptVersionCollision,
+    releasePackageFragments: config.releasePackageFragments,
   };
 }
 
@@ -132,6 +154,32 @@ export function readMergeGuard(input: MergeGuardInput): GuardReading {
     readNotes: input.readNotes,
   });
   return withFetchProblems(reading, fetchProblems);
+}
+
+/** What {@link readHeadPackageFragments} reads. */
+export interface HeadPackageFragmentsInput {
+  /** Git, run at the repository root. */
+  readonly git: GitRunner;
+  readonly settings: Pick<MergeGuardSettings, 'releaseFragments' | 'releasePackageFragments'>;
+  /** The pull request's head branch, read as `<remote>/<head>`. */
+  readonly head: string;
+  /** The remote the head was fetched from. `origin` when left out. */
+  readonly remote?: string;
+}
+
+/**
+ * Each fragment the head's tree holds that `release.packageFragments`
+ * refuses, named by path; see "Package fragments" in the module note.
+ * Read after {@link readMergeGuard}, whose fetch it reads.
+ */
+export function readHeadPackageFragments(input: HeadPackageFragmentsInput): readonly RefusedPackageFragment[] {
+  const mode = input.settings.releasePackageFragments;
+  if (mode === 'allow') return [];
+  const remote = input.remote ?? RELEASE_REMOTE;
+  const tree = readFragmentTree(input.git, `${remote}/${input.head}`, input.settings.releaseFragments);
+  return tree.ok
+    ? refusedPackageFragments(mode, tree.fragments)
+    : [];
 }
 
 /** How `mode` meets a `missing` or `stale` answer. */

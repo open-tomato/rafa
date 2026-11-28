@@ -82,6 +82,14 @@
  *     run without `editsPriority` is held to an `editable` answering no
  *     priority instead, by one case in place of the four, since the
  *     port reads an absent priority as a tracker that writes none.
+ *   - A type through the pair: one more case, held only when an adapter
+ *     run with `editsIssues: true` is also run with `editsType: true`.
+ *     `edit` moves a `debt` issue to `bug`, read back by `editable` and
+ *     `get`, keeping its title, body, module and priority, every label
+ *     that names neither type, and the other issue a `debt` still. An
+ *     adapter with the pair run without `editsType` is held to an
+ *     `editable` answering no type instead, by one case in place of it,
+ *     as for a priority.
  *   - A clock per case, which the source lacks. `create` is handed a
  *     fresh {@link ContractClock} from the `clock` factory, the wall
  *     clock by default, and an adapter stamps `createdAt` from it. Under
@@ -147,6 +155,11 @@ export interface TrackerContractOptions {
    * left out, and read only beside `editsIssues: true`.
    */
   readonly editsPriority?: boolean;
+  /**
+   * Whether the adapter's pair reads and writes a type. False when left
+   * out, and read only beside `editsIssues: true`.
+   */
+  readonly editsType?: boolean;
 }
 
 /** One contract case: its name, and a run that rejects when the adapter breaks it. */
@@ -465,8 +478,67 @@ function priorityCases(options: TrackerContractOptions): readonly TrackerContrac
 }
 
 /**
+ * The labels of `labels` naming neither `debt` nor `bug`, sorted: what a
+ * move between the two keeps, whatever a tracker spells its type label.
+ */
+function labelsBesideType(labels: readonly string[]): string[] {
+  return labels.filter((label) => !label.includes('debt') && !label.includes('bug')).sort();
+}
+
+/** The case of a type through the pair, or the one case holding `editable` to answering none. */
+function typeCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
+  const create = caseCreate(options);
+  if (options.editsType !== true) {
+    return [
+      {
+        name: 'answers no type from editable, run without the type edit',
+        run: async () => {
+          const tracker = await create();
+          await tracker.preflight();
+          const ref = await tracker.create(draftFixture({ opt: 0 }));
+
+          expect((await editMembersOf(tracker).editable(ref)).type).toBeUndefined();
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'edit moves an issue from debt to bug, keeping its other labels, its body and every other issue',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const moved = await tracker.create(draftFixture({
+          opt: 0,
+          type: 'debt',
+          title: 'Replay window',
+          body: 'Codes stay valid.\n',
+          module: 'cli-gap',
+          priority: 'high',
+          cause: 'cli:new-context',
+        }));
+        const other = await tracker.create(draftFixture({ opt: 0, type: 'debt', title: 'Signing keys' }));
+        const { editable, edit } = editMembersOf(tracker);
+        const before = await editable(moved);
+
+        expect(before.type).toBe('debt');
+        await edit(moved, { type: 'bug' });
+
+        const after = await editable(moved);
+        expect(after).toMatchObject({ type: 'bug', title: 'Replay window', body: 'Codes stay valid.\n' });
+        expect(labelsBesideType(after.labels)).toEqual(labelsBesideType(before.labels));
+        expect(await tracker.get(moved)).toMatchObject({ type: 'bug', module: 'cli-gap', priority: 'high' });
+        expect(await editable(other)).toMatchObject({ type: 'debt', title: 'Signing keys' });
+      },
+    },
+  ];
+}
+
+/**
  * The cases of the optional `editable` and `edit` pair with those of a
- * priority through it, or the one case holding the pair left out.
+ * priority and a type through it, or the one case holding the pair left
+ * out.
  */
 function editCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
   const create = caseCreate(options);
@@ -564,6 +636,7 @@ function editCases(options: TrackerContractOptions): readonly TrackerContractCas
       },
     },
     ...priorityCases(options),
+    ...typeCases(options),
   ];
 }
 

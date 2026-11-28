@@ -1,9 +1,10 @@
 /**
  * Tests for the `service` strategy's state file (`state.ts`): both
  * cursors kept under a store's origin for one hub, every other origin's
- * entry dropped on a write, and a file this module did not write read
- * as holding no cursors. Every file lives under this file's temporary
- * directory.
+ * entry dropped on a write, a file this module did not write read as
+ * holding no cursors, a version 1 file read down, and `heldBack` kept
+ * at the first projected contact. Every file lives under this file's
+ * temporary directory.
  */
 import { chmodSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,6 +13,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
+  clearHeldBack,
+  keepHeldBack,
   readSyncCursors,
   SYNC_STATE_FILE_NAME,
   SYNC_STATE_FORMAT,
@@ -24,6 +27,19 @@ const HUB = 'https://hub.example.invalid';
 const OTHER_HUB = 'https://other-hub.example.invalid';
 const ORIGIN = 'aaaaaaaa-0000-4000-8000-00000000000a';
 const OTHER_ORIGIN = 'bbbbbbbb-0000-4000-8000-00000000000b';
+
+const SINCE = '2026-11-20T10:00:00.000Z';
+const LATER = '2026-11-21T10:00:00.000Z';
+
+/**
+ * The version predicate `readStores` shipped with at version 1 (base
+ * 8ee910c9, `state.ts:125`): whether a parsed file is read at all. A
+ * build still on version 1 reads every other file as holding nothing.
+ */
+function shippedVersion1Reads(parsed: unknown): boolean {
+  const record = parsed as { format?: unknown; version?: unknown };
+  return typeof parsed === 'object' && parsed !== null && record.format === SYNC_STATE_FORMAT && record.version === 1;
+}
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-sync-service-state-')));
 
@@ -73,15 +89,17 @@ describe('readSyncCursors', () => {
     const readings = [
       '{ not json',
       JSON.stringify({ format: 'other', version: SYNC_STATE_VERSION, stores: { [ORIGIN]: good } }),
-      JSON.stringify({ format: SYNC_STATE_FORMAT, version: 2, stores: { [ORIGIN]: good } }),
+      JSON.stringify({ format: SYNC_STATE_FORMAT, version: SYNC_STATE_VERSION + 1, stores: { [ORIGIN]: good } }),
       JSON.stringify({ format: SYNC_STATE_FORMAT, version: SYNC_STATE_VERSION, stores: { [ORIGIN]: { ...good, push: { commits: -1 } } } }),
       JSON.stringify({ format: SYNC_STATE_FORMAT, version: SYNC_STATE_VERSION, stores: { [ORIGIN]: { ...good, pull: { commits: 1.5 } } } }),
       JSON.stringify({ format: SYNC_STATE_FORMAT, version: SYNC_STATE_VERSION, stores: { [ORIGIN]: { ...good, hub: 7 } } }),
+      JSON.stringify({ format: SYNC_STATE_FORMAT, version: SYNC_STATE_VERSION, stores: { [ORIGIN]: { ...good, heldBack: { cursor: { commits: -1 }, since: SINCE } } } }),
+      JSON.stringify({ format: SYNC_STATE_FORMAT, version: SYNC_STATE_VERSION, stores: { [ORIGIN]: { ...good, heldBack: { cursor: {}, since: 'not a time' } } } }),
     ].map((text) => {
       writeFileSync(path, text, 'utf8');
       return readSyncCursors(path, ORIGIN, HUB);
     });
-    expect(readings).toEqual(Array.from({ length: 6 }, () => ({ push: {}, pull: {} })));
+    expect(readings).toEqual(Array.from({ length: 8 }, () => ({ push: {}, pull: {} })));
 
     plant(path, { format: SYNC_STATE_FORMAT, version: SYNC_STATE_VERSION, stores: { [ORIGIN]: good } });
     expect(readSyncCursors(path, ORIGIN, HUB)).toEqual({ push: { commits: 1 }, pull: {} });
@@ -128,5 +146,96 @@ describe('writeSyncCursor', () => {
     writeSyncCursor(path, '__proto__', HUB, 'push', { commits: 2 });
     expect(readSyncCursors(path, '__proto__', HUB).push).toEqual({ commits: 2 });
     expect(Object.keys((JSON.parse(readFileSync(path, 'utf8')) as { stores: object }).stores)).toEqual(['__proto__']);
+  });
+});
+
+describe('the version 1 read-down', () => {
+  it('reads a version 1 file with its push and pull cursors kept and no heldBack', () => {
+    const path = freshState();
+    plant(path, {
+      format: SYNC_STATE_FORMAT,
+      version: 1,
+      stores: { [ORIGIN]: { hub: HUB, push: { commits: 4 }, pull: { commits: 9, sessions: 2 } } },
+    });
+    const read = readSyncCursors(path, ORIGIN, HUB);
+    expect(read).toEqual({ push: { commits: 4 }, pull: { commits: 9, sessions: 2 } });
+    expect('heldBack' in read).toBe(false);
+  });
+
+  it('rewrites a version 1 file as this version on the next write, keeping the other cursor', () => {
+    const path = freshState();
+    plant(path, { format: SYNC_STATE_FORMAT, version: 1, stores: { [ORIGIN]: { hub: HUB, push: { commits: 4 }, pull: {} } } });
+    writeSyncCursor(path, ORIGIN, HUB, 'pull', { commits: 7 });
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      format: SYNC_STATE_FORMAT,
+      version: SYNC_STATE_VERSION,
+      stores: { [ORIGIN]: { hub: HUB, push: { commits: 4 }, pull: { commits: 7 } } },
+    });
+  });
+
+  it('is read as empty by the shipped version 1 predicate once written at this version', () => {
+    const path = freshState();
+    writeSyncCursor(path, ORIGIN, HUB, 'pull', { commits: 7 });
+    keepHeldBack(path, ORIGIN, HUB, { cursor: { commits: 7 }, since: SINCE });
+    expect(SYNC_STATE_VERSION).toBe(2);
+    expect(shippedVersion1Reads(JSON.parse(readFileSync(path, 'utf8')))).toBe(false);
+
+    // Control: the same predicate reads a version 1 file, so the false above is the version's doing.
+    plant(path, { format: SYNC_STATE_FORMAT, version: 1, stores: { [ORIGIN]: { hub: HUB, push: {}, pull: { commits: 7 } } } });
+    expect(shippedVersion1Reads(JSON.parse(readFileSync(path, 'utf8')))).toBe(true);
+  });
+});
+
+describe('keepHeldBack', () => {
+  it('keeps the first heldBack over two projected writes', () => {
+    const path = freshState();
+    writeSyncCursor(path, ORIGIN, HUB, 'pull', { commits: 3 });
+    const first = { cursor: { commits: 3 }, since: SINCE };
+    expect(keepHeldBack(path, ORIGIN, HUB, first)).toEqual(first);
+    writeSyncCursor(path, ORIGIN, HUB, 'pull', { commits: 8 });
+    expect(keepHeldBack(path, ORIGIN, HUB, { cursor: { commits: 8 }, since: LATER })).toEqual(first);
+    writeSyncCursor(path, ORIGIN, HUB, 'pull', { commits: 12 });
+    expect(readSyncCursors(path, ORIGIN, HUB)).toEqual({ push: {}, pull: { commits: 12 }, heldBack: first });
+  });
+
+  it('keeps both cursors when it sets heldBack, and a cursor write keeps heldBack', () => {
+    const path = freshState();
+    writeSyncCursor(path, ORIGIN, HUB, 'push', { commits: 2 });
+    writeSyncCursor(path, ORIGIN, HUB, 'pull', { commits: 5 });
+    keepHeldBack(path, ORIGIN, HUB, { cursor: { commits: 5 }, since: SINCE });
+    writeSyncCursor(path, ORIGIN, HUB, 'push', { commits: 6 });
+    expect(readSyncCursors(path, ORIGIN, HUB)).toEqual({
+      push: { commits: 6 },
+      pull: { commits: 5 },
+      heldBack: { cursor: { commits: 5 }, since: SINCE },
+    });
+  });
+
+  it('holds heldBack per store and per hub', () => {
+    const path = freshState();
+    keepHeldBack(path, ORIGIN, HUB, { cursor: {}, since: SINCE });
+    expect(readSyncCursors(path, OTHER_ORIGIN, HUB)).toEqual({ push: {}, pull: {} });
+    expect(readSyncCursors(path, ORIGIN, OTHER_HUB)).toEqual({ push: {}, pull: {} });
+    const other = { cursor: { commits: 1 }, since: LATER };
+    expect(keepHeldBack(path, ORIGIN, OTHER_HUB, other)).toEqual(other);
+  });
+});
+
+describe('clearHeldBack', () => {
+  it('clears heldBack and keeps both cursors, so the next projected contact sets it again', () => {
+    const path = freshState();
+    writeSyncCursor(path, ORIGIN, HUB, 'push', { commits: 2 });
+    writeSyncCursor(path, ORIGIN, HUB, 'pull', { commits: 5 });
+    keepHeldBack(path, ORIGIN, HUB, { cursor: { commits: 1 }, since: SINCE });
+    clearHeldBack(path, ORIGIN, HUB);
+    expect(readSyncCursors(path, ORIGIN, HUB)).toEqual({ push: { commits: 2 }, pull: { commits: 5 } });
+    const next = { cursor: { commits: 5 }, since: LATER };
+    expect(keepHeldBack(path, ORIGIN, HUB, next)).toEqual(next);
+  });
+
+  it('writes nothing when no heldBack is set', () => {
+    const path = freshState();
+    clearHeldBack(path, ORIGIN, HUB);
+    expect(readdirSync(join(path, '..'))).toEqual([]);
   });
 });

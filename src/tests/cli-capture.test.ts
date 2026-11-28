@@ -125,6 +125,7 @@ describe('runRafa', () => {
   // stays under 50 KB, so one file growing past it turns this case red.
   // Rafa's claim (nothing under the scratch HOME) holds on every version;
   // only the control's expectation is version-dependent.
+  // src/tests/bun-cache-line.sweep.test.ts is the guard that names the file which crossed the line.
   const bunWritesInstallCache = Bun.semver.satisfies(Bun.version, '>=1.4.0');
 
   it('leaves no .bun directory under the scratch HOME, where the same spawn under HOME alone leaves one only on Bun versions that write the install cache', () => {

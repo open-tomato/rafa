@@ -6,13 +6,16 @@
  * `stretch/**` runs them too, so an item's red shows before its merge into
  * the stretch branch, not after it on the push.
  *
- * The workflow holds three jobs under the same triggers, permissions and
+ * The workflow holds four jobs under the same triggers, permissions and
  * timeout: `verify` (ring 0) runs the whole suite, lint and types,
+ * and runs the `paradedb` service, pinned by digest, behind `POSTGRES_URL`;
  * `affected` (ring 1) runs `turbo` over the packages a change reaches,
  * the type references and the workspace graph check, against the base
  * `TURBO_SCM_BASE` names, and `atlas` runs each publishable Atlas
  * library's own gates from its folder, one matrix leg per package, since
- * the root `bun test` skips them.
+ * the root `bun test` skips them. `hub-image` builds and starts the hub's
+ * image when a pull request changes a path the image is built from;
+ * `packages/rafa-hub/src/image.test.ts` holds that job's path list.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,11 +38,18 @@ interface Step {
   readonly with?: Readonly<Record<string, unknown>>;
 }
 
+/** One service container of a job, as the workflow writes it. */
+interface Service {
+  readonly image: string;
+  readonly ports?: readonly string[];
+}
+
 /** One job of the workflow, as the workflow writes it. */
 interface Job {
   readonly 'runs-on': string;
   readonly 'timeout-minutes': number;
   readonly env?: Readonly<Record<string, unknown>>;
+  readonly services?: Readonly<Record<string, Service>>;
   readonly steps: readonly Step[];
 }
 
@@ -54,6 +64,12 @@ interface Workflow {
 function parse(text: string): Workflow {
   return Bun.YAML.parse(text) as Workflow;
 }
+
+/** The database URL the job `verify` hands its tests. */
+const POSTGRES_URL = 'postgres://rafa:rafa@localhost:5432/rafa';
+
+/** An image reference pinned by its sha256 digest. */
+const DIGEST_PINNED = /^paradedb\/paradedb@sha256:[0-9a-f]{64}$/;
 
 /** The parsed workflow. */
 const WORKFLOW = parse(TEXT);
@@ -140,8 +156,8 @@ describe('the verify workflow', () => {
     expect(branchesOf(WORKFLOW, 'push')).toEqual(['stretch/**']);
   });
 
-  it('holds three jobs, verify, affected and atlas', () => {
-    expect(Object.keys(WORKFLOW.jobs)).toEqual(['verify', 'affected', 'atlas']);
+  it('holds four jobs, verify, affected, atlas and hub-image', () => {
+    expect(Object.keys(WORKFLOW.jobs)).toEqual(['verify', 'affected', 'atlas', 'hub-image']);
   });
 
   it('reads contents and nothing more', () => {
@@ -197,11 +213,22 @@ describe('the job verify, ring 0', () => {
     ]);
   });
 
-  it('checks out the default shallow history and sets no env', () => {
+  it('checks out the default shallow history and sets POSTGRES_URL alone', () => {
     const checkout = stepsOf('verify').find((step) => step.uses === 'actions/checkout@v7');
 
     expect(checkout?.with).toBeUndefined();
-    expect(WORKFLOW.jobs['verify']?.env).toBeUndefined();
+    expect(WORKFLOW.jobs['verify']?.env).toEqual({ POSTGRES_URL });
+  });
+
+  it('runs the paradedb service from an image pinned by digest, on the port POSTGRES_URL names', () => {
+    const service = WORKFLOW.jobs['verify']?.services?.['paradedb'];
+
+    expect(service?.image).toMatch(DIGEST_PINNED);
+    expect(service?.ports).toEqual(['5432:5432']);
+  });
+
+  it('would see a floating tag, the control over an image named by tag', () => {
+    expect('paradedb/paradedb:0.26.4-pg18').not.toMatch(DIGEST_PINNED);
   });
 });
 
@@ -223,6 +250,11 @@ describe('the job affected, ring 1', () => {
     expect(expression).toContain('format(\'origin/{0}\', github.base_ref)');
     expect(expression).toContain('|| \'origin/integration\'');
     expect(Object.keys(WORKFLOW.on).filter((trigger) => trigger !== 'pull_request')).toEqual(['push']);
+  });
+
+  it('runs no service and sets no POSTGRES_URL', () => {
+    expect(WORKFLOW.jobs['affected']?.services).toBeUndefined();
+    expect(WORKFLOW.jobs['affected']?.env?.['POSTGRES_URL']).toBeUndefined();
   });
 
   it('turns turbo\'s telemetry off', () => {

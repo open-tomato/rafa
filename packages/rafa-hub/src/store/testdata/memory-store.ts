@@ -10,6 +10,12 @@
  * project not listed; a context listing none, or the `default` project
  * alone, keeps one state that every request is served in.
  *
+ * A pull naming a `limit` answers its tables in the order first pushed
+ * and stops at `limit` rows, the cursor of the table it stopped in at
+ * the last row it answered there and that of every table after at the
+ * request's. `contract()` answers the context's `maxPayloadRows`, `null`
+ * when it names none.
+ *
  * Each push replaces the state with a new one rather than editing it.
  */
 import type {
@@ -74,6 +80,28 @@ function appendNew(held: readonly WireRow[], pushed: readonly WireRow[]): readon
   }, held);
 }
 
+/** The rows answered of each table and the cursor past them, from the first `limit` rows in table order. */
+function pageOf(
+  answered: readonly (readonly [string, readonly WireRow[], number])[],
+  since: Readonly<Record<string, number>>,
+  limit: number,
+): Pick<WirePayload, 'tables' | 'cursor'> {
+  const page = answered.reduce<{ readonly room: number; readonly tables: readonly (readonly [string, readonly WireRow[], number])[] }>(
+    ({ room, tables }, [table, rows, last]) => {
+      const kept = rows.slice(0, room);
+      const cursor = kept.length === rows.length
+        ? last
+        : Number(kept.at(-1)?.seq ?? since[table] ?? 0);
+      return { room: room - kept.length, tables: [...tables, [table, kept, cursor]] };
+    },
+    { room: limit, tables: [] },
+  );
+  return {
+    tables: Object.fromEntries(page.tables.map(([table, rows]) => [table, rows])),
+    cursor: { ...since, ...Object.fromEntries(page.tables.map(([table, , cursor]) => [table, cursor])) },
+  };
+}
+
 /** Opens an empty stand-in; `directory` is left unused. */
 export function openMemoryHubStore(context: HubStoreContext): HubStore {
   const projects = context.projects ?? [];
@@ -121,12 +149,12 @@ export function openMemoryHubStore(context: HubStoreContext): HubStore {
     } catch (error) {
       return Promise.reject(error as Error);
     }
-    const held = Object.entries(state.tables);
-    const tables = Object.fromEntries(held.map(([table, rows]) => [
+    const answered = Object.entries(state.tables).map(([table, rows]) => [
       table,
       rows.filter((row) => Number(row.seq) > (since[table] ?? 0) && row['origin_store'] !== device),
-    ]));
-    const cursor = { ...since, ...Object.fromEntries(held.map(([table, rows]) => [table, Math.max(since[table] ?? 0, rows.length)])) };
+      Math.max(since[table] ?? 0, rows.length),
+    ] as const);
+    const { tables, cursor } = pageOf(answered, since, request.limit ?? Number.POSITIVE_INFINITY);
     return Promise.resolve({ format: WIRE_FORMAT, version: WIRE_VERSION, migrations: state.migrations, tables, cursor });
   };
 
@@ -154,7 +182,12 @@ export function openMemoryHubStore(context: HubStoreContext): HubStore {
     return Promise.resolve({ ...answered, projects: context.projects.map(({ id, name }) => ({ id, name })) });
   };
 
-  const contract = (): HubContract => ({ contractVersion: WIRE_CONTRACT_VERSION, migrations: first().migrations, capabilities: CAPABILITIES });
+  const contract = (): HubContract => ({
+    contractVersion: WIRE_CONTRACT_VERSION,
+    migrations: first().migrations,
+    capabilities: CAPABILITIES,
+    maxPayloadRows: context.maxPayloadRows ?? null,
+  });
 
   return { push, pull, status, contract, close: () => Promise.resolve() };
 }

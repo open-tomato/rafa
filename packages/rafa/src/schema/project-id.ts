@@ -73,6 +73,37 @@ function hasColonAfterAt(url: string): boolean {
   return at !== -1 && url.lastIndexOf(':') > at;
 }
 
+/** What opens a URL's authority, after its scheme. */
+const SCHEME_END = '://';
+
+/**
+ * `url` less the credentials after its first `://` that has some: up to
+ * the first `@` after it, kept as `://`, as `/:\/\/[^@]+@/` replaced
+ * them, first match only. An `indexOf` of each does it in linear time,
+ * where that regex ran its `[^@]+` across every `://` of a repeated one
+ * (CodeQL js/polynomial-redos).
+ */
+function withoutCredentials(url: string): string {
+  for (let scheme = url.indexOf(SCHEME_END); scheme !== -1; scheme = url.indexOf(SCHEME_END, scheme + 1)) {
+    const authority = scheme + SCHEME_END.length;
+    const at = url.indexOf('@', authority);
+    if (at === -1) return url;
+    if (at > authority) return `${url.slice(0, authority)}${url.slice(at + 1)}`;
+  }
+  return url;
+}
+
+/**
+ * `text` without its trailing slashes, found by a scan back from the end:
+ * linear in the length, where the regex `/\/+$/` was tried from every slash
+ * of an inner run and took quadratic time on one (CodeQL js/polynomial-redos).
+ */
+function withoutTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charAt(end - 1) === '/') end -= 1;
+  return text.slice(0, end);
+}
+
 /**
  * `url` as continuous-learning-v2 hashes it: credentials stripped, the
  * scheme dropped, `git@host:path` rewritten `host/path`, a trailing
@@ -81,13 +112,12 @@ function hasColonAfterAt(url: string): boolean {
  * replaces only the first match.
  */
 export function normalizeRemote(url: string): string {
-  const stripped = url.replace(/:\/\/[^@]+@/, '://');
+  const stripped = withoutCredentials(url);
   const network = !stripped.startsWith('file://')
-    && (stripped.includes('://') || hasColonAfterAt(stripped));
-  const trimmed = stripped.replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//, '')
+    && (stripped.includes(SCHEME_END) || hasColonAfterAt(stripped));
+  const trimmed = withoutTrailingSlashes(stripped.replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//, '')
     .replace(/^[^@/:]+@([^:/]+):/, '$1/')
-    .replace(/\.git\/?$/, '')
-    .replace(/\/+$/, '');
+    .replace(/\.git\/?$/, ''));
 
   return network
     ? trimmed.toLowerCase()

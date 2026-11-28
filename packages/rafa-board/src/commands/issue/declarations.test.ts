@@ -181,7 +181,7 @@ describe('the flags each upstream command declares', () => {
     const help = (flags: typeof ISSUE_CREATE_DECLARATION.flags): string | undefined => flags
       .find(({ name }) => name === UPSTREAM_FLAG)?.description;
 
-    expect(help(ISSUE_CREATE_DECLARATION.flags)).toContain('a bug only (--type=bug)');
+    expect(help(ISSUE_CREATE_DECLARATION.flags)).toContain('a bug record only (--type=bug or --type=debt)');
     expect(help(ISSUE_COMMENT_DECLARATION.flags)).not.toContain('--type=bug');
   });
 });

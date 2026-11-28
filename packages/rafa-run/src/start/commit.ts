@@ -120,6 +120,14 @@ export const BACKGROUND_WAIT_HOLD
 /** The hold naming the absent half its work was asked to leave behind. */
 const NO_COMMIT_HOLD = 'no commit: the task changed no tracked file';
 
+/**
+ * The line a task held on both absences is printed under, its task's
+ * text after a colon; the run's closing `halt` opens with it too
+ * (`stopEventsOf` in `./continue-run.ts`), so `rafa loop wait` and
+ * `rafa stretch item` name the same hold the text log does.
+ */
+export const TASK_HELD_NOTHING_LEFT = 'Task held: its session left neither a report nor a commit';
+
 /** The blocker text a task held on both absences carries into its next dispatch. */
 export const NOTHING_REPORTED_OR_COMMITTED
   = 'the session wrote no report block and changed no tracked file';
@@ -335,7 +343,7 @@ export function commitFinishedTask(options: FinishedTaskOptions): CommitAttempt 
   }
   if (held) {
     out.error(silent
-      ? `\n⛔ Task held: its session left neither a report nor a commit: ${taskText}`
+      ? `\n⛔ ${TASK_HELD_NOTHING_LEFT}: ${taskText}`
       : `\n⛔ Task blocked by its own report: ${taskText}`);
     for (const hold of holds) out.error(indentBlock(hold));
   } else {

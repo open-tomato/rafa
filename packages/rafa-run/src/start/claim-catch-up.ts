@@ -7,11 +7,12 @@
  * so a plan claimed days before its run starts finds `feat/<stub>` cut
  * from a base that has moved since. A branch that carries nothing but
  * claims has no work a merge could disturb, and the run merges the base
- * into it; a branch with work is never merged, only reported. This
- * module only READS which of the two it is. It merges nothing, fetches
- * nothing and prints nothing: the caller fetches `origin/<base>` when it
- * wants a fresh one, runs the `git merge` in the run's worktree, and
- * says what it did.
+ * into it; a branch with work is never merged, only reported, and the
+ * claim check refuses a run that has committed no task of its plan on
+ * it (`./preflight-claim.ts`). This module only READS which of the two
+ * it is. It merges nothing, fetches nothing and prints nothing: the
+ * caller fetches `origin/<base>` when it wants a fresh one, runs the
+ * `git merge` in the run's worktree, and says what it did.
  *
  * ## The reading
  *
@@ -50,7 +51,16 @@
  *    catch-up. A parent is held when `git merge-base <parent> <base tip>`
  *    answers the parent itself; a merge of anything else is work, since
  *    the side it brings in is not the base;
- *  - WORK, anything else, counted in `behind`'s `workCommits`.
+ *  - WORK, anything else, counted in `behind`'s `workCommits`. The
+ *    reading names the first of them as `git log` lists the range,
+ *    newest first, as `firstWork`: past it the branch holds only claims
+ *    and catch-up merges.
+ *
+ * A `behind` reading also names its CLAIM commits, the single-parent
+ * ones of the first kind, oldest first, as `claimCommits`: the recut the
+ * claim check prints (`./preflight-claim.ts`) picks every one of them
+ * onto the base, those made before a work commit included, and leaves
+ * the catch-up merges behind, the base holding all they brought.
  *
  * A merge commit's own changes, a conflict resolved by hand, are not
  * read: a catch-up merge of a claim-only branch cannot conflict, its
@@ -101,8 +111,21 @@ export type ClaimCatchUpReading =
     readonly kind: 'behind';
     /** The branch's commits past `origin/<base>` that are neither claims nor catch-up merges. */
     readonly workCommits: number;
+    /**
+     * The first of those commits as `git log` lists them, newest first:
+     * every commit after it on the branch is a claim or a catch-up merge.
+     */
+    readonly firstWork: WorkCommit;
+    /** The shas of the branch's claim commits past `origin/<base>`, catch-up merges left out, oldest first. */
+    readonly claimCommits: readonly string[];
   } & BehindReading)
   | ({ readonly kind: 'unreadable'; readonly reason: string } & ReadingOf);
+
+/** A commit of the branch that is not a claim, named by its sha and subject. */
+export interface WorkCommit {
+  readonly sha: string;
+  readonly subject: string;
+}
 
 /** One commit of the branch past `origin/<base>`, as the `log` capture lists it. */
 interface OwnCommit {
@@ -192,9 +215,20 @@ export function readClaimCatchUp(git: GitRunner, branch: string, base: string): 
     return unreadable(`could not list ${branch}'s commits past ${remoteBase}: ${gitSaid(listed)}`);
   }
   const own = ownCommitsOf(listed.stdout);
-  const workCommits = own.filter((commit) => !isClaimOnly(git, commit, baseTip)).length;
+  const claimOnly = own.map((commit) => isClaimOnly(git, commit, baseTip));
+  const work = own.filter((_commit, at) => claimOnly[at] !== true);
   const standing = { ...named, behind, ahead: own.length, mergeBase, baseTip };
-  return workCommits === 0
-    ? { kind: 'catch-up', ...standing }
-    : { kind: 'behind', ...standing, workCommits };
+  const [first] = work;
+  if (first === undefined) return { kind: 'catch-up', ...standing };
+  const claimCommits = own
+    .filter((commit, at) => claimOnly[at] === true && commit.parents.length <= 1)
+    .map((commit) => commit.sha)
+    .reverse();
+  return {
+    kind: 'behind',
+    ...standing,
+    workCommits: work.length,
+    firstWork: { sha: first.sha, subject: first.subject },
+    claimCommits,
+  };
 }

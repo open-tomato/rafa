@@ -106,6 +106,16 @@ import { CONFIG_DEFAULTS } from '../../../../config-registry.js';
 /** The label every pure case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
 
+/**
+ * The spec's one-second bound on a crafted file: the old tab-indent
+ * pattern, its leading run and its tab able to share a line of tabs,
+ * took about 2.3 s on {@link CRAFTED_TABS} tabs and grows with its square.
+ */
+const REDOS_BOUND_MS = 1000;
+
+/** Tabs on the crafted line, about the 50,000 characters of the plan's slow shape. */
+const CRAFTED_TABS = 50_000;
+
 /** The label a user scope file parses under. No file is read at it. */
 const USER_PATH = '/home/someone/.rafa/config.yaml';
 
@@ -126,6 +136,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'store',
   'effortBusyTimeoutMs',
   'effortSync',
+  'effortSyncSkew',
+  'effortSyncMerge',
   'hubUrl',
   'hubTokenSecret',
   'hubTimeout',
@@ -189,6 +201,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'releasePublishCommand',
   'releasePublish',
   'releaseMoveLock',
+  'releasePackageFragments',
   'errorsCodes',
   'bugsRecheckRuns',
   'bugsRecheckTimeoutSeconds',
@@ -245,6 +258,8 @@ const DEFAULTS: RafaConfig = {
   store: 'sqlite',
   effortBusyTimeoutMs: 5000,
   effortSync: 'local',
+  effortSyncSkew: 'refuse',
+  effortSyncMerge: 'ff-only',
   hubUrl: null,
   hubTokenSecret: null,
   hubTimeout: '3s',
@@ -308,6 +323,7 @@ const DEFAULTS: RafaConfig = {
   releasePublishCommand: 'npm publish',
   releasePublish: 'manual',
   releaseMoveLock: false,
+  releasePackageFragments: 'allow',
   errorsCodes: [],
   bugsRecheckRuns: 5,
   bugsRecheckTimeoutSeconds: 300,
@@ -374,6 +390,8 @@ const FULL = [
   'effort:',
   '  busyTimeoutMs: 250',
   '  sync: file',
+  '  syncSkew: pull-projected',
+  '  syncMerge: merge',
   'hub:',
   '  url: https://hub.example.org',
   '  tokenSecret: rafa-hub-token',
@@ -470,6 +488,7 @@ const FULL = [
   '  publishCommand: pnpm publish',
   '  publish: ci',
   '  moveLock: true',
+  '  packageFragments: refuse',
   'errors:',
   '  codes:',
   '    - code: deploy:missing-secret',
@@ -554,6 +573,8 @@ const FULL_VALUES: RafaConfig = {
   store: 'ndjson',
   effortBusyTimeoutMs: 250,
   effortSync: 'file',
+  effortSyncSkew: 'pull-projected',
+  effortSyncMerge: 'merge',
   hubUrl: 'https://hub.example.org',
   hubTokenSecret: 'rafa-hub-token',
   hubTimeout: '10s',
@@ -631,6 +652,7 @@ const FULL_VALUES: RafaConfig = {
   releasePublishCommand: 'pnpm publish',
   releasePublish: 'ci',
   releaseMoveLock: true,
+  releasePackageFragments: 'refuse',
   errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
   bugsRecheckRuns: 12,
   bugsRecheckTimeoutSeconds: 900,
@@ -880,6 +902,21 @@ describe('parseConfigText', () => {
     expect(file.extras).toEqual([{ key: 'note', value: 'a\tb' }]);
   });
 
+  it('reads a line of tabs alone as a blank line, within REDOS_BOUND_MS', () => {
+    const text = '\t'.repeat(CRAFTED_TABS + 1);
+
+    const started = performance.now();
+    const document = parseConfigDocument(text, PATH);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(REDOS_BOUND_MS);
+    expect(document).toBeNull();
+    // Control: content after the same run is still refused as tab-indented.
+    expect(refusal(() => parseConfigDocument(`${text}x`, PATH)).problems).toEqual([
+      `${PATH}: line 1 is indented with a tab; YAML indents with spaces only`,
+    ]);
+  });
+
   it('characterizes yes as a string and TRUE as the boolean, so yes is refused', () => {
     expect(Bun.YAML.parse('a: yes')).toEqual({ a: 'yes' });
     expect(fileOf('tracking:\n  specs: TRUE\n').values.trackingSpecs).toBe(true);
@@ -933,6 +970,16 @@ describe('parseConfigText', () => {
         'effort.sync', 'effort:\n  sync: rsync',
         'effort.sync is "rsync", expected one of: local, file, git, service, p2p',
         'effort:\n  sync: p2p', 'effortSync', 'p2p',
+      ],
+      [
+        'effort.syncSkew', 'effort:\n  syncSkew: pull',
+        'effort.syncSkew is "pull", expected one of: refuse, pull-projected',
+        'effort:\n  syncSkew: pull-projected', 'effortSyncSkew', 'pull-projected',
+      ],
+      [
+        'effort.syncMerge', 'effort:\n  syncMerge: rebase',
+        'effort.syncMerge is "rebase", expected one of: ff-only, merge',
+        'effort:\n  syncMerge: merge', 'effortSyncMerge', 'merge',
       ],
       [
         'hub.url', 'hub:\n  url: hub.example.org',
@@ -1245,6 +1292,11 @@ describe('parseConfigText', () => {
         'release.moveLock', 'release:\n  moveLock: yes',
         'release.moveLock is "yes", expected true or false',
         'release:\n  moveLock: true', 'releaseMoveLock', true,
+      ],
+      [
+        'release.packageFragments', 'release:\n  packageFragments: deny',
+        'release.packageFragments is "deny", expected one of: allow, refuse',
+        'release:\n  packageFragments: refuse', 'releasePackageFragments', 'refuse',
       ],
       [
         'errors.codes', 'errors:\n  codes: git:x',
@@ -1997,6 +2049,41 @@ describe('effort.sync', () => {
 
     expect([omitting.config.effortSync, omitting.sources.effortSync]).toEqual(['file', 'user']);
     expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
+  });
+});
+
+describe('effort.syncSkew', () => {
+  it('accepts refuse and pull-projected and refuses 0, -1 and any other word by the same reader', () => {
+    const accepted = ['refuse', 'pull-projected'].map(
+      (mode) => fileOf(`effort:\n  syncSkew: ${mode}\n`).values.effortSyncSkew,
+    );
+
+    expect(accepted).toEqual(['refuse', 'pull-projected']);
+    expect(refusal(() => fileOf('effort:\n  syncSkew: 0\n')).problems).toEqual([
+      `${PATH}: effort.syncSkew is 0, expected one of: refuse, pull-projected`,
+    ]);
+    expect(refusal(() => fileOf('effort:\n  syncSkew: -1\n')).problems).toEqual([
+      `${PATH}: effort.syncSkew is -1, expected one of: refuse, pull-projected`,
+    ]);
+    expect(refusal(() => fileOf('effort:\n  syncSkew: projected\n')).problems).toEqual([
+      `${PATH}: effort.syncSkew is "projected", expected one of: refuse, pull-projected`,
+    ]);
+  });
+
+  it('is not a setting the command line can name', () => {
+    const cli = { effortSyncSkew: 'pull-projected' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect([resolved.config.effortSyncSkew, resolved.sources.effortSyncSkew]).toEqual(['refuse', 'default']);
+  });
+
+  it('answers refuse when no layer names it, and is kept beside an effort.sync other than service', () => {
+    const unnamed = resolveConfig({ file: fileOf('effort:\n  sync: service\nhub:\n  url: https://hub.example.org\n') });
+    const named = resolveConfig({ file: fileOf('effort:\n  sync: file\n  syncSkew: pull-projected\n') });
+
+    expect([unnamed.config.effortSyncSkew, unnamed.sources.effortSyncSkew]).toEqual(['refuse', 'default']);
+    expect([named.config.effortSync, named.config.effortSyncSkew, named.sources.effortSyncSkew])
+      .toEqual(['file', 'pull-projected', 'file']);
   });
 });
 

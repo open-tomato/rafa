@@ -13,7 +13,10 @@
  *   - `GET /v1/status` (`status.read`): the hub's version, the migration
  *     ids its store holds, its rows per table and each device's last push,
  *     with the store's wire contract beside them: `contractVersion`,
- *     `migrations` (the same ids) and `capabilities`. The rows, devices
+ *     `migrations` (the same ids), `capabilities` and `maxPayloadRows`,
+ *     the payload cap (`null` for none), and `embedding`, the serving
+ *     connector's embedding record as `model`, `hash` and `dimension`,
+ *     each `null` while `vector` is off. The rows, devices
  *     and migrations are the first served project's, and `projects`
  *     names every project the store serves, each by `id` and `name` in
  *     the order listed, as the store's `status()` answers them; a store
@@ -21,11 +24,22 @@
  *   - `POST /v1/effort/push?device=<origin>&project=<id>&contractVersion=<n>`
  *     (`effort.push`): the body is a wire payload as core's
  *     `encodeWirePayload` writes it, checked by core's
- *     `decodeWirePayload`; answers what the push received and added.
- *   - `GET /v1/effort/pull?device=<origin>&project=<id>&since=<cursor>&contractVersion=<n>`
+ *     `decodeWirePayload`; answers what the push received and added. A
+ *     payload carrying more rows than the cap is refused.
+ *   - `GET /v1/effort/pull?device=<origin>&project=<id>&since=<cursor>&contractVersion=<n>&migrations=<ids>`
  *     (`effort.pull`): the rows other origins created past `since`, a
  *     wire cursor as JSON text and read from the start when left out, as
- *     a wire payload.
+ *     a wire payload. `migrations` is the pulling store's migration ids,
+ *     comma-separated: a pull naming them is answered projected to that
+ *     schema when the store holds an id they leave out, and whole when
+ *     they name every id it holds; left out, the pull is answered whole.
+ *     Under a cap the answer is one page of at most the cap rows, its
+ *     cursor past the last row answered.
+ *
+ * The two effort routes are served by `server-effort.ts`, whose module
+ * note gives the cap: the store's `contract().maxPayloadRows`, as
+ * `dangerous.hub.maxPayloadRows` set it, so the status answer and the
+ * routes read one number.
  *
  * `device` is the calling store's origin, its rows' `origin_store`.
  * `project` is the project the rows are for, its root commit sha as 40
@@ -82,8 +96,16 @@
  *     naming a contract version the hub does not speak, its error naming
  *     both versions; refused once the query is read, before the body is
  *     decoded or the store is called;
- *   - `409` for a push the store refuses with `HubUpgradeRequired`: its
- *     message names the migrations the hub lacks and the upgrade to run;
+ *   - `413` for a push carrying more rows than the cap, its error naming
+ *     the rows, the cap and `dangerous.hub.maxPayloadRows`, refused once
+ *     the body is decoded, before the store is called;
+ *   - `409` with `missing`, the migrations the device lacks, for a pull
+ *     whose `migrations` leave out an id the store holds when the store's
+ *     `capabilities.projection` is `false`, refused before the store is
+ *     called: such a store is never handed a pull naming `migrations`;
+ *   - `409` with `missing`, the migrations the hub lacks, for a push the
+ *     store refuses with `HubUpgradeRequired`: its message names them and
+ *     the upgrade to run;
  *   - `500` for anything else, which is logged and never described to
  *     the caller.
  *
@@ -99,7 +121,13 @@
  * The store is opened by `openConnected` when it is given, a connector
  * opening the store and its index (`store/port.ts`, `HubConnector`)
  * together, and by `openStore` otherwise, which opens a store with no
- * index behind it. One of the two must be given.
+ * index behind it. One of the two must be given. Once the store opens
+ * the server logs one `store.opened` line at `info`, holding `sqliteVec`
+ * when the connector answered one ({@link HubConnected.sqliteVec}, the
+ * `sqlite` connector's): whether `sqlite-vec` loaded and the loader's
+ * `why` when it did not. A store opened by `openStore`, or under
+ * `postgres`, logs the line without it. An open that fails logs one
+ * `store.unavailable` line at `error` with its message.
  *
  * ## The index
  *
@@ -143,16 +171,18 @@
  * the error's message and its milliseconds.
  */
 import type { HubAction, HubCaller, HubIdentity, IdentityRefusal, IdentityRefusalReason } from './identity/port.js';
+import type { EffortRouteContext, EffortServed } from './server-effort.js';
 import type { HubKeyRoutes } from './server-keys.js';
 import type { HubLoginRoutes } from './server-login.js';
-import type { HubIndex, HubServedProject, HubStore } from './store/port.js';
-import type { WireCursor } from '@open-tomato/rafa/store';
+import type { HubContract, HubIndex, HubServedProject, HubStore } from './store/port.js';
+import type { SqliteVecAnswer } from './store/sqlite.js';
 
-import { decodeWirePayload, WIRE_FORMAT, WIRE_VERSION, WireFormatError } from '@open-tomato/rafa/store';
+import { WireFormatError } from '@open-tomato/rafa/store';
 
+import { ProjectionUnsupported, PULL_QUERY, PUSH_QUERY, servePull, servePush } from './server-effort.js';
 import { isKeyPath } from './server-keys.js';
 import { isLoginPath } from './server-login.js';
-import { checkContractVersion, checkQuery, ContractUnsupported, readDevice, readProject, RequestRefused } from './server-query.js';
+import { checkQuery, ContractUnsupported, RequestRefused } from './server-query.js';
 import { HubProjectNotServed, HubUpgradeRequired, servesOneProject } from './store/sqlite.js';
 
 /** The path each route answers on. */
@@ -258,6 +288,8 @@ export interface HubServerOptions {
 export interface HubConnected {
   readonly store: HubStore;
   readonly index: HubIndex;
+  /** The `sqlite` connector's answer for `sqlite-vec`, logged on `store.opened`; left out by every other connector. */
+  readonly sqliteVec?: SqliteVecAnswer;
 }
 
 /** A running hub. */
@@ -280,16 +312,9 @@ interface Served {
   readonly fields?: Readonly<Record<string, unknown>>;
 }
 
-/** What a route's handler is handed once the caller is served and the store is open. */
-interface RouteContext {
-  readonly url: URL;
-  readonly request: Request;
-  readonly store: HubStore;
+/** What a route's handler is handed once the caller is served and the store is open: an effort route's context, with the hub's version. */
+interface RouteContext extends EffortRouteContext {
   readonly version: string;
-  /** The projects the hub lists, or null on a single-project hub, which serves every project a request names. */
-  readonly listed: readonly HubServedProject[] | null;
-  /** Starts a rebuild of the index of the project a push named, or queues one; a no-op when the hub rebuilds nothing after a push. Never throws. */
-  readonly rebuild: (project: string | undefined) => void;
 }
 
 /** A route behind the identity port. */
@@ -365,31 +390,18 @@ function refusalResponse(refusal: IdentityRefusal): Response {
   return failure(status, refusal.message, headers);
 }
 
-/** The cursor `since` spells, `{}` when left out, checked by core's wire codec. */
-function readCursor(url: URL): WireCursor {
-  const since = url.searchParams.get('since');
-  if (since === null) return {};
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(since);
-  } catch {
-    throw new RequestRefused(400, 'since is not JSON; expected a cursor such as {"commits":12}.');
-  }
-  const probe = { format: WIRE_FORMAT, version: WIRE_VERSION, migrations: [], tables: {}, cursor: parsed };
-  return decodeWirePayload(JSON.stringify(probe)).cursor;
+/** An effort route's answer: its data in a success envelope, with its log fields. */
+function servedOf({ data, fields }: EffortServed): Omit<Served, 'caller'> {
+  return { response: success(data), fields };
 }
 
-/** The log field naming `project`, none when the request named none. */
-function projectField(project: string | undefined): Readonly<Record<string, string>> {
-  return project === undefined
-    ? {}
-    : { project };
-}
+/** The embedding `/v1/status` answers while vectors are off: each field `null`. */
+const NO_EMBEDDING = Object.freeze({ model: null, hash: null, dimension: null });
 
-/** The rows across every table of `tables`. */
-function rowCount(tables: Readonly<Record<string, readonly unknown[]>>): number {
-  return Object.values(tables).reduce((total, rows) => total + rows.length, 0);
+/** The contract as `/v1/status` answers it: its `embedding` the record's three fields, each `null` when the store answers none. */
+function statusContract(contract: HubContract): Readonly<Record<string, unknown>> {
+  const { embedding, ...rest } = contract;
+  return { ...rest, embedding: embedding ?? NO_EMBEDDING };
 }
 
 /** Every route behind the identity port, by path. */
@@ -398,34 +410,19 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
     method: 'GET',
     action: 'status.read',
     query: [],
-    handle: async ({ store, version }) => ({ response: success({ version, ...await store.status(), ...store.contract() }) }),
+    handle: async ({ store, version }) => ({ response: success({ version, ...await store.status(), ...statusContract(store.contract()) }) }),
   },
   [HUB_ROUTES.push]: {
     method: 'POST',
     action: 'effort.push',
-    query: ['device', 'project', 'contractVersion'],
-    handle: async ({ url, request, store, listed, rebuild }) => {
-      checkContractVersion(url);
-      const device = readDevice(url);
-      const project = readProject(url, listed);
-      const payload = decodeWirePayload(await request.text());
-      const pushed = await store.push({ device, project, payload });
-      if (pushed.added > 0) rebuild(project);
-      return { response: success(pushed), fields: { device, ...projectField(project), received: pushed.received, added: pushed.added } };
-    },
+    query: PUSH_QUERY,
+    handle: async (context) => servedOf(await servePush(context)),
   },
   [HUB_ROUTES.pull]: {
     method: 'GET',
     action: 'effort.pull',
-    query: ['device', 'project', 'since', 'contractVersion'],
-    handle: async ({ url, store, listed }) => {
-      checkContractVersion(url);
-      const device = readDevice(url);
-      const project = readProject(url, listed);
-      const since = readCursor(url);
-      const pulled = await store.pull({ device, project, since });
-      return { response: success(pulled), fields: { device, ...projectField(project), rows: rowCount(pulled.tables) } };
-    },
+    query: PULL_QUERY,
+    handle: async (context) => servedOf(await servePull(context)),
   },
 });
 
@@ -435,7 +432,9 @@ function refusedOf(error: unknown): Response | undefined {
   if (error instanceof ContractUnsupported) return contractRefusal(error);
   if (error instanceof HubProjectNotServed) return failure(404, error.message);
   if (error instanceof WireFormatError) return failure(400, error.message);
-  if (error instanceof HubUpgradeRequired) return failure(409, error.message);
+  if (error instanceof ProjectionUnsupported || error instanceof HubUpgradeRequired) {
+    return answer(409, { success: false, error: error.message, missing: error.missing });
+  }
   return undefined;
 }
 
@@ -485,7 +484,7 @@ function rebuildsOf(index: HubIndex, log: HubLog): Rebuilds {
 /** What {@link holdStore} opens with. */
 interface Opening {
   /** Opens the store, with its index when the hub was given a connector. */
-  readonly open: () => Promise<{ readonly store: HubStore; readonly index: HubIndex | null }>;
+  readonly open: () => Promise<{ readonly store: HubStore; readonly index: HubIndex | null; readonly sqliteVec?: SqliteVecAnswer }>;
   /** The project a rebuild after a push naming `project` records, or null when a push starts none. */
   readonly rebuildFor: ((project: string | undefined) => string) | null;
 }
@@ -498,7 +497,7 @@ function holdStore(opening: Opening, log: HubLog): StoreHolder {
 
   const attempt = async (): Promise<Held | null> => {
     try {
-      const { store, index } = await opening.open();
+      const { store, index, sqliteVec } = await opening.open();
       const { rebuildFor } = opening;
       if (index !== null && rebuildFor !== null) rebuilds = rebuildsOf(index, log);
       held = {
@@ -507,7 +506,9 @@ function holdStore(opening: Opening, log: HubLog): StoreHolder {
           if (rebuildFor !== null) rebuilds.request(rebuildFor(project));
         },
       };
-      log({ level: 'info', event: 'store.opened' });
+      log({ level: 'info', event: 'store.opened', ...sqliteVec === undefined
+        ? {}
+        : { sqliteVec } });
       return held;
     } catch (error) {
       log({ level: 'error', event: 'store.unavailable', error: messageOf(error) });

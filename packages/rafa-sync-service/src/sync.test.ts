@@ -17,12 +17,21 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { openSqliteStore, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
+import { exportWirePayload, openSqliteStore, readConflictedRows, readHeldMigrations, WIRE_CONTRACT_VERSION, WIRE_FORMAT, WIRE_VERSION } from '@open-tomato/rafa/store';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { SYNC_STATE_FILE_NAME } from './state.js';
-import create, { createServiceSync, HubContractMismatch, MOVE_TO_SQLITE, RafaUpdateRequired, SELF_UPDATE, ServiceSyncRefusal } from './sync.js';
+import create, {
+  createServiceSync,
+  HubContractMismatch,
+  HubUpgradeRequired,
+  MOVE_TO_SQLITE,
+  RafaUpdateRequired,
+  SELF_UPDATE,
+  ServiceSyncRefusal,
+  UPGRADE_HUB,
+} from './sync.js';
 import { startStandInHub } from './testdata/stand-in-hub.js';
 
 const TOKEN = 'ghp_service_sync_test_token';
@@ -30,6 +39,9 @@ const TOKEN_SECRET = 'hub-token';
 
 /** A migration id no rafa build has, as a hub a newer rafa brought forward names. */
 const FUTURE_MIGRATION = '9999-from-a-newer-rafa';
+
+/** A second id no rafa build has, for a refusal naming more than one. */
+const SECOND_FUTURE_MIGRATION = '9999-also-from-a-newer-rafa';
 
 /** Long enough for a local answer. */
 const TIMEOUT_MS = 2000;
@@ -138,7 +150,9 @@ function statePathOf(at: Device): string {
 }
 
 /** The state file of `device`'s store, parsed. */
-function stateOf(at: Device): { stores: Record<string, { hub: string; push: Record<string, number>; pull: Record<string, number> }> } {
+function stateOf(at: Device): {
+  stores: Record<string, { hub: string; push: Record<string, number>; pull: Record<string, number>; heldBack?: unknown }>;
+} {
   return JSON.parse(readFileSync(statePathOf(at), 'utf8')) as ReturnType<typeof stateOf>;
 }
 
@@ -155,6 +169,11 @@ function serviceOf(at: Device | string, over: StandInHub, options: Partial<Servi
       : null),
     ...options,
   });
+}
+
+/** The `service` strategy over `at`'s store for `over` under `effort.syncSkew: pull-projected`. */
+function projectingOf(at: Device, over: StandInHub, options: Partial<ServiceSyncOptions> = {}): ReturnType<typeof createServiceSync> {
+  return serviceOf(at, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, syncSkew: 'pull-projected' }, ...options });
 }
 
 /**
@@ -240,7 +259,7 @@ describe('push', () => {
     const a = device(2);
     const answer = await serviceOf(a, over).push({ to: null });
     expect(answer).toEqual({ status: 'pushed', path: null });
-    expect(over.requests).toEqual([{ method: 'POST', path: '/v1/effort/push', device: originOf(a), since: null, authorization: `Bearer ${TOKEN}`, rows: 2, contractVersion: String(WIRE_CONTRACT_VERSION) }]);
+    expect(over.requests).toEqual([{ method: 'POST', path: '/v1/effort/push', device: originOf(a), since: null, authorization: `Bearer ${TOKEN}`, rows: 2, contractVersion: String(WIRE_CONTRACT_VERSION), migrations: null }]);
     expect(over.held('commits').map((row) => `${String(row['origin_store'])}:${String(row['origin_seq'])}`)).toEqual(commitPairs(a));
     const { stores } = stateOf(a);
     expect(Object.keys(stores)).toEqual([originOf(a)]);
@@ -315,6 +334,99 @@ describe('push', () => {
   });
 });
 
+describe('the push\'s dry run and pendingPush', () => {
+  it('count the rows past the push cursor, sending no push and leaving the state file as it was, where the push after sends them', async () => {
+    const over = hub();
+    const a = device(2);
+    const service = serviceOf(a, over);
+    await service.push({ to: null });
+    a.store.append('commits', [commitRow(), commitRow(), commitRow()]);
+    const before = readFileSync(statePathOf(a), 'utf8');
+
+    expect(await service.push({ to: null, dryRun: true })).toEqual({ status: 'pushed', path: null, dryRun: true, rows: 3 });
+    expect(await service.pendingPush()).toBe(3);
+    expect(over.requests.map(({ rows }) => rows)).toEqual([2]);
+    expect(readFileSync(statePathOf(a), 'utf8')).toBe(before);
+
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(over.requests.map(({ rows }) => rows)).toEqual([2, 3]);
+    expect(readFileSync(statePathOf(a), 'utf8')).not.toBe(before);
+    expect(await service.pendingPush()).toBe(0);
+    expect(await service.push({ to: null, dryRun: true })).toEqual({ status: 'pushed', path: null, dryRun: true, rows: 0 });
+  });
+
+  it('write no state file for a store never pushed, where its first push writes one', async () => {
+    const over = hub();
+    const a = device(2);
+    const service = serviceOf(a, over);
+    expect(await service.pendingPush()).toBe(2);
+    expect(await service.push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 2 });
+    expect(existsSync(statePathOf(a))).toBe(false);
+    expect(over.requests).toEqual([]);
+    expect(await service.push({ to: null, dryRun: false })).toEqual({ status: 'pushed', path: null });
+    expect(existsSync(statePathOf(a))).toBe(true);
+    expect(over.requests.map(({ rows }) => rows)).toEqual([2]);
+  });
+
+  it('read the hub\'s status on a dry run alone, the route a push adds never called', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION);
+    const a = device(1);
+    expect(await serviceThrough(a, over).push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 1 });
+    expect(over.paths()).toEqual(['/v1/status']);
+    expect(await serviceThrough(a, over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(over.paths()).toEqual(['/v1/status', '/v1/status', '/v1/effort/push']);
+  });
+
+  it('refuse a hub speaking another contract on a dry run, as a push does, where pendingPush contacts no hub', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION + 1);
+    const a = device(1);
+    const service = serviceThrough(a, over);
+    expect(await rejectionOf(service.push({ to: null, dryRun: true }))).toBeInstanceOf(HubContractMismatch);
+    expect(over.paths()).toEqual(['/v1/status']);
+    expect(await serviceThrough(a, over).pendingPush()).toBe(1);
+    expect(over.paths()).toEqual(['/v1/status']);
+  });
+
+  it('count with pendingPush and no token stored, where the push from the same strategy is refused for the token', async () => {
+    const over = hub();
+    const service = serviceOf(device(2), over, { readSecret: async () => null });
+    expect(await service.pendingPush()).toBe(2);
+    expect(over.statusReads()).toBe(0);
+    expect((await rejectionOf(service.push({ to: null, dryRun: true }))).name).toBe('HubTokenError');
+    expect(over.requests).toEqual([]);
+  });
+
+  it('cannot see the hub\'s 409 on a dry run, which only a sent push is answered with', async () => {
+    const over = hub();
+    const a = device(1);
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: upgrade the hub', missing: [FUTURE_MIGRATION] }, { status: 409 }));
+    expect(await serviceOf(a, over).push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 1 });
+    expect(over.requests).toEqual([]);
+    expect(await rejectionOf(serviceOf(a, over).push({ to: null }))).toBeInstanceOf(HubUpgradeRequired);
+    expect(over.requests).toHaveLength(1);
+  });
+
+  it('answer nothing-to-sync and 0 with no contact when the store is not there yet', async () => {
+    const over = hub();
+    const root = freshRoot();
+    expect(await serviceOf(root, over).push({ to: null, dryRun: true })).toEqual({ status: 'nothing-to-sync' });
+    expect(await serviceOf(root, over).pendingPush()).toBe(0);
+    expect(over.statusReads()).toBe(0);
+    expect(over.requests).toEqual([]);
+    expect(existsSync(join(root, '.rafa'))).toBe(false);
+  });
+
+  it('refuse an NDJSON project and a store with no origin as a push does, where a minted SQLite store counts', async () => {
+    const over = hub();
+    const a = device(1);
+    expect(await rejectionOf(serviceOf(a, over, { backend: 'ndjson' }).pendingPush())).toBeInstanceOf(ServiceSyncRefusal);
+    expect(await rejectionOf(serviceOf(a, over, { backend: 'ndjson' }).push({ to: null, dryRun: true }))).toBeInstanceOf(ServiceSyncRefusal);
+    expect(await rejectionOf(serviceOf(device(1, false), over).pendingPush())).toBeInstanceOf(ServiceSyncRefusal);
+    expect(await serviceOf(a, over).pendingPush()).toBe(1);
+    expect(over.statusReads()).toBe(0);
+  });
+});
+
 describe('pull', () => {
   it('merges the rows another device pushed through mergeStore, keeping the hub\'s cursor and no backup', async () => {
     const over = hub();
@@ -374,9 +486,10 @@ describe('pull', () => {
     const refused = await rejectionOf(serviceOf(b, over).pull({ from: null, dryRun: false }));
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
     expect(refused.message).toBe(
-      `effort sync (service): the hub's store has applied migration ${FUTURE_MIGRATION}, which this rafa does not know,`
-        + ` so its rows cannot be merged here. Nothing was merged. Next step: ${SELF_UPDATE}, then sync again.`,
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged.`
+        + ' Next step: rafa self-update, then rafa effort sync',
     );
+    expect((refused as RafaUpdateRequired).nextStep).toBe(SELF_UPDATE);
     expect((refused as RafaUpdateRequired).missing).toEqual([FUTURE_MIGRATION]);
     expect(commitPairs(b)).toEqual([`${originOf(b)}:1`]);
     expect(existsSync(statePathOf(b))).toBe(false);
@@ -410,6 +523,258 @@ describe('pull', () => {
     over.setExtraMigrations([FUTURE_MIGRATION]);
     const refused = await rejectionOf(serviceOf(device(1), over).pull({ from: null, dryRun: false }));
     expect(refused).toBeInstanceOf(RafaUpdateRequired);
+  });
+
+  it('names every id the hub applied that this rafa lacks, in the hub\'s order', async () => {
+    const over = hub();
+    over.setExtraMigrations([FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION]);
+    const refused = await rejectionOf(serviceOf(device(1), over).pull({ from: null, dryRun: false }));
+    expect(refused.message).toBe(
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
+        + ' nothing was merged. Next step: rafa self-update, then rafa effort sync',
+    );
+  });
+});
+
+describe('the projected pull, under effort.syncSkew: pull-projected', () => {
+  /** A clock answering `times` in turn, holding the last. */
+  const clock = (...times: string[]): (() => Date) => {
+    let calls = 0;
+    return () => new Date(times[Math.min(calls++, times.length - 1)] ?? times[0] ?? '');
+  };
+
+  /** The migration ids `at`'s store applied, in apply order. */
+  const migrationsOf = (at: Device): string => read<{ id: string }>(at.path, 'SELECT id FROM schema_migrations ORDER BY rowid')
+    .map(({ id }) => id)
+    .join(',');
+
+  /** The columns the stand-in hub names as cut off `commits`: two, by the one id it projects. */
+  const CUT_COLUMNS = { commits: ['future_a', 'future_b'] };
+
+  /** A hub one migration ahead of this rafa, projecting `commits` of `columns` (null names none) and holding one row of `a`'s. */
+  const aheadHub = async (a: Device, columns: typeof CUT_COLUMNS | null = CUT_COLUMNS): Promise<StandInHub> => {
+    const over = hub();
+    await serviceOf(a, over).push({ to: null });
+    over.setExtraMigrations([FUTURE_MIGRATION]);
+    over.setProjection({ commits: [FUTURE_MIGRATION] }, columns ?? undefined);
+    return over;
+  };
+
+  it('sends this build\'s migrations, lists the cut rows in held_rows, keeps heldBack and answers the pulled line, where refuse is refused', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    const refused = await rejectionOf(serviceOf(b, over).pull({ from: null, dryRun: false }));
+    expect(refused).toBeInstanceOf(RafaUpdateRequired);
+    expect(over.requests.at(-1)?.migrations).toBeNull();
+
+    const answer = await projectingOf(b, over, { now: clock('2026-11-01T10:00:00.000Z') }).pull({ from: null, dryRun: false });
+    expect(over.requests.at(-1)?.migrations).toBe(migrationsOf(b));
+    expect(answer).toMatchObject({
+      status: 'pulled',
+      merge: { status: 'merged', rowsAdded: 1, rowsHeld: 1 },
+      notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 2 columns wait for rafa self-update',
+    });
+    expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
+    expect(read<{ pair: string }>(b.path, 'SELECT origin_store || \':\' || origin_seq AS pair FROM held_rows').map(({ pair }) => pair))
+      .toEqual(commitPairs(a));
+    expect(readHeldMigrations(b.path)).toEqual([FUTURE_MIGRATION]);
+    expect(stateOf(b).stores[originOf(b)]).toMatchObject({ pull: { commits: 1 } });
+    expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: '2026-11-01T10:00:00.000Z' });
+  });
+
+  it('counts the columns the answer names as cut, not its lacking ids, and none when it names no cut column', async () => {
+    const a = device(1);
+    const named = await projectingOf(device(1), await aheadHub(a)).pull({ from: null, dryRun: false });
+    const unnamed = await projectingOf(device(1), await aheadHub(a, null)).pull({ from: null, dryRun: false });
+    expect(named).toMatchObject({ notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 2 columns wait for rafa self-update' });
+    expect(unnamed).toMatchObject({ notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 0 columns wait for rafa self-update' });
+  });
+
+  it('keeps heldBack at the first projected contact, as a later one pulls past its cursor', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    await projectingOf(b, over, { now: clock('2026-11-01T10:00:00.000Z') }).pull({ from: null, dryRun: false });
+    a.store.append('commits', [commitRow()]);
+    await serviceOf(a, over).push({ to: null });
+    const later = await projectingOf(b, over, { now: clock('2026-11-02T10:00:00.000Z') }).pull({ from: null, dryRun: false });
+    expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+    expect(later).toMatchObject({ status: 'pulled', merge: { rowsAdded: 1, rowsHeld: 1 } });
+    expect(stateOf(b).stores[originOf(b)]).toMatchObject({ pull: { commits: 2 } });
+    expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: '2026-11-01T10:00:00.000Z' });
+    expect(read<{ n: number }>(b.path, 'SELECT count(*) AS n FROM held_rows')).toEqual([{ n: 2 }]);
+  });
+
+  it('keeps no heldBack and no listing under dryRun, where the same pull run keeps both', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    expect(await projectingOf(b, over).pull({ from: null, dryRun: true })).toMatchObject({ status: 'pulled', merge: { status: 'would-merge' } });
+    expect(existsSync(statePathOf(b))).toBe(false);
+    expect(readHeldMigrations(b.path)).toEqual([]);
+    await projectingOf(b, over).pull({ from: null, dryRun: false });
+    expect(stateOf(b).stores[originOf(b)]).toHaveProperty('heldBack');
+  });
+
+  it('answers a whole pull with no notice and no heldBack, from a hub not ahead', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = hub();
+    await serviceOf(a, over).push({ to: null });
+    over.setProjection({ commits: [FUTURE_MIGRATION] });
+    const answer = await projectingOf(b, over).pull({ from: null, dryRun: false });
+    expect(over.requests.at(-1)?.migrations).toBe(migrationsOf(b));
+    expect(answer).not.toHaveProperty('notice');
+    expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+  });
+
+  it('writes a pull 409 naming missing as the rafa self-update line, moving no cursor, and one naming none as the hub wrote it', async () => {
+    const a = device(1);
+    const b = device(1);
+    const over = await aheadHub(a);
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: cannot project', missing: [FUTURE_MIGRATION] }, { status: 409 }));
+    const refused = await rejectionOf(projectingOf(b, over).pull({ from: null, dryRun: false }));
+    expect(refused).toBeInstanceOf(RafaUpdateRequired);
+    expect(refused.message).toBe(
+      `effort sync: this rafa is behind the hub (migration ${FUTURE_MIGRATION}); nothing was merged. Next step: rafa self-update, then rafa effort sync`,
+    );
+    expect(existsSync(statePathOf(b))).toBe(false);
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: cannot project' }, { status: 409 }));
+    expect(await rejectionOf(projectingOf(b, over).pull({ from: null, dryRun: false }))).toMatchObject({ name: 'HubRefused', status: 409 });
+
+    over.setFault(null);
+    expect(await projectingOf(b, over).pull({ from: null, dryRun: false })).toMatchObject({ status: 'pulled' });
+  });
+
+  describe('the refill, from a build knowing every id held_rows lists', () => {
+    /** When `b`'s first projected contact is taken, and the date the refilled line names. */
+    const FIRST = '2026-11-01T10:00:00.000Z';
+
+    /** The pairs `at`'s `held_rows` lists, sorted. */
+    const heldPairs = (at: Device): string[] => read<{ pair: string }>(at.path, 'SELECT origin_store || \':\' || origin_seq AS pair FROM held_rows')
+      .map(({ pair }) => pair)
+      .sort();
+
+    /**
+     * Rewrites every listing of `at`'s `held_rows` to name the newest
+     * migration its store applied, as a build whose catalogue knows the
+     * ids a projected contact listed finds them, and has `over` answer
+     * whole from then on.
+     */
+    const catchUp = (at: Device, over: StandInHub): void => {
+      const newest = migrationsOf(at)
+        .split(',')
+        .at(-1) ?? '';
+      const db = new Database(at.path);
+      try {
+        db.query('UPDATE held_rows SET missing = json_array(?)').run(newest);
+      } finally {
+        db.close();
+      }
+      over.setExtraMigrations([]);
+    };
+
+    /** `b` after one projected contact with a hub ahead holding one row of `a`'s, its pull cursor past that row. */
+    const heldDevice = async (): Promise<{ a: Device; b: Device; over: StandInHub }> => {
+      const a = device(1);
+      const b = device(1);
+      const over = await aheadHub(a);
+      await projectingOf(b, over, { now: clock(FIRST) }).pull({ from: null, dryRun: false });
+      return { a, b, over };
+    };
+
+    it('pulls from heldBack, takes the held rows whole, clears heldBack and answers the refilled line, where a build lacking an id pulls projected past its cursor', async () => {
+      const { a, b, over } = await heldDevice();
+      a.store.append('commits', [commitRow()]);
+      await serviceOf(a, over).push({ to: null });
+      const behind = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+      expect(behind).toMatchObject({ notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 2 columns wait for rafa self-update' });
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+
+      catchUp(b, over);
+      a.store.append('commits', [commitRow()]);
+      await serviceOf(a, over).push({ to: null });
+      const refilled = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toBeNull();
+      expect(refilled).toMatchObject({
+        status: 'pulled',
+        merge: { status: 'merged', rowsAdded: 1, rowsHeld: 0, rowsRefilled: 2, rowsInConflict: 0 },
+        notice: 'effort sync: refilled 2 rows held back since 2026-11-01',
+      });
+      expect(heldPairs(b)).toEqual([]);
+      expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
+      expect(stateOf(b).stores[originOf(b)]).toMatchObject({ pull: { commits: 3 } });
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+
+      a.store.append('commits', [commitRow()]);
+      await serviceOf(a, over).push({ to: null });
+      const after = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 3 });
+      expect(after).toMatchObject({ status: 'pulled', merge: { rowsAdded: 1, rowsRefilled: 0 } });
+      expect(after).not.toHaveProperty('notice');
+    });
+
+    it('refills under effort.syncSkew: refuse too, sending no migrations', async () => {
+      const { b, over } = await heldDevice();
+      catchUp(b, over);
+      const refilled = await serviceOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)).toMatchObject({ since: null, migrations: null });
+      expect(refilled).toMatchObject({ merge: { rowsRefilled: 1 }, notice: 'effort sync: refilled 1 rows held back since 2026-11-01' });
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+    });
+
+    it('keeps heldBack, the listings and the cursor under dryRun, where the same refill run clears them', async () => {
+      const { a, b, over } = await heldDevice();
+      catchUp(b, over);
+      const state = readFileSync(statePathOf(b), 'utf8');
+      const dry = await projectingOf(b, over).pull({ from: null, dryRun: true });
+      expect(dry).toMatchObject({ merge: { status: 'would-merge' }, notice: 'effort sync: refilled 1 rows held back since 2026-11-01' });
+      expect(readFileSync(statePathOf(b), 'utf8')).toBe(state);
+      expect(heldPairs(b)).toEqual(commitPairs(a));
+
+      await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(heldPairs(b)).toEqual([]);
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+    });
+
+    it('keeps heldBack and lists the rows again when the refill is answered projected, by a hub gone further ahead', async () => {
+      const { a, b, over } = await heldDevice();
+      catchUp(b, over);
+      over.setExtraMigrations([SECOND_FUTURE_MIGRATION]);
+      over.setProjection({ commits: [SECOND_FUTURE_MIGRATION] });
+      const answer = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toBeNull();
+      expect(answer).toMatchObject({
+        merge: { rowsRefilled: 0 },
+        notice: 'effort sync: pulled 1 rows projected to this rafa\'s schema; 0 columns wait for rafa self-update',
+      });
+      expect(heldPairs(b)).toEqual(commitPairs(a));
+      expect(readHeldMigrations(b.path)).toContain(SECOND_FUTURE_MIGRATION);
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+    });
+
+    it('takes a heldBack with nothing listed for no refill, pulling past its cursor and clearing it at the first whole answer', async () => {
+      const a = device(1);
+      const b = device(1);
+      const over = await aheadHub(a);
+      over.setProjection({});
+      await projectingOf(b, over, { now: clock(FIRST) }).pull({ from: null, dryRun: false });
+      expect(heldPairs(b)).toEqual([]);
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+
+      const behind = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+      expect(behind).toEqual({ status: 'nothing-to-sync' });
+      expect(stateOf(b).stores[originOf(b)]?.heldBack).toEqual({ cursor: {}, since: FIRST });
+
+      over.setExtraMigrations([]);
+      const whole = await projectingOf(b, over).pull({ from: null, dryRun: false });
+      expect(over.requests.at(-1)?.since).toMatchObject({ commits: 1 });
+      expect(whole).toEqual({ status: 'nothing-to-sync' });
+      expect(stateOf(b).stores[originOf(b)]).not.toHaveProperty('heldBack');
+    });
   });
 });
 
@@ -489,6 +854,35 @@ describe('when the hub cannot be reached or refuses', () => {
 
     over.setFault(null);
     expect(await serviceOf(a, over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+  });
+
+  it('writes a 409 naming missing as the hub-behind line, moving no cursor, where the same hub taking it pushes', async () => {
+    const over = hub();
+    const a = device(1);
+    over.setFault(() => Response.json(
+      { success: false, error: 'rafa-hub: upgrade the hub', missing: [FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION] },
+      { status: 409 },
+    ));
+    const refused = await rejectionOf(serviceOf(a, over).push({ to: null }));
+    expect(refused).toBeInstanceOf(HubUpgradeRequired);
+    expect(refused.message).toBe(
+      `effort sync: the hub is behind this rafa (migration ${FUTURE_MIGRATION}, ${SECOND_FUTURE_MIGRATION});`
+        + ' nothing was sent. Next step: upgrade the hub, then rafa effort sync',
+    );
+    expect((refused as HubUpgradeRequired).missing).toEqual([FUTURE_MIGRATION, SECOND_FUTURE_MIGRATION]);
+    expect((refused as HubUpgradeRequired).nextStep).toBe(UPGRADE_HUB);
+    expect(existsSync(statePathOf(a))).toBe(false);
+
+    over.setFault(null);
+    expect(await serviceOf(a, over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+  });
+
+  it('keeps a 409 naming an empty missing as the hub\'s own line', async () => {
+    const over = hub();
+    over.setFault(() => Response.json({ success: false, error: 'rafa-hub: upgrade the hub', missing: [] }, { status: 409 }));
+    const refused = await rejectionOf(serviceOf(device(1), over).push({ to: null }));
+    expect(refused.name).toBe('HubRefused');
+    expect(refused.message).toBe('the hub refused push: HTTP 409: rafa-hub: upgrade the hub');
   });
 
   it('rejects with the token reader\'s refusal before any contact when no token is stored', async () => {
@@ -682,5 +1076,259 @@ describe('the project', () => {
     const named = serviceOf(a, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'some-project' } });
     expect(await named.push({ to: null })).toEqual({ status: 'pushed', path: null });
     expect(over.projectQueries).toEqual(['some-project']);
+  });
+});
+
+describe('hubStatus', () => {
+  const served = [{ id: 'some-project', name: 'some/project' }, { id: 'other-project', name: 'other/project' }];
+
+  it('answers the contract, the project and its name and the hub\'s migrations, reading /v1/status once across hubStatus, push and pull', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = device(1);
+    await serviceOf(a, over).push({ to: null });
+    const held = stateOf(a);
+    expect(Object.keys(held.stores)).toHaveLength(1);
+    const before = over.statusReads();
+    const named = { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'other-project' };
+    const service = serviceOf(device(1), over, { hub: named });
+    const answer = await service.hubStatus();
+    expect(answer).toEqual({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      projectId: 'other-project',
+      projectName: 'other/project',
+      migrations: exportWirePayload({ path: a.path }).migrations,
+      maxPayloadRows: null,
+    });
+    expect(answer.migrations.length).toBeGreaterThan(0);
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect((await service.pull({ from: null, dryRun: false })).status).toBe('pulled');
+    expect(await service.hubStatus()).toEqual(answer);
+    expect(over.statusReads() - before).toBe(1);
+    expect(over.requests.map(({ path }) => path)).toEqual(['/v1/effort/push', '/v1/effort/push', '/v1/effort/pull']);
+  });
+
+  it('reads /v1/status again for a second strategy, so the count of one could have read two', async () => {
+    const over = hub();
+    const a = device(1);
+    await serviceOf(a, over).hubStatus();
+    await serviceOf(a, over).hubStatus();
+    expect(over.statusReads()).toBe(2);
+  });
+
+  it('names the repository\'s root commit, with no name from a hub naming no projects', async () => {
+    const over = hub();
+    const a = device(1);
+    expect(await serviceOf(a, over).hubStatus()).toEqual({
+      contractVersion: WIRE_CONTRACT_VERSION,
+      projectId: rootCommitOf(a.root),
+      projectName: null,
+      migrations: [],
+      maxPayloadRows: null,
+    });
+  });
+
+  it('answers a hub speaking another contract without refusing it, where push still refuses it', async () => {
+    const over = contractFetch(WIRE_CONTRACT_VERSION + 1);
+    const a = device(1);
+    const service = serviceThrough(a, over);
+    expect(await service.hubStatus()).toMatchObject({ contractVersion: WIRE_CONTRACT_VERSION + 1, projectName: null, migrations: [] });
+    expect(await rejectionOf(service.push({ to: null }))).toBeInstanceOf(HubContractMismatch);
+    expect(over.paths()).toEqual(['/v1/status']);
+  });
+
+  it('answers with no store there yet', async () => {
+    const over = hub();
+    const root = freshRoot();
+    expect(await serviceOf(root, over).hubStatus()).toMatchObject({ contractVersion: WIRE_CONTRACT_VERSION, projectId: rootCommitOf(root) });
+    expect(existsSync(openSqliteStore(root).path('commits'))).toBe(false);
+  });
+
+  it('refuses in a repository with no commit and no hub.project, reading no status, where hub.project lets it answer', async () => {
+    const over = hub();
+    over.setProjects(served);
+    const a = uncommittedDevice();
+    expect(await rejectionOf(serviceOf(a, over).hubStatus())).toBeInstanceOf(ServiceSyncRefusal);
+    expect(over.statusReads()).toBe(0);
+    const named = serviceOf(a, over, { hub: { url: over.url, tokenSecret: TOKEN_SECRET, timeoutMs: TIMEOUT_MS, project: 'some-project' } });
+    expect(await named.hubStatus()).toMatchObject({ projectId: 'some-project', projectName: 'some/project' });
+    expect(over.statusReads()).toBe(1);
+  });
+
+  it('passes an unreachable hub through as HubUnreachable', async () => {
+    const over = hub();
+    const a = device(1);
+    const service = serviceOf(a, over);
+    await over.stop();
+    expect((await rejectionOf(service.hubStatus())).name).toBe('HubUnreachable');
+  });
+});
+
+describe('a bounded push and a pull\'s page', () => {
+  it('answers the hub\'s maxPayloadRows on hubStatus, null from a hub naming none', async () => {
+    const over = hub();
+    const a = device(1);
+    expect((await serviceOf(a, over).hubStatus()).maxPayloadRows).toBeNull();
+    over.setMaxPayloadRows(2);
+    expect((await serviceOf(a, over).hubStatus()).maxPayloadRows).toBe(2);
+  });
+
+  it('sends at most limit rows a push, moving the push cursor past them, where a whole push to the capped hub is refused', async () => {
+    const over = hub();
+    over.setMaxPayloadRows(2);
+    const a = device(3);
+    const service = serviceOf(a, over);
+    expect((await rejectionOf(service.push({ to: null }))).name).toBe('HubRefused');
+    expect(await service.pendingPush()).toBe(3);
+    expect(await service.push({ to: null, limit: 2 })).toEqual({ status: 'pushed', path: null });
+    expect(stateOf(a).stores[originOf(a)]?.push.commits).toBe(2);
+    expect(await service.pendingPush()).toBe(1);
+    await service.push({ to: null, limit: 2 });
+    expect(await service.pendingPush()).toBe(0);
+    expect(over.requests.map(({ rows }) => rows)).toEqual([3, 2, 1]);
+    expect(over.held('commits').map((row) => `${String(row['origin_store'])}:${String(row['origin_seq'])}`)).toEqual(commitPairs(a));
+  });
+
+  it('sends every row when the limit reaches them, and counts the cut on a dry run', async () => {
+    const over = hub();
+    const a = device(3);
+    const service = serviceOf(a, over);
+    expect(await service.push({ to: null, dryRun: true, limit: 2 })).toMatchObject({ dryRun: true, rows: 2 });
+    expect(await service.push({ to: null, dryRun: true })).toMatchObject({ dryRun: true, rows: 3 });
+    await service.push({ to: null, limit: 3 });
+    expect(over.requests.map(({ rows }) => rows)).toEqual([3]);
+    expect(await service.pendingPush()).toBe(0);
+  });
+
+  it.each([0, -1, 1.5])('refuses a push limit of %p before any contact', async (limit) => {
+    const over = hub();
+    const a = device(1);
+    expect(await rejectionOf(serviceOf(a, over).push({ to: null, limit }))).toBeInstanceOf(TypeError);
+    expect(over.requests).toEqual([]);
+    expect(over.statusReads()).toBe(0);
+  });
+
+  it('answers each pulled page\'s rows, so a page reaching the cap is pulled again until every row is merged', async () => {
+    const over = hub();
+    over.setMaxPayloadRows(2);
+    const a = device(3);
+    const pusher = serviceOf(a, over);
+    await pusher.push({ to: null, limit: 2 });
+    await pusher.push({ to: null, limit: 2 });
+    const b = device(1);
+    const puller = serviceOf(b, over);
+    const first = await puller.pull({ from: null, dryRun: false });
+    expect(first).toMatchObject({ status: 'pulled', rows: 2, merge: { rowsAdded: 2 } });
+    const second = await puller.pull({ from: null, dryRun: false });
+    expect(second).toMatchObject({ status: 'pulled', rows: 1, merge: { rowsAdded: 1 } });
+    expect(await puller.pull({ from: null, dryRun: false })).toEqual({ status: 'nothing-to-sync' });
+    expect(commitPairs(b)).toEqual([...commitPairs(a), `${originOf(b)}:1`].sort());
+  });
+});
+
+describe('a push leaving out the conflicted rows', () => {
+  /** A commit row of the sha `seed` hashes to, at `timestamp`: two devices writing one seed at two times disagree on it. */
+  function sharedCommit(seed: string, timestamp: string): CommitEffortRow {
+    const sha = new Bun.CryptoHasher('sha1')
+      .update(`shared-${seed}`)
+      .digest('hex');
+    return { sha, timestamp } as CommitEffortRow;
+  }
+
+  /** A device whose conflicted row is in its store and named in its `merge_conflicts`. */
+  interface Conflicted {
+    readonly over: StandInHub;
+    readonly b: Device;
+    /** The origin pair of the conflicted row, as the stand-in holds rows. */
+    readonly pair: string;
+  }
+
+  /**
+   * A device holding one commit of its own and one a peer pushed to the
+   * same hub at another time, pulled so its merge records the conflict.
+   * Its push cursor is not written yet: it has pushed nothing.
+   */
+  async function conflictedDevice(): Promise<Conflicted> {
+    const over = hub();
+    const peer = device(0);
+    peer.store.append('commits', [sharedCommit('shared', '2026-10-01T09:00:00.000Z')]);
+    await serviceOf(peer, over).push({ to: null });
+    const b = device(1);
+    b.store.append('commits', [sharedCommit('shared', '2026-10-01T10:00:00.000Z')]);
+    expect(await serviceOf(b, over).pull({ from: null, dryRun: false })).toMatchObject({ status: 'pulled', merge: { rowsInConflict: 1 } });
+    const [row] = read<{ seq: number; pair: string }>(
+      b.path,
+      `SELECT seq, origin_store || ':' || origin_seq AS pair FROM commits WHERE sha = '${sharedCommit('shared', '').sha}'`,
+    );
+    if (row === undefined) throw new Error('the device holds no shared commit');
+    expect(readConflictedRows(b.path)).toEqual(new Map([['commits', new Set([row.seq])]]));
+    return { over, b, pair: row.pair };
+  }
+
+  /** The origin pairs the stand-in holds in `commits`. */
+  function heldPairs(over: StandInHub): string[] {
+    return over.held('commits').map((row) => `${String(row['origin_store'])}:${String(row['origin_seq'])}`);
+  }
+
+  /** The pushes `at`'s store sent to `over`. */
+  function pushesOf(over: StandInHub, at: Device): number[] {
+    return over.requests
+      .filter(({ path, device: named }) => path === '/v1/effort/push' && named === originOf(at))
+      .map(({ rows }) => rows);
+  }
+
+  it('sends the conflicted row when leaveOutConflicted is left out or false, answering no conflicted count', async () => {
+    const absent = await conflictedDevice();
+    expect(await serviceOf(absent.b, absent.over).push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(heldPairs(absent.over)).toContain(absent.pair);
+    expect(pushesOf(absent.over, absent.b)).toEqual([2]);
+
+    const off = await conflictedDevice();
+    expect(await serviceOf(off.b, off.over).push({ to: null, leaveOutConflicted: false })).toEqual({ status: 'pushed', path: null });
+    expect(heldPairs(off.over)).toContain(off.pair);
+    expect(pushesOf(off.over, off.b)).toEqual([2]);
+  });
+
+  it('counts the conflicted rows on a dry run, writing neither the cursor nor the state file, where the push after writes both', async () => {
+    const { over, b } = await conflictedDevice();
+    const service = serviceOf(b, over);
+    const before = readFileSync(statePathOf(b), 'utf8');
+    expect(await service.push({ to: null, dryRun: true })).toEqual({ status: 'pushed', path: null, dryRun: true, rows: 2 });
+    expect(await service.push({ to: null, dryRun: true, leaveOutConflicted: true }))
+      .toEqual({ status: 'pushed', path: null, dryRun: true, rows: 1, conflicted: 1 });
+    expect(readFileSync(statePathOf(b), 'utf8')).toBe(before);
+    expect(stateOf(b).stores[originOf(b)]?.push).toEqual({});
+    expect(pushesOf(over, b)).toEqual([]);
+
+    await service.push({ to: null, leaveOutConflicted: true });
+    expect(readFileSync(statePathOf(b), 'utf8')).not.toBe(before);
+    expect(pushesOf(over, b)).toEqual([1]);
+  });
+
+  it('leaves the row out under true: absent from the hub, still in the store, the cursor past it, and never sent after', async () => {
+    const { over, b, pair } = await conflictedDevice();
+    const service = serviceOf(b, over);
+    expect(await service.push({ to: null, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 1 });
+    expect(heldPairs(over)).not.toContain(pair);
+    expect(heldPairs(over)).toContain(`${originOf(b)}:1`);
+    expect(commitPairs(b)).toContain(pair);
+    const cursor = stateOf(b).stores[originOf(b)]?.push.commits;
+    expect(cursor).toBe(exportWirePayload({ path: b.path }).cursor['commits']);
+    expect(cursor).toBeGreaterThanOrEqual(Number(pair.split(':')[1]));
+
+    expect(await service.push({ to: null, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 0 });
+    expect(await service.push({ to: null })).toEqual({ status: 'pushed', path: null });
+    expect(pushesOf(over, b)).toEqual([1, 0, 0]);
+    expect(heldPairs(over)).not.toContain(pair);
+  });
+
+  it('counts a conflicted row once under a limit, in the push whose cut reaches it', async () => {
+    const { over, b, pair } = await conflictedDevice();
+    const service = serviceOf(b, over);
+    expect(await service.push({ to: null, limit: 1, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 0 });
+    expect(await service.push({ to: null, limit: 1, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 1 });
+    expect(await service.push({ to: null, limit: 1, leaveOutConflicted: true })).toEqual({ status: 'pushed', path: null, conflicted: 0 });
+    expect(pushesOf(over, b)).toEqual([1, 0, 0]);
+    expect(heldPairs(over)).not.toContain(pair);
   });
 });

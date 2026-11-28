@@ -1,7 +1,9 @@
 /**
  * Tests for the release plan's six keys: `release.fragments`,
  * `release.strategy`, `release.settle`, `release.tag`,
- * `pr.versionCollision` and `dangerous.acceptVersionCollision`.
+ * `pr.versionCollision` and `dangerous.acceptVersionCollision`, and for
+ * the later `release` keys beside them, `release.packageFragments` among
+ * them.
  *
  * Each key is driven through the spec `SETTINGS` holds for it, so what
  * is proved is the reader the schema actually wires to the key, not a
@@ -260,6 +262,42 @@ describe('release.moveLock', () => {
   });
 });
 
+describe('release.packageFragments', () => {
+  it('spells the key file-only, and defaults to allow in its section object', () => {
+    expect(SETTINGS.releasePackageFragments.key).toBe('release.packageFragments');
+    expect(SETTINGS.releasePackageFragments.cli).toBe(false);
+    expect(RELEASE_DEFAULTS.releasePackageFragments).toBe('allow');
+  });
+
+  it('resolves a config without the key to allow, from default', () => {
+    const file = parseConfigText('release:\n  moveLock: true\n', PATH);
+    const resolved = resolveConfig({ file });
+
+    expect(resolved.config.releasePackageFragments).toBe('allow');
+    expect(resolved.sources.releasePackageFragments).toBe('default');
+  });
+
+  it.each(['allow', 'refuse'])('accepts %s', (raw) => {
+    expectAccepted('releasePackageFragments', raw);
+  });
+
+  it.each(['deny', 'Refuse', true])('refuses %p, naming the key and both values', (raw) => {
+    expectRefused(
+      'releasePackageFragments',
+      raw,
+      `F: release.packageFragments is ${JSON.stringify(raw)}, expected one of: allow, refuse`,
+    );
+  });
+
+  it('resolves a file naming refuse to refuse, from the file', () => {
+    const file = parseConfigText('release:\n  packageFragments: refuse\n', PATH);
+    const resolved = resolveConfig({ file });
+
+    expect(resolved.config.releasePackageFragments).toBe('refuse');
+    expect(resolved.sources.releasePackageFragments).toBe('file');
+  });
+});
+
 describe('pr.versionCollision', () => {
   it.each(['allow', 'report', 'ask', 'refuse'])('accepts %s', (raw) => {
     expectAccepted('prVersionCollision', raw);
@@ -441,6 +479,7 @@ describe('the section', () => {
       ['releasePublishCommand', 'release.publishCommand'],
       ['releasePublish', 'release.publish'],
       ['releaseMoveLock', 'release.moveLock'],
+      ['releasePackageFragments', 'release.packageFragments'],
       ['dangerousAcceptVersionCollision', 'dangerous.acceptVersionCollision'],
     ]);
     expect(RELEASE_SECTION.defaults).toEqual({
@@ -460,6 +499,7 @@ describe('the section', () => {
       releasePublishCommand: 'npm publish',
       releasePublish: 'manual',
       releaseMoveLock: false,
+      releasePackageFragments: 'allow',
       dangerousAcceptVersionCollision: false,
     });
     expect(RELEASE_SECTION.checks ?? []).toEqual([]);

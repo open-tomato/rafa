@@ -8,7 +8,8 @@
  * files nothing and runs no preflight:
  *
  *   - `title` from `--title`, required and not blank for every type but
- *     `bug`, whose title is rendered from its fields (see "A bug");
+ *     `bug` and `debt`, whose title is rendered from its fields (see "A
+ *     bug");
  *   - `body` from `--body`, or from `--body-file` (see below), empty
  *     when both are left out;
  *   - `type` from `--type`, one of the port's types, {@link DEFAULT_ISSUE_TYPE}
@@ -26,18 +27,21 @@
  *
  * ## A bug
  *
- * A `--type=bug` line is filed as a bug record (`./create-bug.ts`): its
+ * A line of a record type, `--type=bug` or `--type=debt`
+ * (`ISSUE_RECORD_TYPES`, `./declarations-shared.ts`), is filed as a bug
+ * record (`./create-bug.ts`), the type the line names kept: its
  * fields are read from `--module`, `--action`, `--summary`, `--env`,
  * `--cause`, `--proposed`, `--reproduce`, `--rerun` and `--project`, from
  * the sections of the body, and from a `--title` when one is typed. rafa
  * fills the versions, the place and the error line, renders the title
  * through `issues.titles.bug`, and refuses a record that is not complete,
  * every problem on a line of its own, before the chain is resolved. A
- * line of another type naming one of those flags is refused, so a field
+ * line of another type naming one of those flags is refused,
+ * `--action is read for --type=bug or --type=debt only`, so a field
  * typed on the wrong line is never dropped without a word.
  *
  * `--module` has no declared default for that reason: a default would
- * reach the flags of a bug line that names no module, and hide that the
+ * reach the flags of a record line that names no module, and hide that the
  * record lacks one. A line of another type still files under
  * `TRIAGE_MODULE` when it names none.
  *
@@ -108,11 +112,12 @@
  * `collaborate.<tool>` names (`.rafa/specs/rafa-751-report-rafa-gaps-bugs.md`),
  * in this order:
  *
- *  1. **The line**, read as every line is. A type other than `bug` is
- *     then refused, `issue create --upstream=rafa: --type=code is not
- *     filed upstream: only a bug is, --type=bug with its fields. Nothing
- *     was filed.`, since only rafa's own bug shape is filed there. The
- *     bug line is read through `readBugLine` (`./create-bug.ts`), so a
+ *  1. **The line**, read as every line is. A type other than a record
+ *     type is then refused, `issue create --upstream=rafa: --type=code
+ *     is not filed upstream: only a bug record is, --type=bug or
+ *     --type=debt with its fields. Nothing was filed.`, since only rafa's
+ *     own bug shape is filed there. The record line is read through
+ *     `readBugLine` (`./create-bug.ts`), so a
  *     record that is not complete is refused before the gate.
  *  2. **The gate**, `resolveUpstream` (`./upstream.ts`): the tool, the
  *     key, this board's owner and visibility, read with one
@@ -168,6 +173,7 @@ import { commandRetrySeams, openProjectRunner } from '../../board/project/projec
 
 import { readSpecLine, settleSpecLine } from './create-blocked.js';
 import { BUG_FLAGS, readBugLine } from './create-bug.js';
+import { ISSUE_RECORD_TYPES } from './declarations-shared.js';
 import { DEFAULT_ISSUE_TYPE, ISSUE_CREATE_DECLARATION } from './declarations.js';
 import {
   DEFAULT_ISSUE_SEAMS,
@@ -191,15 +197,20 @@ import { resolveUpstream, UPSTREAM_FLAG, upstreamGhRunner, upstreamRefusal } fro
  * `--help` lists the flag, and `src/tests/board-coupled/commands/issue/create.test.ts`
  * holds this line as it is.
  */
-const USAGE = 'rafa issue create (--title=<text> | --type=bug --summary=<text> --module=<name> --action=<name> --cause=<code>'
+const USAGE = 'rafa issue create (--title=<text> | --type=bug|debt --summary=<text> --module=<name> --action=<name> --cause=<code>'
   + ' --reproduce=<text>) [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]'
   + ' [--env=<place>] [--proposed=<code>] [--rerun=<command>] [--project=<name>] [--path=<file>] [--dry-run]';
 
 /** What a refusal of `--dry-run` typed with a value ends with. */
 const SWITCH_HINT = `Type it bare: ${USAGE}`;
 
-/** The type whose title is rendered from its fields. */
-const BUG_TYPE: IssueType = 'bug';
+/** The record types as a refusal names them: `--type=bug or --type=debt`. */
+const RECORD_TYPE_FLAGS = ISSUE_RECORD_TYPES.map((type) => `--type=${type}`).join(' or ');
+
+/** True for a type filed as a bug record, its title rendered from its fields; see "A bug" in the module note. */
+export function isRecordType(type: IssueType): boolean {
+  return ISSUE_RECORD_TYPES.includes(type);
+}
 
 /** What a draft with no priority is filed as, in a `--dry-run` listing. */
 const NO_PRIORITY = 'needs-triage';
@@ -247,14 +258,15 @@ export function readBodyFileFlag(flags: LineFlags): string | undefined {
 }
 
 /**
- * The title a line names: required for every type but `bug`, whose line
- * may leave it out (`''`); a refusal with exit code 1 for a line of
- * another type naming a flag only a bug reads. See the module note.
+ * The title a line names: required for every type but a record type,
+ * whose line may leave it out (`''`); a refusal with exit code 1 for a
+ * line of another type naming a flag only a record reads. See the module
+ * note.
  */
 function readTitleFlag(flags: LineFlags, type: IssueType): string {
-  if (type === BUG_TYPE) return readNonBlankFlag(flags, 'title', USAGE) ?? '';
+  if (isRecordType(type)) return readNonBlankFlag(flags, 'title', USAGE) ?? '';
   const stray = BUG_FLAGS.find((flag) => flags[flag] !== undefined);
-  if (stray !== undefined) throw lineRefusal(`--${stray} is read for --type=${BUG_TYPE} only`, USAGE);
+  if (stray !== undefined) throw lineRefusal(`--${stray} is read for ${RECORD_TYPE_FLAGS} only`, USAGE);
   return readRequiredFlag(flags, 'title', USAGE);
 }
 
@@ -347,14 +359,14 @@ export function isDryRun(result: IssueCreateResult | IssueDryRun): result is Iss
 /**
  * The tool `--upstream` names, or undefined when the line leaves it out;
  * a refusal with exit code 1 for a blank value and for a type other than
- * `bug`. See "`--upstream=<tool>`" in the module note.
+ * a record type. See "`--upstream=<tool>`" in the module note.
  */
 export function readUpstreamFlag(flags: LineFlags, type: IssueType): string | undefined {
   const tool = readNonBlankFlag(flags, UPSTREAM_FLAG, USAGE);
-  if (tool === undefined || type === BUG_TYPE) return tool;
+  if (tool === undefined || isRecordType(type)) return tool;
   throw upstreamRefusal(
     { action: 'create', tool },
-    `--type=${type} is not filed upstream: only a bug is, --type=${BUG_TYPE} with its fields.`,
+    `--type=${type} is not filed upstream: only a bug record is, ${RECORD_TYPE_FLAGS} with its fields.`,
   );
 }
 
@@ -373,7 +385,7 @@ function hiddenDraft(draft: IssueDraft, target: UpstreamTarget, owner: PackageOw
   return { ...draft, title: hide(draft.title), body: hide(draft.body) };
 }
 
-/** Files a bug line under `--upstream`, or under `--dry-run` answers its draft; see the module note. */
+/** Files a record line under `--upstream`, or under `--dry-run` answers its draft; see the module note. */
 async function createUpstreamIssue(context: RafaContext, seams: IssueSeams, line: UpstreamLine): Promise<IssueCreateResult | IssueDryRun> {
   // The gate writes the config's warnings, so this read of the same config writes none.
   const bug = await readBugLine(context, seams, line.base, { usage: USAGE, warn: () => undefined });
@@ -397,7 +409,7 @@ export async function createIssue(context: RafaContext, seams: IssueSeams): Prom
   const warn = dryRun
     ? (message: string): void => context.output.warn(message)
     : (): void => undefined;
-  const read = base.type === BUG_TYPE
+  const read = isRecordType(base.type)
     ? (await readBugLine(context, seams, base, { usage: USAGE, warn })).draft
     : base;
   const blockedLine = readSpecLine(read);

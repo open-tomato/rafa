@@ -42,7 +42,7 @@ test reads them.
 | `rafa-stretch-analyst` | da²: tests the person's hunches against the stretch's data, read-only, writing only `analysis.md` |
 | `rafa-stretch-sweep` | phase 1: recheck, security alerts, duplicate groups, ranking, tiers, the bucket report |
 | `rafa-stretch-pit-stop` | phase 3: the five checks after each item, and the decision |
-| `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
+| `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` report: a `bug` when it breaks something, else a `debt` |
 
 Every operator agent carries the single-command rule: run every `rafa` line as
 one command, no `cd … &&`, `;`, pipe or redirect. The allow rules match a
@@ -69,10 +69,12 @@ over as `RAFA_STRETCH_RULES`, so `plan create` appends it to the item's
 snapshot under `## Stretch rules`, after the issue's notes.
 
 The integration branch is `stretch/<n>`, and `pr.base` points at it for the
-stretch. `release settle` folds `origin/<pr.base>`
-(`packages/rafa-release/src/release/settle-worktree.ts`), so the wrap-up points
-`pr.base` back at `main` before it settles: one version per stretch, cut after
-the integration branch reaches `main`.
+stretch until the last `rafa stretch end` puts it back. The settle is the
+person's, run after the merge: `rafa release settle --dry-run`, then
+`rafa release settle`. `release settle` folds `origin/<pr.base>`
+(`packages/rafa-release/src/release/settle-worktree.ts`), so it folds the
+default branch once `pr.base` is back on it: one version per stretch, cut
+after the integration branch reaches the default branch.
 
 ### Starting them
 
@@ -285,24 +287,29 @@ a later task is done, neither the stopped one nor a repair;
 it ends nothing, so `rafa loop wait` and `rafa stretch item` read on past
 it. A stop it retries writes no `task-blocked` line: a task stop writes
 one only once no retry is granted, so a `task-blocked` line still means
-the run stopped.
+the run stopped. A task held because its session left neither a report nor
+a commit, with no retry granted, is followed by one `halt` line,
+`Task held: its session left neither a report nor a commit: <task>`
+(`emitStopEvents`, `packages/rafa-run/src/start/continue-run.ts`), so
+`rafa loop wait` and `rafa stretch item` name that hold as the run's end.
 
-The three `--continue` lines (`context/cli.md`) count tracker lines
-from 1, as the decision prompt does. A `decision` line names the
-strategy a stop was decided as and its reason. A `retry`, `jump` or
-`defer` ends nothing and the run goes on; a `stop` is followed by the
-stop's own `task-blocked` or `halt` line, and the run ends with exit
-code 20. A `decision needed` line is json mode's: no session was
-spawned, the event's data holds the task, its line, why it stopped,
-the open tasks, the retries in a row left and the rendered prompt, and after
-the stop's own line the run ends with exit code 21, for the caller to
-start again with `--continue --decide=<strategy>`. A `passed over` line
-lists the tasks a run ends with passed over; a `halt` follows it and the
-run ends with exit code 22, unless `--force-wrap-up` goes on to a draft
-pull request. A refused forced wrap-up is a `halt` naming its count,
-with exit code 20, and so is a forced wrap-up whose pull request `gh`
-would not make a draft, its `halt` naming the pull request in place of
-the `pr` line. None of these ends on an `error` line.
+The three `--continue` lines (`context/cli.md`) count tracker lines from
+1, as the decision prompt does. A `decision` line names the strategy a
+stop was decided as and its reason. A `retry`, `jump` or `defer` ends
+nothing and the run goes on; a `stop` is followed by the stop's own
+`task-blocked` or `halt` line, a held stop's `task-blocked` by its held
+`halt`, and the run ends with exit code 20. A `decision needed` line is
+json mode's: no session was spawned, the event's data holds the task,
+its line, why it stopped, the open tasks, the retries in a row left and
+the rendered prompt, and after the stop's own line (and a held stop's
+`halt`) the run ends with exit code 21, for the caller to start again
+with `--continue --decide=<strategy>`. A `passed over` line lists the
+tasks a run ends with passed over; a `halt` follows it and the run ends
+with exit code 22, unless `--force-wrap-up` goes on to a draft pull
+request. A refused forced wrap-up is a `halt` naming its count, with
+exit code 20, and so is a forced wrap-up whose pull request `gh` would
+not make a draft, its `halt` naming the pull request in place of the
+`pr` line. None of these ends on an `error` line.
 
 An `inherited` line names
 the run-start failure, by file and case, that a reported bug was read as

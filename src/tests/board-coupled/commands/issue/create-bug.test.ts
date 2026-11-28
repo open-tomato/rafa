@@ -481,7 +481,7 @@ describe('a bug line refused', () => {
   it('refuses a bug flag on a line of another type, where the same line files without it', async () => {
     const refused = await run(['issue', 'create', '--title=x', '--summary=y'], plantCase());
     expect(refused.exitCode).toBe(1);
-    expect(refused.stderr).toContain('--summary is read for --type=bug only');
+    expect(refused.stderr).toContain('--summary is read for --type=bug or --type=debt only');
 
     const project = plantCase();
     expect((await run(['issue', 'create', '--title=x'], project)).exitCode).toBe(0);
@@ -493,5 +493,85 @@ describe('a bug line refused', () => {
 
     expect(outcome.exitCode).toBe(1);
     expect(outcome.stderr).toContain('--title is required: --title=<value>');
+  });
+});
+
+/** A full gap record filed as debt: a missing line that only leaves a step done by hand. */
+const DEBT_LINE = [
+  'issue', 'create', '--type=debt', '--module=cli-gap', '--action=issue list',
+  '--summary=no flag lists the issues of one cause',
+  '--reproduce=rafa issue list --cause=git:new-context',
+  '--cause=cli:new-context', '--proposed=cli:flag-missing',
+];
+
+/** The title {@link DEBT_LINE} renders through `issues.titles.bug`. */
+const DEBT_TITLE = 'cli-gap - issue list: no flag lists the issues of one cause';
+
+/** Each record flag with a value, as a `--type=chore` line would name it. */
+const RECORD_FLAG_WORDS: readonly string[] = [
+  '--summary=y', '--action=start', '--env=local', '--cause=cli:new-context', '--proposed=cli:flag-missing',
+  '--reproduce=rafa x', '--rerun=rafa x', '--project=rafa', '--path=x.ts',
+];
+
+describe('rafa issue create --type=debt', () => {
+  it.each(RECORD_FLAG_WORDS)('refuses %s on --type=chore, naming both record types, and files nothing', async (word) => {
+    const project = plantCase();
+    const refused = await run(['issue', 'create', '--title=x', '--type=chore', word], project);
+
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain(`${word.slice(0, word.indexOf('='))} is read for --type=bug or --type=debt only`);
+    expect(filedNothing(project)).toBe(true);
+  });
+
+  it('files the same --type=chore line without the record flag: the control that the refusal is the flag\'s', async () => {
+    const project = plantCase();
+    expect((await run(['issue', 'create', '--title=x', '--type=chore'], project)).exitCode).toBe(0);
+    expect(localIssue(project, 1).draft).toMatchObject({ title: 'x', type: 'chore' });
+  });
+
+  it('refuses a debt record that is not complete, as a bug\'s, and files nothing', async () => {
+    const project = plantCase();
+    const outcome = await run(['issue', 'create', '--type=debt', '--module=cli-gap', '--summary=y'], project);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('the bug record is not complete:');
+    expect(filedNothing(project)).toBe(true);
+  });
+
+  it('files a full record as type debt, its title rendered as cli-gap - <action>: <summary>', async () => {
+    const project = plantCase();
+
+    const outcome = await run(DEBT_LINE, project);
+
+    expect(outcome).toEqual({ exitCode: 0, stdout: 'Created local issue 1.\n', stderr: '' });
+    const { draft } = localIssue(project, 1);
+    expect(draft).toMatchObject({ title: DEBT_TITLE, type: 'debt', module: 'cli-gap', cause: 'cli:new-context', priority: null });
+    expect(draft.body).toContain('## Reproduce\n\n```\nrafa issue list --cause=git:new-context\n```');
+    expect(draft.body).toContain('## Versions');
+  });
+
+  it('files the record on github under type:debt, never type:bug', async () => {
+    const fake = createFakeGh();
+
+    const outcome = await run(DEBT_LINE, plantCase(GITHUB_CONFIG), {}, { gh: fake.run });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(fake.issue('1')?.title).toBe(DEBT_TITLE);
+    expect(fake.issue('1')?.labels).toEqual(expect.arrayContaining(['type:debt', 'module:cli-gap', 'cause:cli:new-context']));
+    expect(fake.issue('1')?.labels).not.toContain('type:bug');
+  });
+
+  it('prints the rendered title under --dry-run, and files nothing', async () => {
+    const project = plantCase();
+
+    const outcome = await run([...DEBT_LINE, '--dry-run'], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout.split('\n').slice(0, 3)).toEqual([
+      '--dry-run: nothing was filed.',
+      `Title: ${DEBT_TITLE}`,
+      'Type: debt · Module: cli-gap · Priority: needs-triage · Cause: cli:new-context',
+    ]);
+    expect(filedNothing(project)).toBe(true);
   });
 });

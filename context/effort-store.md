@@ -347,36 +347,174 @@ under `packages/`.
 **The `service` strategy makes one contact per command through
 `createHubContact` (`packages/rafa-effort/src/effort/sync/contact.ts`), which
 never throws and never sets the exit code.** A contact runs `pushThenPull()`
-(push then pull) or `pull()` alone. `local` and `file` are never contacted:
+(under `effort.syncMerge: ff-only`, the default, pull then push, skipping the
+push after a pull that did not answer and leaving out the rows
+`merge_conflicts` names; under `merge`, push then pull), `pull()` alone,
+`status()`, or `sync({ stop })`. `status()`
+is a pull alone, then the hub line's facts from the strategy's `hubStatus()`,
+read by shape off the status answer the pull kept, which `hubLine` formats as
+`hub: reachable, contract <n>, project <name>; pulled <n> rows` (`; <m> rows
+held back` when rows were). `sync()` reads the hub's status, checks it for
+skew (the contract version, then the hub's migrations against core's
+catalogue; a hub ahead is let through under `effort.syncSkew:
+pull-projected`), then pushes and pulls in the order `effort.syncMerge`
+names, as `pushThenPull()` does: under `ff-only` it pulls, then pushes
+leaving out the rows `merge_conflicts` names, a pull that did not answer
+ending the run before the push; under `merge` it pushes, then pulls. The
+rows the push left out are the reading's `conflicted` (0 under `merge`),
+and `sync()` writes no held line of its own. A row is left out, and counted,
+once: by the push whose cut reaches it, whose cursor then passes it, so a
+later push neither sends it nor names it in a held line. `stop: 'status'` ends it after the
+check with the rows waiting to push (`pendingPush()`, read by shape), and
+`stop: 'dry-run'` pulls and pushes in the same order with `dryRun`, asking
+the dry-run push only of a strategy carrying `pendingPush`, and under
+`ff-only` counting the conflicted rows past the push cursor without
+writing. A run stops at the first refusal,
+whose `refusal` names its cause, `skew`, `contract`, `project` (the hub's
+`project <id> is not served here`) or `token` (`HubTokenError`), and its one
+line, written once per contact in the hub line's place.
+`local` and `file` are never contacted:
 nothing is loaded, selected or written. The `service` adapter is selected once
 per contact by `selectSync` through the registry `loadModules` answers, and a
 selection that fails (e.g., `SyncModuleMissing`) is written once through
 the caller's `warn`. **When sync runs:** `rafa effort collect` makes one
-contact and pushes then pulls after storing rows and writing its summary;
-`rafa loop start` makes one contact for the run and pushes then pulls at
+contact and runs `pushThenPull()` after storing rows and writing its summary;
+`rafa loop start` makes one contact for the run and runs `pushThenPull()` at
 the end of each task, whatever its outcome, its pulls naming the run's
 session id as `SyncPullRequest.sessionId` so the merge's live-loop guard
-passes the run's own record; `rafa status`, `rafa next`
-(including `--dry-run`), and `rafa effort report` pull alone before they
-read, through `pullBeforeRead` (`packages/rafa-effort/src/effort/collect.ts`,
-`src/start.ts`, querying in the effort module). **The offline rule:** a push or
+passes the run's own record; `rafa next` (including `--dry-run`) and
+`rafa effort report` pull alone before they read, through `pullBeforeRead`
+(`packages/rafa-effort/src/effort/sync/contact.ts`, called from
+`src/commands/next.ts` and `packages/rafa-effort/src/effort/report.ts`),
+and `rafa status` pulls alone through a contact's `status()` kind, then
+prints the hub line, `hub: reachable, contract <n>, project <name>; pulled
+<n> rows`, ending `; <m> rows held back` when the
+pull held rows back, or nothing when the pull did not answer and its own
+line stands in its place (`src/commands/status.ts`); and `rafa effort sync`
+runs a contact's `sync({ stop })` kind, `--status` and `--dry-run` its two
+stop points, and exits 1 for a refusal or a step that failed and 0 otherwise,
+an unreachable hub and `local` or `file` included
+(`src/commands/effort/sync.ts`). **The offline rule:** a push or
 pull that rejects with an error whose `name` is `HubUnreachable` (network error,
 timeout, or hub unreachable) writes exactly one line per contact, `effort
 sync: the hub at <url> is unreachable (<first line of why>); this command
 used the local store, and its rows sync on the next contact`. An unreachable
 hub does not prevent the command from running: it uses the local store and
 exits with the status it would have had, and an unreachable push skips its
-pull so a command waits out one timeout. The name `HubUnreachable` is
+pull (an unreachable pull its push, under `ff-only`) so a command waits out
+one timeout. The name `HubUnreachable` is
 matched on the error's `name` property rather than its class, so a module
 can throw a plain `Error({ name: 'HubUnreachable' })` and import no value
 from core. A rejection named `HubContractMismatch` (the hub speaks another
 wire contract version) is written as its message stands, one line per
 contact, `effort sync: the hub speaks contract <v>, this rafa contract <w>;
 nothing was sent. Next step: <step>`, and a mismatched push skips its pull.
-Any other rejection is written as `effort sync: <push|pull> over
-service failed: <message>`, and a refused push still attempts its pull.
+A rejection named `HubUpgradeRequired` or `RafaUpdateRequired` (the hub or
+this rafa is behind the other's migrations) is also written as its message
+stands, each line once per contact, and its push still pulls. A pull answer
+carrying a `notice` (the `pulled <n> rows projected` and `refilled <n> rows held
+back since <date>` lines) is written as it stands, once per pull page. Any other
+rejection is written as `effort sync: <push|pull> over service failed:
+<message>`, and a refused push still attempts its pull; a pull run first,
+under `ff-only`, skips its push whenever it did not answer.
+**The payload cap:** a contact reads the hub's `maxPayloadRows` by shape
+off the strategy's `hubStatus()`, once per run, and splits a push by cursor
+into payloads under it, asking `push({ to: null, limit })` of a strategy
+carrying `pendingPush()` until no rows wait; it repeats a pull while the
+page's answer says (`rows`) it came back full. A hub naming no cap, a
+strategy with no `pendingPush()` and a dry run push and pull once
+(`packages/rafa-effort/src/effort/sync/contact-pages.ts`). The `service`
+strategy answers `maxPayloadRows` on `hubStatus()`, sends at most `limit`
+rows a push past its push cursor, and answers `rows` on every `pulled`
+page (`packages/rafa-sync-service/src/sync.ts`, `A bounded push and a
+pull's page`).
 `pullBeforeRead` reads the config without writing its warnings and contacts
 nothing when the config is refused, leaving the refusal to the command.
+
+**`effort.syncSkew` in the project's config says what a device does when the
+hub and this rafa are on different migrations.** It takes `refuse`, the
+default, or `pull-projected`, and is read only under `effort.sync: service`:
+beside `effort.sync: local` it has no effect. Core declares it as
+`effortSyncSkew` (`packages/rafa/src/core/config/core-section.ts`), the
+key is among `LOCKED_SETTINGS`, and `selectSync` hands it to the service
+adapter as `syncSkew` (`packages/rafa/src/config-schema-hub.ts`). An example:
+`effort: { sync: service, syncSkew: pull-projected }`. The cases and the
+line each writes are in the wire contract's skew table below. Under
+`effort.syncMerge: ff-only`, the default, a refused pull also stops the push,
+and `pull-projected` lets the pull complete so the push goes on; the
+`effort.syncMerge` paragraph below sets out the order.
+
+**A projected pull leaves two marks: rows listed in `held_rows`, and a
+`heldBack` mark in `sync-service.json`.** A pull the hub answers projected
+passes the payload's `projected` map to `mergeStore`, which lists each row
+it cut in the local table `held_rows` (migration `held-rows`). The table
+holds one row per listed row, keyed by table name and origin pair, with
+`missing`, a JSON array of the migration ids that row lacks. Before that
+merge, the service adapter keeps `heldBack` in the state file beside the
+store file: the pull cursor the contact started from, with its time, set
+by the first projected contact only. The refill pulls from `heldBack`
+once this build's catalogue knows every id `held_rows` lists
+(`readHeldMigrations`), and clears `heldBack` after its merge.
+
+**Under `effort.syncMerge: ff-only`, the default, a device pulls first, then
+pushes, and holds back the rows that differ from the hub's copy.** The
+setting is named after git's pull modes. `ff-only` reads the other side first
+and refuses what it cannot apply cleanly; `merge` takes everything and
+settles it on the receiving side. The hub is the source of truth and a
+coordinator, not a worker, so the device settles what it can before it
+writes and the hub is never handed a mess: the rule is "you can't give me
+your mess", not "give me whatever and I'll figure it out".
+`effort.syncMerge` is read only under `effort.sync: service`.
+
+| Value | Order | What the push sends |
+| --- | --- | --- |
+| `ff-only` (default) | pull, then push | every row past the push cursor except the local rows `merge_conflicts` names, by `(table_name, local_seq)`, whichever merge recorded them |
+| `merge` | push, then pull | every row past the push cursor; nothing is held |
+
+The push runs only after a pull that completed. A pull that finds the hub
+unreachable, speaking another contract, or refusing for skew leaves no push
+attempt, so the rows wait for the next contact. Under `effort.syncSkew:
+pull-projected` the projected pull completes and the push goes on. The
+contacts that push are `rafa effort collect` (after it stores rows), `rafa
+loop start` at the end of each task, and `rafa effort sync`. `rafa next`,
+`rafa effort report` and `rafa status` only pull, and send nothing.
+
+When the push leaves rows out, the contact writes one line, once for the
+run, before the hub line, exactly as `effort sync: <n> rows held: they
+differ from the hub's copy (merge_conflicts); the rest was pushed`. The push
+cursor moves past the rows it left out, so a later push neither resends them
+nor counts them again. `rafa effort sync --dry-run` counts the same rows
+without writing: its dry-run line gains `; <n> rows would be held` after the
+conflict count.
+
+These are not `held_rows`. Those are the rows a projected pull cut, marked
+by `heldBack` and reported as `rows held back`, as the paragraph above says.
+The rows here are local rows a push leaves out, and the code calls them
+conflicted rows (`readConflictedRows`, `withoutConflicted`). No code reads
+or writes `held_rows` or `heldBack` for them.
+
+Example: two devices file the same finding with different tracker refs.
+Under `ff-only` the second device's pull records the conflict and its push
+holds that row, so its line reads `effort sync: 1 rows held: ...`. The hub
+keeps the first ref. The config for this is `effort: { sync: service,
+syncMerge: ff-only }`, which is also the default; `syncMerge: merge`
+restores today's push-first order.
+
+Two limits. A store copied from another disk is not caught here; the origin
+identity check, under #1488, is the subject for that case. Two ports doing
+the same work make extra rows, not conflicts, since each port's rows carry
+its own origin.
+
+Two alternatives were rejected. Refusing the whole push on a conflict has no
+settle step to lean on yet, and it is the strict mode listed under "Later"
+in the spec. Letting the hub's row replace the local one changes the merge's
+keep-local rule, which every merge relies on.
+
+**The state file is at version 2 and reads version 1 down.** A version 1
+entry keeps its push and pull cursors and holds no `heldBack`, and the
+next write makes the file version 2. A build that reads only version 1
+reads a version 2 file as holding no cursors, so its first pull is whole
+and merges as a no-op, since its store holds every row.
 
 **Merge requires the SQLite backend.** A project configured with
 `store: ndjson` is refused by `rafa effort merge <file>`, which names
@@ -386,7 +524,8 @@ of merge. `rafa effort move --to=sqlite` is already documented as
 migrating the store from NDJSON to SQLite.
 
 **The locked settings of the first release are `effort.sync`,
-`prerequisites.required`, `claims.staleAfter` and `claims.ahead`.**
+`effort.syncSkew`, `effort.syncMerge`, `prerequisites.required`,
+`claims.staleAfter` and `claims.ahead`.**
 `src/config-locked.ts` declares them as `LOCKED_SETTINGS`, a frozen list
 of setting names in file-key order. The module enforces nothing, and only
 its test reads the list. These keys cannot be changed by a plan pushing a
@@ -469,6 +608,26 @@ leaves the exit code as the command set it. The offline rule above gives the
 line's place in a contact. A device that has read the status refuses first, so
 the `409` above only answers a request that names a version the hub does not
 speak.
+
+**The skew table gives the line each case writes under each setting.** A
+contact compares the migrations its payload names with the ones this build
+knows, and the hub's status with its own pull options. Each line is written
+once per contact, under the offline rule above, and `<ids>` is the ids the
+`409` named in `missing`, in the hub's order. The table's last row is the
+held line of `effort.syncMerge: ff-only`, which both skew settings write alike.
+
+| Case | `refuse` (default) | `pull-projected` |
+| --- | --- | --- |
+| This rafa is behind the hub, and the hub's store can project | `effort sync: this rafa is behind the hub (migration <ids>); nothing was merged. Next step: rafa self-update, then rafa effort sync` | `effort sync: pulled <n> rows projected to this rafa's schema; <m> columns wait for rafa self-update`; `heldBack` is kept |
+| This rafa is behind the hub, and the hub cannot project (its status says so, or its store answers `409` naming `missing`) | The line above | The line above: a device that sends no migrations gets whole rows, which name ids it lacks |
+| The hub is behind this rafa (the push is refused `409` naming `missing`) | `effort sync: the hub is behind this rafa (migration <ids>); nothing was sent. Next step: upgrade the hub, then rafa effort sync` | The same line |
+| A refill: every id `held_rows` lists is known to this build, and `heldBack` is set | `effort sync: refilled <n> rows held back since <date>`; `heldBack` is cleared | The same line |
+| A refill that still lacks an id `held_rows` lists | The first row's line | Projected again: the `pulled <n> rows projected` line, with `heldBack` kept |
+| A push under `effort.syncMerge: ff-only` left out conflicted rows, after a pull that completed | `effort sync: <n> rows held: they differ from the hub's copy (merge_conflicts); the rest was pushed`, before the hub line | The same line |
+
+The push is refused the same way under both settings, so a development build
+ahead of the hub sends none of its new columns to the hub. A refused pull
+never moves the pull cursor, and a refused push never moves the push cursor.
 
 ### Row origins
 
@@ -818,7 +977,7 @@ busy timeout.
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`, `report_absences`,
 `task_reports`, `preflight`, `dispatches`, `skill_invocations`, `plan_ci`,
 `stale_docs`, `bug_routes`, `reading_supersedes`, `store_meta`, `merges`,
-`merge_conflicts` and `store_replaced` are SQLite-only and stay out of the port's row map. Migration
+`merge_conflicts`, `held_rows` and `store_replaced` are SQLite-only and stay out of the port's row map. Migration
 `store-replaced` creates the last one, `store_replaced` (`store_id` as its
 primary key, `replaced_at`): one row per id this store carried before its
 present one, `local` in `MERGE_RULES`, never left the machine. `settleUnderLock`
@@ -843,8 +1002,8 @@ runtime that did not know the column wrote the row. `mergeStore`
 swaps in through `rebuildAside`, behind
 `effort.sqlite.before-merge-<stamp>.bak`; its refusals, the forwarded copy of an
 other store that lacks migrations, and its row-count check (each table's old
-count plus the rows the merge added, through `checkedCounts`' `added`) are in
-its module note. `settleMatches` (`store/merge-conflicts.ts`) fills
+count plus the rows the merge added, less the `held_rows` listings its held
+copies dropped, through `checkedCounts`' `added`) are in its module note. `settleMatches` (`store/merge-conflicts.ts`) fills
 `merge_conflicts`: it compares each pair the union matched on every column but
 `seq` and the origin pair, skips an equal pair, fills a set-once field NULL here
 from the other store and keeps a filled one against NULL there, and records the

@@ -42,6 +42,7 @@ import { readSessions } from '@open-tomato/rafa/core/loop';
 import { gitIdentityEnv } from '@open-tomato/rafa/tests/git-identity';
 import { scratchHomeEnv } from '@open-tomato/rafa/tests/scratch-home-env';
 import { CHECKOUT_MOVED } from '@open-tomato/rafa-run/start/checkout-guard';
+import { SHARED_CHECKOUT_NOTE } from '@open-tomato/rafa-run/start/run-setup';
 
 import { CONFIG_DEFAULTS } from '../config-registry.js';
 import { expectExit, plantScratchRepo } from '../tests/cli-capture.js';
@@ -274,7 +275,11 @@ describe('the loop guard replaying a removed worktree in a real --as-worktree ru
       expect(existsSync(worktreePath)).toBe(false);
 
       await waitForStopped(scratch.repo);
-      expectExit(await result, 0, scratch);
+      const finished = await result;
+      expectExit(finished, 0, scratch);
+      // An `--as-worktree` run is not in the checkout it was started from,
+      // so it prints no line about edits there going into task commits.
+      expect(`${finished.stdout}${finished.stderr}`).not.toContain(SHARED_CHECKOUT_NOTE.trim());
 
       // The session ran and logged its call before its write into the now
       // gone worktree failed; the guard is what caught the checkout

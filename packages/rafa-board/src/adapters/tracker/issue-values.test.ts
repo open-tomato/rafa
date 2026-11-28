@@ -96,7 +96,7 @@ afterAll(() => {
 
 describe('the issue value lists', () => {
   it.each([
-    ['ISSUE_TYPES', ISSUE_TYPES, ['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic', 'spec']],
+    ['ISSUE_TYPES', ISSUE_TYPES, ['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic', 'spec', 'debt']],
     ['ISSUE_PRIORITIES', ISSUE_PRIORITIES, ['urgent', 'high', 'medium', 'low']],
     [
       'ISSUE_STATES',

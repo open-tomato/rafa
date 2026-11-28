@@ -144,6 +144,16 @@
  *     publishes. It is read through `flag`, so `"true"`, `yes` and `1`
  *     are refused, and it is not a `CommandLineSetting`.
  *
+ * One more `release` setting says whether a fragment may name a package:
+ *
+ *   - `release.packageFragments` defaults to `allow`, which is what
+ *     `rafa release fragment --package=<name>` did before the key: it
+ *     writes a fragment carrying a `package:` line. `refuse` says the
+ *     repository releases no package yet, so a fragment naming one is
+ *     refused. It is read through `oneOf` over
+ *     {@link PACKAGE_FRAGMENT_MODES}, so any other spelling is refused
+ *     naming both values, and it is not a `CommandLineSetting`.
+ *
  * ## The `dangerous` key
  *
  * `dangerous.acceptVersionCollision` has `rafa pr merge` accept, on
@@ -186,6 +196,15 @@ import {
   versionCollisionMode,
 } from './core/config/sections.js';
 
+/**
+ * The two values `release.packageFragments` takes: `allow` lets a
+ * fragment name a package, and `refuse` refuses one that does.
+ */
+export const PACKAGE_FRAGMENT_MODES = ['allow', 'refuse'] as const;
+
+/** One of {@link PACKAGE_FRAGMENT_MODES}. */
+export type PackageFragmentMode = (typeof PACKAGE_FRAGMENT_MODES)[number];
+
 declare module './core/config/config-schema.js' {
   /** The `release` section's fields, added to core's. */
   interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {}
@@ -215,6 +234,7 @@ export interface ReleaseShape {
     readonly publishCommand: string;
     readonly publish: ReleasePublishMode;
     readonly moveLock: boolean;
+    readonly packageFragments: PackageFragmentMode;
   };
 }
 
@@ -292,6 +312,11 @@ export interface ReleaseSettings {
    * in the same release commit. `release.moveLock`.
    */
   releaseMoveLock: boolean;
+  /**
+   * Whether a fragment may name a package, or is refused when it does.
+   * `release.packageFragments`.
+   */
+  releasePackageFragments: PackageFragmentMode;
 }
 
 /** The `dangerous` setting the release plan adds, resolved. */
@@ -325,6 +350,7 @@ export const RELEASE_DEFAULTS: Readonly<ReleaseSettings> = Object.freeze({
   releasePublishCommand: 'npm publish',
   releasePublish: 'manual',
   releaseMoveLock: false,
+  releasePackageFragments: 'allow',
 });
 
 /** What the release plan's `dangerous` setting resolves to when no layer names it. */
@@ -394,6 +420,11 @@ export const RELEASE_SETTINGS: {
   },
   releasePublish: { key: 'release.publish', read: releasePublishMode, cli: false },
   releaseMoveLock: { key: 'release.moveLock', read: flag, cli: false },
+  releasePackageFragments: {
+    key: 'release.packageFragments',
+    read: oneOf(PACKAGE_FRAGMENT_MODES),
+    cli: false,
+  },
 };
 
 /** The release plan's `dangerous` setting spec. */

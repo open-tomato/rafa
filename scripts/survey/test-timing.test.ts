@@ -103,6 +103,14 @@ describe('parseJunit and summarizeTiming', () => {
     expect(summary.slowestMicros).toBe(3_000 + (TOP_SLOWEST - 3) * 10);
   });
 
+  it('strips a comment span left behind once a nested one is removed (CodeQL alert 40)', () => {
+    const nested = report(false).replace(`<testsuite name="${FLAT}"`, `<!-<!-- x -->- <testcase name="hidden" time="9" file="${FLAT}" /> -->\n  <testsuite name="${FLAT}"`);
+    const names = parseJunit(nested).cases.map((item) => item.name);
+
+    expect(nested).toContain('hidden');
+    expect(names).toEqual(['outer & "q" > inner > deep', 'outer & "q" > middle', 'top', 'top two', 'slow', 'later', 'todo']);
+  });
+
   it('refuses a text with no testsuites root', () => {
     expect(() => parseJunit('<html></html>')).toThrow('not a junit report');
   });

@@ -392,6 +392,7 @@ import {
   createStartTriage,
   dispatchTask,
   emitLoopEvent,
+  emitStopEvents,
   finishCleanExit,
   guardCheckout,
   guardRunBranch,
@@ -404,6 +405,7 @@ import {
   isBudgetExit,
   loadRunConfig,
   markBudgetExit,
+  noteSharedCheckout,
   openCheckoutExpectation,
   openRunSession,
   readAlwaysRunFiles,
@@ -525,6 +527,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     branchTemplate: runConfig.config.namingBranch,
   });
   guardRunBranch(planStub, branch, args, runConfig.config.namingBranch);
+  // Past the guard, ahead of every session: without `--as-worktree` the run
+  // is in the checkout it was started from, and one line says that edits
+  // made there go into task commits (`start/run-setup.ts`, #1607).
+  noteSharedCheckout(args);
   // What the loop guard holds the checkout to: its branch at the HEAD it
   // starts from, moved on by each task commit (`start/checkout-watch.ts`).
   let expected = openCheckoutExpectation({ projectRoot: repoRoot, checkout, branch });
@@ -826,7 +832,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // dispatch row takes the resolver and what the prompt offered off
       // `dispatch` (`start/dispatch.ts`). Triage follows
       // the store and the mark, and stops nothing (`start/triage.ts`).
-      // Last, the rows are pushed, the other devices' pulled, then the bug-fix pairs.
+      // Last, the rows are pushed and the other devices' pulled, in the
+      // order `effort.syncMerge` names, then the bug-fix pairs.
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
         await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
@@ -888,8 +895,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (finished.outcome !== 'done') {
         const held = { kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' } as const;
         if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit', retryTask)) continue;
-        if (await decisions.atStop({ kind: 'clean-exit', taskInfo, retryTask, finished, stopEvent: held })) continue;
-        emitLoopEvent(held);
+        const stop = { kind: 'clean-exit', taskInfo, retryTask, finished, stopEvent: held } as const;
+        if (await decisions.atStop(stop)) continue;
+        emitStopEvents(stop);
         return;
       }
       decisions.taskDone(taskInfo);

@@ -32,7 +32,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
 import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';
-import { createRunDecisions } from './continue-run.js';
+import { createRunDecisions, emitStopEvents, stopEventsOf } from './continue-run.js';
 import { UNREADABLE_PREFIX } from './decision-parse.js';
 import { retryTaskOf } from './retry-budget.js';
 
@@ -734,5 +734,108 @@ describe('--force-wrap-up', () => {
     expect(decisions.gateForcedWrapUp('stop', forcedTasks, null)).toBe('stop');
     expect(decisions.gateForcedWrapUp('go-on', forcedTasks, null)).toBe('go-on');
     expect(decisions.gateForcedWrapUp('repair', forcedTasks, redWith(1))).toBe('repair');
+  });
+});
+
+/** The line a task held on both absences is printed under, which its run's closing `halt` opens with. */
+const HELD_TEXT = 'Task held: its session left neither a report nor a commit';
+
+/** The gate's text, a declaration on its line as a plan writes one. */
+const GATE_TEXT = 'Check the env file a person writes';
+
+/** A clean exit held on nothing but its absences, as `finishCleanExit` answers it, on the gate on line index 2. */
+function heldNothingLeft(trackerPath: string): Extract<DecisionStop, { kind: 'clean-exit' }> {
+  writeFileSync(trackerPath, TRACKER.replace(GATE_TEXT, `${GATE_TEXT}  {agent=loop-implementer effort=high}`), 'utf8');
+  const taskInfo = taskAt(trackerPath, 2);
+  const holds = ['no report: the session wrote no rafa:report block the loop could read', 'no commit: the task changed no tracked file'];
+  return {
+    kind: 'clean-exit',
+    taskInfo,
+    retryTask: retryTaskOf(taskInfo, readFileSync(trackerPath, 'utf8')),
+    finished: { attempt: { outcome: 'nothing-to-commit', subject: 's', sha: null, failedStep: null, exitCode: null, message: '' }, holds },
+    stopEvent: { kind: 'task-blocked', position: { index: 1, total: 4 }, reason: holds[0] ?? '' },
+  };
+}
+
+/** The names of the events emitted, in order. */
+function eventNames(): readonly string[] {
+  return events.map(([name]) => name);
+}
+
+describe('the events of a stop no decision goes on from', () => {
+  it('writes no halt after a stop its own report blocked: its task-blocked alone', async () => {
+    const run = plant([]);
+    const stop = heldReport(run.trackerPath);
+
+    expect(await createRunDecisions({ ...run.options, continueArgs: CONTINUE_OFF }).atStop(stop)).toBe(false);
+    emitStopEvents(stop);
+
+    expect(events).toEqual([['task-blocked', { position: { index: 1, total: 4 }, reason: 'status: blocked' }]]);
+  });
+
+  it('writes no halt after a session that exited nonzero, nor after a commit git refused', () => {
+    const run = plant([]);
+    const held = heldNothingLeft(run.trackerPath);
+    const exited = { ...held.stopEvent, reason: 'session exited 1' };
+
+    emitStopEvents({ kind: 'session-exit', taskInfo: held.taskInfo, retryTask: held.retryTask, exitCode: 1, stopEvent: exited });
+    emitStopEvents({ ...held, finished: { ...held.finished, attempt: { ...held.finished.attempt, outcome: 'failed', failedStep: 'commit', exitCode: 1 } } });
+
+    expect(eventNames()).toEqual(['task-blocked', 'task-blocked']);
+  });
+
+  it('writes no extra halt when SIGINT ends the decision on a held stop: its task-blocked naming interrupted alone', async () => {
+    const run = plant([]);
+    run.refusal = 'spent';
+    const decisions = createRunDecisions({
+      ...run.options,
+      spawn: () => {
+        run.interrupted = true;
+        return Promise.resolve({ exitCode: 130, stdout: '' });
+      },
+    });
+
+    const end = await endOf(() => decisions.atStop(heldNothingLeft(run.trackerPath)));
+
+    expect(end.exitCode).toBe(0);
+    expect(events).toEqual([['task-blocked', { position: { index: 1, total: 4 }, reason: 'interrupted' }]]);
+  });
+
+  it('ends a held stop on its task-blocked, then one halt opening with the held text and naming the task', async () => {
+    const run = plant([]);
+    const stop = heldNothingLeft(run.trackerPath);
+
+    expect(await createRunDecisions({ ...run.options, continueArgs: CONTINUE_OFF }).atStop(stop)).toBe(false);
+    emitStopEvents(stop);
+
+    expect(events).toEqual([
+      ['task-blocked', { position: { index: 1, total: 4 }, reason: 'no report: the session wrote no rafa:report block the loop could read' }],
+      ['halt', { reason: `${HELD_TEXT}: ${GATE_TEXT}` }],
+    ]);
+    expect(stopEventsOf(stop).at(-1)).toEqual({ kind: 'halt', reason: `${HELD_TEXT}: ${GATE_TEXT}` });
+  });
+
+  it('ends a held stop a stop decision ends on its decision, its task-blocked, then the halt naming the held text and the task (#1672)', async () => {
+    const run = plant([decisionOutput('strategy: stop', 'reason: "The task text is wrong."')]);
+    run.refusal = 'spent';
+
+    const end = await endOf(() => createRunDecisions(run.options).atStop(heldNothingLeft(run.trackerPath)));
+
+    expect(end.exitCode).toBe(DECISION_STOP_EXIT);
+    expect(run.calls).toHaveLength(1);
+    expect(eventNames()).toEqual(['decision', 'task-blocked', 'halt']);
+    expect(events.at(-1)).toEqual(['halt', { reason: `${HELD_TEXT}: ${GATE_TEXT}` }]);
+  });
+
+  it('ends a held stop that needs a decision under --output=json on decision-needed, its task-blocked, then the same halt (#1672)', async () => {
+    const run = plant([]);
+    run.refusal = 'spent';
+
+    const end = await endOf(() => createRunDecisions({ ...run.options, mode: () => 'json' }).atStop(heldNothingLeft(run.trackerPath)));
+
+    expect(end.exitCode).toBe(DECISION_NEEDED_EXIT);
+    expect(run.calls).toHaveLength(0);
+    expect(eventNames()).toEqual(['decision-needed', 'task-blocked', 'halt']);
+    expect(events.at(-1)).toEqual(['halt', { reason: `${HELD_TEXT}: ${GATE_TEXT}` }]);
   });
 });

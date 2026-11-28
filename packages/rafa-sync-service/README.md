@@ -95,9 +95,11 @@ When the hub is unreachable:
 4. Rows are queued for sync on the next successful contact.
 
 An unreachable hub does not prevent `rafa effort collect`, `rafa loop start`,
-`rafa status`, `rafa next`, or `rafa effort report` from running. A push that
-cannot reach the hub skips its pull, so a command waits for one timeout; a
-pull that fails still reads the local store.
+`rafa status`, `rafa next`, or `rafa effort report` from running. The first
+step of a contact that cannot reach the hub skips the other, so a command waits
+for one timeout: under `ff-only`, the default, an unreachable pull skips its
+push; under `merge`, an unreachable push skips its pull. A pull that fails still
+reads the local store.
 
 ## How sync works
 
@@ -115,9 +117,13 @@ format core's `packages/rafa/src/effort/store/wire.ts` defines.
   the store). The merge's rules are documented in `context/effort-merge.md`.
 
 A command syncs through one contact, once per invocation, and makes it when:
-- `rafa effort collect` pushes then pulls once its rows are stored.
-- `rafa loop start` makes one contact for its run and pushes then pulls at the
+- `rafa effort collect` pushes and pulls once its rows are stored.
+- `rafa loop start` makes one contact for its run and pushes and pulls at the
   end of each task, whatever its outcome.
+
+Both pull first under `effort.syncMerge: ff-only` (the default), and push only
+after a pull that completed, leaving out the rows `merge_conflicts` names;
+under `merge` they push first, then pull.
 - `rafa status`, `rafa next` (`--dry-run` included), and `rafa effort report`
   pull alone before they read, whether or not they write.
 
@@ -137,7 +143,9 @@ A project is refused if:
   command run inside the project's git repository mints one.
 - **Incoming rows name unknown migrations**: The hub holds migrations this
   rafa does not know. `rafa self-update` brings this rafa to a build that
-  knows them, and sync can then proceed.
+  knows them, and sync can then proceed. Under `effort.syncSkew:
+  pull-projected`, a hub that can project answers the rows cut down to this
+  rafa's schema instead, and a pull is refused only by one that cannot.
 
 For the first two cases, every command that touches the store prints the
 refusal; for the third, the pull action alone is refused, and the next push

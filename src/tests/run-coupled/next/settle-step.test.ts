@@ -88,6 +88,8 @@ const RELEASE: MergeGuardSettings = {
   releaseHeading: '## {version} — {date}, {title}',
   prVersionCollision: 'report',
   dangerousAcceptVersionCollision: false,
+  releasePackageFragments: 'allow',
+  releaseMoveLock: false,
 };
 
 describe('the state the settle step answers', () => {

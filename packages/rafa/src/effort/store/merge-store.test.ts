@@ -37,7 +37,7 @@ import { beginSession } from '../../core/loop/index.js';
 
 import { bringForward } from './bring-forward.js';
 import { DevelopmentBuildRefusedError } from './development-build.js';
-import { MergeRefusal, mergeStore, MOVE_TO_SQLITE } from './merge-store.js';
+import { MergeRefusal, mergeStore, MOVE_TO_SQLITE, readHeldMigrations } from './merge-store.js';
 import { migrateSchema, SQLITE_MIGRATIONS } from './sqlite.js';
 import { storeRows } from './testdata/store-rows.js';
 
@@ -488,6 +488,210 @@ describe('mergeStore supersedes', () => {
 
     expect(again).toMatchObject({ rowsAdded: 0, rowsSkipped: 1 });
     expect(supersedesOf(testCase.path)).toHaveLength(1);
+  });
+});
+
+describe('mergeStore projected', () => {
+  /** The ids a projected payload names its findings rows as lacking. */
+  const LACKING = ['test-later-a', 'test-later-b'];
+
+  /** Every listing of the store at `path`, in key order. */
+  function heldOf(path: string): { table_name: string; origin_store: string; origin_seq: number; missing: string }[] {
+    return readRows(path, 'SELECT table_name, origin_store, origin_seq, missing FROM held_rows ORDER BY table_name, origin_store, origin_seq');
+  }
+
+  /** Plants a finding for `key` with no origin pair, as a row an older runtime inserted. */
+  function plantUnstamped(db: Database, key: string): void {
+    db.query('INSERT INTO findings (seq, id, session_id, task_line, kind, what, artifact, signal, outcome, collected_at)'
+      + ' VALUES (?, ?, ?, ?, \'gotcha\', ?, ?, \'loud\', \'done\', ?)')
+      .run(nextSeq(db, 'findings'), `id-${key}`, `session-${key}`, `task ${key}`, `what ${key}`, `artifact-${key}`, COLLECTED_AT);
+  }
+
+  /**
+   * This store holds `a1` and `c1` under its origin; the other holds `a1`
+   * under the same pair, `b1` under its own, `c1` under its own pair
+   * (matched by identity only), `n1` with no pair, and one commit.
+   */
+  function projectedCase(): Case {
+    const testCase = freshCase();
+    withStore(testCase.path, (db) => {
+      plantMeta(db, testCase.path, HERE, PROJECT);
+      plantFinding(db, HERE, 'a1');
+      plantFinding(db, HERE, 'c1');
+    });
+    withStore(testCase.otherPath, (db) => {
+      plantFinding(db, HERE, 'a1');
+      plantFinding(db, THERE, 'b1');
+      plantFinding(db, THERE, 'c1');
+      plantUnstamped(db, 'n1');
+      plantCommit(db, THERE, 'sha-1010', '2026-09-29T10:10:00.000Z', null);
+    });
+    return testCase;
+  }
+
+  it('lists each row of a projected table this store now holds under its pair, in the swapped-in store', () => {
+    const testCase = projectedCase();
+
+    const result = mergeStore(mergeOptions(testCase, { projected: { findings: LACKING } }));
+
+    expect(result).toMatchObject({ status: 'merged', rowsAdded: 3, rowsSkipped: 2, rowsInConflict: 0, rowsHeld: 2 });
+    expect(heldOf(testCase.path)).toEqual([
+      { table_name: 'findings', origin_store: HERE, origin_seq: 1, missing: JSON.stringify(LACKING) },
+      { table_name: 'findings', origin_store: THERE, origin_seq: 2, missing: JSON.stringify(LACKING) },
+    ]);
+    expect(readRows(testCase.path, 'SELECT id, origin_store, origin_seq FROM findings ORDER BY seq')).toEqual([
+      { id: 'id-a1', origin_store: HERE, origin_seq: 1 },
+      { id: 'id-c1', origin_store: HERE, origin_seq: 2 },
+      { id: 'id-b1', origin_store: THERE, origin_seq: 2 },
+      { id: 'id-n1', origin_store: null, origin_seq: null },
+    ]);
+    expect(readRows(testCase.path, 'SELECT count(*) AS n FROM merge_conflicts')).toEqual([{ n: 0 }]);
+    expect(readHeldMigrations(testCase.path)).toEqual(LACKING);
+  });
+
+  it('lists nothing for the same merge with no projected map, nor for a table the map leaves out (controls)', () => {
+    const whole = projectedCase();
+    const other = projectedCase();
+
+    const unprojected = mergeStore(mergeOptions(whole));
+    const sessionsOnly = mergeStore(mergeOptions(other, { projected: { sessions: LACKING } }));
+
+    expect(unprojected).toMatchObject({ rowsAdded: 3, rowsHeld: 0 });
+    expect(heldOf(whole.path)).toEqual([]);
+    expect(sessionsOnly).toMatchObject({ rowsAdded: 3, rowsHeld: 0 });
+    expect(heldOf(other.path)).toEqual([]);
+    expect(readHeldMigrations(whole.path)).toEqual([]);
+  });
+
+  it('keeps one listing for a row listed again, its missing the ids of both lists, counting no new listing', () => {
+    const testCase = projectedCase();
+    mergeStore(mergeOptions(testCase, { projected: { findings: ['test-later-b'] } }));
+
+    const again = mergeStore(mergeOptions(testCase, {
+      stamp: `${STAMP}-2`,
+      newMergeId: () => 'merge-2',
+      projected: { findings: ['test-later-a'], commits: ['test-later-c'] },
+    }));
+
+    expect(again).toMatchObject({ rowsAdded: 0, rowsHeld: 1 });
+    const held = heldOf(testCase.path);
+    expect(held.map(({ table_name: table, origin_store: store, origin_seq: seq }) => [table, store, seq])).toEqual([
+      ['commits', THERE, 1],
+      ['findings', HERE, 1],
+      ['findings', THERE, 2],
+    ]);
+    expect(held.map(({ missing }) => (JSON.parse(missing) as string[]).sort())).toEqual([
+      ['test-later-c'],
+      ['test-later-a', 'test-later-b'],
+      ['test-later-a', 'test-later-b'],
+    ]);
+    expect(readHeldMigrations(testCase.path)).toEqual(['test-later-a', 'test-later-b', 'test-later-c']);
+  });
+
+  it('takes the held rows whole when they come whole, dropping their listings, the count check passing over the drop', () => {
+    const testCase = projectedCase();
+    mergeStore(mergeOptions(testCase, { projected: { findings: LACKING } }));
+
+    const whole = mergeStore(mergeOptions(testCase, { stamp: `${STAMP}-2`, newMergeId: () => 'merge-2' }));
+
+    expect(whole).toMatchObject({ status: 'merged', rowsAdded: 0, rowsInConflict: 0, rowsHeld: 0, rowsRefilled: 2 });
+    expect(heldOf(testCase.path)).toEqual([]);
+    expect(readHeldMigrations(testCase.path)).toEqual([]);
+    expect(readRows(testCase.path, 'SELECT count(*) AS n FROM merge_conflicts')).toEqual([{ n: 0 }]);
+  });
+
+  it('takes no held row of a table projected again, refilling nothing (control)', () => {
+    const testCase = projectedCase();
+    mergeStore(mergeOptions(testCase, { projected: { findings: LACKING } }));
+
+    const again = mergeStore(mergeOptions(testCase, {
+      stamp: `${STAMP}-2`, newMergeId: () => 'merge-2', projected: { findings: LACKING },
+    }));
+
+    expect(again).toMatchObject({ status: 'merged', rowsHeld: 0, rowsRefilled: 0 });
+    expect(heldOf(testCase.path)).toHaveLength(2);
+  });
+
+  it('counts the listings it would write under dryRun, the count check passing over them, and writes none', () => {
+    const testCase = projectedCase();
+    const [hereBefore] = snapshotBoth(testCase);
+
+    const result = mergeStore(mergeOptions(testCase, { dryRun: true, projected: { findings: LACKING } }));
+
+    expect(result).toMatchObject({ status: 'would-merge', rowsHeld: 2 });
+    const [hereAfter] = snapshotBoth(testCase);
+    expect(hereBefore !== undefined && hereAfter !== undefined && sameFiles(hereBefore, hereAfter)).toBe(true);
+    expect(heldOf(testCase.path)).toEqual([]);
+  });
+
+  it('refuses a map naming no merged table, or an empty or blank id list, with a TypeError, leaving both files byte-identical', () => {
+    const testCase = projectedCase();
+    const refusedWith = (text: string) => (error: unknown): void => {
+      expect(error).toBeInstanceOf(TypeError);
+      expect((error as Error).message).toContain(text);
+    };
+
+    expectRefusedUnchanged(
+      testCase,
+      () => mergeStore(mergeOptions(testCase, { projected: { held_rows: LACKING } })),
+      refusedWith('projected names "held_rows", which is no merged table'),
+    );
+    expectRefusedUnchanged(
+      testCase,
+      () => mergeStore(mergeOptions(testCase, { projected: { constructor: LACKING } })),
+      refusedWith('projected names "constructor", which is no merged table'),
+    );
+    expectRefusedUnchanged(
+      testCase,
+      () => mergeStore(mergeOptions(testCase, { projected: { findings: [] } })),
+      refusedWith('projected.findings is not a list of migration ids'),
+    );
+    expectRefusedUnchanged(
+      testCase,
+      () => mergeStore(mergeOptions(testCase, { projected: { findings: [''] } })),
+      refusedWith('projected.findings is not a list of migration ids'),
+    );
+    expect(mergeStore(mergeOptions(testCase, { projected: { findings: LACKING } })).status).toBe('merged');
+  });
+});
+
+describe('readHeldMigrations', () => {
+  /** The `held-rows` entry's place in the catalogue. */
+  const HELD_ROWS_AT = SQLITE_MIGRATIONS.findIndex(({ id }) => id === 'held-rows');
+
+  it('answers each listed id once, in code-point order, across tables and rows', () => {
+    const testCase = freshCase();
+    withStore(testCase.path, (db) => {
+      db.run('INSERT INTO held_rows (table_name, origin_store, origin_seq, missing) VALUES'
+        + ' (\'findings\', \'store-b\', 1, \'["test-z","test-a"]\'),'
+        + ' (\'findings\', \'store-b\', 2, \'["test-a"]\'),'
+        + ' (\'commits\', \'store-c\', 1, \'["test-m"]\')');
+    });
+
+    expect(readHeldMigrations(testCase.path)).toEqual(['test-a', 'test-m', 'test-z']);
+  });
+
+  it('answers nothing for a store with nothing listed, and for a path where no store is', () => {
+    const testCase = freshCase();
+    withStore(testCase.path, (db) => plantFinding(db, HERE, 'a1'));
+
+    expect(readHeldMigrations(testCase.path)).toEqual([]);
+    expect(readHeldMigrations(testCase.otherPath)).toEqual([]);
+  });
+
+  it('answers nothing for a store whose schema predates held_rows, which holds no such table (control)', () => {
+    const testCase = freshCase();
+    mkdirSync(dirname(testCase.path), { recursive: true });
+    const old = new Database(testCase.path, { create: true, readwrite: true });
+    try {
+      migrateSchema(old, testCase.path, SQLITE_MIGRATIONS.slice(0, HELD_ROWS_AT));
+    } finally {
+      old.close();
+    }
+
+    expect(HELD_ROWS_AT).toBeGreaterThan(0);
+    expect(readRows(testCase.path, 'SELECT name FROM sqlite_master WHERE name = \'held_rows\'')).toEqual([]);
+    expect(readHeldMigrations(testCase.path)).toEqual([]);
   });
 });
 

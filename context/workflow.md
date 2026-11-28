@@ -304,7 +304,8 @@ runner runs the suite after the task commits when the task declares
 - `tests.alwaysRun` (glob list; defaults to `src/**/*.sweep.test.ts`) —
   content sweeps that always run alongside scoped tests in every task's
   gates, since they read files at run time and `bun test --changed=<base>`
-  follows only the import graph
+  follows only the import graph. The task step adds the facade test of each
+  package a task's added deep import reaches (`context/verification.md`)
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and
@@ -572,7 +573,14 @@ A branch holding only `claim(rafa-<n>): …` commits is merged with `git merge
 origin/<base>` in the run's worktree before the first task, a merge and never a
 rewrite of the pushed branch, and one line names the commits taken and their
 range. A branch holding any other commit is never merged: one warning says how
-many commits behind `origin/<base>` it is, and the run goes on. A branch at or
+many commits behind `origin/<base>` it is, and the run goes on to the claim
+check (`packages/rafa-run/src/start/preflight-claim.ts`). That check refuses a
+first dispatch of a claimed plan on such a branch before any task, naming the
+branch, the first commit that is not a claim and the line that recuts the
+branch from the base, `git checkout -B <branch> origin/<base>` then `git
+cherry-pick --allow-empty` of every claim commit on it, oldest first, those
+made before that commit included; a resume, whose work
+past the base is its own task commits, goes on at the warning. A branch at or
 ahead of `origin/<base>` prints nothing new. A failed fetch is a warning, the
 branch then read against `origin/<base>` as it stood; a failed merge is aborted
 and refuses the run. `--create-branch` without `--as-worktree` switches to an
@@ -776,18 +784,29 @@ and `packages/rafa/src/effort/store/` for the record) runs all the code.
 ### Bug sweep convention
 
 **When a tooling phase completes, the first group of the bug sweep that
-follows is every open `module:cli-gap` issue.** As new rafa commands or
-fields are shipped, the hook denies `gh` equivalents with a gap report
-offering to file a bug for each missing capability. Those bugs are filed
-with the `module:cli-gap` label. When the feature that closed the gap
-completes and ships, `rafa next` or a manual `rafa issue list
---module=cli-gap` sweeps those issues: each one names a `gh` command or
-flag the hook denied, matched against the rafa line that can now do the
-step. The person running the sweep confirms each equivalence or corrects
-the report, and closes the issue. This establishes a clear pipeline from
-tooling promise (the hook's denial) to tooling completion (the rafa
-command) to closure (the verification sweep), and leaves no gap report
-buried in a list of general bugs.
+follows is every open `module:cli-gap` issue, of either type.** As new rafa
+commands or fields are shipped, the hook denies `gh` equivalents with a gap
+report offering to file one for each missing capability. A gap report is
+filed as `type:debt` when its missing line only leaves a step to be done by
+hand, and as `type:bug` when the missing line makes something break. The
+breaking question, worded the same in every filing place: "Does the missing
+line make something break, beyond a step done by hand?" Breaking means a
+command prints or does something wrong, two refusals leave no way through, or
+a hand-over names the wrong line. Yes files `--type=bug --module=cli-gap`; no
+files `--type=debt --module=cli-gap`. The search before filing stays
+`rafa issue list --module=cli-gap --search=…`, with no `--type`, so a gap
+filed under either type is found. A debt report that later starts to break
+moves to a bug with `rafa issue edit <n> --type=bug`, which keeps its record.
+When the feature that closed the gap completes and ships, `rafa next` or a
+manual `rafa issue list --module=cli-gap` sweeps those issues: each one names
+a `gh` command or flag the hook denied, matched against the rafa line that can
+now do the step. The person running the sweep confirms each equivalence or
+corrects the report, and closes the issue. This establishes a clear pipeline
+from tooling promise (the hook's denial) to tooling completion (the rafa
+command) to closure (the verification sweep). A gap is tech debt, not a bug:
+a bug count reads `--type=bug`, so a gap report shows there only when it
+breaks something. The Atlas QA bug metrics also leave every `module:cli-gap`
+row out (`NOT_CLI_GAP`, `addons/atlas/rafa-atlas/src/metrics/qa.ts`).
 
 A stale line found during other work is corrected in that work, in the same
 commit, and is not filed as a bug.

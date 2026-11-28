@@ -145,8 +145,26 @@ const FIELD_LINE = /^ {0,3}(?:[-*+]\s+)?[*_]{0,2}blocked\s+by[*_]{0,2}\s*:(.*)$/
 /** An issue id as the line names it; nothing but this counts. */
 const ISSUE_ID = /#(\d+)/gu;
 
-/** An issue on another repository, `owner/repo#<n>`, as GitHub spells the names. */
-const FOREIGN_ID = /[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+#\d+/gu;
+/**
+ * An issue on another repository, `owner/repo#<n>`, as GitHub spells the
+ * names, read as one step of a scan that walks the whole line.
+ *
+ * Each match is one of three, tried in order at the scan's place: the
+ * token (the only one with group 1), else the run of owner characters
+ * (letters, digits, `-`) opening there on a letter or digit, else the run
+ * of anything but a letter or digit. One of them always matches, so the
+ * scan never restarts inside a run. A bare token pattern did (CodeQL
+ * `js/polynomial-redos`, alerts 14 and 15): on a run of owner characters
+ * with no `/`, it read the run to its end from every start inside it,
+ * about 10 s at 50,000 characters. Here each run is read at most twice,
+ * once by the failed token and once as the run itself.
+ *
+ * The tokens are the ones the bare pattern found: an owner always runs to
+ * the end of its run, so a token can start inside a run only where an
+ * earlier one ended (`a/b#2c-d/e#3` holds two), and a run opening on `-`
+ * is passed with the hyphens (`-org/repo#1` holds `org/repo#1`).
+ */
+const FOREIGN_SCAN = /([A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+#\d+)|[A-Za-z0-9][A-Za-z0-9-]*|[^A-Za-z0-9]+/gu;
 
 /** What an author must do about a fault; one clause, spelled once. */
 const REMEDY = `name them as "${BLOCKED_BY_FIELD}: #24 #26", or take the ${SPEC_BLOCKED_LABEL} label off`;
@@ -198,10 +216,19 @@ function idsIn(text: string): readonly number[] {
 /** Every `owner/repo#<n>` in `text`, as written, deduped, in line order. */
 function foreignIn(text: string): readonly string[] {
   const found: string[] = [];
-  for (const [token] of text.matchAll(FOREIGN_ID)) {
-    if (!found.includes(token)) found.push(token);
+  for (const [, token] of text.matchAll(FOREIGN_SCAN)) {
+    if (token !== undefined && !found.includes(token)) found.push(token);
   }
   return found;
+}
+
+/** `text` with every `owner/repo#<n>` made a space, so its `#<n>` is no local id. */
+function withoutForeign(text: string): string {
+  return text.replace(FOREIGN_SCAN, (step, token?: string) => (
+    token === undefined
+      ? step
+      : ' '
+  ));
 }
 
 /** What a field line named: its local ids and its foreign tokens. */
@@ -259,7 +286,7 @@ export function readBlockedBy(
   if (found === null) return reading('no-line', issue, null, NAMED_NOTHING, []);
 
   const foreign = foreignIn(found.text);
-  const ids = idsIn(found.text.replace(FOREIGN_ID, ' '));
+  const ids = idsIn(withoutForeign(found.text));
   const named = { ids, foreign };
   if (ids.length === 0) return reading('no-ids', issue, found, named, []);
 

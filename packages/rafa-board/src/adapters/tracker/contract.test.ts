@@ -66,10 +66,23 @@
  * edit written onto every issue or clearing the title the first edit
  * case. A tracker run without `editsPriority` that still answers a
  * priority reddens the one case standing in for the four.
+ *
+ * The type case arrived on 2026-11-27, held by three breaks of its own
+ * below: an `editable` answering no type, an edit's type dropped, and a
+ * move dropping every other label, which is what holds it to the labels
+ * alone, since `get` still answers the module. The in-memory tracker is
+ * run with `editsType: true` and now answers labels, the module's, the
+ * type's and the cause's, and ten earlier breaks redden the case as
+ * well, each list held exactly by the case running them: a throwing
+ * preflight, a missing pair, a missing `edit`, keying issues by opt, a
+ * fixed module and a fixed priority from `get`, an empty body from
+ * `editable`, every edit dropped, an edit written onto every issue and
+ * a cleared title. A tracker run without `editsType` that still answers
+ * a type reddens the one case standing in for it.
  */
 import type { ContractClock } from './contract-clock.js';
 import type { TrackerContractOptions } from './contract.js';
-import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, Tracker } from '@open-tomato/rafa/ports';
+import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, IssueState, IssueType, Tracker } from '@open-tomato/rafa/ports';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -109,6 +122,7 @@ const CASES = {
   editPriority: 'edit writes a priority read back by editable and get, leaving the title, the body and every other issue',
   editPrioritySwap: 'edit swaps one priority for another',
   editPriorityTitle: 'edit writes a priority beside a title, leaving the body',
+  editType: 'edit moves an issue from debt to bug, keeping its other labels, its body and every other issue',
 } as const;
 
 /** The case an adapter run with `readsOpenIssues: false` gets in place of the four `openIssues` cases. */
@@ -117,11 +131,14 @@ const LEFT_OUT_CASE = 'leaves out the openIssues reading it is run without';
 /** The case an adapter run with `readsFiledIssues: false` gets in place of the two `filedIssues` cases. */
 const FILED_LEFT_OUT_CASE = 'leaves out the filedIssues reading it is run without';
 
-/** The case an adapter run without `editsIssues` gets in place of the nine `editable` and `edit` cases. */
+/** The case an adapter run without `editsIssues` gets in place of the ten `editable` and `edit` cases. */
 const EDIT_LEFT_OUT_CASE = 'leaves out the editable and edit pair it is run without';
 
 /** The case an adapter with the pair, run without `editsPriority`, gets in place of the four priority cases. */
 const PRIORITY_LEFT_OUT_CASE = 'answers no priority from editable, run without the priority edit';
+
+/** The case an adapter with the pair, run without `editsType`, gets in place of the type case. */
+const TYPE_LEFT_OUT_CASE = 'answers no type from editable, run without the type edit';
 
 /** The names of the four priority cases, in contract order. */
 const PRIORITY_CASES: readonly string[] = [
@@ -131,7 +148,7 @@ const PRIORITY_CASES: readonly string[] = [
   CASES.editPriorityTitle,
 ];
 
-/** The names of the nine `editable` and `edit` cases, the four priority ones last, in contract order. */
+/** The names of the ten `editable` and `edit` cases, the four priority ones and then the type one last, in contract order. */
 const EDIT_CASES: readonly string[] = [
   CASES.editable,
   CASES.editableClosed,
@@ -139,6 +156,7 @@ const EDIT_CASES: readonly string[] = [
   CASES.editTitle,
   CASES.editUnknown,
   ...PRIORITY_CASES,
+  CASES.editType,
 ];
 
 /** Faults the in-memory tracker can be made with, each breaking what it names. */
@@ -167,6 +185,8 @@ interface Faults {
   readonly bodyEditClearsTitle?: boolean;
   /** `edit` writes a priority onto an issue triage has set none for, and never over one already set. */
   readonly neverSwapsPriority?: boolean;
+  /** `edit` naming a type leaves the issue holding that type's label and no other. */
+  readonly typeEditDropsLabels?: boolean;
 }
 
 /** The states the in-memory tracker holds closed, as the port's `openIssues` note names them. */
@@ -179,6 +199,23 @@ interface HeldIssue {
   readonly comments: readonly string[];
   /** When `create` made it, or null for one the tracker holds no time for. */
   readonly createdAt: string | null;
+  /** Its labels, as a tracker holding labels spells them: the module's, the type's and the cause's. */
+  readonly labels: readonly string[];
+}
+
+/** The labels `create` gives an issue filed from `draft`. */
+function labelsOf(draft: IssueDraft): string[] {
+  return [`module:${draft.module}`, `type:${draft.type}`, ...(draft.cause === undefined
+    ? []
+    : [`cause:${draft.cause}`])];
+}
+
+/** The labels an issue holding `held` holds once moved to `type`, made with `faults`. */
+function movedLabels(held: readonly string[], type: IssueType, faults: Faults): string[] {
+  const kept = faults.typeEditDropsLabels === true
+    ? []
+    : held.filter((label) => !label.startsWith('type:'));
+  return [...kept, `type:${type}`];
 }
 
 /** An in-memory tracker stamping `createdAt` from `clock`, and a reader of the comments it holds. */
@@ -215,7 +252,7 @@ function memoryTracker(clock: ContractClock, faults: Faults = {}): {
       const createdAt = faults.datesFirstOnly === true && issued > 1
         ? null
         : new Date(clock.now()).toISOString();
-      issues.set(externalId, { draft, state: 'todo', comments: [], createdAt });
+      issues.set(externalId, { draft, state: 'todo', comments: [], createdAt, labels: labelsOf(draft) });
       return { opt: draft.opt, kind: 'memory', externalId, url: null };
     },
     get: async (ref) => {
@@ -270,9 +307,10 @@ function memoryTracker(clock: ContractClock, faults: Faults = {}): {
         title: issue.draft.title,
         body: issue.draft.body,
         open: !CLOSED.has(issue.state),
-        labels: [],
+        labels: issue.labels,
         author: '',
         priority: issue.draft.priority,
+        type: issue.draft.type,
       };
     },
     edit: async (ref, change) => {
@@ -288,8 +326,12 @@ function memoryTracker(clock: ContractClock, faults: Faults = {}): {
         const priority = faults.neverSwapsPriority === true && issue.draft.priority !== null
           ? issue.draft.priority
           : change.priority ?? issue.draft.priority;
-        const draft = { ...issue.draft, title, body: change.body ?? issue.draft.body, priority };
-        issues.set(externalId, { ...issue, draft });
+        const type = change.type ?? issue.draft.type;
+        const labels = change.type === undefined
+          ? issue.labels
+          : movedLabels(issue.labels, change.type, faults);
+        const draft = { ...issue.draft, title, body: change.body ?? issue.draft.body, priority, type };
+        issues.set(externalId, { ...issue, draft, labels });
       }
     },
   };
@@ -313,6 +355,7 @@ function contractOptions(
     expectedKind: 'memory',
     editsIssues: true,
     editsPriority: true,
+    editsType: true,
     clock: advanceableContractClock,
     create: async (clock) => {
       const made = memoryTracker(clock, faults);
@@ -338,6 +381,20 @@ function editOf(tracker: Tracker): NonNullable<Tracker['edit']> {
 /** `issue` as a tracker whose pair reads no priority answers it. */
 function withoutPriority(issue: EditableIssue): EditableIssue {
   return Object.fromEntries(Object.entries(issue).filter(([key]) => key !== 'priority')) as unknown as EditableIssue;
+}
+
+/** `issue` as a tracker whose pair reads no type answers it. */
+function withoutType(issue: EditableIssue): EditableIssue {
+  return Object.fromEntries(Object.entries(issue).filter(([key]) => key !== 'type')) as unknown as EditableIssue;
+}
+
+/**
+ * `change` with its type left out. Cast: a change naming a type alone
+ * becomes one naming nothing, which the port's type rules out and the
+ * in-memory tracker writes as no change.
+ */
+function withoutChangedType(change: IssueEdit): IssueEdit {
+  return Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'type')) as unknown as IssueEdit;
 }
 
 /**
@@ -406,6 +463,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.editBody,
       CASES.editTitle,
       ...PRIORITY_CASES,
+      CASES.editType,
     ],
   ],
   [
@@ -426,17 +484,18 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.editBody,
       CASES.editablePriority,
       CASES.editPriority,
+      CASES.editType,
     ],
   ],
   [
     'answers a fixed module',
     contractOptions({}, (base) => ({ get: async (ref) => ({ ...(await base.get(ref)), module: 'billing' }) })),
-    [CASES.get],
+    [CASES.get, CASES.editType],
   ],
   [
     'answers a fixed priority',
     contractOptions({}, (base) => ({ get: async (ref) => ({ ...(await base.get(ref)), priority: 'urgent' }) })),
-    [CASES.priority, CASES.editPriority, CASES.editPrioritySwap],
+    [CASES.priority, CASES.editPriority, CASES.editPrioritySwap, CASES.editType],
   ],
   [
     'ignores the module in find',
@@ -564,7 +623,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'answers editable with an empty body',
     contractOptions({}, (base) => ({ editable: async (ref) => ({ ...(await editableOf(base)(ref)), body: '' }) })),
-    [CASES.editable, CASES.editBody, CASES.editTitle, CASES.editPriority, CASES.editPriorityTitle],
+    [CASES.editable, CASES.editBody, CASES.editTitle, CASES.editPriority, CASES.editPriorityTitle, CASES.editType],
   ],
   [
     'answers an unknown ref from editable',
@@ -583,7 +642,15 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'drops every edit',
     contractOptions({}, () => ({ edit: async () => {} })),
-    [CASES.editBody, CASES.editTitle, CASES.editUnknown, CASES.editPriority, CASES.editPrioritySwap, CASES.editPriorityTitle],
+    [
+      CASES.editBody,
+      CASES.editTitle,
+      CASES.editUnknown,
+      CASES.editPriority,
+      CASES.editPrioritySwap,
+      CASES.editPriorityTitle,
+      CASES.editType,
+    ],
   ],
   [
     'writes the body with its trailing newline trimmed',
@@ -594,8 +661,12 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     })),
     [CASES.editBody],
   ],
-  ['writes the edit onto every issue', contractOptions({ editsEveryIssue: true }), [CASES.editBody, CASES.editPriority]],
-  ['clears the title on an edit naming none', contractOptions({ bodyEditClearsTitle: true }), [CASES.editBody, CASES.editPriority]],
+  ['writes the edit onto every issue', contractOptions({ editsEveryIssue: true }), [CASES.editBody, CASES.editPriority, CASES.editType]],
+  [
+    'clears the title on an edit naming none',
+    contractOptions({ bodyEditClearsTitle: true }),
+    [CASES.editBody, CASES.editPriority, CASES.editType],
+  ],
   [
     'answers editable without a priority',
     contractOptions({}, (base) => ({ editable: async (ref) => withoutPriority(await editableOf(base)(ref)) })),
@@ -626,6 +697,17 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     [CASES.editPriorityTitle],
   ],
   ['never writes a priority over one already set', contractOptions({ neverSwapsPriority: true }), [CASES.editPrioritySwap]],
+  [
+    'answers editable without a type',
+    contractOptions({}, (base) => ({ editable: async (ref) => withoutType(await editableOf(base)(ref)) })),
+    [CASES.editType],
+  ],
+  [
+    'drops the type of an edit',
+    contractOptions({}, (base) => ({ edit: async (ref, change) => editOf(base)(ref, withoutChangedType(change)) })),
+    [CASES.editType],
+  ],
+  ['drops every other label on a type move', contractOptions({ typeEditDropsLabels: true }), [CASES.editType]],
 ];
 
 runTrackerContract(contractOptions());
@@ -712,7 +794,7 @@ describe('the Tracker contract cases', () => {
 });
 
 describe('the Tracker contract cases run without editsIssues', () => {
-  it('swaps the nine editable and edit cases for one holding the pair left out', () => {
+  it('swaps the ten editable and edit cases for one holding the pair left out', () => {
     const without = { ...contractOptions(), editsIssues: undefined };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
@@ -740,8 +822,9 @@ describe('the Tracker contract cases run without editsPriority', () => {
     const without = { ...contractOptions(), editsPriority: undefined };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
-      ...Object.values(CASES).filter((name) => !PRIORITY_CASES.includes(name)),
+      ...Object.values(CASES).filter((name) => !PRIORITY_CASES.includes(name) && name !== CASES.editType),
       PRIORITY_LEFT_OUT_CASE,
+      CASES.editType,
     ]);
   });
 
@@ -758,6 +841,37 @@ describe('the Tracker contract cases run without editsPriority', () => {
 
   it('reads editsPriority beside editsIssues alone, adding no priority case to a tracker run without the pair', () => {
     const without = { ...contractOptions(), editsIssues: false, editsPriority: true };
+
+    expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
+      ...Object.values(CASES).filter((name) => !EDIT_CASES.includes(name)),
+      EDIT_LEFT_OUT_CASE,
+    ]);
+  });
+});
+
+describe('the Tracker contract cases run without editsType', () => {
+  it('swaps the type case for one holding editable to answering none', () => {
+    const without = { ...contractOptions(), editsType: undefined };
+
+    expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
+      ...Object.values(CASES).filter((name) => name !== CASES.editType),
+      TYPE_LEFT_OUT_CASE,
+    ]);
+  });
+
+  it('holds a tracker run without editsType to answering no type, beside one that answers none', async () => {
+    const answersOne = { ...contractOptions(), editsType: false };
+    const answersNone = {
+      ...contractOptions({}, (base) => ({ editable: async (ref) => withoutType(await editableOf(base)(ref)) })),
+      editsType: false,
+    };
+
+    expect(await rejectedCases(answersOne)).toEqual([TYPE_LEFT_OUT_CASE]);
+    expect(await rejectedCases(answersNone)).toEqual([]);
+  });
+
+  it('reads editsType beside editsIssues alone, adding no type case to a tracker run without the pair', () => {
+    const without = { ...contractOptions(), editsIssues: false, editsType: true };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
       ...Object.values(CASES).filter((name) => !EDIT_CASES.includes(name)),

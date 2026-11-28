@@ -227,12 +227,39 @@ its change reaches:
   file under `src/`, `scripts/` and `packages/`, and it fails on any `from` path
   of a move list under `scripts/codemod/moves/` that a scanned file still names,
   once that entry's `to` exists: a list written ahead of its run counts nothing.
+
+  The task step also joins the facade tests a task's added deep imports reach.
+  An added line in a script file that imports `@open-tomato/<pkg>/<path>` from
+  outside `packages/<pkg>/` reaches `packages/<pkg>/index.test.ts`, when the
+  checkout holds one; the step runs each such test once beside the always-run
+  files, and prints `🧩 Facade check added` for it. The facade test holds the
+  package's `index.ts` to the names the rest of the tree takes from it, and no
+  other part of the task step reads it: `--changed` follows the import graph
+  from the changed files, not from the facade test, and the default glob takes
+  no `index.test.ts`. The join runs wherever the always-run files run in the
+  task step, so an `affected` step takes it in its second run, and a `full`
+  step runs the facade tests already and reads no diff. The stage step and the
+  pre-wrap-up step do not join them. A removed deep import adds nothing, and a
+  diff git does not answer warns and adds none.
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a
   test file the step's own change touches ran before it; `false`
   switches that retake off and nothing else; read "A newly red file is
   run alone once" below
+
+**The Bun transpiler-cache line.** Bun caches the transpiled output of a source
+file at 51,200 bytes or more under `$HOME/.bun/install/cache/@t@/`, and a file
+under the line leaves no `.bun` there. One such file on the `rafa --help` load
+path turns the `runRafa` case of `src/tests/cli-capture.test.ts` red, with a
+message about `.bun` under `HOME` and nothing about size. That case spawns the
+CLI and imports no source, so `--changed` never selects it. The guard
+`src/tests/bun-cache-line.sweep.test.ts` reads the tracked `.ts` sources, not
+tests, declarations or installed and built trees, and fails naming each file at
+or over the line with its size. The `src/**/*.sweep.test.ts` glob above runs it
+in every step. When it fires, move one cohesive part of the named file into a
+module beside it and import that back; exported names keep their paths, or
+their importers move in the same commit.
 
 **The coupling reading is a survey reading, not a gate.**
 `bun scripts/survey/coupling.ts --max=20` reads `docs/survey/import-graph.json`,
@@ -282,13 +309,15 @@ finding the ticked pre-wrap-up repair on the tracker, writes its blocker
 on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
-`.github/workflows/verify.yml` runs two jobs under two triggers, each
-with three gates. **Triggers:** pull requests into `main`, `integration`
+`.github/workflows/verify.yml` runs four jobs under two triggers; each
+ring runs three gates. **Triggers:** pull requests into `main`, `integration`
 or `stretch/**`, and pushes to `stretch/**`. **Gates** (each step runs
 unless the job was cancelled): ring 0's job `verify` runs `bun test`,
 `bunx eslint .`, and
-`bun run check-types`, the root config and the ten composite members,
-which hold the types. Ring 1's job `affected` runs `bun run verify:affected`
+`bun run check-types`, the root config and the eleven composite members,
+which hold the types; it runs the `paradedb` service
+(`paradedb/paradedb:0.26.4-pg18`, pinned by digest) and hands its tests
+`POSTGRES_URL`, which `affected` does not set. Ring 1's job `affected` runs `bun run verify:affected`
 (`turbo run lint check-types test --affected`), `bunx tsc --build
 tsconfig.references.json` and `bun scripts/workspace/graph-check.ts`.
 `affected` checks out the whole history and names turbo's base in
@@ -303,11 +332,26 @@ root `AGENTS.md`, which is capped at 80 lines, so a session that runs turbo
 reads `git status` afterwards and finds no such block. Measured on turbo
 2.11.8: a dry run under `CLAUDECODE` and `AI_AGENT` left `git status` empty
 and `AGENTS.md` at 80 lines. `src/tests/turbo-config.sweep.test.ts` holds the
-key. **Two cases for
+key. The job `atlas` runs each publishable Atlas library's gates from its
+folder. The job `hub-image` builds `packages/rafa-hub/Dockerfile` with the
+Bun of `packageManager`, then runs three containers from it. The first is an
+`api-key` hub over a named volume holding only `rafa-hub.yaml`: it checks
+`/health` answers 200 within the image's start period, the `store.opened`
+line's `sqliteVec.loaded`, the keys file, the install record's `dataDir` and
+`bun`, the one `config.yaml` warning naming the `.ts` file and `rafa 1.0.0`,
+and the image's own `HEALTHCHECK` reaching `healthy`. The second, on an empty
+volume, checks that the start exits non-zero naming the `.ts` path. The third,
+on a volume holding a `.ts` config on a port other than the default, checks
+that `rafa-hub health` passes inside the container and that the `listening`
+line takes that port. On a pull request its first step lists the changed
+files, and the rest run only when one lies under its `HUB_PATHS`, which
+`packages/rafa-hub/src/image.test.ts` holds to the hub's workspace closure;
+on a push every step runs. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
-`integration` reports the `verify` and `affected` checks (merge with
-`rafa pr wait <n>` then `rafa pr merge <n>`); a pull request into `stretch/**` reports
-the same two and the `fragment` check (merge with `rafa pr merge <n>`, which
+`integration` reports the `verify`, `affected` and `hub-image` checks
+(merge with `rafa pr wait <n>` then `rafa pr merge <n>`); a pull request
+into `stretch/**` reports the same three and the `fragment` check (merge
+with `rafa pr merge <n>`, which
 `rafa stretch item --wait` runs once they pass; `--skip-checks` is refused
 there). So an item's red shows on its pull request, before the merge into
 the stretch branch, and each item merge waits for one hosted run. One more

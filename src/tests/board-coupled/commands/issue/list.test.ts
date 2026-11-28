@@ -109,7 +109,7 @@ const LOCAL_ROWS = [
 /** Each set of flags the query refuses, and the problem its refusal names. */
 const QUERY_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{ state: 'open' }, '--state is "open", expected one of: backlog, todo, in-progress, in-review, done, released, cancelled'],
-  [{ type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
+  [{ type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec, debt'],
   [{ limit: '0' }, '--limit is "0", expected a positive whole number'],
   [{ limit: '05' }, '--limit is "05", expected a positive whole number'],
   [{ limit: '2.5' }, '--limit is "2.5", expected a positive whole number'],
@@ -552,7 +552,7 @@ describe('rafa issue list --roadmap, refused', () => {
   it.each([
     [['--roadmap', '--state=open'], LINE_REFUSALS[0]?.[1]],
     [['--all'], LINE_REFUSALS[2]?.[1]],
-    [['--roadmap', '--type=feature'], '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
+    [['--roadmap', '--type=feature'], '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec, debt'],
     [['--roadmap', '--limit=0'], '--limit is "0", expected a positive whole number'],
   ])('refuses %j with exit code 1 before running any gh', async (flags, problem) => {
     const calls: string[][] = [];

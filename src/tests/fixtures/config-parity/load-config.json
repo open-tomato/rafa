@@ -120,6 +120,14 @@
       "value": "local",
       "source": "default"
     },
+    "effortSyncMerge": {
+      "value": "ff-only",
+      "source": "default"
+    },
+    "effortSyncSkew": {
+      "value": "refuse",
+      "source": "default"
+    },
     "errorsCodes": {
       "value": [],
       "source": "default"
@@ -322,6 +330,10 @@
     },
     "releaseMoveLock": {
       "value": false,
+      "source": "default"
+    },
+    "releasePackageFragments": {
+      "value": "allow",
       "source": "default"
     },
     "releasePublish": {

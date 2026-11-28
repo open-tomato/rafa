@@ -100,13 +100,13 @@ describe('the survey readers over the live tree', () => {
     expect(counts.contract + counts['use-case'] + counts.unit).toBe(tracked.test.length);
   });
 
-  it('lists core with ./store/* among its exports keys and the hub with none', () => {
+  it('lists core with ./store/* among its exports keys and the hub with . alone', () => {
     const members = readMembers(ROOT);
     const core = members.find((member) => member.name === '@open-tomato/rafa-core');
     const hub = members.find((member) => member.name === '@open-tomato/rafa-hub');
 
     expect(core?.exports).toContain('./store/*');
     expect(hub).toBeDefined();
-    expect(hub?.exports).toEqual([]);
+    expect(hub?.exports).toEqual(['.']);
   });
 });

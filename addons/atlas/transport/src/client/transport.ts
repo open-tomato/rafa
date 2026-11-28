@@ -53,9 +53,20 @@ function urlOf(base: string, request: AtlasRequest): string {
     : `${base}${request.path}?${query}`;
 }
 
+/**
+ * `text` without its trailing slashes, found by a scan back from the end:
+ * linear in the length, where the regex `/\/+$/` was tried from every slash
+ * of an inner run and took quadratic time on one (CodeQL js/polynomial-redos).
+ */
+function withoutTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '/') end -= 1;
+  return text.slice(0, end);
+}
+
 /** A transport over `fetch` to `options.baseUrl`. */
 export function fetchTransport(options: FetchTransportOptions): Transport {
-  const base = options.baseUrl.replace(/\/+$/, '');
+  const base = withoutTrailingSlashes(options.baseUrl);
   const send = options.fetch ?? fetch;
   return {
     async send(request, signal) {

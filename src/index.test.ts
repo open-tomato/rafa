@@ -213,7 +213,9 @@ import {
   selectEffortStore,
 } from '@open-tomato/rafa/store';
 import * as storeEntry from '@open-tomato/rafa/store';
-import { mergeStore } from '@open-tomato/rafa/store/merge-store';
+import { readConflictedRows } from '@open-tomato/rafa/store/merge-conflicts';
+import { mergeStore, readHeldMigrations } from '@open-tomato/rafa/store/merge-store';
+import { readStoreOrigin } from '@open-tomato/rafa/store/store-meta';
 import {
   decodeWirePayload,
   encodeWirePayload,
@@ -321,8 +323,11 @@ const RUNTIME_EXPORTS = [
   'planPrerequisites',
   'prerequisitesPathForPlan',
   'readConfigFile',
+  'readConflictedRows',
+  'readHeldMigrations',
   'readProjectScope',
   'readRafaBlocks',
+  'readStoreOrigin',
   'registerAdapters',
   'registerCoreAdapters',
   'registerCoreConfigSections',
@@ -412,8 +417,11 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['planPrerequisites', entry.planPrerequisites, planPrerequisites],
   ['prerequisitesPathForPlan', entry.prerequisitesPathForPlan, prerequisitesPathForPlan],
   ['readConfigFile', entry.readConfigFile, readConfigFile],
+  ['readConflictedRows', entry.readConflictedRows, readConflictedRows],
+  ['readHeldMigrations', entry.readHeldMigrations, readHeldMigrations],
   ['readProjectScope', entry.readProjectScope, readProjectScope],
   ['readRafaBlocks', entry.readRafaBlocks, readRafaBlocks],
+  ['readStoreOrigin', entry.readStoreOrigin, readStoreOrigin],
   ['registerAdapters', entry.registerAdapters, registerAdapters],
   ['registerCoreAdapters', entry.registerCoreAdapters, registerCoreAdapters],
   ['registerCoreConfigSections', entry.registerCoreConfigSections, registerCoreConfigSections],
@@ -716,6 +724,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/store/merge-store', ['MOVE_TO_SQLITE']],
     ['@open-tomato/rafa/store/move', ['MOVE_TARGET', 'MoveRefusal', 'moveToSqlite']],
   ]],
+  ['./commands/effort/sync.js', [
+    ['@open-tomato/rafa-effort', ['conflictedLine', 'createHubContact', 'hubLine']],
+    ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
+    ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/config/load', ['loadConfig']],
+  ]],
   ['./commands/module/list.js', [
     ['@open-tomato/rafa/commands/plan/plan-files', ['expectNoArgument']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
@@ -977,9 +991,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['@open-tomato/rafa/core/plan', ['plansDirAt', 'isStampableStub', 'planStampLine', 'escapeBlockerText']],
   ]],
   ['./commands/status.js', [
-    ['@open-tomato/rafa-effort', ['pullBeforeRead']],
+    ['@open-tomato/rafa-effort', ['createHubContact', 'hubLine']],
     ['@open-tomato/rafa/commands/plan/plan-files', ['resolveProjectConfig']],
     ['@open-tomato/rafa/core/command', ['CommandExit']],
+    ['@open-tomato/rafa/core/config', ['ConfigError']],
+    ['@open-tomato/rafa/core/config/load', ['loadConfig']],
     ['../status/render.js', ['renderStatus', 'statusData']],
     ['../status/sections.js', ['readStatusSections']],
   ]],
@@ -1317,6 +1333,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/effort/merge.js',
       './commands/effort/import.js',
       './commands/effort/move.js',
+      './commands/effort/sync.js',
       './commands/module/list.js',
       './commands/module/exec.js',
       './commands/agent/vendor.js',
