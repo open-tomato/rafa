@@ -293,22 +293,23 @@ a commit, with no retry granted, is followed by one `halt` line,
 (`emitStopEvents`, `packages/rafa-run/src/start/continue-run.ts`), so
 `rafa loop wait` and `rafa stretch item` name that hold as the run's end.
 
-The three `--continue` lines (`context/cli.md`) count tracker lines
-from 1, as the decision prompt does. A `decision` line names the
-strategy a stop was decided as and its reason. A `retry`, `jump` or
-`defer` ends nothing and the run goes on; a `stop` is followed by the
-stop's own `task-blocked` or `halt` line, and the run ends with exit
-code 20. A `decision needed` line is json mode's: no session was
-spawned, the event's data holds the task, its line, why it stopped,
-the open tasks, the retries in a row left and the rendered prompt, and after
-the stop's own line the run ends with exit code 21, for the caller to
-start again with `--continue --decide=<strategy>`. A `passed over` line
-lists the tasks a run ends with passed over; a `halt` follows it and the
-run ends with exit code 22, unless `--force-wrap-up` goes on to a draft
-pull request. A refused forced wrap-up is a `halt` naming its count,
-with exit code 20, and so is a forced wrap-up whose pull request `gh`
-would not make a draft, its `halt` naming the pull request in place of
-the `pr` line. None of these ends on an `error` line.
+The three `--continue` lines (`context/cli.md`) count tracker lines from
+1, as the decision prompt does. A `decision` line names the strategy a
+stop was decided as and its reason. A `retry`, `jump` or `defer` ends
+nothing and the run goes on; a `stop` is followed by the stop's own
+`task-blocked` or `halt` line, a held stop's `task-blocked` by its held
+`halt`, and the run ends with exit code 20. A `decision needed` line is
+json mode's: no session was spawned, the event's data holds the task,
+its line, why it stopped, the open tasks, the retries in a row left and
+the rendered prompt, and after the stop's own line (and a held stop's
+`halt`) the run ends with exit code 21, for the caller to start again
+with `--continue --decide=<strategy>`. A `passed over` line lists the
+tasks a run ends with passed over; a `halt` follows it and the run ends
+with exit code 22, unless `--force-wrap-up` goes on to a draft pull
+request. A refused forced wrap-up is a `halt` naming its count, with
+exit code 20, and so is a forced wrap-up whose pull request `gh` would
+not make a draft, its `halt` naming the pull request in place of the
+`pr` line. None of these ends on an `error` line.
 
 An `inherited` line names
 the run-start failure, by file and case, that a reported bug was read as

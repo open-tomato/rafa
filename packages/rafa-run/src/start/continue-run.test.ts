@@ -814,4 +814,28 @@ describe('the events of a stop no decision goes on from', () => {
     ]);
     expect(stopEventsOf(stop).at(-1)).toEqual({ kind: 'halt', reason: `${HELD_TEXT}: ${GATE_TEXT}` });
   });
+
+  it('ends a held stop a stop decision ends on its decision, its task-blocked, then the halt naming the held text and the task (#1672)', async () => {
+    const run = plant([decisionOutput('strategy: stop', 'reason: "The task text is wrong."')]);
+    run.refusal = 'spent';
+
+    const end = await endOf(() => createRunDecisions(run.options).atStop(heldNothingLeft(run.trackerPath)));
+
+    expect(end.exitCode).toBe(DECISION_STOP_EXIT);
+    expect(run.calls).toHaveLength(1);
+    expect(eventNames()).toEqual(['decision', 'task-blocked', 'halt']);
+    expect(events.at(-1)).toEqual(['halt', { reason: `${HELD_TEXT}: ${GATE_TEXT}` }]);
+  });
+
+  it('ends a held stop that needs a decision under --output=json on decision-needed, its task-blocked, then the same halt (#1672)', async () => {
+    const run = plant([]);
+    run.refusal = 'spent';
+
+    const end = await endOf(() => createRunDecisions({ ...run.options, mode: () => 'json' }).atStop(heldNothingLeft(run.trackerPath)));
+
+    expect(end.exitCode).toBe(DECISION_NEEDED_EXIT);
+    expect(run.calls).toHaveLength(0);
+    expect(eventNames()).toEqual(['decision-needed', 'task-blocked', 'halt']);
+    expect(events.at(-1)).toEqual(['halt', { reason: `${HELD_TEXT}: ${GATE_TEXT}` }]);
+  });
 });

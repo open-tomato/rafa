@@ -558,7 +558,7 @@ Decisions: 9 tenets, 152 Rejected lines, 361 context rules. A line read in more 
 - **`task.skills` names the resolver and `task.lessons` gates whether blessed lessons join the prompt.** (`context/workflow.md:237`)
 - **The dispatch record holds what skills and lessons reached the prompt.** (`context/workflow.md:247`)
 - **Branch creation happens in the CHECKOUT, not the project root.** (`context/workflow.md:280`)
-- A branch holding any other commit is never merged: one warning says how many commits behind `origin/<base>` it is, and the run goes on. (`context/workflow.md:298`)
+- A branch holding any other commit is never merged: one warning says how many commits behind `origin/<base>` it is, and the run goes on to the claim check, which refuses a first dispatch of a claimed plan on such a branch. (`context/workflow.md:298`)
 - A branch holding only `claim(rafa-<n>): …` commits is merged with `git merge origin/<base>` in the run's worktree before the first task, a merge and never a rewrite of the pushed branch, and one line names the commits taken and their range. (`context/workflow.md:298`)
 - **An existing branch under `--as-worktree` catches up with its base when it holds only claims.** (`context/workflow.md:298`)
 - When `--as-worktree` takes a branch that already exists (local, remote-only, or held by the worktree an earlier start left), it fetches `origin/<base>` (the base, never the branch) and reads the branch's commits past it (`src/start/claim-catch-up.ts`). (`context/workflow.md:298`)

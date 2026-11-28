@@ -831,7 +831,10 @@ New; it replaces no earlier text. What a row or an action added to
     emits `decision-needed` (the task, its line, why it stopped, the open
     tasks, the retries left and the rendered prompt), then its own
     `task-blocked` or `halt`, and the run ends with exit code 21, the
-    tracker as the stop left it. The text and events modes decide
+    tracker as the stop left it. A held stop (neither report nor commit)
+    adds, after its `task-blocked`, the `halt` naming the hold and the
+    task that a held stop no decision goes on from ends on; so does a
+    decision's `stop` on one (#1672). The text and events modes decide
     through the session.
   - **The end**: when only passed-over tasks are left open, the run lists
     each with its strategy and reason, emits `passed-over` and a `halt`,
@@ -858,8 +861,9 @@ New; it replaces no earlier text. What a row or an action added to
     20 so none meets a code `loop wait` answers (10 to 16, 2) or one
     every command shares (0 to 3). Each is thrown as a `LoopEnd` once
     the run has emitted its own events, `decision`, `decision-needed` or
-    `passed-over` and then the stop's `task-blocked` or `halt`, so the
-    run's catch writes no `error` event for it. `context/operators.md`
+    `passed-over` and then the stop's `task-blocked` or `halt` (a held
+    stop's `task-blocked` followed by its `halt`), so the run's catch
+    writes no `error` event for it. `context/operators.md`
     shows their lines.
 - **The `--continue` criteria** (`src/continue-criteria.md`,
   `start/decision-prompt.ts`): the decision session chooses by criteria
@@ -2790,6 +2794,9 @@ New; it replaces no earlier text. What a row or an action added to
   `origin`, retries its push if held unpushed locally, and refuses the run
   naming the owner when another store holds the claim or when the push still
   fails (a "claim lost" halt), so no two devices work the same issue; a
+  first dispatch on a claim branch this device holds that is behind
+  `origin/<base>` with a commit that is not a claim, named with that commit
+  and the line that recuts the branch from the base (the same file); a
   failed required prerequisite — the two automatic items a `gh` pull request
   provider contributes, `gh` on `PATH` and `gh auth status` for `origin`'s
   host, checked ahead of the configured tiers, and the plan's `[start]`

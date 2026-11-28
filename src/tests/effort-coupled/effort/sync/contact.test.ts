@@ -119,11 +119,11 @@ function mismatch(): Error {
 
 /** The line the `service` strategy's `HubUpgradeRequired` carries for a hub lacking two migrations. */
 const HUB_BEHIND_LINE = 'effort sync: the hub is behind this rafa (migration held-rows, extra); nothing was sent.'
-  + ' Next step: upgrade the hub, then sync again';
+  + ' Next step: upgrade the hub, then rafa effort sync';
 
 /** The line the `service` strategy's `RafaUpdateRequired` carries for a hub ahead by one migration. */
 const RAFA_BEHIND_LINE = 'effort sync: this rafa is behind the hub (migration held-rows); nothing was merged.'
-  + ' Next step: rafa self-update, then sync again';
+  + ' Next step: rafa self-update, then rafa effort sync';
 
 /** A skew refusal as the `service` strategy throws it: an error of `name`, its fields beside the line. */
 function skewRefusal(name: string, line: string): Error {

@@ -7,7 +7,9 @@
  * through {@link INDEX_SETUPS}, keyed by the same names, beside the probe
  * the suite reads the store's and the index's identities with and the
  * planter of its `ref_links`; a connector added without one fails the
- * guard case here, unless it is named as having no index half yet.
+ * guard case here, unless it is named as having no index half yet. Each
+ * index case is held to close every store it opened: one still open
+ * after the suite's own hook fails that case.
  *
  * `postgres` runs behind the `POSTGRES_URL` gate
  * (`testdata/postgres-gate.ts`): closed, a skipped case names the gate;
@@ -118,10 +120,39 @@ describe('the connectors both suites run over', () => {
   });
 });
 
+/** The stores an index case opened and has not closed yet, across every connector. */
+const OPEN_INDEX_STORES = new Set<HubStore>();
+
+/** `connect`, each store it opens held in {@link OPEN_INDEX_STORES} until its close is called. */
+function trackingStores(connect: HubIndexConnector): HubIndexConnector {
+  return async (context, setup) => {
+    const hub = await connect(context, setup);
+    const store: HubStore = Object.freeze({
+      ...hub.store,
+      close: () => {
+        OPEN_INDEX_STORES.delete(store);
+        return hub.store.close();
+      },
+    });
+    OPEN_INDEX_STORES.add(store);
+    return { ...hub, store };
+  };
+}
+
 describePostgresGate(POSTGRES);
-// Runs after the suite's own hook has closed the case's stores. Dropped case by
-// case, the schemas never pile up in the catalogue the later cases read.
-afterEach(() => POSTGRES_INDEX.dropMade());
+// Runs after the suite's own hook has closed the case's stores, so a store
+// still open here is one the case left open: it fails that case, and is
+// closed so it holds no client through the later ones. Dropped case by case,
+// the schemas never pile up in the catalogue the later cases read.
+afterEach(async () => {
+  const left = [...OPEN_INDEX_STORES];
+  try {
+    await Promise.allSettled(left.map((store) => store.close()));
+    await POSTGRES_INDEX.dropMade();
+  } finally {
+    expect(left.length).toBe(0);
+  }
+});
 
 for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
   // The registry's own entry stores in the default schemas of a real hub,
@@ -134,8 +165,9 @@ for (const [name, connector] of Object.entries(HUB_CONNECTORS)) {
   const setup = INDEX_SETUPS[name];
   if (setup !== undefined) {
     const options = { embedder: INDEX_CONTRACT_EMBEDDER, plantLinks: setup.plantLinks, probe: setup.probe };
-    hubIndexContract(name, setup.connect, options);
-    hubIndexContract(`${name}, extension off`, setup.connect, { ...options, holdExtensionOff: true });
+    const connect = trackingStores(setup.connect);
+    hubIndexContract(name, connect, options);
+    hubIndexContract(`${name}, extension off`, connect, { ...options, holdExtensionOff: true });
   }
 }
 

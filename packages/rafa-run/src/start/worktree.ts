@@ -88,7 +88,9 @@
  *    rewrite of a pushed branch, and one line naming the commits taken,
  *    their count and the `<merge base>..<base tip>` range;
  *  - `behind`, the branch holding any other commit: never merged, one
- *    warning line saying how far behind it is, and the run goes on;
+ *    warning line saying how far behind it is, and the run goes on to
+ *    the claim check, which refuses it on a first dispatch of a claimed
+ *    plan (`./preflight-claim.ts`) and lets a resume through;
  *  - `current`, at or ahead of `origin/<base>`: nothing printed;
  *  - `unreadable`: one warning line naming why, and the run goes on.
  *

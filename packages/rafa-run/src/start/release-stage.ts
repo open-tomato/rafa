@@ -318,12 +318,15 @@ function releaseTitle(input: ReleaseStageInput): string {
  * other than {@link ASSUMPTIONS_HEADING}, which the readiness gate puts
  * above a plan created under assumptions and which names no release;
  * else `planStub` (empty when null).
+ * Each line loses one trailing `\r` before the match, so a CRLF plan
+ * reads the same title as its LF copy.
  * The runner-opened pull request takes its title from here too
  * (`start/wrap-up-run.ts`), so the fragment and that title cannot name
  * the plan two ways.
  */
 export function planTitleIn(planContent: string, planStub: string | null): string {
   const headings = planContent.split('\n')
+    .map((line) => line.replace(/\r$/, ''))
     .filter((line) => line.trim() !== ASSUMPTIONS_HEADING)
     .map((line) => (PLAN_HEADING.exec(line)?.[1] ?? '').trim())
     .filter((heading) => heading !== '');

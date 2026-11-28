@@ -5666,7 +5666,7 @@
         }
       ],
       "fileCounts": {
-        "source": 57,
+        "source": 58,
         "test": 51,
         "testSupport": 0
       },
@@ -5720,6 +5720,7 @@
         "packages/rafa-release/src/release/fragment-tree.ts",
         "packages/rafa-release/src/release/guard-merge.test.ts",
         "packages/rafa-release/src/release/guard-merge.ts",
+        "packages/rafa-release/src/release/guard-merged-version.ts",
         "packages/rafa-release/src/release/guard.test.ts",
         "packages/rafa-release/src/release/guard.ts",
         "packages/rafa-release/src/release/ladder.test.ts",

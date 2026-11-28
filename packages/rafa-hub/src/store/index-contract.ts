@@ -67,7 +67,7 @@
  * ## Each case's world
  *
  * A fresh directory under the temporary directory and a clock per case,
- * the connector's store closed and the directory removed after it,
+ * every store the case opened closed and the directory removed after it,
  * whatever the case did. The helpers that read nothing of a connector's
  * storage live in `index-contract-helpers.ts`.
  */
@@ -221,11 +221,15 @@ export function hubIndexContract(name: string, connector: HubIndexConnector, opt
       return hub;
     };
 
-    /** Opens the connector once, closes it, plants links in its store, and opens it again. */
+    /**
+     * Opens the connector once, closes it, plants links in its store, and
+     * opens it again. Only the first open's store leaves the opened list,
+     * so a store the case opened before is still closed after the case.
+     */
     const connectWithLinks = async (links: readonly HubIndexLink[]): Promise<Connected> => {
       const first = await connect();
       await first.store.close();
-      opened = [];
+      opened = opened.filter((store) => store !== first.store);
       await plantLinks(context(), links);
       return connect();
     };
