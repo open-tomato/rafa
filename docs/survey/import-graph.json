@@ -64119,6 +64119,11 @@
     },
     {
       "cluster": "c08-index",
+      "kind": "source",
+      "path": "packages/rafa-release/src/release/guard-merged-version.ts"
+    },
+    {
+      "cluster": "c08-index",
       "kind": "test",
       "path": "packages/rafa-release/src/release/guard.test.ts"
     },
