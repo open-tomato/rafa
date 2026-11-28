@@ -42,7 +42,10 @@ spells out, and the shapes the lint config forces.
   sibling type import, lands where the lint message says (`./release.js` type
   import should occur before type import of `../../adapters/tracker/github.js`).
   Value imports differ: the `parent` group (`../`) comes before the `sibling`
-  group (`./`), a blank line between them. A new test that imports
+  group (`./`), a blank line between them; a core file importing both by
+  value without it gets "There should be at least one empty line between
+  import groups", so take the order and the blank line from that message
+  too. A new test that imports
   `@open-tomato/rafa-effort` beside `bun:test` and `@open-tomato/rafa/*` gets
   "There should be at least one empty line between import groups"; run `bunx
   eslint --fix` on that new test file rather than placing the blank lines by
