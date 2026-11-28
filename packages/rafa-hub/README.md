@@ -87,8 +87,8 @@ state.
 
 The container includes a health check, `rafa-hub health`, that asks `/health`
 every 30 seconds once the startup period ends. The hub answers `503` until its
-store opens, so a failing check means the store did not open; read the logs to
-see why.
+store opens. The check also fails when the config is refused or the hub is not
+reached, so read the logs to see which of the three it was.
 
 ### Login and keys in the container
 

@@ -15,7 +15,7 @@ const CORE: WorkspaceMember = {
   name: '@open-tomato/rafa-core',
 };
 
-/** A member whose manifest has no `exports`, as the hub's has none. */
+/** A member whose manifest has no `exports`, as the sync service's has none; the hub's names its root `.`. */
 const HUB: WorkspaceMember = { exports: [], folder: 'packages/rafa-hub/', name: '@open-tomato/rafa-hub' };
 
 /** A member exporting its root only. */

@@ -28,9 +28,9 @@
 #   docker run -d -p 7373:7373 -v rafa-hub-data:/data rafa-hub
 #
 # RAFA_HUB_CONFIG names /data/rafa-hub.config.ts, the hub's config, which
-# needs at least `hub.repository`; a volume holding /data/rafa-hub.yaml and
-# no `.ts` file starts from that YAML, with one warning line. The start runs `rafa-hub install
-# --data-dir=/data` first, which writes the install record
+# needs at least `hub.repository`; a volume holding /data/rafa-hub.yaml and no
+# `.ts` file starts from that YAML, with one warning line. The start runs
+# `rafa-hub install --data-dir=/data` first, which writes the install record
 # /data/rafa-hub.install.json, then execs the server, so it gets the stop
 # signals. With `hub.storePath` left out, the SQLite store is opened beside
 # the config, in /data, so the store outlives the container. The install
