@@ -8,7 +8,9 @@
  * the merge removes set back, the section schemas for `hub` and
  * `dangerous`, and every refusal: an unresolved value import naming its
  * specifier, a module that cannot be loaded, a missing file, a path that
- * is no `.ts` file, the readers' problems and a key two entries set.
+ * is no `.ts` file, the readers' problems and a key two entries set. Last,
+ * the two forms side by side: one config written both ways, and each
+ * top-level refusal in each form.
  *
  * Each refusal sits beside an accepting control: a type-only import
  * loads where the value import of the same package is refused, and a
@@ -30,6 +32,15 @@ const PROJECT = 'expected it in the project\'s rafa.config.ts, which the hub nev
 
 /** What a key holding a function takes, as a refusal says it. */
 const FUNCTION = 'expected a value written out; the hub\'s config declares no extension point, so it runs no function';
+
+/** What the top level takes, as a refusal says it. */
+const TOP_LEVEL = 'expected only hub and dangerous at the top level';
+
+/** What `dangerous` takes, as a refusal says it. */
+const DANGEROUS = 'expected only dangerous.hub under dangerous';
+
+/** Where the install's values belong, as a refusal says it. */
+const INSTALL = 'expected the install\'s values in the install record, written by rafa-hub install';
 
 /** What `hub.port` takes, as a refusal says it. */
 const PORT_EXPECTED = 'expected a whole number from 1 to 65535, such as 7373';
@@ -491,5 +502,193 @@ describe('restoredDocument', () => {
 
     expect(restoredDocument({ config, provenance })).toEqual({ hub: { auth: {}, index: { rebuildAfterPush: false } } });
     expect(config).toEqual({ hub: { auth: {}, index: {} } });
+  });
+});
+
+/** A root commit sha, as git prints it. */
+const SHA = 'a'.repeat(40);
+
+/** One config setting every section away from its default, as a `.ts` module writes it. */
+const FULL_MODULE = module(`{
+  hub: {
+    port: 7600,
+    projects: [{ id: '${SHA}', name: 'rafa', repository: 'open-tomato/rafa', storePath: 'store/rafa.sqlite' }],
+    auth: {
+      adapter: 'api-key',
+      apiKeys: ['RAFA_HUB_KEY'],
+      cacheFor: false,
+      login: {
+        mode: 'oauth',
+        oauth: {
+          authorizeUrl: 'https://id.example.org/authorize',
+          tokenUrl: 'https://id.example.org/token',
+          userUrl: 'https://id.example.org/user',
+          clientId: 'rafa-hub',
+          clientSecretVariable: 'RAFA_HUB_OAUTH_SECRET',
+          allowed: [583231],
+        },
+      },
+    },
+    store: { engine: 'postgres', sqliteLibrary: '/opt/sqlite/libsqlite3.so', postgres: { urlVariable: 'HUB_DB_URL' } },
+    index: { rebuildAfterPush: false, embedding: { model: 'nomic-embed-text-v1.5', precision: 'full' } },
+  },
+  dangerous: { hub: { maxPayloadRows: 'unlimited' } },
+}`);
+
+/** The YAML twin of {@link FULL_MODULE}. */
+const FULL_YAML = `hub:
+  port: 7600
+  projects:
+    - id: ${SHA}
+      name: rafa
+      repository: open-tomato/rafa
+      storePath: store/rafa.sqlite
+  auth:
+    adapter: api-key
+    apiKeys:
+      - RAFA_HUB_KEY
+    cacheFor: false
+    login:
+      mode: oauth
+      oauth:
+        authorizeUrl: https://id.example.org/authorize
+        tokenUrl: https://id.example.org/token
+        userUrl: https://id.example.org/user
+        clientId: rafa-hub
+        clientSecretVariable: RAFA_HUB_OAUTH_SECRET
+        allowed:
+          - 583231
+  store:
+    engine: postgres
+    sqliteLibrary: /opt/sqlite/libsqlite3.so
+    postgres:
+      urlVariable: HUB_DB_URL
+  index:
+    rebuildAfterPush: false
+    embedding:
+      model: nomic-embed-text-v1.5
+      precision: full
+dangerous:
+  hub:
+    maxPayloadRows: unlimited
+`;
+
+/** Every object and list in `value`, itself included, that is not frozen, by key path. */
+function unfrozen(value: unknown, at = 'config'): string[] {
+  if (typeof value !== 'object' || value === null) return [];
+
+  const inside = Object.entries(value).flatMap(([key, entry]) => unfrozen(entry, `${at}.${key}`));
+  return Object.isFrozen(value)
+    ? inside
+    : [at, ...inside];
+}
+
+describe('one hub config written as .ts and as .yaml', () => {
+  it('reads both to the same HubConfig, frozen at every depth', async () => {
+    const ts = await fixture('rafa-hub.config.ts', FULL_MODULE);
+    const yaml = await fixture('twin.yaml', FULL_YAML);
+    const storePath = join(dir, 'store/rafa.sqlite');
+    const expected = {
+      repository: 'open-tomato/rafa',
+      port: 7600,
+      storePath,
+      projects: [{ id: SHA, name: 'rafa', repository: 'open-tomato/rafa', storePath }],
+      cacheForMs: null,
+      authAdapter: 'api-key' as const,
+      apiKeys: ['RAFA_HUB_KEY'],
+      login: {
+        mode: 'oauth' as const,
+        oauth: {
+          authorizeUrl: 'https://id.example.org/authorize',
+          tokenUrl: 'https://id.example.org/token',
+          userUrl: 'https://id.example.org/user',
+          clientId: 'rafa-hub',
+          clientSecretVariable: 'RAFA_HUB_OAUTH_SECRET',
+          scope: null,
+          allowed: ['583231'],
+          callbackUrl: null,
+        },
+      },
+      storeEngine: 'postgres' as const,
+      postgresUrlVariable: 'HUB_DB_URL',
+      sqliteLibrary: '/opt/sqlite/libsqlite3.so',
+      rebuildAfterPush: false,
+      embeddingModel: 'nomic-embed-text-v1.5',
+      embeddingPrecision: 'full' as const,
+      maxPayloadRows: null,
+    };
+
+    const fromModule = await readHubConfig({ RAFA_HUB_CONFIG: ts });
+    const fromYaml = await readHubConfig({ RAFA_HUB_CONFIG: yaml });
+
+    expect([fromModule.form, fromYaml.form]).toEqual(['ts', 'yaml']);
+    expect(fromModule.config).toStrictEqual(expected);
+    expect(fromYaml.config).toStrictEqual(expected);
+    expect(unfrozen(fromModule.config)).toEqual([]);
+    expect(unfrozen(fromYaml.config)).toEqual([]);
+  });
+});
+
+describe('the top-level refusals of the .ts form', () => {
+  /** The file's path and the problems of a `.ts` config holding a clean `hub` section, then `extra`. */
+  async function refusedModule(extra: string, hub = '{ repository: \'open-tomato/rafa\' }'): Promise<[string, readonly string[]]> {
+    const path = await fixture('rafa-hub.config.ts', `export default { hub: ${hub}, ${extra} };\n`);
+    return [path, await readRefusalOf({ RAFA_HUB_CONFIG: path })];
+  }
+
+  it('refuses an unknown top-level key', async () => {
+    const [path, problems] = await refusedModule('server: {}');
+
+    expect(problems).toEqual([`${path}: server is not a key of the hub's config; ${TOP_LEVEL}`]);
+  });
+
+  it('refuses a key under dangerous other than hub', async () => {
+    const [path, problems] = await refusedModule('dangerous: { hub: { maxPayloadRows: 10 }, server: {} }');
+
+    expect(problems).toEqual([`${path}: dangerous.server is not a key of the hub's config; ${DANGEROUS}`]);
+  });
+
+  it('refuses a function value, naming its key path', async () => {
+    const [path, problems] = await refusedModule('', '{ repository: \'open-tomato/rafa\', port: () => 7373 }');
+
+    expect(problems).toEqual([`${path}: hub.port is a function, ${FUNCTION}`]);
+  });
+
+  it('refuses an install key, naming rafa-hub install', async () => {
+    const [path, problems] = await refusedModule('install: { dataDir: \'/data\' }');
+
+    expect(problems).toEqual([`${path}: install is not a key of the hub's config; ${INSTALL}`]);
+  });
+});
+
+describe('the top-level refusals of the YAML form', () => {
+  /** The file's path and the problems of a YAML config holding a clean `hub` section, then `lines`. */
+  async function refusedYaml(...lines: string[]): Promise<[string, readonly string[]]> {
+    const path = await fixture('rafa-hub.yaml', hubYaml().concat(lines.join('\n'), '\n'));
+    return [path, await readRefusalOf({ RAFA_HUB_CONFIG: path })];
+  }
+
+  it('refuses an unknown top-level key', async () => {
+    const [path, problems] = await refusedYaml('server: {}');
+
+    expect(problems).toEqual([`${path}: server is not a key of the hub's config; ${TOP_LEVEL}`]);
+  });
+
+  it('refuses a key under dangerous other than hub', async () => {
+    const [path, problems] = await refusedYaml('dangerous:', '  hub:', '    maxPayloadRows: 10', '  server: {}');
+
+    expect(problems).toEqual([`${path}: dangerous.server is not a key of the hub's config; ${DANGEROUS}`]);
+  });
+
+  it('holds no function value: one written out is read as its text, and refused as that value', async () => {
+    const [path, problems] = await refusedYaml('  port: !!js/function "() => 7373"');
+
+    expect(problems).toEqual([`${path}: hub.port is "() => 7373", ${PORT_EXPECTED}`]);
+  });
+
+  it('refuses an install key, naming rafa-hub install', async () => {
+    const [path, problems] = await refusedYaml('install:', '  dataDir: /data');
+
+    expect(problems).toEqual([`${path}: install is not a key of the hub's config; ${INSTALL}`]);
   });
 });
