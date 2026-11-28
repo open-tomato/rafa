@@ -59,6 +59,68 @@ warning naming `rafa-hub install`. With both naming the same library, the
 record's is loaded and the warning is given. Two different libraries stop the
 start with a refusal, so remove the key once the record names the library.
 
+## Running config
+
+`RAFA_HUB_CONFIG` names the hub's config file. `readHubConfig` in
+`packages/rafa-hub/src/config-file.ts` reads it and answers the config with the
+form and the path it was read from. The serving start, `rafa-hub install` and
+`rafa-hub health` all read through it, so the three refuse the same file in the
+same sentences.
+
+Two forms are read:
+
+- `.ts`, the form the operator's guide writes: a module whose default export is
+  the config. It loads through `createLoader` from `@open-tomato/define-config`
+  with the section schemas `hubSectionSchemas` answers, `hub` and `dangerous`,
+  and the merged value goes through `readHubDocument` in `config.ts`.
+- `.yaml`, the legacy form, read by `parseHubConfig` in `config.ts`. A name
+  ending in neither `.ts` nor `.yaml` is read as YAML too.
+
+`locateHubConfig` decides which file is read:
+
+- `rafa-hub.config.ts` and `rafa-hub.yaml` both in the named file's directory
+  refuse the start, naming both paths, whichever of the two is named.
+- A named `.ts` file that exists is read in the `.ts` form.
+- A named `.ts` file that is missing, beside a `rafa-hub.yaml`, reads that YAML
+  file as the fallback. This keeps a volume written before the `.ts` form
+  starting.
+- A named `.ts` file that is missing, with no `rafa-hub.yaml` beside it, is
+  refused, naming the `.ts` path.
+- A path holds a file only when it names a regular file, so a directory named
+  like either file is no file. A named `hub.config.ts` beside a `rafa-hub.yaml`
+  loads, since the both-files rule looks only at the two names.
+- `RAFA_HUB_CONFIG` unset or empty is refused, naming the variable.
+
+The top level holds only `hub` and `dangerous`, and `dangerous` holds only
+`hub`. `config-top-level.ts` refuses every other key with its path and where it
+belongs: a project key points to the project's `rafa.config.ts`, a
+served-project key (`projects` and its four keys) to `hub.projects`, and any
+other key names the two sections, and under `dangerous` the one it holds. An
+`install` key is refused in both forms, naming `rafa-hub install`, since the
+install's values live in the install record that command writes. A function
+value is refused wherever it is written, naming its key path, because the hub's
+config declares no extension point and runs no function.
+
+A serve start that reads YAML, named or as the fallback, logs one `config.yaml`
+warning once the hub listens (`yamlConfigWarning` in `config-file.ts`, logged by
+`bin.ts`). The line names the YAML file, the `.ts` file to write beside it and
+`rafa 1.0.0`, the release that stops reading YAML. For a named YAML file it also
+names the `.ts` file `RAFA_HUB_CONFIG` has to name. No command writes the `.ts`
+form: the warning is the move. From `rafa 1.0.0` a YAML config is refused.
+`rafa-hub install` and `rafa-hub health` print no such warning, since health
+runs every 30 seconds. A config the reader refuses is logged as one
+`config.refused` line holding every problem, and the serve command exits 1
+without listening.
+
+`rafa-hub health` (`cli-health.ts`, `runHealth`) reads the config through the
+same loader, then asks `http://127.0.0.1:<hub.port>/health` of the hub on this
+machine, with a 5 s wait (`HEALTH_TIMEOUT_MS`). It exits 0 when the hub answers
+`200`, and 1 otherwise: when the config is refused, when the hub answers another
+status (a redirect is not followed), or when the hub is not reached. Its reason
+goes to standard error, each line opening `rafa-hub health`. It takes no
+arguments past `health`. The image's `HEALTHCHECK` runs `rafa-hub health`, and
+its entry is the `rafa-hub` wrapper on the `PATH`.
+
 ## Connectors
 
 A connector is one storage engine behind the hub. It opens a `HubStore`, which

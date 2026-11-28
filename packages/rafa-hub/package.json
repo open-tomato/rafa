@@ -8,6 +8,9 @@
     "team": "@open-tomato/maintainers"
   },
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "bin": {
     "rafa-hub": "./src/bin.ts"
   },
@@ -17,6 +20,7 @@
     "check-types": "tsc --build"
   },
   "dependencies": {
+    "@open-tomato/define-config": "0.5.0",
     "@open-tomato/rafa-core": "workspace:*",
     "@open-tomato/rafa-hub-port": "workspace:*",
     "@open-tomato/rafa-hub-postgres": "workspace:*",

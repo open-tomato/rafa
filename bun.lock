@@ -186,6 +186,7 @@
         "rafa-hub": "./src/bin.ts",
       },
       "dependencies": {
+        "@open-tomato/define-config": "0.5.0",
         "@open-tomato/rafa-core": "workspace:*",
         "@open-tomato/rafa-hub-port": "workspace:*",
         "@open-tomato/rafa-hub-postgres": "workspace:*",

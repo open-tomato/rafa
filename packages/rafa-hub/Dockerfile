@@ -27,9 +27,10 @@
 #
 #   docker run -d -p 7373:7373 -v rafa-hub-data:/data rafa-hub
 #
-# /data/rafa-hub.yaml is the hub's config (RAFA_HUB_CONFIG), which needs
-# at least `hub.repository`. The start runs `rafa-hub install
-# --data-dir=/data` first, which writes the install record
+# RAFA_HUB_CONFIG names /data/rafa-hub.config.ts, the hub's config, which
+# needs at least `hub.repository`; a volume holding /data/rafa-hub.yaml and no
+# `.ts` file starts from that YAML, with one warning line. The start runs
+# `rafa-hub install --data-dir=/data` first, which writes the install record
 # /data/rafa-hub.install.json, then execs the server, so it gets the stop
 # signals. With `hub.storePath` left out, the SQLite store is opened beside
 # the config, in /data, so the store outlives the container. The install
@@ -74,13 +75,14 @@ RUN printf '#!/bin/sh\nexec bun /app/packages/rafa-hub/src/bin.ts "$@"\n' > /usr
   && mkdir /data && chown bun:bun /data
 WORKDIR /app
 USER bun
-ENV RAFA_HUB_CONFIG=/data/rafa-hub.yaml
+ENV RAFA_HUB_CONFIG=/data/rafa-hub.config.ts
 VOLUME /data
 EXPOSE 7373
-# Asks /health on the port the config names (7373 when hub.port is left
-# out); the hub answers 503 until its store opens, which fails the check.
+# `rafa-hub health` reads the config as the start does and asks /health on
+# the port it names (7373 when hub.port is left out); the hub answers 503
+# until its store opens, which fails the check.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD ["bun", "-e", "const config = Bun.YAML.parse(await Bun.file(process.env.RAFA_HUB_CONFIG).text()); const port = config?.hub?.port ?? 7373; const response = await fetch(`http://127.0.0.1:${port}/health`); process.exit(response.ok ? 0 : 1);"]
+  CMD ["rafa-hub", "health"]
 # Two steps: the install writes the record, then the server replaces the
 # shell, so it is the process `docker stop` signals.
 CMD ["sh", "-c", "rafa-hub install --data-dir=/data && exec rafa-hub"]

@@ -42,7 +42,10 @@ spells out, and the shapes the lint config forces.
   sibling type import, lands where the lint message says (`./release.js` type
   import should occur before type import of `../../adapters/tracker/github.js`).
   Value imports differ: the `parent` group (`../`) comes before the `sibling`
-  group (`./`), a blank line between them. A new test that imports
+  group (`./`), a blank line between them; a core file importing both by
+  value without it gets "There should be at least one empty line between
+  import groups", so take the order and the blank line from that message
+  too. A new test that imports
   `@open-tomato/rafa-effort` beside `bun:test` and `@open-tomato/rafa/*` gets
   "There should be at least one empty line between import groups"; run `bunx
   eslint --fix` on that new test file rather than placing the blank lines by
@@ -371,18 +374,18 @@ target under `packages/rafa/src/`, and each `exports` key of
 target names.
 
 **The public-entries sweep holds every member to its `exports`.**
-`src/tests/public-entries.sweep.test.ts` reads the members through
-`readMembers` of `scripts/survey/package-entries.ts`, never a list in code.
-Each bare `@open-tomato/` specifier in a code file outside a member that lands
-on a file of that member names one of its `exports` keys (`isPublicEntry`) and
-lands on the file the key's target names; a member with no `exports`, the hub
-and the sync service, is named by no bare specifier. A specifier that lands
-outside the checkout or nowhere is matched to a member by its package name, as
-a worktree resolves a workspace link through the main checkout's
-`node_modules`. The tests under `src/tests/core-coupled/` are read as core's
-own files, as `isCoreRead` reads them, so their deep subpaths into core are
-set aside and counted. It prints its counts at load, and a planted tree holds
-a control for each failure.
+`src/tests/public-entries.sweep.test.ts` reads the members through `readMembers`
+of `scripts/survey/package-entries.ts`, never a list in code. Each bare
+`@open-tomato/` specifier in a code file outside a member that lands on a file
+of that member names one of its `exports` keys (`isPublicEntry`) and lands on
+the file the key's target names; a member with no `exports`, the sync service,
+is named by no bare specifier, and the hub is held to its root `.` alone. A
+specifier that lands outside the checkout or nowhere is matched to a member by
+its package name, as a worktree resolves a workspace link through the main
+checkout's `node_modules`. The tests under `src/tests/core-coupled/` are read as
+core's own files, as `isCoreRead` reads them, so their deep subpaths into core
+are set aside and counted. It prints its counts at load, and a planted tree
+holds a control for each failure.
 
 **Core's tests that import above core wait in `src/tests/core-coupled/`.** Each
 keeps its path under `src/` from before the move: `core/config/config.test.ts`

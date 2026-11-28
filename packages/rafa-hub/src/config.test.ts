@@ -1,22 +1,16 @@
 /**
  * Tests for the hub's config reader (`config.ts`): its server keys,
- * their defaults, the refusal of `0`, negative and out-of-range values,
- * and the file `RAFA_HUB_CONFIG` names.
+ * their defaults, and the refusal of `0`, negative and out-of-range
+ * values. The file `RAFA_HUB_CONFIG` names is `config-file.test.ts`'s.
  *
  * Each refusal sits beside an accepting control of the same key, so a
  * reader that refused everything, or a check that never fired, fails
  * here rather than passing. Every refusal is SPELLED, never built from
- * the module's own constants. Files are written under a fresh `tmpdir`
- * directory per case, and the environment is handed in, never read
- * from `process.env`.
+ * the module's own constants.
  */
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { describe, expect, it } from 'bun:test';
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-
-import { cacheForMs, HubConfigError, parseHubConfig, readHubConfig } from './config.js';
+import { cacheForMs, HubConfigError, parseHubConfig } from './config.js';
 
 /** The config file's path, as a refusal names it. */
 const PATH = '/srv/hub/hub.yaml';
@@ -498,66 +492,5 @@ describe('the document', () => {
 
     expect(problems).toHaveLength(1);
     expect(problems[0]).toStartWith('/srv/hub/hub.yaml: not valid YAML: ');
-  });
-});
-
-describe('readHubConfig', () => {
-  let dir = '';
-
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'rafa-hub-config-'));
-  });
-
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
-  it('reads the file RAFA_HUB_CONFIG names, resolving the store beside it', async () => {
-    const path = join(dir, 'hub.yaml');
-    await writeFile(path, hubYaml('port: 9000'));
-
-    expect(await readHubConfig({ RAFA_HUB_CONFIG: path })).toEqual({
-      repository: 'open-tomato/rafa',
-      port: 9000,
-      storePath: join(dir, 'rafa-hub.sqlite'),
-      projects: [{ id: 'default', name: 'open-tomato/rafa', repository: 'open-tomato/rafa', storePath: join(dir, 'rafa-hub.sqlite') }],
-      cacheForMs: 600_000,
-      authAdapter: 'github',
-      apiKeys: [],
-      login: null,
-      storeEngine: 'sqlite',
-      postgresUrlVariable: null,
-      sqliteLibrary: null,
-      rebuildAfterPush: true,
-      embeddingModel: null,
-      embeddingPrecision: 'half',
-      maxPayloadRows: 50_000,
-    });
-  });
-
-  it('refuses an unset or empty RAFA_HUB_CONFIG', async () => {
-    const expected = ['RAFA_HUB_CONFIG is not set; expected the path of the hub\'s YAML config file'];
-
-    for (const env of [{}, { RAFA_HUB_CONFIG: '' }, { RAFA_HUB_CONFIG: '  ' }]) {
-      const error = await readHubConfig(env).then(() => null, (thrown: unknown) => thrown);
-      expect(error).toBeInstanceOf(HubConfigError);
-      expect((error as HubConfigError).problems).toEqual(expected);
-    }
-  });
-
-  it('refuses a file that cannot be read, naming its path', async () => {
-    const path = join(dir, 'absent.yaml');
-    const error = await readHubConfig({ RAFA_HUB_CONFIG: path }).then(() => null, (thrown: unknown) => thrown);
-
-    expect(error).toBeInstanceOf(HubConfigError);
-    expect((error as HubConfigError).problems[0]).toStartWith(`${path}: the hub's config file could not be read: `);
-  });
-
-  it('refuses the problems of a file it read', async () => {
-    const path = join(dir, 'hub.yaml');
-    await writeFile(path, hubYaml('port: -1'));
-    const error = await readHubConfig({ RAFA_HUB_CONFIG: path }).then(() => null, (thrown: unknown) => thrown);
-
-    expect((error as HubConfigError).problems).toEqual([`${path}: hub.port is -1, ${PORT_EXPECTED}`]);
   });
 });

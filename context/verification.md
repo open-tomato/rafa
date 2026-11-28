@@ -334,13 +334,19 @@ reads `git status` afterwards and finds no such block. Measured on turbo
 and `AGENTS.md` at 80 lines. `src/tests/turbo-config.sweep.test.ts` holds the
 key. The job `atlas` runs each publishable Atlas library's gates from its
 folder. The job `hub-image` builds `packages/rafa-hub/Dockerfile` with the
-Bun of `packageManager`, starts an `api-key` hub over a named volume, and
-checks `/health` answers 200 within the image's start period, the
-`store.opened` line's `sqliteVec.loaded`, the keys file and the install
-record's `dataDir` and `bun`. On a pull request its first step lists the
-changed files, and the rest run only when one lies under its `HUB_PATHS`,
-which `packages/rafa-hub/src/image.test.ts` holds to the hub's workspace
-closure; on a push every step runs. **Two cases for
+Bun of `packageManager`, then runs three containers from it. The first is an
+`api-key` hub over a named volume holding only `rafa-hub.yaml`: it checks
+`/health` answers 200 within the image's start period, the `store.opened`
+line's `sqliteVec.loaded`, the keys file, the install record's `dataDir` and
+`bun`, the one `config.yaml` warning naming the `.ts` file and `rafa 1.0.0`,
+and the image's own `HEALTHCHECK` reaching `healthy`. The second, on an empty
+volume, checks that the start exits non-zero naming the `.ts` path. The third,
+on a volume holding a `.ts` config on a port other than the default, checks
+that `rafa-hub health` passes inside the container and that the `listening`
+line takes that port. On a pull request its first step lists the changed
+files, and the rest run only when one lies under its `HUB_PATHS`, which
+`packages/rafa-hub/src/image.test.ts` holds to the hub's workspace closure;
+on a push every step runs. **Two cases for
 `gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify`, `affected` and `hub-image` checks
 (merge with `rafa pr wait <n>` then `rafa pr merge <n>`); a pull request

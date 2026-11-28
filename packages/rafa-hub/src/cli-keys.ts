@@ -65,7 +65,8 @@ import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Writable as WritableStream } from 'node:stream';
 
-import { HUB_CONFIG_ENV, HubConfigError, readHubConfig } from './config.js';
+import { readHubConfig } from './config-file.js';
+import { HUB_CONFIG_ENV, HubConfigError } from './config.js';
 import { KEY_NAME, resolveKeysFile } from './identity/key-store.js';
 import { LOGIN_PASSWORD_VARIABLE, LOGIN_USER_VARIABLE, openSqliteLoginStore } from './identity/login-store.js';
 import { readInstallRecord } from './install-record.js';
@@ -316,7 +317,7 @@ async function loginSetting(env: Readonly<Record<string, string | undefined>>, h
   }
   let config: HubConfig;
   try {
-    config = await readHubConfig(env);
+    ({ config } = await readHubConfig(env));
   } catch (error) {
     if (!(error instanceof HubConfigError)) throw error;
 

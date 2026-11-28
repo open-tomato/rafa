@@ -11,8 +11,10 @@
  * changes a path its `HUB_PATHS` names, so that list is held to the same
  * closure: each of its folders named, no other package's, the files the
  * image is built from at the root, and every file `bin.ts` reaches through
- * its run-time imports. Each list has a control that proves the comparison
- * can fail.
+ * its run-time imports. The runtime stage's `ENV` names the `.ts` config
+ * on the volume and its `HEALTHCHECK` runs `rafa-hub health`, the entry
+ * the `CMD` runs. Each list and line has a control that proves the
+ * comparison can fail.
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -88,16 +90,62 @@ async function hubClosure(dirs: readonly string[]): Promise<string[]> {
   return [...reached].sort();
 }
 
-/** The build stage's lines: from the first `FROM` up to the second, backslash continuations joined. */
-function buildStage(dockerfile: string): string[] {
-  const lines = dockerfile.replace(/\\\n/g, ' ')
+/** The Dockerfile's lines, trimmed, backslash continuations joined. */
+function joinedLines(dockerfile: string): string[] {
+  return dockerfile.replace(/\\\n/g, ' ')
     .split('\n')
     .map((line) => line.trim());
+}
+
+/** The build stage's lines: from the first `FROM` up to the second, backslash continuations joined. */
+function buildStage(dockerfile: string): string[] {
+  const lines = joinedLines(dockerfile);
   const froms = lines.flatMap((line, index) => line.startsWith('FROM ')
     ? [index]
     : []);
 
   return lines.slice(froms[0], froms[1]);
+}
+
+/** The runtime stage's lines: from the last `FROM` to the end, backslash continuations joined. */
+function runtimeStage(dockerfile: string): string[] {
+  const lines = joinedLines(dockerfile);
+  const froms = lines.flatMap((line, index) => line.startsWith('FROM ')
+    ? [index]
+    : []);
+
+  return lines.slice(froms.at(-1));
+}
+
+/** The value the stage's `ENV` lines set for `name`, in `ENV name=value` form; the last line wins. */
+function envValue(stage: readonly string[], name: string): string | undefined {
+  const prefix = `ENV ${name}=`;
+
+  return stage.filter((line) => line.startsWith(prefix))
+    .at(-1)
+    ?.slice(prefix.length);
+}
+
+/** The exec-form argument list `text` opens with, or `undefined` when it opens with no `[`. */
+function execForm(text: string | undefined): string[] | undefined {
+  return text?.startsWith('[')
+    ? JSON.parse(text) as string[]
+    : undefined;
+}
+
+/** The stage's `HEALTHCHECK` command, in exec form: the list after its `CMD` word. */
+function healthCommand(stage: readonly string[]): string[] | undefined {
+  const line = stage.find((each) => each.startsWith('HEALTHCHECK '));
+
+  return execForm(line?.split(' CMD ')[1]);
+}
+
+/** The stage's `CMD`, in exec form; the last line wins. */
+function startCommand(stage: readonly string[]): string[] | undefined {
+  const line = stage.filter((each) => each.startsWith('CMD '))
+    .at(-1);
+
+  return execForm(line?.slice('CMD '.length));
 }
 
 /** The sources of the build stage's `COPY` lines from the build context, in order; a line's last word is its destination. */
@@ -261,6 +309,42 @@ describe('the hub image\'s build stage', () => {
     expect(copiedPackages(before)).toEqual([]);
     expect(copiedManifests(after)).toEqual([]);
     expect(copiedPackages(after).length).toBeGreaterThan(0);
+  });
+});
+
+/** The config file the image names, on its volume. */
+const IMAGE_CONFIG = '/data/rafa-hub.config.ts';
+
+/** The image's entry, the wrapper on the `PATH`. */
+const WRAPPER = 'rafa-hub';
+
+describe('the hub image\'s runtime stage', () => {
+  it('names the .ts config on the volume as RAFA_HUB_CONFIG', () => {
+    expect(envValue(runtimeStage(DOCKERFILE), 'RAFA_HUB_CONFIG')).toBe(IMAGE_CONFIG);
+  });
+
+  it('control: the YAML file named instead reads as another value', () => {
+    const yaml = DOCKERFILE.replace(`ENV RAFA_HUB_CONFIG=${IMAGE_CONFIG}\n`, 'ENV RAFA_HUB_CONFIG=/data/rafa-hub.yaml\n');
+
+    expect(yaml).not.toBe(DOCKERFILE);
+    expect(envValue(runtimeStage(yaml), 'RAFA_HUB_CONFIG')).toBe('/data/rafa-hub.yaml');
+  });
+
+  it('runs rafa-hub health as its health check, in exec form, through the wrapper the CMD runs', () => {
+    const stage = runtimeStage(DOCKERFILE);
+
+    expect(healthCommand(stage)).toEqual([WRAPPER, 'health']);
+    expect(startCommand(stage)?.join(' ')).toContain(`exec ${WRAPPER}`);
+  });
+
+  it('control: the health check written in shell form, or as a bun script, reads as another command', () => {
+    const exec = '  CMD ["rafa-hub", "health"]\n';
+    const shell = DOCKERFILE.replace(exec, '  CMD rafa-hub health\n');
+    const script = DOCKERFILE.replace(exec, '  CMD ["bun", "-e", "process.exit(0)"]\n');
+
+    expect(shell).not.toBe(DOCKERFILE);
+    expect(healthCommand(runtimeStage(shell))).toBeUndefined();
+    expect(healthCommand(runtimeStage(script))).toEqual(['bun', '-e', 'process.exit(0)']);
   });
 });
 
