@@ -3,7 +3,8 @@
  * a run of an issue this device does not own is refused before any probe
  * and any session, a claim `plan create` could not push is pushed here,
  * a claim the remote holds under an id this store replaced is re-signed
- * to the store's own id, and once the whole preflight has passed the
+ * to the store's own id, a first dispatch on a claim branch holding work
+ * past the base is refused, and once the whole preflight has passed the
  * issue's `rafa:claimed` label is swapped for `rafa:in-development`
  * (`.rafa/plans/rafa-324-claim-issue-so-two`).
  *
@@ -167,6 +168,45 @@
  *
  * It is printed as one line; it is wrapped here for the width.
  *
+ * ## A claim branch with work on it
+ *
+ * A claim branch kept from an older stretch keeps the commits that
+ * stretch made before the claim (#1669): a branch cut from stretch
+ * 116's branch, claimed, released and taken again on the same branch,
+ * ran its plan with stretch 116's fragment on it, and the pull request
+ * brought it back. So once a run holds its claim, {@link refuseUnownedClaim}
+ * reads its branch against `origin/<base>` through `./claim-catch-up.ts`,
+ * as the last fetch left it (under `--as-worktree` the catch-up fetched
+ * it a moment before), and refuses a `behind` reading, a branch behind
+ * the base holding any commit that is neither a claim nor a catch-up
+ * merge, before any probe and any session:
+ *
+ *     ❌ Refusing to start: feat/rafa-7-x holds work that is not a
+ *        claim, and no task of this plan has been committed on it.
+ *        feat/rafa-7-x is 8 commits behind origin/main, and 1 of its
+ *        4 commits past it is not a claim; the first, newest first, is
+ *        066f005d1234 chore: apply #1605
+ *        The run would carry that work into its pull request. Recut the
+ *        branch from the base, keeping the claims made after that
+ *        commit,
+ *        in the checkout that holds feat/rafa-7-x:
+ *          git rebase --onto origin/main 066f005d1234 feat/rafa-7-x && git push --force-with-lease origin feat/rafa-7-x
+ *        Nothing was checked and nothing was dispatched.
+ *
+ * The opening, the count and the advice are one line each; they are
+ * wrapped here for the width. The commit named is the first of the work
+ * as `git log` lists the range, newest first, so every commit after it
+ * is a claim or a catch-up merge, and the rebase replays those onto the
+ * base (empty claim commits included: git keeps a commit that starts
+ * empty) and drops the rest.
+ *
+ * The reading is made on a FIRST DISPATCH alone (`isFirstDispatch`,
+ * `preflight/first-dispatch.ts`): a resumed run's work past the base is
+ * its own task commits, and it keeps today's report, the catch-up's
+ * `behindLine` under `--as-worktree` and nothing otherwise. A `current`,
+ * `catch-up` or `unreadable` reading goes on as before, as does a run
+ * with no claim, and a seam with no `readBase` reads nothing.
+ *
  * ## The label
  *
  * {@link markInDevelopment} swaps the labels through `claims/labels.ts`
@@ -176,6 +216,7 @@
  * best-effort: a board that is not `gh`, or a write that fails, is one
  * warning beside a run that goes on.
  */
+import type { ClaimCatchUpReading } from './claim-catch-up.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimBranchReading } from '@open-tomato/rafa/claims/git';
 import type { Ownership } from '@open-tomato/rafa/claims/record';
@@ -205,6 +246,10 @@ import { resolvePrProvider } from '@open-tomato/rafa-pr';
 
 import { holdsClaim, readDeviceStoreId } from '../claims/device.js';
 import { labelInDevelopment } from '../claims/labels.js';
+import { resolveBaseBranch } from '../cleanup/index.js';
+import { isFirstDispatch } from '../preflight/first-dispatch.js';
+
+import { readClaimCatchUp } from './claim-catch-up.js';
 
 /** The seams the claim check reads and writes through. */
 export interface StartPreflightClaim {
@@ -222,6 +267,13 @@ export interface StartPreflightClaim {
    * `DEFAULT_BRANCH_TEMPLATE` when left out.
    */
   readonly branchTemplate?: string;
+  /**
+   * The run's base, without `origin/`, which a held claim's branch is
+   * read against; `resolveBaseBranch` over `pr.base` from
+   * {@link createStartPreflightClaim}. Left out, the branch is not read;
+   * see "A claim branch with work on it" in the module note.
+   */
+  readonly readBase?: () => string;
 }
 
 /**
@@ -231,23 +283,26 @@ export interface StartPreflightClaim {
  * refreshing the issue on the project (`../board/project/issue-board-refresh.ts`),
  * this device's
  * store id read under `config.store`, `claims.staleAfter`, and the
- * `naming.branch` template (`config.namingBranch`). Resolving the provider reads
- * `origin` unless `pr.provider` is configured; nothing else is read
- * until the check runs.
+ * `naming.branch` template (`config.namingBranch`), and the run's base
+ * (`pr.base`, else `origin/HEAD`, read when a held claim's branch is).
+ * Resolving the provider reads `origin` unless `pr.provider` is
+ * configured; nothing else is read until the check runs.
  */
 export function createStartPreflightClaim(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'namingBranch'> & RefreshConfig,
+  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'namingBranch'> & Partial<Pick<RafaConfig, 'prBase'>> & RefreshConfig,
 ): StartPreflightClaim {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
+  const git = createGitRunner(repoRoot);
   return {
-    git: createGitRunner(repoRoot),
+    git,
     board: provider === 'gh'
       ? createRefreshingGhIssueBoard({ gh: createGhRunner({ cwd: repoRoot }), config })
       : null,
     readStoreId: () => readDeviceStoreId(repoRoot, config),
     staleAfter: config.claimsStaleAfter,
     branchTemplate: config.namingBranch,
+    readBase: () => resolveBaseBranch(git, config.prBase ?? null),
   };
 }
 
@@ -605,9 +660,54 @@ export function ownedLine(claim: OwnedClaim): string {
   }
 }
 
+/** How many characters of a commit the recut refusal names, as the catch-up line does. */
+const SHORT_SHA = 12;
+
+/** `count` commits, worded for a line. */
+function commitCount(count: number): string {
+  return count === 1
+    ? '1 commit'
+    : `${String(count)} commits`;
+}
+
+/**
+ * The refusal of a run that has committed no task of its plan on a
+ * claim branch holding work past `origin/<base>`, naming the branch, the
+ * first commit that is not a claim and the line that recuts the branch
+ * from the base; see "A claim branch with work on it" in the module note.
+ */
+export function workOnClaimBranchRefusal(reading: Extract<ClaimCatchUpReading, { kind: 'behind' }>): string {
+  const { branch, base, firstWork } = reading;
+  const remoteBase = `${REMOTE}/${base}`;
+  const sha = firstWork.sha.slice(0, SHORT_SHA);
+  const work = reading.workCommits === 1
+    ? 'is not a claim'
+    : 'are not claims';
+  return openingWith(`${branch} holds work that is not a claim, and no task of this plan has been committed on it`, [
+    `${branch} is ${commitCount(reading.behind)} behind ${remoteBase}, and ${String(reading.workCommits)} of its `
+    + `${commitCount(reading.ahead)} past it ${work}; the first, newest first, is ${sha} ${firstWork.subject}`,
+    'The run would carry that work into its pull request. Recut the branch from the base, keeping the claims made after that commit,',
+    `in the checkout that holds ${branch}:`,
+    `  git rebase --onto ${remoteBase} ${sha} ${branch} && git push --force-with-lease ${REMOTE} ${branch}`,
+  ].join('\n'));
+}
+
+/**
+ * Refuses a run holding its claim on a branch with work past
+ * `origin/<base>` before its first task, when no task of its plan has
+ * been committed yet; a resume, and a run with no `readBase` seam, read
+ * nothing. See "A claim branch with work on it" in the module note.
+ */
+function refuseWorkOnClaimBranch(claim: OwnedClaim, planPath: string, seams: StartPreflightClaim): void {
+  if (seams.readBase === undefined || !isFirstDispatch(planPath)) return;
+  const reading = readClaimCatchUp(seams.git, claim.branch, seams.readBase());
+  if (reading.kind === 'behind') throw new CommandExit(1, workOnClaimBranchRefusal(reading));
+}
+
 /**
  * Refuses the run with `CommandExit` exit code 1 when this device does
- * not own the claim on its issue, and prints the line of one it holds;
+ * not own the claim on its issue, or owns it on a branch whose work a
+ * first dispatch would carry in, and prints the line of one it holds;
  * answers the reading. See the module note.
  */
 export function refuseUnownedClaim(planPath: string, seams: StartPreflightClaim): RunClaim {
@@ -620,6 +720,7 @@ export function refuseUnownedClaim(planPath: string, seams: StartPreflightClaim)
     const line = ownedLine(claim);
     if (WARNED_VIAS.includes(claim.via)) output.warn(line);
     else output.info(line);
+    refuseWorkOnClaimBranch(claim, planPath, seams);
   }
   return claim;
 }

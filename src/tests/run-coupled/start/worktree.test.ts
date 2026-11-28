@@ -848,6 +848,7 @@ describe('addRunWorktree catching an existing branch up', () => {
 
 describe('the catch-up lines', () => {
   const standing = { branch: BRANCH, base: BASE, behind: 1, ahead: 1, mergeBase: FORK, baseTip: BASE_TIP };
+  const WORK = { sha: 'a'.repeat(40), subject: 'feat: the work' };
 
   it('words a single commit taken in the singular, the range cut to twelve characters', () => {
     expect(caughtUpLine({ kind: 'catch-up', ...standing })).toBe(
@@ -856,13 +857,13 @@ describe('the catch-up lines', () => {
   });
 
   it('words a single commit behind, and a single one of its own, in the singular', () => {
-    expect(behindLine({ kind: 'behind', ...standing, workCommits: 1 })).toBe(
+    expect(behindLine({ kind: 'behind', ...standing, workCommits: 1, firstWork: WORK })).toBe(
       `   ⚠️  ${BRANCH} is 1 commit behind origin/${BASE} and was not merged: 1 of its 1 commit past it is not a claim.`,
     );
   });
 
   it('words several work commits in the plural', () => {
-    expect(behindLine({ kind: 'behind', ...standing, behind: 3, ahead: 4, workCommits: 2 })).toBe(
+    expect(behindLine({ kind: 'behind', ...standing, behind: 3, ahead: 4, workCommits: 2, firstWork: WORK })).toBe(
       `   ⚠️  ${BRANCH} is 3 commits behind origin/${BASE} and was not merged: 2 of its 4 commits past it are not claims.`,
     );
   });

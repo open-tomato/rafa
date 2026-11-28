@@ -2794,6 +2794,9 @@ New; it replaces no earlier text. What a row or an action added to
   `origin`, retries its push if held unpushed locally, and refuses the run
   naming the owner when another store holds the claim or when the push still
   fails (a "claim lost" halt), so no two devices work the same issue; a
+  first dispatch on a claim branch this device holds that is behind
+  `origin/<base>` with a commit that is not a claim, named with that commit
+  and the line that recuts the branch from the base (the same file); a
   failed required prerequisite — the two automatic items a `gh` pull request
   provider contributes, `gh` on `PATH` and `gh auth status` for `origin`'s
   host, checked ahead of the configured tiers, and the plan's `[start]`
