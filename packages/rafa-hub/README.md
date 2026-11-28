@@ -41,9 +41,10 @@ lines on standard output. Read them with `docker logs`.
 ### Files in `/data`
 
 Everything the hub keeps is in `/data`. The image sets `RAFA_HUB_CONFIG` to
-`/data/rafa-hub.yaml`, the operator's config, which needs at least
-`hub.repository`, as [Configuration](#configuration) describes. The hub then
-keeps:
+`/data/rafa-hub.config.ts`, the operator's config, which needs at least
+`hub.repository`, as [Configuration](#configuration) describes; a volume
+holding `/data/rafa-hub.yaml` and no `.ts` file reads that YAML file. The hub
+then keeps:
 
 - `rafa-hub.install.json`, the install record, written by each start.
 - `rafa-hub.sqlite`, the store, unless `hub.storePath` names another file.
@@ -83,9 +84,10 @@ loader's reason. The store still opens, since the loader raises nothing.
 Vector search stays off while no embedder ships, whatever the extension's
 state.
 
-The container includes a health check that asks `/health` every 30 seconds once
-the startup period ends. The hub answers `503` until its store opens, so a
-failing check means the store did not open; read the logs to see why.
+The container includes a health check, `rafa-hub health`, that asks `/health`
+every 30 seconds once the startup period ends. The hub answers `503` until its
+store opens, so a failing check means the store did not open; read the logs to
+see why.
 
 ### Login and keys in the container
 
@@ -150,7 +152,8 @@ file, resolving relative paths against the working directory: a `.ts` file
 (`rafa-hub.config.ts`) or a YAML one (`rafa-hub.yaml`). A missing `.ts` file
 beside a `rafa-hub.yaml` reads that YAML file instead; with neither, the start
 is refused naming the `.ts` path, and with both in one directory it is refused
-naming both. In Docker, the environment variable is set to `/data/rafa-hub.yaml`.
+naming both. In Docker, the environment variable is set to
+`/data/rafa-hub.config.ts`.
 
 ### `hub.repository`
 
