@@ -4,10 +4,12 @@
  * reddens the pin (with a tampered copy as the control that proves the
  * check can fail), and, where `POSTGRES_URL` is set, a project's schema is
  * built apart from `public`, migrated once, and refused when its log holds
- * a hash the shipped file does not. Each live case creates a uniquely
- * named schema and drops only that one.
+ * a hash the shipped file does not, and a migration that throws rejects
+ * the call once, leaves no unhandled rejection and releases the reserved
+ * connection. Each live case creates a uniquely named schema and drops
+ * only that one.
  */
-import { appendFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -108,6 +110,12 @@ describe('the applied-hash check', () => {
 
 const url = process.env['POSTGRES_URL'];
 
+/** How long a case waits for a stray rejection to surface after the call settles. */
+const UNHANDLED_SETTLE_MS = 200;
+
+/** How long a case waits for the one pooled connection to come back. */
+const RELEASE_WAIT_MS = 2000;
+
 describe('migrateProjectSchema, without a database', () => {
   it('refuses a schema name it would have to quote, before it connects', async () => {
     const client = { reserve: () => { throw new Error('connected'); } } as unknown as SQL;
@@ -171,6 +179,49 @@ describe.skipIf(url === undefined || url === '')('migrateProjectSchema, live on 
     await migrateProjectSchema(client, schema);
     const rows = await client.unsafe<{ hash: string }[]>(`SELECT hash FROM "${schema}"."${MIGRATIONS_TABLE}"`);
     expect(rows.map((row) => row.hash)).toEqual(SHIPPED_MIGRATION_HASHES.map(({ hash }) => hash));
+  });
+
+  it('rejects once on a migration that throws, leaving no unhandled rejection and the connection released', async () => {
+    const schema = freshSchema();
+    const folder = mkdtempSync(join(tmpdir(), 'rafa-hub-postgres-throwing-'));
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    // One connection in the pool, so a reserved connection left unreleased stalls the next query.
+    const single = new SQL(url as string, { max: 1 });
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      cpSync(SHIPPED_MIGRATIONS_FOLDER, folder, { recursive: true });
+      const journalPath = join(folder, 'meta', '_journal.json');
+      const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: { idx: number; when: number; tag: string }[] };
+      const last = journal.entries.at(-1);
+      if (last === undefined) throw new Error('no shipped migration');
+      journal.entries.push({ ...last, idx: last.idx + 1, when: last.when + 1, tag: '9999_throws' });
+      writeFileSync(journalPath, JSON.stringify(journal));
+      writeFileSync(join(folder, '9999_throws.sql'), 'SELECT 1/0;');
+
+      const reasons: unknown[] = [];
+      await migrateProjectSchema(single, schema, { folder }).catch((reason: unknown) => {
+        reasons.push(reason);
+      });
+      await Bun.sleep(UNHANDLED_SETTLE_MS);
+
+      expect(reasons).toHaveLength(1);
+      expect(String(reasons[0])).toContain('SELECT 1/0');
+      expect(unhandled).toEqual([]);
+      const next = await Promise.race([
+        single.unsafe<{ one: number }[]>('SELECT 1 AS one').then((rows) => rows[0]?.one),
+        Bun.sleep(RELEASE_WAIT_MS).then(() => 'still reserved'),
+      ]);
+      expect(next).toBe(1);
+      const logged = await single.unsafe<{ count: string }[]>(`SELECT count(*) AS count FROM "${schema}"."${MIGRATIONS_TABLE}"`);
+      expect(Number(logged[0]?.count)).toBe(0);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      await single.close();
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 
   it('refuses a schema whose log holds another hash, naming the tag and both hashes', async () => {

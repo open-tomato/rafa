@@ -14,6 +14,16 @@
  * project records the migrations it has applied. `search_path` is reset
  * before the connection goes back to the pool.
  *
+ * ## The migration's transaction
+ *
+ * Drizzle's migrate applies the pending migrations in one transaction it
+ * opens through its client's `begin`. Bun's `ReservedSQL.begin` (1.3.14)
+ * rejects twice when its body throws, once where it is awaited and once
+ * unhandled, so the migrator hands Drizzle the reserved connection behind
+ * {@link reservedClient}, whose `begin` sends `BEGIN`, `COMMIT` and
+ * `ROLLBACK` itself on that connection. A migration that throws rolls the
+ * whole run back and rejects the call once.
+ *
  * ## A shipped migration never changes
  *
  * Drizzle's migrator decides what to apply by each journal entry's `when`
@@ -31,7 +41,7 @@
  * Nothing here is exported from the package's entry: the `Bun.sql`
  * client it takes stays inside the connector under the leak rule.
  */
-import type { SQL } from 'bun';
+import type { ReservedSQL, SQL } from 'bun';
 import type { MigrationMeta } from 'drizzle-orm/migrator';
 
 import { readFileSync } from 'node:fs';
@@ -162,6 +172,39 @@ function checkedSchema(schema: string): string {
   return schema;
 }
 
+/**
+ * Runs `body` inside a transaction on the reserved connection, sent as
+ * plain `BEGIN`, `COMMIT` and `ROLLBACK`: a body that throws is rolled back
+ * and its error is the one rejection.
+ */
+async function inTransaction<T>(connection: ReservedSQL, body: (client: SQL) => Promise<T>): Promise<T> {
+  await connection.unsafe('BEGIN');
+  let result: T;
+  try {
+    result = await body(connection);
+  } catch (error) {
+    await connection.unsafe('ROLLBACK');
+    throw error;
+  }
+  await connection.unsafe('COMMIT');
+  return result;
+}
+
+/**
+ * The client Drizzle's migrate runs on: the reserved connection's queries,
+ * with `begin` sent through {@link inTransaction} in place of
+ * `ReservedSQL.begin`. Drizzle's `bun-sql` session calls `unsafe` and
+ * `begin` alone on it, and `savepoint` only inside a nested transaction,
+ * which its migrate never opens.
+ */
+function reservedClient(connection: ReservedSQL): SQL {
+  const client = {
+    unsafe: (query: string, params?: unknown[]) => connection.unsafe(query, params),
+    begin: (body: (tx: SQL) => Promise<unknown>) => inTransaction(connection, body),
+  };
+  return client as unknown as SQL;
+}
+
 /** Options of {@link migrateProjectSchema}. */
 export interface MigrateOptions {
   /** The migrations folder to apply; the shipped one when left out. */
@@ -173,7 +216,10 @@ export interface MigrateOptions {
  * creates the schema when it is missing, refuses when its log holds a
  * migration under a hash other than the shipped file's, then applies the
  * migrations it has not, all with `search_path` set to the schema on one
- * reserved connection.
+ * reserved connection. Drizzle's migrate is awaited inside the one
+ * try/finally that resets `search_path` and releases the connection, so a
+ * migration that throws rejects this call once and leaves the connection
+ * back in the pool.
  */
 export async function migrateProjectSchema(client: SQL, schema: string, options: MigrateOptions = {}): Promise<void> {
   const name = checkedSchema(schema);
@@ -187,7 +233,7 @@ export async function migrateProjectSchema(client: SQL, schema: string, options:
       throw new Error(`hub migrator: schema ${name} holds a migration the shipped files do not: ${faults.join('; ')}`);
     }
     await reserved.unsafe(`SET search_path TO "${name}"`);
-    await migrate(drizzle({ client: reserved }), {
+    await migrate(drizzle({ client: reservedClient(reserved) }), {
       migrationsFolder: folder,
       migrationsSchema: name,
       migrationsTable: MIGRATIONS_TABLE,
