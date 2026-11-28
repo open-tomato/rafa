@@ -192,14 +192,24 @@ afterAll(() => {
   rmSync(spawnBase, { recursive: true, force: true });
 });
 
-/** Runs git in `cwd` under `scratch`'s HOME, no system config, a fixed identity; answers trimmed stdout. */
+/** The environment {@link scratchGit} runs under: `scratch`'s HOME, no system config, a fixed identity. */
+function scratchEnv(scratch: ScratchRepo): NodeJS.ProcessEnv {
+  return { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
+}
+
+/** Runs git in `cwd` under {@link scratchEnv}; answers trimmed stdout. */
 function scratchGit(scratch: ScratchRepo, cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    stdio: 'pipe',
-    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
-  }).trim();
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe', env: scratchEnv(scratch) }).trim();
+}
+
+/** Runs the recut line a refusal printed, as printed, through `/bin/sh` in `cwd`; answers its exit code. */
+function runPrintedRecut(scratch: ScratchRepo, cwd: string, said: string): number {
+  const line = said
+    .split('\n')
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith('git checkout -B '));
+  if (line === undefined) throw new Error(`no recut line in:\n${said}`);
+  return spawnSync('/bin/sh', ['-c', line], { cwd, stdio: 'pipe', env: scratchEnv(scratch) }).status ?? -1;
 }
 
 /**
@@ -212,13 +222,20 @@ function plantFailingClaude(scratch: ScratchRepo): void {
   chmodSync(claude, 0o755);
 }
 
+/** What {@link plantKeptClaim} planted: the scratch, the older commit, and the claim commits, oldest first. */
+interface KeptClaim {
+  readonly scratch: ScratchRepo;
+  readonly oldWork: string;
+  readonly claims: readonly string[];
+}
+
 /**
  * A project on `main` with a bare `origin`, and #1669's claim branch: cut
  * after an older stretch's commit `origin/main` never took, then claimed
- * by this device's store and pushed, while `main` moved on. Answers the
- * scratch and the older commit's sha.
+ * by this device's store and pushed, while `main` moved on. With
+ * `claimFirst`, the branch also holds a claim made before that commit.
  */
-function plantKeptClaim(): { readonly scratch: ScratchRepo; readonly oldWork: string } {
+function plantKeptClaim(claimFirst = false): KeptClaim {
   const scratch = plantScratchRepo(spawnBase);
   const { repo } = scratch;
   const origin = join(dirname(repo), 'origin.git');
@@ -235,7 +252,23 @@ function plantKeptClaim(): { readonly scratch: ScratchRepo; readonly oldWork: st
   scratchGit(scratch, repo, 'push', '-q', '-u', 'origin', BASE);
   scratchGit(scratch, repo, 'remote', 'set-head', 'origin', BASE);
 
-  scratchGit(scratch, repo, 'switch', '-q', '-c', 'stretch/old');
+  // The store mints its id on its first write that adds a row, once the project has its root commit and origin.
+  writePreflightChecks(repo, {
+    runId: 'mint',
+    checks: [{ tier: 'required', item: { kind: 'tool', name: 'mint', probe: 'exit 0' }, outcome: 'pass', durationMs: 0, failure: null }],
+  });
+  const device = readDeviceStoreId(repo, { store: 'sqlite' });
+  if (!device.ok) throw new Error(device.reason);
+  const claimOn = (parent: string): string => {
+    const made = makeOwnershipCommit(isolatedGitRunner(repo), parent, { action: 'claim', issue: 1669, store: device.storeId });
+    if (!made.ok) throw new Error(made.reason);
+    return made.sha;
+  };
+
+  const earlier = claimFirst
+    ? [claimOn(scratchGit(scratch, repo, 'rev-parse', 'HEAD'))]
+    : [];
+  scratchGit(scratch, repo, 'switch', '-q', '-c', 'stretch/old', ...earlier);
   writeFileSync(join(repo, 'old-fragment.md'), 'used by an earlier release\n', 'utf8');
   scratchGit(scratch, repo, 'add', '-A');
   scratchGit(scratch, repo, 'commit', '-q', '--no-verify', '-m', OLD_WORK_SUBJECT);
@@ -246,38 +279,38 @@ function plantKeptClaim(): { readonly scratch: ScratchRepo; readonly oldWork: st
   scratchGit(scratch, repo, 'commit', '-q', '--no-verify', '-m', 'base moves on');
   scratchGit(scratch, repo, 'push', '-q', 'origin', BASE);
 
-  // The store mints its id on its first write that adds a row, once the project has its root commit and origin.
-  writePreflightChecks(repo, {
-    runId: 'mint',
-    checks: [{ tier: 'required', item: { kind: 'tool', name: 'mint', probe: 'exit 0' }, outcome: 'pass', durationMs: 0, failure: null }],
-  });
-  const device = readDeviceStoreId(repo, { store: 'sqlite' });
-  if (!device.ok) throw new Error(device.reason);
-  const made = makeOwnershipCommit(isolatedGitRunner(repo), oldWork, { action: 'claim', issue: 1669, store: device.storeId });
-  if (!made.ok) throw new Error(made.reason);
-  scratchGit(scratch, repo, 'branch', RUN_BRANCH, made.sha);
+  const claims = [...earlier, claimOn(oldWork)];
+  scratchGit(scratch, repo, 'branch', RUN_BRANCH, claims[claims.length - 1] ?? '');
   scratchGit(scratch, repo, 'push', '-q', 'origin', RUN_BRANCH);
 
   mkdirSync(join(repo, '.plans'));
   writeFileSync(join(repo, RUN_PLAN_REL), RUN_PLAN, 'utf8');
   plantFailingClaude(scratch);
-  return { scratch, oldWork };
+  return { scratch, oldWork, claims };
 }
 
 /** The refusal's lines as a first dispatch on {@link plantKeptClaim}'s branch prints them. */
-function refusalLines(oldWork: string): readonly string[] {
-  const sha = oldWork.slice(0, 12);
+function refusalLines({ oldWork, claims }: KeptClaim): readonly string[] {
+  const short = (sha: string): string => sha.slice(0, 12);
   return [
     `❌ Refusing to start: ${RUN_BRANCH} holds work that is not a claim, and no task of this plan has been committed on it.`,
-    `   ${RUN_BRANCH} is 1 commit behind origin/${BASE}, and 1 of its 2 commits past it is not a claim; the first, newest first, is ${sha} ${OLD_WORK_SUBJECT}`,
-    `     git rebase --onto origin/${BASE} ${sha} ${RUN_BRANCH} && git push --force-with-lease origin ${RUN_BRANCH}`,
+    `   ${RUN_BRANCH} is 1 commit behind origin/${BASE}, and 1 of its ${String(claims.length + 1)} commits past it is not a claim; `
+    + `the first, newest first, is ${short(oldWork)} ${OLD_WORK_SUBJECT}`,
+    `     git checkout -B ${RUN_BRANCH} origin/${BASE} && git cherry-pick --allow-empty ${claims.map(short).join(' ')} `
+    + `&& git push --force-with-lease origin ${RUN_BRANCH}`,
     '   Nothing was checked and nothing was dispatched.',
   ];
 }
 
+/** The subjects of the run branch's commits past `origin/<base>`, as `git log` lists them in `cwd`. */
+function subjectsPastBase(scratch: ScratchRepo, cwd: string, branch = RUN_BRANCH): string {
+  return scratchGit(scratch, cwd, 'log', '--format=%s', `origin/${BASE}..${branch}`);
+}
+
 describe('rafa loop start on a kept claim branch holding a commit that is not a claim (#1669)', () => {
   it('refuses before the first task, naming the branch, the commit and the recut; the recut branch then reaches its first task', () => {
-    const { scratch, oldWork } = plantKeptClaim();
+    const planted = plantKeptClaim();
+    const { scratch } = planted;
     const worktree = join(scratch.repo, WORKTREE_DIR, RUN_STUB);
 
     const refused = runRafa(scratch, scratch.repo, RUN_ARGS);
@@ -285,14 +318,41 @@ describe('rafa loop start on a kept claim branch holding a commit that is not a 
 
     expectExit(refused, 1, scratch);
     const said = `${refused.stdout}\n${refused.stderr}`;
-    for (const line of refusalLines(oldWork)) expect(said).toContain(line);
+    for (const line of refusalLines(planted)) expect(said).toContain(line);
     expect(calledByRefused).toBe(false);
     expect(existsSync(join(worktree, BASE_FILE))).toBe(false);
 
-    // The control: the branch recut by the refusal's own line keeps its claim and reaches its first task.
-    scratchGit(scratch, worktree, 'rebase', '-q', '--onto', `origin/${BASE}`, oldWork.slice(0, 12), RUN_BRANCH);
-    scratchGit(scratch, worktree, 'push', '-q', '--force-with-lease', 'origin', RUN_BRANCH);
-    expect(scratchGit(scratch, worktree, 'log', '--format=%s', `origin/${BASE}..${RUN_BRANCH}`)).toBe('claim(rafa-1669): claim');
+    // The control: the branch recut by the refusal's own line, run as printed, keeps its claim and reaches its first task.
+    expect(runPrintedRecut(scratch, worktree, said)).toBe(0);
+    expect(subjectsPastBase(scratch, worktree)).toBe('claim(rafa-1669): claim');
+    expect(subjectsPastBase(scratch, worktree, `origin/${RUN_BRANCH}`)).toBe('claim(rafa-1669): claim');
+
+    const recut = runRafa(scratch, scratch.repo, RUN_ARGS);
+
+    expect(`${recut.stdout}\n${recut.stderr}`).not.toContain('Refusing to start');
+    expect(existsSync(scratch.callLog)).toBe(true);
+  }, SPAWNED_TIMEOUT);
+
+  it('keeps a claim made before the commit that is not a claim, which a rebase from that commit drops', () => {
+    const planted = plantKeptClaim(true);
+    const { scratch, oldWork } = planted;
+    const worktree = join(scratch.repo, WORKTREE_DIR, RUN_STUB);
+
+    const refused = runRafa(scratch, scratch.repo, RUN_ARGS);
+
+    expectExit(refused, 1, scratch);
+    const said = `${refused.stdout}\n${refused.stderr}`;
+    for (const line of refusalLines(planted)) expect(said).toContain(line);
+
+    // The control: the rebase line this refusal printed before drops the earlier claim, so the reading below can fail.
+    scratchGit(scratch, worktree, 'branch', 'rebase-control', RUN_BRANCH);
+    scratchGit(scratch, worktree, 'rebase', '-q', '--onto', `origin/${BASE}`, oldWork, 'rebase-control');
+    expect(subjectsPastBase(scratch, worktree, 'rebase-control')).toBe('claim(rafa-1669): claim');
+    scratchGit(scratch, worktree, 'switch', '-q', RUN_BRANCH);
+
+    expect(runPrintedRecut(scratch, worktree, said)).toBe(0);
+    expect(subjectsPastBase(scratch, worktree)).toBe('claim(rafa-1669): claim\nclaim(rafa-1669): claim');
+    expect(existsSync(join(worktree, 'old-fragment.md'))).toBe(false);
 
     const recut = runRafa(scratch, scratch.repo, RUN_ARGS);
 

@@ -857,13 +857,13 @@ describe('the catch-up lines', () => {
   });
 
   it('words a single commit behind, and a single one of its own, in the singular', () => {
-    expect(behindLine({ kind: 'behind', ...standing, workCommits: 1, firstWork: WORK })).toBe(
+    expect(behindLine({ kind: 'behind', ...standing, workCommits: 1, firstWork: WORK, claimCommits: [] })).toBe(
       `   ⚠️  ${BRANCH} is 1 commit behind origin/${BASE} and was not merged: 1 of its 1 commit past it is not a claim.`,
     );
   });
 
   it('words several work commits in the plural', () => {
-    expect(behindLine({ kind: 'behind', ...standing, behind: 3, ahead: 4, workCommits: 2, firstWork: WORK })).toBe(
+    expect(behindLine({ kind: 'behind', ...standing, behind: 3, ahead: 4, workCommits: 2, firstWork: WORK, claimCommits: [] })).toBe(
       `   ⚠️  ${BRANCH} is 3 commits behind origin/${BASE} and was not merged: 2 of its 4 commits past it are not claims.`,
     );
   });

@@ -54,8 +54,13 @@
  *  - WORK, anything else, counted in `behind`'s `workCommits`. The
  *    reading names the first of them as `git log` lists the range,
  *    newest first, as `firstWork`: past it the branch holds only claims
- *    and catch-up merges, so it is the commit a recut from the base
- *    starts after (`./preflight-claim.ts`).
+ *    and catch-up merges.
+ *
+ * A `behind` reading also names its CLAIM commits, the single-parent
+ * ones of the first kind, oldest first, as `claimCommits`: the recut the
+ * claim check prints (`./preflight-claim.ts`) picks every one of them
+ * onto the base, those made before a work commit included, and leaves
+ * the catch-up merges behind, the base holding all they brought.
  *
  * A merge commit's own changes, a conflict resolved by hand, are not
  * read: a catch-up merge of a claim-only branch cannot conflict, its
@@ -111,6 +116,8 @@ export type ClaimCatchUpReading =
      * every commit after it on the branch is a claim or a catch-up merge.
      */
     readonly firstWork: WorkCommit;
+    /** The shas of the branch's claim commits past `origin/<base>`, catch-up merges left out, oldest first. */
+    readonly claimCommits: readonly string[];
   } & BehindReading)
   | ({ readonly kind: 'unreadable'; readonly reason: string } & ReadingOf);
 
@@ -208,10 +215,20 @@ export function readClaimCatchUp(git: GitRunner, branch: string, base: string): 
     return unreadable(`could not list ${branch}'s commits past ${remoteBase}: ${gitSaid(listed)}`);
   }
   const own = ownCommitsOf(listed.stdout);
-  const work = own.filter((commit) => !isClaimOnly(git, commit, baseTip));
+  const claimOnly = own.map((commit) => isClaimOnly(git, commit, baseTip));
+  const work = own.filter((_commit, at) => claimOnly[at] !== true);
   const standing = { ...named, behind, ahead: own.length, mergeBase, baseTip };
   const [first] = work;
-  return first === undefined
-    ? { kind: 'catch-up', ...standing }
-    : { kind: 'behind', ...standing, workCommits: work.length, firstWork: { sha: first.sha, subject: first.subject } };
+  if (first === undefined) return { kind: 'catch-up', ...standing };
+  const claimCommits = own
+    .filter((commit, at) => claimOnly[at] === true && commit.parents.length <= 1)
+    .map((commit) => commit.sha)
+    .reverse();
+  return {
+    kind: 'behind',
+    ...standing,
+    workCommits: work.length,
+    firstWork: { sha: first.sha, subject: first.subject },
+    claimCommits,
+  };
 }

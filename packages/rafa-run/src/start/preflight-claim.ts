@@ -187,18 +187,21 @@
  *        4 commits past it is not a claim; the first, newest first, is
  *        066f005d1234 chore: apply #1605
  *        The run would carry that work into its pull request. Recut the
- *        branch from the base, keeping the claims made after that
- *        commit,
+ *        branch from the base, keeping every claim commit on it,
  *        in the checkout that holds feat/rafa-7-x:
- *          git rebase --onto origin/main 066f005d1234 feat/rafa-7-x && git push --force-with-lease origin feat/rafa-7-x
+ *          git checkout -B feat/rafa-7-x origin/main && git cherry-pick --allow-empty 5d1e0a9b7c3f 9a8b7c6d5e4f && git push --force-with-lease origin feat/rafa-7-x
  *        Nothing was checked and nothing was dispatched.
  *
- * The opening, the count and the advice are one line each; they are
- * wrapped here for the width. The commit named is the first of the work
- * as `git log` lists the range, newest first, so every commit after it
- * is a claim or a catch-up merge, and the rebase replays those onto the
- * base (empty claim commits included: git keeps a commit that starts
- * empty) and drops the rest.
+ * The opening, the count, the advice and the recut are one line each;
+ * they are wrapped here for the width. The commit named is the first of
+ * the work as `git log` lists the range, newest first. The recut resets
+ * the branch to the base and picks the reading's `claimCommits` onto it,
+ * oldest first, so a claim made before a work commit is kept as well as
+ * one made after it; a rebase from the named commit would replay only
+ * the commits after it. `--allow-empty` keeps the claim commits, which
+ * are empty, and the catch-up merges are left out, the base holding all
+ * they brought. A branch with no claim commit past the base is reset to
+ * it, with no pick.
  *
  * The reading is made on a FIRST DISPATCH alone (`isFirstDispatch`,
  * `preflight/first-dispatch.ts`): a resumed run's work past the base is
@@ -686,10 +689,25 @@ export function workOnClaimBranchRefusal(reading: Extract<ClaimCatchUpReading, {
   return openingWith(`${branch} holds work that is not a claim, and no task of this plan has been committed on it`, [
     `${branch} is ${commitCount(reading.behind)} behind ${remoteBase}, and ${String(reading.workCommits)} of its `
     + `${commitCount(reading.ahead)} past it ${work}; the first, newest first, is ${sha} ${firstWork.subject}`,
-    'The run would carry that work into its pull request. Recut the branch from the base, keeping the claims made after that commit,',
+    'The run would carry that work into its pull request. Recut the branch from the base, keeping every claim commit on it,',
     `in the checkout that holds ${branch}:`,
-    `  git rebase --onto ${remoteBase} ${sha} ${branch} && git push --force-with-lease ${REMOTE} ${branch}`,
+    `  ${recutLine(reading)}`,
   ].join('\n'));
+}
+
+/**
+ * The line that recuts the branch of a `behind` reading from the base:
+ * reset to `origin/<base>`, every claim commit picked back on, oldest
+ * first, then pushed; see "A claim branch with work on it" in the module note.
+ */
+export function recutLine(reading: Extract<ClaimCatchUpReading, { kind: 'behind' }>): string {
+  const { branch, base, claimCommits } = reading;
+  const reset = `git checkout -B ${branch} ${REMOTE}/${base}`;
+  const picks = claimCommits.map((claim) => claim.slice(0, SHORT_SHA));
+  const steps = picks.length === 0
+    ? [reset]
+    : [reset, `git cherry-pick --allow-empty ${picks.join(' ')}`];
+  return [...steps, `git push --force-with-lease ${REMOTE} ${branch}`].join(' && ');
 }
 
 /**
