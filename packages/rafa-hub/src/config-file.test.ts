@@ -10,7 +10,9 @@
  * specifier, a module that cannot be loaded, a missing file, a path that
  * is no `.ts` file, the readers' problems and a key two entries set. Last,
  * the two forms side by side: one config written both ways, and each
- * top-level refusal in each form.
+ * top-level refusal in each form, and the warning a serving start logs
+ * for a reading in the YAML form, named or as the fallback, beside the
+ * `.ts` reading that answers none.
  *
  * Each refusal sits beside an accepting control: a type-only import
  * loads where the value import of the same package is refused, and a
@@ -24,7 +26,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { hubSectionSchemas, loadHubConfigFile, locateHubConfig, missingImportProblem, readHubConfig, restoredDocument } from './config-file.js';
+import { hubSectionSchemas, loadHubConfigFile, locateHubConfig, missingImportProblem, readHubConfig, restoredDocument, yamlConfigWarning } from './config-file.js';
 import { HubConfigError, parseHubConfig } from './config.js';
 
 /** Where a project key belongs, as a refusal says it. */
@@ -486,6 +488,38 @@ describe('missingImportProblem', () => {
     );
     expect(missingImportProblem('/c.ts', 'node:nothing')).toBe('/c.ts: imports node:nothing, which cannot be found from this file');
     expect(missingImportProblem('/c.ts', '/opt/x.ts')).toBe('/c.ts: imports /opt/x.ts, which cannot be found from this file');
+  });
+});
+
+describe('yamlConfigWarning', () => {
+  it('names rafa-hub.config.ts beside a named YAML file, rafa 1.0.0, and RAFA_HUB_CONFIG to name it', async () => {
+    const yaml = await fixture('hub.yaml', hubYaml());
+    const reading = await readHubConfig({ RAFA_HUB_CONFIG: yaml });
+
+    expect(yamlConfigWarning(yaml, reading)).toBe(
+      `${yaml}: the hub's config is read from YAML, which rafa 1.0.0 stops reading; `
+      + `write what it holds to ${join(dir, 'rafa-hub.config.ts')} as its default export, remove hub.yaml, and name it in RAFA_HUB_CONFIG`,
+    );
+  });
+
+  it('names the missing named .ts file for the fallback, which RAFA_HUB_CONFIG already names', async () => {
+    const yaml = await fixture('rafa-hub.yaml', hubYaml());
+    const ts = join(dir, 'hub.config.ts');
+    const reading = await readHubConfig({ RAFA_HUB_CONFIG: ts });
+
+    expect(reading.path).toBe(yaml);
+    expect(yamlConfigWarning(ts, reading)).toBe(
+      `${yaml}: the hub's config is read from YAML, which rafa 1.0.0 stops reading; `
+      + `write what it holds to ${ts} as its default export, remove rafa-hub.yaml`,
+    );
+  });
+
+  it('answers null for a reading in the .ts form', async () => {
+    const ts = await fixture('rafa-hub.config.ts', module('{ hub: { repository: \'open-tomato/rafa\' } }'));
+    const reading = await readHubConfig({ RAFA_HUB_CONFIG: ts });
+
+    expect(reading.form).toBe('ts');
+    expect(yamlConfigWarning(ts, reading)).toBeNull();
   });
 });
 

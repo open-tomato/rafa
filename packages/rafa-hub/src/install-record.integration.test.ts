@@ -28,6 +28,9 @@
  * names no custom library, so nothing reads it there, and macOS answers
  * vector search off for it and serves all the same.
  *
+ * Each config is YAML, so every start logs the `config.yaml` warning
+ * first, and each case's warnings open with it ({@link yamlWarning}).
+ *
  * `hub.port` refuses `0`, so each hub listens on a port the system
  * handed a probe server a moment before.
  */
@@ -112,6 +115,18 @@ function hubEnvironment(port: number, store: readonly string[] = []): Readonly<R
   return { [HUB_CONFIG_ENV]: path, [ENV_KEY_VARIABLE]: ENV_KEY_VALUE };
 }
 
+/** The `config.yaml` warning a start over the case's `hub.yaml` logs before any other. */
+function yamlWarning(): HubLogEntry {
+  const path = join(configDirectory(), 'hub.yaml');
+  return {
+    level: 'warn',
+    event: 'config.yaml',
+    path,
+    message: `${path}: the hub's config is read from YAML, which rafa 1.0.0 stops reading; `
+      + `write what it holds to ${join(configDirectory(), 'rafa-hub.config.ts')} as its default export, remove hub.yaml, and name it in RAFA_HUB_CONFIG`,
+  };
+}
+
 /** Which of the case's directories, `dataDir` included, hold a keys file. */
 function keysFileHolders(dataDir: string): readonly string[] {
   return [dataDir, configDirectory(), join(root, 'store')]
@@ -190,14 +205,14 @@ describe('a hub started over a config directory and its install record', () => {
     const created = await keys(first.hub, ['create', KEY_NAME]);
     const plain = created[0] ?? '';
     expect(await statusFor(first.hub, plain)).toBe(200);
-    expect(warningsOf(first.logged)).toEqual([]);
+    expect(warningsOf(first.logged)).toEqual([yamlWarning()]);
     await stop(first.hub);
 
     const second = await start(env);
 
     expect(await statusFor(second.hub, plain)).toBe(200);
     expect(await keys(second.hub, ['list'])).toEqual([expect.stringContaining(`${KEY_NAME}\tactive\t`)]);
-    expect(warningsOf(second.logged)).toEqual([]);
+    expect(warningsOf(second.logged)).toEqual([yamlWarning()]);
     // Asked after the warnings are read, since a refused request logs one of its own.
     expect(await statusFor(second.hub, `${plain}x`)).toBe(401);
     expect(keysFileHolders(dataDir)).toEqual([dataDir]);
@@ -231,7 +246,7 @@ describe('a hub started over a config directory and its install record', () => {
   it('serves with no record over the defaults, logging one install.missing warning, the keys file beside the config', async () => {
     const { hub, logged } = await start(hubEnvironment(await freePort()));
 
-    expect(warningsOf(logged)).toEqual([{
+    expect(warningsOf(logged)).toEqual([yamlWarning(), {
       level: 'warn',
       event: 'install.missing',
       path: recordPath(),
@@ -246,13 +261,13 @@ describe('a hub started over a config directory and its install record', () => {
     const library = join(root, 'lib', 'libsqlite3.so');
     const env = hubEnvironment(await freePort(), ['  store:', `    sqliteLibrary: ${library}`]);
     const errors: string[] = [];
-    // A record naming no library, so the warning under test is the start's only one.
+    // A record naming no library, so the warning under test is the start's only one beside config.yaml.
     const installed = await runInstall([], env, HUB_VERSION, { out: () => undefined, err: (line) => errors.push(line) });
     expect({ installed, errors }).toEqual({ installed: 0, errors: [] });
 
     const { hub, logged } = await start(env);
 
-    expect(warningsOf(logged)).toEqual([{
+    expect(warningsOf(logged)).toEqual([yamlWarning(), {
       level: 'warn',
       event: 'config.deprecated',
       key: 'hub.store.sqliteLibrary',

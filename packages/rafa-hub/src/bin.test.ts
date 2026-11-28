@@ -31,6 +31,10 @@
  * under the case's root, seeded with one commit pushed from a real
  * export (`@open-tomato/rafa/store`), so the counts it prints are read
  * from rows rather than from an empty index.
+ *
+ * The `config.yaml` cases start the hub from a named YAML file, from the
+ * `rafa-hub.yaml` read beside a missing named `.ts` file, and, as the
+ * control, from a `.ts` file, which logs none.
  */
 import type { SqliteHubOpener } from './bin.js';
 import type { HubLogEntry, HubServer } from './server.js';
@@ -1297,5 +1301,56 @@ describe('runHub and the store.opened line', () => {
     expect(answered).toHaveLength(1);
     expect(answered[0]).toBeDefined();
     expect(lines).toEqual([{ level: 'info', event: 'store.opened' }]);
+  });
+});
+
+describe('runHub and the config.yaml warning', () => {
+  /** Starts the hub on the file `named`, answering what it logged. */
+  async function startOn(named: string): Promise<readonly HubLogEntry[]> {
+    mkdirStore();
+    const { log, logged } = collecting();
+    const server = await runHub({ [HUB_CONFIG_ENV]: named }, { log, githubApi: 'http://127.0.0.1:9', hostname: '127.0.0.1' });
+    if (server === null) throw new Error(`the hub refused its start: ${JSON.stringify(logged)}`);
+    running = [...running, server];
+    return logged;
+  }
+
+  it('logs one config.yaml warning for a named YAML file, naming rafa-hub.config.ts and rafa 1.0.0', async () => {
+    const yaml = writeConfig(await freePort());
+
+    const warnings = (await startOn(yaml)).filter((entry) => entry.event === 'config.yaml');
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ level: 'warn', path: yaml });
+    expect(warnings[0]?.['message']).toBe(
+      `${yaml}: the hub's config is read from YAML, which rafa 1.0.0 stops reading; `
+      + `write what it holds to ${join(root, 'rafa-hub.config.ts')} as its default export, remove hub.yaml, and name it in RAFA_HUB_CONFIG`,
+    );
+  });
+
+  it('logs one config.yaml warning for the rafa-hub.yaml read beside a missing named .ts file, naming that file', async () => {
+    const yaml = join(root, 'rafa-hub.yaml');
+    writeFileSync(yaml, readFileSync(writeConfig(await freePort()), 'utf8'));
+    rmSync(join(root, 'hub.yaml'));
+    const ts = join(root, 'rafa-hub.config.ts');
+
+    const warnings = (await startOn(ts)).filter((entry) => entry.event === 'config.yaml');
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ level: 'warn', path: yaml });
+    expect(warnings[0]?.['message']).toBe(
+      `${yaml}: the hub's config is read from YAML, which rafa 1.0.0 stops reading; `
+      + `write what it holds to ${ts} as its default export, remove rafa-hub.yaml`,
+    );
+  });
+
+  it('logs no config.yaml line for a start from a .ts file', async () => {
+    const ts = join(root, 'rafa-hub.config.ts');
+    writeFileSync(ts, `export default { hub: { repository: '${REPOSITORY}', port: ${String(await freePort())}, storePath: 'store/rafa-hub.sqlite' } };\n`);
+
+    const logged = await startOn(ts);
+
+    expect(logged.filter((entry) => entry.event === 'config.yaml')).toEqual([]);
+    expect(logged.filter((entry) => entry.level === 'error')).toEqual([]);
   });
 });

@@ -66,6 +66,11 @@
  * pull page that large holds the hub's memory and its request for its
  * whole length. The default and any smaller cap log nothing.
  *
+ * A config read from YAML, named or as the fallback beside a missing
+ * `.ts` file, logs one `config.yaml` warning once the hub listens,
+ * naming the `.ts` file to write and rafa 1.0.0, which stops reading
+ * YAML (`yamlConfigWarning`, `config-file.ts`).
+ *
  * A config the reader refuses is logged as one `config.refused` line
  * holding every problem, and the command exits 1 without listening; so
  * is an `api-key` hub whose named variable is unset or empty, the line
@@ -153,6 +158,7 @@
  * process's exit, so a test runs them in process; importing this file starts
  * nothing.
  */
+import type { HubConfigLocation } from './config-file.js';
 import type { SqliteLibraryChoice } from './config-store.js';
 import type { HubConfig } from './config.js';
 import type { HubKeyStore, KeysFilePlace } from './identity/key-store.js';
@@ -178,7 +184,7 @@ import { HEALTH_USAGE, HEALTH_WORD, isHealthCommand, runHealth } from './cli-hea
 import { INSTALL_USAGE, INSTALL_WORD, installCommandOf, runInstall } from './cli-install.js';
 import { isLoginCommand, keysCommandOf, KEYS_USAGE, runKeys, runLogin } from './cli-keys.js';
 import { DEFAULT_MAX_PAYLOAD_ROWS, isDangerousPayloadCap, MAX_PAYLOAD_ROWS_KEY } from './config-dangerous.js';
-import { readHubConfig } from './config-file.js';
+import { readHubConfig, yamlConfigWarning } from './config-file.js';
 import { chooseSqliteLibrary, DEFAULT_POSTGRES_URL_VARIABLE } from './config-store.js';
 import { HUB_CONFIG_ENV, HubConfigError } from './config.js';
 import { openApiKeyIdentity } from './identity/api-key.js';
@@ -441,6 +447,12 @@ function warnSqliteLibraryKey(choice: SqliteLibraryChoice | undefined, log: HubL
   log({ level: 'warn', event: 'config.deprecated', key: 'hub.store.sqliteLibrary', message: warning });
 }
 
+/** Logs one `config.yaml` warning when `reading`, of the file `env` names, was in the YAML form. */
+function warnYamlConfig(reading: HubConfigLocation, env: HubEnv, log: HubLog): void {
+  const warning = yamlConfigWarning(env[HUB_CONFIG_ENV] ?? '', reading);
+  if (warning !== null) log({ level: 'warn', event: 'config.yaml', path: reading.path, message: warning });
+}
+
 /** Logs one `install.missing` warning when `reading` found no record and answered the defaults. */
 function warnMissingInstallRecord(reading: HubInstallReading | null, log: HubLog): void {
   const warning = reading?.warning ?? null;
@@ -466,6 +478,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   const openers: HubOpeners = { connectPostgres: options.connectPostgres ?? connectPostgresHub, connectSqlite: options.connectSqlite ?? connectSqliteHub };
   let install;
   let config;
+  let location;
   let library: SqliteLibraryChoice | undefined;
   let keysFile: KeysFilePlace | undefined;
   let identity;
@@ -473,7 +486,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
   let connected: HubConnected | undefined;
   try {
     install = await readInstallAtStart(env);
-    ({ config } = await readHubConfig(env));
+    ({ config, ...location } = await readHubConfig(env));
     library = sqliteLibraryAt(install, config, env);
     keysFile = config.authAdapter === 'api-key'
       ? keysFileAt(install, config)
@@ -517,6 +530,7 @@ export async function runHub(env: Readonly<Record<string, string | undefined>>, 
     closeOpened();
     throw error;
   }
+  warnYamlConfig(location, env, log);
   warnMissingInstallRecord(install, log);
   warnOldKeysFile(keysFile, log);
   warnSqliteLibraryKey(library, log);

@@ -35,6 +35,21 @@
  * neither `.ts` nor `.yaml` (`hub.yml`) is still read as YAML, as every
  * name was before.
  *
+ * ## The YAML warning
+ *
+ * {@link yamlConfigWarning} answers, for a reading in the YAML form, the
+ * one warning a serving start logs (`config.yaml`, in `bin.ts`): the
+ * file read, {@link HUB_YAML_DROPPED_IN} as the release that stops
+ * reading YAML, and the `.ts` file to write. For the fallback that is
+ * the named `.ts` file; for a named YAML file it is
+ * {@link HUB_CONFIG_MODULE_FILE} in that file's directory, which
+ * `RAFA_HUB_CONFIG` then has to name. Either way the YAML file is to be
+ * removed, since the two names in one directory refuse the start. A
+ * reading in the `.ts` form answers null. `rafa-hub install` and
+ * `rafa-hub health` read through {@link readHubConfig} as well and log
+ * no warning: the reading carries none, and only the serving start asks
+ * for it.
+ *
  * ## The load
  *
  * {@link loadHubConfigFile} hands the loader one layer, `hub`, whose
@@ -132,6 +147,9 @@ export const HUB_CONFIG_MODULE_FILE = 'rafa-hub.config.ts';
 
 /** The name of the hub's config file in its YAML form, read beside a missing `.ts` file. */
 export const HUB_CONFIG_YAML_FILE = 'rafa-hub.yaml';
+
+/** The release that stops reading the hub's config file in its YAML form. */
+export const HUB_YAML_DROPPED_IN = 'rafa 1.0.0';
 
 /** The form a hub config file is written in. */
 export type HubConfigForm = 'ts' | 'yaml';
@@ -475,4 +493,28 @@ export async function readHubConfig(env: Readonly<Record<string, string | undefi
     ? await loadHubConfigFile(path)
     : await readYamlFile(path);
   return Object.freeze({ config, form, path });
+}
+
+/**
+ * The warning a serving start logs for a config read in the YAML form,
+ * named or as the fallback beside a missing `.ts` file, or null for one
+ * read in the `.ts` form; see "The YAML warning" in the module note.
+ *
+ * @param named - The path `RAFA_HUB_CONFIG` names, as the reading was asked for.
+ * @param reading - The file read and its form, as {@link readHubConfig} answers them.
+ * @returns One sentence naming the YAML file, the `.ts` file to write and
+ *   {@link HUB_YAML_DROPPED_IN}, or null.
+ */
+export function yamlConfigWarning(named: string, reading: HubConfigLocation): string | null {
+  if (reading.form !== 'yaml') return null;
+
+  const fallback = extname(named) === HUB_CONFIG_MODULE_EXTENSION;
+  const module = fallback
+    ? resolve(named)
+    : join(dirname(reading.path), HUB_CONFIG_MODULE_FILE);
+  const rename = fallback
+    ? ''
+    : `, and name it in ${HUB_CONFIG_ENV}`;
+  return `${reading.path}: the hub's config is read from YAML, which ${HUB_YAML_DROPPED_IN} stops reading; `
+    + `write what it holds to ${module} as its default export, remove ${basename(reading.path)}${rename}`;
 }
