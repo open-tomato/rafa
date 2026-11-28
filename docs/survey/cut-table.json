@@ -5888,7 +5888,7 @@
       "edges": [],
       "fileCounts": {
         "source": 11,
-        "test": 53,
+        "test": 54,
         "testSupport": 9
       },
       "files": [
@@ -5900,6 +5900,7 @@
         "packages/rafa-hub/src/config-dangerous.test.ts",
         "packages/rafa-hub/src/config-file.test.ts",
         "packages/rafa-hub/src/config-login.test.ts",
+        "packages/rafa-hub/src/config-module.integration.test.ts",
         "packages/rafa-hub/src/config-store.test.ts",
         "packages/rafa-hub/src/config-top-level.test.ts",
         "packages/rafa-hub/src/config.test.ts",
